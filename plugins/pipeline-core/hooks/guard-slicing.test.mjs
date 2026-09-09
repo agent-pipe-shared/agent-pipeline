@@ -742,6 +742,29 @@ test("GS33: registered Antigravity observer associates PreToolUse events with th
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
+test("GS33a: Antigravity resolves state from workspacePaths when its hook runs outside the consumer repository", () => {
+  const repo = initNativeRepo();
+  const installationDir = mkdtempSync(join(tmpdir(), "native-slicing-installation-"));
+  try {
+    const preInvocation = (invocationNum) => ({ workspacePaths: [repo], conversationId: "agy-workspace-root", invocationNum });
+    const call = (stepIdx) => ({
+      workspacePaths: [repo], conversationId: "agy-workspace-root", stepIdx,
+      toolCall: { name: "invoke_subagent", args: { Subagents: [{ TypeName: "goldfish-implementor", Prompt: `slice-${stepIdx}` }] } },
+    });
+    assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], preInvocation(1), installationDir).stdout, "");
+    for (const [number, stepIdx] of [[2, 1], [3, 2], [4, 3]]) {
+      assert.equal(runNative(ANTIGRAVITY_NATIVE, ["observe"], call(stepIdx), installationDir).stdout, "");
+      if (number < 4) assert.equal(runNative(ANTIGRAVITY_NATIVE, ["deliver"], preInvocation(number), installationDir).stdout, "");
+    }
+    const delivery = runNative(ANTIGRAVITY_NATIVE, ["deliver"], preInvocation(4), installationDir);
+    assert.equal(delivery.status, 0);
+    assert.match(delivery.stdout, /native parallel subagent dispatch/);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+    rmSync(installationDir, { recursive: true, force: true });
+  }
+});
+
 test("GS34: native fan-out, malformed envelopes, and storage failures are silent and never deny", () => {
   const repo = initNativeRepo();
   try {

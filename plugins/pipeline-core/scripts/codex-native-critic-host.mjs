@@ -227,22 +227,30 @@ function observePhysical(input, dependencies) {
   return { repoRoot, scratch, cliPath, referencePaths, rolePath: physicalPluginFile(ROLE), promptPath: physicalPluginFile(PROMPT), verdictPath: physicalPluginFile(VERDICT) };
 }
 
-async function runFixedChild(request, dependencies) {
+export async function runFixedChild(request, dependencies = {}) {
   if (typeof dependencies.runChild === "function") return dependencies.runChild(structuredClone(request));
   const spawnFn = dependencies.spawnFn ?? spawn;
+  const schedule = dependencies.setTimeoutFn ?? setTimeout;
+  const cancel = dependencies.clearTimeoutFn ?? clearTimeout;
+  const kill = dependencies.killFn ?? process.kill;
   const child = spawnFn(process.execPath, [CHILD], { cwd: request.cwd, env: process.env, shell: false, detached: true, stdio: ["pipe", "pipe", "pipe", "ipc"] });
   let stdoutBytes = 0; let stderrBytes = 0; const chunks = []; let overflow = false; let timedOut = false;
-  let killTimer = null; let idleTimer = null; let stopped = false;
+  let killTimer = null; let idleTimer = null; let stopped = false; let escalation = null;
   let heartbeat = { initialized: false, threadStarted: false, turnStarted: false, turnCompleted: false };
   const armIdle = () => {
-    if (idleTimer !== null) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => { timedOut = true; stop(); }, heartbeat.turnStarted ? REVIEW_IDLE_MS : STARTUP_IDLE_MS);
+    if (idleTimer !== null) cancel(idleTimer);
+    idleTimer = schedule(() => { timedOut = true; stop(); }, heartbeat.turnStarted ? REVIEW_IDLE_MS : STARTUP_IDLE_MS);
   };
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    try { process.kill(-child.pid, "SIGTERM"); } catch { try { child.kill("SIGTERM"); } catch {} }
-    killTimer = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch { try { child.kill("SIGKILL"); } catch {} } }, 500);
+    try { kill(-child.pid, "SIGTERM"); } catch { try { child.kill("SIGTERM"); } catch {} }
+    escalation = new Promise((resolveEscalation) => {
+      killTimer = schedule(() => {
+        try { kill(-child.pid, "SIGKILL"); } catch { try { child.kill("SIGKILL"); } catch {} }
+        resolveEscalation();
+      }, 500);
+    });
   };
   child.on("message", (value) => {
     const next = nativeCriticHeartbeatSnapshot(heartbeat, value);
@@ -256,13 +264,16 @@ async function runFixedChild(request, dependencies) {
     child.once("error", (error) => resolveClose({ code: null, signal: null, error: error?.code ?? "spawn-error" }));
     child.once("close", (code, signal) => resolveClose({ code, signal, error: null }));
   });
-  const timer = setTimeout(() => { timedOut = true; stop(); }, MAX_ELAPSED_MS);
+  const timer = schedule(() => { timedOut = true; stop(); }, MAX_ELAPSED_MS);
   armIdle();
   child.stdin.end(JSON.stringify(request));
   const terminal = await close;
-  clearTimeout(timer);
-  if (idleTimer !== null) clearTimeout(idleTimer);
-  if (killTimer !== null) clearTimeout(killTimer);
+  cancel(timer);
+  if (idleTimer !== null) cancel(idleTimer);
+  // A wrapper can close on SIGTERM while a descendant from its detached group
+  // still survives. Keep the grace timer alive and wait for the group SIGKILL.
+  if (!stopped && killTimer !== null) cancel(killTimer);
+  if (escalation !== null) await escalation;
   let result = null;
   if (!overflow) {
     const lines = Buffer.concat(chunks).toString("utf8").trim().split("\n").filter(Boolean);
@@ -354,6 +365,11 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   try { checked = validateChild(child.result, selection, input.expectedTuple, verdictSchema, { ...child, stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes }); }
   catch { return boundedFailure("child-output-invalid", selection, terminal, lifecycle); }
   if (!checked.ok) return boundedFailure(checked.code, selection, terminal, checked.lifecycle);
+  // The child receives paths, not immutable file descriptors. Re-observe every
+  // bound source and evidence file before issuing the review receipt so a
+  // concurrent replacement cannot inherit the pre-turn binding.
+  try { observePhysical(input, dependencies); }
+  catch { return boundedFailure("physical-proof-drift", selection, terminal, checked.lifecycle); }
   const receipt = {
     schema: "pipeline.codex-native-critic-execution-receipt.v1",
     status: "reviewed",

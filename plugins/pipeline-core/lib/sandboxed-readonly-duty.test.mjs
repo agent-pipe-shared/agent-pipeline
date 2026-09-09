@@ -5,13 +5,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { arch, release, tmpdir, type } from "node:os";
 
 import { bindSandboxedReadonlyDuty, buildSandboxedReadonlyRequest, validateSandboxedExecutionReceipt } from "./sandboxed-readonly-duty.mjs";
 import { sandboxSelectionDigest } from "../scripts/codex-sandbox-select.mjs";
-import { invokeCodexNativeCriticHost } from "../scripts/codex-native-critic-host.mjs";
+import { invokeCodexNativeCriticHost, runFixedChild } from "../scripts/codex-native-critic-host.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { buildNativeCriticSelection, nativeCriticCanonicalDigest } from "./codex-native-critic-policy.mjs";
 import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest, reduceDiscoveredNativeMcpServers } from "./codex-native-critic-tools.mjs";
@@ -195,6 +196,52 @@ test("native Critic consumer accepts only a bound native child proof and never e
   assert.equal(value.receipt.schema, "pipeline.codex-native-critic-execution-receipt.v1");
   assert.equal(value.receipt.assurance.class, "native-model-tool-read-only");
   assert.equal(value.receipt.observed.toolSurface.observationSha256, NATIVE_TUPLE.toolSurface.observationSha256);
+});
+
+test("native Critic re-observes the reference binding after the child returns", async () => {
+  let observations = 0;
+  const stablePhysical = nativeDependencies().observePhysical;
+  const value = await invokeCodexNativeCriticHost(nativeInput(), {
+    ...nativeDependencies(),
+    observePhysical: (input) => {
+      observations += 1;
+      if (observations === 2) throw new Error("reference replaced during review");
+      return stablePhysical(input);
+    },
+  });
+  assert.equal(value.code, "physical-proof-drift");
+  assert.equal(observations, 2);
+});
+
+test("native Critic timeout escalates to the detached process group after its wrapper closes", async () => {
+  const child = new EventEmitter();
+  child.pid = 4242;
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = { end() {} };
+  child.kill = () => {};
+  const timers = [];
+  const signals = [];
+  const schedule = (callback) => {
+    const timer = { callback, cancelled: false };
+    timers.push(timer);
+    return timer;
+  };
+  const runTimer = (timer) => { if (!timer.cancelled) timer.callback(); };
+  const running = runFixedChild({ cwd: process.cwd() }, {
+    spawnFn: () => child,
+    setTimeoutFn: schedule,
+    clearTimeoutFn: (timer) => { timer.cancelled = true; },
+    killFn: (pid, signal) => { signals.push([pid, signal]); },
+  });
+  runTimer(timers[1]);
+  child.emit("close", 0, null);
+  await Promise.resolve();
+  assert.equal(timers[2].cancelled, false, "the SIGKILL grace timer survives wrapper closure");
+  runTimer(timers[2]);
+  const result = await running;
+  assert.equal(result.timedOut, true);
+  assert.deepEqual(signals, [[-4242, "SIGTERM"], [-4242, "SIGKILL"]]);
 });
 
 test("native Critic consumer rejects selection drift and unsafe child policy without exposing child output", async () => {

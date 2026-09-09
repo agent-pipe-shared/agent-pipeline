@@ -122,7 +122,13 @@ function saveState(path, state, dependencies = {}) {
 function withState(input, runner, options, callback) {
   try {
     const rawSessionId = sessionId(input, runner);
-    const rootDir = options.rootDir ?? input?.cwd ?? process.cwd();
+    // Antigravity hooks execute from the installed integration directory. Its
+    // event envelope carries the consumer workspace explicitly, while Codex
+    // supplies cwd. Prefer the former only for that runner.
+    const workspaceRoot = runner === "antigravity" && Array.isArray(input?.workspacePaths)
+      ? input.workspacePaths.find((path) => typeof path === "string" && path !== "")
+      : null;
+    const rootDir = options.rootDir ?? workspaceRoot ?? input?.cwd ?? process.cwd();
     const commonDir = (options.resolveGitCommonDirFn ?? resolveGitCommonDir)(rootDir, options);
     if (!rawSessionId || !commonDir) return { due: false, output: null };
     const { path, state } = loadState(commonDir, runner, rawSessionId, options);
