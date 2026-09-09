@@ -14,6 +14,7 @@ import { createSelectedSandboxDisposition, reduceSelectedSandboxDisposition, val
 import { compileCriticReviewLineage, validateCriticReviewHistory } from "./critic-review-lineage.mjs";
 import { REVIEW_LIMITS, sha256Canonical } from "./review-economy.mjs";
 import { captureCriticPreflightSource, qualifyCriticPreflightObservation } from "./critic-preflight-observer.mjs";
+import { createInterruptionStore, productionPorts } from "./interruption-receipt-store.mjs";
 
 const registry = JSON.parse(readFileSync(new URL("../../../policies/interruption-registry.v1.json", import.meta.url), "utf8"));
 const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64);
@@ -921,4 +922,53 @@ test("C1 observer never invokes source getters and rejects malformed time or unc
     { ok: false, code: "C1O-TIME", source: null, observedAt: null });
   assert.deepEqual(qualifyCriticPreflightObservation({ source: c1Source(), observedAt: { value: null, status: "unknown" }, root: "/not-a-c1-root", specPath: "specs/c1.md" }),
     { ok: false, code: "C1O-ROOT", observation: null });
+});
+
+const c1StorePorts = (io) => ({ io, clock: () => ({ value: null, status: "unknown" }), randomId: () => "must-not-mint", platform: () => ({ status: "unsupported", backendId: null }) });
+const c1StoreIo = (onCall = () => {}) => Object.fromEntries(Object.keys(productionPorts.io).map((key) => [key, (...args) => {
+  onCall(key); return productionPorts.io[key](...args);
+}]));
+const c1UnknownTime = () => ({ value: null, status: "unknown" });
+const c1SnapshotRequest = () => ({ window: { start: c1UnknownTime(), end: c1UnknownTime() }, scope: { featureId: null, packageId: null, dispatchId: null } });
+
+test("C1 store factory is descriptor-safe and performs no I/O or identity allocation", () => {
+  let calls = 0;
+  const neverIo = Object.fromEntries(Object.keys(productionPorts.io).map((key) => [key, () => { calls++; throw new Error("unexpected I/O"); }]));
+  assert.doesNotThrow(() => createInterruptionStore({ root: "scratch/c1-factory-lazy" }, c1StorePorts(neverIo)));
+  assert.equal(calls, 0);
+  let getterCalls = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, "root", { enumerable: true, get() { getterCalls++; return "scratch"; } });
+  assert.throws(() => createInterruptionStore(hostile), { name: "TypeError", message: "C1S-SHAPE" });
+  assert.equal(getterCalls, 0);
+  assert.throws(() => createInterruptionStore({ root: "scratch" }, { io: {}, clock: () => null, randomId: () => null, platform: () => null }),
+    { name: "TypeError", message: "C1S-SHAPE" });
+});
+
+test("C1 absent reads return closed not-found results without mutating or minting an ID", () => {
+  const root = fs.mkdtempSync("scratch/c1-store-absent-");
+  const calls = [];
+  try {
+    const store = createInterruptionStore({ root }, c1StorePorts(c1StoreIo((key) => calls.push(key))));
+    assert.deepEqual(store.readOperation({ operationId: "operation-1" }),
+      { schema: "pipeline.interruption-store-operation-result.v1", ok: false, code: "C1S-NOT-FOUND", operation: null });
+    assert.deepEqual(store.readSnapshot(c1SnapshotRequest()),
+      { schema: "pipeline.interruption-store-snapshot-result.v1", ok: false, code: "C1S-NOT-FOUND", snapshot: null });
+    assert.deepEqual(calls.filter((key) => ["mkdirSync", "openSync", "writeSync", "linkSync", "unlinkSync", "fsyncSync", "rmdirSync"].includes(key)), []);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C1 absent reads distinguish a lock and prepared owned material without remediation", () => {
+  const root = fs.mkdtempSync("scratch/c1-store-partial-");
+  const collection = `${root}/evidence/interruption-collection`;
+  try {
+    fs.mkdirSync(`${collection}/store`, { recursive: true });
+    const store = createInterruptionStore({ root });
+    assert.equal(store.readOperation({ operationId: "operation-1" }).code, "C1S-NOT-FOUND");
+    fs.writeFileSync(`${collection}/store/metadata.json`, "prepared", "utf8");
+    assert.equal(store.readOperation({ operationId: "operation-1" }).code, "C1S-INCOMPLETE");
+    fs.unlinkSync(`${collection}/store/metadata.json`);
+    fs.mkdirSync(`${collection}/.writer-lock`);
+    assert.equal(store.readSnapshot(c1SnapshotRequest()).code, "C1S-LOCKED");
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
