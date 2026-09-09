@@ -2134,12 +2134,21 @@ function rawReadCandidatePath(value, root) {
 // (isReadOnlySimpleWords' single-command rule, above) on purpose -- this pipeline family
 // keeps its own copy rather than merging the two, a different pipeline family from the
 // single-command shape (pipeline.read-scope-single-command-root-check).
-function isApprovedCatPipelineReadPath(value, root) {
+function isApprovedCatPipelineReadPath(value, root, extraRoots = []) {
   if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
   const raw = rawReadCandidatePath(value, root);
   if (raw === null) return false;
   try {
-    return isRealpathedWithinBoundary(raw, root);
+    if (isRealpathedWithinBoundary(raw, root)) return true;
+    return extraRoots.some((extra) => {
+      try {
+        if (raw === extra) return true;
+        if (statSync(extra).isFile()) return false;
+        return isRealpathedWithinBoundary(raw, extra);
+      } catch {
+        return false;
+      }
+    });
   } catch {
     return false;
   }
@@ -2150,7 +2159,7 @@ function isApprovedCatPipelineReadPath(value, root) {
 // approved by isApprovedCatPipelineReadPath above. At least one path is required -- a `cat`
 // with no path argument reads stdin only, which is not a file read this pipeline family
 // exists to admit.
-function isValidCatPipelineSourceArgs(argv, root) {
+function isValidCatPipelineSourceArgs(argv, root, extraRoots = []) {
   let afterDashDash = false;
   const paths = [];
   for (const arg of argv) {
@@ -2161,7 +2170,7 @@ function isValidCatPipelineSourceArgs(argv, root) {
     }
     paths.push(arg);
   }
-  return paths.length > 0 && paths.every((path) => isApprovedCatPipelineReadPath(path, root));
+  return paths.length > 0 && paths.every((path) => isApprovedCatPipelineReadPath(path, root, extraRoots));
 }
 
 /**
@@ -2179,7 +2188,7 @@ function isValidCatPipelineSourceArgs(argv, root) {
  * function and CAT_PIPELINE_DISPLAY_FLAGS for the flag-allowlist and path-restriction
  * rationale (deliberately narrower than the existing single-command `cat` rule).
  */
-function isBoundedCatPipeline(parsed, root) {
+export function isBoundedCatPipeline(parsed, root, extraRoots = []) {
   if (!parsed || parsed.parseStatus !== "accepted"
     || parsed.segments.length !== 2
     || parsed.operators.length !== 1
@@ -2189,7 +2198,7 @@ function isBoundedCatPipeline(parsed, root) {
   const expectedCat = windows ? "cat.exe" : "cat";
   const sourceName = basename(parsed.segments[0].executable).toLowerCase();
   if (sourceName !== expectedCat) return false;
-  if (!isValidCatPipelineSourceArgs(parsed.segments[0].argv, root)) return false;
+  if (!isValidCatPipelineSourceArgs(parsed.segments[0].argv, root, extraRoots)) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   const expectedGrep = windows ? "grep.exe" : "grep";
   if (sinkName === expectedGrep) {
@@ -2678,20 +2687,16 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
  * `extraRoots` (NVA-B-READCONTAIN-2): zero or more additional, per-invocation resolved roots a
  * read target may also fall under, ADDITIVE to BOUNDED_PIPELINE_ADDITIONAL_ROOTS -- never a
  * replacement for it. Defaults to `[]` so every pre-existing call site naming only
- * `(command, root)` is unaffected. Threaded only into the containment-checked lanes that
- * already honor BOUNDED_PIPELINE_ADDITIONAL_ROOTS today (the single-command, git-pipeline, and
- * `&&`-chain/trailing-stderr-redirect families); the rg-to-rg/rg-to-head bounded pipeline
- * (guard-command-grammar.mjs's isBoundedReadOnlyPipeline) and the cat-pipeline family
- * (isBoundedCatPipeline) are deliberately NOT widened here -- see this dispatch's own report
- * for why (the former's containment is lexical-only, not realpath-safe; the latter would need a
- * three-function signature change not required by this task's DoD).
+ * `(command, root)` is unaffected. Threaded into the containment-checked lanes (the
+ * single-command, git-pipeline, `&&`-chain/trailing-stderr-redirect, rg-to-rg/rg-to-head,
+ * and cat-pipeline families), all backed by the shared realpath-safe containment discipline.
  */
 export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   const pipelineRoots = [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots];
-  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
+  if (isBoundedReadOnlyPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedGrepPipeline(parsed, root)) return true;
-  if (isBoundedCatPipeline(parsed, root)) return true;
+  if (isBoundedCatPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedGitPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedReadOnlyAndChain(command, root, extraRoots)) return true;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, extraRoots)) return true;
@@ -3133,7 +3138,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   }
   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedGrepPipeline(parsed, root)) return false;
-  if (isBoundedCatPipeline(parsed, root)) return false;
+  if (isBoundedCatPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedReadOnlyAndChain(command, root)) return false;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root)) return false;

@@ -28,6 +28,7 @@ import {
   VERDICT,
   coveringPath,
   declaredCommits,
+  declaredOrchestratorPaths,
   declaredPaths,
   exitCodeFor,
   gitDeps,
@@ -293,6 +294,48 @@ test("declaredPaths distinguishes 'no path field' from 'an empty list'", () => {
   assert.equal(declaredPaths({ outcome: "done", report: "prose" }), null);
   assert.deepEqual(declaredPaths({ report: { changedFiles: [] } }), []);
   assert.deepEqual(declaredPaths({ report: { changedFiles: ["`src/a.mjs` - why", { path: "src/b.mjs" }] } }), ["src/a.mjs", "src/b.mjs"]);
+});
+
+test("orchestratorAddedFiles: declaredOrchestratorPaths extracts paths, and declaredPaths merges them", () => {
+  assert.deepEqual(declaredOrchestratorPaths({ report: { changedFiles: ["src/a.mjs"] } }), []);
+  assert.deepEqual(
+    declaredOrchestratorPaths({ report: { changedFiles: ["src/a.mjs"], orchestratorAddedFiles: ["docs/state.md - update", { path: "docs/adr/0099.md" }] } }),
+    ["docs/state.md", "docs/adr/0099.md"]
+  );
+  assert.deepEqual(
+    declaredPaths({ report: { changedFiles: ["src/a.mjs"], orchestratorAddedFiles: ["docs/state.md"] } }),
+    ["src/a.mjs", "docs/state.md"]
+  );
+  // Also top-level orchestratorAddedFiles
+  assert.deepEqual(
+    declaredPaths({ report: { changedFiles: ["src/a.mjs"] }, orchestratorAddedFiles: ["docs/state.md"] }),
+    ["src/a.mjs", "docs/state.md"]
+  );
+});
+
+test("orchestratorAddedFiles: a commit with orchestrator-added files passes when declared in the record", () => {
+  writeRecord("DOD-ORCH", {
+    taskId: "DOD-ORCH",
+    outcome: "completed",
+    commit: "def5678",
+    model: "claude-sonnet-5",
+    rulesetSha: "cb16a3df",
+    report: {
+      changedFiles: ["src/feature.mjs - the feature"],
+      orchestratorAddedFiles: ["docs/state.md - handover update"],
+    },
+  });
+  const verdict = verifyCommit(
+    "def5678901",
+    commit({
+      message: `feat(x): a feature\n\nWhy it matters.\n\nDispatch: DOD-ORCH (goldfish)\nAI-Assisted: true\nCommit-Act: orchestrator\n`,
+      paths: ["src/feature.mjs", "docs/state.md"],
+    }),
+  );
+  assert.equal(verdict.verdict, VERDICT.pass);
+  assert.equal(verdict.classification, "bound");
+  assert.equal(verdict.taskId, "DOD-ORCH");
+  assert.deepEqual(verdict.orchestratorAddedFiles, ["docs/state.md"]);
 });
 
 test("exit codes: 0 all pass, 1 any fail, 2 unverifiable-only, and --strict folds 2 into 1", () => {

@@ -6181,6 +6181,41 @@ test("NVA-B-READCONTAIN-1 correction round 2, F4: a `<symlink>/../<outside-sibli
   }
 });
 
+test("pipeline.rg-pipe-lexical-containment-gap: rg-pipeline resolves symlinks and refuses direct symlink and symlink+.. targets pointing outside root", () => {
+  const { projectDir, outsideRoot, linkPath } = dotdotThroughSymlinkFixture();
+  try {
+    const directSymlinkCommand = `rg -n 'secret' ${linkPath} | head -n 5`;
+    assert.equal(
+      isReadOnlyDiagnosticCommand(directSymlinkCommand, projectDir),
+      false,
+      "the rg-pipeline shape must refuse a direct symlink inside the root pointing outside it",
+    );
+    const directResult = readScopeRun(directSymlinkCommand, projectDir, { lifecycleStatus: "ready" });
+    assert.equal(directResult.exitCode, 2, "the direct symlink rg-pipeline read must be refused, not admitted");
+
+    const dotdotAttackArg = `${linkPath}/../sibling/secret.txt`;
+    const dotdotRgCommand = `rg -n 'secret' ${dotdotAttackArg} | head -n 5`;
+    assert.equal(
+      isReadOnlyDiagnosticCommand(dotdotRgCommand, projectDir),
+      false,
+      "the rg-pipeline shape must not lexically escape the root check via a symlink+..",
+    );
+    const dotdotResult = readScopeRun(dotdotRgCommand, projectDir, { lifecycleStatus: "ready" });
+    assert.equal(dotdotResult.exitCode, 2, "the dotdot-through-symlink rg-pipeline read must be refused, not admitted");
+
+    // An in-root file read through the rg-pipeline stays admitted
+    writeFileSync(join(projectDir, "ok.txt"), "secret in-root\n");
+    assert.equal(
+      isReadOnlyDiagnosticCommand(`rg -n 'secret' ${join(projectDir, "ok.txt")} | head -n 5`, projectDir),
+      true,
+      "an in-root file read through rg-pipeline must stay admitted",
+    );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outsideRoot, { recursive: true, force: true });
+  }
+});
+
 // NVA-B-READCONTAIN-1 (correction round 2, F5). isRealpathedWithinBoundary()'s `dependencies`
 // parameter was, before this test, never supplied by any real call site, and its
 // `catch { return false; }` blocking paths had no test exercising them -- present but
@@ -6302,6 +6337,40 @@ test("NVA-B-READCONTAIN-2: a Bash read of a file inside dirname(transcript_path)
     );
     assert.deepEqual(result, { exitCode: 0, stderr: "" },
       "a Bash read of a file inside the session's own memory/ directory must be admitted");
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+  }
+});
+
+test("pipeline.rg-pipe-lexical-containment-gap: cat-pipeline reads transcript-file or memory-dir through cat ... | grep and cat ... | head", () => {
+  const projectDir = hgoGitFixture("signature");
+  const { transcriptPath, memoryDir } = transcriptReadFixture();
+  const memoryFile = join(memoryDir, "learned.md");
+  writeFileSync(memoryFile, "note with target-word\n");
+  try {
+    const grepTranscriptResult = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${transcriptPath} | grep target-word`, transcriptPath),
+      { projectDir, ...hgoReadyDeps() },
+    );
+    assert.deepEqual(grepTranscriptResult, { exitCode: 0, stderr: "" },
+      "cat <transcriptPath> | grep target-word must be admitted when transcript is threaded as extraRoot");
+
+    const headMemoryResult = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${memoryFile} | head -n 5`, transcriptPath),
+      { projectDir, ...hgoReadyDeps() },
+    );
+    assert.deepEqual(headMemoryResult, { exitCode: 0, stderr: "" },
+      "cat <memoryFile> | head -n 5 must be admitted when memory-dir is threaded as extraRoot");
+
+    const outsideFile = join(dirname(transcriptPath), "outside.txt");
+    writeFileSync(outsideFile, "outside\n");
+    const outsideResult = evaluateLifecycleReadyGuard(
+      bashWithTranscript(`cat ${outsideFile} | head -n 5`, transcriptPath),
+      { projectDir, ...hgoReadyDeps() },
+    );
+    assert.equal(outsideResult.exitCode, 2, "cat <outsideFile> | head -n 5 must be refused");
+    assert.match(outsideResult.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(dirname(transcriptPath), { recursive: true, force: true });

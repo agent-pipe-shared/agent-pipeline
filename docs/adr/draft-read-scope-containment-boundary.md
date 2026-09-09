@@ -84,21 +84,14 @@ This restoration does not close every read-scope gap that exists or has
 been found since. Recorded here so a future reader sees the complete,
 honest boundary rather than assuming the lane is now uniformly hardened:
 
-- **The `rg`-to-`rg`/`rg`-to-`head` bounded pipeline stays fully lexical**
-  (`guard-command-grammar.mjs`'s `approvedReadPath`) — no `realpathSync` at
-  all, a strictly weaker check than even `NVA-B-READCONTAIN-1`'s own
-  round-1 fix, and it does not receive the two new session-derived roots
-  either. Tracked:
-  `2026-09-06-the-rg-pipe-family-stays-lexical-and-symlink-unaware-after-readcontain-1.md`.
-- **The cat-pipeline family** (`isBoundedCatPipeline`) also does not
-  receive the two new session-derived roots — reading the transcript or
-  memory directory through a `cat <path> | grep ...` shape is refused;
-  only the single-command shape is admitted. Disclosed in
-  `NVA-B-READCONTAIN-2`'s own commit message as a deliberate scope
-  boundary (would need a three-function signature change not required by
-  that task's DoD). Folded into the rg-pipe item below (same shape: a
-  pipeline lane not receiving a root set or discipline the single-command
-  lane already has).
+- **Closed, 2026-09-09 (`pipeline.rg-pipe-lexical-containment-gap`):**
+  The `rg`-to-`rg`/`rg`-to-`head` bounded pipeline (`guard-command-grammar.mjs`'s
+  `approvedReadPath`) resolves read targets through the same realpath-safe
+  discipline (`isRealpathedWithinBoundary`), refusing direct symlinks and
+  composed `..` paths pointing outside root. Both the `rg`-pipeline and the
+  cat-pipeline family (`isBoundedCatPipeline`) now receive the session-derived
+  exception roots (transcript file and memory directory), admitting them under
+  the same containment rules as the single-command lane.
 - **grep-pipe carries no location containment at all**, in either the
   pre-removal, removed, or restored state — `NVA-BL-76` never scoped it in.
 - **A leading-`~` argument was admitted as inside the project root** (a

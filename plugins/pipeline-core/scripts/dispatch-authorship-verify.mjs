@@ -294,7 +294,23 @@ export function shasBind(a, b) {
 }
 
 /**
- * Pull declared paths out of `report.changedFiles`. Entries are either objects with a
+ * Pull declared orchestrator paths out of `report.orchestratorAddedFiles` or top-level `orchestratorAddedFiles`.
+ */
+export function declaredOrchestratorPaths(record) {
+  const orchestrator = record?.report?.orchestratorAddedFiles ?? record?.orchestratorAddedFiles;
+  if (!Array.isArray(orchestrator)) return [];
+  const paths = [];
+  for (const entry of orchestrator) {
+    const text = typeof entry === "string" ? entry : entry?.path;
+    if (typeof text !== "string") continue;
+    const token = text.trim().replace(/^[`'"]+/u, "").split(/[\s`'",]+/u)[0];
+    if (token) paths.push(token.replace(/[.,;:]+$/u, ""));
+  }
+  return paths;
+}
+
+/**
+ * Pull declared paths out of `report.changedFiles` and optional `orchestratorAddedFiles`. Entries are either objects with a
  * `path`, or strings shaped `"<path> - why it changed"` (the house style). Returns null —
  * distinct from an empty array — when the record has no machine-readable path field, which
  * is what makes the caller answer UNVERIFIABLE instead of FAIL.
@@ -303,11 +319,15 @@ export function declaredPaths(record) {
   const changed = record?.report?.changedFiles ?? record?.changedFiles;
   if (!Array.isArray(changed)) return null;
   const paths = [];
-  for (const entry of changed) {
-    const text = typeof entry === "string" ? entry : entry?.path;
-    if (typeof text !== "string") continue;
-    const token = text.trim().replace(/^[`'"]+/u, "").split(/[\s`'",]+/u)[0];
-    if (token) paths.push(token.replace(/[.,;:]+$/u, ""));
+  const orchestrator = record?.report?.orchestratorAddedFiles ?? record?.orchestratorAddedFiles;
+  for (const list of [changed, orchestrator]) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const text = typeof entry === "string" ? entry : entry?.path;
+      if (typeof text !== "string") continue;
+      const token = text.trim().replace(/^[`'"]+/u, "").split(/[\s`'",]+/u)[0];
+      if (token) paths.push(token.replace(/[.,;:]+$/u, ""));
+    }
   }
   return paths;
 }
@@ -582,9 +602,11 @@ export function verifyCommit(sha, deps) {
     );
   }
 
-  return result(sha, VERDICT.pass, "bound", `bound to \`${taskId}\` (outcome \`${record.outcome}\`, ${changed.length} path(s) covered)`, {
+  const orchestratorPaths = declaredOrchestratorPaths(record);
+  return result(sha, VERDICT.pass, "bound", `bound to \`${taskId}\` (outcome \`${record.outcome}\`, ${changed.length} path(s) covered${orchestratorPaths.length > 0 ? `, ${orchestratorPaths.length} orchestrator-added` : ""})`, {
     taskId,
     modelCheck,
+    ...(orchestratorPaths.length > 0 ? { orchestratorAddedFiles: orchestratorPaths } : {}),
   });
 }
 

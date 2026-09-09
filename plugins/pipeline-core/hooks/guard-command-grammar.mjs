@@ -7,7 +7,8 @@
  * command subset used by Pipeline and one bounded read-only diagnostic
  * pipeline. Unsupported syntax returns no authoritative argv.
  */
-import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 const CONTROL = new Set([";", "&&", "||", "&", "(", ")"]);
 const SEARCH_BOOLEAN = new Set([
@@ -203,42 +204,66 @@ function pathInside(root, target) {
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
+function rawReadCandidatePath(value, root) {
+  if (typeof value !== "string" || value === "" || value.startsWith("-")) return null;
+  if (value.startsWith("~")) return `${sep}${value}`;
+  return isAbsolute(value) ? value : `${root}${sep}${value}`;
+}
+
+export function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}) {
+  if (resolved === boundary) return true;
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  const stat = dependencies.statSyncFn ?? statSync;
+  let realBoundary;
+  try {
+    realBoundary = realpath(boundary);
+    if (!stat(realBoundary).isDirectory()) return false;
+  } catch {
+    return false;
+  }
+  if (!pathInside(realBoundary, resolved)) return false;
+  let ancestor = resolved;
+  try {
+    while (ancestor !== boundary && !exists(ancestor)) ancestor = dirname(ancestor);
+    return pathInside(realBoundary, realpath(ancestor));
+  } catch {
+    return false;
+  }
+}
+
 /**
- * GF-078 bug 2: `additionalRoots` admits a read target under one more resolved root besides
- * the project root -- always resolved from `resolve(root, value)` first (a relative `value`
- * is still interpreted against the invocation root, `root`, exactly as before; only an
- * ABSOLUTE `value` can ever resolve outside `root` in the first place, so additionalRoots
- * only ever matters for that case). Every single, non-piped read-only command this guard
- * family admits elsewhere (`rg`, `grep`, `cat`, `head`, `tail`, `wc`, `stat`, `file` in
- * guard-lifecycle-ready.mjs's `isReadOnlyDiagnosticCommand`) carries NO path restriction at
- * all, so this bounded rg-to-rg/rg-to-head pipeline was the only read-only lane in the whole
- * guard family that refused a legitimate outside-root read -- a self-inspection of the
- * plugin's own installed directory, in particular. Passing one additional resolved root is
- * strictly narrower than that existing single-command allowance, never wider than it.
+ * NVA-B-READCONTAIN-1 / pipeline.rg-pipe-lexical-containment-gap:
+ * Resolves `value` against `root` and requires it to stay inside `root` or one of
+ * `additionalRoots`, through the realpath-resolving discipline isRealpathedWithinBoundary().
+ * A direct symlink inside `root` pointing outside it is refused, not admitted.
+ * Like the single-command, cat-pipeline, and git-pipeline lanes in guard-lifecycle-ready.mjs,
+ * the candidate fed to that check is the raw un-collapsed path from rawReadCandidatePath(),
+ * so `..` through symlinks cannot bypass containment.
  */
 function approvedReadPath(value, root, additionalRoots = []) {
   if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
-  // NVA-B-TILDEFIX-1 (backlog: 2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-
-  // the-project-root.md): a leading `~` is expanded by the real shell to an absolute
-  // home-directory path BEFORE this argument ever reaches `resolve(root, value)` below --
-  // resolving it against `root` there collapses it to a literal, never-realpathed
-  // `<root>/~/...` string that pathInside() admits on lexical grounds alone, no ancestor-walk
-  // even needed. Refused unconditionally, regardless of `additionalRoots` -- this function's
-  // only caller (isBoundedReadOnlyPipeline, always inside a `|`-joined two-segment pipeline)
-  // already denies with an existing code (GUARD-OPERATOR-UNAPPROVED or
-  // GUARD-READ-SCOPE-OUTSIDE-ROOT) once containment fails here, so no self-referential-match
-  // trick is needed to route this to a specific code the way guard-lifecycle-ready.mjs's
-  // independent twin of this same one-line check must (see that file's
-  // rawReadCandidatePath() -- not imported here; the import direction is fixed the other way,
-  // this file exports to that one, never the reverse). Never existsSync/realpathSync -- a
-  // narrow reject, not real tilde expansion.
+  // NVA-B-TILDEFIX-1: leading `~` is rejected unconditionally
   if (value.startsWith("~")) return false;
-  if (value === ".") return true;
+  if (value === ".") {
+    try {
+      return statSync(root).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+  const raw = rawReadCandidatePath(value, root);
+  if (raw === null) return false;
   try {
-    const target = resolve(root, value);
-    if (pathInside(resolve(root), target)) return true;
+    if (isRealpathedWithinBoundary(raw, root)) return true;
     return additionalRoots.some((extra) => {
-      try { return pathInside(resolve(extra), target); } catch { return false; }
+      try {
+        if (raw === extra) return true;
+        if (statSync(extra).isFile()) return false;
+        return isRealpathedWithinBoundary(raw, extra);
+      } catch {
+        return false;
+      }
     });
   } catch {
     return false;
