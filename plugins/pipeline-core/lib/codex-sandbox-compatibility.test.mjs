@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
@@ -10,6 +11,8 @@ import { INTERMEDIATE_LITERAL, WEAK_LITERAL, buildCompatibilityProjection, canon
 const D = "a".repeat(64);
 const CLI_VERSION = "0.146.0";
 const CLI_SHA256 = "d".repeat(64);
+const PREFLIGHT_SCHEMA_PATH = new URL("../scripts/codex-sandbox-preflight.schema.json", import.meta.url);
+const CURRENT_PREFLIGHT_SCHEMA_SHA256 = createHash("sha256").update(readFileSync(PREFLIGHT_SCHEMA_PATH)).digest("hex");
 test("F4 policy and projection schemas parse and close their root vocabulary", () => {
   for (const path of [new URL("../config/codex-sandbox-compatibility.v2.schema.json", import.meta.url), new URL("../scripts/codex-sandbox-compatibility-receipt.schema.json", import.meta.url)]) {
     const schema = JSON.parse(readFileSync(path, "utf8"));
@@ -44,6 +47,14 @@ test("committed registry is closed, semantic-version-agnostic and has exactly on
   assert.match(path, /codex-sandbox-compatibility\.v2\.json$/u);
   assert.equal(value.fallback.assuranceLiteral, WEAK_LITERAL);
   assert.equal(value.entries.every((entry) => entry.compatibilityClass === "codex-sandbox-state-v1" && !Object.hasOwn(entry, "cliVersion") && !Object.hasOwn(entry, "releasedArtifactSha256")), true);
+});
+
+test("current v2 policy entries pin the raw bytes of the shipped preflight schema", () => {
+  const policy = loadCompatibilityPolicy().value;
+  for (const entry of policy.entries) assert.equal(entry.preflightSchemaSha256, CURRENT_PREFLIGHT_SCHEMA_SHA256, entry.id);
+  const currentSchemaObservation = observation(policy);
+  currentSchemaObservation.preflight.schemaSha256 = CURRENT_PREFLIGHT_SCHEMA_SHA256;
+  assert.equal(classifyCompatibility(policy, currentSchemaObservation).state, "intermediate-preflight-eligible");
 });
 
 test("newer attested versions pass while binary drift and stale/foreign-boot evidence fail closed", () => {
