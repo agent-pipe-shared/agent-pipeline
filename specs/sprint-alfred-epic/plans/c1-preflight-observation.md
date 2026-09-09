@@ -90,6 +90,12 @@ In particular, `CDP-EVIDENCE-REQUIRED` does not establish `expected-boundary` or
 
 ## 4. Reconciled controller, capture and qualification
 
+The producer boundary invokes only a trusted synchronous callback and ignores
+its return without reading `then`, getters or assimilating a Promise. Synchronous
+callback throws are isolated from the original producer result/error. Production
+callbacks do not schedule asynchronous telemetry; this contract makes no claim
+to contain independently scheduled rejection or arbitrary callback side effects.
+
 The direct CLI remains read-only and preserves the producer's stdout/stderr/exit
 contract. A dedicated observe-critic-preflight create/run/status controller
 invokes the shared parser and unchanged producer. Argument parsing precedes the
