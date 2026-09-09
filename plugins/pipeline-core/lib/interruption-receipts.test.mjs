@@ -923,6 +923,30 @@ test("C1 observer never invokes source getters and rejects malformed time or unc
   assert.deepEqual(qualifyCriticPreflightObservation({ source: c1Source(), observedAt: { value: null, status: "unknown" }, root: "/not-a-c1-root", specPath: "specs/c1.md" }),
     { ok: false, code: "C1O-ROOT", observation: null });
 });
+test("C1 observer closes primitive coercion, qualify input accessors, and hostile proxy errors", () => {
+  let coercions = 0;
+  const hostilePrimitive = { toString() { coercions++; throw new Error("coercion"); } };
+  for (const field of ["commit", "tree", "specSha256"]) {
+    const source = c1Source();
+    if (field === "commit" || field === "tree") source.candidate = { commit: "a".repeat(40), tree: "b".repeat(40), ...{ [field]: hostilePrimitive } };
+    else source.specSha256 = hostilePrimitive;
+    assert.deepEqual(captureCriticPreflightSource(source), { ok: false, code: "C1O-SOURCE", source: null, observedAt: null });
+  }
+  const hostileTime = { value: hostilePrimitive, status: "measured" };
+  assert.deepEqual(captureCriticPreflightSource(c1Source(), hostileTime), { ok: false, code: "C1O-TIME", source: null, observedAt: null });
+  assert.equal(coercions, 0);
+
+  let accessed = 0;
+  const accessorInput = {};
+  for (const key of ["source", "observedAt", "root", "specPath"]) Object.defineProperty(accessorInput, key, { enumerable: true, get() { accessed++; throw new Error("access"); } });
+  assert.deepEqual(qualifyCriticPreflightObservation(accessorInput), { ok: false, code: "C1O-ROOT", observation: null });
+  assert.equal(accessed, 0);
+  assert.deepEqual(qualifyCriticPreflightObservation(null), { ok: false, code: "C1O-ROOT", observation: null });
+
+  const throwingProxy = new Proxy({}, { getPrototypeOf() { throw new Error("proxy"); }, ownKeys() { throw new Error("proxy"); } });
+  assert.deepEqual(captureCriticPreflightSource(throwingProxy), { ok: false, code: "C1O-SOURCE", source: null, observedAt: null });
+  assert.deepEqual(qualifyCriticPreflightObservation(throwingProxy), { ok: false, code: "C1O-SCOPE-UNAVAILABLE", observation: null });
+});
 
 const c1StorePorts = (io) => ({ io, clock: () => ({ value: null, status: "unknown" }), randomId: () => "must-not-mint", platform: () => ({ status: "unsupported", backendId: null }) });
 const c1StoreIo = (onCall = () => {}) => Object.fromEntries(Object.keys(productionPorts.io).map((key) => [key, (...args) => {

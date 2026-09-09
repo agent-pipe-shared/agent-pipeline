@@ -46,7 +46,8 @@ function valuesOf(value, keys, code) {
 function candidateSnapshot(value) {
   if (value === null) return null;
   const candidate = valuesOf(value, ["commit", "tree"], "C1O-SOURCE");
-  if (!OID.test(candidate.commit) || !OID.test(candidate.tree) || candidate.commit.length !== candidate.tree.length) fail("C1O-SOURCE");
+  if (typeof candidate.commit !== "string" || typeof candidate.tree !== "string"
+    || !OID.test(candidate.commit) || !OID.test(candidate.tree) || candidate.commit.length !== candidate.tree.length) fail("C1O-SOURCE");
   return { commit: candidate.commit, tree: candidate.tree };
 }
 function sourceCheck(value) {
@@ -55,9 +56,9 @@ function sourceCheck(value) {
     || !STAGES.includes(source.stage) || !["rejected", "packet-ready"].includes(source.outcome)) fail("C1O-SOURCE");
   const candidate = candidateSnapshot(source.candidate);
   if (source.outcome === "packet-ready") {
-    if (source.stage !== "complete" || source.code !== null || candidate === null || !DIGEST.test(source.specSha256)) fail("C1O-SOURCE");
+    if (source.stage !== "complete" || source.code !== null || candidate === null || typeof source.specSha256 !== "string" || !DIGEST.test(source.specSha256)) fail("C1O-SOURCE");
   } else {
-    if (source.stage === "complete" || !CODES.includes(source.code) || (source.specSha256 !== null && !DIGEST.test(source.specSha256))) fail("C1O-SOURCE");
+    if (source.stage === "complete" || !CODES.includes(source.code) || (source.specSha256 !== null && (typeof source.specSha256 !== "string" || !DIGEST.test(source.specSha256)))) fail("C1O-SOURCE");
     if (source.code !== "CDP-UNEXPECTED" && !MATRIX[source.stage]?.includes(source.code)) fail("C1O-SOURCE");
   }
   return { schema: source.schema, producer: source.producer, observationRevision: source.observationRevision, stage: source.stage, outcome: source.outcome,
@@ -153,8 +154,9 @@ export function resolveCriticPreflightContext(input = {}) {
     };
   } catch (error) { return { ok: false, code: closedError(error, "C1O-SCOPE-UNAVAILABLE"), context: null }; }
 }
-export function qualifyCriticPreflightObservation({ source, observedAt, root, specPath } = {}) {
+export function qualifyCriticPreflightObservation(input = {}) {
   try {
+    const { source, observedAt, root, specPath } = valuesOf(input, ["source", "observedAt", "root", "specPath"], "C1O-ROOT");
     const safeSource = sourceCheck(source), time = timeCheck(observedAt), normalizedSpec = normalizedPath(specPath), actualRoot = physicalRoot(root);
     const authority = resolveProjectAuthorityPaths({ rootDir: actualRoot });
     if (authority.status !== "ready" || typeof authority.state !== "string") fail("C1O-SCOPE-UNAVAILABLE");
