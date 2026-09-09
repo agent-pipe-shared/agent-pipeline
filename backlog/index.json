@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "40aa700bd97996ce4c77755f7f5c138972cc5ab044d5d691d7ad2a6b4f34e22f"
+    "transitionHead": "4c7ed47b22a5fed6455319d367675e030f7826d1cfdf5a4f123137338be24a1f"
   },
   "counts": {
-    "open": 111,
+    "open": 112,
     "in_progress": 0,
     "closed": 526,
     "rejected": 3,
@@ -6929,6 +6929,15 @@
       "closureRepository": "self",
       "closureCommit": "8e8072ee475b261c38f847392e867060cc081666",
       "closureEvidence": "backlog/items/2026-08-19-staleness-check-unsettled-top-level-await-warning.md"
+    },
+    {
+      "id": "pipeline.standing-critic-consent-reprompts-host-approval",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-09",
+      "source": "PO-requested investigation, 2026-09-09; durable standing-consent and reprompt observations in backlog/evidence/2026-09-09-local-candidate-po-decisions.md and backlog/evidence/2026-09-09-standing-critic-consent-reprompt.md.",
+      "deferred": false
     },
     {
       "id": "pipeline.stateful-design-contract-template",
