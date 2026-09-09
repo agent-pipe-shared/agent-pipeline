@@ -139,15 +139,26 @@ function isBoundNativeCriticPythonReadCommand(command, request) {
  */
 export function nativeCriticUnknownContentReadMatchesCommand(command, actionCommand, request) {
   if (typeof command !== "string" || typeof actionCommand !== "string") return false;
-  const parsedAction = parseGuardCommand(actionCommand, request?.cwd);
-  if (parsedAction.parseStatus !== "accepted" || parsedAction.operators.length !== 0
-    || parsedAction.redirects.length !== 0 || parsedAction.segments.length !== 1) return false;
-  const [{ executable, argv }] = parsedAction.segments;
-  const boundedCat = ["cat", "/bin/cat", "/usr/bin/cat"].includes(executable) && argv.length === 1
-    && isBoundNativeCriticContentPath(argv[0], request);
   const boundedPythonRead = isBoundNativeCriticPythonReadCommand(actionCommand, request);
+  let boundedCat = false;
+  const parsedAction = parseGuardCommand(actionCommand, request?.cwd);
+  if (parsedAction.parseStatus === "accepted" && parsedAction.operators.length === 0
+    && parsedAction.redirects.length === 0 && parsedAction.segments.length === 1) {
+    const [{ executable, argv }] = parsedAction.segments;
+    boundedCat = ["cat", "/bin/cat", "/usr/bin/cat"].includes(executable) && argv.length === 1
+      && isBoundNativeCriticContentPath(argv[0], request);
+  }
   if (!boundedCat && !boundedPythonRead) return false;
   if (command === actionCommand) return true;
+  // The app-server represents this multiline expression as a shell-wrapped
+  // item. Parsing shell source with a newline is intentionally outside the
+  // generic grammar, so compare only the exact wrapper around the already
+  // validated expression.
+  if (boundedPythonRead) {
+    return ["bash", "sh", "zsh", "/bin/bash", "/bin/sh", "/bin/zsh"].some((shell) => (
+      command === `${shell} -c "${actionCommand}"` || command === `${shell} -lc "${actionCommand}"`
+    ));
+  }
   const parsedCommand = parseGuardCommand(command, request?.cwd);
   if (parsedCommand.parseStatus !== "accepted" || parsedCommand.operators.length !== 0
     || parsedCommand.redirects.length !== 0 || parsedCommand.segments.length !== 1) return false;
