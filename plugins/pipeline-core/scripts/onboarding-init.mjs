@@ -968,6 +968,20 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
       executedSinceAnchor = true;
     }
 
+    // A V4 `ready` inspection is the onboarding terminal receipt.  It may
+    // additionally advertise a Pipeline-State handover action, but that action
+    // belongs to the project lifecycle after onboarding; following it here
+    // would make a completed legacy migration look non-terminal (or require
+    // this generic driver to interpret state-machine phases).  This branch is
+    // deliberately limited to the public V4 anchor, after the re-anchor
+    // progress check above, so a migration `inspect` classification can never
+    // claim readiness before its plan and exact activation action run.
+    if (wasAnchorStep
+      && output?.schema === "pipeline.project-onboarding.v4"
+      && output?.status === "ready") {
+      return { schema: SCHEMA, runner, root, outcome: "ready", stepCap, stepsExecuted: steps.length, steps, final: output };
+    }
+
     if (nextAction && typeof nextAction === "object" && nextAction.kind === "command") {
       const pendingAsksInfo = extractPendingAsks(nextAction);
       if (pendingAsksInfo.malformed) {

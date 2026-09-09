@@ -4135,11 +4135,16 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
       repository,
       runtime: emptyRuntime(),
       nextAction: commandAction(
-        [MIGRATION_SCRIPT, refresh ? "plan" : "inspect", "--root", legacy.root],
+        // `inspect` reports source classification only.  A legacy source can
+        // therefore look "ready" to the generic onboarding driver while its
+        // required V3 activation has never been planned or applied.  Always
+        // hand the driver the real migration plan: its exact `nextAction`
+        // binds the subsequent `apply --activate` transaction.
+        [MIGRATION_SCRIPT, "plan", "--root", legacy.root],
         false,
         false,
-        refresh ? "pipeline.runner-profile-migration-plan.v3" : "pipeline.runner-profile-migration-inspect.v3",
-        refresh ? ["ready", "noop"] : ["ready", "invalid-root", "recovery-required", "invalid-source"],
+        "pipeline.runner-profile-migration-plan.v3",
+        ["ready", "noop"],
       ),
       diagnostics: [lifecycleDiagnostic(
         "$.source",

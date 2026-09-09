@@ -43,6 +43,7 @@ import {
 } from "./project-onboarding-v3.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
+import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-migration-v3.mjs";
 import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
@@ -3196,9 +3197,9 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     assert.equal(migration.status, "migration-required");
     assertDiagnostic(migration, "migration_required");
     assertSingleLineAction(migration.nextAction, action(
-      [MIGRATION_SCRIPT, "inspect", "--root", legacy],
-      ["ready", "invalid-root", "recovery-required", "invalid-source"],
-      "pipeline.runner-profile-migration-inspect.v3",
+      [MIGRATION_SCRIPT, "plan", "--root", legacy],
+      ["ready", "noop"],
+      "pipeline.runner-profile-migration-plan.v3",
     ));
 
     const portablePlan = planProjectOnboardingV3({ runner: "codex", rootDir: runtime, deps: fakeDeps });
@@ -3235,6 +3236,57 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
   } finally {
     dispose(empty); dispose(existing); dispose(legacy); dispose(runtime);
   }
+});
+
+test("the real legacy V0 frontdoor drives migration plan and exact activation before re-anchoring ready", () => {
+  const path = root();
+  const runDriverStep = (executable, argv) => {
+    let stdout = "";
+    let code;
+    if (argv[0] === ONBOARDING_SCRIPT) {
+      code = onboardingCli(argv.slice(1), {
+        deps: fakeDeps,
+        write: (chunk) => { stdout += chunk; },
+      });
+    } else if (argv[0] === MIGRATION_SCRIPT) {
+      code = runnerProfileMigrationCli(argv.slice(1), {
+        write: (chunk) => { stdout += chunk; },
+        writePreview() {},
+      });
+    } else {
+      throw new Error(`unexpected driver action: ${JSON.stringify({ executable, argv })}`);
+    }
+    return { status: code, stdout, stderr: "" };
+  };
+  try {
+    // Build an actually ready V4 repository first, then replace only its
+    // authority source with a real V0 fixture.  This makes the final anchor a
+    // genuine readiness readback rather than a hand-written plan response.
+    hostGit(path, ["init", "-q"]);
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "ready");
+    writeFileSync(join(path, "pipeline.user.yaml"), yaml(v0Source()));
+
+    const result = driveOnboardingInit({ rootDir: path, runner: "codex", run: runDriverStep });
+    assert.equal(result.outcome, "ready", JSON.stringify(result));
+    assert.equal(result.stepsExecuted, 4);
+    assert.deepEqual(result.steps.map((step) => step.argv), [
+      [ONBOARDING_SCRIPT, "inspect", "--root", path, "--runner", "codex"],
+      [MIGRATION_SCRIPT, "plan", "--root", path],
+      [MIGRATION_SCRIPT, "apply", "--root", path, "--activate"],
+      [ONBOARDING_SCRIPT, "inspect", "--root", path, "--runner", "codex"],
+    ]);
+    assert.equal(result.final.status, "ready");
+
+    // The migrated authority is truly at rest: a second frontdoor walk runs
+    // only its anchor and cannot schedule a reverse migration.
+    const rerun = driveOnboardingInit({ rootDir: path, runner: "codex", run: runDriverStep });
+    assert.equal(rerun.outcome, "ready", JSON.stringify(rerun));
+    assert.equal(rerun.stepsExecuted, 1);
+    assert.deepEqual(rerun.steps[0].argv, [ONBOARDING_SCRIPT, "inspect", "--root", path, "--runner", "codex"]);
+  } finally { dispose(path); }
 });
 
 test("every lifecycle plan exposes the exact digest-bound apply status contract and rendering", () => {
