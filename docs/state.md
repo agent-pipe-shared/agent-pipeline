@@ -59,6 +59,15 @@ Investigate this startup failure through the selected runner contract;
 do not infer that a healthy daemon proves this child starts, or substitute
 generic-agent review for the candidate's selected-transport requirement.
 
+Startup diagnosis now has a terminal read-only-filesystem failure and a
+negative log-directory-override control. The version-bound Codex source
+requires write-opening its installation-ID file before Stdio initialization;
+the inherited home is read-only in the legacy whole-process sandbox. The
+exact local failing syscall is not traced. See
+`backlog/evidence/2026-09-09-selected-critic-startup-diagnosis.md` for evidence
+and limits. Do not retry the unchanged transport or activate the separate
+native lane without its own current physical and tool-surface proof.
+
 Documentation reader binding passed for `5b21e726`, reviewed documentation
 commit `7fc1bc503473339bfe1b15c34082e86a175eba43`, with assurance
 `committed-state-and-evidence-presence-only`. The capability inventory still
