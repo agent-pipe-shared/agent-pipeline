@@ -195,3 +195,7 @@ content-v1:081327d87b1ab19f416c119d3504a9c913f2247cc95b810870c60f24d012f680:gove
 # Public deterministic GMW revoke ID; PO-approved 2026-09-06.
 # Exact content/path/rule/position-bound exception.
 content-v1:88cc8879a89d4c3eec339244937908aee063293e59485562fd4a688130cc5944:governance/events/human/14-evt-gmw-revoke-3de0bdca05a90ca795ac7696f4717abe-0.json:generic-api-key:1:1030
+# Alfred Event 16: deterministic public decision ID; PO-approved permanently 2026-09-09.
+# No expiry. Exact content, path, rule and position binding.
+# Evidence: specs/sprint-alfred-epic/evidence/event16-permanent-scanner-exception-2026-09-09.md
+content-v1:3e768b0197a72c030671700e14cbc6e2d6b73681ad69309533a6aefe54265d7b:governance/events/human/16-evt-hgo-deny-cc612114562e4c5069cb6c66c06dda55-0.json:generic-api-key:1:987

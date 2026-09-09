@@ -1,0 +1,27 @@
+{
+  "schema": "alfred.permanent-scanner-exception-probe.v1",
+  "status": "passed",
+  "approval": {
+    "source": "PO conversation 2026-09-09",
+    "permanent": true,
+    "expiresAt": null
+  },
+  "scope": "disposable fixture using the actual gitleaks adapter and binary",
+  "eventPath": "governance/events/human/16-evt-hgo-deny-cc612114562e4c5069cb6c66c06dda55-0.json",
+  "eventSha256": "388d642aded73d90a0789c70a036d527db692cf21bd7c35bd67b31508c6994e6",
+  "beforeIgnoreSha256": "df51a473b4aa013e482f25b8f4bf4de60f08fafc3ea27004cd6056757281f02e",
+  "proposedAfterIgnoreSha256": "1aa63cbd6da79e7d7db2d6f2baefb61008a191097cca78d0024ea23e5f365186",
+  "authorityLine": "content-v1:3e768b0197a72c030671700e14cbc6e2d6b73681ad69309533a6aefe54265d7b:governance/events/human/16-evt-hgo-deny-cc612114562e4c5069cb6c66c06dda55-0.json:generic-api-key:1:987",
+  "checks": {
+    "originalFindingObserved": true,
+    "exactTargetSuppressed": true,
+    "otherPathStillReported": true,
+    "sourceFilesUnchanged": true
+  },
+  "findings": {
+    "before": 2,
+    "after": 1,
+    "remainingIsControl": true
+  },
+  "limitation": "Fixture proof only; live ignore mutation, candidate Security and Full Verify remain separate."
+}

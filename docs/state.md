@@ -65,11 +65,12 @@ equals the producer `denyDecisionId({intentSha256: event.correlation.requestId,
 generation: 0, producer: hgo})`, `payload.decisionId`, and `idempotencyKey`.
 The PO explicitly approved on 2026-09-09 one permanent, narrow event-16
 `content-v1` exception bound to the exact event path, `generic-api-key`, line 1,
-column 987, and the machine-confirmed content fingerprint. The approval is
-recorded but not applied: root owns preparing and applying the single scanner
-entry through the permitted mutation route and actual guard requirements, then
-providing readback. The event and scanner ignore remain unchanged until then;
-the earlier proposed 2026-09-26 review/expiry date is superseded.
+column 987, and the machine-confirmed content fingerprint. The exact prepared
+entry has been applied once through the permitted mutation route and read back;
+the event remains immutable. Hashes and fixture results are recorded in
+`specs/sprint-alfred-epic/evidence/event16-permanent-scanner-exception-2026-09-09.md`
+and its JSON receipt. The earlier proposed 2026-09-26 review/expiry date is
+superseded.
 
 The C1 aggregation implementation and focused tests are locally committed at
 `854b0da8d1732bf2f787a684f9ad79659a7c9186`; its final checks record receipt
