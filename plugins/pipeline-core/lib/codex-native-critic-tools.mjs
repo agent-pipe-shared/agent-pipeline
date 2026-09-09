@@ -126,7 +126,7 @@ function isBoundNativeCriticPythonReadCommand(command, request) {
   // This is intentionally not a Python allowlist. It is one observed,
   // content-only expression emitted by the native model before it falls back
   // to cat: a Path construction followed directly by read_text().
-  const match = /^from pathlib import Path\nprint\(Path\((['"])([^'"\n]+)\1\)\.read_text\(\)\)$/.exec(command);
+  const match = /^from pathlib import Path(?:\n|;\s*)print\(Path\((['"])([^'"\n]+)\1\)\.read_text\(\)\)$/.exec(command);
   return match !== null && isBoundNativeCriticContentPath(match[2], request);
 }
 

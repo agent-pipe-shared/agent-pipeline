@@ -1665,6 +1665,7 @@ check("the actual child admits native-tools only after native policy, complete f
       ["bound role contract", `cat ${join(fixture, "role.md")}`, `cat ${join(fixture, "role.md")}`],
       ["wrapped bound prompt contract", `bash -lc 'cat ${join(fixture, "prompt.md")}'`, `cat ${join(fixture, "prompt.md")}`],
       ["wrapped bound Python content read", `/bin/sh -c "from pathlib import Path\nprint(Path('${join(fixture, "role.md")}').read_text())"`, `from pathlib import Path\nprint(Path('${join(fixture, "role.md")}').read_text())`],
+      ["semicolon-separated bound Python content read", `/bin/sh -c "from pathlib import Path; print(Path('${join(fixture, "role.md")}').read_text())"`, `from pathlib import Path; print(Path('${join(fixture, "role.md")}').read_text())`],
     ]) {
       const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
         { type: "commandExecution", command, commandActions: [{ type: "unknown", command: actionCommand }] }, finalItem,
