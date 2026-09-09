@@ -70,10 +70,20 @@ native lane without its own current physical and tool-surface proof.
 
 Resumption inventory `a7a08652` confirms the existing repairs and exact historical
 Verify; see `backlog/evidence/2026-09-09-critic-resumption-inventory.md`.
-The native components already exist, but no production smoke/selection
-coordinator was found. Task `NVA-NATIVE-PREFLIGHT-1` supplies the missing
-model-free preflight; its live proof and independent review remain pending.
-Do not repeat the old initialization probes or infer a PASS from missing files.
+The existing native components now have a model-free preflight (`049b0edd`,
+`04e5883b`) and scratch coordinator. Full Verify at `04e5883b` finished clean,
+exact and green: 517/517, zero reused results, run
+`verify-1788989991645-2d255110bd894c78`. A fresh native smoke then admitted a
+real independent review of `b876302d..04e5883b`; the model turn completed and
+the native host validated its execution receipt. The result is **FAIL**, with
+two major preflight defects: a late protocol failure can be lost, and stdin
+errors/null frames can escape bounded failure handling. Immutable result:
+`backlog/evidence/2026-09-09-native-preflight-critic-round-1.json`.
+Task `NVA-NATIVE-PREFLIGHT-FIX-1` repairs those findings with wire regressions.
+This new-package review does not close the migration correction review or
+inventory/reader-checker/Nova-B coverage. Do not repeat the old initialization
+probes or infer a PASS from a completed model turn. Subsequent edits require
+their own fresh final Verify; the cited result covers only `04e5883b`.
 
 Documentation reader binding passed for `5b21e726`, reviewed documentation
 commit `7fc1bc503473339bfe1b15c34082e86a175eba43`, with assurance

@@ -1,0 +1,149 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Closed-bootstrap ruleset: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Reviewed named paths between b876302d37b0e1933743311000014d2e1c2bb571 and 04e5883b5b915b6734a6e41b2c4cded2aab6e8bd; independently resolved candidate tree fd292d95c2390824a21a0b385af504473d309573. evidence/verify-latest.json records the full Verify command, exit 0, 517 successful non-reused suites, and clean matching candidate identities at start and finish. Both commits carry Goldfish Dispatch trailers; separate dispatch records were not supplied. In-memory reproductions using the inspected RpcProcess implementation confirmed both findings. Auto-injected context comprised AGENTS instructions and environment metadata. Report persistence was unavailable under the enforced read-only boundary; no files were modified.",
+    "findings": [
+      {
+        "gap": "Protocol failures are not retained after a pending request resolves. A prohibited server request arriving immediately after the final command response can trigger finish(), yet a subsequent graceful child exit still permits a passed receipt with protocolError set to false.",
+        "risk": "A protocol-invalid execution can supply passing native-isolation evidence. The in-memory reproduction retained the successful command response and accepted terminal exit 0 after rejecting an unsolicited server request.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/codex-native-critic-preflight.mjs:206-211",
+        "spec_ref": "Local candidate delta, Review, evidence and delivery: usable transport, no unsupported isolation claim, and preservation of completed-but-invalid execution facts; architecture-guidelines item 4."
+      },
+      {
+        "gap": "RPC input failures can escape the asynchronous failure handler: child.stdin has no error listener, and receive() accesses value.method without checking whether parsed JSON is null. Both EPIPE and a null protocol frame throw outside the awaited request.",
+        "risk": "An initialization pipe failure or malformed response can terminate the preflight without its structured unavailable result or bounded child cleanup. In-memory reproductions left the request pending and invoked no child termination.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/codex-native-critic-preflight.mjs:111-121",
+        "spec_ref": "Local candidate delta, Review, evidence and delivery: preserve initialization stdin and terminate the child within the declared bound; architecture-guidelines item 4."
+      }
+    ],
+    "deliberately_not_flagged": [
+      "The producer has a callable export and CLI entry point, remains model-free, and never sends turn/start.",
+      "Scratch containment rejects directory symlinks and escapes; thread and command requests explicitly select read-only operation with network access disabled.",
+      "The write-denial check requires an execution marker, an accepted OS error, and an unchanged canary, distinguishing launch failure from witnessed denial.",
+      "Existing tests were preserved and new subprocess fixtures are explicitly identified as fake; their results were not treated as live sandbox proof.",
+      "The new source carries the required SPDX identifier and introduces no third-party dependency or hardcoded credential."
+    ],
+    "trajectory_verdict": "consistent",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_7o5ktygtolk6krzmb6idkn3lgi",
+    "selectionSha256": "c161cea66e07a0fae19a7e01562b7f2178007e0a018c3c916a02c65592cb7afc",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "04e5883b5b915b6734a6e41b2c4cded2aab6e8bd",
+      "candidateTree": "fd292d95c2390824a21a0b385af504473d309573",
+      "referenceSetSha256": "0407cb67ba6ada22a30896c08f0b784541275ad63766427ff40137a12a732316",
+      "requestSha256": "8e20775cedda908ee30120fb1eb7c485e63a234abd5f12fa1b7a0d254bd86084"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "04e5883b5b915b6734a6e41b2c4cded2aab6e8bd"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.153.4",
+        "sha256": "56ef98ab4032d317ab26e9b5e5a175650717351edb16ed9cde0cb6d1734d62da"
+      },
+      "protocolSchemaSha256": "bf15a4a551fabb399babfdb712f5832904a75703256e77d455e96a868cc94087",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "efadd9bae5b47668d56d25ab633d1c7ec5844082afaebfa8f8b965ea55390eb6"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266"
+      }
+    },
+    "smokeReceiptSha256": "e093352399de882126904c0ed35deb43314f7ce354dbd24221c6833103950295",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 135,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "c52510b1a243ece868d2dcdb7de19b281b7997c1eb6420ccc20e962cd671988e",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    }
+  }
+}
