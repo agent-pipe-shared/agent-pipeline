@@ -25,9 +25,13 @@ const TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
 const fail = (code) => { throw new TypeError(code); };
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 function closedError(error, fallback) {
-  if (!(error instanceof TypeError)) return fallback;
-  const message = Object.getOwnPropertyDescriptor(error, "message");
-  return typeof message?.value === "string" && DIAGNOSTICS.has(message.value) ? message.value : fallback;
+  try {
+    if (!(error instanceof TypeError)) return fallback;
+    const message = Object.getOwnPropertyDescriptor(error, "message");
+    return typeof message?.value === "string" && DIAGNOSTICS.has(message.value) ? message.value : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 // Never read a caller property until its own data descriptor has been checked.
