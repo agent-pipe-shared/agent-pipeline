@@ -13,6 +13,7 @@ import { projectC1SourceJoins } from "./interruption-source-adapter.mjs";
 import { createSelectedSandboxDisposition, reduceSelectedSandboxDisposition, validateSelectedSandboxDisposition } from "./selected-sandbox-disposition.mjs";
 import { compileCriticReviewLineage, validateCriticReviewHistory } from "./critic-review-lineage.mjs";
 import { REVIEW_LIMITS, sha256Canonical } from "./review-economy.mjs";
+import { captureCriticPreflightSource, qualifyCriticPreflightObservation } from "./critic-preflight-observer.mjs";
 
 const registry = JSON.parse(readFileSync(new URL("../../../policies/interruption-registry.v1.json", import.meta.url), "utf8"));
 const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64);
@@ -878,4 +879,46 @@ test("source adapter and its entire fresh import graph evaluate and run under am
   const result = childProcess.spawnSync(process.execPath, ["--no-warnings", "--experimental-vm-modules", "--input-type=module", "-e", script,
     new URL("./interruption-source-adapter.mjs", import.meta.url).href, JSON.stringify(sourceInput())], { encoding: "utf8", timeout: 15000 });
   assert.equal(result.error, undefined); assert.equal(result.status, 0, result.stderr); assert.equal(result.stdout, "");
+});
+
+const c1Source = (patch = {}) => ({
+  schema: "pipeline.critic-preflight-observation.v1", producer: "critic-dispatch-preflight", observationRevision: 1,
+  stage: "complete", outcome: "packet-ready", code: null, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, specSha256: A, ...patch,
+});
+test("C1 observer accepts only the frozen source matrix and detaches snapshots", () => {
+  const matrix = {
+    arguments: ["CDP-ARGUMENT"], request: ["CDP-INPUT"], candidate: ["CDP-GIT", "CDP-REF", "CDP-RANGE"],
+    paths: ["CDP-PATH", "CDP-PATHS", "CDP-DUPLICATE-PATH", "CDP-EVIDENCE-REQUIRED", "CDP-PRIOR-ALIASED"],
+    inventory: ["CDP-GIT", "CDP-TREE", "CDP-PATH"], manifest: ["CDP-MANIFEST"], governance: ["CDP-GIT", "CDP-PATH"],
+    "candidate-files": ["CDP-CANDIDATE-PATH", "CDP-CANDIDATE-READ"], evidence: ["CDP-EVIDENCE-PATH", "CDP-EVIDENCE-FILE", "CDP-EVIDENCE-JSON", "CDP-EVIDENCE-BINDING"],
+    "prior-evidence": ["CDP-EVIDENCE-PATH", "CDP-EVIDENCE-FILE"],
+  };
+  const ready = c1Source(), captured = captureCriticPreflightSource(ready);
+  assert.equal(captured.ok, true); assert.deepEqual(captured.observedAt, { value: null, status: "unknown" });
+  ready.candidate.commit = "c".repeat(40); assert.equal(captured.source.candidate.commit, "a".repeat(40));
+  for (const [stage, codes] of Object.entries(matrix)) for (const code of codes)
+    assert.equal(captureCriticPreflightSource(c1Source({ stage, outcome: "rejected", code, candidate: null, specSha256: null })).ok, true, `${stage}/${code}`);
+  for (const stage of Object.keys(matrix))
+    assert.equal(captureCriticPreflightSource(c1Source({ stage, outcome: "rejected", code: "CDP-UNEXPECTED", candidate: null, specSha256: null })).ok, true, `${stage}/unexpected`);
+  const pairs = Object.entries(matrix).flatMap(([stage, codes]) => codes.map((code) => [stage, code]));
+  for (const [stage, code] of pairs) {
+    const wrong = stage === "arguments" ? "request" : "arguments";
+    assert.deepEqual(captureCriticPreflightSource(c1Source({ stage: wrong, outcome: "rejected", code, candidate: null, specSha256: null })),
+      { ok: false, code: "C1O-SOURCE", source: null, observedAt: null });
+  }
+  for (const malformed of [
+    c1Source({ stage: "complete", outcome: "rejected", code: "CDP-UNEXPECTED", candidate: null, specSha256: null }),
+    c1Source({ stage: "complete", code: null, candidate: null }), c1Source({ extra: null }),
+    c1Source({ stage: "candidate", outcome: "rejected", code: "CDP-NEXT", candidate: null, specSha256: null }),
+  ]) assert.equal(captureCriticPreflightSource(malformed).code, "C1O-SOURCE");
+});
+test("C1 observer never invokes source getters and rejects malformed time or uncorrelated owner input", () => {
+  let touched = 0;
+  const hostile = c1Source(); Object.defineProperty(hostile, "code", { enumerable: true, get() { touched++; return null; } });
+  assert.deepEqual(captureCriticPreflightSource(hostile), { ok: false, code: "C1O-SOURCE", source: null, observedAt: null });
+  assert.equal(touched, 0);
+  assert.deepEqual(captureCriticPreflightSource(c1Source(), { value: "not-a-time", status: "measured" }),
+    { ok: false, code: "C1O-TIME", source: null, observedAt: null });
+  assert.deepEqual(qualifyCriticPreflightObservation({ source: c1Source(), observedAt: { value: null, status: "unknown" }, root: "/not-a-c1-root", specPath: "specs/c1.md" }),
+    { ok: false, code: "C1O-ROOT", observation: null });
 });
