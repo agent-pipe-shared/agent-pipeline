@@ -13,6 +13,7 @@ import { spawn } from "node:child_process";
 import {
   NATIVE_CRITIC_REDUCING_CONFIG,
   NATIVE_CRITIC_REDUCING_CONFIG_SHA256,
+  nativeCriticUnknownContentReadMatchesCommand,
   nativeCriticUnknownGitActionMatchesCommand,
   nativeCriticReducingCliArgs,
   nativeCriticToolSurfaceConfigDigest,
@@ -233,7 +234,10 @@ if (!process.exitCode) {
       const boundedNativeGitRead = native && Array.isArray(item.commandActions) && item.commandActions.length === 1
         && item.commandActions[0]?.type === "unknown"
         && nativeCriticUnknownGitActionMatchesCommand(item.command, item.commandActions[0].command, request);
-      if (!knownReadActions && !boundedNativeGitRead) {
+      const boundedNativeContentRead = native && Array.isArray(item.commandActions) && item.commandActions.length === 1
+        && item.commandActions[0]?.type === "unknown"
+        && nativeCriticUnknownContentReadMatchesCommand(item.command, item.commandActions[0].command, request);
+      if (!knownReadActions && !boundedNativeGitRead && !boundedNativeContentRead) {
         // Keep the emitted evidence deliberately content-free: commands may contain
         // paths or arguments that do not belong in a durable Critic receipt. The
         // classification still tells the host whether the next repair belongs in

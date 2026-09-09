@@ -1661,6 +1661,24 @@ check("the actual child admits native-tools only after native policy, complete f
     assert.equal(unknownNonGitRead.result.code, "write-attempt");
     assert.equal(unknownNonGitRead.result.observed.writeAttemptKind, "command-unknown-non-git");
 
+    for (const [name, command, actionCommand] of [
+      ["bound role contract", `cat ${join(fixture, "role.md")}`, `cat ${join(fixture, "role.md")}`],
+      ["wrapped bound prompt contract", `bash -lc 'cat ${join(fixture, "prompt.md")}'`, `cat ${join(fixture, "prompt.md")}`],
+    ]) {
+      const result = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
+        { type: "commandExecution", command, commandActions: [{ type: "unknown", command: actionCommand }] }, finalItem,
+      ], { requireNativeWire: true }), fixture, { native: true });
+      assert.equal(result.status, 0, name);
+      assert.equal(result.result.code, "answered", name);
+    }
+
+    const unboundContentRead = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [
+      { type: "commandExecution", command: "cat /etc/passwd", commandActions: [{ type: "unknown", command: "cat /etc/passwd" }] }, finalItem,
+    ], { requireNativeWire: true }), fixture, { native: true });
+    assert.equal(unboundContentRead.status, 2);
+    assert.equal(unboundContentRead.result.code, "write-attempt");
+    assert.equal(unboundContentRead.result.observed.writeAttemptKind, "command-unknown-non-git");
+
     const emptyInventory = runActualCriticChild(childPath, writeFakeCriticAppServer(fixture, [finalItem], { requireNativeWire: true }), fixture, { native: true });
     assert.equal(emptyInventory.status, 0);
     assert.equal(emptyInventory.result.observed.toolSurface.mcpReductionCount, 0);

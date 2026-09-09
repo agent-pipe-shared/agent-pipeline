@@ -113,6 +113,38 @@ export function nativeCriticUnknownGitActionMatchesCommand(command, actionComman
     && argv.length === 2 && ["-c", "-lc"].includes(argv[0]) && argv[1] === actionCommand;
 }
 
+function isBoundNativeCriticContentPath(path, request) {
+  if (typeof path !== "string" || !path.startsWith("/") || !request || typeof request.cwd !== "string") return false;
+  const contractPaths = [request.roleContractPath, request.promptContractPath, request.verdictSchemaPath];
+  const referencePaths = Array.isArray(request.referencePaths)
+    ? request.referencePaths.map((referencePath) => `${request.cwd}/${referencePath}`)
+    : [];
+  return [...contractPaths, ...referencePaths].includes(path);
+}
+
+/**
+ * The native model currently exposes simple file reads as
+ * CommandAction::Unknown. Admit only a direct `cat` of a contract or the
+ * already-bound reference set; no glob, option, shell syntax, directory, or
+ * unbound filesystem path can enter this allowance.
+ */
+export function nativeCriticUnknownContentReadMatchesCommand(command, actionCommand, request) {
+  if (typeof command !== "string" || typeof actionCommand !== "string") return false;
+  const parsedAction = parseGuardCommand(actionCommand, request?.cwd);
+  if (parsedAction.parseStatus !== "accepted" || parsedAction.operators.length !== 0
+    || parsedAction.redirects.length !== 0 || parsedAction.segments.length !== 1) return false;
+  const [{ executable, argv }] = parsedAction.segments;
+  if (!(["cat", "/bin/cat", "/usr/bin/cat"].includes(executable) && argv.length === 1
+    && isBoundNativeCriticContentPath(argv[0], request))) return false;
+  if (command === actionCommand) return true;
+  const parsedCommand = parseGuardCommand(command, request?.cwd);
+  if (parsedCommand.parseStatus !== "accepted" || parsedCommand.operators.length !== 0
+    || parsedCommand.redirects.length !== 0 || parsedCommand.segments.length !== 1) return false;
+  const [{ executable: wrapper, argv: wrapperArgv }] = parsedCommand.segments;
+  return ["bash", "sh", "zsh", "/bin/bash", "/bin/sh", "/bin/zsh"].includes(wrapper)
+    && wrapperArgv.length === 2 && ["-c", "-lc"].includes(wrapperArgv[0]) && wrapperArgv[1] === actionCommand;
+}
+
 export function nativeCriticReducingCliArgs() {
   return Object.entries(NATIVE_CRITIC_REDUCING_CONFIG).flatMap(([key, value]) => ["-c", `${key}=${value}`]);
 }
