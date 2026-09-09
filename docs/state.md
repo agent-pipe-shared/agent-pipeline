@@ -24,7 +24,47 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-09: lifecycle recovery and selected review blocker
+## Current handover — 2026-09-10: migration correction and remaining artifact reviews
+
+**Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
+
+Continue the accepted local 0.6.2 test-candidate goal, then approved Nova work;
+collect actual human decisions in
+`backlog/evidence/2026-09-06-po-decision-queue.md`. Ordinary implementation,
+tests, local commits and reviews remain authorized. Do not repeat historical
+startup diagnosis, missing-record searches or completed review rounds.
+
+The genuine migration correction review is retained in
+`backlog/evidence/2026-09-10-migration-correction-critic.json`. Final correction
+`712f2aa3` preserves required input after activation; the parent inspected the
+driver and reproduced `collect-input` on the formerly false-ready path. This
+direct self-verification closes the final correction under the two-round cap;
+it is not a Critic PASS. Full Verify at
+`712f2aa390d07423d802e2c53cb99a558f7345e5`, tree
+`561a26e14263a1ba3fb9f6a75d4e9229556a71ca`, passed 517/517 with no reuse and
+exact clean binding, including security. Run:
+`verify-1788995343057-eaf89c315d0e6573`. Later edits need their own final gate.
+
+Inventory review withheld substantive judgment because of historical review
+commentary in its input. The exact result is retained and the live reason is
+now neutral; the inventory remains pending with no receipt digest. The old
+reader-package candidate failed Verify outside its eleven unchanged source
+files. Main already has that guard repair. Neither attempt establishes reader
+or inventory clearance. Details and immutable references:
+`backlog/evidence/2026-09-10-review-progress-and-input-repair.md`.
+
+Next: implement and verify the explicit native current-artifact scope in
+`specs/sprint-nova-epic/design/2026-09-10-native-current-artifact-review.md`,
+then independently review the remaining current artifacts with exact current
+evidence. Preserve the existing native policy and full exact-range mode.
+No synthetic comparison history or contradictory spec-only audit is used.
+After actual inventory attestation, run fresh two-stage reader review and
+binding, final build stamp, fresh Verify/security and reproducible local test
+handover. D.6's missing comparison remains an evidence dependency. Installed
+plugin and Alfred readiness are unchanged; push still needs its exact proof,
+and release/plugin replacement are outside the authorization.
+
+## Earlier handover — 2026-09-09: lifecycle recovery and selected review blocker
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 
