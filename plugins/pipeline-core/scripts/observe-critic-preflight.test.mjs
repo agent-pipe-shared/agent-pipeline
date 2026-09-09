@@ -84,3 +84,35 @@ test("packet-ready and the direct CLI never auto-write an observation", () => {
     assert.deepEqual(readdirSync(join(fx.root, "evidence/interruption-receipts")), []);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
+
+test("owner phase changes retain the operation lineage while recording the current phase", () => {
+  const fx = fixture();
+  try {
+    const create = run(observed, ["create", "--root", fx.root, "--spec", "specs/sprint-alfred-epic/spec.md"]);
+    assert.equal(create.status, 0, `${create.stdout}${create.stderr}`);
+    const operationId = JSON.parse(create.stdout).handle.operationId;
+    const producerArgs = args(fx, false).slice(2);
+    const bareBefore = run(direct, ["--root", fx.root, ...producerArgs]);
+    const first = run(observed, ["run", "--root", fx.root, "--operation", operationId, "--", ...producerArgs]);
+    assert.equal(first.status, bareBefore.status);
+    assert.equal(first.stdout, bareBefore.stdout);
+    assert.equal(first.stderr, bareBefore.stderr);
+    const statePath = join(fx.root, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.activeFeature.phase = "verification";
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+    const bareAfter = run(direct, ["--root", fx.root, ...producerArgs]);
+    assert.equal(bareAfter.status, bareBefore.status);
+    assert.equal(bareAfter.stdout, bareBefore.stdout);
+    assert.equal(bareAfter.stderr, bareBefore.stderr);
+    const second = run(observed, ["run", "--root", fx.root, "--operation", operationId, "--", ...producerArgs]);
+    assert.equal(second.status, bareAfter.status);
+    assert.equal(second.stdout, bareAfter.stdout);
+    assert.equal(second.stderr, bareAfter.stderr);
+    const receipts = readdirSync(join(fx.root, "evidence/interruption-receipts"));
+    assert.equal(receipts.length, 2);
+    const entries = receipts.map((entry) => JSON.parse(readFileSync(join(fx.root, "evidence/interruption-receipts", entry, "receipt.json"), "utf8")));
+    assert.equal(new Set(entries.map((entry) => entry.lineageId)).size, 1);
+    assert.deepEqual(new Set(entries.map((entry) => entry.scope.phase)), new Set(["implementation", "verification"]));
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
