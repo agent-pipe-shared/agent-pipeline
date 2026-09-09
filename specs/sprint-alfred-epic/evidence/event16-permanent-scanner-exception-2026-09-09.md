@@ -14,5 +14,6 @@ SHA-256 remains `388d642aded73d90a0789c70a036d527db692cf21bd7c35bd67b31508c6994e
 
 The sanctioned fixture probe recorded two findings before the exception and
 one after it; the other control path remained reported. The live ignore
-mutation and readback match the expected hash. Candidate Security and Full
-Verify remain separate pending gates.
+mutation and readback match the expected hash. The candidate Security run is
+clean; Full Verify remains red and its eight failures are recorded separately
+in [event16-candidate-verification-2026-09-09.json](event16-candidate-verification-2026-09-09.json).
