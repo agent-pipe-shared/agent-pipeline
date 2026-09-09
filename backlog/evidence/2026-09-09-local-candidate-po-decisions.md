@@ -21,3 +21,12 @@ its explicitly human-only terminal route. Agent execution did not bypass it.
 Readback confirms commit `bdaa374b303dee04b1a6a3311c1b4a76c0c1d748` adds
 exactly the seven prepared cases (72 lines). The new commit requires fresh
 full Verify binding; the prior 517/517 result binds only `c3daf1a2`.
+
+## Feature-branch push after completion
+
+The PO subsequently requested a push once the local candidate is final.
+This supersedes the earlier no-push instruction for the completed candidate
+only. The configured upstream is `origin/feat/sprint-nova-codex-v046`.
+Preserve the local version stamp, satisfy the normal push prerequisites, and
+read back the remote commit. This grants no release, force push, or exchange
+of installed plugins.

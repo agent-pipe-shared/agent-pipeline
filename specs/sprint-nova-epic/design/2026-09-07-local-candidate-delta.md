@@ -2,8 +2,9 @@
 
 This contract supplements the Sprint Nova PRD for the next local test candidate.
 The release target is 0.6.2; a local candidate retains the current release base
-and receives runner-specific build metadata. Publication and pushing are outside
-this delivery. D.2–D.6 followed the first test candidate; the current user goal
+and receives runner-specific build metadata. Release publication remains outside
+this delivery. The PO now authorizes pushing the final tested local candidate to
+the existing feature branch. D.2–D.6 followed the first test candidate; the current user goal
 includes them in the next local candidate, before the 0.6.2 release.
 
 ## Current documentation completion scope — 9 September
