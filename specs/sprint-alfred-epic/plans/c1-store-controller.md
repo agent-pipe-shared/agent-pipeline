@@ -22,6 +22,24 @@ callback, awaits an arbitrary Promise, or lets a telemetry exception replace the
 producer result. Telemetry latency is additional, bounded filesystem work; this
 does not promise identical timing.
 
+The store implementation must lazily read the fixed plugin asset
+`plugins/pipeline-core/config/interruption-registry.v1.json` through its module
+location, never a consumer `policies/` fallback. It must enforce regular
+file/no-symlink checks, bounded UTF-8/strict JSON at 16 KiB, the exact packaged
+byte digest `a37b5ab200f0b88cae6e45adb8befa4e273a8949494197d2958d01df094e23e9`,
+the full canonical registry digest
+`888b6d7942c6a99e97b79e492156d0388d65e5f8cff63b5c6560dfe44069a982`, the
+frozen family digest `e60c80dd242b9d4dde5fd3b035b4ad56671c10117568f82b31d77d430fe12ff5`,
+and all nine rules. No manifest asset mutation or consumer-root fallback is
+introduced. Missing, unsafe, malformed or mismatched asset returns C1S-REGISTRY
+with null identity/digest/output fields.
+
+Factory construction remains lazy and performs no I/O. Reads that require the
+registry must also pass the existing `validateInterruptionRegistry` success
+check. `C1S-REGISTRY` never becomes a platform failure, and `WriteResult.coreCode`
+remains null; an absent-store read that does not need registry validation may
+return the established `C1S-NOT-FOUND` result without acquiring the asset.
+
 Deliver a real, separately named observed controller:
 `plugins/pipeline-core/scripts/observe-critic-preflight.mjs`.
 The original `critic-dispatch-preflight.mjs` direct CLI stays read-only and retains
@@ -154,10 +172,6 @@ Context is the detached result of the actual observer owner-correlation path:
 ```text
 Context = {scope, ownerBinding}
 ownerBinding = {stateSha256, continuityRevision, specSha256, specPathSha256}
-
-`specPathSha256` is the SHA-256 of normalized repository-relative spec path
-UTF-8 bytes with no newline; state/spec digests are lowercase 64-character
-SHA-256 values and continuityRevision is a safe integer.
 Handle = {storeId, operationId, operationSha256}
 CreateResult = {schema, ok, code, handle}
 OperationResult = {schema, ok, code, operation}
@@ -169,9 +183,21 @@ WriteResult = {
  schema, status, code, coreCode, eventId, lineageId, entrySha256
 }
 SnapshotResult = {schema, ok, code, snapshot}
-ReportResult = {schema, status, code, reportSha256}
+ReportResult = {schema, status, code, reportSha256, output}
+output = null | {json, text}
 ControllerFailure = {schema, status:"rejected", code}
 ```
+
+`specPathSha256` is the SHA-256 of normalized repository-relative spec path
+UTF-8 bytes with no newline; state/spec digests are lowercase 64-character
+SHA-256 values and continuityRevision is a safe integer. For `created|replayed`,
+`code` is null, `reportSha256` is the exact complete `report.json` byte digest,
+and output contains detached UTF-8 strings from final validated immutable
+`report.json` and `report.txt` readback. Existing 16 MiB JSON and 256 KiB text
+limits apply. Failure leaves output and digest null. The report CLI prints only
+the selected stored bytes according to its closed format flag; it does not
+invoke a second renderer or reopen a caller path. Publication/readback failure
+emits the existing closed stderr and exit 2.
 
 Literal schemas are respectively:
 `pipeline.interruption-store-create-result.v1`,
@@ -197,7 +223,7 @@ metadata, not an untagged behavioral metric.
 Closed store codes:
 `C1S-SHAPE|C1S-ROOT|C1S-PLATFORM|C1S-LOCKED|C1S-INCOMPLETE|
 C1S-LIMIT|C1S-IO|C1S-NOT-FOUND|C1S-BINDING|C1S-CONFLICT|
-C1S-CORRUPT|C1S-RECEIPT|C1S-AGGREGATE|C1S-COVERAGE`.
+C1S-CORRUPT|C1S-RECEIPT|C1S-AGGREGATE|C1S-COVERAGE|C1S-REGISTRY`.
 Observer diagnostics retain the prior proposal's closed C1O enum. Diagnostic
 control bodies permit exactly those C1O/C1S codes; unknown codes are rejected.
 Wrapper syntax uses C1S-SHAPE. No string-to-authority mapping is introduced.
@@ -208,6 +234,12 @@ JSON. There is no CLI command accepting them. Authentic acquisition is establish
 only by the shipped controller calling the actual producer and owner readers.
 
 ## 4. Observer reconciliation and exact hashes
+
+The producer boundary invokes only a trusted synchronous callback and ignores
+its return without reading `then`, getters or assimilating a Promise. Synchronous
+callback throws are isolated from the original producer result/error. Production
+callbacks do not schedule asynchronous telemetry; this contract makes no claim
+to contain independently scheduled rejection or arbitrary callback side effects.
 
 Retain Source and the complete 19-code/stage matrix from the reconciled
 [C1 preflight observation plan](c1-preflight-observation.md). The scratch
@@ -681,9 +713,10 @@ Report CLI:
 Unknown omitted boundaries use null/unknown; explicit canonical times describe the
 requested window only, not measured source collection. No --coverage/--complete,
 arbitrary grouping, file path, outdir or native-source override exists.
-Default format json. Generate both canonical JSON envelope and deterministic
-concise text; stdout selects the requested one, stderr empty, exit0 after
-validated immutable publication/readback. Failure emits one closed
+Default format json. After validated immutable publication/readback, stdout
+selects and prints the detached bytes returned by the store's `output.json` or
+`output.text`; there is no second renderer and no caller-selected path. stderr
+is empty and exit0 on success. Failure emits one closed
 {schema:"pipeline.interruption-report-result.v1",status:"rejected",code} JSON on
 stderr, stdout empty, exit2. Report storage failure does not print an apparently
 persisted successful report.
@@ -691,7 +724,8 @@ persisted successful report.
 publishReport accepts only the closed snapshot. It revalidates the snapshot
 digest, all included receipt/core/registry bindings and source-entry descriptor
 against retained immutable source publications, recomputes aggregate using the
-unchanged core, and derives deterministic text internally. It never trusts
+unchanged core, derives deterministic text internally, and returns only the
+validated stored report bytes through ReportResult. It never trusts
 caller-supplied aggregate or text. Newer source entries do not invalidate a
 retained coherent older snapshot; missing or changed referenced bytes do.
 Report envelope is exactly {schema:"pipeline.interruption-local-report.v1",
@@ -712,8 +746,17 @@ uninterrupted coverage, all seed categories, measured-zero population or a
 
 ## 9. Planned paths, tests and delivery gates
 
+Required source-layout behavior includes byte equality between the canonical
+source registry asset and the packaged plugin asset, plus a copied-plugin
+consumer fixture proving the store does not read the consumer root registry.
+Report created and replayed fixtures compare CLI stdout byte-for-byte with the
+validated stored JSON/text artifacts and assert failed publication produces no
+successful stdout. These are proposed fixtures, not executed results.
+
 Implementation paths, to freeze in the parent's tracked scoped plan:
 - new lib/interruption-receipt-store.mjs: synchronous bounded store and reader;
+- new config/interruption-registry.v1.json: exact unchanged copy of
+  `policies/interruption-registry.v1.json`;
 - new lib/critic-preflight-observer.mjs: capture, strict source validation, actual
   owner/root/spec correlation and sanitized Observation construction;
 - modify scripts/critic-dispatch-preflight.mjs: optional internal source callback,

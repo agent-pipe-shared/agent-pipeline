@@ -63,13 +63,13 @@ does not authorize an independent Critic launch.
 The focused event-16 scanner diagnostic exits 0 and confirms that the raw match
 equals the producer `denyDecisionId({intentSha256: event.correlation.requestId,
 generation: 0, producer: hgo})`, `payload.decisionId`, and `idempotencyKey`.
-The scanner proposal remains `proposal-not-applied` and pending a new PO
-decision; the prior narrow approval does not cover event 16. No standalone
-new-exception writer command was identified; `repairStaleIgnoreEntry` is for an
-existing stale entry and is not applicable. Any eventual exact diff must use
-the repository's permitted mutation route and actual guard requirements. The
-proposed review date of
-2026-09-26 is a PO proposal, not an automatically enforced expiry.
+The PO explicitly approved on 2026-09-09 one permanent, narrow event-16
+`content-v1` exception bound to the exact event path, `generic-api-key`, line 1,
+column 987, and the machine-confirmed content fingerprint. The approval is
+recorded but not applied: root owns preparing and applying the single scanner
+entry through the permitted mutation route and actual guard requirements, then
+providing readback. The event and scanner ignore remain unchanged until then;
+the earlier proposed 2026-09-26 review/expiry date is superseded.
 
 The C1 aggregation implementation and focused tests are locally committed at
 `854b0da8d1732bf2f787a684f9ad79659a7c9186`; its final checks record receipt
@@ -90,6 +90,14 @@ recorded in `scratch/alfred-c1-source-projection-checks-final.json`. This is
 focused evidence, not a new Full Verify or T1 review. Usage/read-only I/O,
 local store/report, real observer composition and the 14-day baseline remain
 open.
+The producer-only capture increment is now committed at
+`3e11cdadfe8c0e6ab9bd864211fc6dc6e03270dc`, tree
+`ab433771e3711d999d75d04fbc3f71acbeb7a845`. Focused capture checks were 6/6,
+then 20/20 with 14 added checks; six were preserved, consumer checks were 9/9,
+and diff-check was 0. Evidence is
+`specs/sprint-alfred-epic/evidence/c1-preflight-capture-verification-2026-09-09.md`.
+The next work is store/observer/controller integration, followed by a new
+candidate Full Verify; no emission or baseline success is claimed.
 An optional next-package read-only agent bootstrap was auto-review-rejected
 because bare `pipeline-start-preflight` may perform cleanup beyond its
 read-only scope; there was no retry or bypass, and orientation was completed
