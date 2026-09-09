@@ -79,14 +79,29 @@ the native host validated its execution receipt. The result is **FAIL**, with
 two major preflight defects: a late protocol failure can be lost, and stdin
 errors/null frames can escape bounded failure handling. Immutable result:
 `backlog/evidence/2026-09-09-native-preflight-critic-round-1.json`.
-Task `NVA-NATIVE-PREFLIGHT-FIX-1` repaired those findings in `0e8732a0`;
-focused runtime tests pass 14/14 and consumer-safe tests pass 9/9. The single
-correction review remains pending. Its scratch coordinator is
+Task `NVA-NATIVE-PREFLIGHT-FIX-1` repaired those findings in `0e8732a0`.
+Full Verify then passed 517/517, exact and clean, at `b4818e66` (run
+`verify-1788991424686-4009c7355553278a`). The single correction review completed
+with one further major finding: post-failure requests could remain unsettled.
+Immutable result: `backlog/evidence/2026-09-10-native-preflight-critic-round-2.json`.
+Final correction `d71f9fd6` rejects post-failure work and preserves the first
+failure while settling pending requests. Runtime tests pass 15/15 and consumer
+tests pass 9/9. Parent direct self-verification of the extracted current RPC
+class confirms one request write, immediate original-error rejection, no
+pending request and closed child; capture
+`evidence/NVA-NATIVE-PREFLIGHT-FIX-2-parent-self-verification.txt` is an
+in-memory fixture, not live Codex or Critic PASS. The two-round cap is exhausted;
+do not dispatch a third review of this package. Final full Verify and live
+model-free smoke of the corrected source remain pending.
+The completed correction review's scratch coordinator is
 `scratch/NVA-NATIVE-REREVIEW-COORDINATOR-1/native-rereview-coordinator.mjs`:
 it binds the original native receipt to review base `04e5883b`, retains prior
 verdict material only at the coordinator boundary, and requests full inspection
 of the exact correction range. This is coordinator lineage validation, not
-native-host lineage enforcement or a review PASS.
+native-host lineage enforcement or a review PASS. Remaining original coverage
+and exact recovered refs are preserved in
+`backlog/evidence/2026-09-10-remaining-candidate-review-coverage.md`; do not
+reinvestigate missing historical packets or reopen closed GG22 packages.
 This new-package review does not close the migration correction review or
 inventory/reader-checker/Nova-B coverage. Do not repeat the old initialization
 probes or infer a PASS from a completed model turn. Subsequent edits require

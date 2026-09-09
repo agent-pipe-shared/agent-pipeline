@@ -1,0 +1,144 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Loaded ruleset SHA: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Reviewed the named paths in 04e5883b5b915b6734a6e41b2c4cded2aab6e8bd..b4818e6677a654b0870eef49cbc2bfd0fdfe1c6e; independently resolved candidate tree 81e59aa5acbcfd0f0ecb50d62c7badae5a016fe5. The range contains 104c4796e6a980d92eda6c31be3e916e4ffd66b5, 0e8732a046565961458137715f17e464d58f90a1, bb96b51003626f9962858785b49c2c2b16f9f715 and b4818e6677a654b0870eef49cbc2bfd0fdfe1c6e. evidence/verify-latest.json records node harness/scripts/verify.mjs with exitCode 0, 517 successful non-reused steps and exact clean start/finish bindings to this candidate, including both changed test suites. Authorship remains not verifiable: dispatch trailers exist, but no stripped dispatch records were supplied. The finding was reproduced using extracted candidate code and an in-memory protocol fixture; this was not a live Codex execution. Auto-injected context comprised the AGENTS.md pointer and workspace/runtime instructions. No files or git state were modified; report persistence was unavailable under the read-only restriction.",
+    "findings": [
+      {
+        "gap": "The new sticky-failure early return in finish() leaves later requests unsettled because request() still admits work after failure. An initialize response followed by a forbidden server request in the same input batch resolves initialization before recording the failure; the resumed caller then queues thread/start, which subsequent stdin-error and close events cannot reject.",
+        "risk": "The preflight can terminate without emitting its structured unavailable result, or wait for a timeout that obscures the original protocol failure. The in-memory reproduction observed a closed child with one unresolved request; restoring the previous finish() behavior settled that request.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/codex-native-critic-preflight.mjs:135-145",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md — Review, evidence and delivery; governance/examples/guidelines/architecture-guidelines.md — item 4, explicit boundary error handling"
+      }
+    ],
+    "deliberately_not_flagged": [
+      "Spec fidelity, scope and reachability: codex-native-critic-host.mjs forwards the required full review mode to codex-critic-app-server-child.mjs, which renders the exact correction range. Missing or unsupported native modes are rejected; the legacy request shape remains unchanged.",
+      "Error paths and test integrity: terminal sticky failures prevent a successful smoke receipt; non-object frames and stdin errors receive explicit handling. codex-critic-host.test.mjs and codex-sandbox-runtime.test.mjs add regressions without removing existing assertions. Their fake-server results are not treated as live isolation evidence.",
+      "Guardrails, security, dependencies and language: the inspected correction introduces no dependency, credential, personal-data flow, deployment action or new source file. No separate finding arose from the named governance constraints.",
+      "Resolved specification and manifest: specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md; .claude/pipeline.yaml.",
+      "Resolved guardrails: governance/examples/guidelines/architecture-guidelines.md; governance/examples/policies/checklist.md; governance/examples/policies/deploy-policy.yaml; governance/examples/policies/deploy-risks.example.md; governance/examples/policies/license-allowlist.json; governance/examples/policies/live-deploy-lock.md; governance/examples/policies/policy-lock.example.yaml; governance/examples/policies/semgrep/dependency-direction.yml; governance/examples/policies/semgrep/example-rule.yml; governance/examples/policies/third-party-licenses.example.json.",
+      "Resolved implementation and tests: plugins/pipeline-core/scripts/codex-critic-app-server-child.mjs; plugins/pipeline-core/scripts/codex-critic-host.test.mjs; plugins/pipeline-core/scripts/codex-native-critic-host.mjs; plugins/pipeline-core/scripts/codex-native-critic-preflight.mjs; plugins/pipeline-core/scripts/codex-sandbox-runtime.test.mjs. Their working bytes matched the candidate.",
+      "Resolved review contracts: plugins/pipeline-core/roles/critic.md; plugins/pipeline-core/templates/prompts/critic-review.md; plugins/pipeline-core/scripts/critic-verdict.schema.json."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_j5wv43sm4lbj2san4zjnhbd2im",
+    "selectionSha256": "3582e59a65c6949e8651579735a305ca72f69cd377ff989af7ae61d99c087b61",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "b4818e6677a654b0870eef49cbc2bfd0fdfe1c6e",
+      "candidateTree": "81e59aa5acbcfd0f0ecb50d62c7badae5a016fe5",
+      "referenceSetSha256": "e58452a931e5e49cf8e4a09127506b877a27d8e733417eecd8aec635c744ba7e",
+      "requestSha256": "9c9d93e1d6ff8ccb55fa258844655ff747768844b15c413d0eddd0d9e82b4c0c"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "b4818e6677a654b0870eef49cbc2bfd0fdfe1c6e"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.153.4",
+        "sha256": "56ef98ab4032d317ab26e9b5e5a175650717351edb16ed9cde0cb6d1734d62da"
+      },
+      "protocolSchemaSha256": "bf15a4a551fabb399babfdb712f5832904a75703256e77d455e96a868cc94087",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "efadd9bae5b47668d56d25ab633d1c7ec5844082afaebfa8f8b965ea55390eb6"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266"
+      }
+    },
+    "smokeReceiptSha256": "94b78cfcfc71be4972cbc7402e834a40383a2e403810b6d5419e575f35814065",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 135,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "925c301ccf764730f317d9b3ca5332b91e6627ee1a588edec9175232f01bb811",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    }
+  }
+}
