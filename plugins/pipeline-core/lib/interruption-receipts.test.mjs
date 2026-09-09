@@ -1043,3 +1043,86 @@ test("C1 createOperation rejects malformed observer context before filesystem mu
     assert.deepEqual(fs.readdirSync(root), []);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+const c1PreflightObservation = (patch = {}) => ({
+  schema: "pipeline.critic-preflight-local-observation.v1", source: c1Source({ specSha256: B }), observedAt: c1UnknownTime(),
+  scope: c1Context().scope, actor: { runner: null, role: null }, ownerBinding: c1Context().ownerBinding, ...patch,
+});
+function c1ReadyStore(root, ids = ["create-nonce", "store-1", "operation-1", "write-nonce", "lineage-1"]) {
+  const store = createInterruptionStore({ root }, c1EligiblePorts(ids));
+  const created = store.createOperation({ context: c1Context() });
+  assert.equal(created.ok, true, created.code);
+  return { store, handle: created.handle };
+}
+
+test("C1 recordPreflight publishes detached exact observation and a valid immutable receipt", () => {
+  const root = fs.mkdtempSync("scratch/c1-store-preflight-");
+  try {
+    const { store, handle } = c1ReadyStore(root);
+    const observation = c1PreflightObservation();
+    const result = store.recordPreflight({ handle, eventId: "preflight-1", observation });
+    assert.deepEqual(Object.keys(result).sort(), ["code", "coreCode", "entrySha256", "eventId", "lineageId", "schema", "status"]);
+    assert.equal(result.status, "created"); assert.equal(result.code, null); assert.equal(result.lineageId, "lineage-1");
+    observation.source.candidate.commit = "c".repeat(40);
+    const path = `${root}/evidence/interruption-receipts/${createHash("sha256").update("preflight-1").digest("hex")}`;
+    const storedObservation = JSON.parse(fs.readFileSync(`${path}/observation.json`, "utf8"));
+    const storedReceipt = JSON.parse(fs.readFileSync(`${path}/receipt.json`, "utf8"));
+    const marker = JSON.parse(fs.readFileSync(`${path}/commit.json`, "utf8"));
+    assert.equal(storedObservation.source.candidate.commit, "a".repeat(40));
+    assert.deepEqual(validate(storedReceipt, registry), { ok: true, code: null });
+    assert.deepEqual(storedReceipt.observations, [{ sourceKind: "workflow-observer", facts: [], artifact: { id: "preflight-1", sha256: createHash("sha256").update(fs.readFileSync(`${path}/observation.json`)).digest("hex") } }]);
+    assert.equal(marker.files[1].recordSha256, storedReceipt.recordSha256);
+    assert.equal(result.entrySha256, createHash("sha256").update(fs.readFileSync(`${path}/commit.json`)).digest("hex"));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C1 recordPreflight replays only exact bytes and binds the retained operation", () => {
+  const root = fs.mkdtempSync("scratch/c1-store-preflight-replay-");
+  const otherRoot = fs.mkdtempSync("scratch/c1-store-preflight-other-");
+  try {
+    const { store, handle } = c1ReadyStore(root);
+    const request = { handle, eventId: "preflight-1", observation: c1PreflightObservation() };
+    const first = store.recordPreflight(request), replay = store.recordPreflight(clone(request));
+    assert.equal(first.status, "created"); assert.deepEqual(replay, { ...first, status: "replayed" });
+    const changed = clone(request); changed.observation.source.candidate.tree = "d".repeat(40);
+    assert.equal(store.recordPreflight(changed).code, "C1S-CONFLICT");
+    const { handle: otherHandle } = c1ReadyStore(otherRoot, ["create-nonce", "store-other", "operation-other", "write-nonce", "lineage-other"]);
+    assert.equal(store.recordPreflight({ ...request, handle: otherHandle }).code, "C1S-BINDING");
+    const unbound = clone(request); unbound.handle.operationSha256 = A;
+    assert.equal(store.recordPreflight(unbound).code, "C1S-BINDING");
+  } finally { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(otherRoot, { recursive: true, force: true }); }
+});
+
+test("C1 recordPreflight rejects unbound candidate/owner observations and hostile descriptors before publication", () => {
+  const root = fs.mkdtempSync("scratch/c1-store-preflight-binding-");
+  try {
+    const { store, handle } = c1ReadyStore(root);
+    const wrongSpec = c1PreflightObservation(); wrongSpec.source.specSha256 = A;
+    assert.equal(store.recordPreflight({ handle, eventId: "wrong-spec", observation: wrongSpec }).code, "C1S-BINDING");
+    const wrongOwner = c1PreflightObservation(); wrongOwner.ownerBinding.specSha256 = A;
+    assert.equal(store.recordPreflight({ handle, eventId: "wrong-owner", observation: wrongOwner }).code, "C1S-BINDING");
+    let touched = 0;
+    const hostile = c1PreflightObservation(); Object.defineProperty(hostile, "source", { enumerable: true, get() { touched++; return c1Source(); } });
+    assert.deepEqual(store.recordPreflight({ handle, eventId: "hostile", observation: hostile }),
+      { schema: "pipeline.interruption-store-write-result.v1", status: "rejected", code: "C1S-SHAPE", coreCode: null, eventId: null, lineageId: null, entrySha256: null });
+    assert.equal(touched, 0); assert.deepEqual(fs.readdirSync(`${root}/evidence/interruption-receipts`), []);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("C1 recordPreflight preserves locked and incomplete owned material", () => {
+  const lockedRoot = fs.mkdtempSync("scratch/c1-store-preflight-lock-");
+  try {
+    const { store, handle } = c1ReadyStore(lockedRoot);
+    fs.mkdirSync(`${lockedRoot}/evidence/interruption-collection/.writer-lock`);
+    const result = store.recordPreflight({ handle, eventId: "locked", observation: c1PreflightObservation() });
+    assert.equal(result.code, "C1S-LOCKED"); assert.equal(fs.existsSync(`${lockedRoot}/evidence/interruption-collection/.writer-lock`), true);
+  } finally { fs.rmSync(lockedRoot, { recursive: true, force: true }); }
+  const incompleteRoot = fs.mkdtempSync("scratch/c1-store-preflight-incomplete-");
+  try {
+    const { store, handle } = c1ReadyStore(incompleteRoot);
+    const path = `${incompleteRoot}/evidence/interruption-receipts/${createHash("sha256").update("incomplete").digest("hex")}`;
+    fs.mkdirSync(path); fs.writeFileSync(`${path}/observation.json`, "partial", "utf8");
+    const result = store.recordPreflight({ handle, eventId: "different-event", observation: c1PreflightObservation() });
+    assert.equal(result.code, "C1S-INCOMPLETE"); assert.equal(fs.readFileSync(`${path}/observation.json`, "utf8"), "partial");
+  } finally { fs.rmSync(incompleteRoot, { recursive: true, force: true }); }
+});
