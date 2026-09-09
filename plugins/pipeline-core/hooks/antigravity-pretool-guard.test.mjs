@@ -403,6 +403,19 @@ check("Antigravity pretool guard blocks agent self-approval for approve-push", (
   rmSync(root, { recursive: true, force: true });
 });
 
+check("Antigravity pretool guard admits approve-push when external cryptographic --proof is provided", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-pretool-bare-"));
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by 'PO' --remote origin --destination refs/heads/main --proof evidence/proof-1.json --proof-request evidence/req-1.json --proof-authority evidence/auth-1.json" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
 // 3. Restored Antigravity Hardening Layer (ADR-0014 read-only Critic contract)
 
 check("Antigravity pretool guard blocks a critic subagent defined with write tools enabled", () => {
