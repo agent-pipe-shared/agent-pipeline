@@ -709,6 +709,38 @@ function recordPreflight(factory, value, ports) {
   } finally { releaseLock(factory.io, token); }
 }
 
+function readOperation(factory, value) {
+  if (!operationInput(value)) return operationResult("C1S-SHAPE");
+  // Preserve the read-only absent-layout distinction: empty bootstrap
+  // containers are not a corrupt initialized store.
+  const absentState = inspectAbsentStore(factory.root, factory.io);
+  if (absentState === "C1S-NOT-FOUND") return operationResult("C1S-NOT-FOUND");
+  const root = safeRoot(factory.io, factory.root);
+  if (!root) return operationResult("C1S-ROOT");
+  const topology = writeTopology(factory, root);
+  if (topology.code) return operationResult(absentState === "C1S-INCOMPLETE" && topology.code === "C1S-CORRUPT" ? "C1S-INCOMPLETE" : topology.code);
+  const operations = operationInventory(factory.io, topology.entriesPath, topology.storeId);
+  if (!operations) return operationResult("C1S-CORRUPT");
+  const operation = operations.get(value.operationId);
+  if (!operation) return operationResult("C1S-NOT-FOUND");
+  const receipts = receiptInventory(factory.io, topology.receiptsPath, root.stat, operations);
+  if (!receipts) return operationResult("C1S-INCOMPLETE");
+  const lineage = operationLineage(receipts, operation);
+  if (!lineage) return operationResult("C1S-CORRUPT");
+  const view = Object.freeze({
+    handle: Object.freeze({ storeId: operation.storeId, operationId: operation.metadata.operationId, operationSha256: operation.sha256 }),
+    operationKind: operation.metadata.operationKind,
+    status: lineage.sequence === 1 ? "open" : "observed",
+    scope: Object.freeze({ ...operation.metadata.scope }),
+    specSha256: operation.metadata.specSha256,
+    lineageId: lineage.lineageId,
+    firstObservedAt: lineage.firstObservedAt === null ? Object.freeze({ value: null, status: "unknown" }) : Object.freeze({ ...lineage.firstObservedAt }),
+    headEntrySha256: lineage.previousEntrySha256,
+    sequence: lineage.sequence - 1,
+  });
+  return Object.freeze({ schema: OPERATION_SCHEMA, ok: true, code: null, operation: view });
+}
+
 /**
  * Construct a closed C1 store façade.  Construction is deliberately lazy.
  */
@@ -724,7 +756,7 @@ export function createInterruptionStore(input, ports = productionPorts) {
     recordPreflight: (value) => recordPreflight(factory, value, ports),
     recordCompletion: (value) => unavailableInput(value, ["handle", "controlId", "source", "observedAt", "context"]) ? incompleteWrite() : incompleteWrite("C1S-SHAPE"),
     recordDiagnostic: (value) => unavailableInput(value, ["handle", "controlId", "code", "observedAt"]) ? incompleteWrite() : incompleteWrite("C1S-SHAPE"),
-    readOperation: read(operationInput, operationResult),
+    readOperation: (value) => readOperation(factory, value),
     readSnapshot: read(snapshotInput, snapshotResult),
     publishReport: (value) => unavailableInput(value, ["snapshot"]) ? incompleteReport() : incompleteReport("C1S-SHAPE"),
   });

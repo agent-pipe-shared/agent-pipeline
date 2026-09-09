@@ -121,6 +121,38 @@ function candidateSpecSha256(root, candidate, specPath) {
   if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout)) fail("C1O-SCOPE-BINDING");
   return sha256(result.stdout);
 }
+/**
+ * Resolve the detached owner context used to create a retained local operation.
+ * This intentionally has no caller-supplied scope: authority, feature and spec
+ * are read from the physical repository twice before the context is returned.
+ */
+export function resolveCriticPreflightContext(input = {}) {
+  try {
+    const supplied = valuesOf(input, ["root", "specPath"], "C1O-ROOT");
+    const { root, specPath } = supplied;
+    const normalizedSpec = normalizedPath(specPath), actualRoot = physicalRoot(root);
+    const authority = resolveProjectAuthorityPaths({ rootDir: actualRoot });
+    if (authority.status !== "ready" || typeof authority.state !== "string") fail("C1O-SCOPE-UNAVAILABLE");
+    const before = ownerSnapshot(actualRoot, authority.state, normalizedSpec);
+    let afterState, afterSpec, after;
+    try {
+      afterState = boundedFile(actualRoot, authority.state, "C1O-SCOPE-STALE");
+      afterSpec = boundedFile(actualRoot, normalizedSpec, "C1O-SCOPE-STALE");
+      after = JSON.parse(afterState.toString("utf8"));
+    } catch { fail("C1O-SCOPE-STALE"); }
+    if (before.stateSha256 !== sha256(afterState) || before.revision !== after.continuity?.revision
+      || before.specSha256 !== sha256(afterSpec)) fail("C1O-SCOPE-STALE");
+    return {
+      ok: true,
+      code: null,
+      context: {
+        scope: { featureId: before.featureId, packageId: null, dispatchId: null, phase: before.phase },
+        ownerBinding: { stateSha256: before.stateSha256, continuityRevision: before.revision,
+          specSha256: before.specSha256, specPathSha256: sha256(Buffer.from(normalizedSpec, "utf8")) },
+      },
+    };
+  } catch (error) { return { ok: false, code: closedError(error, "C1O-SCOPE-UNAVAILABLE"), context: null }; }
+}
 export function qualifyCriticPreflightObservation({ source, observedAt, root, specPath } = {}) {
   try {
     const safeSource = sourceCheck(source), time = timeCheck(observedAt), normalizedSpec = normalizedPath(specPath), actualRoot = physicalRoot(root);
