@@ -91,8 +91,15 @@ class confirms one request write, immediate original-error rejection, no
 pending request and closed child; capture
 `evidence/NVA-NATIVE-PREFLIGHT-FIX-2-parent-self-verification.txt` is an
 in-memory fixture, not live Codex or Critic PASS. The two-round cap is exhausted;
-do not dispatch a third review of this package. Final full Verify and live
-model-free smoke of the corrected source remain pending.
+do not dispatch a third review of this package. Full Verify of the final
+correction passed 517/517 with zero reused results and exact clean binding at
+`e8374a5f221e8acc1576afda4a9fa2ff0a953092`, tree
+`d0ac4ca90fd2a8f78ee2ce01b98c4c7dd12c259e`, run
+`verify-1788992531351-c080575401c72593`, finished
+`2026-09-09T22:24:57.401Z`. Live model-free smoke also passed, capture
+`evidence/NVA-NATIVE-FINAL-SMOKE-1.txt`: actual read and denied write,
+unchanged canary/source, host control, clean termination, zero model turns.
+This subsequent handover-only edit is outside that preceding Verify.
 The completed correction review's scratch coordinator is
 `scratch/NVA-NATIVE-REREVIEW-COORDINATOR-1/native-rereview-coordinator.mjs`:
 it binds the original native receipt to review base `04e5883b`, retains prior
