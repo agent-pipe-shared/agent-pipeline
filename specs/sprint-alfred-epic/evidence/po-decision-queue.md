@@ -22,7 +22,7 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## Decisions awaiting the PO
 
-### Event 16 deterministic scanner collision — new decision required
+### Event 16 deterministic scanner collision — approved, not yet applied
 
 The exact clean candidate is `d88b543486ddc8e6215d3944fafc1e38aa6790da`
 (tree `f803aa1a4b353ee6093676b3f33961359d193fe1`). Full Verify is red (exit 1,
@@ -34,17 +34,13 @@ The focused diagnostic exits 0 and confirms the raw match equals the producer
 `evidence/alfred-recovery-d88b5434-verify.json` and
 `evidence/alfred-event16-scanner-proposal.json`.
 
-Recommendation: defer applying an exception while C1 implementation and test
-preparation continue. Independent Critic launch remains blocked by red
-deterministic Verify. Alternative: the PO may approve one narrow
-content-v1 exception bound exactly to the event path, `generic-api-key`, line
-1, column 987, and the machine-confirmed content fingerprint in the scanner
-proposal. The proposed owner is the PO and the proposed review date is
-2026-09-26; this date is not automatic expiry. No new exception is authorized
-by the earlier GMW approval, and no standalone new-exception writer command was
-identified. Any eventual exact diff must use the repository's permitted
-mutation route and actual guard requirements. The event and scanner ignore
-remain unchanged.
+The PO explicitly approved on 2026-09-09 one permanent, narrow `content-v1`
+exception bound exactly to the event path, `generic-api-key`, line 1, column
+987, and the machine-confirmed content fingerprint in the scanner proposal.
+This approval is recorded as approved but not applied. Root owns preparing and
+applying the single scanner entry through the repository's permitted mutation
+route and actual guard requirements. The event and scanner ignore remain
+unchanged until that readback.
 
 ## Open agent work and later gates
 
@@ -53,6 +49,7 @@ remain unchanged.
 | C1 observer/store suite registration | Preparation is documented in [the registration route](c1-suite-registration-route-2026-09-08.md); implementation and focused tests are not yet complete | Implement the observer/store suites, run focused tests, prepare the exact registration patch, then evaluate the actual current TP-3 authorization; apply only through the valid active TP-3 route; no signature is presumed and no new approval is requested prematurely |
 | C1 pure aggregation | Implementation and focused tests committed at `854b0da8`; receipt 64/64 and consumer checks 9/9 pass | With source projection now landed, prepare emission/local-report refinement, then run the next candidate Verify and independent T1 review |
 | C1 source projection | Committed at `125a2d160ac7b3c4d16979ed4cfbe305a98f8ed5`, tree `173ccbd8f7b0e6e5438742c6a79be6692d01e9c6`; C1 receipt suite 80/80 (64 preserved plus 16 source-projection tests), consumer 9/9, diff-check 0; candidate `96238c3c` Verify is now recorded red at 499/508 | Prepare store/controller contract and later usage/observer work; T1 remains gated by red Verify and baseline is not started |
+| C1 producer capture | Committed at `3e11cdadfe8c0e6ab9bd864211fc6dc6e03270dc`, tree `ab433771e3711d999d75d04fbc3f71acbeb7a845`; focused checks baseline 6/6 then 20/20, consumer 9/9, diff-check 0 | Integrate the reviewed store/observer/controller plans, then run a new candidate Full Verify; no emission or baseline claim |
 | Slice/parallel hooks | Exact hook identity, native tool coverage and live invocation evidence unmeasured | Read-only investigation, then bounded tests where admitted |
 | Existing first-core and scanner-exception review | Installed CAS-READY health and physical Critic adapter layout fix are observed; selected execution and T1 remain pending while Verify is red | Recheck the selected transport and candidate-bound review after the next green Verify |
 | Real collection baseline | Native evidence and measured 14-day window remain open | Implement/validate collection before recording a real start; never backdate |
