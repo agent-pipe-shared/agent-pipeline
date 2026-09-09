@@ -426,31 +426,12 @@ if (denials.length > 0) {
   if (grammarOnlyDenial) {
     deny(denials.map((entry) => entry.reason).join("\n"));
   }
-  // A consumer session cannot attest or mutate the Codex plugin cache.  This
-  // is an external authority boundary, not an effect that an in-repository
-  // Human-override audit can reconcile.  Returning verify-audit here creates
-  // an infinite retry loop without changing the allowed execution boundary.
+  // guard-lifecycle-ready owns the cross-repository HGO consume/plan path.
+  // Its denial already contains the one exact human-gated ceremony; planning
+  // it again here would create a second competing authorization.  The outer
+  // adapter only transports that authoritative refusal to Codex.
   if (crossRepositoryOnlyDenial) {
-    deny([
-      denials.map((entry) => entry.reason).join("\n"),
-      "Guard recovery route:",
-      JSON.stringify({
-        status: "external-operator-required",
-        code: "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY",
-        nextAction: {
-          kind: "external-operator",
-          executionBoundary: "separate-session-rooted-at-plugin-cache",
-          invocation: "user-copy-only",
-          action: {
-            toolName,
-            toolInputSha256,
-            repositoryRoot: projectRoot,
-            ...commandDisclosureFields(projectRoot, toolName, input?.tool_input, command),
-          },
-          reason: "the Codex plugin cache is outside this repository's physical authority boundary",
-        },
-      }),
-    ].join("\n"));
+    deny(denials.map((entry) => entry.reason).join("\n"));
   }
   const overrideSpawn = (executable, args, options) => boundedSpawn(
     executable,

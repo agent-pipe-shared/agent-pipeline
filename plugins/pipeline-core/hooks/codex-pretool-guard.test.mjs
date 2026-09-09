@@ -607,24 +607,12 @@ check("Pipeline Author Repair selects one exact source root and consumes one pat
   assert.equal(decision(run(input, root)).permissionDecision, "deny");
 });
 
-// The `doesNotMatch(/Human override available/)` this check carried until c609ac0 was a
-// PROXY, not the property. When fe59eb4 wrote it (2026-08-01), GUARD-CROSS-REPO-MUTATION had
-// no human-override route at all, so "no route text" and "no self-service retry loop" were
-// the same observation. c609ac0 routed that denial class through HGO (ADR-0059 Decision 6),
-// and this command was already HGO-classifiable before then -- eligibility()'s
-// exactLocalPluginInstall / "global-plugin-install" mode landed in a483675, an ancestor of
-// b108b3e. Measured, not inferred: this check is green at c609ac0^ and red at c609ac0, and
-// b108b3e (the out-of-root eligible class) is not involved.
-//
-// The property fe59eb4 actually fixed survives intact and is pinned positively below. The
-// defect it closed was an agent-executable LOOP: the cross-repository denial used to route to
-// HGO-NARROWER-WRITER-REQUIRED, whose next action is `verify-audit` followed by "retry the
-// exact original denial" -- every step runnable by the agent alone, ending back at the same
-// denial without ever changing the allowed execution boundary. What replaced it is one
-// terminal external boundary. The override route now printed alongside it is not that loop:
-// it terminates at a human authorization the agent cannot issue for itself, which is a
-// different thing from a self-service retry and is asserted as such.
-check("local plugin-cache installation returns one external boundary without an audit retry loop", () => {
+// ADR-0059 Decision 6 makes GUARD-CROSS-REPO-MUTATION liftable through HGO. The exact local
+// plugin-install shape is eligible as `global-plugin-install`, so this adapter must delegate
+// to the shared consume/plan path instead of replacing the HGO ceremony with an external
+// boundary. The offered route is still not agent-executable: it ends at an attended human
+// authorization, while an audit-only retry would be a self-service loop.
+check("local plugin-cache installation offers the human-gated HGO route without an audit retry loop", () => {
   const root = readyLifecycleFixture("chat");
   try {
     const output = decision(run({
@@ -634,37 +622,26 @@ check("local plugin-cache installation returns one external boundary without an 
     assert.equal(output.permissionDecision, "deny");
     const reason = output.permissionDecisionReason;
     assert.match(reason, /GUARD-CROSS-REPO-MUTATION/u);
-    assert.match(reason, /HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/u);
-    assert.match(reason, /separate-session-rooted-at-plugin-cache/u);
+    assert.match(reason, /Human override available for this exact command/u);
+    assert.match(reason, /Step: prepare-authorization/u);
+    assert.match(reason, /Step: authorize/u);
+    assert.doesNotMatch(reason, /HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/u);
+    assert.doesNotMatch(reason, /separate-session-rooted-at-plugin-cache/u);
     assert.doesNotMatch(reason, /verify-audit/u);
     assert.doesNotMatch(reason, /effect-reconciliation-required/u);
-    // ONE external boundary, still: the denial names it exactly once, so the agent is given a
-    // single terminal destination rather than a menu of competing recoveries.
-    assert.equal((reason.match(/HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/gu) ?? []).length, 1);
-    assert.equal((reason.match(/separate-session-rooted-at-plugin-cache/gu) ?? []).length, 1);
-    // NO audit retry loop, still: nothing instructs the agent to re-run the denied command
-    // after a step it could have taken by itself.
+    // The offered route is human-gated, not an agent-only loop. The fixture commits chat mode
+    // as part of real onboarding, so the configured continuation must retain its attended
+    // authorization step rather than silently clearing the denial.
+    assert.match(reason, /--activate/u);
+    assert.equal((reason.match(/Human override available for this exact command/gu) ?? []).length, 1);
     assert.doesNotMatch(reason, /retry the exact original denial/u);
     assert.doesNotMatch(reason, /fresh emergency plan/u);
-    // The route that IS offered is human-gated, which is why it is not a loop: the decisive
-    // step is an authorization the agent cannot mint. Asserted mode-independently -- this
-    // fixture commits chat mode as part of its real onboarding setup, and that setting is not
-    // this check's subject; neither route lets the agent clear the denial by repeating it.
-    if (/Human override available/u.test(reason)) {
-      assert.match(reason, /prepare-authorization --repo/u,
-        "an override route was advertised without the human authorization step that gates it");
-    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-// backlog: cross-repository-boundary-guidance-still-omits-the-literal-command. The
-// crossRepositoryOnlyDenial branch used to emit only `toolInputSha256` -- a hash a human
-// attending the real terminal cannot act on -- unconditionally, not even behind the same
-// `commandIsSafe` gate the sibling host-boundary route (GF-064) already applies. These two
-// checks mirror that sibling's GF-064 pairing for this second site.
-check("a safe Bash cross-repository-boundary denial carries the literal command and a copyCommand", () => {
+check("a safe Bash local-plugin-install denial does not expose the original command outside HGO", () => {
   const root = readyLifecycleFixture("chat");
   const command = "codex plugin add pipeline-core@agent-pipeline-local";
   try {
@@ -673,11 +650,8 @@ check("a safe Bash cross-repository-boundary denial carries the literal command 
       tool_input: { command },
     }, root));
     assert.equal(output.permissionDecision, "deny");
-    const route = guardRecoveryRoute(output.permissionDecisionReason);
-    assert.equal(route.code, "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY");
-    assert.equal(route.nextAction.action.command, command);
-    assert.ok(route.nextAction.action.copyCommand, "copyCommand field is missing");
-    assert.equal(route.nextAction.action.copyCommand.maxColumns, 72);
+    assert.match(output.permissionDecisionReason, /Human override available for this exact command/u);
+    assert.doesNotMatch(output.permissionDecisionReason, new RegExp(command, "u"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -694,12 +668,8 @@ check("a secret-bearing Bash cross-repository-boundary denial never carries the 
   assert.equal(output.permissionDecision, "deny");
   assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
     "the secret-bearing Bash command leaked verbatim into the denial reason");
-  const route = guardRecoveryRoute(output.permissionDecisionReason);
-  assert.equal(route.code, "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY");
-  assert.equal(route.nextAction.action.command, null,
-    "command must be suppressed when the eligibility secret screen flags the command");
-  assert.equal(route.nextAction.action.copyCommand, null,
-    "copyCommand must be suppressed exactly like command, never a bypass around the secret screen");
+  assert.match(output.permissionDecisionReason, /HGO-EXTERNAL-SENSITIVE-INPUT/u);
+  assert.match(output.permissionDecisionReason, /No human override route is offered/u);
 });
 
 check("override persistence failure remains a sanitized fail-closed denial", () => {
