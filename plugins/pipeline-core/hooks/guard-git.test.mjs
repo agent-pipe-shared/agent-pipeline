@@ -1394,6 +1394,78 @@ check(
   },
 );
 
+// GG22-9 through GG22-15: a pathspec'd commit is scoped to the paths it names only when
+// the invocation is provably pathspec-exclusive. Each fixture builds real history with status-flip
+// debt and a deliberately unrelated staged source file: a pass must come from the fixed commit
+// pathspec handling, never from an empty index or absent debt.
+function gg22PathspecDebtFixture(prefix) {
+  const root = gitRepoFixture(prefix);
+  commitFile(root, "seed.txt", "seed\n");
+  gg22CommitItem(root, "demo.md", "open", "chore: add demo item (open)");
+  gg22CommitLedgerTouch(root);
+  gg22CommitItem(root, "demo.md", "in_progress", "chore: flip demo item to in_progress");
+  gg22StageFile(root, "backlog/transitions.ndjson", "{\"seq\":2}\n");
+  gg22StageFile(root, "src/unrelated.mjs", "export const unrelated = true;\n");
+  return root;
+}
+
+const GG22_PATHSPEC_ALLOWED_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-allowed-");
+check(
+  "GG22-9 allow  pathspec ledger commit ignores unrelated staged source file",
+  'git commit -m "chore: reconcile ledger" -- backlog/transitions.ndjson',
+  ALLOW,
+  { projectDir: GG22_PATHSPEC_ALLOWED_DIR },
+);
+
+const GG22_PATHSPEC_DISALLOWED_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-disallowed-");
+check(
+  "GG22-10 block  pathspec source commit remains blocked while GG22 debt exists",
+  'git commit -m "feat: source change" -- src/unrelated.mjs',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_DISALLOWED_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_BARE_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-bare-");
+check(
+  "GG22-11 block  bare staged-index commit remains blocked with unrelated source staged",
+  'git commit -m "feat: source change"',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_BARE_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_INCLUDE_SHORT_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-include-short-");
+check(
+  "GG22-12 block  -i widens a pathspec commit to the staged index",
+  'git commit -i -m "chore: reconcile ledger" -- backlog/transitions.ndjson',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_INCLUDE_SHORT_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_INCLUDE_LONG_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-include-long-");
+check(
+  "GG22-13 block  --include widens a pathspec commit to the staged index",
+  'git commit --include -m "chore: reconcile ledger" -- backlog/transitions.ndjson',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_INCLUDE_LONG_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_TRAVERSAL_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-traversal-");
+check(
+  "GG22-14 block  ../ traversal escaping backlog/items is disallowed",
+  'git commit -m "feat: source change" -- backlog/items/../../src/unrelated.mjs',
+  BLOCK,
+  { projectDir: GG22_PATHSPEC_TRAVERSAL_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md"] },
+);
+
+const GG22_PATHSPEC_TRAILING_DIR = gg22PathspecDebtFixture("guard-test-gg22-pathspec-trailing-");
+gg22StageFile(GG22_PATHSPEC_TRAILING_DIR, "backlog/items/repair.md", gg22ItemBody("closed"));
+check(
+  "GG22-15 allow  trailing-slash backlog/items directory pathspec is admitted",
+  'git commit -m "chore: close item" -- backlog/items/',
+  ALLOW,
+  { projectDir: GG22_PATHSPEC_TRAILING_DIR },
+);
+
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, ...SIGNED_ROOTS]) {
   try {
