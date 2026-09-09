@@ -1,5 +1,22 @@
 # PO decision queue — collected 2026-09-06
 
+## Evening continuation — 2026-09-09
+
+The PO requested completing the local 0.6.2 test candidate first, followed by
+autonomous work on approved Nova backlog scope. Collect human decisions here
+while progressing independent work. A technical failure is not an extra
+approval gate, and prior decisions below must not be asked again.
+
+| Topic | Current disposition | Human decision needed |
+|---|---|---|
+| Local candidate and subsequent backlog | Continue the accepted candidate scope, then eligible Nova work. | None for ordinary implementation, tests, local commits or review preparation. |
+| V3 migration recovery review | Source repair passes 517/517 Verify; selected Codex review child exits before initialization. Investigate within the selected transport contract. | None yet; this is a technical blocker, not a request to waive review. |
+| Final test acceptance | Report the stamped build identity, actual checks, installation status and residual limitations when available. | PO testing/acceptance after delivery. |
+| Material new scope, protected external actions or required signatures | Prepare concrete proposals and append them here when encountered; work on independent approved items continues. | Only the specific decision or proof required by the configured gate. |
+
+No new approval, review PASS, live Alfred readiness or release is asserted
+by this queue entry.
+
 ## PO decisions — 2026-09-07, Codex takeover
 
 These decisions supersede the waiting/recommendation text below; numbering is unchanged.

@@ -24,7 +24,55 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-09: candidate evidence and remaining closure
+## Current handover — 2026-09-09: lifecycle recovery and selected review blocker
+
+**Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
+
+The latest local candidate goal remains the 0.6.2 test build under
+`specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md`.
+The PO's evening instruction is to finish that candidate first, then continue
+approved Nova backlog work autonomously and collect human decisions in
+`backlog/evidence/2026-09-06-po-decision-queue.md`. Candidate preparation is
+not evidence of installation or release.
+
+The recovered migration repair is committed in `653703e9` and `93423c67`;
+rollback/compatibility documentation is in `a695c5e9`. Independent review
+then exposed the real legacy frontdoor bypassing the migration plan.
+Corrections `7cc72e48` and `5b21e726` cover the actual activation route and
+restrict terminal migration readback to preserve Greenfield intake.
+Full Verify completed with 517/517 steps, zero failures, fresh receipts and
+an exact clean binding at `5b21e7260abdbb6b2fecec2eae25a9d3ac2945a1`, tree
+`921e4dfc915edd91627f7f37dfb344c754e24521`.
+Evidence: `evidence/verify-1788986681947-494491b0d04a1ba5.json` and
+`evidence/dispatch-record-NVA-V3-MIGRATION-FRONTDOOR.json`.
+This subsequent handover edit is not covered by that preceding Verify.
+
+The correction review's selected Codex transport was actually invoked.
+It returned `selected-critic-transport-failed`: child started, exit 1,
+initialization/thread/model turn all false, cleanup complete. There is no
+review verdict. The bound result is
+`scratch/v3-frontdoor-selected-review-result.json`; dispatch admission is
+`scratch/v3-frontdoor-critic-preflight.json`; the bounded coordinator is
+`scratch/review-v3-frontdoor-selected.mjs`. The prior finding is retained in
+`scratch/v3-frontdoor-prior-critic.json` as a report, not a transport receipt.
+Investigate this startup failure through the selected runner contract;
+do not infer that a healthy daemon proves this child starts, or substitute
+generic-agent review for the candidate's selected-transport requirement.
+
+Documentation reader binding passed for `5b21e726`, reviewed documentation
+commit `7fc1bc503473339bfe1b15c34082e86a175eba43`, with assurance
+`committed-state-and-evidence-presence-only`. The capability inventory still
+declares `required-before-publication`; no current passing Critic receipt
+has activated it. A claim that every documentation deliverable is complete
+would therefore be premature. Preserve D.6's explicit comparison dependency.
+
+Remaining candidate work: usable selected independent review and finding
+disposition; inventory/reader obligations from the candidate delta; final
+runner build stamps, fresh final full gate, and the local test handover.
+The Alfred checkout and its three pending migration files were not changed
+during this recovery. Live Alfred readiness remains unverified.
+
+## Earlier handover — 2026-09-09: candidate evidence and remaining closure
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 
