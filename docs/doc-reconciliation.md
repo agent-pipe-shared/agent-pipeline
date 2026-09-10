@@ -2772,3 +2772,19 @@ keeps every active capability and moves only its public anchor target from the
 entry README to SETUP, PIPELINE_FLOW or the normative Operating Model. The
 vendored Operating Model remains byte-identical. No runner support,
 authorization, publication, worker, evidence or Verify contract changes.
+
+## Candidate bf304b4f76a7abd9e04d4891e49d4a6fc8b1e0d0 — 2026-09-11, range a60c7f0a..bf304b4f, align the public reader journey
+
+- ADR-0011: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0076: checked, no change needed.
+- ADR-0078: checked, no change needed.
+
+This second Lektor correction keeps the English-canonical bilingual front
+doors aligned and changes no authority or distribution behavior. It orders the
+reader path as README, SETUP, PIPELINE_FLOW, then Usage; makes the README
+Critic branch explicitly conditional; removes stale prose references; and
+cuts historical probe forensics from the public parallel-work guide. The
+review reports remain feature evidence under the existing canonical artifact
+topology. No approval, release-channel, model-route, or runner-support contract
+changes.
