@@ -32,6 +32,17 @@ You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, rea
 
 `disable-model-invocation: false` permits the Elephant to dispatch this standard review gate autonomously after the applicable plan gate is recorded and the deterministic Verify chain is green. A Critic still does not replace a PO decision, final acceptance, or an explicitly configured gate. `context: fork` + `agent: critic` is deliberate: no conversation history can leak in. Fallback if fork dispatch is unavailable: the Elephant dispatches the `critic` agent directly with the path-only briefing template (`templates/prompts/critic-review.md`, agent-pipeline repo — plugin-root fallback per `pipeline-start` SKILL.md's canon-reference rule for a hosted project).
 
+**Execution ownership (Elephant, including consuming user projects):** after
+the applicable plan and deterministic gates, prepare and validate the bounded
+review input, start the supported Critic route, monitor it, read the actual
+result, and continue authorized finding disposition and repair. Ordinary review
+needs no additional Pipeline PO approval or obligatory user terminal step. Use
+the host's normal execution-permission mechanism where needed; it is not a new
+Pipeline PO gate. Report actual host/security denials or unavailable execution
+without bypassing them or claiming a completed review. This duty does not
+guarantee execution on every host. Preserve review admission, isolation,
+correction/review budgets and expressly defined PO gates.
+
 **Dispatch admission (Elephant, mandatory):** immediately before every Critic
 spawn, run `scripts/critic-dispatch-preflight.mjs` against the fixed base and
 candidate. Pass the candidate Spec, every declared guardrail, each fresh

@@ -366,7 +366,7 @@ routine implementation step.
 
 Once bootstrap is ready and the required plan gate is recorded, continue the
 approved implementation autonomously: scoped edits, focused tests, state
-readback, one-line commits, Verify, Critic preparation and ordinary block
+readback, one-line commits, Verify, Critic execution and ordinary block
 continuation are agent work. A standing approval is not a fresh human touch.
 **"Agent work" here means Goldfish-dispatched work, starting with the very
 first implementation edit of the plan — not this Elephant session writing
@@ -387,6 +387,16 @@ A feature's implementation is not complete until a Critic review
 (`critic-review` skill) has been dispatched against it and returned a
 result — pass, or a documented fail-then-fix cycle; this is a requirement to
 satisfy before treating the block as done, not an optional or ambient step.
+This duty applies in consuming user projects too: after the applicable plan and
+deterministic gates, the Elephant prepares and validates the bounded review
+input, starts the supported Critic route, monitors it, reads its actual result,
+and continues authorized disposition and repair. Do not add a Pipeline PO
+approval or obligatory user terminal step for ordinary Critic execution. Use
+the host's normal execution-permission mechanism when needed; do not invent a
+Pipeline PO gate from it. Actual host/security denials or unavailable execution
+must be reported, never bypassed or treated as a completed review. These
+instructions do not guarantee host execution capability. Review admission,
+isolation, correction/review budgets and expressly defined PO gates still apply.
 The Workflow tool and the Agent tool's own fan-out capability are
 Elephant-only — never delegate them to a fork or `general-purpose` subagent,
 which inherit the full parent toolset unlike the tool-scoped

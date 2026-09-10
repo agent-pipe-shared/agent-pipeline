@@ -291,8 +291,20 @@ human gates. A calibrated two-gate workflow has exactly those two configured
 human decision points; it does not acquire additional chat confirmations while
 work is in progress. Once the applicable plan gate is recorded, ordinary
 implementation is autonomous: bounded edits, focused checks, state readback,
-one-line commits, Verify, Critic preparation and the next approved block are
+one-line commits, Verify, Critic execution and the next approved block are
 agent work.
+
+This includes consuming user projects. After the applicable plan and
+deterministic gates pass, the agent prepares and validates the bounded Critic
+input, starts the supported review route, monitors it, reads the actual result,
+and continues authorized finding disposition and repair. Ordinary Critic
+execution needs no additional Pipeline PO approval or obligatory user terminal
+step. Use the host's normal execution-permission mechanism where needed; it is
+not a new Pipeline PO gate. Actual host/security denials or unavailable
+execution must be reported and never bypassed or presented as a review result.
+This is a workflow duty, not a guarantee that every host permits execution.
+Expressly defined PO gates, review admission, isolation, and correction/review
+budgets still apply.
 
 **Plan approval is an execution mandate, not a per-step conversation.** A
 recorded PRD/Spec approval covers every implementation choice and recovery
@@ -679,7 +691,20 @@ beiden konfigurierten menschlichen Entscheidungspunkte; während der Arbeit
 entstehen keine zusätzlichen Chat-Bestätigungen. Sobald das nötige Plan-Gate
 aufgezeichnet ist, läuft die gewöhnliche Implementierung autonom: begrenzte
 Änderungen, fokussierte Checks, State-Readback, einzeilige Commits, Verify,
-Critic-Vorbereitung und der nächste freigegebene Block sind Agentenarbeit.
+Critic-Ausführung und der nächste freigegebene Block sind Agentenarbeit.
+
+Das gilt auch für konsumierende Nutzerprojekte. Nach den nötigen Plan- und
+deterministischen Gates bereitet der Agent die begrenzte Critic-Eingabe vor,
+validiert sie, startet den unterstützten Review-Weg, überwacht ihn, liest das
+tatsächliche Ergebnis und setzt autorisierte Befund-Disposition und Reparatur
+fort. Ein gewöhnlicher Critic braucht keine zusätzliche Pipeline-PO-Freigabe
+und keinen obligatorischen Terminal-Schritt des Nutzers. Bei Bedarf den normalen
+Ausführungsberechtigungsmechanismus des Hosts verwenden; er ist kein neues
+Pipeline-PO-Gate. Tatsächliche Host-/Security-Ablehnungen oder nicht verfügbare
+Ausführung melden, niemals umgehen oder als Review-Ergebnis darstellen. Das ist
+eine Ablaufpflicht, keine Garantie, dass jeder Host die Ausführung erlaubt.
+Ausdrücklich definierte PO-Gates, Review-Zulassung, Isolation sowie Korrektur-
+und Review-Budgets gelten weiterhin.
 
 **Eine Planfreigabe ist ein Ausführungsmandat, kein Gespräch für jeden
 Einzelschritt.** Eine aufgezeichnete PRD-/Spec-Freigabe deckt jede

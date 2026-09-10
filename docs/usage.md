@@ -67,7 +67,7 @@ continues autonomously within that approved scope:
 2. Give each implementor a bounded goal, exact context paths, acceptance checks,
    prohibitions, and stop conditions.
 3. Run the configured verify command and any applicable security checks.
-4. Obtain the independent Critic review required by the profile and risk.
+4. Run the independent Critic review required by the profile and risk.
 5. Record the outcome and close the feature only when its tracked work is
    actually complete.
 
@@ -75,6 +75,15 @@ The human remains the decision owner for material scope changes, configured
 approvals, and remote or otherwise irreversible actions. Routine task ordering,
 test fixes, evidence collection, and follow-up within an approved plan are
 delivery work, not extra approval turns.
+
+In your project, the agent also handles ordinary Critic execution: after the
+required plan and deterministic checks, it prepares the bounded review input,
+starts and monitors the review, reads the actual result, and continues authorized
+repairs. You do not need to approve the review again or routinely launch it in
+a terminal. The agent uses the host's normal permission mechanism when needed;
+actual denials or unavailable execution are reported, never bypassed. Host
+capabilities vary. This workflow preserves expressly defined human gates,
+review admission, isolation, and correction/review limits.
 
 ## Know the boundary
 
