@@ -10,7 +10,8 @@
       "unsupported-profile",
       "sandbox-setup-error",
       "permission-denial",
-      "child-stdio-error"
+      "child-stdio-error",
+      "native-host-unavailable"
     ]
   },
   "entries": [

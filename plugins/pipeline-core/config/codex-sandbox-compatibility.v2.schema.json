@@ -16,7 +16,7 @@
         "laneId": { "type": "string" },
         "runnerId": { "type": "string" },
         "assuranceLiteral": { "type": "string", "const": "functional-equivalent-read-only; OS isolation not asserted" },
-        "allowedFailureCodes": { "type": "array", "items": { "type": "string", "enum": ["binary-missing", "unsupported-profile", "sandbox-setup-error", "permission-denial", "child-stdio-error"] } }
+        "allowedFailureCodes": { "type": "array", "items": { "type": "string", "enum": ["binary-missing", "unsupported-profile", "sandbox-setup-error", "permission-denial", "child-stdio-error", "native-host-unavailable"] } }
       }
     },
     "entries": {

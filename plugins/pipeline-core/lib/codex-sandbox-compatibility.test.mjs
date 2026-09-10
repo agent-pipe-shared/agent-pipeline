@@ -115,6 +115,18 @@ test("fallback is same-runner, pre-verdict, allowlisted and exactly once", () =>
   }
 });
 
+test("native host unavailability selects the one contractual session fallback", () => {
+  const policy = loadCompatibilityPolicy().value;
+  const result = decideFallback(policy, {
+    selectedRunnerId: "codex", primaryRunnerId: "codex", failureCode: "native-host-unavailable",
+    verdictBytesObserved: false, ambiguous: false, cleanupAttempted: false, fallbackAttempts: 0,
+  });
+  assert.deepEqual(result, {
+    action: "run-exact-fallback", runnerId: "codex", laneId: policy.fallback.laneId,
+    assuranceClass: "contractual-read-only", literal: WEAK_LITERAL,
+  });
+});
+
 test("registry policy digest is deterministic", () => {
   const policy = loadCompatibilityPolicy().value;
   assert.equal(sha256(Buffer.from(canonicalJson(policy))), sha256(Buffer.from(canonicalJson(structuredClone(policy)))));

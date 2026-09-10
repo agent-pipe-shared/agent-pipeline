@@ -47,9 +47,9 @@ export function validateCompatibilityPolicy(policy) {
   if (policy.schema !== POLICY_SCHEMA || policy.maxEvidenceAgeMs !== 86_400_000 || !Array.isArray(policy.entries)) fail("F4-POLICY", "policy header is invalid");
   exactKeys(policy.fallback, ["laneId", "runnerId", "assuranceLiteral", "allowedFailureCodes"], "fallback");
   if (policy.fallback.assuranceLiteral !== WEAK_LITERAL || policy.fallback.runnerId !== "codex"
-    || !Array.isArray(policy.fallback.allowedFailureCodes) || policy.fallback.allowedFailureCodes.length !== 5
-    || new Set(policy.fallback.allowedFailureCodes).size !== 5) fail("F4-FALLBACK", "fallback is not the one exact ADR-0035 lane");
-  const allowedFailures = ["binary-missing", "unsupported-profile", "sandbox-setup-error", "permission-denial", "child-stdio-error"];
+    || !Array.isArray(policy.fallback.allowedFailureCodes) || policy.fallback.allowedFailureCodes.length !== 6
+    || new Set(policy.fallback.allowedFailureCodes).size !== 6) fail("F4-FALLBACK", "fallback is not the one exact ADR-0035 lane");
+  const allowedFailures = ["binary-missing", "unsupported-profile", "sandbox-setup-error", "permission-denial", "child-stdio-error", "native-host-unavailable"];
   if (allowedFailures.some((code) => !policy.fallback.allowedFailureCodes.includes(code))) fail("F4-FALLBACK", "fallback failure allowlist drifted");
   const ids = new Set(); const tuples = new Set();
   for (const entry of policy.entries) {
