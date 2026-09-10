@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "7db2c9b907f29752cc45383ce74d8764f2b5c0df",
-    "tree": "5a76ef267d036545eb5e21d4a7798b10223a7abf"
+    "commit": "399d0a2c560074fe45cf33d386e84fd521d08618",
+    "tree": "0ffe043df5eb84b235d85c0f63bed53c541c4928"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -269,6 +269,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:consumer-baseline-verify-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
@@ -527,6 +528,7 @@
         "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
         "verify-phase:harness/scripts/verify.mjs:security-scan-v2-integration-tests",
         "verify-phase:harness/scripts/verify.mjs:self-application-attestation-gate-tests",
+        "verify-phase:harness/scripts/verify.mjs:self-verify-selection-tests",
         "verify-phase:harness/scripts/verify.mjs:semgrep-default-rules-tests",
         "verify-phase:harness/scripts/verify.mjs:semgrep-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
@@ -575,6 +577,7 @@
         "verify-phase:harness/scripts/verify.mjs:verify-evidence-producer-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-evidence-root-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-evidence-writer-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-selection-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
@@ -620,14 +623,19 @@
         "pipeline-core plugin"
       ],
       "productionEvidence": [
+        "harness/scripts/self-verify-selection.mjs",
         "harness/scripts/verify.mjs",
+        "plugins/pipeline-core/lib/consumer-baseline-verify.mjs",
         "plugins/pipeline-core/lib/consumer-verify.mjs",
+        "plugins/pipeline-core/lib/verify-selection.mjs",
         "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
         "plugins/pipeline-core/scripts/verify-evidence-producer.mjs"
       ],
       "testEvidence": [
         "harness/scripts/check-doc-contracts.test.mjs",
+        "harness/scripts/self-verify-selection.test.mjs",
         "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
+        "plugins/pipeline-core/lib/consumer-baseline-verify.test.mjs",
         "plugins/pipeline-core/lib/finding-lifecycle.test.mjs",
         "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
         "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
@@ -647,6 +655,7 @@
         "plugins/pipeline-core/lib/threat-model-discovery.test.mjs",
         "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
         "plugins/pipeline-core/lib/threat-model.test.mjs",
+        "plugins/pipeline-core/lib/verify-selection.test.mjs",
         "plugins/pipeline-core/scripts/sbom-discovery.test.mjs",
         "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs"
       ],
