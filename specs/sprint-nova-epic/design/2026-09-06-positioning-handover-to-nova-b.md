@@ -1,6 +1,7 @@
-> **Persisted 2026-09-06** from the read-only positioning session's scratch
-> output `scratch/handover-to-nova-b-2026-09-06.md`, verbatim apart from this header and
-> the cross-reference paths noted below. Design input for the 0.6.2
+> **Persisted 2026-09-06; editorial draft refreshed 2026-09-10** from the read-only positioning session's scratch
+> output `scratch/handover-to-nova-b-2026-09-06.md`. The draft reference and
+> editorial status notes were updated on 2026-09-10; the execution plan below
+> remains a historical snapshot. Design input for the 0.6.2
 > documentation block (D.1–D.6 in the handover file), not canon: nothing in
 > it is a decision until an ADR, a guardrail, or `docs/state.md` says so.
 > Status tags inside it (LIVE / CLI / CONTRACT / BUILT-NOT-WIRED / ROADMAP)
@@ -27,7 +28,7 @@ touched, `git status` was clean throughout. The Kanalprobe hook was removed from
 |---|---|---|
 | `specs/sprint-nova-epic/design/2026-09-06-positioning-and-doc-gaps.md` | Positioning decision, market context, **measured doc-gap audit** (§3), front-door structure (§4), **12 dispatch-sized work items (§5)**, what "measurable rails" must publish (§6) | The doc/positioning work for 0.6.2 |
 | `specs/sprint-nova-epic/design/2026-09-06-positioning-usp-catalog.md` | Verified feature catalog with status column (LIVE / CLI / CONTRACT / BUILT-NOT-WIRED / ROADMAP), source paths | Capability inventory extension; new doc pages; never claim a BUILT-NOT-WIRED item as live |
-| `specs/sprint-nova-epic/design/2026-09-06-positioning-reddit-post-prep.md` | The post draft (TL;DR, audience paragraph, origin story, two USPs, cost block, 10-minute test), pre-post fix list (§1), latest greenfield data (§3), swap blocks, source map | Everything marked `[KORRIGIERE MICH]` needs the PO; the fix list is doc-drift work for 0.6.2 |
+| `specs/sprint-nova-epic/design/2026-09-06-positioning-reddit-post-prep.md` | Refreshed public draft, runner-specific openings, bounded ten-minute first-contact test, three feedback questions, internal publication checklist, and dated research note | Editorial copy is separate from candidate/publication readiness; verify current runner docs, rules, and candidate state immediately before posting |
 | `specs/sprint-nova-epic/design/2026-09-06-positioning-kanalprobe-result.md` | PreToolUse `additionalContext` reaches the model — confirmed live and statically | Precondition for `guard-slicing` increment 1; cite it in the slicing ADR addendum |
 
 ## Order for the 0.6.2 local candidate (PO, 2026-09-06: "rest erst danach")
@@ -136,5 +137,6 @@ The six items below, in this order.
   PO can sign immediately.
 - Status honesty: catalog status tags are load-bearing. Nothing BUILT-NOT-WIRED or CONTRACT is
   documented as enforcement.
-- The post's `[KORRIGIERE MICH]` markers (SUL rationale, latest greenfield numbers, CI state on
-  the 0.6.2 commit, outside-tester count) are PO inputs, not dispatch work.
+- The refreshed post omits unverified personal anecdotes and current-run numbers.
+  Candidate readiness and publication remain separate decisions; consult the
+  draft's current pre-publication checklist instead of the retired placeholders.
