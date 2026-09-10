@@ -26,6 +26,8 @@ import {
 import { buildNativeCriticSelection, nativeCriticArtifactRequestDigest, nativeCriticCanonicalDigest } from "../lib/codex-native-critic-policy.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { readCriticExportConsentState, resolveCriticExportConsentState, runCriticExportConsent } from "./critic-export-consent.mjs";
+import { prepareCriticExportConsent, recordCriticExportConsent } from "../lib/critic-export-policy.mjs";
 
 import {
   ASSURANCE,
@@ -1878,12 +1880,50 @@ await checkAsync("a real Git current-artifact preflight flows through the actual
       dispatch: { queueRevision: 1, candidateCommit, candidateTree, referenceSetSha256, requestSha256: nativeCriticArtifactRequestDigest({ candidateCommit, candidateTree, referenceSetSha256, reviewMode: "full", reviewScope }) },
       route, poDecisionSha256: "4".repeat(64), smokeReceipt, smokeReceiptSha256: nativeCriticCanonicalDigest(smokeReceipt), createdAt: "2026-09-10T11:59:30.000Z",
     }, { validateRoute: () => route, expectedTuple: tuple, nowMs, maxSmokeAgeMs: 300_000 });
-    const input = { selection, expectedTuple: tuple, repository: { root, cliPath: fake }, coordinatorScratch: { path: root }, referencePaths, referenceRecords, reviewScope, reviewMode: "full" };
-    const result = await invokeCodexNativeCriticHost(input, {
+    const exportContext = { provider: "OpenAI", service: "consumer-selected-review-service", hostGate: "additional-check-required", providerGate: "not-observed", observedEndpoint: null };
+    const input = { exportContext, selection, expectedTuple: tuple, repository: { root, cliPath: fake }, coordinatorScratch: { path: root }, referencePaths, referenceRecords, reviewScope, reviewMode: "full" };
+    const dependencies = {
       nowMs, resolveRoute: () => route,
       readFileSync: (path) => path === "/proc/version" ? "Linux Microsoft" : path === "/proc/self/mountinfo" ? `1 0 0:1 / ${root} rw - ext4 /dev/root rw\n` : "boot",
-    });
+    };
+    const noChild = async (value, code, consentCode) => {
+      let children = 0;
+      const rejected = await invokeCodexNativeCriticHost(value, { ...dependencies,
+        resolveRoute: () => value.selection.route,
+        runChild: async () => { children++; throw new Error("unexpected child"); },
+      });
+      assert.equal(children, 0, JSON.stringify(rejected));
+      assert.equal(rejected.terminal.childStarted, false);
+      assert.equal(rejected.code, code, JSON.stringify(rejected));
+      if (consentCode) {
+        assert.equal(rejected.exportConsent.code, consentCode);
+        assert.equal(rejected.exportConsent.hostApprovalGranted, false);
+      }
+      return rejected;
+    };
+    const noContext = structuredClone(input); delete noContext.exportContext;
+    await noChild(noContext, "consent-unavailable", "consent-context-required");
+    await noChild(input, "consent-unavailable", "consent-missing");
+    const grantRequest = "evidence/consent-request.json";
+    writeFileSync(join(root, grantRequest), JSON.stringify({ scope: {
+      recipient: { provider: exportContext.provider, runner: "codex", service: exportContext.service }, purpose: "critic",
+      sourceRoots: [".claude/pipeline.yaml", "governance", "specs"], evidenceRoots: ["evidence"],
+    } }));
+    const consentArgs = ["--root", root, "--request", grantRequest];
+    const plan = runCriticExportConsent(["plan", ...consentArgs]);
+    assert.equal(runCriticExportConsent(["record", ...consentArgs, "--plan-sha256", plan.planSha256,
+      "--decision-reference", "test-fixture:consumer-setup", "--decision-sha256", "e".repeat(64)]).ok, true);
+    const saved = readCriticExportConsentState(root);
+    const statePath = resolveCriticExportConsentState(root).path;
+    const savedBytes = readFileSync(statePath);
+    const result = await invokeCodexNativeCriticHost(input, dependencies);
     assert.equal(result.status, "reviewed", JSON.stringify(result));
+    assert.equal(result.exportConsent.coverage, "covered");
+    assert.equal(result.exportConsent.hostApprovalGranted, false);
+    assert.equal(result.exportConsent.externalGates.host, "additional-check-required");
+    assert.equal(result.exportConsent.observedEndpoint, null);
+    assert.deepEqual(result.exportConsent.declaredRecipient, { provider: "OpenAI", runner: "codex", service: exportContext.service });
+    assert.deepEqual(readFileSync(statePath), savedBytes, "admission is read-only");
     assert.deepEqual(result.receipt.reviewScope, preflight.reviewScope);
     assert.deepEqual(result.receipt.sourceCoverage, preflight.sourceCoverage);
     assert.equal(result.receipt.dispatch.candidateCommit, preflight.candidate.commit);
@@ -1895,6 +1935,80 @@ await checkAsync("a real Git current-artifact preflight flows through the actual
     const rejected = await invokeCodexNativeCriticHost(missingMode, { runChild: async () => { childCreated = true; throw new Error("must not run"); } });
     assert.equal(rejected.code, "input-invalid");
     assert.equal(childCreated, false);
+
+    for (const gate of ["hostGate", "providerGate"]) {
+      const denied = structuredClone(input); denied.exportContext[gate] = "denied";
+      const blocked = await noChild(denied, "consent-unavailable", "external-gate-denied");
+      assert.equal(blocked.exportConsent.coverage, "covered");
+      assert.equal(blocked.exportConsent.externalGates[gate === "hostGate" ? "host" : "provider"], "denied");
+    }
+    const otherService = structuredClone(input); otherService.exportContext.service = "other-review-service";
+    await noChild(otherService, "consent-unavailable", "consent-recipient-not-covered");
+    const mismatchingLabel = structuredClone(input); mismatchingLabel.exportContext.provider = "openai";
+    await noChild(mismatchingLabel, "consent-unavailable", "consent-recipient-not-covered");
+    for (const provider of ["Anthropic", "OPENAI", ""]) {
+      const foreignProvider = structuredClone(input); foreignProvider.exportContext.provider = provider;
+      await noChild(foreignProvider, "input-invalid");
+    }
+    const missingProvider = structuredClone(input); delete missingProvider.exportContext.provider;
+    await noChild(missingProvider, "input-invalid");
+    const malformed = structuredClone(input); malformed.exportContext.extra = true;
+    await noChild(malformed, "input-invalid");
+    const badSelection = structuredClone(input); badSelection.selection.smokeReceipt.observed.sandboxLaunchDenied = true;
+    await noChild(badSelection, "selection-invalid");
+
+    const rebind = (value) => {
+      value.referencePaths = value.referenceRecords.map(({ path }) => path);
+      value.selection.dispatch.referenceSetSha256 = nativeCriticCanonicalDigest(value.referenceRecords);
+      value.selection.dispatch.requestSha256 = nativeCriticArtifactRequestDigest({
+        candidateCommit: value.selection.dispatch.candidateCommit, candidateTree: value.selection.dispatch.candidateTree,
+        referenceSetSha256: value.selection.dispatch.referenceSetSha256, reviewMode: value.reviewMode, reviewScope: value.reviewScope,
+      });
+    };
+    const expanded = structuredClone(input);
+    expanded.referenceRecords.push({ path: "notes/later.md", blobOid: run("git", ["rev-parse", `${candidateCommit}:notes/later.md`], root), sha256: createHash("sha256").update(readFileSync(join(root, "notes/later.md"))).digest("hex") });
+    rebind(expanded);
+    await noChild(expanded, "consent-unavailable", "consent-path-not-covered");
+    const driftBytes = readFileSync(join(root, "specs/review.md"));
+    writeFileSync(join(root, "specs/review.md"), "content drift\n");
+    await noChild(input, "physical-proof-unavailable");
+    writeFileSync(join(root, "specs/review.md"), driftBytes);
+    const evidenceBytes = readFileSync(join(root, "evidence/verify.json"));
+    writeFileSync(join(root, "evidence/verify.json"), "{}\n");
+    await noChild(input, "physical-proof-unavailable");
+    writeFileSync(join(root, "evidence/verify.json"), evidenceBytes);
+    runCriticExportConsent(["revoke", "--root", root]);
+    await noChild(input, "consent-unavailable", "consent-revoked");
+    writeFileSync(statePath, savedBytes);
+    const foreign = recordCriticExportConsent({ ...prepareCriticExportConsent({ ...saved.plan.scope,
+      project: { ...saved.plan.scope.project, inode: `${BigInt(saved.plan.scope.project.inode) + 1n}` } }),
+      decisionReference: "test-fixture:foreign-project", decisionSha256: "f".repeat(64) }).consent;
+    writeFileSync(statePath, JSON.stringify(foreign));
+    await noChild(input, "consent-unavailable", "consent-project-not-covered");
+    writeFileSync(statePath, JSON.stringify({ ...saved, planSha256: "0".repeat(64) }));
+    await noChild(input, "consent-unavailable", "consent-invalid");
+    writeFileSync(statePath, savedBytes);
+
+    // A second actual commit and freshly named evidence reuse the same grant.
+    writeFileSync(join(root, "specs/review.md"), "next candidate\n");
+    run("git", ["add", "specs/review.md"], root); run("git", ["commit", "-qm", "next candidate"], root);
+    const next = structuredClone(input);
+    const nextCommit = run("git", ["rev-parse", "HEAD"], root);
+    const nextTree = run("git", ["rev-parse", "HEAD^{tree}"], root);
+    next.selection.dispatch.candidateCommit = nextCommit; next.selection.dispatch.candidateTree = nextTree;
+    next.selection.route.candidateCommit = nextCommit;
+    writeFileSync(join(root, "evidence/verify-next.json"), JSON.stringify({ candidate: { commit: nextCommit, tree: nextTree } }));
+    for (const record of next.referenceRecords) {
+      if (record.blobOid !== undefined) record.blobOid = run("git", ["rev-parse", `${nextCommit}:${record.path}`], root);
+      else { record.path = "evidence/verify-next.json"; record.candidate = { commit: nextCommit, tree: nextTree }; }
+      record.sha256 = createHash("sha256").update(readFileSync(join(root, record.path))).digest("hex");
+    }
+    rebind(next);
+    const successive = await invokeCodexNativeCriticHost(next, { ...dependencies, resolveRoute: () => next.selection.route });
+    assert.equal(successive.status, "reviewed", JSON.stringify(successive));
+    assert.equal(successive.exportConsent.disclosure.candidate.commit, nextCommit);
+    assert.notEqual(successive.exportConsent.disclosure.invocationSha256, result.exportConsent.disclosure.invocationSha256);
+    assert.deepEqual(readFileSync(statePath), savedBytes);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { after } from "node:test";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { EventEmitter } from "node:events";
@@ -13,6 +13,7 @@ import { arch, release, tmpdir, type } from "node:os";
 import { bindSandboxedReadonlyDuty, buildSandboxedReadonlyRequest, validateSandboxedExecutionReceipt } from "./sandboxed-readonly-duty.mjs";
 import { sandboxSelectionDigest } from "../scripts/codex-sandbox-select.mjs";
 import { invokeCodexNativeCriticHost, runFixedChild } from "../scripts/codex-native-critic-host.mjs";
+import { runCriticExportConsent } from "../scripts/critic-export-consent.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { buildNativeCriticSelection, nativeCriticArtifactRequestDigest, nativeCriticCanonicalDigest } from "./codex-native-critic-policy.mjs";
 import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest, reduceDiscoveredNativeMcpServers } from "./codex-native-critic-tools.mjs";
@@ -143,6 +144,22 @@ test("a started child with an error receipt cannot become a usable duty binding"
 });
 
 const NATIVE_NOW = Date.parse("2026-09-09T12:00:00.000Z");
+const EXPORT_CONTEXT = { provider: "openai", service: "fixture-review-service", hostGate: "not-observed", providerGate: "not-observed", observedEndpoint: null };
+function grantNativeFixture(root, sourceRoots) {
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  writeFileSync(join(root, "evidence/consent-request.json"), JSON.stringify({ scope: {
+    recipient: { provider: EXPORT_CONTEXT.provider, runner: "codex", service: EXPORT_CONTEXT.service },
+    purpose: "critic", sourceRoots, evidenceRoots: ["evidence"],
+  } }));
+  const args = ["--root", root, "--request", "evidence/consent-request.json"];
+  const plan = runCriticExportConsent(["plan", ...args]);
+  assert.equal(runCriticExportConsent(["record", ...args, "--plan-sha256", plan.planSha256,
+    "--decision-reference", "test-fixture:explicit-grant", "--decision-sha256", "e".repeat(64)]).ok, true);
+}
+const nativeConsentRoot = mkdtempSync(join(tmpdir(), "native-transport-consent-"));
+execFileSync("git", ["init", "-q", nativeConsentRoot]);
+grantNativeFixture(nativeConsentRoot, ["templates"]);
+after(() => rmSync(nativeConsentRoot, { recursive: true, force: true }));
 const NATIVE_ROUTE = Object.freeze({ dutyId: "critic_high_risk", runner: "codex", model: "gpt-5.6-terra", effort: "high", sourceSha256: "e".repeat(64), candidateCommit: "b".repeat(40) });
 const NATIVE_FEATURE = Object.freeze({ pageCount: 1, dataCount: NATIVE_CRITIC_PROHIBITED_FEATURES.length, digest: "f".repeat(64) });
 const NATIVE_MCP = Object.freeze({ pageCount: 1, dataCount: 0, digest: "0".repeat(64) });
@@ -184,10 +201,10 @@ function nativeChild(overrides = {}) {
 function nativeDependencies(response = nativeChild()) {
   return {
     nowMs: NATIVE_NOW, resolveRoute: () => NATIVE_ROUTE, runChild: async () => response,
-    observePhysical: () => ({ repoRoot: process.cwd(), scratch: process.cwd(), cliPath: process.execPath, referencePaths: ["templates/prompts/critic-review.md"], rolePath: "roles/critic.md", promptPath: "templates/prompts/critic-review.md", verdictPath: "plugins/pipeline-core/scripts/critic-verdict.schema.json" }),
+    observePhysical: () => ({ repoRoot: nativeConsentRoot, scratch: nativeConsentRoot, cliPath: process.execPath, referencePaths: ["templates/prompts/critic-review.md"], rolePath: "roles/critic.md", promptPath: "templates/prompts/critic-review.md", verdictPath: "plugins/pipeline-core/scripts/critic-verdict.schema.json" }),
   };
 }
-function nativeInput() { return { selection: nativeSelection(), expectedTuple: NATIVE_TUPLE, repository: { root: process.cwd(), cliPath: process.execPath }, coordinatorScratch: { path: process.cwd() }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords: NATIVE_RECORDS, reviewBase: "a".repeat(40), reviewMode: "full" }; }
+function nativeInput() { return { exportContext: EXPORT_CONTEXT, selection: nativeSelection(), expectedTuple: NATIVE_TUPLE, repository: { root: nativeConsentRoot, cliPath: process.execPath }, coordinatorScratch: { path: nativeConsentRoot }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords: NATIVE_RECORDS, reviewBase: "a".repeat(40), reviewMode: "full" }; }
 function nativeArtifactInput() {
   const reviewScope = { kind: "current-artifacts", paths: ["templates/prompts/critic-review.md"] };
   const referenceRecords = [{ ...NATIVE_RECORDS[0], mode: "100644" }];
@@ -201,7 +218,7 @@ function nativeArtifactInput() {
       referenceSetSha256, reviewMode: "full", reviewScope,
     }),
   };
-  return { selection, expectedTuple: NATIVE_TUPLE, repository: { root: process.cwd(), cliPath: process.execPath }, coordinatorScratch: { path: process.cwd() }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords, reviewScope, reviewMode: "full" };
+  return { exportContext: EXPORT_CONTEXT, selection, expectedTuple: NATIVE_TUPLE, repository: { root: nativeConsentRoot, cliPath: process.execPath }, coordinatorScratch: { path: nativeConsentRoot }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords, reviewScope, reviewMode: "full" };
 }
 
 test("native Critic consumer accepts and forwards only full exact-range review mode", async () => {
@@ -411,7 +428,8 @@ test("native Critic default physical observer binds candidate sources and ignore
     const route = { ...NATIVE_ROUTE, candidateCommit: commit };
     const selected = buildNativeCriticSelection({ selectionId: "cncs_bbbbbbbbbbbbbbbbbbbbbbbbbb", repoFingerprint: repositoryFingerprint(root), dispatch: { queueRevision: 1, candidateCommit: commit, candidateTree: tree, referenceSetSha256: nativeCriticCanonicalDigest(records), requestSha256: "9".repeat(64) }, route, poDecisionSha256: "a".repeat(64), smokeReceipt: smoke, smokeReceiptSha256: nativeCriticCanonicalDigest(smoke), createdAt: "2026-09-09T11:59:30.000Z" }, { validateRoute: () => route, expectedTuple: tuple, nowMs: NATIVE_NOW, maxSmokeAgeMs: 300_000 });
     const response = nativeChild(); response.result.observed = { ...response.result.observed, toolSurface: { ...response.result.observed.toolSurface, configSha256: tuple.toolSurface.configSha256, observationSha256: tuple.toolSurface.observationSha256 } };
-    const input = { selection: selected, expectedTuple: tuple, repository: { root, cliPath: cli }, coordinatorScratch: { path: root }, referencePaths: records.map(({ path }) => path), referenceRecords: records, reviewBase: commit, reviewMode: "full" };
+    grantNativeFixture(root, ["specs"]);
+    const input = { exportContext: EXPORT_CONTEXT, selection: selected, expectedTuple: tuple, repository: { root, cliPath: cli }, coordinatorScratch: { path: root }, referencePaths: records.map(({ path }) => path), referenceRecords: records, reviewBase: commit, reviewMode: "full" };
     const deps = { nowMs: NATIVE_NOW, resolveRoute: () => route, runChild: async () => response, readFileSync: (path) => path === "/proc/version" ? "Linux Microsoft" : path === "/proc/self/mountinfo" ? `1 0 0:1 / ${root} rw - ext4 /dev/root rw\n` : "boot" };
     assert.equal((await invokeCodexNativeCriticHost(input, deps)).status, "reviewed");
     const reviewScope = { kind: "current-artifacts", paths: ["specs/review.md"] };
@@ -425,7 +443,7 @@ test("native Critic default physical observer binds candidate sources and ignore
         requestSha256: nativeCriticArtifactRequestDigest({ candidateCommit: commit, candidateTree: tree, referenceSetSha256: artifactReferenceSetSha256, reviewMode: "full", reviewScope }),
       },
     };
-    const artifactInput = { selection: artifactSelection, expectedTuple: tuple, repository: { root, cliPath: cli }, coordinatorScratch: { path: root }, referencePaths: artifactRecords.map(({ path }) => path), referenceRecords: artifactRecords, reviewScope, reviewMode: "full" };
+    const artifactInput = { exportContext: EXPORT_CONTEXT, selection: artifactSelection, expectedTuple: tuple, repository: { root, cliPath: cli }, coordinatorScratch: { path: root }, referencePaths: artifactRecords.map(({ path }) => path), referenceRecords: artifactRecords, reviewScope, reviewMode: "full" };
     const artifactResult = await invokeCodexNativeCriticHost(artifactInput, deps);
     assert.equal(artifactResult.status, "reviewed");
     assert.deepEqual(artifactResult.receipt.sourceCoverage.map(({ path, mode }) => ({ path, mode })), [{ path: "specs/review.md", mode: "100644" }]);

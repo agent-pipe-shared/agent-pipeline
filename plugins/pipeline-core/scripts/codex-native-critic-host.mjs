@@ -27,6 +27,7 @@ import {
 import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest } from "../lib/codex-native-critic-tools.mjs";
 import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
+import { admitNativeCriticExport } from "../lib/native-critic-export-admission.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = realpathSync(resolve(HERE, ".."));
@@ -48,7 +49,7 @@ const TREE = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const REGULAR_MODE = new Set(["100644", "100755"]);
 const SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGPIPE"]);
 const FAILURE_CODES = new Set([
-  "input-invalid", "selection-invalid", "route-invalid", "physical-proof-unavailable", "physical-proof-drift",
+  "input-invalid", "selection-invalid", "route-invalid", "physical-proof-unavailable", "physical-proof-drift", "consent-unavailable",
   "child-spawn-failed", "child-timeout", "child-stream-overflow", "child-output-invalid", "child-policy-invalid",
   "child-lifecycle-invalid", "child-verdict-invalid", "child-write-attempt", "child-request-invalid",
   "child-prompt-invalid", "child-protocol-error", "child-exit-error", "child-terminal-invalid",
@@ -146,9 +147,21 @@ function boundedFailure(code, selection = null, terminal = null, lifecycle = {})
 
 function validateInput(value) {
   const artifact = Object.hasOwn(value ?? {}, "reviewScope");
-  exactKeys(value, artifact
+  const keys = artifact
     ? ["selection", "expectedTuple", "repository", "coordinatorScratch", "referencePaths", "referenceRecords", "reviewScope", "reviewMode"]
-    : ["selection", "expectedTuple", "repository", "coordinatorScratch", "referencePaths", "referenceRecords", "reviewBase", "reviewMode"], "native Critic host input");
+    : ["selection", "expectedTuple", "repository", "coordinatorScratch", "referencePaths", "referenceRecords", "reviewBase", "reviewMode"];
+  if (Object.hasOwn(value ?? {}, "exportContext")) {
+    keys.push("exportContext");
+    exactKeys(value.exportContext, ["provider", "service", "hostGate", "providerGate", "observedEndpoint"], "native Critic export context");
+    const label = (entry) => typeof entry === "string" && entry.length > 0 && entry.length <= 512 && entry.trim() === entry && !/[\x00-\x1f\x7f]/u.test(entry);
+    const gates = new Set(["not-observed", "approved", "denied", "additional-check-required"]);
+    // These are explicit labels for this host's fixed OpenAI provider. Keep
+    // the selected spelling intact for the standing grant's exact comparison.
+    if (![PROVIDER, "OpenAI"].includes(value.exportContext.provider)
+      || !label(value.exportContext.service) || !gates.has(value.exportContext.hostGate) || !gates.has(value.exportContext.providerGate)
+      || !(value.exportContext.observedEndpoint === null || label(value.exportContext.observedEndpoint))) fail("native Critic export context is invalid");
+  }
+  exactKeys(value, keys, "native Critic host input");
   exactKeys(value.repository, ["root", "cliPath"], "native Critic repository");
   exactKeys(value.coordinatorScratch, ["path"], "native Critic coordinator scratch");
   if (!Array.isArray(value.referencePaths) || value.referencePaths.length === 0 || new Set(value.referencePaths).size !== value.referencePaths.length
@@ -366,6 +379,9 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   let physical;
   try { physical = observePhysical(input, dependencies); }
   catch { return boundedFailure("physical-proof-unavailable", selection); }
+  const exportConsent = admitNativeCriticExport(input, physical.repoRoot);
+  const executionFailure = (code, terminal = null, lifecycle = {}) => ({ ...boundedFailure(code, selection, terminal, lifecycle), exportConsent });
+  if (!exportConsent.ok) return executionFailure("consent-unavailable");
   const request = {
     codexPath: physical.cliPath, cwd: physical.repoRoot, scratchPath: physical.scratch,
     model: selection.route.model, effort: selection.route.effort, referencePaths: physical.referencePaths,
@@ -376,26 +392,26 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   };
   let child;
   try { child = await runFixedChild(request, dependencies); }
-  catch { return boundedFailure("child-spawn-failed", selection); }
+  catch { return executionFailure("child-spawn-failed"); }
   const terminal = childTerminal(child.terminal);
   const lifecycle = { ...child.heartbeat, ...(child.result?.observed ?? {}), stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes };
-  if (child.timedOut) return boundedFailure("child-timeout", selection, terminal, lifecycle);
-  if (child.overflow) return boundedFailure("child-stream-overflow", selection, terminal, lifecycle);
+  if (child.timedOut) return executionFailure("child-timeout", terminal, lifecycle);
+  if (child.overflow) return executionFailure("child-stream-overflow", terminal, lifecycle);
   if (child.terminal.error !== null || child.terminal.code !== 0 || child.terminal.signal !== null) {
-    return boundedFailure(nativeCriticReportedChildFailure(child.result) ?? "child-terminal-invalid", selection, terminal, lifecycle);
+    return executionFailure(nativeCriticReportedChildFailure(child.result) ?? "child-terminal-invalid", terminal, lifecycle);
   }
   let verdictSchema;
   try { verdictSchema = JSON.parse(readFileSync(physical.verdictPath, "utf8")); }
-  catch { return boundedFailure("physical-proof-unavailable", selection, terminal, lifecycle); }
+  catch { return executionFailure("physical-proof-unavailable", terminal, lifecycle); }
   let checked;
   try { checked = validateChild(child.result, selection, input.expectedTuple, verdictSchema, { ...child, stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes }); }
-  catch { return boundedFailure("child-output-invalid", selection, terminal, lifecycle); }
-  if (!checked.ok) return boundedFailure(checked.code, selection, terminal, checked.lifecycle);
+  catch { return executionFailure("child-output-invalid", terminal, lifecycle); }
+  if (!checked.ok) return executionFailure(checked.code, terminal, checked.lifecycle);
   // The child receives paths, not immutable file descriptors. Re-observe every
   // bound source and evidence file before issuing the review receipt so a
   // concurrent replacement cannot inherit the pre-turn binding.
   try { observePhysical(input, dependencies); }
-  catch { return boundedFailure("physical-proof-drift", selection, terminal, checked.lifecycle); }
+  catch { return executionFailure("physical-proof-drift", terminal, checked.lifecycle); }
   const receipt = {
     schema: "pipeline.codex-native-critic-execution-receipt.v1",
     status: "reviewed",
@@ -419,5 +435,5 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
       }),
     }),
   };
-  return { schema: "pipeline.codex-native-critic-host-result.v1", status: "reviewed", verdict: checked.verdict, receipt };
+  return { schema: "pipeline.codex-native-critic-host-result.v1", status: "reviewed", verdict: checked.verdict, receipt, exportConsent };
 }
