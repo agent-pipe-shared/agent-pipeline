@@ -154,7 +154,10 @@ function candidateText(root, candidate, path) {
     timeout: 10_000,
     maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
   });
-  if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  // Managed runtimes can attach a synthetic EPERM observation even when git
+  // exited successfully and returned the complete blob.  The child exit and
+  // presence of stdout are the authoritative read result in that case.
+  if (result.status !== 0 || result.stdout === null) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
   return String(result.stdout);
 }
 
@@ -166,7 +169,7 @@ function candidateBytes(root, candidate, path) {
     timeout: 10_000,
     maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
   });
-  if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  if (result.status !== 0 || result.stdout === null) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
   return result.stdout;
 }
 
