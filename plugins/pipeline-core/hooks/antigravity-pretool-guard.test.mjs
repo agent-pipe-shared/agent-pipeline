@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -214,6 +214,90 @@ check("Antigravity pretool guard blocks chained commands (&&, ;, pipes)", () => 
   assert.equal(res.decision, "deny");
   assert.match(res.reason, /GUARD-OPERATOR-UNAPPROVED|GUARD-PARSE-UNSUPPORTED|guard-command-grammar|BLOCKED/);
   rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity run_command uses its absolute Cwd instead of the first workspace", () => {
+  const readyRoot = readyLifecycleFixture();
+  const unreadyRoot = fixture();
+  try {
+    const res = decision(run({
+      workspacePaths: [readyRoot, unreadyRoot],
+      toolCall: {
+        name: "run_command",
+        args: { CommandLine: "node verify.mjs", Cwd: unreadyRoot },
+      },
+    }, readyRoot, { hookCwd: readyRoot }));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /GUARD-LIFECYCLE-NOT-READY/);
+  } finally {
+    rmSync(readyRoot, { recursive: true, force: true });
+    rmSync(unreadyRoot, { recursive: true, force: true });
+  }
+});
+
+check("Antigravity run_command resolves a relative Cwd from the adapter working directory", () => {
+  const readyRoot = readyLifecycleFixture();
+  const unreadyRoot = fixture();
+  try {
+    const res = decision(run({
+      workspacePaths: [readyRoot, unreadyRoot],
+      toolCall: {
+        name: "run_command",
+        args: { CommandLine: "node verify.mjs", Cwd: relative(readyRoot, unreadyRoot) },
+      },
+    }, readyRoot, { hookCwd: readyRoot }));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /GUARD-LIFECYCLE-NOT-READY/);
+  } finally {
+    rmSync(readyRoot, { recursive: true, force: true });
+    rmSync(unreadyRoot, { recursive: true, force: true });
+  }
+});
+
+check("Antigravity run_command falls back to workspacePaths when Cwd is missing", () => {
+  const readyRoot = readyLifecycleFixture();
+  const unreadyRoot = fixture();
+  try {
+    const res = decision(run({
+      workspacePaths: [readyRoot, unreadyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs" } },
+    }, readyRoot, { hookCwd: unreadyRoot }));
+    assert.equal(res.decision, "allow");
+  } finally {
+    rmSync(readyRoot, { recursive: true, force: true });
+    rmSync(unreadyRoot, { recursive: true, force: true });
+  }
+});
+
+check("Antigravity run_command fails closed for a malformed explicit Cwd", () => {
+  const readyRoot = readyLifecycleFixture();
+  try {
+    const res = decision(run({
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: 42 } },
+    }, readyRoot));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /project root is unavailable/);
+  } finally { rmSync(readyRoot, { recursive: true, force: true }); }
+});
+
+check("Antigravity run_command checks relative read targets against its selected Cwd", () => {
+  const firstWorkspace = readyLifecycleFixture();
+  const executedWorkspace = readyLifecycleFixture();
+  try {
+    const res = decision(run({
+      workspacePaths: [firstWorkspace, executedWorkspace],
+      toolCall: {
+        name: "run_command",
+        args: { CommandLine: "cat ../outside.txt", Cwd: executedWorkspace },
+      },
+    }, firstWorkspace, { hookCwd: firstWorkspace }));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /GUARD-CROSS-REPO-MUTATION|outside the project root|outside this repository/);
+  } finally {
+    rmSync(firstWorkspace, { recursive: true, force: true });
+    rmSync(executedWorkspace, { recursive: true, force: true });
+  }
 });
 
 check("Antigravity pretool guard blocks writes outside project root (GUARD-CROSS-REPO-MUTATION)", () => {

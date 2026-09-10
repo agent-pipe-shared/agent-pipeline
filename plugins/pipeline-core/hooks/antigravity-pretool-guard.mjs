@@ -335,9 +335,16 @@ export async function runAntigravityPreToolGuard(rawInput) {
 
   let projectRoot;
   try {
-    const rawCwd = (Array.isArray(input?.workspacePaths) && input.workspacePaths.length > 0)
+    const nativeArgs = input?.toolCall?.name === "run_command" ? input.toolCall.args : null;
+    const hasRequestedCwd = nativeArgs && Object.hasOwn(nativeArgs, "Cwd");
+    if (hasRequestedCwd && (typeof toolInput?.cwd !== "string" || toolInput.cwd.trim() === "")) {
+      throw new TypeError("run_command Cwd must be a non-empty string");
+    }
+    const requestedCwd = hasRequestedCwd ? toolInput.cwd : null;
+    const rawCwd = requestedCwd
+      ?? ((Array.isArray(input?.workspacePaths) && input.workspacePaths.length > 0)
       ? input.workspacePaths[0]
-      : (typeof input?.cwd === "string" && input.cwd.trim() !== "" ? input.cwd : process.cwd());
+      : (typeof input?.cwd === "string" && input.cwd.trim() !== "" ? input.cwd : process.cwd()));
     projectRoot = realpathSync(resolve(rawCwd));
   } catch (error) {
     deny("Antigravity PreToolUse project root is unavailable; pipeline guards fail closed.", {
