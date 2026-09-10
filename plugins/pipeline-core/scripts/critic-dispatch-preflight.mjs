@@ -39,6 +39,7 @@ const FIXED_EVIDENCE_LOCATIONS = [
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const PATH_MAX = 240;
 const EVIDENCE_MAX_BYTES = 1024 * 1024;
+const CANDIDATE_SOURCE_MAX_BYTES = 16 * 1024 * 1024;
 
 export class CriticDispatchPreflightError extends Error {
   constructor(code, message) {
@@ -151,7 +152,7 @@ function candidateText(root, candidate, path) {
     env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
     shell: false,
     timeout: 10_000,
-    maxBuffer: EVIDENCE_MAX_BYTES,
+    maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
   });
   if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
   return String(result.stdout);
@@ -163,7 +164,7 @@ function candidateBytes(root, candidate, path) {
     env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
     shell: false,
     timeout: 10_000,
-    maxBuffer: EVIDENCE_MAX_BYTES,
+    maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
   });
   if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
   return result.stdout;

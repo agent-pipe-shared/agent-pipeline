@@ -91,6 +91,24 @@ test("current-artifact preflight binds an unchanged artifact to the later candid
   }
 });
 
+test("current-artifact preflight keeps evidence small while admitting bounded large candidate sources", () => {
+  const fx = fixture();
+  writeFileSync(join(fx.root, "specs", "large.md"), "x".repeat((1024 * 1024) + 1));
+  const candidate = commit(fx.root, "large candidate source");
+  const tree = git(fx.root, ["rev-parse", "HEAD^{tree}"]);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  const result = preflightCriticDispatch({
+    root: fx.root, candidate, reviewScope: { kind: "current-artifacts", paths: ["specs/large.md"] },
+    specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"],
+  });
+  assert.equal(result.sourceCoverage[0].path, "specs/large.md");
+  writeFileSync(join(fx.root, "evidence", "oversized.json"), "x".repeat((1024 * 1024) + 1));
+  assert.throws(() => preflightCriticDispatch({
+    root: fx.root, candidate, reviewScope: { kind: "current-artifacts", paths: ["specs/large.md"] },
+    specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/oversized.json"],
+  }), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-FILE");
+});
+
 test("rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing", () => {
   const fx = fixture();
   assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: [] })), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-REQUIRED");
