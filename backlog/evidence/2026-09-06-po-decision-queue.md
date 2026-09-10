@@ -1,5 +1,48 @@
 # PO decision queue — collected 2026-09-06
 
+## Completed split review batch and inventory decision — 2026-09-10
+
+The external five-job batch completed on candidate
+`8741613004e7ac84e48fa00a0a25e3d08ab682d1`. Compatibility/bootstrap passed;
+the other four results contain ten findings in total. Lifecycle/override
+explicitly remains partial because two large test bodies exceeded its tool
+budget. `reviewed` records execution, not approval. Repairs are isolated in
+the `candidate-review-fixes-8741613004e7` worktree; no installed plugin swap,
+push or release is authorized. The combined corrected candidate's full
+Verify is still pending at this entry.
+
+- **Question:** once the concrete inventory corrections and deterministic
+  checks are complete, may one final, narrowly scoped inventory correction
+  review exceed the usual two-round cap?
+- **Recommendation:** retain the required genuine passing inventory receipt;
+  obtain an explicit one-time QG-13 exception for that package only. Do not
+  interpret this entry as granting the exception or start it automatically.
+- **Alternatives/consequences:** retain the normal cap and leave publication
+  attestation pending; local repair and other approved work can continue.
+  Direct parent verification is required by QG-13 after the second blocking
+  round, but is not the genuine passing receipt the current inventory spec
+  expressly requires. Changing that attestation contract would itself need
+  an explicit PO decision, never a silent substitution.
+- **Evidence:** both genuine inventory rounds found blocking defects.
+  Initial result: `2026-09-10-current-artifact-critic-round-1.json`.
+  Correction result:
+  `scratch/native-current-artifact/attempt-1789020478349-c9b978eed6f1f60493605ccb/result.json`.
+  Batch summary:
+  `scratch/NVA-CANDIDATE-REVIEW-COMPLETION-1/batch-1789020476965-f8c06b06/summary.json`.
+  Governing requirements: [QG-13](../../guardrails/quality-gates.md)
+  and [inventory attestation contract](../../specs/sprint-nova-epic/design/2026-09-10-capability-current-source-review.md).
+- **Affected package/blocking status:** inventory publication attestation and
+  its downstream final reader closure; no additional approval is needed for
+  the already authorized repairs, focused tests, local commits, documentation
+  corrections or combined Verify. Prepare those results before asking the
+  PO to decide.
+
+The PO also requested a global, concise README with runner details on the
+linked detail page. Obsolete Claude-only enforcement claims are corrected:
+Codex and Antigravity have blocking adapters, with coverage and prerequisites
+documented separately. Recent happy paths without observed bypass are
+reported by the PO; no independent live receipt is invented from that report.
+
 ## Morning review result — 2026-09-10
 
 The PO executed the prepared remaining-candidate review in an external
