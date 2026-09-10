@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fd7b2a73fc1cf49acd22c07f92d279aa4ea0d8f466930631d81487af3de82432"
+    "transitionHead": "fd1c723024eb4db81d64365d0442949107b7ea14bf1baab7c6a5b13200df7e24"
   },
   "counts": {
     "open": 108,
     "in_progress": 0,
-    "closed": 531,
+    "closed": 532,
     "rejected": 3,
     "deferred": 11
   },
@@ -4651,6 +4651,19 @@
       "closureRepository": "self",
       "closureCommit": "5e34c0b55321d2332eec641c1e881e6bd73fe5d3",
       "closureEvidence": "backlog/items/2026-08-18-onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string.md"
+    },
+    {
+      "id": "pipeline.onboarding-design-answers-have-no-pre-generation-correction-path",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-10",
+      "source": "Claude 0.6.2 greenfield report: a placeholder answer submitted while testing the onboarding command became immutable and had to be repaired later in the generated PRD. Code inspection confirmed that intake-design-questions-apply rejects every changed replay even before staging generation.",
+      "deferred": false,
+      "closedAt": "2026-09-10",
+      "closureRepository": "self",
+      "closureCommit": "8b7dfd05c7604bbfa9de6590c28ba0ee7786fac2",
+      "closureEvidence": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
     },
     {
       "id": "pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates",

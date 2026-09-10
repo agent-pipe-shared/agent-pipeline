@@ -380,6 +380,7 @@
 | pipeline.observerunner-has-no-test-coverage | closed | defect | pipeline | 2026-08-30 | Nova B -- Critic finding (minor), NVA-CF-SANDBOXQUICKFIX delta review, not blocking |
 | pipeline.onboarding-asks-published-in-one-window-only | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking at the PO's second touch: the onboarding questions reach the human through exactly one command's response, so a run that passes that point never asks them again. |
 | pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string | closed | defect | pipeline | 2026-08-18 | — |
+| pipeline.onboarding-design-answers-have-no-pre-generation-correction-path | closed | defect | pipeline | 2026-09-10 | — |
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.onboarding-guidance-never-asks-about-an-existing-signing-key | closed | defect | pipeline | 2026-08-30 | Retrospective-analysis follow-up item #2, PO-confirmed 2026-08-30 ('auch verdrahten und fixen! das muss der runner zwingend abfragen') |
 | pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key | closed | defect | pipeline | 2026-08-29 | NOW / Nova A -- happy-path blocker, PO's own words: 'einen bestehenden Key zu nutzen ist auch zu umständlich im happy pfad da eine merkwürdige reperatur nötig ist und der driver hier nicht hilft und die agents kreise drehen'. |
@@ -663,6 +664,6 @@
 
 - open: 108
 - in_progress: 0
-- closed: 531
+- closed: 532
 - rejected: 3
 - deferred: 11
