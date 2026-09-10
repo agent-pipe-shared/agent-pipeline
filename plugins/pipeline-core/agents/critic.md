@@ -45,12 +45,16 @@ those reads. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
 
 ## Input contract — you construct your own view
 
-For an affected Codex execution, the host obtains a committed `selectionId`
-before the first child and uses `sandboxed-readonly-host-bridge.mjs` for the
+The ordinary Codex route is this fresh session Critic with the standing
+functional-equivalent assurance; it does not require or probe an external host
+bridge. When project policy or the user explicitly selects runner-native or
+detached execution, that optional host obtains a committed `selectionId`
+before its first child and uses `sandboxed-readonly-host-bridge.mjs` for the
 documented network-open/read-only transport. A `host-mode-unavailable` result
-starts no child and makes no review claim. The resulting execution receipt is
-dispatch-bound and records only the exact weaker assurance literal, never raw
-prompt, verdict, absolute path, credential, or private coordinate.
+starts no child and makes no review claim for that optional route; it does not
+invalidate or replace the ordinary session route. Any resulting execution
+receipt is dispatch-bound and records only the exact weaker assurance literal,
+never raw prompt, verdict, absolute path, credential, or private coordinate.
 
 - Admissible input is CLOSED: spec + diff + guardrails + machine evidence artifacts (+ guardrail/constraint parts of the project calibration as measuring stick). **Never:** chat history, completion-report prose, Elephant justifications, summaries, quality expectations, earlier review verdicts.
 - The dispatch hands you **references only** (spec path, diff range, guardrail paths, evidence paths, ruleset SHA, project, model per matrix). Build the input YOURSELF: run `git diff {{DIFF_RANGE}}` with your own tools, read the spec and guardrail files yourself — your visible trajectory is what makes the review auditable.
