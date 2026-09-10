@@ -151,7 +151,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   try { configuration = readConsumerVerifyConfiguration(root); }
   catch (error) { fail("VEP-CALIBRATION", error.message); }
   const { fullCommand: command, project } = configuration;
-  if (mode === "release" && command === null) fail("VEP-NO-COMMAND", "Release Verify requires a configured full project command.");
+  if (command === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
   const started = candidateIdentity(root);
   const startedAt = new Date().toISOString();
 
@@ -161,7 +161,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     const evidence = {
       schema: VERIFY_EVIDENCE_SCHEMA,
       project,
-      command: command ?? "pipeline consumer baseline",
+      command,
       commit: started.commit,
       tree: started.tree,
       candidate: { commit: started.commit, tree: started.tree },
@@ -234,7 +234,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   const evidence = {
     schema: VERIFY_EVIDENCE_SCHEMA,
     project,
-    command: command ?? "pipeline consumer baseline",
+    command,
     commit: started.commit,
     tree: started.tree,
     candidate: { commit: started.commit, tree: started.tree },
@@ -248,7 +248,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
       terminalStatus: run.terminal.status,
     }),
     selection,
-    coverage: command === null && configuration.baseline.length === 0 && configuration.areas.length === 0 ? "baseline-only" : "project-calibrated",
+    coverage: "project-calibrated",
     exitCode: 0,
   };
   writeEvidence(root, target, evidence);

@@ -93,7 +93,7 @@ test("the produced artifact satisfies the real publication-gate-evidence consume
   });
 });
 
-test("a calibration naming no verify command runs the explicit shipped baseline but cannot claim project coverage", async () => {
+test("a calibration naming no verify command cannot produce success at any boundary", async () => {
   const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
   try {
     mkdirSync(join(root, ".claude"), { recursive: true });
@@ -103,11 +103,13 @@ test("a calibration naming no verify command runs the explicit shipped baseline 
     git(root, ["init", "-q"]);
     git(root, ["add", "."]);
     git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "initial"]);
-    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json" });
-    assert.equal(result.status, "passed");
-    assert.equal(result.evidence.coverage, "baseline-only");
-    assert.equal(result.evidence.command, "pipeline consumer baseline");
-    await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/release.json", mode: "release" }), (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND");
+    for (const mode of ["work", "critic", "push", "candidate", "release"]) {
+      await assert.rejects(
+        () => produceVerifyEvidence({ rootDir: root, outPath: `evidence/${mode}.json`, mode }),
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
+      );
+      assert.equal(existsSync(join(root, "evidence", `${mode}.json`)), false);
+    }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -233,7 +235,7 @@ test("real product assertions stay fresh while eligible baselines resume with du
   });
 });
 
-test("invalid manifests fail closed while the legacy placeholder is baseline-only", async () => {
+test("invalid manifests and the legacy placeholder fail closed at every boundary", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
     writeFileSync(join(root, ".claude/pipeline.yaml"), "invalid: manifest\n");
     git(root, ["add", ".claude/pipeline.yaml"]);
@@ -242,14 +244,13 @@ test("invalid manifests fail closed while the legacy placeholder is baseline-onl
     assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
   });
   await withFixture('node -e "console.log(\'the verify contract of this project is not configured\')"', async (root) => {
-    const result = await produceVerifyEvidence({ rootDir: root });
-    assert.equal(result.status, "passed");
-    assert.equal(result.evidence.coverage, "baseline-only");
-    assert.equal(result.evidence.command, "pipeline consumer baseline");
-    await assert.rejects(
-      () => produceVerifyEvidence({ rootDir: root, mode: "release" }),
-      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
-    );
+    for (const mode of ["work", "critic", "push", "candidate", "release"]) {
+      await assert.rejects(
+        () => produceVerifyEvidence({ rootDir: root, mode }),
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
+      );
+      assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+    }
   });
 });
 

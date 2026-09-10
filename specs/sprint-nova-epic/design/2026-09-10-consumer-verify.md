@@ -59,3 +59,12 @@ contract and be documented in the tests.
 
 This slice creates no release, installation, network access, Critic PASS or
 PO signature. Independent review and final candidate gates remain required.
+
+## Rollback
+
+Revert this slice as one unit if boundary selection or consumer evidence
+regresses. Restore the prior full-suite repository entry point and remove the
+generated consumer adapter through the existing onboarding transaction rather
+than deleting a user-owned conflicting path. Evidence produced by the reverted
+implementation is candidate- and implementation-bound and must not be reused;
+the next run replaces canonical evidence only after the restored checks pass.
