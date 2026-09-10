@@ -168,28 +168,34 @@ test("drivePushInit: layer 1b is skipped, not failed, when the project has no ha
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present but --base omitted stops with that precondition named, never invents a range", () => {
+test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present but --base omitted reports that precondition while collecting the other read-only checks", () => {
   const root = freshFixtureRoot();
   try {
     mkdirSync(join(root, "harness", "scripts"), { recursive: true });
     writeFileSync(join(root, "harness", "scripts", "check-doc-reconciliation.mjs"), "// fixture\n");
-    const result = drivePushInit({ rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main" });
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
+    });
     assert.equal(result.outcome, "precondition-unmet");
     assert.equal(result.checks[0].id, "doc-reconciliation");
     assert.equal(result.checks[0].status, "base-required");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present, --base supplied but --candidate omitted stops with that precondition named, never invents HEAD (NVA-B-PUSHINIT-1)", () => {
+test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present, --base supplied but --candidate omitted reports that precondition and never invents HEAD (NVA-B-PUSHINIT-1)", () => {
   const root = freshFixtureRoot();
   try {
     mkdirSync(join(root, "harness", "scripts"), { recursive: true });
     writeFileSync(join(root, "harness", "scripts", "check-doc-reconciliation.mjs"), "// fixture\n");
-    const result = drivePushInit({ rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1" });
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1",
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
+    });
     assert.equal(result.outcome, "precondition-unmet");
     assert.equal(result.checks[0].id, "doc-reconciliation");
     assert.equal(result.checks[0].status, "candidate-required");
-    assert.equal(result.steps.length, 0, "no subprocess must be spawned when candidate is missing");
+    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability", "push-prepare"]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -249,7 +255,7 @@ test("drivePushInit: dirty working tree stops at push-prepare's own check, named
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("drivePushInit: stale verify evidence stops at the cheap gate-satisfiability preflight, named, before push-prepare ever runs", () => {
+test("drivePushInit: stale verify evidence is reported by the cheap preflight while push-prepare still collects its independent checks", () => {
   const root = freshFixtureRoot();
   try {
     const result = drivePushInit({
@@ -268,12 +274,11 @@ test("drivePushInit: stale verify evidence stops at the cheap gate-satisfiabilit
     // The ONLY failing check -- proves this fixture isolates exactly the one precondition
     // under test, not a side effect of an unrelated fixture gap.
     assert.deepEqual(result.checks.map((check) => check.id), ["verify-evidence-bound"], JSON.stringify(result.checks));
-    // Fails fast: push-prepare never ran.
-    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability"]);
+    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability", "push-prepare"]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("drivePushInit: missing push-threat-model.md stops at gate-satisfiability, named, before push-prepare ever runs", () => {
+test("drivePushInit: missing push-threat-model.md is reported while push-prepare still collects its independent checks", () => {
   const root = freshFixtureRoot();
   try {
     const result = drivePushInit({
@@ -283,7 +288,44 @@ test("drivePushInit: missing push-threat-model.md stops at gate-satisfiability, 
     });
     assert.equal(result.outcome, "precondition-unmet");
     assert.equal(result.checks.some((check) => check.id === "push-threat-model-materialized"), true, JSON.stringify(result.checks));
-    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability"]);
+    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability", "push-prepare"]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit: one run returns failures from satisfiability and push-prepare together", () => {
+  const root = freshFixtureRoot();
+  try {
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      assessPushGateSatisfiability: () => ({
+        ok: true,
+        report: {
+          satisfiable: false,
+          checks: [
+            { id: "verify-contract-configured", ok: false, message: "verify missing" },
+            { id: "push-threat-model-materialized", ok: false, message: "threat model missing" },
+          ],
+        },
+      }),
+      pushPrepareReport: () => ({
+        ok: true,
+        report: {
+          ready: false,
+          checks: [
+            { id: "working-tree-clean", ok: false, message: "tree dirty" },
+            { id: "security-evidence", ok: false, message: "security evidence missing" },
+          ],
+        },
+      }),
+    });
+    assert.equal(result.outcome, "precondition-unmet");
+    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability", "push-prepare"]);
+    assert.deepEqual(result.checks.map((check) => check.id), [
+      "verify-contract-configured",
+      "push-threat-model-materialized",
+      "working-tree-clean",
+      "security-evidence",
+    ]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -357,12 +399,9 @@ test("drivePushInit: re-entrant -- two consecutive calls from unchanged state pr
 // time (it did: commit b84fd343 turned a real finding this check used to fail into a pass),
 // so this test asserts the INVARIANT that holds either way rather than one fixed shape:
 // step 1 is always the real spawn, argv[0] always names the real script, and the driver's
-// own continue-or-stop decision must follow THAT spawn's own `ok`, never a guess -- it stops
-// at exactly one step with the failure named when the real verdict is a fail, and it must
-// have continued past layer 1b (never re-reporting doc-reconciliation as a failing check)
-// when the real verdict is a pass. A fixed `steps.length === 1` expectation would (and did)
-// silently re-encode "the repository currently has an outstanding finding" as if it were a
-// property of the driver -- it is not; only the follow-verdict behavior is.
+// own verdict must be retained, never guessed. A failure remains named while the other two
+// independent read-only preflights still run, so the caller receives every currently visible
+// prerequisite in one response. A pass must never reappear as a failing reconciliation check.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -404,15 +443,14 @@ test("drivePushInit: real repo -- layer 1b actually spawns check-doc-reconciliat
   assert.equal(typeof reconciliationStep.exitCode, "number", "a real subprocess always reports a numeric exit code");
 
   if (reconciliationStep.ok === false) {
-    // The real script's own real failure: the driver must stop immediately on it, never
-    // proceed on a guess, and surface that script's own verdict (not an invented one).
+    // The real script's own real failure is surfaced, while the two independent read-only
+    // preflights still execute and collect their own findings.
     assert.equal(result.outcome, "precondition-unmet", JSON.stringify(result, null, 2));
-    assert.equal(result.steps.length, 1, "a failing real verdict must stop the driver at step 1, never proceed");
-    assert.equal(result.checks.length, 1);
-    assert.equal(result.checks[0].id, "doc-reconciliation");
-    assert.equal(result.checks[0].ok, false);
-    assert.equal(typeof result.checks[0].message, "string");
-    assert.ok(result.checks[0].message.length > 0, "the surfaced verdict must carry the real script's own message, not a placeholder");
+    assert.deepEqual(result.steps.map((step) => step.id), ["doc-reconciliation", "push-gate-satisfiability", "push-prepare"]);
+    const surfaced = result.checks.find((check) => check.id === "doc-reconciliation");
+    assert.equal(surfaced?.ok, false);
+    assert.equal(typeof surfaced?.message, "string");
+    assert.ok(surfaced.message.length > 0, "the surfaced verdict must carry the real script's own message, not a placeholder");
   } else {
     // The real script's own real pass: the driver must have continued past layer 1b on the
     // strength of THAT verdict -- never stopping at step 1 as though it failed, and never

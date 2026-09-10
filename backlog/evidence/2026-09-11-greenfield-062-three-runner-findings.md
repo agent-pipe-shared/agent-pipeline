@@ -68,14 +68,22 @@ possible.
    registry because executable and configuration surfaces deliberately default
    to conservative classification. Relaxing that rule requires gate-strength
    evidence; it is not a safe 0.6.2 quick fix.
+7. **Push preparation revealed known failures sequentially.** The Claude run
+   needed three `push-init` attempts because the driver returned after the
+   first red read-only layer. The 0.6.2 follow-up changes the driver to execute
+   all independent read-only preflights and return their failures together;
+   any failure still blocks signature preparation.
 
 ## Candidate disposition
 
 The 0.6.2 candidate already contains the read-scope correction, bounded review
 input handling, session Critic default, optional external launcher, impacted
 Verify behavior, user-project baseline checks and pre-generation answer
-replacement. The exact stamped candidate passed 520 of 520 Verify suites with
-Security exit 0. The independent Critic passed the final functional delta.
+replacement. The exact pre-follow-up stamped candidate passed 520 of 520 Verify
+suites with Security exit 0, and the independent Critic passed its final
+functional delta. The push-diagnostic aggregation is a later follow-up and must
+receive its own exact Verify and Critic evidence before it can replace that
+candidate.
 
 No additional blocking or major defect was established by these reports after
 those corrections. The remaining items improve cost, discoverability and

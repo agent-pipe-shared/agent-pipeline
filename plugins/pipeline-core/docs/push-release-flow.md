@@ -48,8 +48,11 @@ exists in the target project; `--base` AND `--candidate` both become required
 the moment it does — this driver never invents either, since which commit is
 the candidate is exactly the same kind of domain decision as which commit is
 the base), the cheap satisfiability preflight, and the full `push-prepare.mjs`
-readiness report, in that fixed order, and reports the first precondition that
-is not green. `--record-ref` stays optional and defaults to `HEAD`, matching
+readiness report in that fixed order. Because all three steps are read-only,
+it evaluates every
+independent step and reports all currently failing prerequisites together;
+it never asks the caller to repair one known problem merely to reveal another
+on the next run. `--record-ref` stays optional and defaults to `HEAD`, matching
 `check-doc-reconciliation.mjs`'s own default — the real flow commits the
 substantive work as `<candidate>` first and the reconciliation record on top
 as a later commit, which is where `HEAD` normally already points by the time

@@ -26,7 +26,9 @@
  * already holds about its own bootstrap `inspect` call. It never interprets WHY any given
  * precondition failed, never invents a fix, and never runs a remedy on the caller's
  * behalf -- every failing check is reported with the id/message/remedy the underlying
- * script itself already produces, verbatim.
+ * script itself already produces, verbatim. The three reports are independent and
+ * read-only, so the driver collects their failures before returning. This prevents a
+ * caller from repairing one prerequisite only to discover another on the next run.
  *
  * WHY TWO OF THE THREE STEPS ARE IN-PROCESS IMPORTS, NOT SUBPROCESS SPAWNS. push-gate-
  * satisfiability.mjs and push-prepare.mjs live in this SAME directory, are pure,
@@ -211,6 +213,7 @@ export function drivePushInit({
   }
 
   const steps = [];
+  const failedChecks = [];
 
   // Layer 1b -- conditional, see header comment "WHY LAYER 1b IS CONDITIONAL".
   const reconciliationScriptPath = join(root, RECONCILIATION_SCRIPT_RELATIVE_PATH);
@@ -244,9 +247,7 @@ export function drivePushInit({
         remedy: "resolve each finding named above (amend the ADR or record it as checked in docs/doc-reconciliation.md), then retry",
       };
   }
-  if (!reconciliationCheck.ok) {
-    return { schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: [reconciliationCheck] };
-  }
+  if (!reconciliationCheck.ok) failedChecks.push(reconciliationCheck);
 
   // Layer 2 (cheap preflight) -- push-gate-satisfiability.mjs, in-process.
   const satisfiability = assessPushGateSatisfiability(["--root", root], satisfiabilityDeps);
@@ -255,10 +256,7 @@ export function drivePushInit({
     return { schema: SCHEMA, root, outcome: "error", steps, error: { faultCode: "usage-error", message: satisfiability.error } };
   }
   if (!satisfiability.report.satisfiable) {
-    return {
-      schema: SCHEMA, root, outcome: "precondition-unmet", steps,
-      checks: satisfiability.report.checks.filter((check) => !check.ok),
-    };
+    failedChecks.push(...satisfiability.report.checks.filter((check) => !check.ok));
   }
 
   // Layer 2 (full report) -- push-prepare.mjs, in-process.
@@ -268,11 +266,10 @@ export function drivePushInit({
   if (!prepare.ok) {
     return { schema: SCHEMA, root, outcome: "error", steps, error: { faultCode: "usage-error", message: prepare.error } };
   }
-  if (!prepare.report.ready) {
-    return {
-      schema: SCHEMA, root, outcome: "precondition-unmet", steps,
-      checks: prepare.report.checks.filter((check) => !check.ok),
-    };
+  if (!prepare.report.ready) failedChecks.push(...prepare.report.checks.filter((check) => !check.ok));
+
+  if (failedChecks.length > 0) {
+    return { schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks };
   }
 
   // Every precondition is green. Present the signature command; never execute it -- see the
