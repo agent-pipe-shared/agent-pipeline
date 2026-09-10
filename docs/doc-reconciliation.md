@@ -2574,3 +2574,18 @@ skill surfaces were updated together, and their vendored copies are
 byte-identical. Ordinary Critic execution is autonomous agent work after the
 deterministic gates. A host failure is reported as a typed runtime problem; it
 does not invent a Pipeline PO decision point.
+
+## Candidate 1d350f4f6f1a5341454532458690996e6eec42af — 2026-09-10, range ff09e773..1d350f4f, Critic correction removes residual native-route prerequisites
+
+- ADR-0003: checked, no change needed.
+- ADR-0014: checked, no change needed.
+- ADR-0035: checked, no change needed.
+
+The correction implements the already-recorded decisions without changing
+them. The Codex Critic agent now starts with the ordinary fresh session lane;
+it consults the external host bridge only when project policy or the user
+explicitly selected runner-native or detached execution. The canonical Critic
+role and prompt example now name the standing functional-equivalent lane as
+the T1 default, with runner-native isolation as the same optional escalation.
+Root and vendored role/prompt copies remain byte-identical, and the protected
+preimage hashes bind the corrected canonical bytes.
