@@ -34,6 +34,13 @@
  *
  * Usage:
  *   node verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]
+ *   node verify-evidence-producer.mjs --prepare [--root <repo>]
+ *
+ * Existing projects explicitly prepare and commit the deterministic adapter
+ * first; onboarding seeds it in the portable transaction. Runs never seed it.
+ * Each replacement run removes prior canonical success before any checks.
+ * Baseline calibration/contract checks may resume on the identical candidate;
+ * manifest validation and the opaque product command execute freshly.
  *
  * `--out` defaults to `VERIFY_EVIDENCE_DEFAULT_PATH` (../lib/verify-evidence-path.mjs)
  * -- the same path `guard-push.mjs` and `push-prepare.mjs` read -- so a bare
@@ -45,13 +52,17 @@
  * configured verify command failed, the candidate drifted mid-run, or the
  * calibration names no usable command -- nothing is written.
  */
+import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { runVerifyJournal, sealVerifyCleanupRegistration } from "./verify-journal.mjs";
+import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource } from "../lib/worktree-lifecycle.mjs";
+import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify } from "../lib/consumer-verify.mjs";
 
 export const VERIFY_EVIDENCE_SCHEMA = "pipeline.verify-evidence.v0";
 
@@ -112,9 +123,12 @@ function writeEvidence(target, evidence) {
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
  */
-export function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH }) {
   const root = resolve(rootDir);
   const target = safeOutPath(root, outPath);
+  // Invalidate prior success before configuration, candidate checks or execution.
+  // An interrupted replacement attempt must never leave consumable stale green.
+  for (const path of new Set([target, safeOutPath(root, VERIFY_EVIDENCE_DEFAULT_PATH)])) rmSync(path, { force: true });
   const { command, project } = readConfiguredVerifyCommand(root);
   const started = candidateIdentity(root);
   const startedAt = new Date().toISOString();
@@ -138,11 +152,35 @@ export function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIF
     return { status: "dirty", evidence, outPath: target };
   }
 
-  const run = spawnSync(command, { cwd: root, shell: true, encoding: "utf8" });
-  const exitCode = run.status ?? 1;
-  if (run.error || exitCode !== 0) {
-    fail("VEP-VERIFY-FAILED", `The configured verify command failed (exit ${exitCode}) -- no evidence was written.`);
-  }
+  const file = assertConsumerVerifyAdapter(root);
+  const policyInputs = consumerVerifyPolicy(root);
+  const attempt = randomBytes(16).toString("hex");
+  const suites = [
+    { name: "baseline-calibration", file, args: [CONSUMER_VERIFY_DISPATCHER, "calibration"] },
+    // Manifest semantics include time and external policy data: always recheck.
+    { name: "baseline-manifest", file, args: [CONSUMER_VERIFY_DISPATCHER, "manifest", attempt] },
+    { name: "baseline-verify-contract", file, args: [CONSUMER_VERIFY_DISPATCHER, "contract"] },
+    { name: "configured-verify", file, args: [CONSUMER_VERIFY_DISPATCHER, "product", attempt], dependsOn: ["baseline-calibration", "baseline-manifest", "baseline-verify-contract"] },
+  ];
+  let registration;
+  const run = await runVerifyJournal({
+    repoRoot: root,
+    gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
+    candidate: { commit: started.commit, tree: started.tree },
+    suites, policyInputs, allowCrossCandidateReuse: false,
+    registerRun({ runId, runPath }) {
+      const descriptor = startSessionDescriptor(root);
+      const resourceId = `consumer-${attempt}`;
+      registration = { sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce, resourceId };
+      registerTemporaryIntent(root, { ...registration, type: "verify-run-directory", path: runPath, contentClass: "verify-recovery", soleCopy: false, cleanupPolicy: "remove-directory" });
+      return sealVerifyCleanupRegistration({ status: "registered", runId, runPath, sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256, resourceId, registeredAt: new Date().toISOString() });
+    },
+  });
+  // Keep the real private descriptor and resource available for recovery/resume.
+  // Interrupted runs retain their creating intent rather than inventing a seal.
+  finalizeTemporaryResource(root, { ...registration, canaryRelative: "terminal.json" });
+  if (run.terminal.status !== "passed") fail("VEP-VERIFY-FAILED", "Required consumer Verify checks failed; no success evidence was written.");
+  if (JSON.stringify(consumerVerifyPolicy(root)) !== JSON.stringify(policyInputs)) fail("VEP-DRIFT", "Installed implementation or declared inputs changed during Verify.");
 
   const finished = candidateIdentity(root);
   if (finished.status !== "clean" || finished.commit !== started.commit || finished.tree !== started.tree) {
@@ -158,7 +196,8 @@ export function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIF
     candidate: { commit: started.commit, tree: started.tree },
     startedAt,
     finishedAt: new Date().toISOString(),
-    steps: [{ name: "configured-verify", exitCode: 0 }],
+    steps: run.steps,
+    verifyRun: { runId: run.runId, policySha256: run.policySha256, terminalSha256: run.terminal.terminalSha256 },
     exitCode: 0,
   };
   writeEvidence(target, evidence);
@@ -167,20 +206,23 @@ export function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIF
 
 function parseArgs(argv) {
   const value = {};
-  for (let index = 0; index < argv.length; index += 2) {
+  for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
-    const next = argv[index + 1];
+    if (flag === "--prepare") { value.prepare = true; continue; }
+    if (!["--root", "--out"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
+    const next = argv[++index];
     if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) {
       fail("VEP-USAGE", "Usage: verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]");
     }
     value[flag] = next;
   }
-  return { rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH };
+  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH };
 }
 
 if (isDirectInvocation(import.meta.url)) {
   try {
-    const result = produceVerifyEvidence(parseArgs(process.argv.slice(2)));
+    const args = parseArgs(process.argv.slice(2));
+    const result = args.prepare ? prepareConsumerVerify(args) : await produceVerifyEvidence(args);
     process.stdout.write(`${JSON.stringify({ status: result.status, outPath: result.outPath, ...result.evidence }, null, 2)}\n`);
     if (result.status === "dirty") process.exitCode = 1;
   } catch (error) {

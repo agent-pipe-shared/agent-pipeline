@@ -8,6 +8,7 @@
  * migration/repair workflow.
  */
 import { createHash, randomBytes } from "node:crypto";
+import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
 import {
   accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
   linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
@@ -4678,6 +4679,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
       CRITICAL_HUMAN_PROOF_POLICY_PATH,
     ].map((path) => ({ path, bytes: baselines[path].bytes })),
     { path: SOURCE, bytes: renderYaml(intent) },
+    { path: CONSUMER_VERIFY_ADAPTER_PATH, bytes: CONSUMER_VERIFY_ADAPTER },
     ...(seedsProjectIgnore ? [{ path: ".gitignore", bytes: PROJECT_IGNORE_SEED }] : []),
   ].sort((left, right) => left.path.localeCompare(right.path));
   const targets = internal.map((target) => ({
