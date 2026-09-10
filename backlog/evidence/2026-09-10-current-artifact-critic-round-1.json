@@ -1,0 +1,318 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Ruleset: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Reviewed candidate 243dd1a00610fda07835ad11912329d36ce9e016, tree 3a9f5a973c9b090128b61c42c94493f63ffa5a71; all 19 named artifacts match their committed bytes. evidence/verify-current-artifact.json records the configured Verify command, matching clean start/finish identities, and 517 non-reused steps with exit code 0. Authorship remains not fully verifiable: the supplied initial-authorship-243dd1a0.json contains one stripped dispatch projection but only Git metadata for the other packages. No orchestrator authorship is inferred. Auto-injected context comprised the AGENTS.md pointer and environment/dispatch instructions; no session history was inspected. No writes, network access, or delegation occurred. Notes persistence was unavailable in this read-only lane.",
+    "findings": [
+      {
+        "gap": "Inventory coverage is discovered from the working directory rather than sourceBaseline's committed tree. Baseline validation checks resolution and ancestry without binding the discovered surfaces to that baseline.",
+        "risk": "An inventory can pass while assigning surfaces absent from its claimed source snapshot. A read-only in-memory probe of the current functions accepted a later-added suite against an unchanged older baseline.",
+        "severity": "major",
+        "evidence": "harness/scripts/check-product-capability-inventory.mjs:493-499",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-10-current-candidate-artifact-audit.md:23-24 — coverage must agree with the exact committed source baseline"
+      },
+      {
+        "gap": "The target checker treats HTML comments as anchors. Of the inventory's 35 active public targets, 34 lack an actual HTML or heading anchor, although the current helper accepts all 35.",
+        "risk": "Capability references such as README.md#capability-plugin-distribution-and-publication cannot navigate to their documented targets, while final validation reports those targets as present.",
+        "severity": "major",
+        "evidence": "harness/scripts/check-product-capability-inventory.mjs:422-425",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-10-current-candidate-artifact-audit.md:24-25 — public targets must resolve to actual current anchors"
+      },
+      {
+        "gap": "The consumer prerequisite instructions invoke a repository-local plugins/pipeline-core path without establishing a source checkout or resolving the installed plugin location.",
+        "risk": "A consumer following README into SETUP cannot run the advertised prerequisite diagnostic from its project root because installing the plugin does not supply that repository-local source path.",
+        "severity": "minor",
+        "evidence": "SETUP.md:24-27",
+        "spec_ref": "CR-04 — reachability from the consumer's starting position; current-candidate-artifact-audit.md:7-8"
+      },
+      {
+        "gap": "The flow guide names project-onboarding-v3 apply --activate as the fresh consumer initializer, contradicting SETUP's digest-bound apply-portable-seed contract and explicit statement that no unbound apply alias exists.",
+        "risk": "An operator following the flow guide selects an unsupported onboarding invocation and cannot complete the documented initialization path.",
+        "severity": "minor",
+        "evidence": "PIPELINE_FLOW.md:236-240",
+        "spec_ref": "SETUP.md:113-119 — sanctioned consumer initialization contract"
+      },
+      {
+        "gap": "The German profile table requires an answered fresh Advisor consultation and blocks writable work without it. The English table and Operating Model require only model-free capability observation at bootstrap, with consultation on demand.",
+        "risk": "German readers are instructed to launch an unnecessary consultation or stop otherwise admissible feature and epic work.",
+        "severity": "minor",
+        "evidence": "PIPELINE_FLOW.md:373-374",
+        "spec_ref": "docs/operating-model.md §3.1–3.2; PIPELINE_FLOW.md:98-99 — model-free bootstrap and demand-bound consultation"
+      },
+      {
+        "gap": "The Operating Model still prescribes up to three correction re-Critic rounds, also reflected in the flow guide. Its own evidence-and-recovery section instead permits only one re-review and forbids a third dispatch.",
+        "risk": "Following the earlier normative passage causes extra independent review dispatches beyond the stated round limit.",
+        "severity": "minor",
+        "evidence": "docs/operating-model.md:257-259",
+        "spec_ref": "docs/operating-model.md:343-346 — QG-13 review-round limit"
+      }
+    ],
+    "deliberately_not_flagged": [
+      "The inventory contains 616 unique surface assignments across 35 capabilities, including the named native Critic preflight suites. Its pending review status and null receipt digest correctly avoid claiming an attestation.",
+      "The reader checker enforces the fixed document set, closed record/disposition fields, bounded regular Git blobs, safe evidence paths, digests, ancestry, and endpoint equality. Its actual CLI is exercised by the supplied tests; reader identity and judgment quality remain explicitly outside its assurance.",
+      "Release integration checks committed source membership, verifies local checker bytes, and rejects failed, malformed, or mismatched child results. The corresponding consumer-safe-path exceptions identify source-only integration data.",
+      "Both compatibility entries pin the actual preflight schema SHA-256, a0130aee9c4d437df26fdb1c8e764f0c78e3bc2bc7b5f0d7af218843b7f9a3ce. Fixture classifications were not treated as evidence of live sandbox readiness.",
+      "GG22-9 through GG22-15 exercise the real hook entry with backlog debt and unrelated staged source content. Their ledger, source, bare-index, include-flag, traversal, and trailing-directory expectations address the specified regressions. Existing GG22 implementation was not reopened.",
+      "Both vendored documentation copies are byte-identical to their named origins. Missing historical dispatch records were not converted into an unsupported authorship finding, and no installation, publication, live-system, or cross-runner measurement claim was inferred."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_bqr323ojcj24wx56xjg3ab3r7e",
+    "selectionSha256": "29d412b3c71ed2f2453a0b8fde2cb60164d6b875b0763aef350894a4d49691ca",
+    "repoFingerprint": "4be774c7313c47ee8dc4da4bbddc8c9c388acbe8af4e02ab3c8fabeb1de48d89",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "243dd1a00610fda07835ad11912329d36ce9e016",
+      "candidateTree": "3a9f5a973c9b090128b61c42c94493f63ffa5a71",
+      "referenceSetSha256": "7d6a440f32a891b144f9608fb52304069392607c5379bfd780a1f54f15898e78",
+      "requestSha256": "d6e9651ddbc2323c5bf4a0b3e09509ec65f49dd69a63673752fff93ec5f0cc3b"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "243dd1a00610fda07835ad11912329d36ce9e016"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.153.4",
+        "sha256": "56ef98ab4032d317ab26e9b5e5a175650717351edb16ed9cde0cb6d1734d62da"
+      },
+      "protocolSchemaSha256": "bf15a4a551fabb399babfdb712f5832904a75703256e77d455e96a868cc94087",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "efadd9bae5b47668d56d25ab633d1c7ec5844082afaebfa8f8b965ea55390eb6"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266"
+      }
+    },
+    "smokeReceiptSha256": "99978f7ac18050b0ced63272b36411805dbecbe4a653f83f1600c0704e70ad08",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 135,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "99baf5bba3e9cd143c1801416f70b254e6ba19d729f15943170cb6f8b6873e4d",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        "PIPELINE_FLOW.md",
+        "README.md",
+        "SETUP.md",
+        "docs/operating-model.md",
+        "docs/product-capability-inventory.json",
+        "docs/push-release-flow.md",
+        "harness/reader-review-protocol.md",
+        "harness/scripts/check-consumer-safe-paths.mjs",
+        "harness/scripts/check-doc-contracts.test.mjs",
+        "harness/scripts/check-doc-reader-binding.mjs",
+        "harness/scripts/check-product-capability-inventory.mjs",
+        "harness/scripts/check-product-capability-inventory.test.mjs",
+        "plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json",
+        "plugins/pipeline-core/docs/operating-model.md",
+        "plugins/pipeline-core/docs/push-release-flow.md",
+        "plugins/pipeline-core/hooks/guard-git.test.mjs",
+        "plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs",
+        "plugins/pipeline-core/scripts/release-preflight-cli.mjs",
+        "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": "PIPELINE_FLOW.md",
+        "blobOid": "d855e7131a33c8667c7487a2e19356677009f279",
+        "sha256": "86bc51068b691e5f98e10f9e94a5d3054e241c190bc44c5932b0f70e27d54609",
+        "mode": "100644"
+      },
+      {
+        "path": "README.md",
+        "blobOid": "b5d1da132357b75cafaaeca6f91a4281c0ebe07c",
+        "sha256": "024c71b80c529e848285d47e9b14212a4d86ba79fea7ba752c995cfc7d01c180",
+        "mode": "100644"
+      },
+      {
+        "path": "SETUP.md",
+        "blobOid": "e0434f8bc773897c2e5ea5adc28c47b1b82551c9",
+        "sha256": "2d5070cde598bca11505211d8daf0a268c96ad8773b359760a705da28a41d4d5",
+        "mode": "100644"
+      },
+      {
+        "path": "docs/operating-model.md",
+        "blobOid": "e341d287b8a2b16ad77c90464a9e9955dc84e4a0",
+        "sha256": "f89650656884590b3f30bd092693620c6c9d57ce6e2d539eca7a53f669175bb3",
+        "mode": "100644"
+      },
+      {
+        "path": "docs/product-capability-inventory.json",
+        "blobOid": "46741df3d922903ae4f99cd4ba756b8fd3902502",
+        "sha256": "66c695a7be97ec6d513b6e546116a18fecbe124738f0e4e62f234c01a30e781d",
+        "mode": "100644"
+      },
+      {
+        "path": "docs/push-release-flow.md",
+        "blobOid": "8e9977306206ab5fbf0f1387a7dd352e776c4771",
+        "sha256": "d9c4ea9bcc19b3b9e9744b3dc6cfc7e32e1892e3ae5581456bf0614c88952d1d",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/reader-review-protocol.md",
+        "blobOid": "19db01e40b6e3cad1bb17382ba222159e86c7c39",
+        "sha256": "9347e59408878daedf01f62b2ae1381d182d0bbdcaee47328dc10a8e9d8fad17",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-consumer-safe-paths.mjs",
+        "blobOid": "009247bf3583c11629c31f099be4dd53cbba0b9a",
+        "sha256": "9d42052b22990241aa66ce3e9566365ba2e36d788c65caa8c8a29c9df50c28e7",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-doc-contracts.test.mjs",
+        "blobOid": "119503b96e052cf646c17f1e78cdcee0174075bb",
+        "sha256": "be420def330ca3171ccba355fdcb7fa51d759e3d4ae44837f1073dd8cc559eab",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-doc-reader-binding.mjs",
+        "blobOid": "45d5010d2b90e6cf577bd592d365f6502e3f55d4",
+        "sha256": "061c73c51dd84bfe62319a26547a49a3fac085c142bdbe14e9cc0dfcbcbe9031",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-product-capability-inventory.mjs",
+        "blobOid": "e59348cf6779bb7c2d4476cb2c666c15f1a07f47",
+        "sha256": "816b51bbd24b8cb0888902019d77d412d319a84dc76b556b041659d40e2c1d25",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-product-capability-inventory.test.mjs",
+        "blobOid": "35940fb7237a31e40d24ca41084a1ef0d05a85a8",
+        "sha256": "144f9025605b294b4214da6f9ffa2845868b77c4eff763fa3a77e639719bd075",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json",
+        "blobOid": "a7e3c03185425b02de61beab3a7480a9b8fe4b4c",
+        "sha256": "943588d9e951d86efe03ddc81783ee328d9735dd56d832639c399105b7d4c40c",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/docs/operating-model.md",
+        "blobOid": "e341d287b8a2b16ad77c90464a9e9955dc84e4a0",
+        "sha256": "f89650656884590b3f30bd092693620c6c9d57ce6e2d539eca7a53f669175bb3",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/docs/push-release-flow.md",
+        "blobOid": "8e9977306206ab5fbf0f1387a7dd352e776c4771",
+        "sha256": "d9c4ea9bcc19b3b9e9744b3dc6cfc7e32e1892e3ae5581456bf0614c88952d1d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+        "blobOid": "92de5bb85170522f858f621e2337626ec49563a5",
+        "sha256": "6a1073cc7609f6222e53f7125c23d629bace95352065fbe66987a84c033d0bdd",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs",
+        "blobOid": "80dd00e7ae04e3eed60ee7f816717d92705035e3",
+        "sha256": "b78071bae98a8403ceafa1fb37314c776f5b977c5202ab67d08abc8174bc5318",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/release-preflight-cli.mjs",
+        "blobOid": "4435fff1c1256ae50e7e8689f02b84018f3ee349",
+        "sha256": "26fa5212f40ca5af8c07ed81936ffe04868aa44ee93e33e636ae13dc5cce2e28",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
+        "blobOid": "7b90692521a19beb29870572fc8614a2f4b0bbfb",
+        "sha256": "8fe5d308c88661d4d924aba195f613581fc29d686790b6476c88003e33f55c25",
+        "mode": "100644"
+      }
+    ]
+  }
+}

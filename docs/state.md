@@ -53,11 +53,26 @@ files. Main already has that guard repair. Neither attempt establishes reader
 or inventory clearance. Details and immutable references:
 `backlog/evidence/2026-09-10-review-progress-and-input-repair.md`.
 
-Next: implement and verify the explicit native current-artifact scope in
-`specs/sprint-nova-epic/design/2026-09-10-native-current-artifact-review.md`,
-then independently review the remaining current artifacts with exact current
-evidence. Preserve the existing native policy and full exact-range mode.
-No synthetic comparison history or contradictory spec-only audit is used.
+The native current-artifact adapter is implemented in `243dd1a0`. Its first
+independent review cleared the production contract and found one missing
+end-to-end fixture. Correction `dbd20a2f` passed the genuine correction review,
+with no findings. A preceding input refusal did not assess the correction;
+all three actual results are retained in `backlog/evidence/2026-09-10-native-artifact-adapter-*.json`.
+Full Verify at `dbd20a2ff1c0fbc6f853b14efb9fad528140a29f`, tree
+`02594b12f70f58573382a9941cbddc48e6652f25`, passed 517/517 exact/clean with
+zero reuse: `verify-1788997609815-26ee5b0e4bdce08a`.
+
+The genuine current-artifact review completed on `243dd1a0`; all nineteen
+reviewed files were byte-identical at `dbd20a2f`. Result:
+`backlog/evidence/2026-09-10-current-artifact-critic-round-1.json`.
+It found two major inventory defects (working-directory rather than committed
+baseline discovery, and comment-only public anchors) plus four documentation
+inconsistencies. Reader binding, release integration, compatibility schema pins
+and GG22 regression tests were explicitly cleared within that review's scope.
+Repair these six findings, then run one substantive correction review of the
+same nineteen artifacts against the freshly tested corrected candidate.
+Inventory remains pending; no PASS or attestation is inferred from execution.
+
 After actual inventory attestation, run fresh two-stage reader review and
 binding, final build stamp, fresh Verify/security and reproducible local test
 handover. D.6's missing comparison remains an evidence dependency. Installed

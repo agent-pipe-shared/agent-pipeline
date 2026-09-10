@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkEntryPointReachability, discoverEntryPoints, discoverSurfaces, validateInventory } from "./check-product-capability-inventory.mjs";
+import { checkEntryPointReachability, discoverEntryPoints, discoverSurfaces, targetAnchorExists, validateInventory } from "./check-product-capability-inventory.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const inventoryPath = join(repoRoot, "docs", "product-capability-inventory.json");
@@ -78,6 +78,42 @@ function revision(ref) {
     commit: gitText(["rev-parse", "--verify", `${ref}^{commit}`]),
     tree: gitText(["rev-parse", "--verify", `${ref}^{tree}`]),
   };
+}
+
+function run(root, command, args) {
+  const result = spawnSync(command, args, { cwd: root, encoding: "utf8" });
+  if (result.error) throw result.error;
+  return result;
+}
+
+function withBaselineClone(fn) {
+  const parent = mkdtempSync(join(tmpdir(), "haw-baseline-cli-"));
+  const root = join(parent, "repo");
+  try {
+    const clone = run(parent, "git", ["clone", "--quiet", "--no-local", repoRoot, root]);
+    assert.equal(clone.status, 0, clone.stderr);
+    fn(root);
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+}
+
+function cliInventory(root) {
+  return run(root, process.execPath, [
+    join(repoRoot, "harness", "scripts", "check-product-capability-inventory.mjs"),
+    "--root", root,
+    "--phase", "inventory",
+  ]);
+}
+
+function writeInventoryFixture(root, mutate = () => {}) {
+  const document = JSON.parse(readFileSync(join(root, "docs", "product-capability-inventory.json"), "utf8"));
+  document.criticReview = { status: "attested", receiptSha256: FIXTURE_RECEIPT_SHA256, reason: null };
+  for (const capability of document.capabilities) {
+    for (const target of capability.targets) target.status = "pending";
+  }
+  mutate(document);
+  writeFileSync(join(root, "docs", "product-capability-inventory.json"), `${JSON.stringify(document, null, 2)}\n`, "utf8");
 }
 
 function nonAncestorBaseline() {
@@ -202,14 +238,64 @@ check("HAW-A05 accepts an ancestor baseline and still requires every discovered 
   document.sourceBaseline = revision("HEAD^");
   assert.equal(validated(document).ok, true);
 
-  // v3: an older baseline does not relax the surface contract. The surface set is
-  // derived from the CURRENT checkout either way, so dropping a categorization is
-  // still caught with the baseline moved back.
+  // An older exact baseline does not relax the surface contract: every surface
+  // derived from that committed tree still needs a categorization.
   const capability = document.capabilities.find((candidate) => candidate.surfaceIds.length > 1);
   capability.surfaceIds = capability.surfaceIds.slice(1);
   const result = validated(document);
   assert.equal(result.ok, false);
   assert.match(result.findings.join("\n"), /discovered surface is absent from every capability/);
+});
+
+check("HAW-A05a CLI discovery is bound to the committed baseline and rejects a later uncommitted assignment", () => {
+  withBaselineClone((root) => {
+    const laterSurfacePath = "plugins/baseline-regression/skills/later-surface/SKILL.md";
+    const laterSurfaceId = `skill:${laterSurfacePath}:later-surface`;
+    mkdirSync(dirname(join(root, laterSurfacePath)), { recursive: true });
+    writeFileSync(join(root, laterSurfacePath), "# Later surface\n", "utf8");
+
+    // This path is directly discoverable from the dirty checkout but absent from
+    // the exact committed sourceBaseline. It must not change the baseline set.
+    writeInventoryFixture(root);
+    const unchanged = cliInventory(root);
+    assert.equal(unchanged.status, 0, unchanged.stderr);
+    assert.match(unchanged.stdout, /PASS: product capability inventory \(inventory\)/);
+
+    writeInventoryFixture(root, (document) => {
+      const capability = document.capabilities[0];
+      capability.surfaceIds = [...capability.surfaceIds, laterSurfaceId]
+        .sort((left, right) => Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8")));
+    });
+    const assigned = cliInventory(root);
+    assert.notEqual(assigned.status, 0);
+    assert.match(assigned.stderr, /capabilities\[0\] references missing surface skill:plugins\/baseline-regression\/skills\/later-surface\/SKILL\.md:later-surface/);
+  });
+});
+
+check("HAW-A05b accepts only rendered target anchors, never comments or code examples", () => {
+  const target = { document: "README", anchorId: "capability-example" };
+  withFixtureRoot({
+    "README.md": [
+      "<!-- <a id=\"capability-example\"></a> -->",
+      "`<a id=\"capability-example\"></a>`",
+      "    <a id=\"capability-example\"></a>",
+      "<a data-id=\"capability-example\"></a>",
+      "<a id=\"CAPABILITY-EXAMPLE\"></a>",
+      "<a id=\"wrong-id\" id=\"capability-example\"></a>",
+      "```md",
+      "<a id=\"capability-example\"></a>",
+      "```not-a-closing-fence",
+      "<a id=\"capability-example\"></a>",
+      "```",
+      "## Capability Example {#capability-example}",
+    ].join("\n"),
+  }, (root) => assert.equal(targetAnchorExists(root, target), false));
+  withFixtureRoot({ "README.md": "<a id=\"capability-example\"></a>\n" }, (root) => {
+    assert.equal(targetAnchorExists(root, target), true);
+  });
+  withFixtureRoot({ "README.md": "## Capability Example\n" }, (root) => {
+    assert.equal(targetAnchorExists(root, target), true);
+  });
 });
 
 for (const [name, fixture, pattern] of [

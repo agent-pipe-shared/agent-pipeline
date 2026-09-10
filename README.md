@@ -40,7 +40,7 @@ Four deliberately separated roles carry the model:
 
 <!-- capability:human-accountability-roles -->
 <a id="capability-human-accountability-roles"></a>
-<!-- anchor:capability-human-accountability-roles -->
+
 - **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
   final sign-off.
 - **Elephant** — the long-lived orchestrator session. Turns your intent into a spec,
@@ -265,19 +265,20 @@ contracts live in the linked reference pages, rather than in a second catalog
 here.
 
 <!-- capability:plugin-distribution-and-publication -->
-<!-- anchor:capability-plugin-distribution-and-publication -->
+<a id="capability-plugin-distribution-and-publication"></a>
 <!-- capability:session-and-delivery-skills -->
-<!-- anchor:capability-session-and-delivery-skills -->
+<a id="capability-session-and-delivery-skills"></a>
 <!-- capability:specialist-agent-roles -->
-<!-- anchor:capability-specialist-agent-roles -->
+<a id="capability-specialist-agent-roles"></a>
 <!-- capability:starter-templates -->
-<!-- anchor:capability-starter-templates -->
+<a id="capability-starter-templates"></a>
 <!-- capability:generated-agent-obligations -->
-<!-- anchor:capability-generated-agent-obligations -->
+<a id="capability-generated-agent-obligations"></a>
 <!-- capability:v3-routed-duties -->
-<!-- anchor:capability-v3-routed-duties -->
+<a id="capability-v3-routed-duties"></a>
 <!-- capability:v3-work-profiles -->
-<!-- anchor:capability-v3-work-profiles -->
+<a id="capability-v3-work-profiles"></a>
+
 **Plan and delivery.** Distributed plugins, starter templates, V3 profiles and
 routed duties, named specialist roles, generated obligations, and bounded
 session skills make a task and its delivery record explicit. Publication is a
@@ -285,56 +286,60 @@ separate evidence-bound action; a selected route is not an effective-model
 attestation.
 
 <!-- capability:handover-hard-size-gate -->
-<!-- anchor:capability-handover-hard-size-gate -->
+<a id="capability-handover-hard-size-gate"></a>
 <!-- capability:governance-event-ledger -->
-<!-- anchor:capability-governance-event-ledger -->
+<a id="capability-governance-event-ledger"></a>
 <!-- capability:agent-decision-journal -->
-<!-- anchor:capability-agent-decision-journal -->
+<a id="capability-agent-decision-journal"></a>
 <!-- capability:continuity-and-handover -->
-<!-- anchor:capability-continuity-and-handover -->
+<a id="capability-continuity-and-handover"></a>
+
 **Continuity.** Size-bounded handovers and explicit continuity, journal, and
 event-ledger tools preserve inspectable state. A library or record does not
 automatically activate a runner integration or create authority.
 
 <!-- capability:audit-and-evidence-cli -->
-<!-- anchor:capability-audit-and-evidence-cli -->
+<a id="capability-audit-and-evidence-cli"></a>
 <!-- capability:change-control-cli -->
-<!-- anchor:capability-change-control-cli -->
+<a id="capability-change-control-cli"></a>
 <!-- capability:security-control-catalog -->
-<!-- anchor:capability-security-control-catalog -->
+<a id="capability-security-control-catalog"></a>
 <!-- capability:supply-chain-provenance -->
-<!-- anchor:capability-supply-chain-provenance -->
+<a id="capability-supply-chain-provenance"></a>
 <!-- capability:ai-assisted-hardening -->
-<!-- anchor:capability-ai-assisted-hardening -->
+<a id="capability-ai-assisted-hardening"></a>
+
 **Assurance evidence.** Audit, change-control, security-catalog, provenance,
 and hardening tools are explicit local operations. Their receipts inform
 review; they do not publish externally, install a scanner, or certify security
 or compliance.
 
 <!-- capability:critical-human-authorization -->
-<!-- anchor:capability-critical-human-authorization -->
+<a id="capability-critical-human-authorization"></a>
 <!-- capability:repair-guidance-cli -->
-<!-- anchor:capability-repair-guidance-cli -->
+<a id="capability-repair-guidance-cli"></a>
 <!-- capability:human-override-and-maintenance-window -->
-<!-- anchor:capability-human-override-and-maintenance-window -->
+<a id="capability-human-override-and-maintenance-window"></a>
+
 **Human boundaries.** Critical authorization, refusal repair, override, and
 maintenance-window paths require an attended, declared procedure. Asking for
 guidance or preparing a request never grants an agent an override.
 
 <!-- capability:afk-capability-workers -->
-<!-- anchor:capability-afk-capability-workers -->
+<a id="capability-afk-capability-workers"></a>
 <!-- capability:local-worker-supervision -->
-<!-- anchor:capability-local-worker-supervision -->
+<a id="capability-local-worker-supervision"></a>
 <!-- capability:cost-and-benchmark-cli -->
-<!-- anchor:capability-cost-and-benchmark-cli -->
+<a id="capability-cost-and-benchmark-cli"></a>
 <!-- capability:error-register-quality-gate -->
-<!-- anchor:capability-error-register-quality-gate -->
+<a id="capability-error-register-quality-gate"></a>
 <!-- capability:organization-policy-packs -->
-<!-- anchor:capability-organization-policy-packs -->
+<a id="capability-organization-policy-packs"></a>
 <!-- capability:external-traceability-adapters -->
-<!-- anchor:capability-external-traceability-adapters -->
+<a id="capability-external-traceability-adapters"></a>
 <!-- capability:documentation-quality-gates -->
-<!-- anchor:capability-documentation-quality-gates -->
+<a id="capability-documentation-quality-gates"></a>
+
 **Operations.** Claude-only analysis workers, explicit local-worker
 supervision, cost/benchmark and quality checks, policy packs, and traceability
 adapters retain their stated boundaries: provider execution, external writes,

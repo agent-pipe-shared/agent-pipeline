@@ -1,0 +1,143 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Loaded ruleset SHA independently confirmed: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Reviewed only 4fbb49d506adfc791644b965b2b0581424ce7dba through 243dd1a00610fda07835ad11912329d36ce9e016; the range contains one commit, with candidate tree 3a9f5a973c9b090128b61c42c94493f63ffa5a71. evidence/verify-1788996252015-95135d9b8514dcd1.json records a completed full Verify with exit code 0, clean exact candidate bindings, and 517 successful, unreused checks, including the affected suites. scratch/NVA-NATIVE-ARTIFACT-ADAPTER-REVIEW-1/authorship-evidence.json agrees with the commit's Goldfish dispatch trailer, but its supplemental projection does not independently establish fresh-context authorship. Auto-injected context included the AGENTS.md pointer and workspace metadata; no session history was inspected. Persistence was unavailable under the read-only restriction; no files or git state were modified.",
+    "findings": [
+      {
+        "gap": "The required integration fixture is missing. The unchanged-artifact scenario stops at preflight, the host tests construct reference records independently and substitute runChild, and the actual-child test uses hardcoded candidate identities. No provided test carries the same real Git candidate and preflight source coverage through the actual child prompt and execution receipt.",
+        "risk": "A handoff that loses scoped source coverage or retains a spec reference without the newly required mode can reject an otherwise valid artifact review while all added component tests remain green.",
+        "severity": "minor",
+        "evidence": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs:1769-1785",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-10-native-current-artifact-review.md:52-58"
+      }
+    ],
+    "deliberately_not_flagged": [
+      "Scope and compatibility: all seven changed files concern the artifact-review alternative; existing native exact-range and legacy request shapes remain supported.",
+      "Admission and identity: the host rejects mixed scopes, missing source coverage, unsupported modes and mismatched request digests. The canonical digest binds candidate, full review mode, artifact paths and ordered references.",
+      "Physical integrity and concurrency: source bytes, Git blob identities and executable modes are checked before and after execution; cloning prevents caller mutation during the awaited child from changing receipt coverage.",
+      "Prompt behavior: the artifact branch names complete current artifacts and omits the correction-range instruction. Existing native policy, tool reduction and lifecycle checks remain intact.",
+      "Test integrity: existing assertions were preserved. The reported gap concerns the explicitly required integration coverage, not a failed or fabricated Verify run.",
+      "Guardrails, security, dependencies and language: the inspected constraints revealed no additional change-specific violation, new dependency, credential, live-system action or deferred-risk exception."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_4mxryc6mlvlkhnmtawtug4vztk",
+    "selectionSha256": "a9a1cccf82b97091a19059dca59c46d283c693a17468c92630432ebdc6c71cb8",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "243dd1a00610fda07835ad11912329d36ce9e016",
+      "candidateTree": "3a9f5a973c9b090128b61c42c94493f63ffa5a71",
+      "referenceSetSha256": "60e2b606e5cb9f85baee2a39680ce76e1f022ef75ea257ffbb51bec249fe7f98",
+      "requestSha256": "9b633c71bb757570622c6b2d3d40011aa23ae379daf237c30962276a6805a244"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "243dd1a00610fda07835ad11912329d36ce9e016"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.153.4",
+        "sha256": "56ef98ab4032d317ab26e9b5e5a175650717351edb16ed9cde0cb6d1734d62da"
+      },
+      "protocolSchemaSha256": "bf15a4a551fabb399babfdb712f5832904a75703256e77d455e96a868cc94087",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "efadd9bae5b47668d56d25ab633d1c7ec5844082afaebfa8f8b965ea55390eb6"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266"
+      }
+    },
+    "smokeReceiptSha256": "1425cff560ad20d54b4ad60939d5dc6dcd4e82a30d0ae82551c33b827d8d6cc3",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 135,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "accf799a4e4676c91cea5736c875a62a9665e76718bf8baffc42adf3fe981b97",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    }
+  }
+}

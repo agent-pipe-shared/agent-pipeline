@@ -5,7 +5,7 @@
  *
  * The inventory is deliberately a closed, evidence-only index.  It does not
  * derive marketing claims from prose: every claimed capability is bound to the
- * current directly discoverable product surface, code/configuration evidence,
+ * sourceBaseline's directly discoverable committed product surface, code/configuration evidence,
  * and (until the documentation reduction lands) a pending public anchor.
  */
 import { execFileSync } from "node:child_process";
@@ -118,6 +118,35 @@ function walkFiles(root, start, accept) {
   return found.sort(utf8Compare);
 }
 
+function checkoutSource(root) {
+  return {
+    exists(path) { return existsSync(join(root, path)); },
+    read(path) { return readFileSync(join(root, path), "utf8"); },
+    walk(start, accept) { return walkFiles(root, start, accept); },
+  };
+}
+
+/** Read only regular tracked blobs from one already-verified baseline commit. */
+function committedSource(root, commit) {
+  const listing = execFileSync("git", ["ls-tree", "-r", "-z", commit], {
+    cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+  });
+  const files = new Set();
+  for (const row of listing.split("\0")) {
+    if (!row) continue;
+    const match = /^(100644|100755) blob [a-f0-9]+\t(.+)$/s.exec(row);
+    if (match) files.add(match[2]);
+  }
+  return {
+    exists(path) { return files.has(path) || [...files].some((file) => file.startsWith(`${path}/`)); },
+    read(path) {
+      if (!files.has(path)) throw new Error(`baseline source path is unavailable: ${path}`);
+      return execFileSync("git", ["show", `${commit}:${path}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    },
+    walk(start, accept) { return [...files].filter((path) => path.startsWith(`${start}/`) && accept(path)).sort(utf8Compare); },
+  };
+}
+
 function safeStem(path) {
   return path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "").replace(/\.mjs$/, "");
 }
@@ -147,13 +176,12 @@ function hookMembers(path, contents) {
   return members.sort(utf8Compare);
 }
 
-function verifyMembers(root) {
-  const verifyPath = join(root, "harness/scripts/verify.mjs");
-  const source = readFileSync(verifyPath, "utf8");
-  const start = source.indexOf("const TEST_SUITES = [");
-  const end = source.indexOf("];", start);
+function verifyMembers(source) {
+  const text = source.read("harness/scripts/verify.mjs");
+  const start = text.indexOf("const TEST_SUITES = [");
+  const end = text.indexOf("];", start);
   if (start < 0 || end < 0) throw new Error("harness/scripts/verify.mjs TEST_SUITES declaration is unavailable");
-  const names = [...source.slice(start, end).matchAll(/\{ name: "([^"]+)"/g)].map((match) => match[1]);
+  const names = [...text.slice(start, end).matchAll(/\{ name: "([^"]+)"/g)].map((match) => match[1]);
   if (names.length === 0 || new Set(names).size !== names.length) {
     throw new Error("harness/scripts/verify.mjs TEST_SUITES names are missing or duplicate");
   }
@@ -161,30 +189,30 @@ function verifyMembers(root) {
   return [...names, "security-scan", "validate-manifest"].sort(utf8Compare);
 }
 
-function releaseCommandMembers(root) {
-  const paths = walkFiles(root, "plugins/pipeline-core/scripts", (path) =>
+function releaseCommandMembers(source) {
+  const paths = source.walk("plugins/pipeline-core/scripts", (path) =>
     /\/(?:codex-plugin-validator-parity|native-plugin-readback|neutral-exclusion-review|neutral-range-plan|public-baseline-diagnose|publication-close-journal)\.mjs$/.test(path),
   );
   return paths.map((path) => ({ path, member: safeStem(path), kind: path.includes("publication") || path.includes("public-") ? "publication" : "release" }));
 }
 
 /** Discover exactly the direct product-surface members defined by Hawkeye. */
-export function discoverSurfaces(root) {
+export function discoverSurfaces(root, source = checkoutSource(root)) {
   const surfaces = [];
   const add = (kind, path, member) => surfaces.push({ surfaceId: `${kind}:${path}:${member}`, kind, path, member });
 
-  for (const path of walkFiles(root, "plugins", (item) => /^plugins\/[^/]+\/skills\/[^/]+\/SKILL\.md$/.test(item))) {
+  for (const path of source.walk("plugins", (item) => /^plugins\/[^/]+\/skills\/[^/]+\/SKILL\.md$/.test(item))) {
     add("skill", path, path.split("/").slice(-2, -1)[0]);
   }
-  for (const path of walkFiles(root, "plugins", (item) => /^plugins\/[^/]+\/agents\/[^/]+\.md$/.test(item))) {
+  for (const path of source.walk("plugins", (item) => /^plugins\/[^/]+\/agents\/[^/]+\.md$/.test(item))) {
     add("agent-role", path, safeStem(path));
   }
-  for (const path of walkFiles(root, "roles", (item) => /^roles\/[^/]+\.md$/.test(item))) {
+  for (const path of source.walk("roles", (item) => /^roles\/[^/]+\.md$/.test(item))) {
     add("human-role", path, safeStem(path));
   }
 
   const intentPath = "pipeline.user.yaml";
-  const intent = parseYaml(readFileSync(join(root, intentPath), "utf8"));
+  const intent = parseYaml(source.read(intentPath));
   if (!isObject(intent?.routing?.profiles) || !isObject(intent?.routing?.duties)) {
     throw new Error("pipeline.user.yaml has no routing.profiles/routing.duties object");
   }
@@ -192,20 +220,20 @@ export function discoverSurfaces(root) {
   for (const member of Object.keys(intent.routing.duties).sort(utf8Compare)) add("duty", intentPath, member);
 
   for (const path of ["plugins/pipeline-core/hooks/codex-hooks.json", "plugins/pipeline-core/hooks/hooks.json"]) {
-    for (const member of hookMembers(path, readFileSync(join(root, path), "utf8"))) add("hook", path, member);
+    for (const member of hookMembers(path, source.read(path))) add("hook", path, member);
   }
-  for (const path of walkFiles(root, "plugins/pipeline-core/hooks", (item) => /\/guard-[^/]+\.mjs$/.test(item) && !item.endsWith(".test.mjs"))) {
+  for (const path of source.walk("plugins/pipeline-core/hooks", (item) => /\/guard-[^/]+\.mjs$/.test(item) && !item.endsWith(".test.mjs"))) {
     add("guard", path, safeStem(path));
   }
-  for (const member of verifyMembers(root)) add("verify-phase", "harness/scripts/verify.mjs", member);
+  for (const member of verifyMembers(source)) add("verify-phase", "harness/scripts/verify.mjs", member);
 
   for (const member of ["guidelines", "policies"]) {
     const path = `governance/examples/${member}`;
-    if (existsSync(join(root, path))) add("governance-extension", path, member);
+    if (source.exists(path)) add("governance-extension", path, member);
   }
-  for (const path of walkFiles(root, "templates", () => true)) add("template-extension", path, path.slice("templates/".length));
+  for (const path of source.walk("templates", () => true)) add("template-extension", path, path.slice("templates/".length));
   add("setup", "setup.mjs", "setup");
-  for (const command of releaseCommandMembers(root)) add(command.kind, command.path, command.member);
+  for (const command of releaseCommandMembers(source)) add(command.kind, command.path, command.member);
   add("publication", ".claude-plugin/marketplace.json", "marketplace");
   add("publication", "plugins/pipeline-core/.claude-plugin/plugin.json", "plugin-manifest");
   add("publication", "plugins/pipeline-core/.codex-plugin/plugin.json", "codex-plugin-manifest");
@@ -419,10 +447,41 @@ function documentPath(document) {
   }[document];
 }
 
-function targetAnchorExists(root, target) {
-  const text = readFileSync(join(root, documentPath(target.document)), "utf8");
-  const escaped = target.anchorId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?:^|\\n)#{1,6}\\s+[^\\n]*\\{#${escaped}\\}|(?:^|\\n)<!--\\s*anchor:${escaped}\\s*-->`, "u").test(text);
+function renderedMarkdown(text) {
+  const uncommented = text.replace(/<!--[\s\S]*?-->/g, "");
+  const lines = [];
+  let fence = null;
+  for (const line of uncommented.split("\n")) {
+    const match = /^(?: {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence === null && match) { fence = { marker: match[1][0], width: match[1].length }; continue; }
+    if (fence !== null && match && match[1][0] === fence.marker && match[1].length >= fence.width && match[2].trim() === "") {
+      fence = null;
+      continue;
+    }
+    if (fence === null) lines.push(line);
+  }
+  return lines.join("\n");
+}
+
+function simpleHeadingSlug(value) {
+  // This exact subset has GitHub's rendered heading-slug behavior. Capability
+  // IDs outside it must use the explicit standalone HTML form below rather
+  // than an approximation of a Markdown renderer's full slug algorithm.
+  if (!/^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/.test(value)) return null;
+  return value.toLowerCase().replace(/ /g, "-");
+}
+
+export function targetAnchorExists(root, target) {
+  const text = renderedMarkdown(readFileSync(join(root, documentPath(target.document)), "utf8"));
+  const heading = text.split("\n").some((line) => {
+    const match = /^(?: {0,3})#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+    return match !== null && simpleHeadingSlug(match[1]) === target.anchorId;
+  });
+  const html = text.split("\n").some((line) => {
+    const tag = /^ {0,3}<a\s+id\s*=\s*(?:"([^"]*)"|'([^']*)')\s*>\s*<\/a\s*>\s*$/iu.exec(line);
+    return tag !== null && (tag[1] ?? tag[2]) === target.anchorId;
+  });
+  return heading || html;
 }
 
 function capabilityMarkerExists(root, id) {
@@ -454,6 +513,7 @@ export function validateInventory({
   const rootKeys = ["schema", "sourceBaseline", "criticReview", "capabilities"];
   if (!hasExactKeys(inventory, rootKeys)) fail(findings, `inventory root must have exactly ${rootKeys.join(", ")}`);
   if (inventory.schema !== SCHEMA) fail(findings, `inventory schema must equal ${SCHEMA}`);
+  let baselineSource = null;
   if (!hasExactKeys(inventory.sourceBaseline, ["commit", "tree"]) || !GIT_OID_RE.test(inventory.sourceBaseline?.commit ?? "") || !GIT_OID_RE.test(inventory.sourceBaseline?.tree ?? "")) {
     fail(findings, "sourceBaseline must have exactly full lowercase Git commit and tree");
   } else {
@@ -463,8 +523,13 @@ export function validateInventory({
     } else {
       const baselineTree = gitOperations.revision(root, `${baselineCommit}^{tree}`);
       if (inventory.sourceBaseline.tree !== baselineTree) fail(findings, "sourceBaseline tree does not match commit");
-      if (requireCurrentBaseline && !gitOperations.isAncestor(root, baselineCommit, "HEAD")) {
+      const baselineIsAncestor = !requireCurrentBaseline || gitOperations.isAncestor(root, baselineCommit, "HEAD");
+      if (!baselineIsAncestor) {
         fail(findings, "sourceBaseline commit is not an ancestor of current HEAD");
+      }
+      if (inventory.sourceBaseline.tree === baselineTree && baselineIsAncestor) {
+        try { baselineSource = committedSource(root, baselineCommit); }
+        catch { fail(findings, "sourceBaseline committed source cannot be read"); }
       }
     }
   }
@@ -492,8 +557,11 @@ export function validateInventory({
   // discovery rule could emit a kind nobody added to that set.
   const surfaceById = new Map();
   let discovered = [];
-  try { discovered = discoverSurfaces(root); }
-  catch (error) { fail(findings, `surface discovery failed: ${error.message}`); }
+  if (baselineSource === null) fail(findings, "surface discovery requires a readable exact sourceBaseline");
+  else {
+    try { discovered = discoverSurfaces(root, baselineSource); }
+    catch (error) { fail(findings, `surface discovery failed: ${error.message}`); }
+  }
   for (const surface of discovered) {
     if (!SURFACE_KINDS.has(surface.kind)) fail(findings, `discovered surface has an invalid kind: ${surface.surfaceId}`);
     surfaceById.set(surface.surfaceId, surface);

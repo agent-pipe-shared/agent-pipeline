@@ -124,7 +124,7 @@ a *new* reviewer checks it again. Neither an optional readiness decision nor a
 ## 3. Deliver in independently checkable packages
 
 <!-- capability:deterministic-verification -->
-<!-- anchor:capability-deterministic-verification -->
+<a id="capability-deterministic-verification"></a>
 
 For an audit-facing delivery, retain the candidate-bound Verify receipt with
 the package: it identifies the command, candidate, tree, suites, and result.
@@ -133,10 +133,10 @@ not a green result. [Audit and evidence](docs/audit-and-evidence.md) explains
 what a review package can contain and what it cannot prove.
 
 <!-- capability:claude-hook-safety -->
-<!-- anchor:capability-claude-hook-safety -->
+<a id="capability-claude-hook-safety"></a>
 
 <!-- capability:codex-host-hook-bridge -->
-<!-- anchor:capability-codex-host-hook-bridge -->
+<a id="capability-codex-host-hook-bridge"></a>
 
 ```mermaid
 flowchart LR
@@ -173,7 +173,8 @@ call it equivalent.
 ## 4. Optional branches are explicit, not implied
 
 <!-- capability:release-planning-controls -->
-<!-- anchor:capability-release-planning-controls -->
+<a id="capability-release-planning-controls"></a>
+
 | Branch | It exists only when | Owner | Evidence | Rejoin / terminal state |
 |---|---|---|---|---|
 | Security | The manifest declares the security phase or task risk requires its configured checks. | Deterministic security harness; Elephant owns disposition. | Scanner status and exact-candidate evidence. `SKIPPED` is not `PASS`; `ERROR` fails closed. | A policy-acceptable result rejoins Critic/close. Findings or unavailable required checks enter recovery or stop. |
@@ -185,7 +186,7 @@ call it equivalent.
 ## Integration and update boundaries
 
 <!-- capability:parallel-sprint-promotion-gates -->
-<!-- anchor:capability-parallel-sprint-promotion-gates -->
+<a id="capability-parallel-sprint-promotion-gates"></a>
 
 Independent packages can run in parallel only when their files and state do
 not overlap. Integration advances the explicitly selected merge-ready Sprint;
@@ -193,7 +194,7 @@ protected or overlapping baseline changes require bounded impact review before
 promotion. See [parallel work](docs/parallel-work.md).
 
 <!-- capability:pipeline-update-channels -->
-<!-- anchor:capability-pipeline-update-channels -->
+<a id="capability-pipeline-update-channels"></a>
 
 Update channels provide a declared alpha, beta, or stable selection and a
 sanctioned repository-local override. Availability is read-only information;
@@ -211,7 +212,7 @@ evidence and approval rules.
 |---|---|---|---|
 | Deterministic gate is red with a known product cause | Goldfish, then Elephant. | One automatic product retry at the same cause (two total attempts). | A passing retry returns to the deterministic gate/normal review. A second failure opens a human course decision. |
 | Trusted environment fault before product work | Elephant. | One narrow, fresh environment failover with frozen authority and no delegation. | On success resume bounded work; on another fault or an unproven cause, stop for a course decision. |
-| Critic finding needs semantic correction | Elephant dispatches a fresh correction. | At most three local rework cycles, each followed by an independent delta re-gate. | A green delta returns to close. A fourth correction is not automatic: human course decision. |
+| Critic finding needs semantic correction | Elephant dispatches a fresh correction. | One fresh re-review after the initial blocking result. | A passing re-review returns to close. If it still reports a blocking finding, the Elephant self-verifies the next correction directly; no third Critic round. |
 | Spec, scope, evidence, or authority drift | Elephant and human as needed. | Re-plan or re-approve; never carry stale approval into a changed contract. | Return to triage, Spec, readiness, or approval — whichever became stale. |
 | Unknown cause, repeated signature, exhausted budget, or conflict | Human decision-maker. | Continue with a new direction, defer, or stop. | No unbounded retry loop and no success claim without required evidence. |
 
@@ -234,11 +235,12 @@ are current and performs no writes. If a step reports drift or an invalid source
 stop rather than editing generated `.claude` bytes by hand.
 
 These are not consumer-root setup commands. A fresh consumer first runs the
-mandatory `pipeline-start` skill, which classifies it before any Git/V3 check;
-its plugin-owned `project-onboarding-v3` inspect → plan → explicit
-`apply --activate` path is the only initializer. An explicit user request to
-create/initialize authorizes the apply; partial roots fail closed and are never
-overwritten.
+mandatory `pipeline-start` skill, which classifies it before any Git/V3 check.
+Follow its plugin-local read-only `inspect` and `plan` actions. An explicit
+user request to create or initialize the project authorizes only the exact
+returned `apply-portable-seed --plan-sha256 <reviewed-plan-digest> --activate`
+action, retaining its root and runner arguments. Partial roots fail closed
+and are never overwritten.
 
 ## Support boundary and current scope
 
@@ -370,8 +372,8 @@ und wo er wieder einmündet.
 
 | Profil | Einstieg, wenn | Owner | Nachweis / Schutz | Wiedereinstieg oder Stopp |
 |---|---|---|---|---|
-| `epic` | Die Arbeit Architektur, mehrere Blöcke oder ein breites koordiniertes Ergebnis umfasst. | Elephant; der Mensch entscheidet materiellen Scope. | Registrierte V3-`epic`-Route und ein beantworteter frischer lesender Beratungsbeleg. | Weiter zur Triage. Fehlender oder veralteter Beratungsnachweis stoppt schreibende Arbeit. |
-| `feature` | Eine begrenzte Produktänderung trotzdem normale Design- und Lieferdisziplin braucht. | Elephant. | Registrierte V3-`feature`-Route und ein beantworteter frischer lesender Beratungsbeleg. | Weiter zur Triage. Fehlender oder veralteter Beratungsnachweis stoppt schreibende Arbeit. |
+| `epic` | Die Arbeit Architektur, mehrere Blöcke oder ein breites koordiniertes Ergebnis umfasst. | Elephant; der Mensch entscheidet materiellen Scope. | Registrierte V3-`epic`-Route sowie modellfreier V2-Capability-Status und Assurance. Beratung erfolgt nur für eine konkrete Frage. | Direkt zur Triage. `unknown` oder `unavailable` dokumentiert den Capability-Status; es ist weder ein Bootstrap-Timeout noch ein Beratungsergebnis. |
+| `feature` | Eine begrenzte Produktänderung trotzdem normale Design- und Lieferdisziplin braucht. | Elephant. | Registrierte V3-`feature`-Route sowie modellfreier V2-Capability-Status und Assurance. Beratung erfolgt nur für eine konkrete Frage. | Direkt zur Triage. SessionStart, Resume und Compact starten keinen Advisor. |
 | `mini` | Es wirklich ein kleines, eng begrenztes Feature oder ein Hotfix ist. | Elephant. | V3-`mini`-Route; Beratung ist absichtlich deaktiviert. Die leichte Grenze umfasst etwa fünf Dateien, keine Guardrail-/Canon-Dateien und keine neue Abhängigkeit. | Leichten Pfad fortsetzen. Wächst der Scope oder erscheint eine geschützte Oberfläche, zu `feature` oder `epic` eskalieren und den vollen Pfad erneut betreten. |
 
 Das Profil kommt aus aktivem Feature und Aufgabenform, nicht aus einem alten
@@ -470,7 +472,7 @@ eigenen Nachweis- und Freigaberegeln.
 |---|---|---|---|
 | Deterministisches Gate ist rot mit bekannter Produktursache | Goldfish, dann Elephant. | Ein automatischer Produkt-Retry für dieselbe Ursache (insgesamt zwei Versuche). | Ein bestandener Retry kehrt zum deterministischen Gate/normalen Review zurück. Der zweite Fehlschlag öffnet eine menschliche Kursentscheidung. |
 | Vertrauenswürdiger Umgebungsfehler vor Produktarbeit | Elephant. | Ein enger frischer Umgebungs-Failover mit eingefrorener Authority und ohne Delegation. | Bei Erfolg begrenzte Arbeit fortsetzen; bei weiterem Fehler oder unbewiesener Ursache für Kursentscheidung stoppen. |
-| Critic-Befund braucht semantische Korrektur | Elephant dispatcht eine frische Korrektur. | Höchstens drei lokale Nacharbeitszyklen, jeder mit unabhängigem Delta-Re-Gate. | Ein grünes Delta kehrt zu Close zurück. Eine vierte Korrektur ist nicht automatisch: menschliche Kursentscheidung. |
+| Critic-Befund braucht semantische Korrektur | Elephant dispatcht eine frische Korrektur. | Eine frische Nachprüfung nach dem ersten blockierenden Ergebnis. | Eine bestandene Nachprüfung führt zu Close zurück. Bleibt ein blockierender Befund, prüft der Elephant die nächste Korrektur selbst; keine dritte Critic-Runde. |
 | Spec-, Scope-, Nachweis- oder Authority-Drift | Elephant und nötigenfalls Mensch. | Neu planen oder freigeben; alte Freigabe nie in einen veränderten Vertrag tragen. | Zur Triage, Spec, Readiness oder Freigabe zurück — je nachdem, was veraltet ist. |
 | Unbekannte Ursache, wiederholte Signatur, erschöpftes Budget oder Konflikt | Menschlicher Entscheider. | Mit neuer Richtung fortsetzen, verschieben oder stoppen. | Keine endlose Retry-Schleife und kein Erfolg ohne erforderliche Nachweise. |
 

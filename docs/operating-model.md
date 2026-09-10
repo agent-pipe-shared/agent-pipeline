@@ -253,15 +253,12 @@ normative shape is:
    against the combined diff, instead of a separate Verify+Critic pass per
    dispatch. The block size is a bound the Elephant states before
    dispatching (e.g. "this sweep's N items"), so a regression cannot ride
-   along unreviewed indefinitely. This does NOT loosen a single package's
-   OWN correction-wave re-Critic cadence (the round-budget rule: one delta
-   re-Critic after each fresh local correction commit, up to three, per
-   `templates/prompts/critic-review.md` item 4) — a 2026-08-24/25 correction
-   range showed that per-commit cadence catching a regression introduced by
-   the immediately preceding correction wave (documented in the same
-   backlog item's Description); a coarser correction-wave cadence risks
-   missing or burying exactly that class of regression, so it stays
-   unchanged.
+   along unreviewed indefinitely. This does not change a single package's
+   correction-review budget: after an initial blocking Critic result, perform
+   at most one fresh re-review of the correction. If that re-review still
+   reports a blocking finding, the Elephant self-verifies the next correction
+   directly; do not dispatch a third Critic round for the same package
+   (`guardrails/quality-gates.md` QG-13).
 8. **Close.** Synchronize handover and history, preserve evidence, perform the
    required retro and run close extensions. A feature lifecycle is closed only
    after its tracked work is actually complete.
@@ -370,7 +367,8 @@ Typical repository dials are:
 - protected test paths and approved ritual extensions.
 
 <!-- capability:governance-example-extensions -->
-<!-- anchor:capability-governance-example-extensions -->
+<a id="capability-governance-example-extensions"></a>
+
 Extensions are optional and bounded: custom PRD/spec/ADR/handover templates,
 governance guidelines, policy checks, release/deploy adapters, UI/security
 phases and organization-private adapters. They must be configured through the

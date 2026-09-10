@@ -22,9 +22,11 @@ end-to-end flow; this page only explains installation and adoption.
   not `pass`.** `skipped` means the gate checked nothing for that category —
   it is not a substitute for a passing scan, and a green Verify result built
   on a skipped gate does not mean that category was actually scanned. Run
-  `node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root "$PWD"`
+  `node "<absolute-plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"`
   to see every configured tool with its observed version, or a copyable
-  platform-appropriate install command for whatever is missing.
+  platform-appropriate install command for whatever is missing. After binding
+  the plugin, replace `<absolute-plugin-root>` with its installed directory
+  and run this from the governed project root.
 - Keep the pipeline source and each governed repository under version control.
 - Treat credentials, account mappings, local paths, and private marketplace
   details as machine-local configuration. Do not commit them into the pipeline
@@ -345,7 +347,7 @@ irreversible action. See [PO approval](docs/po-human-approval.md).
 ## A. Maintain a shared pipeline source (occasional)
 
 <!-- capability:setup-and-runtime-projection -->
-<!-- anchor:capability-setup-and-runtime-projection -->
+<a id="capability-setup-and-runtime-projection"></a>
 
 Clone or fork this repository into the organisation that will maintain the
 shared pipeline. Keep that clone as a versioned product; projects should bind
@@ -403,10 +405,12 @@ reports each configured tool, observed version, blocked claim, and a copyable
 platform command. The standalone form remains:
 
 ```sh
-node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root "$PWD"
+node "<absolute-plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
 ```
 
-Review an offered installer command under your host/package-management policy,
+Replace `<absolute-plugin-root>` with the installed Pipeline plugin directory;
+run the command from the governed project root. Review an offered installer
+command under your host/package-management policy,
 then repeat setup or the preflight. npm is never substituted for non-npm
 scanners; bounded Semgrep settings prevent ordinary home-directory writes from
 being reported as a missing installation.
