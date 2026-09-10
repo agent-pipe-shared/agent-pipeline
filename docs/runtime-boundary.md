@@ -22,7 +22,7 @@ The implementation and tests are the authoritative coverage references:
 | --- | --- | --- |
 | Claude Code | Native plugin hooks in [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | Hook-specific suites under [`hooks/`](../plugins/pipeline-core/hooks/) |
 | Codex | [`codex-pretool-guard.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.mjs) and [`codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | [`codex-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs) |
-| Antigravity | [`antigravity-pretool-guard.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs) and [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | [`antigravity-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs) |
+| Antigravity | [`antigravity-pretool-guard.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs) and [`hooks.json`](../plugins/pipeline-core/hooks.json) | [`antigravity-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs) |
 
 These adapters invoke the configured provider-neutral guards for the tool
 operations they recognize. Coverage is bounded by the installed manifest,
@@ -87,7 +87,7 @@ Die maßgeblichen Abdeckungsquellen sind die Implementierung und ihre Tests:
 | --- | --- | --- |
 | Claude Code | Native Plugin-Hooks in [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | Hook-spezifische Suiten unter [`hooks/`](../plugins/pipeline-core/hooks/) |
 | Codex | [`codex-pretool-guard.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.mjs) und [`codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | [`codex-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs) |
-| Antigravity | [`antigravity-pretool-guard.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs) und [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | [`antigravity-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs) |
+| Antigravity | [`antigravity-pretool-guard.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs) und [`hooks.json`](../plugins/pipeline-core/hooks.json) | [`antigravity-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs) |
 
 Die Adapter rufen die konfigurierten, runnerneutralen Guards für erkannte
 Werkzeugoperationen auf. Ihre Abdeckung ist durch Manifest,
