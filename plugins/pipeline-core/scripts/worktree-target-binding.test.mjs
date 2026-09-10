@@ -6,10 +6,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 const GUARD = fileURLToPath(new URL("../hooks/guard-push.mjs", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "btm-d1-linked-")), primary = join(root, "primary"), target = join(root, "target");
 const git = (cwd, ...args) => spawnSync("git", args, { cwd, encoding: "utf8" });
-function artifact(dir, rel, value) { const path = join(dir, rel); mkdirSync(join(path, ".."), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); }
+function artifact(dir, rel, value) { const path = join(dir, rel); mkdirSync(join(path, ".."), { recursive: true }); if (rel === "evidence/verify-latest.json" && value?.exitCode === 0 && !value.selection) value = verifyEvidenceFixture(value.commit); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); }
 function guard(command, cwd, projectDir = primary) { return spawnSync(process.execPath, [GUARD], { cwd, encoding: "utf8", input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }), env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir } }); }
 try {
   mkdirSync(primary); git(primary, "init", "-q", "-b", "main"); git(primary, "config", "user.name", "Fixture"); git(primary, "config", "user.email", "fixture@example.invalid"); writeFileSync(join(primary, "README.md"), "A\n"); git(primary, "add", "README.md"); git(primary, "commit", "-q", "-m", "A");

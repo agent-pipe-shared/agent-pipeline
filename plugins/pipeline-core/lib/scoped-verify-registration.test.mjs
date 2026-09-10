@@ -221,6 +221,8 @@ function scopedRegistrationFailureFixture() {
       join(repoRoot, "harness", "scripts", "verify-evidence-writer.mjs"),
       join(fixtureRoot, "harness", "scripts", "verify-evidence-writer.mjs"),
     );
+    copyFileSync(join(repoRoot, "harness", "scripts", "self-verify-selection.mjs"), join(fixtureRoot, "harness", "scripts", "self-verify-selection.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-selection.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-selection.mjs"));
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));

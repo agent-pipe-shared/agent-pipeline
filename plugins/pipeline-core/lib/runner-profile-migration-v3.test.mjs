@@ -1010,10 +1010,8 @@ record("overlayCalibration separates a private overlay's own calibration from an
     // always-green verify command reaches an ordinary consumer project.
     assert.equal(consumerCalibrationBytes.includes("agent-pipeline-private-overlay"), false);
     assert.notEqual(consumerCalibration.project, "agent-pipeline-private-overlay");
-    assert.notEqual(consumerCalibration.verify, "git diff --check HEAD");
-    assert.match(consumerCalibration.verify, /not configured/u);
-    const verifyRun = spawnSync(consumerCalibration.verify, { cwd: root, shell: true, encoding: "utf8" });
-    assert.notEqual(verifyRun.status, 0, "a freshly seeded, unconfigured verify contract must not report success");
+    assert.equal(consumerCalibration.verify, null,
+      "consumer projects use the shipped baseline until they configure a project command");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

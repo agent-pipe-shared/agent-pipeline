@@ -23,6 +23,7 @@ import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { buildPushInitArgv, buildReconciliationArgv, drivePushInit, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
+import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -83,7 +84,7 @@ function satisfiabilityDepsAllGreen(overrides = {}) {
     exists: (path) => path.endsWith("push-threat-model.md") || path.endsWith("trust-policy.json"),
     readFile: (path) => {
       if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "k", publicKeySha256: "a".repeat(64), humanName: "Tester" });
-      if (path.endsWith("verify-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(verifyEvidenceFixture(HEAD));
       if (path === "/fake/calibration.json") return JSON.stringify({ verify: "node harness/scripts/verify.mjs" });
       throw new Error(`unexpected read: ${path}`);
     },
@@ -103,7 +104,8 @@ function prepareDepsAllGreen(overrides = {}) {
     exists: (path) => path.endsWith("push-threat-model.md") || path.endsWith("trust-policy.json"),
     readFile: (path) => {
       if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "k", publicKeySha256: "a".repeat(64), humanName: "Tester" });
-      if (path.endsWith("verify-latest.json") || path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(verifyEvidenceFixture(HEAD));
+      if (path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
       throw new Error(`unexpected read: ${path}`);
     },
     readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [] }),

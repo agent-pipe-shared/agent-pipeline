@@ -27,6 +27,7 @@ import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critic
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 const ALL_DIRS = [];
@@ -49,6 +50,7 @@ function gitAt(dir, ...args) {
 }
 
 function writeFile(dir, relPath, body) {
+  if (relPath === "evidence/verify-latest.json" && body && typeof body === "object" && body.exitCode === 0 && !body.selection) body = verifyEvidenceFixture(body.commit);
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, typeof body === "string" ? body : JSON.stringify(body));

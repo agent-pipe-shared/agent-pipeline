@@ -173,6 +173,7 @@ export const UNIVERSAL_ADRS = Object.freeze([
   { path: "docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md", reason: "Cited by docs/push-release-flow.md ('A fourth kind: release-preflight')." },
   { path: "docs/adr/0074-port-authorize-critical-ceremony.md", reason: "Cited by docs/push-release-flow.md (the ported `authorize-critical` single-command ceremony)." },
   { path: "docs/adr/0076-global-chat-attributed-unattested-approval-mode.md", reason: "Cited by the vendored docs/operating-model.md as the normative distinction between chat-attributed-unattested and signature approval." },
+  { path: "docs/adr/0081-boundary-aware-impacted-verify.md", reason: "Defines the universal work, Critic, push, candidate, and release verification boundaries used in consuming projects." },
 ]);
 
 /**

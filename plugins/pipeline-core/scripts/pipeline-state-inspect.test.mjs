@@ -282,38 +282,28 @@ function approvedFixture(name, verify) {
   return root;
 }
 
-test("approved next-action with the seeded verify placeholder collects a real command and renders the writer-required transition", () => {
-  const root = approvedFixture("approved-placeholder-verify", SEEDED_VERIFY);
+test("approved next-action uses the shipped baseline without asking the PO for a project command", () => {
+  const root = approvedFixture("approved-baseline-verify", SEEDED_VERIFY);
   const statePathValue = resolveStatePath(root);
   const calibrationPath = join(root, "project", "pipeline.json");
-  const beforeState = readFileSync(statePathValue, "utf8");
   const beforeCalibration = readFileSync(calibrationPath, "utf8");
 
   const result = invoke(root, ["inspect"]);
   assert.equal(result.status, 0, result.err);
   const payload = JSON.parse(result.out);
   assert.equal(payload.status, "approved");
-  assert.equal(payload.nextAction.kind, "collect-input");
-  assert.deepEqual(payload.nextAction.inputs.map((input) => input.name), ["verify-command"]);
-  assert.equal(payload.nextAction.executable, undefined,
-    "an unresolved verify command must never be published as an executable action");
-  assert.equal(payload.nextAction.argv, undefined,
-    "an unresolved verify command must never leak a placeholder into runnable argv");
-  assert.ok(payload.nextAction.guidance.includes("set-phase --phase implementation --verify-command"),
-    `guidance must render the exact writer-required transition: ${payload.nextAction.guidance}`);
-  assert.ok(payload.nextAction.guidance.includes("<project verify command>"),
-    `guidance must identify the one missing value truthfully: ${payload.nextAction.guidance}`);
-  assert.equal(readFileSync(statePathValue, "utf8"), beforeState, "inspect must not mutate State");
-  assert.equal(readFileSync(calibrationPath, "utf8"), beforeCalibration, "inspect must not configure verify itself");
-
-  const realVerify = "node --test";
-  const transitioned = invoke(root, [
-    "set-phase", "--phase", "implementation", "--verify-command", realVerify,
-  ]);
+  assert.deepEqual(payload.nextAction, {
+    kind: "command",
+    executable: process.execPath,
+    argv: [PIPELINE_STATE_SCRIPT_PATH, "set-phase", "--phase", "implementation"],
+    mutation: true,
+    requiresConfirmation: true,
+  });
+  const transitioned = invoke(root, payload.nextAction.argv.slice(1));
   assert.equal(transitioned.status, 0, transitioned.err);
   assert.equal(JSON.parse(readFileSync(statePathValue, "utf8")).activeFeature.phase, "implementation");
-  assert.equal(JSON.parse(readFileSync(calibrationPath, "utf8")).verify, realVerify,
-    "the exact transition shape inspect renders must satisfy the writer's verify contract");
+  assert.equal(readFileSync(calibrationPath, "utf8"), beforeCalibration,
+    "entering implementation on the shipped baseline must not invent project configuration");
 });
 
 test("approved next-action keeps the existing bare set-phase command when verify is already configured", () => {

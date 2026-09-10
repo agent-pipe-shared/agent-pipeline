@@ -151,6 +151,7 @@ check("WAVR18 detects a tampered authority matrix from the validator fixture roo
 const FIXTURE_MODULES = Object.freeze([
   "harness/scripts/check-verify-suite-registration.mjs", // duplicateSuiteIds
   "harness/scripts/manual-check-logic.mjs", // imported by verify.mjs for the manual-check step
+  "harness/scripts/self-verify-selection.mjs",
   "harness/scripts/verify-evidence-writer.mjs", // writeEvidenceAtomic (NVA-B-EVSLOTFIXTURE-1)
   "plugins/pipeline-core/lib/project-authority.mjs", // resolveAuthorityArtifactPath (ADR-0054)
   "plugins/pipeline-core/lib/scoped-verify-registration.mjs",
@@ -160,6 +161,7 @@ const FIXTURE_MODULES = Object.freeze([
   "plugins/pipeline-core/lib/windows-private-state.mjs", // via worktree-lifecycle.mjs
   "plugins/pipeline-core/lib/nova-candidate-freeze.mjs",
   "plugins/pipeline-core/lib/review-economy.mjs", // via nova-candidate-freeze.mjs
+  "plugins/pipeline-core/lib/verify-selection.mjs",
 ]);
 const JOURNAL_STUB_REL_PATH = "plugins/pipeline-core/scripts/verify-journal.mjs";
 const JOURNAL_STUB_SOURCE = 'export function runVerifyJournal() { throw new Error("journal must not run after windows-assurance-registration failure"); }\n';

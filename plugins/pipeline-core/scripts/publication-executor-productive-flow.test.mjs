@@ -53,6 +53,7 @@ import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
 import { checkReleaseStateConsistency } from "./check-release-state-consistency.mjs";
 import { createPublicReleaseState } from "../lib/public-release-state.mjs";
 import { runVerifyJournal, sealVerifyCleanupRegistration } from "./verify-journal.mjs";
+import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 import {
   applyPublicationAuthorization,
   executePublication,
@@ -124,9 +125,11 @@ async function realVerifyRun(value, { exitOk }) {
 function verifyEvidenceFromRealRun(value, result) {
   return {
     schema: "pipeline.verify-evidence.v0",
+    commit: value.candidate,
     candidate: { commit: value.candidate, tree: value.tree },
     steps: result.steps.map((step) => ({ name: step.name, exitCode: step.exitCode })),
     exitCode: result.steps.some((step) => step.exitCode !== 0) ? 1 : 0,
+    selection: verifyEvidenceFixture(value.candidate, "release").selection,
   };
 }
 

@@ -17,6 +17,7 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync 
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
@@ -63,6 +64,7 @@ function writePublicationMode(dir) {
   });
 }
 function writeEvidence(dir, relPath, obj) {
+  if (relPath === "evidence/verify-latest.json" && obj && typeof obj === "object" && obj.exitCode === 0 && !obj.selection) obj = verifyEvidenceFixture(obj.commit);
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));

@@ -874,26 +874,16 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       ]), path, env);
 
       const handover = freshDriver(path, runner, env);
-      assert.equal(handover.outcome, "collect-input", `${runner}: ${JSON.stringify(handover)}`);
-      assert.equal(handover.collectInput.input?.name, "verifyCommand");
-      assert.equal(handover.collectInput.applyAction?.kind, "command");
-      assert.equal(handover.collectInput.applyAction.argv.filter(
-        (value) => value === PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
-      ).length, 1);
-      const verifyCommand = `"${process.execPath}" --check game.js`;
-      invokePlainAction(handover.collectInput.applyAction, new Map([
-        [PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER, verifyCommand],
-      ]), path, env);
-
-      const implementing = freshDriver(path, runner, env);
+      assert.equal(handover.outcome, "ready", `${runner}: ${JSON.stringify(handover)}`);
+      const implementing = handover;
       assert.equal(implementing.outcome, "ready", `${runner}: ${JSON.stringify(implementing)}`);
       assert.equal(implementing.final.status, "ready");
       assert.equal(implementing.final.nextAction, null);
       const admitted = productProbe();
       assert.equal(admitted.status, 0, `${runner}: ${admitted.stderr}`);
       writeFileSync(join(path, "game.js"), "export const playable = true;\n");
-      const verified = spawnSync(verifyCommand, { cwd: path, env, encoding: "utf8", shell: true, timeout: 30_000 });
-      assert.equal(verified.status, 0, `${runner}: ${verified.stderr}`);
+      assert.equal(JSON.parse(readFileSync(join(path, "project", "pipeline.json"), "utf8")).verify, null,
+        `${runner}: implementation may start on the shipped baseline without a PO-supplied command`);
     }
   } finally {
     for (const path of fixtures) dispose(path);
@@ -1013,32 +1003,8 @@ test.skip("legacy helper-driven intake-to-implementation path (superseded by the
         runner,
         run: publicDriverRun(path, driverInvocations),
       });
-      if (runner === "claude") {
-        assert.equal(handover.outcome, "ready",
-          `${runner}: the configured-verify command published by onboarding-init must execute and re-enter ready: ${JSON.stringify(handover)}`);
-      } else {
-        assert.equal(handover.outcome, "collect-input",
-          `${runner}: a seeded verify placeholder must surface the public verify-command input instead of executing a doomed bare transition: ${JSON.stringify(handover)}`);
-        assert.equal(handover.collectInput?.input?.name, "verifyCommand", JSON.stringify(handover));
-        const publishedApply = handover.collectInput?.applyAction;
-        assert.equal(publishedApply?.kind, "command", JSON.stringify(handover));
-        assert.equal(typeof publishedApply.executable, "string");
-        assert.ok(Array.isArray(publishedApply.argv));
-        assert.equal(publishedApply.argv.filter((value) => value === "<PO_VERIFY_COMMAND>").length, 1,
-          `${runner}: the public contract must expose exactly one verify placeholder`);
-        const materializedArgv = publishedApply.argv.map((value) => value === "<PO_VERIFY_COMMAND>" ? verifyCommand : value);
-        const applied = publicDriverRun(path, driverInvocations)(publishedApply.executable, materializedArgv);
-        assert.equal(applied.status, 0, `${runner}: the materialized published applyAction failed: ${applied.stderr}`);
-        assert.deepEqual(driverInvocations.at(-1), { executable: publishedApply.executable, argv: materializedArgv },
-          `${runner}: the mutating handover must be exactly the published contract with only its declared placeholder replaced`);
-        handover = driveOnboardingInit({
-          rootDir: path,
-          runner,
-          run: publicDriverRun(path, driverInvocations),
-        });
-        assert.equal(handover.outcome, "ready",
-          `${runner}: re-entering the public driver after its published applyAction must reach ready: ${JSON.stringify(handover)}`);
-      }
+      assert.equal(handover.outcome, "ready",
+        `${runner}: baseline or configured verification must enter implementation without a PO question: ${JSON.stringify(handover)}`);
       assert.ok(driverInvocations.length >= 1, `${runner}: public driver must execute at least its own inspect`);
 
       const ready = run(onboarding, ["inspect", "--root", path, "--runner", runner], path);
@@ -1046,7 +1012,8 @@ test.skip("legacy helper-driven intake-to-implementation path (superseded by the
       assert.equal(ready.json.status, "ready", `${runner}: final inspection must remain ready`);
       assert.equal(ready.json.nextAction, null, `${runner}: implementation-ready must not point back into onboarding`);
       const calibration = JSON.parse(readFileSync(join(path, "project", "pipeline.json"), "utf8"));
-      assert.equal(calibration.verify, verifyCommand, `${runner}: the real verify command is persisted at the transition`);
+      assert.equal(calibration.verify, runner === "claude" ? verifyCommand : null,
+        `${runner}: only an explicitly configured project command is persisted`);
     }
   } finally {
     for (const path of paths) dispose(path);

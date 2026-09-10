@@ -131,7 +131,7 @@ given carefully.
 (`plugins/pipeline-core/scripts/push-prepare.mjs`, backlog item
 `pipeline.full-push-preflight-before-signature`): a single READ-ONLY report
 that atomically checks a clean/unchanged working tree, canonical
-candidate-bound verify evidence, the push threat-model artifact, and the
+candidate-bound `push`-mode Verify evidence, the push threat-model artifact, and the
 critical-human-proof trust-anchor posture (including the exact
 `external-key-directory-vs-committed-trustAnchors` membership check the next
 section describes by hand) — all BEFORE the passphrase prompt, not
@@ -251,6 +251,10 @@ location every other pre-signature scratch artifact in this flow already
 uses.
 
 ### Source reader binding (Agent Pipeline source checkout only)
+
+Release, tag, marketplace and publication preparation require fresh
+`release`-mode Verify evidence with an empty omitted-suite set. An impacted
+work, Critic, candidate or push artifact cannot be promoted into that proof.
 
 The Agent Pipeline source release preflight also requires a current reader
 binding. This source-only rule is selected from committed calibration at the

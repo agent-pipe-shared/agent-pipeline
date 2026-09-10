@@ -134,6 +134,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/public-core-origin-allowlist.mjs`, `lib/ruleset-source.mjs`,
   `lib/self-application-attestation-gate.mjs`,
   `lib/trusted-tool-resolution.mjs`, `scripts/pipeline-start-preflight.mjs`,
+  `lib/verify-selection.mjs`,
   `scripts/pipeline-update-channel.mjs`, `scripts/po-approval-request.mjs`,
   `scripts/po-human-approval.mjs` (the script the human uses to sign),
   `scripts/push-gate-satisfiability.mjs`, `scripts/push-prepare.mjs`,
@@ -190,7 +191,7 @@ below assumes it holds and is written to catch a change that would break it.
   of the commit-size check. Its own only first-party import,
   `lib/project-authority.mjs`, is already kernel above, so no further hops are
   needed. Added: `lib/handover-rotation.mjs`.
-- Consumer Verify adds `lib/consumer-verify.mjs`, imported by the kernel evidence
+- Consumer Verify adds `lib/consumer-baseline-verify.mjs` and `lib/consumer-verify.mjs`, imported by the kernel evidence
   producer, and `scripts/consumer-verify-check.mjs`, the generated adapter's
   dynamic import target. The producer supplies that dispatcher's fixed URL from
   the executing plugin. Both first-party modules are never liftable; the closure

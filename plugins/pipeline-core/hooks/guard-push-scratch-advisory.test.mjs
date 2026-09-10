@@ -27,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 import { bindScratchDescriptor } from "../lib/session-cleanup-recovery.mjs";
+import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 const ALL_DIRS = [];
@@ -58,6 +59,7 @@ function writeState(dir, obj) {
   writeFileSync(join(dir, ".claude", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
 }
 function writeEvidence(dir, relPath, obj) {
+  if (relPath === "evidence/verify-latest.json" && obj && typeof obj === "object" && obj.exitCode === 0 && !obj.selection) obj = verifyEvidenceFixture(obj.commit);
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));

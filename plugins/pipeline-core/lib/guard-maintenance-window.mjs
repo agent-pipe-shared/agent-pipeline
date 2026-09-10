@@ -318,6 +318,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/ruleset-source.mjs",
   "plugins/pipeline-core/lib/self-application-attestation-gate.mjs",
   "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
+  "plugins/pipeline-core/lib/verify-selection.mjs",
   "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
   "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
   "plugins/pipeline-core/scripts/po-approval-request.mjs",
@@ -406,6 +407,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // Consumer Verify is reached from the kernel evidence producer. Its generated
   // adapter dynamically imports the fixed plugin dispatcher; both ends remain
   // protected, and the closure suite binds that declared edge to the real URL.
+  "plugins/pipeline-core/lib/consumer-baseline-verify.mjs",
   "plugins/pipeline-core/lib/consumer-verify.mjs",
   "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
 ]);

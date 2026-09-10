@@ -30,6 +30,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 
@@ -60,6 +61,7 @@ function writeManifest(dir, yamlText) {
   writeFileSync(join(dir, ".claude", "pipeline.yaml"), yamlText);
 }
 function writeEvidence(dir, relPath, obj) {
+  if (relPath === "evidence/verify-latest.json" && obj && typeof obj === "object" && obj.exitCode === 0 && !obj.selection) obj = verifyEvidenceFixture(obj.commit);
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));
