@@ -2660,10 +2660,12 @@ approval ceremony or platform contract. The focused onboarding suite passes
 - ADR-0077: checked, no change needed.
 
 ADR-0061 now makes the diagnostic consequence of its existing human-ceremony
-rule explicit: an agent-side, read-only preparation driver evaluates all
-independent prerequisites it can already determine and reports every current
-failure together. A red result still blocks signature preparation, so the
-change reduces repeated discovery without weakening the push gate.
+rule explicit: an agent-side preparation driver evaluates all independent
+read-only prerequisites it can already determine and reports every current
+failure together. During a red aggregate result, housekeeping mutations are
+disabled so every check binds the same candidate. A red result still blocks
+signature preparation, so the change reduces repeated discovery without
+weakening the push gate.
 
 The remaining implicated decisions need no amendment. The driver still stops
 before the human signature and never executes approval or push actions; the

@@ -295,6 +295,7 @@ test("drivePushInit: missing push-threat-model.md is reported while push-prepare
 test("drivePushInit: one run returns failures from satisfiability and push-prepare together", () => {
   const root = freshFixtureRoot();
   try {
+    let prepareOptions = null;
     const result = drivePushInit({
       rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
       assessPushGateSatisfiability: () => ({
@@ -307,16 +308,19 @@ test("drivePushInit: one run returns failures from satisfiability and push-prepa
           ],
         },
       }),
-      pushPrepareReport: () => ({
-        ok: true,
-        report: {
-          ready: false,
-          checks: [
-            { id: "working-tree-clean", ok: false, message: "tree dirty" },
-            { id: "security-evidence", ok: false, message: "security evidence missing" },
-          ],
-        },
-      }),
+      pushPrepareReport: (_argv, _deps, options) => {
+        prepareOptions = options;
+        return {
+          ok: true,
+          report: {
+            ready: false,
+            checks: [
+              { id: "working-tree-clean", ok: false, message: "tree dirty" },
+              { id: "security-evidence", ok: false, message: "security evidence missing" },
+            ],
+          },
+        };
+      },
     });
     assert.equal(result.outcome, "precondition-unmet");
     assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability", "push-prepare"]);
@@ -326,6 +330,7 @@ test("drivePushInit: one run returns failures from satisfiability and push-prepa
       "working-tree-clean",
       "security-evidence",
     ]);
+    assert.deepEqual(prepareOptions, { foldPendingApprovalWrite: false });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

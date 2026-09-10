@@ -501,7 +501,7 @@ export function foldPendingPushApprovalWrite(dir, deps = {}) {
   return { folded: true };
 }
 
-export function pushPrepareReport(argv, deps = {}) {
+export function pushPrepareReport(argv, deps = {}, options = {}) {
   const dir = deps.dir ?? projectDir();
   const parsed = parseArgs(argv);
   if (parsed.error) return { ok: false, error: parsed.error };
@@ -513,7 +513,8 @@ export function pushPrepareReport(argv, deps = {}) {
   // Runs BEFORE anything below that assumes a clean tree (NVA-PUSHFOLD-1): a pending trailing
   // write from a prior `approve-push` is folded in here first, so `checkWorkingTreeClean`
   // never has to be manually chased by a human/session noticing the dirty state file.
-  foldPendingPushApprovalWrite(dir, deps);
+  const foldPending = deps.foldPendingApprovalWrite ?? foldPendingPushApprovalWrite;
+  if (options.foldPendingApprovalWrite !== false) foldPending(dir, deps);
 
   const headCommit = resolveHeadCommit(dir, deps);
   const checks = [];

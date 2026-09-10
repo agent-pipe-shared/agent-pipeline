@@ -70,9 +70,11 @@ possible.
    evidence; it is not a safe 0.6.2 quick fix.
 7. **Push preparation revealed known failures sequentially.** The Claude run
    needed three `push-init` attempts because the driver returned after the
-   first red read-only layer. The 0.6.2 follow-up changes the driver to execute
-   all independent read-only preflights and return their failures together;
-   any failure still blocks signature preparation.
+   first red layer. The 0.6.2 follow-up changes the driver to execute all
+   independent preflights and return their failures together. When an earlier
+   layer is red, the full report runs in a mutation-free inspection mode so all
+   findings bind the same candidate; any failure still blocks signature
+   preparation.
 
 ## Candidate disposition
 

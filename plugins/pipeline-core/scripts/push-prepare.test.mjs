@@ -513,6 +513,25 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.doesNotMatch(humanText, /render-copy-safe|available on demand/u);
 });
 
+test("pushPrepareReport: inspection mode never folds a pending approval write", () => {
+  let foldCalls = 0;
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({
+      gitStatus: () => " M project/pipeline-state.json\n",
+      foldPendingApprovalWrite: () => {
+        foldCalls += 1;
+        throw new Error("inspection mode must not invoke the mutating fold");
+      },
+    }),
+    { foldPendingApprovalWrite: false },
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.report.checks.find((check) => check.id === "working-tree-clean")?.ok, false);
+  assert.equal(foldCalls, 0);
+});
+
 test("committed global chat reports chat-attributed-unattested and omits all proof/key preparation", () => {
   const root = foldFixtureRepo({ humanApproval: "chat", pushApproval: "signature" });
   let proofPolicyReads = 0;

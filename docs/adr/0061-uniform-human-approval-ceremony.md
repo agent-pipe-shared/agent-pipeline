@@ -112,12 +112,14 @@ review and consent, and nothing that a machine could have derived. Where a guard
 today blocks the agent from a step whose own design intent says the agent may
 perform it, the guard's scope is the defect — not the human's time.
 
-The same rule applies before the ceremony. A read-only preparation driver must
-evaluate every independent prerequisite it can already determine and report all
-current failures in one result. It must not stop at the first red check and
-force the human or agent through repeated repair-and-rerun cycles before the
-signature can even be prepared. Any red check still prevents the ceremony;
-aggregation changes the diagnostic, not the gate strength.
+The same rule applies before the ceremony. A preparation driver must evaluate
+every independent read-only prerequisite it can already determine and report
+all current failures in one result. While aggregating a red result it must
+disable any housekeeping mutation, so every finding binds the same candidate.
+It must not stop at the first red check and force the human or agent through
+repeated repair-and-rerun cycles before the signature can even be prepared.
+Any red check still prevents the ceremony; aggregation changes the diagnostic,
+not the gate strength.
 
 **4. The command informs at the moment of approval.** *"Der human prüft und gibt
 FREI"* — the review is part of the ceremony, not a preceding chat message the

@@ -89,10 +89,12 @@ threat model in sequence. That behavior violated this item's original
 requirement to report every reason together even though the individual checks
 remained correct.
 
-Commit `e4497682183e66a79022e1887177e84281a4b5ba` corrects the regression. The
-driver now runs every independent read-only layer, returns all current failures
-in one response and still refuses to prepare a signature when any check is
-red. A regression fixture supplies failures from both Satisfiability and
+Commit `e4497682183e66a79022e1887177e84281a4b5ba` introduced aggregate reporting;
+its immediate Critic correction adds an inspection mode that suppresses
+`push-prepare`'s normally permitted pending-state fold whenever an earlier
+layer is red. The driver returns all current failures for one unchanged
+candidate and still refuses to prepare a signature when any check is red. A
+regression fixture supplies failures from both Satisfiability and
 `push-prepare` and requires all of them in the same result. Detailed measured
 context is retained in
 `backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.

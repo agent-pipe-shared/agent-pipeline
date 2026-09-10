@@ -26,9 +26,11 @@
  * already holds about its own bootstrap `inspect` call. It never interprets WHY any given
  * precondition failed, never invents a fix, and never runs a remedy on the caller's
  * behalf -- every failing check is reported with the id/message/remedy the underlying
- * script itself already produces, verbatim. The three reports are independent and
- * read-only, so the driver collects their failures before returning. This prevents a
- * caller from repairing one prerequisite only to discover another on the next run.
+ * script itself already produces, verbatim. When an earlier read-only layer is red, the
+ * driver invokes `pushPrepareReport()` in its explicit inspection mode, which suppresses
+ * that function's normally permitted pending-approval fold. It can therefore collect the
+ * remaining failures without moving HEAD. This prevents a caller from repairing one
+ * prerequisite only to discover another on the next run.
  *
  * WHY TWO OF THE THREE STEPS ARE IN-PROCESS IMPORTS, NOT SUBPROCESS SPAWNS. push-gate-
  * satisfiability.mjs and push-prepare.mjs live in this SAME directory, are pure,
@@ -92,13 +94,13 @@
  * forward-looking information for a LATER, separate invocation after a human has produced
  * and consumed the signature elsewhere -- this driver never runs them either.
  *
- * RE-ENTRANT BY CONSTRUCTION, MORE STRONGLY THAN onboarding-init.mjs. Every function this
- * driver calls -- check-doc-reconciliation.mjs, `assessPushGateSatisfiability()`,
- * `pushPrepareReport()` -- is READ-ONLY by its own documented contract (none of the three
- * writes a file, mutates pipeline state, or touches the network). Running this driver twice
- * from the same repository state therefore cannot double-apply anything: there is nothing
- * mutating to double-apply. Two consecutive invocations against unchanged state produce
- * byte-identical results (see this driver's own test suite).
+ * RE-ENTRANCY. Reconciliation and satisfiability are read-only. `pushPrepareReport()` has
+ * one documented mutation: on the ordinary path it may fold a stale, pending approval
+ * state write into its own commit before checking cleanliness. This driver permits that
+ * fold only after the preceding layers are green. If either is red, inspection mode
+ * disables the fold and the whole aggregate attempt is read-only. Repeating an unchanged
+ * red attempt is byte-identical; repeating after a permitted fold converges on the folded
+ * candidate and its normal evidence checks.
  */
 
 import { spawnSync } from "node:child_process";
@@ -261,7 +263,8 @@ export function drivePushInit({
 
   // Layer 2 (full report) -- push-prepare.mjs, in-process.
   const prepareArgv = ["--by", by, "--remote", remote, "--destination", destination];
-  const prepare = pushPrepareReport(prepareArgv, { dir: root, ...prepareDeps });
+  const prepareOptions = failedChecks.length > 0 ? { foldPendingApprovalWrite: false } : {};
+  const prepare = pushPrepareReport(prepareArgv, { dir: root, ...prepareDeps }, prepareOptions);
   steps.push({ id: "push-prepare", inProcess: true, ok: prepare.ok });
   if (!prepare.ok) {
     return { schema: SCHEMA, root, outcome: "error", steps, error: { faultCode: "usage-error", message: prepare.error } };
