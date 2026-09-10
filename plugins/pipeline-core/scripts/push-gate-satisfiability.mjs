@@ -118,13 +118,12 @@ export function checkVerifyContractConfigured(dir, deps = {}) {
   }
   const command = parsed?.verify;
   if (typeof command !== "string" || command.trim() === "") {
-    return { id, status: "missing", ok: false, message: "project calibration names no verify command." };
+    return { id, status: "baseline-only", ok: true, message: "project calibration names no full command; the shipped baseline remains available and release remains blocked." };
   }
   if (command.includes(UNCONFIGURED_VERIFY_MARKER)) {
     return {
-      id, status: "placeholder", ok: false,
-      message: "the configured verify command is still the plugin's UNCONFIGURED_VERIFY placeholder -- "
-        + "replace project/pipeline.json's verify field with this project's real verification command before requesting a signature.",
+      id, status: "baseline-only", ok: true,
+      message: "the legacy unconfigured placeholder is treated as no full command; the shipped baseline remains available and release remains blocked.",
     };
   }
   return { id, status: "configured", ok: true, message: `a real verify command is configured: ${command}` };

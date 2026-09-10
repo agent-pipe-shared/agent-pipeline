@@ -65,6 +65,7 @@ import { validateScopedVerifyRegistration } from "../../plugins/pipeline-core/li
 import { validateWindowsAssuranceVerifyRegistration } from "../../plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs";
 import { createPublicVerifyRunEvidence } from "../../plugins/pipeline-core/lib/verify-resume.mjs";
 import { runVerifyJournal } from "../../plugins/pipeline-core/scripts/verify-journal.mjs";
+import { parseVerifyInvocation, renderVerifyCommand, resolveSelfVerifySelection } from "./self-verify-selection.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
@@ -105,7 +106,10 @@ function gitCommonDirectory() {
   return result.stdout.trim();
 }
 const startedCandidate = candidateIdentity();
-const command = "node harness/scripts/verify.mjs";
+let invocation;
+try { invocation = parseVerifyInvocation(process.argv.slice(2), process.env); }
+catch (error) { console.error(error.message); process.exit(2); }
+const command = renderVerifyCommand(invocation);
 // Evidence must always land at the PRIMARY worktree root (the parent of Git's
 // common directory), never at the invoking worktree's own root: the push gate
 // (guard-push.mjs's resolveEvidenceProject) only ever reads evidence from the
@@ -489,6 +493,9 @@ const TEST_SUITES = [
   { name: "nova-b4-gitlab-forge-adapter-tests", file: join(pluginScriptsDir, "gitlab-forge-adapter.test.mjs") },
   { name: "nova-candidate-freeze-tests", file: join(libDir, "nova-candidate-freeze.test.mjs") },
   { name: "nova-verify-resume-tests", file: join(libDir, "verify-resume.test.mjs") },
+  { name: "verify-selection-tests", file: join(libDir, "verify-selection.test.mjs") },
+  { name: "consumer-baseline-verify-tests", file: join(libDir, "consumer-baseline-verify.test.mjs") },
+  { name: "self-verify-selection-tests", file: join(scriptDir, "self-verify-selection.test.mjs") },
   { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
   { name: "afk-assumption-mode-tests", file: join(libDir, "afk-assumption-mode.test.mjs") },
   { name: "afk-capability-worker-tests", file: join(libDir, "afk-capability-worker.test.mjs") },
@@ -824,6 +831,7 @@ if (manualVerifyResult.step && manualVerifyResult.step.name === "verify-manual-c
 const steps = [];
 let verifyRun = null;
 let verifyRunEvidence = null;
+let verifySelection = null;
 // A known dirty candidate cannot produce delivery evidence.  Fail before any
 // expensive or externally-dependent suite so this is an actionable preflight,
 // not a misleading red full run.  Non-Git fixtures retain the historic
@@ -858,18 +866,22 @@ if (startedCandidate.status === "dirty") {
         steps.push({ name: "verify-suite-registration-duplicates", exitCode: 1 });
       } else {
         try {
+          const resolvedSelection = resolveSelfVerifySelection({ repoRoot, candidateCommit: startedCandidate.commit, registeredSuites, invocation });
+          verifySelection = resolvedSelection.selection;
           verifyRun = await runVerifyJournal({
             gitCommonDir: gitCommonDirectory(),
             runId,
             repoRoot,
             candidate: { commit: startedCandidate.commit, tree: startedCandidate.tree },
-            suites: registeredSuites,
+            suites: resolvedSelection.suites,
             policyInputs: {
               command,
               harnessSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
               phase26Result,
               phase3Result,
+              selectionSha256: verifySelection.selectionSha256,
             },
+            allowCrossCandidateReuse: verifySelection.execution === "impacted",
           });
           steps.push(...verifyRun.steps.map(({ name, exitCode, durationMs, reused }) => ({ name, exitCode, durationMs, reused })));
           verifyRunEvidence = createPublicVerifyRunEvidence({
@@ -877,7 +889,7 @@ if (startedCandidate.status === "dirty") {
             policySha256: verifyRun.policySha256,
             resumePlanSha256: verifyRun.plan.planSha256,
             terminalSha256: verifyRun.terminal.terminalSha256,
-            registeredSuiteCount: registeredSuites.length,
+            registeredSuiteCount: resolvedSelection.suites.length,
             terminalReceiptCount: verifyRun.terminal.receipts.length,
             terminalStatus: verifyRun.terminal.status,
           });
@@ -929,6 +941,8 @@ const evidence = {
   finishedAt: new Date().toISOString(),
   steps,
   verifyRun: verifyRunEvidence,
+  selection: verifySelection,
+  coverage: "repository-calibrated",
   verifyManualStatus: manualVerifyResult.evidence,
   exitCode: overallExitCode,
 };

@@ -16,8 +16,9 @@ placeholders. Do not rebuild a private sequence of onboarding commands.
 
 The ordinary human inputs are purposeful: project and author details, the
 first trust-anchor choice (an existing key is valid, as is a newly created
-one), the project/intake answers, a plan decision where the selected
-profile requires it, and a real verify command. The Driver retains approved
+one), the project/intake answers, and a plan decision where the selected
+profile requires it. A real full Verify command is required before release,
+while new projects begin with the shipped, explicitly labelled baseline. The Driver retains approved
 onboarding context across its restart boundary so the next session does not
 need to rediscover it.
 
@@ -40,10 +41,27 @@ it does not replace your tests. A conflicting adapter is reported for repair.
 
 On the clean committed candidate, run
 `node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root>`.
-The pipeline checks calibration, the verify contract and a present runtime
-manifest, then reports the configured project command separately. Missing
-product verification remains unconfigured and cannot produce an overall pass.
-Passing baseline checks alone does not establish product-test coverage.
+Choose the boundary explicitly and supply the reviewed base:
+
+```bash
+node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode critic --base <review-base>
+node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode push --base <remote-base>
+node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode release --base <release-base>
+```
+
+`work`, `critic`, `candidate`, and `push` run the fixed baseline plus commands
+registered for changed areas. `release` always runs the full project command.
+Unknown paths, missing bindings and incomplete policies fall back to full.
+
+The fixed baseline validates project authority and a present runtime manifest,
+tracked JSON syntax, merge-conflict markers, and `git diff --check`. If no
+product command exists yet, ordinary evidence is marked `baseline-only`; it
+does not establish product-test coverage and release mode refuses it.
+
+Projects can add a `verifyImpact` object to their calibration. Each baseline or
+area command has a stable id; each area declares repository-relative paths.
+The schema and example are in [ADR-0081](adr/0081-boundary-aware-impacted-verify.md).
+The existing `verify` field remains the full project command.
 
 Eligible baseline results can resume on the same bound candidate; the opaque
 project command runs freshly. A changed candidate, failed run or interrupted

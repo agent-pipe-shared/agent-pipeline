@@ -45,6 +45,7 @@ import {
 } from "./human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 import { probeSymlinkCapability, symlinkCapability, symlinkSkip } from "./symlink-capability.mjs";
+import { planVerifySelection } from "./verify-selection.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -341,6 +342,23 @@ test("ADR-0059 Decision 1: a valid, correctly-bound signed proof arms the identi
     const audit = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
     const auditEvents = readFileSync(audit, "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
     assert.deepEqual(auditEvents.map(({ type }) => type), ["denied", "authorized", "consumed"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+test("an exact retry ignores only regenerated human-override handoff text in a nested denial", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { command: "*** Begin Patch\n*** Update File: notes.md\n@@\n-old\n+new\n*** End Patch" };
+    const stableReason = "BLOCKED (guard-testpath): TP-3 exact protected-path refusal";
+    const firstDenials = [{ guard: "guard-apply-patch.mjs", reason: `${stableReason}\n\nHuman override available for this exact edit (one use):\nrequest aaaaa` }];
+    const retryDenials = [{ guard: "guard-apply-patch.mjs", reason: `${stableReason}\n\nHuman override available for this exact edit (one use):\nrequest bbbbb` }];
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "apply_patch", toolInput, denials: firstDenials });
+    authorizeHumanGuardOverrideBySignature({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath });
+    const consumed = consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch", toolInput, denials: retryDenials, nowMs: 4000 });
+    assert.equal(consumed.status, "consumed");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -4359,7 +4377,8 @@ function pipelineSourcePushRepo(base, name) {
   git(root, "commit", "-q", "-m", "fixture");
   const head = git(root, "rev-parse", "HEAD");
   mkdirSync(join(root, "evidence"), { recursive: true });
-  writeFileSync(join(root, "evidence", "verify-latest.json"), JSON.stringify({ exitCode: 0, commit: head }));
+  const selection = planVerifySelection({ mode: "push", baseCommit: head, candidateCommit: head, changedPaths: [], registeredSuiteIds: ["fixture"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["fixture"], areas: [{ id: "whole-project", paths: ["**"], suites: ["fixture"] }] } });
+  writeFileSync(join(root, "evidence", "verify-latest.json"), JSON.stringify({ exitCode: 0, commit: head, selection }));
   return { root, sourceRoot, head };
 }
 

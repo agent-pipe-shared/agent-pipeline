@@ -758,9 +758,10 @@ export function createDisposableCheckout(sourceRoot, reviewDir, commit, dispatch
   return reviewDir;
 }
 
-export function runCalibratedVerify(reviewRoot, calibrationPath) {
+export function runCalibratedVerify(reviewRoot, calibrationPath, { mode = "critic", base = null } = {}) {
   const verify = parseVerifyCommand(reviewRoot, calibrationPath);
-  const result = run(process.execPath, [join(reviewRoot, verify.script)], {
+  const argumentsForVerify = [join(reviewRoot, verify.script), "--mode", mode, ...(base === null ? [] : ["--base", base])];
+  const result = run(process.execPath, argumentsForVerify, {
     cwd: reviewRoot,
     env: calibratedEnv(),
     maxBuffer: 64 * 1024 * 1024,
@@ -768,7 +769,7 @@ export function runCalibratedVerify(reviewRoot, calibrationPath) {
   });
   if (result.status !== 0) fail(`calibrated verify failed with exit ${result.status}`);
   return {
-    command: verify.command,
+    command: `${verify.command} --mode ${mode}${base === null ? "" : ` --base ${base}`}`,
     stdoutSha256: sha256(result.stdout ?? ""),
     stderrSha256: sha256(result.stderr ?? ""),
     stdoutBytes: Buffer.byteLength(result.stdout ?? "", "utf8"),
@@ -1142,7 +1143,7 @@ export function prepareNativeCritic(options, deps = {}) {
   (deps.createCheckout ?? createDisposableCheckout)(repoRoot, reviewRoot, request.candidate_commit, dispatchId, cleanupCapability);
   assertFingerprintMapEqual(protectedBefore, protectedFingerprintMap(repoRoot, pipelineRoot, observers), "checkout subprocess");
   const governance = deriveBoundCriticGovernancePacket(reviewRoot, request);
-  const verify = (deps.runVerify ?? runCalibratedVerify)(reviewRoot, request.calibration_path);
+  const verify = (deps.runVerify ?? runCalibratedVerify)(reviewRoot, request.calibration_path, { mode: "critic", base: request.review_base });
   validateVerifyEvidence(verify);
   assertFingerprintMapEqual(protectedBefore, protectedFingerprintMap(repoRoot, pipelineRoot, observers), "verify subprocess");
   const commits = enumerateReviewCommits(reviewRoot, request.review_base, request.candidate_commit);

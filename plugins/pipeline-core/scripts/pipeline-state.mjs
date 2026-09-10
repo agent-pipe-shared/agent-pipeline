@@ -3215,8 +3215,8 @@ const UNCONFIGURED_VERIFY_MARKER = "the verify contract of this project is not c
  * the writer immediately refuses (or maintaining a second marker that can drift).
  */
 export function classifyVerifyCommand(command) {
-  if (typeof command !== "string" || command.trim() === "") return "missing";
-  return command.includes(UNCONFIGURED_VERIFY_MARKER) ? "placeholder" : "configured";
+  if (typeof command !== "string" || command.trim() === "") return "baseline-only";
+  return command.includes(UNCONFIGURED_VERIFY_MARKER) ? "baseline-only" : "configured";
 }
 
 /**
@@ -3632,7 +3632,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
   }
   if (lifecycle.status === "approved") {
     const verifyStatus = readCalibrationVerifyStatus(dir);
-    if (verifyStatus.status !== "configured") {
+    if (!new Set(["configured", "baseline-only"]).has(verifyStatus.status)) {
       const scriptPath = fileURLToPath(import.meta.url);
       const command = boundedCopySafeCommand({
         executable: process.execPath,
@@ -8212,7 +8212,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         }
       } else {
         const verifyStatus = readCalibrationVerifyStatus(dir);
-        if (verifyStatus.status !== "configured") {
+        if (!new Set(["configured", "baseline-only"]).has(verifyStatus.status)) {
           console.error(`Error: set-phase implementation refused -- project/pipeline.json's verify command is still ${verifyStatus.status === "missing" ? "missing" : "the seeded UNCONFIGURED_VERIFY placeholder"}. Supply the project's real verification command with set-phase --phase implementation --verify-command "<command>" (for example its test suite) before entering implementation.`);
           return 2;
         }

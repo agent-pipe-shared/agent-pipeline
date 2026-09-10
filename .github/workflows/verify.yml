@@ -52,6 +52,8 @@ jobs:
       - name: Runner-free offline Core Verify
         env:
           PIPELINE_LIVE_CERTIFICATION: disabled
+          PIPELINE_VERIFY_MODE: ${{ github.event_name == 'push' && 'push' || 'candidate' }}
+          PIPELINE_VERIFY_BASE: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
         # `openssl` is in this allowlist because the product genuinely requires it, not to
         # make a suite go green: po-human-approval.mjs shells out to it for the entire
         # signature-mode key chain (`genpkey -algorithm ED25519 -aes-256-cbc`,
@@ -61,7 +63,7 @@ jobs:
         # an otherwise identical synthetic PATH. "Runner-free" therefore means free of
         # runner-provided tooling, never free of the base system crypto binary this
         # repository's own signing path depends on.
-        run: core_path="${RUNNER_TEMP}/pipeline-core-path" && mkdir -p "${core_path}" && ln -s "$(command -v node)" "${core_path}/node" && ln -s "$(command -v git)" "${core_path}/git" && ln -s "$(command -v bash)" "${core_path}/bash" && ln -s "$(command -v sh)" "${core_path}/sh" && ln -s "$(command -v openssl)" "${core_path}/openssl" && PATH="${core_path}" "${core_path}/node" harness/scripts/verify.mjs
+        run: core_path="${RUNNER_TEMP}/pipeline-core-path" && mkdir -p "${core_path}" && ln -s "$(command -v node)" "${core_path}/node" && ln -s "$(command -v git)" "${core_path}/git" && ln -s "$(command -v bash)" "${core_path}/bash" && ln -s "$(command -v sh)" "${core_path}/sh" && ln -s "$(command -v openssl)" "${core_path}/openssl" && PATH="${core_path}" "${core_path}/node" harness/scripts/verify.mjs --mode "${PIPELINE_VERIFY_MODE}" --base "${PIPELINE_VERIFY_BASE}"
       - name: Surface failing suite diagnostics
         if: failure()
         # A reporter, never a gate (NVA-B-CIDIAG): reads evidence/verify-latest.json

@@ -186,6 +186,7 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0048](0048-local-goldfish-supervisor.md) | Lokaler Goldfish-Supervisor | akzeptiert | 2026-07-26 |
 | [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab-CI-Pilot für eingeschränkte Remote-Ausführung | akzeptiert | 2026-07-27 |
 | [0050](0050-candidate-bound-verify-run-journal.md) | Kandidatengebundenes privates Verify-Run-Journal | akzeptiert | 2026-08-01 |
+| [0081](0081-boundary-aware-impacted-verify.md) | Boundary-aware Impact Verify; Full Verify nur am Release-Rand | akzeptiert | 2026-09-10 |
 
 ## Wiedervorlagen
 

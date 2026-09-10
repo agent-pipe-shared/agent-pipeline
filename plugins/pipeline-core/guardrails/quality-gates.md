@@ -11,21 +11,21 @@ Rule IDs: `QG-xx`.
 
 ## QG-01 — The gate chain is the norm
 
-- **MUST** pass the full deterministic chain `Format → Lint → Typecheck → Tests → Build` (blocking) before any submission counts and before any LLM review starts. The concrete checkers per project come from the calibration (<PROJECT_A>: pnpm chain; <PROJECT_B>: yamllint + `check_config`; <PROJECT_C>: build/compile gate) — the chain semantics are central and non-negotiable.
+- **MUST** pass the deterministic checks selected for the current boundary before any submission counts and before any LLM review starts. Work, Critic, local-candidate and ordinary-push boundaries run the fixed baseline plus every affected registered area. Release, tag, marketplace and publication boundaries run the complete `Format → Lint → Typecheck → Tests → Build` chain. Missing selection metadata or an unclassified change falls back to that complete chain (ADR-0081).
 - **MUST NOT** hand a diff to the Critic while deterministic gates are red, and the Critic **MUST NOT** flag anything CI/verify already enforces (lint, formatting, type errors) — no noise, no double work.
 - `verify` + evidence are invariant on ALL rigor levels — there is no path around the deterministic gates, not even for one-line fixes (`docs/operating-model.md`, *Rigor, risk and gates*).
 - **Why:** Machines find mechanical errors guaranteed and cheaply; LLM review is probabilistic and expensive — inverting the order wastes tokens and dilutes findings.
 - **Verification:** The verify script encodes the chain (QG-02); the gate decision (SDLC step 8) records green evidence before the Critic dispatch; Critic reports contain no CI-enforceable findings.
 
-## QG-02 — verify-script contract: ONE script, three consumers
+## QG-02 — verify-script contract: ONE engine, boundary-bound modes
 
-- Each project **MUST** define exactly ONE verify entry point (`{{VERIFY_COMMAND}}`, e.g. `pnpm verify` — named in the project calibration at its resolved authority tier — `project/pipeline.json`, else `.claude/pipeline.json` — field `verify`) that runs the full chain.
-- Exactly three consumers execute the IDENTICAL command:
+- Each project **MUST** define one full product Verify command when it can make a release claim. The pipeline's one Verify engine selects registered area commands for ordinary boundaries and that full command for release.
+- Exactly three consumers use the same engine and versioned selection policy:
   1. **Stop hook** — blocks the Goldfish turn from ending while red (exit 2 + stderr feedback),
   2. **Goldfish submission** — the run that writes the evidence artifact (QG-03),
   3. **CI** — the final, unbypassable instance on push/PR.
-- **MUST NOT** define additional or diverging check chains in hooks, CI, or scripts ("one more quick check over here" is how three truths start).
-- **Why:** Three diverging check paths = three truths = gate drift (a known anti-pattern); one script is the only way "green" stays unambiguous (ADR-0005).
+- **MUST NOT** define diverging selection logic in hooks, CI, or scripts. CI for a release or publication invokes `release` mode.
+- **Why:** One selection engine keeps "green" tied to a named boundary while avoiding release-sized work on every local step.
 - **Verification:** Calibration names the command; the CI workflow provably calls the same command; the evidence artifact names script + commit + tree + exit code. The runner first invalidates any earlier evidence with a red `running` record, captures a clean Git candidate, and rejects the result if the worktree, commit, or tree changes before evidence write. Thus an interrupted run cannot leave a prior candidate's green result usable. Bootstrap step 5 checks the script exists and is callable (`harness/session-bootstrap.md`). **DEFER:** the central stop-hook gate framework (consumer 1) is not shipped in the plugin — `close-block` already runs the verify gate at close, so consumers 2 and 3 carry the contract meanwhile; trigger to build it: first unverified-close incident in the feature phase.
 
 ## QG-03 — Evidence artifact: machine-generated JSON
@@ -41,6 +41,14 @@ Rule IDs: `QG-xx`.
     "commit": "{{GIT_SHA}}",
     "tree": "{{GIT_TREE}}",
     "candidate": { "binding": "exact" },
+    "selection": {
+      "schema": "pipeline.verify-selection.v1",
+      "mode": "critic",
+      "execution": "impacted",
+      "registeredSuiteIds": ["..."],
+      "selectedSuiteIds": ["..."],
+      "omittedSuiteIds": ["..."]
+    },
     "finishedAt": "{{ISO8601_TIMESTAMP}}",
     "steps": [
       { "name": "format", "exitCode": 0 },

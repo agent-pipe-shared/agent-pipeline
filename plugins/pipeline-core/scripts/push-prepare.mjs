@@ -49,6 +49,7 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { authorizeCriticalPushCommand, parseHumanArgs } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
 const REMOTE_RE = /^[A-Za-z0-9._-]{1,80}$/u;
@@ -163,6 +164,9 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
   if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy };
   if (data.commit !== headCommit) {
     return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy };
+  }
+  if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
+    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push` };
   }
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
 }

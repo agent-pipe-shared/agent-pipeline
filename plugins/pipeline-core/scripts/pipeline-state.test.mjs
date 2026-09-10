@@ -1486,20 +1486,18 @@ function awaitingApprovalFixture() {
   }, null, 2));
   const deps = { dir: root, now: () => now };
 
-  // 1. Entering implementation with the placeholder still in place, and no
-  // --verify-command supplied, is REFUSED -- not silently allowed through, and
-  // not a case the old code even distinguished (this refusal did not exist before
-  // this fix: the transition used to succeed regardless of the verify contract).
-  const refused = capturedStderr(() => run(["set-phase", "--phase", "implementation"], deps));
-  assert.equal(refused.result, 2, "must refuse to enter implementation while verify is still the seeded placeholder");
-  assert.ok(refused.lines.some((line) => line.includes("verify-command")),
-    `refusal must name the sanctioned escape (--verify-command): ${refused.lines.join(" ")}`);
-  const stillDesign = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
-  assert.equal(stillDesign.activeFeature.phase, "design", "a refused transition must not have moved the phase");
+  // 1. A product-specific command is not a PO gate. The legacy placeholder is
+  // interpreted as baseline-only and implementation can start without another
+  // human turn. Release remains independently blocked by the producer.
+  assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
+    "baseline-only verification must allow the approved plan to enter implementation");
+  const baselineState = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(baselineState.activeFeature.phase, "implementation");
   assert.equal(JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8")).verify, seededVerify,
-    "a refused transition must not have touched the calibration either");
+    "the transition must not relabel the legacy placeholder as a full command");
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({ ...baselineState, activeFeature: { ...baselineState.activeFeature, phase: "design" } }, null, 2));
 
-  // 2. --verify-command carrying the placeholder text itself (or blank) is also
+  // 2. --verify-command carrying the placeholder text itself (or blank) is
   // refused -- the deadlock's fix must never let the placeholder re-enter through
   // the new door it just opened.
   assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", seededVerify], deps), 2,
@@ -1507,7 +1505,7 @@ function awaitingApprovalFixture() {
   assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", "   "], deps), 2,
     "a blank --verify-command must be refused");
 
-  // 3. Supplying a real command is the sanctioned route through: the SAME
+  // 3. Supplying a real command remains the sanctioned atomic configuration route:
   // transaction that unlocks implementation writes the real verify command,
   // before GS-10 would otherwise arm for that field (GS-10 itself is a
   // PreToolUse hook, not exercised by this in-process call at all).

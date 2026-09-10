@@ -72,24 +72,24 @@ test("checkVerifyContractConfigured: no calibration -> status missing, ok:false"
   assert.equal(result.ok, false);
 });
 
-test("checkVerifyContractConfigured: calibration names the UNCONFIGURED_VERIFY placeholder -> status placeholder, ok:false", () => {
+test("checkVerifyContractConfigured: legacy placeholder degrades to the shipped baseline without claiming release coverage", () => {
   const result = checkVerifyContractConfigured(FIXTURE_DIR, {
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "project/pipeline.json" }),
     readFile: () => JSON.stringify({
       verify: "node -e \"console.error('pipeline: the verify contract of this project is not configured. Replace the verify command in project/pipeline.json with the real verification command for this project (for example its test suite), then run verify again.'); process.exit(1)\"",
     }),
   });
-  assert.equal(result.status, "placeholder");
-  assert.equal(result.ok, false);
+  assert.equal(result.status, "baseline-only");
+  assert.equal(result.ok, true);
 });
 
-test("checkVerifyContractConfigured: blank verify field -> status missing, ok:false", () => {
+test("checkVerifyContractConfigured: blank verify field uses baseline-only, ok:true", () => {
   const result = checkVerifyContractConfigured(FIXTURE_DIR, {
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "project/pipeline.json" }),
     readFile: () => JSON.stringify({ verify: "   " }),
   });
-  assert.equal(result.status, "missing");
-  assert.equal(result.ok, false);
+  assert.equal(result.status, "baseline-only");
+  assert.equal(result.ok, true);
 });
 
 test("checkVerifyContractConfigured: a real command -> status configured, ok:true", () => {

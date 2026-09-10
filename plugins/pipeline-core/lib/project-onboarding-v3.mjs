@@ -1122,7 +1122,7 @@ export function freshManifestBytes(profile = null) {
 // would have its `.claude/pipeline.json` seeded from the overlay literal the
 // moment runtime initialization finds it still absent.
 export function freshCalibrationBytes() {
-  return `${JSON.stringify({ project: "new-project", verify: UNCONFIGURED_VERIFY, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: "local-only", worktree: "optional", stakes: "standard", constraints: ["Configure project-specific policy before delivery."] }, null, 2)}\n`;
+  return `${JSON.stringify({ project: "new-project", verify: null, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: "local-only", worktree: "optional", stakes: "standard", constraints: ["Configure project-specific verification before release."] }, null, 2)}\n`;
 }
 // Materializes `project/critical-human-proof.json` at onboarding time,
 // unconditionally of `gates.push_approval` (ADR-0056) -- that setting is
@@ -1242,7 +1242,7 @@ function freshBaselines(intent, { hostManaged = false, profile = null, fs = null
     // exactly what to replace and where. `node` is used rather than a shell
     // builtin because the runtime executing this command is guaranteed present
     // on every host the Pipeline runs on, on Windows as well.
-    ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify({ project: "new-project", verify: UNCONFIGURED_VERIFY, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: hostManaged ? "host-managed" : "local-only", worktree: "optional", stakes: "standard", constraints: [hostManaged ? "Codex owns .git and .codex; configure project verification before delivery." : "Configure project-specific policy before delivery."] }, null, 2)}\n` },
+    ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify({ project: "new-project", verify: null, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: hostManaged ? "host-managed" : "local-only", worktree: "optional", stakes: "standard", constraints: [hostManaged ? "Codex owns .git and .codex; configure project verification before release." : "Configure project-specific verification before release."] }, null, 2)}\n` },
     ".claude/pipeline.yaml": { status: "present", bytes: freshManifestBytes(profile) },
     ".codex/config.toml": { status: "present", bytes: "" },
     ".codex/agents/implementor.toml": { status: "present", bytes: codexCustomAgentSeed("implementor") },

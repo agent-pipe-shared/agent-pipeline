@@ -1274,12 +1274,30 @@ function actionPreview(toolName, toolInput, paths, commandClass) {
   };
 }
 
+const HUMAN_GUARD_HANDOFF_HEADLINES = Object.freeze([
+  "Human override available for this exact ",
+  "Pipeline Author Repair is available for this exact ",
+  "No human override route is offered for this exact ",
+]);
+
+function bindingDenialReason(reason) {
+  const value = String(reason);
+  const starts = HUMAN_GUARD_HANDOFF_HEADLINES
+    .map((headline) => value.indexOf(`\n${headline}`))
+    .filter((index) => index >= 0);
+  return (starts.length === 0 ? value : value.slice(0, Math.min(...starts))).trimEnd();
+}
+
 function denialRationale(denials) {
   return denials.map((denial) => ({
     guard: String(denial.guard),
-    denialSha256: sha(String(denial.reason)),
-    rationale: String(denial.reason).slice(0, 2_000),
+    denialSha256: sha(bindingDenialReason(denial.reason)),
+    rationale: bindingDenialReason(denial.reason).slice(0, 2_000),
   })).sort((left, right) => `${left.guard}:${left.denialSha256}`.localeCompare(`${right.guard}:${right.denialSha256}`));
+}
+
+function denialDigests(denials) {
+  return denialRationale(denials).map(({ guard, denialSha256 }) => ({ guard, sha256: denialSha256 }));
 }
 
 function denialRetryActions(denials) {
@@ -2538,10 +2556,7 @@ export function recordHumanGuardDenial({
     toolName,
     toolInputSha256: sha(toolInput),
     commandClass,
-    denials: denials.map((denial) => ({
-      guard: String(denial.guard),
-      sha256: sha(String(denial.reason)),
-    })).sort((left, right) => `${left.guard}:${left.sha256}`.localeCompare(`${right.guard}:${right.sha256}`)),
+    denials: denialDigests(denials),
     policy,
     preview,
     eligiblePaths: eligible.paths,
@@ -3459,10 +3474,7 @@ export function consumeHumanGuardOverride({
   }
   const paths = storage(repo.common);
   const toolInputSha256 = sha(toolInput);
-  const denialDigests = denials.map((denial) => ({
-    guard: String(denial.guard),
-    sha256: sha(String(denial.reason)),
-  })).sort((left, right) => `${left.guard}:${left.sha256}`.localeCompare(`${right.guard}:${right.sha256}`));
+  const currentDenialDigests = denialDigests(denials);
   const files = [];
   let replanRequired = false;
   // NVA-SIGDISCLOSE-1 Finding 6: a capability file this process cannot read or validate
@@ -3491,7 +3503,7 @@ export function consumeHumanGuardOverride({
     }
     if (capability.status !== "armed" || capability.toolName !== toolName
       || capability.toolInputSha256 !== toolInputSha256
-      || canonical(capability.denials) !== canonical(denialDigests)) continue;
+      || canonical(capability.denials) !== canonical(currentDenialDigests)) continue;
     const lock = join(paths.locks, `${planSha256}.lock`);
     let lockFd;
     try { lockFd = openSync(lock, "wx", 0o600); }
@@ -3519,7 +3531,7 @@ export function consumeHumanGuardOverride({
         root: capability.root !== repo.root,
         toolName: capability.toolName !== toolName,
         toolInputSha256: capability.toolInputSha256 !== toolInputSha256,
-        denials: canonical(capability.denials) !== canonical(denialDigests),
+        denials: canonical(capability.denials) !== canonical(currentDenialDigests),
         plugin: canonical(capability.plugin) !== canonical(plugin),
         policy: canonical(capability.policy) !== canonical(policy),
         repository: canonical(capability.repository) !== canonical(repository),

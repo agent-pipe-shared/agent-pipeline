@@ -11,6 +11,7 @@
  * runner, so a packet-ready result is deliberately not a spawn authorization.
  */
 import { createHash } from "node:crypto";
+import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -204,6 +205,9 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path) 
     : value;
   if (!isObject(binding) || binding.commit !== candidateCommit || binding.tree !== candidateTree) {
     fail("CDP-EVIDENCE-BINDING", `Evidence is missing or stale for the exact candidate: ${path}`);
+  }
+  if (value?.schema === "pipeline.verify-evidence.v0" && !verifyEvidenceSatisfiesBoundary(value, "critic")) {
+    fail("CDP-EVIDENCE-MODE", `Verify evidence was not produced for the Critic boundary: ${path}`);
   }
   return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree } };
 }

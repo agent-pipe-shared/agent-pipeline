@@ -11,6 +11,7 @@ import {
   deriveGateEvidence,
   writeGateEvidence,
 } from "./publication-gate-evidence.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
 
 const OID = "a".repeat(40);
 const TREE = "b".repeat(40);
@@ -26,7 +27,9 @@ function root(files = {}) {
 }
 const verifyPass = (over = {}) => ({
   schema: "pipeline.verify-evidence.v0",
+  commit: OID,
   candidate: { start: { commit: OID, tree: TREE }, finish: { commit: OID, tree: TREE } },
+  selection: planVerifySelection({ mode: "release", baseCommit: "base", candidateCommit: OID, changedPaths: [], registeredSuiteIds: ["a"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["a"], areas: [{ id: "all", paths: ["**"], suites: ["a"] }] } }),
   steps: [{ name: "a", exitCode: 0 }, { name: "b", exitCode: 0 }],
   exitCode: 0,
   ...over,

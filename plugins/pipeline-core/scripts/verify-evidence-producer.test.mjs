@@ -49,9 +49,11 @@ test("a passing verify produces a consumable artifact bound to the exact commit 
     assert.deepEqual(result.evidence.verifyRun, createPublicVerifyRunEvidence({
       ...result.evidence.verifyRun,
       resumePlanSha256: JSON.parse(readFileSync(join(root, ".git/agent-pipeline/verify/runs", result.evidence.verifyRun.runId, "resume-plan.json"), "utf8")).planSha256,
-      registeredSuiteCount: 4, terminalReceiptCount: 4, terminalStatus: "passed",
+      registeredSuiteCount: 5, terminalReceiptCount: 5, terminalStatus: "passed",
     }));
-    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-verify-contract", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
+    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
+    assert.equal(result.evidence.coverage, "project-calibrated");
+    assert.equal(result.evidence.selection.mode, "candidate");
     const onDisk = JSON.parse(readFileSync(join(root, "evidence", "verify.json"), "utf8"));
     assert.deepEqual(onDisk, result.evidence);
   });
@@ -81,7 +83,7 @@ test("a dirty working tree is refused before the verify command runs, and the re
 
 test("the produced artifact satisfies the real publication-gate-evidence consumer unmodified", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
-    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json" });
+    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1" });
     const derived = deriveGateEvidence({ rootDir: root, gate: "verify", sourcePath: "evidence/verify.json" });
     assert.equal(derived.evidence.gate, "verify");
     assert.equal(derived.evidence.status, "passed");
@@ -91,19 +93,52 @@ test("the produced artifact satisfies the real publication-gate-evidence consume
   });
 });
 
-test("a calibration naming no verify command is refused, never defaulted", async () => {
+test("a calibration naming no verify command runs the explicit shipped baseline but cannot claim project coverage", async () => {
   const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
   try {
     mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "no-verify" }, null, 2)}\n`);
+    writeFileSync(join(root, "README.md"), "# Baseline-only fixture\n");
+    prepareConsumerVerify({ rootDir: root });
     git(root, ["init", "-q"]);
     git(root, ["add", "."]);
     git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "initial"]);
-    await assert.rejects(
-      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json" }),
-      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
-    );
+    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json" });
+    assert.equal(result.status, "passed");
+    assert.equal(result.evidence.coverage, "baseline-only");
+    assert.equal(result.evidence.command, "pipeline consumer baseline");
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/release.json", mode: "release" }), (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND");
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("critic mode runs baseline and the changed project area without invoking unrelated or full commands", async () => {
+  await withFixture('node -e "process.exit(9)"', async (root) => {
+    const calibrationPath = join(root, ".claude", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    calibration.verifyImpact = {
+      schema: "pipeline.project-verify-impact.v1",
+      baseline: [{ id: "common", command: 'node -e "require(\'fs\').writeFileSync(\'.git/baseline-ran\', \'yes\')"' }],
+      areas: [
+        { id: "docs", paths: ["docs/**"], commands: [{ id: "docs", command: 'node -e "require(\'fs\').writeFileSync(\'.git/docs-ran\', \'yes\')"' }] },
+        { id: "source", paths: ["src/**"], commands: [{ id: "source", command: 'node -e "process.exit(8)"' }] },
+      ],
+    };
+    writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "impact policy"]);
+    mkdirSync(join(root, "docs"));
+    writeFileSync(join(root, "docs", "guide.md"), "# Guide\n");
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "docs"]);
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "critic", base: "HEAD^1" });
+    assert.equal(result.status, "passed");
+    assert.equal(result.evidence.selection.execution, "impacted");
+    assert.deepEqual(result.evidence.selection.matchedAreaIds, ["docs"]);
+    assert.equal(result.evidence.selection.selectedSuiteIds.includes("project-docs"), true);
+    assert.equal(result.evidence.selection.omittedSuiteIds.includes("project-source"), true);
+    assert.equal(existsSync(join(root, ".git", "baseline-ran")), true);
+    assert.equal(existsSync(join(root, ".git", "docs-ran")), true);
+  });
 });
 
 test("a bare invocation with no --out resolves to the shared VERIFY_EVIDENCE_DEFAULT_PATH constant", async () => {
@@ -185,10 +220,10 @@ test("real product assertions stay fresh while eligible baselines resume with du
     const first = await produceVerifyEvidence({ rootDir: root });
     const second = await produceVerifyEvidence({ rootDir: root });
     assert.equal(second.evidence.command, command);
-    assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-verify-contract"]);
+    assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-repository", "baseline-verify-contract"]);
     const runs = join(root, ".git/agent-pipeline/verify/runs");
     const run = join(runs, second.evidence.verifyRun.runId);
-    assert.equal(readdirSync(join(run, "receipts")).length, 4);
+    assert.equal(readdirSync(join(run, "receipts")).length, 5);
     assert.match(readFileSync(join(run, "progress.jsonl"), "utf8"), /"state":"reused"/u);
     assert.match(readFileSync(join(run, "logs", `${verifySuiteArtifactName("baseline-manifest")}.log`), "utf8"), /"status":"absent"/u);
     writeFileSync(join(root, ".git/fail-product"), "fail");
@@ -198,7 +233,7 @@ test("real product assertions stay fresh while eligible baselines resume with du
   });
 });
 
-test("invalid present manifest and placeholders cannot yield success", async () => {
+test("invalid manifests fail closed while the legacy placeholder is baseline-only", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
     writeFileSync(join(root, ".claude/pipeline.yaml"), "invalid: manifest\n");
     git(root, ["add", ".claude/pipeline.yaml"]);
@@ -207,7 +242,14 @@ test("invalid present manifest and placeholders cannot yield success", async () 
     assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
   });
   await withFixture('node -e "console.log(\'the verify contract of this project is not configured\')"', async (root) => {
-    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }), /Required consumer Verify/u);
+    const result = await produceVerifyEvidence({ rootDir: root });
+    assert.equal(result.status, "passed");
+    assert.equal(result.evidence.coverage, "baseline-only");
+    assert.equal(result.evidence.command, "pipeline consumer baseline");
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, mode: "release" }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
+    );
   });
 });
 
@@ -232,10 +274,10 @@ test("an external installed package works and implementation changes invalidate 
     cpSync(new URL("../", import.meta.url), installed, { recursive: true });
     await withFixture('node -e "require(\'assert\').equal(2 + 2, 4)"', (root) => {
       const entry = join(installed, "scripts/verify-evidence-producer.mjs");
-      execFileSync(process.execPath, [entry, "--root", root]);
+      execFileSync(process.execPath, [entry, "--root", root, "--mode", "release"]);
       const dependency = join(installed, "scripts/consumer-verify-check.mjs");
       writeFileSync(dependency, `${readFileSync(dependency, "utf8")}\n// changed installed implementation\n`);
-      execFileSync(process.execPath, [entry, "--root", root]);
+      execFileSync(process.execPath, [entry, "--root", root, "--mode", "release"]);
       const evidence = JSON.parse(readFileSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH), "utf8"));
       assert.ok(evidence.steps.every((s) => !s.reused));
       assert.equal(deriveGateEvidence({ rootDir: root, gate: "verify", sourcePath: VERIFY_EVIDENCE_DEFAULT_PATH }).evidence.status, "passed");

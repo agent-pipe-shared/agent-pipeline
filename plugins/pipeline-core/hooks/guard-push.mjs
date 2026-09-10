@@ -177,6 +177,7 @@ function projectCalibrationRelPath(rootDir) {
 }
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 // NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
 // calls-it.md, Point 3): read-only observer, no mkdirSync/physicalScratchRoot call -- see
 // buildScratchOrphanAdvisory below for the full rationale.
@@ -1944,6 +1945,9 @@ function checkEvidenceFreshness(relPath) {
   }
   if (data?.commit !== sourceCommit) {
     failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
+  }
+  if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && !verifyEvidenceSatisfiesBoundary(data, "push")) {
+    failures.push(`${relPath}: Verify evidence was not produced for the push boundary`);
   }
   return failures;
 }

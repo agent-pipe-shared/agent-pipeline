@@ -44,6 +44,7 @@ import {
 import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
 import { run as runPipelineState } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -52,6 +53,12 @@ const FIXTURE_DIR = mkdtempSync(join(SCRATCH, "push-prepare-"));
 after(() => rmSync(FIXTURE_DIR, { recursive: true, force: true }));
 
 const HEAD = "1a757618133eb27b62f1e427b2fb55895da42d85";
+const pushVerifyEvidence = (commit = HEAD) => ({
+  schema: "pipeline.verify-evidence.v0",
+  exitCode: 0,
+  commit,
+  selection: planVerifySelection({ mode: "push", baseCommit: "base", candidateCommit: commit, changedPaths: ["src/a.mjs"], registeredSuiteIds: ["a"], policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "source", paths: ["src/**"], suites: ["a"] }] } }),
+});
 
 // ---------------------------------------------------------------------------
 // parseArgs
@@ -123,7 +130,7 @@ test("checkEvidenceFreshness: stale commit -> ok:false with remedy", () => {
 
 test("checkEvidenceFreshness: exitCode 0 and matching commit -> ok:true", () => {
   const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
-    readFile: () => JSON.stringify({ exitCode: 0, commit: HEAD }),
+    readFile: () => JSON.stringify(pushVerifyEvidence()),
   });
   assert.equal(result.ok, true);
 });
@@ -458,7 +465,8 @@ function readyDeps(overrides = {}) {
     exists: (path) => path.endsWith("push-threat-model.md") || path.endsWith("trust-policy.json"),
     readFile: (path) => {
       if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
-      if (path.endsWith("verify-latest.json") || path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(pushVerifyEvidence());
+      if (path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
       throw new Error(`unexpected read: ${path}`);
     },
     readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [] }),
@@ -598,7 +606,8 @@ test("pushPrepareReport: verify-evidence check reads the shared VERIFY_EVIDENCE_
     readFile: (path) => {
       readPaths.push(path);
       if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
-      if (path.endsWith("verify-latest.json") || path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(pushVerifyEvidence());
+      if (path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
       throw new Error(`unexpected read: ${path}`);
     },
   });
@@ -625,7 +634,7 @@ test("pushPrepareReport: gates.security off -> no security-evidence check, ready
     loadManifestSafe: () => ({ gates: { security: { mode: "off" } } }),
     readFile: (path) => {
       if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
-      if (path.endsWith("verify-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(pushVerifyEvidence());
       if (path.endsWith("security-latest.json")) throw new Error("ENOENT -- security evidence must not be read when the gate is off");
       throw new Error(`unexpected read: ${path}`);
     },
@@ -650,7 +659,7 @@ test("pushPrepareReport: gates.security blocking, missing evidence -> ready:fals
     loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }),
     readFile: (path) => {
       if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
-      if (path.endsWith("verify-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(pushVerifyEvidence());
       if (path.endsWith("security-latest.json")) throw new Error("ENOENT");
       throw new Error(`unexpected read: ${path}`);
     },

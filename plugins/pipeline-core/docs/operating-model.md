@@ -26,9 +26,15 @@ this document and the applicable ADRs take precedence.
 > and replace only its declared human-input placeholders. The first trust
 > anchor may use an existing key or create a new one. Nova B and
 > runner-specific refinement remain open; publication requires the final
-> candidate's full Verify, security, Critic, approval, and remote-readback
+> candidate's full release-mode Verify, security, Critic, approval, and remote-readback
 > evidence. No native-sandbox, model-identity, or platform claim is implied
 > beyond the evidence recorded for that specific runner.
+
+Verify is boundary-aware (ADR-0081). Work, Critic, local-candidate and ordinary
+push runs execute the fixed baseline plus every registered area affected since
+the bound base. Release, tag, marketplace and publication runs execute the full
+registry. The selection and its rule digest are evidence; an unknown path,
+missing base or incomplete registration falls back to full execution.
 
 ## 1. What the model protects
 

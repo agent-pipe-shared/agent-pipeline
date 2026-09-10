@@ -2355,7 +2355,7 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
 // above: drives the real CLI `apply-portable-seed --activate` path and
 // proves the ask surfaces there, additively, without changing the resting
 // status or the primary chained nextAction.
-test("apply-portable-seed records the unresolved verify contract but defers its PO question to the implementation handover", () => {
+test("apply-portable-seed records baseline-only verification without a PO question", () => {
   const withCandidate = root();
   const withoutCandidate = root();
   const invoke = (args, deps) => {
@@ -2378,16 +2378,9 @@ test("apply-portable-seed records the unresolved verify contract but defers its 
       "the ask-step must never replace or change the lifecycle's own resting status");
     assert.equal(applied.result.nextAction.kind, "command",
       "the ask-step must never replace the primary chained nextAction");
-    assert.equal(applied.result.verifyContractAction.kind, "collect-input");
-    assert.equal(applied.result.verifyContractAction.mutation, false);
-    assert.equal(applied.result.verifyContractAction.input.name, "verifyCommand");
-    assert.match(applied.result.verifyContractAction.guidance, /node --test test\/onboarding-sample\.test\.mjs/u,
-      "must offer the REAL detected script, not a hardcoded default");
-    assert.match(applied.result.verifyContractAction.guidance, /"npm test"/u);
-    assert.match(applied.result.verifyContractAction.guidance, /"defer"/u);
-    assert.equal(applied.result.verifyContractStatus, "placeholder");
-    assert.equal(applied.result.pushGateSatisfiable, false,
-      "typed field, not prose: a caller must be able to branch on this directly");
+    assert.equal(Object.hasOwn(applied.result, "verifyContractAction"), false);
+    assert.equal(Object.hasOwn(applied.result, "verifyContractStatus"), false);
+    assert.equal(Object.hasOwn(applied.result, "pushGateSatisfiable"), false);
     assert.equal(applied.result.nextAction.pendingAsks.some((ask) => ask.input?.name === "verifyCommand"), false,
       "the first setup round must not ask for a test command before the project design exists");
 
@@ -2402,9 +2395,9 @@ test("apply-portable-seed records the unresolved verify contract but defers its 
     const noCandidateDigest = noCandidatePlanned.result.nextAction.argv[noCandidatePlanned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const noCandidateApplied = invoke(["apply-portable-seed", "--root", withoutCandidate, "--plan-sha256", noCandidateDigest, "--activate", "--runner", "codex"], fakeDeps);
     assert.equal(noCandidateApplied.code, 0);
-    assert.equal(noCandidateApplied.result.verifyContractAction.kind, "collect-input");
-    assert.match(noCandidateApplied.result.verifyContractAction.guidance, /No obvious candidate/u);
-    assert.equal(noCandidateApplied.result.pushGateSatisfiable, false);
+    assert.equal(Object.hasOwn(noCandidateApplied.result, "verifyContractAction"), false);
+    assert.equal(Object.hasOwn(noCandidateApplied.result, "verifyContractStatus"), false);
+    assert.equal(Object.hasOwn(noCandidateApplied.result, "pushGateSatisfiable"), false);
   } finally { dispose(withCandidate); dispose(withoutCandidate); }
 });
 
@@ -2414,7 +2407,7 @@ test("apply-portable-seed records the unresolved verify contract but defers its 
 // itself -- the seeded verify command stays the deliberately-failing
 // UNCONFIGURED_VERIFY placeholder until a human actually edits
 // project/pipeline.json, so running the SEEDED command exits non-zero.
-test("a seeded configuration can never produce passing verify evidence without a real command having run", () => {
+test("a seeded configuration leaves project verification to the shipped baseline", () => {
   const projectRoot = root();
   const invoke = (args, deps) => {
     let output = "";
@@ -2429,18 +2422,15 @@ test("a seeded configuration can never produce passing verify evidence without a
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const applied = invoke(["apply-portable-seed", "--root", projectRoot, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
     assert.equal(applied.code, 0);
-    assert.equal(applied.result.verifyContractAction.kind, "collect-input",
-      "a candidate was detected and offered, but never silently adopted");
+    assert.equal(Object.hasOwn(applied.result, "verifyContractAction"), false,
+      "a detected command is product configuration, not a PO gate");
 
     const calibrationPath = existsSync(join(projectRoot, "project", "pipeline.json"))
       ? join(projectRoot, "project", "pipeline.json")
       : join(projectRoot, ".claude", "pipeline.json");
     const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
-    assert.match(calibration.verify, /the verify contract of this project is not configured/u,
-      "the offered candidate must never be silently applied to the seeded calibration");
-
-    const run = spawnSync(calibration.verify, { shell: true, encoding: "utf8" });
-    assert.notEqual(run.status, 0, "the seeded verify command must fail -- it never ran a real check");
+    assert.equal(calibration.verify, null,
+      "the detected project command must never be silently adopted");
   } finally { dispose(projectRoot); }
 });
 
@@ -4321,10 +4311,9 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
 // directly above) is the sole mechanism that actually refuses implementation
 // writes, and it is completely unaffected by whether this proposal exists or
 // is ever acted on -- both halves are asserted below.
-test("the public onboarding handover is executable for every runner with placeholder and configured verify", () => {
+test("the public onboarding handover is executable for every runner with baseline-only and configured verify", () => {
   const paths = [];
   const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
-  const verifyPlaceholder = PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER;
   try {
     for (const runner of ["claude", "codex", "antigravity"]) {
       const path = root();
@@ -4444,30 +4433,24 @@ test("the public onboarding handover is executable for every runner with placeho
       const approved = state(["approve-plan", "--by", "po"]);
       assert.equal(approved.code, 0, `${runner}: approve-plan: ${approved.stderr}`);
 
-      // Fresh calibration still contains UNCONFIGURED_VERIFY. The public CLI
-      // must publish one primary collect-input action whose nested apply argv
-      // is the sanctioned atomic phase+verify transaction -- no raw config edit.
-      const placeholder = publicInspect();
-      assert.equal(placeholder.status, "ready");
-      assert.equal(placeholder.runner, runner);
-      assert.equal(placeholder.nextAction?.kind, "collect-input");
-      assert.equal(placeholder.nextAction.input?.name, "verifyCommand");
-      assert.equal(Object.hasOwn(placeholder.nextAction, "pendingAsks"), false, `${runner}: no duplicate verify ask`);
-      assert.doesNotMatch(placeholder.nextAction.guidance, /edit .*pipeline\.json/iu);
-      assert.deepEqual(placeholder.nextAction.applyAction.argv, [
-        PIPELINE_STATE_SCRIPT, "set-phase", "--phase", "implementation",
-        "--verify-command", verifyPlaceholder,
-      ]);
-      const materialized = placeholder.nextAction.applyAction.argv.map((part) => part === verifyPlaceholder ? verifyCommand : part);
-      assert.equal(materialized.filter((part) => part === verifyCommand).length, 1);
-      const firstPhase = state(materialized.slice(1));
-      assert.equal(firstPhase.code, 0, `${runner}: placeholder apply: ${firstPhase.stderr}`);
-      assert.equal(reenterDriver().outcome, "ready", `${runner}: placeholder re-entry`);
+      // Fresh calibration uses the shipped baseline and needs no PO input.
+      const baselineOnly = publicInspect();
+      assert.equal(baselineOnly.status, "ready");
+      assert.equal(baselineOnly.runner, runner);
+      assert.equal(baselineOnly.nextAction?.kind, "command");
+      assert.deepEqual(baselineOnly.nextAction.argv, [PIPELINE_STATE_SCRIPT, "set-phase", "--phase", "implementation"]);
+      const firstPhase = state(baselineOnly.nextAction.argv.slice(1));
+      assert.equal(firstPhase.code, 0, `${runner}: baseline-only apply: ${firstPhase.stderr}`);
+      assert.equal(reenterDriver().outcome, "ready", `${runner}: baseline-only re-entry`);
 
       // Return to design through the public writer, approve the unchanged plan
       // again, and prove configured verify retains the exact historical command.
       const reopened = state(["reopen-design", "--by", "po"]);
       assert.equal(reopened.code, 0, `${runner}: reopen: ${reopened.stderr}`);
+      approve();
+      const configuredPhase = state(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand]);
+      assert.equal(configuredPhase.code, 0, `${runner}: configure verify: ${configuredPhase.stderr}`);
+      assert.equal(state(["reopen-design", "--by", "po"]).code, 0);
       approve();
       const configured = publicInspect();
       assert.equal(configured.nextAction?.kind, "command");
@@ -4636,7 +4619,7 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
       },
     );
     const producer = fileURLToPath(new URL("../scripts/verify-evidence-producer.mjs", import.meta.url));
-    const produceEvidence = () => spawnSync(process.execPath, [producer, "--root", path, "--out", "evidence/verify-latest.json"], {
+    const produceEvidence = () => spawnSync(process.execPath, [producer, "--root", path, "--out", "evidence/verify-latest.json", "--mode", "push"], {
       cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
     });
     // NVA-R33-SECGATEON: the second, independent bucket the seeded gate chapter now
@@ -4679,10 +4662,11 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     assert.match(String(refused.stderr), /evidence\/verify-latest\.json missing/u);
     assert.match(String(refused.stderr), /Push approval missing/u);
 
-    // (1) The seeded verify placeholder fails by design, so no evidence is written
-    // -- the artifact can never claim a pass that did not happen.
-    assert.notEqual(produceEvidence().status, 0, "an unconfigured verify contract must not yield passing evidence");
-    assert.equal(existsSync(join(path, "evidence", "verify-latest.json")), false);
+    // (1) The shipped baseline produces honest baseline-only evidence without a PO turn.
+    assert.equal(produceEvidence().status, 0, "the shipped baseline must yield bounded evidence");
+    const baselineEvidence = JSON.parse(readFileSync(join(path, "evidence", "verify-latest.json"), "utf8"));
+    assert.equal(baselineEvidence.coverage, "baseline-only");
+    assert.equal(baselineEvidence.selection.mode, "push");
 
     // (2) The human configures a real verify command; the producer then writes
     // candidate-bound evidence. Both steps the calibration already demands.
@@ -4770,7 +4754,7 @@ test("the seeded security gate refuses a push with missing security evidence and
       },
     );
     const verifyProducer = fileURLToPath(new URL("../scripts/verify-evidence-producer.mjs", import.meta.url));
-    const produceVerifyEvidence = () => spawnSync(process.execPath, [verifyProducer, "--root", path, "--out", "evidence/verify-latest.json"], {
+    const produceVerifyEvidence = () => spawnSync(process.execPath, [verifyProducer, "--root", path, "--out", "evidence/verify-latest.json", "--mode", "push"], {
       cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
     });
     const securityScanScript = fileURLToPath(new URL("../scripts/security-scan.mjs", import.meta.url));
@@ -6367,7 +6351,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(applied.status, "applied");
     // The ignore rules are ANCHORED. An unanchored `evidence/` also matches
     assert.match(readFileSync(join(path, "project/consumer-verify.mjs"), "utf8"), /runConsumerVerifyCheck/u);
-    assert.match(JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8")).verify, /the verify contract of this project is not configured/u);
+    assert.equal(JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8")).verify, null);
     // `<anything>/evidence/`, which is how this repository once silently broke the
     // closure citations its own backlog gate demands.
     const ignore = readFileSync(join(path, ".gitignore"), "utf8");
@@ -6410,11 +6394,9 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     // freshIntent()'s gates literal in project-onboarding-v3.mjs for the full chain.
     assert.equal(source.gates.security, "blocking");
     const calibration = JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8"));
-    // Contract correction: this pin used to assert the always-green placeholder
-    // `git diff --check`. That value made a brand-new project report a satisfied
-    // verification contract while owning no tests, so the pin encoded the defect
-    // it was meant to guard. The contract is now "fails until configured".
-    assert.match(calibration.verify, /not configured/);
+    // The project command remains unconfigured while the shipped baseline still
+    // provides bounded verification without a PO decision.
+    assert.equal(calibration.verify, null);
     assert.equal(calibration.repositoryMode, "local-only");
     assert.equal(existsSync(join(path, "docs/state.md")), false, "handover stays a project decision; normal bootstrap deliberately remains F4 until it exists");
     const barrier = readRestartBarrier({ rootDir: path, spawn: fakeGit });
@@ -7821,14 +7803,10 @@ test("a freshly seeded project is honest about its authority tier, its verify co
     assert.equal(legacyAuthority.calibration, ".claude/pipeline.json");
     assert.equal(JSON.parse(readFileSync(join(legacyPath, ".claude", "pipeline.json"), "utf8")).verify, "npm test");
 
-    // (c) The seeded verify contract FAILS until a human configures it, and its
-    // own output names what to replace and where. An unconfigured project is
-    // distinguishable from a satisfied one by running verify.
+    // (c) The project-specific command is absent until configured; this state is
+    // explicit and leaves bounded checks to the shipped consumer baseline.
     const calibration = JSON.parse(readFileSync(join(path, "project", "pipeline.json"), "utf8"));
-    const verify = spawnSync(calibration.verify, { cwd: path, shell: true, encoding: "utf8" });
-    assert.notEqual(verify.status, 0, "an unconfigured verify contract must not report success");
-    assert.match(String(verify.stderr), /not configured/);
-    assert.match(String(verify.stderr), /Replace the verify command in project\/pipeline\.json/);
+    assert.equal(calibration.verify, null);
 
     // (d) The seeded manifest carries a gate chapter, and it is a LIVE gate --
     // for the profile-neutral greenfield seed and for each of the three PO
@@ -7925,11 +7903,9 @@ test("an ordinary consumer project's runtime initialization never seeds the priv
     assert.equal(bytes.includes("agent-pipeline-private-overlay"), false, "a consumer project must never carry the private overlay's project identity");
     const calibration = JSON.parse(bytes);
     assert.notEqual(calibration.project, "agent-pipeline-private-overlay");
-    assert.notEqual(calibration.verify, "git diff --check HEAD");
-    const verifyRun = spawnSync(calibration.verify, { cwd: path, shell: true, encoding: "utf8" });
-    assert.notEqual(verifyRun.status, 0, "an unconfigured verify contract must not report success on an arbitrary tree");
-    assert.match(String(verifyRun.stderr), /not configured/);
-    // Both tiers of one fresh project must agree the verify gate is unconfigured.
+    assert.equal(calibration.verify, null);
+    // Both tiers of one fresh project must agree that no project-specific command
+    // has been configured; the shipped baseline remains available independently.
     const neutralCalibration = JSON.parse(readFileSync(join(path, "project", "pipeline.json"), "utf8"));
     assert.equal(calibration.verify, neutralCalibration.verify);
   } finally { dispose(path); }

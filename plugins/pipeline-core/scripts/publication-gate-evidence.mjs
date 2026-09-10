@@ -52,6 +52,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 
 export const PUBLICATION_GATE_EVIDENCE_SCHEMA = "pipeline.publication-gate-evidence.v1";
 export const DERIVABLE_GATES = Object.freeze(["identity", "verify", "security"]);
@@ -109,6 +110,7 @@ function sourceOutcome(gate, record) {
     if (steps.length === 0) fail("PGE-OUTCOME", "verify evidence records no steps");
     const failed = steps.filter((step) => step?.exitCode !== 0).map((step) => step?.name);
     if (record.exitCode !== 0 || failed.length > 0) fail("PGE-OUTCOME", `verify did not pass (exitCode ${record.exitCode}${failed.length ? `, failing: ${failed.join(", ")}` : ""})`);
+    if (!verifyEvidenceSatisfiesBoundary(record, "release")) fail("PGE-BOUNDARY", "publication requires full release-mode Verify evidence");
     return { status: "passed", exitCode: 0 };
   }
   if (gate === "security") {

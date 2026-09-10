@@ -18,6 +18,10 @@ Annahmen"*) authorizes drafting under assumption, not accepting; the same Triage
 records why this surface is Design-tier/Critic-mandatory per MP-07.
 **Constrained by** [ADR-0050](0050-candidate-bound-verify-run-journal.md), whose
 receipt and drift model this ADR reuses without amending its schema.
+**Partially superseded by** [ADR-0081](0081-boundary-aware-impacted-verify.md):
+Decisions 3 and 8 no longer require full execution for a local candidate or an
+ordinary push. Their full-only rule now applies at release, tag, marketplace
+and publication boundaries. Exact candidate binding remains unchanged.
 **Does not touch** [ADR-0055](0055-critical-human-proof-waiver.md)/[ADR-0056](0056-push-approval-mode.md)/[ADR-0061](0061-uniform-human-approval-ceremony.md);
 see Decision 5.
 

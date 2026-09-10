@@ -11,7 +11,7 @@
 
 ## Checklist
 
-- [ ] `node harness/scripts/verify.mjs` passes locally
+- [ ] `node harness/scripts/verify.mjs --mode candidate --base <review-base>` passes locally
 - [ ] All commits are signed off (`git commit -s`) per the DCO
 - [ ] **CLA acceptance — Agent-Pipeline CLA v1.0 (SHA-256: `d2fe49f26b6609e367e915ae484131dde3c66f7a78af97952513a9188a6fc21b`) — I, @REPLACE_WITH_PR_AUTHOR_LOGIN, have read and expressly accept this CLA for every contribution in this pull request and confirm that I have the rights needed to make its grants.**
 - [ ] Commits are small and atomic, using Conventional Commits messages

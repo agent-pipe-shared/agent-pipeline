@@ -63,7 +63,8 @@ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { runVerifyJournal, sealVerifyCleanupRegistration } from "./verify-journal.mjs";
 import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource } from "../lib/worktree-lifecycle.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
-import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify } from "../lib/consumer-verify.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
+import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify, readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
 
 export const VERIFY_EVIDENCE_SCHEMA = "pipeline.verify-evidence.v0";
 
@@ -94,17 +95,16 @@ function candidateIdentity(root) {
   return { status: porcelain.length === 0 ? "clean" : "dirty", commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) };
 }
 
-function readConfiguredVerifyCommand(root) {
-  const calibration = resolveAuthorityArtifactPath("calibration", { rootDir: root });
-  if (!calibration.exists) fail("VEP-NO-CALIBRATION", "No project calibration found -- nothing configures a verify command.");
-  let parsed;
-  try { parsed = JSON.parse(readFileSync(calibration.path, "utf8")); }
-  catch { fail("VEP-CALIBRATION", "Project calibration is not valid JSON."); }
-  const command = parsed?.verify;
-  if (typeof command !== "string" || command.trim() === "") {
-    fail("VEP-NO-COMMAND", "Project calibration names no verify command -- deciding one is out of scope for this producer.");
-  }
-  return { command, project: typeof parsed?.project === "string" && parsed.project.length > 0 ? parsed.project : "unspecified" };
+function resolveCommit(root, ref) {
+  if (ref === null) return null;
+  try { return git(root, ["rev-parse", "--verify", `${ref}^{commit}`]); } catch { return null; }
+}
+
+function selectionInputs(root, mode, base, candidateCommit) {
+  const baseCommit = resolveCommit(root, base) ?? (mode === "release" ? null : resolveCommit(root, "HEAD^1"));
+  if (baseCommit === null) return { baseCommit, changedPaths: null };
+  try { return { baseCommit, changedPaths: git(root, ["diff", "--name-only", "-z", baseCommit, candidateCommit, "--"]).split("\0").filter(Boolean) }; }
+  catch { return { baseCommit, changedPaths: null }; }
 }
 
 function safeOutPath(root, outPath) {
@@ -141,13 +141,17 @@ function writeEvidence(root, target, evidence) {
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
  */
-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, mode = "candidate", base = null }) {
   const root = resolve(rootDir);
   const target = safeOutPath(root, outPath);
   // Invalidate prior success before configuration, candidate checks or execution.
   // An interrupted replacement attempt must never leave consumable stale green.
   for (const path of new Set([target, safeOutPath(root, VERIFY_EVIDENCE_DEFAULT_PATH)])) rmSync(path, { force: true });
-  const { command, project } = readConfiguredVerifyCommand(root);
+  let configuration;
+  try { configuration = readConsumerVerifyConfiguration(root); }
+  catch (error) { fail("VEP-CALIBRATION", error.message); }
+  const { fullCommand: command, project } = configuration;
+  if (mode === "release" && command === null) fail("VEP-NO-COMMAND", "Release Verify requires a configured full project command.");
   const started = candidateIdentity(root);
   const startedAt = new Date().toISOString();
 
@@ -157,7 +161,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     const evidence = {
       schema: VERIFY_EVIDENCE_SCHEMA,
       project,
-      command,
+      command: command ?? "pipeline consumer baseline",
       commit: started.commit,
       tree: started.tree,
       candidate: { commit: started.commit, tree: started.tree },
@@ -173,19 +177,41 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   const file = assertConsumerVerifyAdapter(root);
   const policyInputs = consumerVerifyPolicy(root);
   const attempt = randomBytes(16).toString("hex");
-  const suites = [
+  const standardSuites = [
     { name: "baseline-calibration", file, args: [CONSUMER_VERIFY_DISPATCHER, "calibration"] },
     // Manifest semantics include time and external policy data: always recheck.
     { name: "baseline-manifest", file, args: [CONSUMER_VERIFY_DISPATCHER, "manifest", attempt] },
+    { name: "baseline-repository", file, args: [CONSUMER_VERIFY_DISPATCHER, "repository-baseline"] },
     { name: "baseline-verify-contract", file, args: [CONSUMER_VERIFY_DISPATCHER, "contract"] },
-    { name: "configured-verify", file, args: [CONSUMER_VERIFY_DISPATCHER, "product", attempt], dependsOn: ["baseline-calibration", "baseline-manifest", "baseline-verify-contract"] },
   ];
+  const configuredBaselineSuites = configuration.baseline.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) }));
+  const configuredAreaSuites = configuration.areas.flatMap((area) => area.commands.map((entry) => ({ name: `project-${entry.id}`, file, args: [CONSUMER_VERIFY_DISPATCHER, "configured-command", entry.id], dependsOn: standardSuites.map((suite) => suite.name) })));
+  const fullSuite = command === null ? null : { name: "configured-verify", file, args: [CONSUMER_VERIFY_DISPATCHER, "product", attempt], dependsOn: standardSuites.map((suite) => suite.name) };
+  const selectionInput = selectionInputs(root, mode, base, started.commit);
+  const baselineIds = [...standardSuites, ...configuredBaselineSuites].map((suite) => suite.name);
+  let registry = [...standardSuites, ...configuredBaselineSuites, ...configuredAreaSuites];
+  let areas = configuration.areas.map((area) => ({ id: area.id, paths: area.paths, suites: area.commands.map((entry) => `project-${entry.id}`) }));
+  if (mode === "release") {
+    registry = [...standardSuites, ...configuredBaselineSuites, fullSuite];
+    areas = [{ id: "whole-project", paths: ["**"], suites: registry.map((suite) => suite.name) }];
+  } else if (areas.length === 0) {
+    if (fullSuite !== null) registry.push(fullSuite);
+    areas = [{ id: "whole-project", paths: ["**"], suites: registry.map((suite) => suite.name) }];
+  }
+  let selection = planVerifySelection({ mode, baseCommit: selectionInput.baseCommit, candidateCommit: started.commit, changedPaths: selectionInput.changedPaths, registeredSuiteIds: registry.map((suite) => suite.name), policy: { schema: "pipeline.verify-selection.v1", baseline: baselineIds, areas } });
+  if (selection.execution === "full" && fullSuite !== null && !registry.some((suite) => suite.name === fullSuite.name)) {
+    const fallbackReason = selection.fallbackReason;
+    registry = [...standardSuites, ...configuredBaselineSuites, fullSuite];
+    selection = planVerifySelection({ mode, baseCommit: selectionInput.baseCommit, candidateCommit: started.commit, changedPaths: [], registeredSuiteIds: registry.map((suite) => suite.name), policy: { schema: "pipeline.verify-selection.v1", baseline: baselineIds, areas: [{ id: "whole-project", paths: ["**"], suites: registry.map((suite) => suite.name) }] }, forceFullReason: fallbackReason });
+  }
+  const selected = new Set(selection.selectedSuiteIds);
+  const suites = registry.filter((suite) => selected.has(suite.name));
   let registration;
   const run = await runVerifyJournal({
     repoRoot: root,
     gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
     candidate: { commit: started.commit, tree: started.tree },
-    suites, policyInputs, allowCrossCandidateReuse: false,
+    suites, policyInputs: { ...policyInputs, selectionSha256: selection.selectionSha256 }, allowCrossCandidateReuse: selection.execution === "impacted",
     registerRun({ runId, runPath }) {
       const descriptor = startSessionDescriptor(root);
       const resourceId = `consumer-${attempt}`;
@@ -208,7 +234,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   const evidence = {
     schema: VERIFY_EVIDENCE_SCHEMA,
     project,
-    command,
+    command: command ?? "pipeline consumer baseline",
     commit: started.commit,
     tree: started.tree,
     candidate: { commit: started.commit, tree: started.tree },
@@ -221,6 +247,8 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
       registeredSuiteCount: suites.length, terminalReceiptCount: run.terminal.receipts.length,
       terminalStatus: run.terminal.status,
     }),
+    selection,
+    coverage: command === null && configuration.baseline.length === 0 && configuration.areas.length === 0 ? "baseline-only" : "project-calibrated",
     exitCode: 0,
   };
   writeEvidence(root, target, evidence);
@@ -232,14 +260,16 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === "--prepare") { value.prepare = true; continue; }
-    if (!["--root", "--out"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
+    if (!["--root", "--out", "--mode", "--base"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
     const next = argv[++index];
     if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) {
       fail("VEP-USAGE", "Usage: verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]");
     }
     value[flag] = next;
   }
-  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH };
+  const mode = value["--mode"] ?? "candidate";
+  if (!["work", "critic", "push", "candidate", "release"].includes(mode)) fail("VEP-USAGE", `Unknown Verify mode: ${mode}`);
+  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, mode, base: value["--base"] ?? null };
 }
 
 if (isDirectInvocation(import.meta.url)) {
