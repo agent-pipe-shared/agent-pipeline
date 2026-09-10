@@ -148,6 +148,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+import { isDispatchRecordCoordinationPath } from "../lib/guard-devplan-policy.mjs";
 // NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
 // after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
 // the policy module both of this gate's lanes already share, never re-decided here. See that
@@ -410,6 +411,7 @@ const normalizedPath = normalize(relPath);
 // its checks before scratch/ was ever considered, diverging from the lib the shell lane
 // still uses).
 if (normalizedPath.startsWith("scratch/")) process.exit(0);
+if (isDispatchRecordCoordinationPath(normalizedPath)) process.exit(0);
 
 // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
 const manifestResult = loadManifest(projectDir);

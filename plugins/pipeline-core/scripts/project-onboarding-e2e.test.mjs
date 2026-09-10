@@ -57,6 +57,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const onboarding = join(here, "project-onboarding-v3.mjs");
 const onboardingInit = join(here, "onboarding-init.mjs");
+const resumeHint = join(here, "resume-hint.mjs");
 const authority = join(here, "v3-bootstrap-authority.mjs");
 const migration = join(here, "runner-profile-migration-v3.mjs");
 const fixtureGitConfig = new Map();
@@ -808,6 +809,12 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         assert.equal(restart?.kind, "restart-process");
         assert.equal(restart.launch?.argv?.[0]?.endsWith("codex-onboarding-launch.mjs"), true);
         assert.deepEqual(restart.launch.argv.slice(1, 3), ["--root", "."]);
+        const prescribedReadback = evaluateLifecycleReadyGuard({
+          tool_name: "Bash",
+          tool_input: { command: `node '${resumeHint}' inspect --root '${path}'` },
+        }, { projectDir: path, runner: "codex" });
+        assert.deepEqual(prescribedReadback, { exitCode: 0, stderr: "" },
+          "codex: restart-required must admit the prescribed resume-hint readback");
         // The returned restart action is asserted above. Complete its
         // readback handshake through the same in-process host seam used by
         // the other lifecycle tests; the launcher process contract is
@@ -854,6 +861,23 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         `${runner}: the returned inspect chain must execute present-plan`);
       const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
       assert.equal(state.planApproved, false, `${runner}: presentation must not silently approve the plan`);
+
+      const dispatchReceipt = devPlanGateVerdict({
+        filePath: "evidence/dispatch-record-GREENFIELD-DESIGN-1.json",
+        projectDir: path,
+      });
+      assert.equal(dispatchReceipt.verdict, "allow",
+        `${runner}: a role must be able to write its opening dispatch receipt before plan approval`);
+      const unrelatedEvidence = devPlanGateVerdict({ filePath: "evidence/review.json", projectDir: path });
+      assert.equal(unrelatedEvidence.verdict, "block",
+        `${runner}: the receipt exception must not widen to ordinary evidence writes`);
+
+      const externalInventory = evaluateLifecycleReadyGuard({
+        tool_name: "Bash",
+        tool_input: { command: `rg --files -uu '${source}' | rg 'existing-private'` },
+      }, { projectDir: path, runner });
+      assert.deepEqual(externalInventory, { exitCode: 0, stderr: "" },
+        `${runner}: closed passive inventory reads use host filesystem visibility`);
 
       // The hook script is necessarily a nested Node process. Exercise its
       // shared policy directly here so this runner-contract test remains

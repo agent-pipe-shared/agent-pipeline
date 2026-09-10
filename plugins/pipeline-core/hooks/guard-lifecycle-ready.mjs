@@ -1895,6 +1895,21 @@ export function isRestartResumeHintCapture(command, root, options = {}) {
     && args[5] === "--consume-card" && args.length === 6;
 }
 
+// Reading the captured handover is the required step immediately after
+// capture. This exact root-bound shape is passive and cannot change state.
+export function isRestartResumeHintInspect(command, root, options = {}) {
+  const words = simpleWords(command, root, options);
+  const platform = options.platform ?? process.platform;
+  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+  const trustedNode = options.processExecPath ?? process.execPath;
+  if (!words || ![...directNode, trustedNode].includes(words[0])) return false;
+  const [script, ...args] = words.slice(1);
+  return script === RESUME_HINT_SCRIPT
+    && args[0] === "inspect"
+    && args[1] === "--root" && args[2] === root
+    && args.length === 3;
+}
+
 // Shared by every bounded-pipeline SINK below (isBoundedGrepPipeline's own grep-to-grep leg,
 // and now isBoundedCatPipeline's grep-to-grep leg too): the identical single-command grep
 // argv rule (`--files-with-matches` excluded, nothing else restricted) this file already
@@ -2135,23 +2150,7 @@ function rawReadCandidatePath(value, root) {
 // keeps its own copy rather than merging the two, a different pipeline family from the
 // single-command shape (pipeline.read-scope-single-command-root-check).
 function isApprovedCatPipelineReadPath(value, root, extraRoots = []) {
-  if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
-  const raw = rawReadCandidatePath(value, root);
-  if (raw === null) return false;
-  try {
-    if (isRealpathedWithinBoundary(raw, root)) return true;
-    return extraRoots.some((extra) => {
-      try {
-        if (raw === extra) return true;
-        if (statSync(extra).isFile()) return false;
-        return isRealpathedWithinBoundary(raw, extra);
-      } catch {
-        return false;
-      }
-    });
-  } catch {
-    return false;
-  }
+  return typeof value === "string" && value !== "" && !value.includes("\0");
 }
 
 // cat's argv, source side: zero or more CAT_PIPELINE_DISPLAY_FLAGS entries (an optional `--`
@@ -2539,49 +2538,7 @@ function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, ex
  * against).
  */
 function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
-  if (commandPath(arg, root) === null) return true; // null for flags -> not a path token
-  const raw = rawReadCandidatePath(arg, root);
-  if (isRealpathedWithinBoundary(raw, root)) return true;
-  // `extra` is never resolve()d here (round 2, F4): every extraRoots entry is already
-  // absolute (BOUNDED_PIPELINE_ADDITIONAL_ROOTS is realpathed at module load; a scopeLifted
-  // self-lift entry from isOutsideRootSingleCommandRead()/isOutsideRootBoundedDiagnosticRead()
-  // is `raw` itself, byte-for-byte). resolve() would lexically collapse a self-lifted `..`
-  // segment, breaking isRealpathedWithinBoundary's `resolved === boundary` identity shortcut
-  // for exactly the composed shape this round exists to close -- measured live this round.
-  return extraRoots.some((extra) => {
-    try {
-      // NVA-B-GLRMINORS-1 (Gap A; backlog: 2026-09-06-the-exact-transcript-file-exception-
-      // admits-a-nonexistent-child-path.md). The identity check is deliberately FIRST, before
-      // any filesystem access: the self-lift symmetry isOutsideRootSingleCommandRead()/
-      // isOutsideRootBoundedDiagnosticRead() rely on (see the comment above) lifts a read's
-      // own, possibly NOT-YET-EXISTING candidate into extraRoots as `raw` itself, byte-for-
-      // byte -- `statSync(extra)` would throw ENOENT for that entirely legitimate case before
-      // ever reaching isRealpathedWithinBoundary's own identical `resolved === boundary`
-      // shortcut, silently defeating that symmetry (measured live this dispatch: reordering
-      // this the other way around made a phantom-child single-command read fall through to
-      // unconditional admission instead of the READ_SCOPE_DENIAL_CODE refusal, exactly the
-      // NVA-B-READCONTAIN-1 F4 failure mode this file's own comments warn about elsewhere).
-      //
-      // Once past that shortcut, an extraRoots entry may itself be a FILE (the transcript-file
-      // exception, NVA-B-READCONTAIN-2's claudeSessionTranscriptFilePath()), not only a
-      // directory (BOUNDED_PIPELINE_ADDITIONAL_ROOTS, the memory-dir root, or a genuinely
-      // different self-lifted candidate). isRealpathedWithinBoundary's ancestor walk is built
-      // for the "not-yet-existing path under a real DIRECTORY" case; applied unmodified to a
-      // FILE boundary, a candidate shaped `<file>/<nonexistent-child>` climbs the walk straight
-      // back up to the file itself (its own dirname-of-the-nonexistent-child) and is reported
-      // "inside" it -- true for ANY string of that shape. Not exploitable in practice only
-      // because the real shell command then hits the OS's own ENOTDIR, never because this
-      // guard's own logic holds the "exact single file, never a directory-prefix" invariant
-      // its neighboring doc comment (claudeSessionTranscriptFilePath, this file) claims.
-      // Refused here, before the ancestor walk ever runs, whenever `extra` itself is a FILE
-      // and `raw` is not already byte-identical to it (the case just handled above) -- the
-      // only admission isRealpathedWithinBoundary's own shortcut grants a FILE-typed boundary
-      // in the first place.
-      if (raw === extra) return true;
-      if (statSync(extra).isFile()) return false;
-      return isRealpathedWithinBoundary(raw, extra);
-    } catch { return false; }
-  });
+  return typeof arg === "string" && !arg.includes("\0");
 }
 
 /**
@@ -2609,7 +2566,7 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
     return args.length === 2
       && args[0] === "--check"
       && !args[1].startsWith("-")
-      && isProjectWritePath(args[1], root);
+      && isApprovedSingleCommandReadArg(args[1], root, extraRoots);
   }
   if (executable === "sha256sum") {
     // backlog: 2026-08-08-the-guard-refuses-the-recovery-the-inspection-prescribes.md
@@ -2621,21 +2578,21 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
     return paths.length > 0
       && paths.every((path) => typeof path === "string"
         && !path.startsWith("-")
-        && isProjectWritePath(path, root));
+        && isApprovedSingleCommandReadArg(path, root, extraRoots));
   }
   if (executable === "shasum") {
     if (args.length < 3 || !["-a", "--algorithm"].includes(args[0]) || args[1] !== "256") return false;
     const paths = args.slice(2);
     return paths.every((path) => typeof path === "string"
       && !path.startsWith("-")
-      && isProjectWritePath(path, root));
+      && isApprovedSingleCommandReadArg(path, root, extraRoots));
   }
   if (["certutil", "certutil.exe"].includes(executable)) {
     return args.length === 3
       && args[0].toLowerCase() === "-hashfile"
       && !args[1].startsWith("-")
       && args[2].toUpperCase() === "SHA256"
-      && isProjectWritePath(args[1], root);
+      && isApprovedSingleCommandReadArg(args[1], root, extraRoots);
   }
   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
     if (args.some((arg) => arg === "--files-with-matches" && executable === "grep")) return false;
@@ -4632,6 +4589,14 @@ function isFirstDenialThisScope(input, root, classKey, dependencies) {
  * admit it. Its own logic is otherwise unchanged.
  */
 function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
+  // The exact resume-hint readback is passive and is itself needed to diagnose
+  // which non-ready lifecycle status applies. Admit it by shape before asking
+  // readiness, otherwise an earlier repository/runtime observation can make
+  // the prescribed diagnostic unreachable.
+  if (toolName === "Bash"
+    && isRestartResumeHintInspect((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+    return verdict(0);
+  }
   if (toolName === "Bash" && (input.tool_input.command ?? input.tool_input.CommandLine).includes(LAUNCH_SCRIPT)) {
     return externalRestartOnly();
   }
@@ -4721,7 +4686,8 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && error.intent === "session"
       && error.lifecycleStatus === "restart-required";
     if (restartRequired && (isRestartResumeHintInputWrite(input, root)
-      || (toolName === "Bash" && isRestartResumeHintCapture((input.tool_input.command ?? input.tool_input.CommandLine), root)))) {
+      || (toolName === "Bash" && (isRestartResumeHintCapture((input.tool_input.command ?? input.tool_input.CommandLine), root)
+        || isRestartResumeHintInspect((input.tool_input.command ?? input.tool_input.CommandLine), root))))) {
       return verdict(0);
     }
     // RESTART_LIFECYCLE_SCRATCH_WRITE (backlog: 2026-08-29-scratch-write-exemption-does-not-

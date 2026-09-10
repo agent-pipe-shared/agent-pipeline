@@ -71,6 +71,15 @@ import {
  */
 export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claude/", "backlog/", "scratch/"]);
 
+// A dispatched role must create this receipt as its opening act. It is
+// coordination evidence rather than product implementation, so only this
+// canonical receipt filename is admitted before plan approval.
+const DISPATCH_RECORD_PATH = /^evidence\/dispatch-record-[A-Za-z0-9][A-Za-z0-9._-]*\.json$/u;
+
+export function isDispatchRecordCoordinationPath(normalizedPath) {
+  return typeof normalizedPath === "string" && DISPATCH_RECORD_PATH.test(normalizedPath);
+}
+
 // The denial code `guard-lifecycle-ready.mjs`'s `Bash|PowerShell` lane names for this gate
 // (GUARD-DEVPLAN-SHELL, the shell-lane sibling of GUARD-TESTPATH-SHELL) -- co-located with the
 // policy it denies for rather than with `protected-test-paths.mjs`, whose own
@@ -140,6 +149,7 @@ export function devPlanGateVerdict({ filePath, projectDir }) {
 
   // ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
   if (normalizedPath.startsWith("scratch/")) return { verdict: "allow" };
+  if (isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
 
   // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
   const manifestResult = loadManifest(projectDir);

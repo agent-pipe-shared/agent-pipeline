@@ -52,13 +52,16 @@ function runGuard(toolName, filePath, projectDir) {
     input: JSON.stringify({ tool_name: toolName, tool_input: { file_path: filePath, old_string: "a", new_string: "b" } }),
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir },
+    timeout: 8_000,
   });
   return { code: res.status, stderr: res.stderr ?? "" };
 }
 
 let pass = 0;
 const failures = [];
+const checkFilter = process.env.PIPELINE_GUARD_DEVPLAN_TEST_FILTER ?? "";
 function check(id, toolName, filePath, expectExit, { projectDir, stderrIncludes, stderrEmpty } = {}) {
+  if (checkFilter !== "" && !id.includes(checkFilter)) return;
   const { code, stderr } = runGuard(toolName, filePath, projectDir);
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit}) -- stderr: ${stderr.trim().slice(0, 200)}`);
@@ -283,6 +286,17 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
     projectDir: dir,
     stderrEmpty: true,
   });
+}
+
+// ---- DP30 exact dispatch receipt is coordination evidence, not implementation -----------
+{
+  const dir = freshDir("dispatch-record-before-approval");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, UNAPPROVED_STATE);
+  check("DP30 allow exact dispatch receipt before approval", "Write", "evidence/dispatch-record-AMONSUL-DESIGN-1.json", ALLOW, { projectDir: dir, stderrEmpty: true });
+  check("DP30b block unrelated evidence before approval", "Write", "evidence/review.json", BLOCK, { projectDir: dir });
+  check("DP30c block dispatch receipt traversal", "Write", "evidence/dispatch-record-X/../../src/foo.json", BLOCK, { projectDir: dir });
+  check("DP30d block empty dispatch receipt id", "Write", "evidence/dispatch-record-.json", BLOCK, { projectDir: dir });
 }
 
 // ---- DP09 planPath itself -> allow -------------------------------------------------------

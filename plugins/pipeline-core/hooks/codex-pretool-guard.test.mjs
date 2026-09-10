@@ -26,6 +26,7 @@ const adapter = join(hookDir, "codex-pretool-guard.mjs");
 const humanOverrideScript = join(pluginRoot, "scripts", "guard-human-override.mjs");
 const onboardingScript = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
 let passed = 0;
+const checkFilter = process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER ?? "";
 
 /**
  * authorizeHumanGuardOverride()'s chat-mode/pipeline-author-repair activation now requires
@@ -163,6 +164,7 @@ function run(input, root = fixture(), {
 }
 
 function check(name, fn) {
+  if (checkFilter !== "" && !name.includes(checkFilter)) return;
   try {
     fn();
     passed++;
@@ -918,6 +920,23 @@ function nonReadyLifecycleFixture() {
   writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   return root;
 }
+
+check("Codex adapter admits a closed passive inventory pipeline against a host-readable external path", () => {
+  const root = nonReadyLifecycleFixture();
+  const outside = mkdtempSync(join(tmpdir(), "codex-pretool-read-outside-"));
+  try {
+    writeFileSync(join(outside, "guard-marker.txt"), "fixture\n");
+    const result = run({
+      tool_name: "Bash",
+      tool_input: { command: `rg --files -uu ${outside} | rg 'guard-marker'` },
+    }, root);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, "", "an admitted Codex PreToolUse call emits no denial envelope");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
 
 check("GF-060/GF-064: an invalid lifecycle denial has no HGO route and never discloses a secret", () => {
   const root = nonReadyLifecycleFixture();

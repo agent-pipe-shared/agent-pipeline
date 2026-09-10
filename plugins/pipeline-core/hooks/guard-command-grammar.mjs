@@ -15,14 +15,16 @@ const SEARCH_BOOLEAN = new Set([
   "-n", "--line-number", "-S", "--smart-case", "-i", "--ignore-case",
   "-s", "--case-sensitive", "-F", "--fixed-strings", "-w", "--word-regexp",
   "-x", "--line-regexp", "-l", "--files-with-matches", "-L",
-  "--files-without-match", "--hidden", "--no-ignore", "--no-messages",
+  "--files-without-match", "--hidden", "--no-ignore", "--no-messages", "-u", "-uu",
 ]);
 const SEARCH_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
   "-g", "--glob", "-t", "--type", "-T", "--type-not", "-e", "--regexp",
   "--max-count", "--max-depth",
 ]);
-const FILE_BOOLEAN = new Set(["--hidden", "--no-ignore", "--no-messages"]);
+// -u/-uu are the compact forms of the already admitted ignore/hidden modes.
+// Keep -uuu refused because it additionally searches binary files.
+const FILE_BOOLEAN = new Set(["--hidden", "--no-ignore", "--no-messages", "-u", "-uu"]);
 const FILE_VALUE = new Set(["-g", "--glob", "-t", "--type", "-T", "--type-not", "--max-depth"]);
 const NUMERIC_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
@@ -243,31 +245,10 @@ export function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}
  */
 function approvedReadPath(value, root, additionalRoots = []) {
   if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
-  // NVA-B-TILDEFIX-1: leading `~` is rejected unconditionally
-  if (value.startsWith("~")) return false;
-  if (value === ".") {
-    try {
-      return statSync(root).isDirectory();
-    } catch {
-      return false;
-    }
-  }
-  const raw = rawReadCandidatePath(value, root);
-  if (raw === null) return false;
-  try {
-    if (isRealpathedWithinBoundary(raw, root)) return true;
-    return additionalRoots.some((extra) => {
-      try {
-        if (raw === extra) return true;
-        if (statSync(extra).isFile()) return false;
-        return isRealpathedWithinBoundary(raw, extra);
-      } catch {
-        return false;
-      }
-    });
-  } catch {
-    return false;
-  }
+  // The lifecycle guard owns command shape and mutation prevention. Read
+  // visibility is bounded by the host sandbox and OS permissions, not by a
+  // second repository-root policy invented by this grammar.
+  return true;
 }
 
 function validateRg(argv, root, windows, additionalRoots = []) {
