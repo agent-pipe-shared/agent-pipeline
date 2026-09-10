@@ -1,0 +1,17 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "NVA-PLAN-DEDUP-FIX-1",
+  "agentType": "goldfish",
+  "model": "gpt-5.6-terra",
+  "effort": "medium",
+  "rulesetSha": "d4bff6d696ad56402e4f2b34964e0940ce11801f78eb91bcb5b54b51e81d076d",
+  "dispatcher": "/root",
+  "outcome": "in-progress",
+  "commits": [],
+  "log": [
+    { "event": "dispatch-opened", "scope": "Codex pending-plan advisory deduplication" },
+    { "event": "red-confirmed", "artifact": "evidence/NVA-PLAN-DEDUP-FIX-1-red.txt", "exitCode": 1, "cause": "the full update_plan input hash treats explanation-only changes as a distinct batch" },
+    { "event": "verification", "nativeSlicing": { "artifact": "evidence/NVA-PLAN-DEDUP-FIX-1-native-slicing.txt", "exitCode": 0 }, "consumerSafePaths": { "artifact": "evidence/NVA-PLAN-DEDUP-FIX-1-consumer-safe-paths.txt", "exitCode": 0 }, "diffCheck": { "exitCode": 0 } }
+  ],
+  "report": null
+}

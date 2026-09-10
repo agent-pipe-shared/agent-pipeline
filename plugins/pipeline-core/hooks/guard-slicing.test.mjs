@@ -713,6 +713,34 @@ test("GS32: Codex native lifecycle overlap resets a serial run without widening 
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
+test("GS32a: Codex update_plan nudges once per distinct pending set", () => {
+  const repo = initNativeRepo();
+  try {
+    const base = { cwd: repo, session_id: "codex-plan-dedup", tool_name: "update_plan" };
+    const pending = [
+      { step: "one", status: "pending" },
+      { step: "two", status: "pending" },
+      { step: "three", status: "pending" },
+    ];
+    const first = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_input: { explanation: "initial plan", plan: pending } }, repo);
+    assert.match(first.stdout, /disjoint declared write scopes/, "the qualifying pending set emits its advisory");
+    const explanationOnly = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_input: { explanation: "edited prose only", plan: pending } }, repo);
+    assert.equal(explanationOnly.stdout, "", "an explanation-only edit must not repeat the advisory");
+    const reordered = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_input: { explanation: "same work, reordered", plan: [...pending].reverse() } }, repo);
+    assert.equal(reordered.stdout, "", "the same pending set in a different order must not repeat the advisory");
+    const completedEdit = runNative(CODEX_NATIVE, ["PreToolUse"], {
+      ...base,
+      tool_input: { explanation: "completed detail changed", plan: [...pending, { step: "already done, revised", status: "completed" }] },
+    }, repo);
+    assert.equal(completedEdit.stdout, "", "completed-item edits must not repeat the advisory");
+    const changedPending = runNative(CODEX_NATIVE, ["PreToolUse"], {
+      ...base,
+      tool_input: { plan: [...pending.slice(0, 2), { step: "replacement", status: "pending" }] },
+    }, repo);
+    assert.match(changedPending.stdout, /disjoint declared write scopes/, "a genuinely different pending set emits again");
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
 test("GS33: registered Antigravity observer associates PreToolUse events with the preceding PreInvocation and injects one ephemeral nudge", () => {
   const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("../hooks.json", import.meta.url)), "utf8"));
   const pretool = manifest["pipeline-core"].PreToolUse[0].hooks;

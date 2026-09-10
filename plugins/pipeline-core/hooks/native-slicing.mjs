@@ -150,6 +150,15 @@ function planPendingCount(toolInput) {
   return plan.filter((entry) => entry && typeof entry === "object" && entry.status === "pending").length;
 }
 
+function pendingPlanSet(toolInput) {
+  const plan = toolInput?.plan ?? toolInput?.steps ?? toolInput?.todos;
+  if (!Array.isArray(plan)) return [];
+  return plan
+    .filter((entry) => entry && typeof entry === "object" && entry.status === "pending")
+    .map((entry) => JSON.stringify(entry))
+    .sort();
+}
+
 /** Evaluate the Codex native PreToolUse and Subagent lifecycle channels. */
 export function observeCodexSlicing(input, eventName = "PreToolUse", options = {}) {
   return withState(input, "codex", options, (state) => {
@@ -192,7 +201,7 @@ export function observeCodexSlicing(input, eventName = "PreToolUse", options = {
     if (name === "update_plan") {
       const pending = planPendingCount(inputValue);
       if (pending < NATIVE_SLICING_THRESHOLD) return { due: false, output: null };
-      const batch = hash(inputValue);
+      const batch = hash(pendingPlanSet(inputValue));
       if (!boundedPush(state.planBatches, batch, MAX_SEEN)) return { due: false, output: null };
       return { due: true, output: SLICING_NUDGE };
     }
