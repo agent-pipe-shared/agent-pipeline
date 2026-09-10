@@ -110,6 +110,7 @@ import { dirname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { NEVER_LIFTABLE_KERNEL_PATHS, isNeverLiftableKernelPath } from "./guard-maintenance-window.mjs";
+import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_DISPATCHER } from "./consumer-verify.mjs";
 
 // plugins/pipeline-core/lib/ -> plugins/pipeline-core/ -> plugins/ -> <repo root>
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -174,6 +175,12 @@ function stripCodeComments(source) {
 // below), so an edge added or removed in the source without updating this table fails
 // rather than silently stops being covered.
 const DYNAMIC_IMPORT_EDGES = {
+  // The generated consumer adapter imports the dispatcher supplied by the
+  // evidence producer. Its URL is bound to the executing plugin, not the
+  // consumer's tree; generated executable text is deliberately scanned too.
+  "plugins/pipeline-core/lib/consumer-verify.mjs": [
+    "../scripts/consumer-verify-check.mjs",
+  ],
   // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these four via
   // `pathToFileURL(join(PLUGIN_LIB_DIR, "<name>")).href` -- PLUGIN_LIB_DIR is an
   // install-time-bound absolute path, not a literal specifier the static scanner can read.
@@ -451,6 +458,20 @@ check("GMWKC04 relativeImportSpecifiers still fails closed on a genuine unclassi
     "are never liftable by a maintenance window, so silently passing it would be a blind spot, " +
     "not a fix",
   );
+});
+
+check("GMWKC06 generated consumer adapter's declared edge names its actual plugin dispatcher", () => {
+  const generator = "plugins/pipeline-core/lib/consumer-verify.mjs";
+  const declared = DYNAMIC_IMPORT_EDGES[generator];
+  assert.equal(countDynamicImports(CONSUMER_VERIFY_ADAPTER), 1);
+  assert.deepEqual(declared, ["../scripts/consumer-verify-check.mjs"]);
+  assert.equal(resolveRepoRelative(generator, declared[0]),
+    normalize(fileURLToPath(CONSUMER_VERIFY_DISPATCHER)).slice(normalize(REPO_ROOT).length + 1).split(sep).join("/"));
+  assert.ok(relativeImportSpecifiers(join(REPO_ROOT, generator), generator).includes(declared[0]));
+  for (const path of [generator, resolveRepoRelative(generator, declared[0])]) {
+    assert.ok(NEVER_LIFTABLE_KERNEL_PATHS.includes(path), path);
+    assert.equal(isNeverLiftableKernelPath(join(REPO_ROOT, path), { rootDir: REPO_ROOT }), true);
+  }
 });
 
 check("GMWKC05 stripCodeComments blanks // and /* */ prose without ever corrupting or being corrupted by string contents", () => {

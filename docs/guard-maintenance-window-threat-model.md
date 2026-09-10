@@ -190,6 +190,13 @@ below assumes it holds and is written to catch a change that would break it.
   of the commit-size check. Its own only first-party import,
   `lib/project-authority.mjs`, is already kernel above, so no further hops are
   needed. Added: `lib/handover-rotation.mjs`.
+- Consumer Verify adds `lib/consumer-verify.mjs`, imported by the kernel evidence
+  producer, and `scripts/consumer-verify-check.mjs`, the generated adapter's
+  dynamic import target. The producer supplies that dispatcher's fixed URL from
+  the executing plugin. Both first-party modules are never liftable; the closure
+  suite binds the declared dynamic edge to the exported URL and continues to
+  reject unclassified dynamic imports. The generated consumer adapter is checked
+  byte-for-byte before evidence production; it is not an author-repository asset.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

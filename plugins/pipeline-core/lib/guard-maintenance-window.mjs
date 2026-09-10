@@ -403,6 +403,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // commit-size check. Its own only first-party import, lib/project-authority.mjs, is
   // already kernel above, so no further hops are needed.
   "plugins/pipeline-core/lib/handover-rotation.mjs",
+  // Consumer Verify is reached from the kernel evidence producer. Its generated
+  // adapter dynamically imports the fixed plugin dispatcher; both ends remain
+  // protected, and the closure suite binds that declared edge to the real URL.
+  "plugins/pipeline-core/lib/consumer-verify.mjs",
+  "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

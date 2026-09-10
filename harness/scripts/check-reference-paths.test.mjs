@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { assertConsumerVerifyAdapter, CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH, prepareConsumerVerify } from "../../plugins/pipeline-core/lib/consumer-verify.mjs";
 
 import {
   ALLOWLIST,
@@ -121,6 +122,27 @@ test("the shipped ALLOWLIST has no unused entries against the real repository", 
     assert.equal(typeof entry.match, "string");
     assert.ok((entry.reason ?? "").length >= 20, "every allowlist entry states why the reference is right as written");
   }
+});
+
+test("consumer adapter exceptions bind the actual generated artifact and exactly two live surfaces", () => {
+  const entries = ALLOWLIST.filter(({ match }) => match === CONSUMER_VERIFY_ADAPTER_PATH);
+  assert.deepEqual(entries.map(({ file }) => file).sort(), ["docs/usage.md", "plugins/pipeline-core/lib/consumer-verify.mjs"]);
+  const consumer = mkdtempSync(join(FIXTURE_ROOT, "consumer-"));
+  try {
+    assert.deepEqual(prepareConsumerVerify({ rootDir: consumer }), { status: "prepared", path: CONSUMER_VERIFY_ADAPTER_PATH });
+    assert.equal(assertConsumerVerifyAdapter(consumer), join(consumer, CONSUMER_VERIFY_ADAPTER_PATH));
+    assert.equal(readFileSync(join(consumer, CONSUMER_VERIFY_ADAPTER_PATH), "utf8"), CONSUMER_VERIFY_ADAPTER);
+    const surfaces = entries.map(({ file }) => file);
+    const result = checkRepository(REPO, { scanPaths: surfaces, trackedPaths: surfaces, allowlist: entries });
+    assert.deepEqual(result.findings, []);
+    const missing = checkRepository(FIXTURE_ROOT, { scanPaths: ["docs/unrelated.md"], trackedPaths: [],
+      allowlist: entries, readText: () => `See ${CONSUMER_VERIFY_ADAPTER_PATH}` });
+    assert.ok(missing.findings.some((finding) => finding.startsWith("docs/unrelated.md:1: references")), "the consumer path is not globally exempt");
+    assert.equal(missing.findings.filter((finding) => finding.startsWith("allowlist:")).length, 2, "both absent surfaces still expire as stale entries");
+    const wrongTarget = checkRepository(FIXTURE_ROOT, { scanPaths: ["docs/usage.md"], trackedPaths: [],
+      allowlist: entries, readText: () => "See project/missing-verify.mjs" });
+    assert.ok(wrongTarget.findings.some((finding) => finding.includes('references "project/missing-verify.mjs"')));
+  } finally { rmSync(consumer, { recursive: true, force: true }); }
 });
 
 test("a checkout prefix is dropped but a URL host is not treated as one", () => {

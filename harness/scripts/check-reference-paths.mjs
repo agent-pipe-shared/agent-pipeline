@@ -67,6 +67,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CONSUMER_VERIFY_ADAPTER_PATH } from "../../plugins/pipeline-core/lib/consumer-verify.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -126,6 +127,16 @@ export const TEST_SUITE_PATTERN = /\.test\.mjs$/u;
 // a change to the stored value: `resolvesAgainst` still receives the full,
 // unbroken concatenated string.
 export const ALLOWLIST = Object.freeze([
+  {
+    file: "docs/usage.md",
+    match: CONSUMER_VERIFY_ADAPTER_PATH,
+    reason: "Consumer Verify preparation creates this exact adapter in the consuming project, which commits it before evidence production. Its generator and path authority are plugins/pipeline-core/lib/consumer-verify.mjs; this is not an author-repository script reference.",
+  },
+  {
+    file: "plugins/pipeline-core/lib/consumer-verify.mjs",
+    match: CONSUMER_VERIFY_ADAPTER_PATH,
+    reason: "The exported adapter path is the consumer-relative output of prepareConsumerVerify in this same module. The generator writes and subsequently byte-validates it in the consuming repository; no copy belongs in this author repository.",
+  },
   {
     file: "docs/doc-reconciliation.md",
     match: "evidence/acceptance-evidence-map" +
