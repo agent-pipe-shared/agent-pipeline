@@ -29,6 +29,7 @@ Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
 orchestrator's ordinary agent dispatch remains the execution authority. Its
 returned candidate-tree guardrail paths are the paths passed to this skill.
 This preflight is read-only.
+A rejected packet is a coordinator defect, not Critic work: do not spawn a child, create a packet or substitute prose/evidence.
 
 **Evidence artifact shape (confirmed from source, hard — not free-form text):**
 each `evidence:{{PATH}}` file must be JSON (plain text is rejected as
