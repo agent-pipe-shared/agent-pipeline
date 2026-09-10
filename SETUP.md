@@ -10,8 +10,9 @@ that will use it. Maintaining a shared pipeline source is a separate,
 occasional job later in this guide.
 
 Start with the top-level [README](README.md) for the value proposition and
-terminology. Read [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) for the maintained
-end-to-end flow; this page only explains installation and adoption.
+terminology, continue with this setup guide, then read the operator-facing
+[`docs/usage.md`](docs/usage.md) before the maintained end-to-end flow in
+[`PIPELINE_FLOW.md`](PIPELINE_FLOW.md).
 
 ## Before you start
 
@@ -37,7 +38,7 @@ end-to-end flow; this page only explains installation and adoption.
   across runners is still unmeasured; see [cost and
   measurement](docs/cost-and-measurement.md) before estimating adoption work.
 
-## B. Activate the pipeline in one project repository
+## A. Activate the pipeline in one project repository
 
 Repeat this routine path for every application or service repository. It uses
 the public onboarding Driver: bind the supported runner integration, start a
@@ -93,53 +94,19 @@ onboarding Driver, exercised across Claude, Codex, and Antigravity: it
 inspects the directory and returns the next structured action, and it owns
 the sequence. Follow the returned action as given and replace only its named
 human-input placeholders instead of reconstructing a private sequence of
-onboarding commands. The digest-bound `apply-portable-seed` command in B.0
+onboarding commands. The digest-bound `apply-portable-seed` command in step 1
 below is what that returned action resolves to for an operator invoking it
 directly; it is the fallback for an attended step, not the primary
 instruction for a first read of this section.
 
-### 0. Let `pipeline-start` classify the consumer root first
+### 0. Bind the supported runner integration and fully restart its host
 
-Do not copy `setup.mjs` into a consumer project or start a blank directory by
-manually creating Git/V3 runtime files. Bind the runner first, then **end that
-host process and start a new session in the project root**. A Claude
-`/reload-plugins` refresh is not equivalent to the mandatory first binding
-restart. In the new session invoke `/pipeline-core:pipeline-start` as the first
-project action. Its plugin-owned preflight runs before Git or V3 authority
-checks and has these outcomes:
+Bind the integration for the runner that will govern the project. After the
+first binding, **fully end that host process and start a new session in the
+project root before invoking `pipeline-start` or classifying the root**. A
+refresh inside the existing host is insufficient for the first binding.
 
-- A fresh empty root, including Codex's `fresh-host-managed` root, stops as
-  `F0: onboarding-required`, with no bootstrap
-  confirmation. The agent runs the plugin-local read-only `inspect` and `plan`
-  operations and reports their public targets/digests.
-- Only an explicit user request to create or initialize the project authorizes
-  the exact digest-bound plugin-local `project-onboarding-v3.mjs
-  apply-portable-seed --plan-sha256 … --activate` action returned by the
-  reviewed plan. There is no unbound `apply` compatibility alias.
-  For a normal root that transaction initializes Git and the complete V3
-  source/runtime seed. For `fresh-host-managed`, it creates only the portable
-  authority and `.claude/**`, retaining Codex-owned `.git`/`.codex` controls
-  (and `.agents` when present) unchanged. Neither form creates a commit or remote, nor installs
-  dependencies or application scaffolding. Rerun `pipeline-start` afterwards;
-  its normal V3 readback remains required before a confirmation line.
-- An existing project with no Pipeline authority stops as `F0A:
-  adoption-required`. Its reviewed plan adds only absent Pipeline-owned targets
-  and preserves project files plus valid Git metadata; it is neither a legacy
-  migration nor permission to overwrite an existing `.claude`, `.codex`, or
-  `.agents` path.
-- A V0/V1/V2 authority uses the official migration inspect → plan → explicit
-  apply workflow, never the fresh initializer. A partial, invalid, unsafe, or
-  malformed root fails closed with no overwrite. A root consisting solely of
-  host-owned, non-writable `.git`/`.codex` controls (and `.agents` when
-  present) is the
-  supported `fresh-host-managed` variant; never delete, overwrite, chmod,
-  ignore, or silently bypass those paths.
-
-Codex currently has no SessionStart hook in its manifest. The mandatory
-`pipeline-start` invocation is proactive for the user's first request; it is
-not an automatic hidden initialization.
-
-### 1. Bind the plugin at project scope (Claude Code)
+#### Claude Code: project-scoped binding
 
 In the project repository, add the marketplace that hosts your pipeline source
 and install the plugin at project scope:
@@ -171,7 +138,7 @@ claim that its hooks are installed. Use that runtime's supported integration,
 then follow the methodology and manual controls described in the
 runtime-boundary document.
 
-### 1a. Bind or refresh the plugin in Codex
+#### Codex: bind or refresh the plugin
 
 Codex uses its own marketplace and install commands. Add the approved Git
 source once, refresh its snapshot when the approved ref advances, and install
@@ -199,55 +166,43 @@ new thread in the project root before invoking `/pipeline-core:pipeline-start`.
 For a later refresh, start a new Codex thread as well. Do not hand-edit Codex
 marketplace or cache files.
 
-### 1b. Activate a slim private overlay
+### 1. Let `pipeline-start` classify the consumer root
 
-A slim private overlay contains project configuration and allowlisted inputs,
-not a copied setup program or verification harness. Its project root must have:
+Do not copy `setup.mjs` into a consumer project or start a blank directory by
+manually creating Git/V3 runtime files. After completing the binding and full
+host restart in step 0, invoke `/pipeline-core:pipeline-start` as the first
+project action in the new session. Its plugin-owned preflight runs before Git
+or V3 authority checks and has these outcomes:
 
-- a valid `pipeline.user.yaml` with `schema: pipeline.user.v3`;
-- `.agent-pipeline/core.lock.json` pinned to the approved Public repository,
-  branch, commit, tree, plugin version, and manifest digest; and
-- only declared Markdown inputs below `.agent-pipeline/policies/`,
-  `guidelines/`, `templates/`, and `extensions/`.
+- A fresh empty root, including Codex's `fresh-host-managed` root, stops as
+  `F0: onboarding-required`, with no bootstrap
+  confirmation. The agent runs the plugin-local read-only `inspect` and `plan`
+  operations and reports their public targets/digests.
+- Only an explicit user request to create or initialize the project authorizes
+  the exact digest-bound plugin-local `project-onboarding-v3.mjs
+  apply-portable-seed --plan-sha256 … --activate` action returned by the
+  reviewed plan. There is no unbound `apply` compatibility alias.
+  For a normal root that transaction initializes Git and the complete V3
+  source/runtime seed. For `fresh-host-managed`, it creates only the portable
+  authority and `.claude/**`, retaining Codex-owned `.git`/`.codex` controls
+  (and `.agents` when present) unchanged. Neither form creates a commit or remote, nor installs
+  dependencies or application scaffolding. Rerun `pipeline-start` afterwards;
+  its normal V3 readback remains required before a confirmation line.
+- An existing project with no Pipeline authority stops as `F0A:
+  adoption-required`. Its reviewed plan adds only absent Pipeline-owned targets
+  and preserves project files plus valid Git metadata; it is neither a legacy
+  migration nor permission to overwrite an existing `.claude`, `.codex`, or
+  `.agents` path.
+- A V0/V1/V2 authority uses the official migration inspect → plan → explicit
+  apply workflow, never the fresh initializer. A partial, invalid, unsafe, or
+  malformed root fails closed with no overwrite. A root consisting solely of
+  host-owned, non-writable `.git`/`.codex` controls (and `.agents` when
+  present) is the supported `fresh-host-managed` variant; never delete,
+  overwrite, chmod, ignore, or silently bypass those paths.
 
-In the new Codex thread, open the overlay root and invoke
-`pipeline-core:pipeline-start`. The installed skill resolves its own plugin
-root, compares the configured marketplace source with the installed cache, and
-runs the read-only private-overlay status bridge. It has three relevant
-outcomes:
-
-- `rejected`: stop and repair the reported identity or input boundary;
-- `activation-required`: review the sanitized plan digest and explicitly
-  authorize the activation step; or
-- `activated`: the runtime projection, machine-local PO-profile receipt, and
-  authenticated private-input consumption all read back against the same
-  candidate.
-
-Activation is never implicit during bootstrap. Do not hand-edit generated
-runtime projections, copy a receipt, substitute a project-local `setup.mjs`,
-or treat an overlay-local harness as Public-plugin identity evidence. After an
-explicit activation, rerun `pipeline-core:pipeline-start`; project calibration,
-handover, Verify, and feature-state checks remain separate and may still fail
-closed even when the overlay bridge is activated.
-
-### 1c. Declare the Git lifecycle before delivery
-
-An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
-the project calibration at its resolved authority tier (`project/pipeline.json`,
-else `.claude/pipeline.json`): onboarding creates a repository but no initial commit,
-remote, or credential binding. Make the initial commit before normal work.
-When the project is intentionally connected to a shared remote, change the
-committed calibration to `repositoryMode: "remote-tracked"`; the session
-freshness check then requires an upstream and blocks writes when it is stale or
-unknown. `local-only` permits local work only; it never authorizes a push,
-publication, or release claim.
-
-For the exact Codex `fresh-host-managed` layout, the seed instead records
-`repositoryMode: "host-managed"` and deliberately creates neither Git metadata
-nor an initial commit. Codex owns `.git` and `.codex`; retain those controls,
-configure a project-specific verification command, and do not make a
-push/publication/release claim from this mode until the project has its own
-delivery-ready repository lifecycle.
+Codex currently has no SessionStart hook in its manifest. The mandatory
+`pipeline-start` invocation is proactive for the user's first request; it is
+not an automatic hidden initialization.
 
 ### 2. Complete project calibration after onboarding
 
@@ -280,7 +235,26 @@ Put hard project denies and permission boundaries in committed
 `pipeline.json`. Start conservatively: read and plan first, then grant only the
 autonomy your team is prepared to supervise.
 
-### 3. Optional manifest, governance, and ritual extensions
+### 3. Declare the Git lifecycle before delivery
+
+An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
+the project calibration at its resolved authority tier (`project/pipeline.json`,
+else `.claude/pipeline.json`): onboarding creates a repository but no initial commit,
+remote, or credential binding. Make the initial commit before normal work.
+When the project is intentionally connected to a shared remote, change the
+committed calibration to `repositoryMode: "remote-tracked"`; the session
+freshness check then requires an upstream and blocks writes when it is stale or
+unknown. `local-only` permits local work only; it never authorizes a push,
+publication, or release claim.
+
+For the exact Codex `fresh-host-managed` layout, the seed instead records
+`repositoryMode: "host-managed"` and deliberately creates neither Git metadata
+nor an initial commit. Codex owns `.git` and `.codex`; retain those controls,
+configure a project-specific verification command, and do not make a
+push/publication/release claim from this mode until the project has its own
+delivery-ready repository lifecycle.
+
+### 4. Optional manifest, governance, and ritual extensions
 
 Use [`templates/pipeline.yaml.example`](templates/pipeline.yaml.example) only
 when your project directly authors the optional declarative manifest. It can
@@ -303,9 +277,11 @@ core plugin. Keep each extension deterministic, versioned, and safe to run in
 the stated lifecycle phase; a failed extension stops that ritual and must be
 fixed or deliberately removed.
 
-### 4. Bootstrap the first working session
+### 5. Enter routine working sessions
 
-Open the project in Claude Code and run:
+After the Driver completes an authorized seed or adoption action, invoke
+`pipeline-start` again as directed. In each later working session, open the
+project root with the runner integration bound in step 0, then invoke:
 
 ```text
 /pipeline-core:pipeline-start
@@ -317,7 +293,7 @@ begins. For a material feature, it also follows the V3 profile and advisory
 rules before writable work. A reminder hook is not a substitute for the
 bootstrap itself.
 
-### 5. Optional human-approval key (one-time setup)
+### 6. Optional human-approval key (one-time setup)
 
 Routine implementation, tests, and Critic review remain agent work after the
 approved plan. When a project configures a real human decision gate, create
@@ -340,7 +316,64 @@ future adapter work, not 0.5.0 CLI features. A code pasted into the same agent
 chat is visible to that agent and cannot replace final local proof for an
 irreversible action. See [PO approval](docs/po-human-approval.md).
 
-## A. Maintain a shared pipeline source (occasional)
+### Advanced: activate a slim private overlay (optional)
+
+A slim private overlay contains project configuration and allowlisted inputs,
+not a copied setup program or verification harness. Its project root must have:
+
+- a valid `pipeline.user.yaml` with `schema: pipeline.user.v3`;
+- `.agent-pipeline/core.lock.json` pinned to the approved Public repository,
+  branch, commit, tree, plugin version, and manifest digest; and
+- only declared Markdown inputs below `.agent-pipeline/policies/`,
+  `guidelines/`, `templates/`, and `extensions/`.
+
+In the new Codex thread, open the overlay root and invoke
+`pipeline-core:pipeline-start`. The installed skill resolves its own plugin
+root, compares the configured marketplace source with the installed cache, and
+runs the read-only private-overlay status bridge. It has three relevant
+outcomes:
+
+- `rejected`: stop and repair the reported identity or input boundary;
+- `activation-required`: review the sanitized plan digest and explicitly
+  authorize the activation step; or
+- `activated`: the runtime projection, machine-local PO-profile receipt, and
+  authenticated private-input consumption all read back against the same
+  candidate.
+
+Activation is never implicit during bootstrap. Do not hand-edit generated
+runtime projections, copy a receipt, substitute a project-local `setup.mjs`,
+or treat an overlay-local harness as Public-plugin identity evidence. After an
+explicit activation, rerun `pipeline-core:pipeline-start`; project calibration,
+handover, Verify, and feature-state checks remain separate and may still fail
+closed even when the overlay bridge is activated.
+
+<a id="c-bring-an-existing-repository-under-the-pipeline"></a>
+
+## B. Bring an existing repository under the pipeline
+
+Do this on a normal change branch and adopt one control at a time:
+
+1. Read the project, identify its existing test/build commands, branch policy,
+   sensitive paths, and current documentation location.
+2. Bind the supported runner integration and add the calibration plus project
+   guidance through the additive adoption plan, preserving existing
+   settings and `CLAUDE.md` instructions.
+3. Create or consolidate the one `verify` command. Run it successfully before
+   treating it as the delivery gate.
+4. Add a handover file and name it in the calibration. Move current state there
+   instead of maintaining several status copies.
+5. Add project-specific denies, risk zones, and constraints. Enable governance
+   policies only after their paths and checks are real.
+6. Pilot the workflow read-mostly: bootstrap, write a small spec, run the
+   deterministic checks, and request an independent review. Expand autonomy
+   only when the evidence and operating cost are understood.
+
+Migration changes your project’s process, so review those changes like any
+other architectural change. Do not paste a pipeline source’s
+`pipeline.user.yaml` into an application repository, and do not make a legacy
+authority look current by copying generated runtime files.
+
+## C. Maintain a shared pipeline source (occasional)
 
 <!-- capability:setup-and-runtime-projection -->
 <a id="capability-setup-and-runtime-projection"></a>
@@ -420,30 +453,6 @@ hand. This is not a general revert: change completed authority in a reviewed
 working copy, then run a new inspect → plan → explicit activation cycle and
 read it back with `node setup.mjs`.
 
-## C. Bring an existing repository under the pipeline
-
-Do this on a normal change branch and adopt one control at a time:
-
-1. Read the project, identify its existing test/build commands, branch policy,
-   sensitive paths, and current documentation location.
-2. Bind the plugin (where Claude Code is used) and add the calibration plus
-   project guidance through the additive adoption plan, preserving existing
-   settings and `CLAUDE.md` instructions.
-3. Create or consolidate the one `verify` command. Run it successfully before
-   treating it as the delivery gate.
-4. Add a handover file and name it in the calibration. Move current state there
-   instead of maintaining several status copies.
-5. Add project-specific denies, risk zones, and constraints. Enable governance
-   policies only after their paths and checks are real.
-6. Pilot the workflow read-mostly: bootstrap, write a small spec, run the
-   deterministic checks, and request an independent review. Expand autonomy
-   only when the evidence and operating cost are understood.
-
-Migration changes your project’s process, so review those changes like any
-other architectural change. Do not paste a pipeline source’s
-`pipeline.user.yaml` into an application repository, and do not make a legacy
-authority look current by copying generated runtime files.
-
 ## Troubleshooting: Codex local agent activity
 
 If Codex agent threads no longer appear after adoption, inspect its persistent
@@ -469,9 +478,10 @@ an attended local Codex session and retain the result in the handover.
 ## Where to go next
 
 - [README](README.md) — why the pipeline exists and its core capabilities.
+- [Usage guide](docs/usage.md) — operator-facing commands and routine work.
 - [PIPELINE_FLOW.md](PIPELINE_FLOW.md) — the maintained V3 flow and boundaries.
 - [Operating Model](docs/operating-model.md) — normative roles, gates, and
   lifecycle rules.
-- [Runtime boundary](docs/runtime-boundary.md) — what is enforced on Claude
-  Code and what remains manual elsewhere.
+- [Runtime boundary](docs/runtime-boundary.md) — exact controls, prerequisites,
+  and manual responsibilities for each supported runner integration.
 - [Documentation map](docs/README.md) — focused reference links.

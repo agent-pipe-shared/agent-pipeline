@@ -8,8 +8,9 @@ inspect later.
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
 > **Newcomer path:** Read this page, then follow [SETUP](SETUP.md) for the
-> normal consumer adoption flow. [PIPELINE_FLOW](PIPELINE_FLOW.md) explains the
-> lifecycle; the links below are optional reference.
+> normal consumer adoption flow, continue with [Usage](docs/usage.md), and use
+> [PIPELINE_FLOW](PIPELINE_FLOW.md) for the lifecycle. The links below are
+> optional reference.
 
 > **Documentation line: `0.6.2`.** This is the next release's documented scope,
 > not a tag, installation recommendation, production-availability claim, or
@@ -75,11 +76,47 @@ Around those roles:
 For a project that will consume the pipeline, go to [SETUP](SETUP.md) and
 follow **Adopt a project**. It starts with prerequisites and the runner's
 public onboarding path; it does not ask a consumer to run this repository's
-source-maintainer setup. Then use [PIPELINE_FLOW](PIPELINE_FLOW.md) to choose
-the delivery route and [the documentation map](docs/README.md) for evidence,
-security, cost, and runtime-boundary reference.
+source-maintainer setup. Continue with [Usage](docs/usage.md), then use
+[PIPELINE_FLOW](PIPELINE_FLOW.md) to choose the delivery route and
+[the documentation map](docs/README.md) for evidence, security, cost, and
+runtime-boundary reference.
 
 ## How it works
+
+```mermaid
+flowchart LR
+    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(orchestrator)"]
+    Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
+    Goldfish -->|"evidence"| Gates["Deterministic gates<br/>(tests, security, lint)"]
+    Gates -.->|"fail"| Goldfish
+    Gates -->|"pass"| Critic["Critic<br/>(independent reviewer)"]
+    Critic -->|"findings"| Elephant
+    Elephant -->|"decision"| PO
+```
+
+## How a run flows end to end
+
+```mermaid
+flowchart TD
+    ID["Idea"] --> P
+    ID -.->|"optional, advisory"| DS["Design pre-stage<br/>(self-service,<br/>docs/design/)"]
+    DS -.-> P
+    P["Profile / model decision"] --> PL["Plan artifact +<br/>human plan gate"]
+    PL --> R["Readiness check"]
+    R --> D["Dispatch<br/>(fresh context, briefing)"]
+    D --> G["Deterministic gates<br/>(verify, security scan)"]
+    G --> C["Risk-class-dependent Critic"]
+    C --> H["Human completion gate"]
+    H --> M["Merge + doc sync"]
+    M -.->|"optional, if manifest declares release"| REL["Release/Promotion<br/>(optional)"]
+```
+
+Order matters: deterministic gates always run *before* any LLM judgment — a
+Critic never reviews a diff that hasn't already cleared the machine chain.
+
+An optional Release/Promotion tail can hook in after the merge (`REL` above) once
+a project's manifest declares a `release` section — detail in
+[`docs/deploy/README.md`](docs/deploy/README.md).
 
 ### Three roots, one direction of dependency
 
@@ -116,41 +153,6 @@ effort selected per phase and runner.
 Session bootstrap observes Advisor capability locally without a model request.
 An actual Advisor runs only on demand for one concrete, reasoned and
 digest-bound question; start, resume, re-entry and Compact never launch it.
-
-```mermaid
-flowchart LR
-    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(orchestrator)"]
-    Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
-    Goldfish -->|"evidence"| Gates["Deterministic gates<br/>(tests, security, lint)"]
-    Gates -.->|"fail"| Goldfish
-    Gates -->|"pass"| Critic["Critic<br/>(independent reviewer)"]
-    Critic -->|"findings"| Elephant
-    Elephant -->|"decision"| PO
-```
-
-## How a run flows end to end
-
-```mermaid
-flowchart TD
-    ID["Idea"] --> P
-    ID -.->|"optional, advisory"| DS["Design pre-stage<br/>(self-service,<br/>docs/design/)"]
-    DS -.-> P
-    P["Profile / model decision"] --> PL["Plan artifact +<br/>human plan gate"]
-    PL --> R["Readiness check"]
-    R --> D["Dispatch<br/>(fresh context, briefing)"]
-    D --> G["Deterministic gates<br/>(verify, security scan)"]
-    G --> C["Risk-class-dependent Critic"]
-    C --> H["Human completion gate"]
-    H --> M["Merge + doc sync"]
-    M -.->|"optional, if manifest declares release"| REL["Release/Promotion<br/>(optional)"]
-```
-
-Order matters: deterministic gates always run *before* any LLM judgment — a
-Critic never reviews a diff that hasn't already cleared the machine chain.
-
-An optional Release/Promotion tail can hook in after the merge (`REL` above) once
-a project's manifest declares a `release` section — detail in
-[`docs/deploy/README.md`](docs/deploy/README.md).
 
 ## The front door: optional design pre-stage
 
@@ -210,32 +212,11 @@ scarcest resource — so strictness gets invested where mistakes are expensive,
 and consciously spared elsewhere. The final judgment still always stays with the
 human.
 
-## Source-maintainer command reference
+## Source-maintainer reference
 
-Routine adopters should use [SETUP](SETUP.md) rather than these source-checkout
-commands. A fresh consumer root never copies or runs this repository's root
-`setup.mjs`.
-
-### Command lifecycle
-
-Run these commands from the indicated checkout; they are the concise, normal
-lifecycle rather than a replacement for the detailed setup guide.
-
-| When | Exact command |
-| --- | --- |
-| Initial pipeline-source setup | `node setup.mjs` |
-| Normal session start | `/pipeline-core:pipeline-start` |
-| Verify the current change | `node harness/scripts/verify.mjs` |
-| Close a completed block | `/pipeline-core:close-block` |
-| Update a Claude Code binding, then reload the running host | `claude plugin marketplace update agent-pipeline`<br>`claude plugin update pipeline-core@agent-pipeline --scope project`<br>`/reload-plugins` |
-| Test a local Codex plugin candidate | Follow [`docs/codex-local-plugin-development.md`](docs/codex-local-plugin-development.md); use the isolated `pipeline-core@agent-pipeline-local` identity |
-| Inspect a V3 authority (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"` |
-| Plan its V3-owned changes (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"` |
-| Explicitly activate the reviewed V3 plan (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate` |
-
-The V3 sequence is deliberately inspect → plan → explicit activation; `apply
---activate` is its only write step. Read it back with `node setup.mjs`. Do not
-use these source-authority commands in an arbitrary application repository.
+Source maintainers can find the checkout commands and V3 authority sequence in
+[Maintain a shared pipeline source](SETUP.md).
+Routine adopters should follow the consumer path above.
 
 Before your first big feature, a quick look at
 [`docs/design/README.md`](docs/design/README.md) pays off — a self-service
@@ -371,8 +352,9 @@ einer begrenzten Aufgabe, Maschinenevidenz, unabhängiger Prüfung und einem
 dauerhaften, später einsehbaren Nachweis.
 
 > **Einstieg für Neue:** Lies diese Seite und folge dann [SETUP](SETUP.md) für
-> den normalen Consumer-Ablauf. [PIPELINE_FLOW](PIPELINE_FLOW.md) erklärt den
-> Lifecycle; die weiteren Links sind Nachschlagewerk.
+> den normalen Consumer-Ablauf, lies danach [Usage](docs/usage.md) und nutze
+> [PIPELINE_FLOW](PIPELINE_FLOW.md) für den Lifecycle. Die weiteren Links sind
+> Nachschlagewerk.
 
 > **Dokumentationslinie: `0.6.2`.** Sie beschreibt den dokumentierten Umfang
 > des nächsten Releases, keinen Tag, keine Installationsempfehlung, keine
@@ -442,46 +424,11 @@ Ergänzend dazu:
 Für ein Consumer-Projekt gehe zu [SETUP](SETUP.md) und folge **Adopt a
 project**. Dieser Weg beginnt mit Voraussetzungen und dem öffentlichen
 Onboarding-Pfad des Runners; er verlangt nicht die source-maintainer-`setup.mjs`.
-Danach erklärt [PIPELINE_FLOW](PIPELINE_FLOW.md) die Lieferroute und die
-[Dokumentationskarte](docs/README.md) verweist auf Evidenz, Security, Kosten und
-Runner-Grenzen.
+Danach folgt [Usage](docs/usage.md); [PIPELINE_FLOW](PIPELINE_FLOW.md) erklärt
+die Lieferroute, und die [Dokumentationskarte](docs/README.md) verweist auf
+Evidenz, Security, Kosten und Runner-Grenzen.
 
 ## Wie es funktioniert
-
-### Drei Wurzeln, eine Abhängigkeitsrichtung
-
-Der **Public Core** ist der portable, committete Vertrag: Methodik, Plugin,
-Templates und die öffentliche `pipeline.user.yaml`-Autorität. Seine Entwicklung
-findet auf öffentlichen Feature-Branches statt. Eine separat versionierte,
-ignorierte **Private Extension** (auch Private Overlay genannt) konsumiert genau
-einen gepinnten, unveränderlichen Public-Core-SHA; sie liefert keine Account-,
-Owner-, Repository- oder Pfadkoordinaten zurück in den Core. **Lokale User-,
-PC- und Runtime-Datenwurzeln** enthalten Zugangsdaten, Marketplace- und
-Account-Mappings, absolute Pfade, lokale Einstellungen, Caches und Session-Daten.
-Sie bleiben ignoriert und werden nie in eine öffentliche Projektion kompiliert.
-So ist ein zweites Gerät aus dem öffentlichen Snapshot plus passendem Private-Pin
-reproduzierbar, ohne Secrets oder lokale Historie zu kopieren.
-
-In einem **Pipeline-Source-Checkout** ist `pipeline.user.yaml` die öffentliche
-Quelle der Setup-Absicht, und `node setup.mjs` kompiliert die zugehörigen
-Runtime-Projektionen. Ein Consumer-Projekt darf weder eine Root-`setup.mjs`
-kopieren noch ausführen; sein geladenes Plugin klassifiziert frische, Legacy-
-und partielle Roots durch `pipeline-start` und besitzt den offiziellen
-Onboarding-/Migrationspfad. **Generierte Runtime-Konfiguration wird nie von
-Hand bearbeitet.** Der Compiler erkennt Drift, statt eine lokale Änderung
-stillschweigend zur Autorität zu machen.
-
-V3 hat registrierte Routen für Claude, Codex und Antigravity. Unterstützte
-Runner-Integrationen können konfigurierte Guards durchsetzen; Rollen, Evidenz
-und Review bleiben übertragbar. Die runnerspezifischen Kontrollen,
-Voraussetzungen und manuellen Zuständigkeiten stehen in
-[`docs/runtime-boundary.md`](docs/runtime-boundary.md).
-
-Das Modellrouting liegt in V3-Profilen (`epic`, `feature`, `mini`); Modell und
-Effort werden je Phase und Runner ausgewählt.
-Der Session-Bootstrap beobachtet Advisor-Capability lokal ohne Modellrequest.
-Ein echter Advisor läuft nur on demand für genau eine konkrete, begründete und
-Digest-gebundene Frage; Start, Resume, Re-entry und Compact starten ihn nie.
 
 ```mermaid
 flowchart LR
@@ -518,6 +465,41 @@ Kette noch nicht durchlaufen hat.
 Ein optionaler Release/Promotion-Ausklang kann nach dem Merge andocken (`REL`
 oben), sobald das Manifest eines Projekts einen `release`-Abschnitt erklärt —
 Details in [`docs/deploy/README.md`](docs/deploy/README.md).
+
+### Drei Wurzeln, eine Abhängigkeitsrichtung
+
+Der **Public Core** ist der portable, committete Vertrag: Methodik, Plugin,
+Templates und die öffentliche `pipeline.user.yaml`-Autorität. Seine Entwicklung
+findet auf öffentlichen Feature-Branches statt. Eine separat versionierte,
+ignorierte **Private Extension** (auch Private Overlay genannt) konsumiert genau
+einen gepinnten, unveränderlichen Public-Core-SHA; sie liefert keine Account-,
+Owner-, Repository- oder Pfadkoordinaten zurück in den Core. **Lokale User-,
+PC- und Runtime-Datenwurzeln** enthalten Zugangsdaten, Marketplace- und
+Account-Mappings, absolute Pfade, lokale Einstellungen, Caches und Session-Daten.
+Sie bleiben ignoriert und werden nie in eine öffentliche Projektion kompiliert.
+So ist ein zweites Gerät aus dem öffentlichen Snapshot plus passendem Private-Pin
+reproduzierbar, ohne Secrets oder lokale Historie zu kopieren.
+
+In einem **Pipeline-Source-Checkout** ist `pipeline.user.yaml` die öffentliche
+Quelle der Setup-Absicht, und `node setup.mjs` kompiliert die zugehörigen
+Runtime-Projektionen. Ein Consumer-Projekt darf weder eine Root-`setup.mjs`
+kopieren noch ausführen; sein geladenes Plugin klassifiziert frische, Legacy-
+und partielle Roots durch `pipeline-start` und besitzt den offiziellen
+Onboarding-/Migrationspfad. **Generierte Runtime-Konfiguration wird nie von
+Hand bearbeitet.** Der Compiler erkennt Drift, statt eine lokale Änderung
+stillschweigend zur Autorität zu machen.
+
+V3 hat registrierte Routen für Claude, Codex und Antigravity. Unterstützte
+Runner-Integrationen können konfigurierte Guards durchsetzen; Rollen, Evidenz
+und Review bleiben übertragbar. Die runnerspezifischen Kontrollen,
+Voraussetzungen und manuellen Zuständigkeiten stehen in
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md).
+
+Das Modellrouting liegt in V3-Profilen (`epic`, `feature`, `mini`); Modell und
+Effort werden je Phase und Runner ausgewählt.
+Der Session-Bootstrap beobachtet Advisor-Capability lokal ohne Modellrequest.
+Ein echter Advisor läuft nur on demand für genau eine konkrete, begründete und
+Digest-gebundene Frage; Start, Resume, Re-entry und Compact starten ihn nie.
 
 ## Die Vordertür: optionale Design-Vorstufe
 
@@ -578,33 +560,11 @@ Aufmerksamkeit ist die knappste Ressource — Strenge wird also dort
 investiert, wo Fehler teuer sind, und woanders bewusst gespart. Das letzte
 Urteil bleibt trotzdem immer beim Menschen.
 
-## Source-Maintainer-Befehlsreferenz
+## Source-Maintainer-Referenz
 
-Normale Consumer-Übernahmen folgen [SETUP](SETUP.md), nicht diesen
-Source-Checkout-Befehlen. Ein frischer Consumer-Root kopiert oder startet die
-root-`setup.mjs` dieses Repositories nie.
-
-### Befehls-Lebenszyklus
-
-Führe die Befehle im jeweils genannten Checkout aus; sie bilden den kompakten
-normalen Ablauf ab und ersetzen nicht den detaillierten Setup-Guide.
-
-| Wann | Exakter Befehl |
-| --- | --- |
-| Initiales Pipeline-Source-Setup | `node setup.mjs` |
-| Normaler Session-Start | `/pipeline-core:pipeline-start` |
-| Aktuelle Änderung verifizieren | `node harness/scripts/verify.mjs` |
-| Fertigen Block abschließen | `/pipeline-core:close-block` |
-| Claude-Code-Binding aktualisieren und laufenden Host neu laden | `claude plugin marketplace update agent-pipeline`<br>`claude plugin update pipeline-core@agent-pipeline --scope project`<br>`/reload-plugins` |
-| Lokalen Codex-Plugin-Kandidaten testen | Folge [`docs/codex-local-plugin-development.md`](docs/codex-local-plugin-development.md); nutze die getrennte Identität `pipeline-core@agent-pipeline-local` |
-| V3-Autorität inspizieren (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"` |
-| Ihre V3-eigenen Änderungen planen (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"` |
-| Geprüften V3-Plan explizit aktivieren (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate` |
-
-Die V3-Reihenfolge ist bewusst Inspect → Plan → explizite Aktivierung;
-`apply --activate` ist ihr einziger Write-Schritt. Lies anschließend mit `node
-setup.mjs` zurück. Nutze diese Source-Autoritätsbefehle nicht in einem beliebigen
-Anwendungs-Repository.
+Source-Maintainer finden die Checkout-Befehle und die V3-Autoritätsreihenfolge
+unter [Maintain a shared pipeline source](SETUP.md).
+Normale Consumer-Übernahmen folgen dem oben beschriebenen Consumer-Pfad.
 
 Vor dem ersten großen Feature lohnt ein kurzer Blick in
 [`docs/design/README.md`](docs/design/README.md) — der Selbstbedienungs-Guide

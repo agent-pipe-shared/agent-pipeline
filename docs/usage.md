@@ -68,6 +68,33 @@ project command runs freshly. A changed candidate, failed run or interrupted
 attempt cannot borrow an old green result as current evidence. Resolve
 `<plugin-root>` from the installed pipeline, not a source checkout path.
 
+## Deliver work after readiness
+
+Once the project is ready and any required plan gate is recorded, delivery
+continues autonomously within that approved scope:
+
+1. Split independent, non-overlapping packages so they may run in parallel.
+2. Give each implementor a bounded goal, exact context paths, acceptance checks,
+   prohibitions, and stop conditions.
+3. Run the configured verify command and any applicable security checks.
+4. Run the independent Critic review required by the profile and risk.
+5. Record the outcome and close the feature only when its tracked work is
+   actually complete.
+
+The human remains the decision owner for material scope changes, configured
+approvals, and remote or otherwise irreversible actions. Routine task ordering,
+test fixes, evidence collection, and follow-up within an approved plan are
+delivery work, not extra approval turns.
+
+In your project, the agent also handles ordinary Critic execution: after the
+required plan and deterministic checks, it prepares the bounded review input,
+starts and monitors the review, reads the actual result, and continues authorized
+repairs. You do not need to approve the review again or routinely launch it in
+a terminal. The agent uses the host's normal permission mechanism when needed;
+actual denials or unavailable execution are reported, never bypassed. Host
+capabilities vary. This workflow preserves expressly defined human gates,
+review admission, isolation, and correction/review limits.
+
 ## Choose the human-approval strength deliberately
 
 The optional repository-wide selector is `gates.human_approval` in
@@ -101,79 +128,22 @@ installed version supports it. See
 [ADR-0076](adr/0076-global-chat-attributed-unattested-approval-mode.md) for the
 full decision and migration boundary.
 
-## Deliver work after readiness
-
-Once the project is ready and any required plan gate is recorded, delivery
-continues autonomously within that approved scope:
-
-1. Split independent, non-overlapping packages so they may run in parallel.
-2. Give each implementor a bounded goal, exact context paths, acceptance checks,
-   prohibitions, and stop conditions.
-3. Run the configured verify command and any applicable security checks.
-4. Run the independent Critic review required by the profile and risk.
-5. Record the outcome and close the feature only when its tracked work is
-   actually complete.
-
-The human remains the decision owner for material scope changes, configured
-approvals, and remote or otherwise irreversible actions. Routine task ordering,
-test fixes, evidence collection, and follow-up within an approved plan are
-delivery work, not extra approval turns.
-
-In your project, the agent also handles ordinary Critic execution: after the
-required plan and deterministic checks, it prepares the bounded review input,
-starts and monitors the review, reads the actual result, and continues authorized
-repairs. You do not need to approve the review again or routinely launch it in
-a terminal. The agent uses the host's normal permission mechanism when needed;
-actual denials or unavailable execution are reported, never bypassed. Host
-capabilities vary. This workflow preserves expressly defined human gates,
-review admission, isolation, and correction/review limits.
-
-Private review content can have a one-time setup decision bound to this physical
-project, an explicitly declared provider/runner/service, and selected source and
-review-evidence directories. Fresh candidates and freshly named evidence within
-those directories reuse that decision. Every invocation still discloses its
-candidate, exact paths and digests, declared recipient, and independently observed
-endpoint (or `null` when unknown). Changing the project, recipient or approved
-data boundary requires one amendment decision; revocation stops reuse. Secrets,
-authentication files, caches, transcripts and unrelated project files remain
-outside the grant. Path screening does not establish that arbitrary file contents
-are secret-free: the caller must select review material within those data classes.
-
-The installed plugin provides `node <plugin-root>/scripts/critic-export-consent.mjs
---help`. Its `plan` and `check` commands are read-only; `record` binds the displayed
-plan digest to the actual user decision reference and SHA-256, and `revoke`
-invalidates that saved decision. Records live in owner-private Git state and do
-not dirty the candidate checkout. The decision reference is attribution, not
-cryptographic proof that a human approved. The CLI never calls a review provider.
-Its request shape and flags are printed by `--help`.
-
-The shipped `invokeCodexNativeCriticHost` entry in
-`scripts/codex-native-critic-host.mjs` checks saved consent automatically after
-validating the selection and physical source/evidence bytes, before creating a
-candidate-bearing child. The coordinator supplies the closed `exportContext`
-object with `provider`, `service`, `hostGate`, `providerGate`, and `observedEndpoint` (`null`
-when unknown). Gate values are `not-observed`, `approved`,
-`additional-check-required`, or `denied`. The provider must explicitly be `OpenAI`
-or `openai` and exactly match the saved grant's label. The service is an explicit declaration
-for the selected OpenAI/Codex review, never inferred from its model name.
-The host normalizes its bound reference records, reads the physical project's
-owner-private consent, and returns `exportConsent` alongside execution evidence.
-Missing context or missing, revoked, or mismatching consent returns a structured
-`consent-unavailable` failure without creating a child. The detailed reason and
-coverage/disclosure remain in `exportConsent`; admission never writes a decision.
-
-Consent coverage never grants host permission or changes access mode. A denied
-host remains denied, and additional host checks remain visible. This setup does
-not require Full Access or promise that an external approval reviewer will accept
-a later invocation. It adds no routine PO gate after setup.
+Private review export can reuse one repository-scoped consent decision while
+keeping secrets, credentials, caches, transcripts, and unrelated projects out
+of scope. The exact provider, service, paths, digests, revocation behavior, and
+host-permission boundary are maintained in [runtime boundary](runtime-boundary.md#private-review-export-consent).
+Ordinary Critic execution remains agent work; changing the recipient or data
+boundary requires an amended decision.
 
 ## Know the boundary
 
-`0.6.2` is the current release. The three-runner Greenfield Driver contract
-is covered for Claude, Codex, and Antigravity, but coverage is not a claim of
-identical native enforcement across hosts. Publication of the next candidate
-needs its own Verify, security, independent review, approval, and remote
-readback. Nova B remains open for further runner and workflow refinements.
+`0.6.2` names the next release's documented scope; it is not a tag,
+installation recommendation, or availability claim. The three-runner
+Greenfield Driver contract is covered for Claude, Codex, and Antigravity, but
+coverage is not a claim of identical native enforcement across hosts.
+Publication still needs its own Verify, security, independent review,
+approval, and remote readback. Nova B remains open for further runner and
+workflow refinements.
 
 Use [SETUP](../SETUP.md) for installation, [PIPELINE_FLOW](../PIPELINE_FLOW.md)
 for the maintained lifecycle, and the [documentation map](README.md) for the

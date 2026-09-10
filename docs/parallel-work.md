@@ -4,20 +4,6 @@ Agent-Pipeline can use native subagent facilities when a batch contains at
 least three independent work packages. This is an advisory default: a
 sequential plan remains valid and needs no special justification.
 
-## Native runner surfaces
-
-The configured Claude adapter observes `Task`, `Agent`, `Workflow`, and
-`TodoWrite`. A Workflow can fan out `agent()` calls; `Task` and `Agent` are
-the corresponding native dispatch surfaces. The Codex adapter observes
-`spawn_agent` and `update_plan`, and also receives `SubagentStart` and
-`SubagentStop` lifecycle events. The Antigravity adapter observes native
-`invoke_subagent` calls and uses its preceding `PreInvocation` event to
-deliver a due advisory.
-
-These are the runner contracts represented in the shipped hook configuration
-and adapters. They do not imply a portable workflow command, a new workflow
-engine, or an obligation to use the same mechanism on every runner.
-
 ## When parallel work helps
 
 Consider a native fan-out when there are three or more remaining packages and
@@ -33,6 +19,20 @@ all of the following are true:
 This can shorten independent review, documentation, or implementation work.
 It adds coordination cost, so small, overlapping, or dependent work is often
 better kept sequential.
+
+## Native runner surfaces
+
+The configured Claude adapter observes `Task`, `Agent`, `Workflow`, and
+`TodoWrite`. A Workflow can fan out `agent()` calls; `Task` and `Agent` are
+the corresponding native dispatch surfaces. The Codex adapter observes
+`spawn_agent` and `update_plan`, and also receives `SubagentStart` and
+`SubagentStop` lifecycle events. The Antigravity adapter observes native
+`invoke_subagent` calls and uses its preceding `PreInvocation` event to
+deliver a due advisory.
+
+These are the runner contracts represented in the shipped hook configuration
+and adapters. They do not imply a portable workflow command, a new workflow
+engine, or an obligation to use the same mechanism on every runner.
 
 ## What the advisory observes
 

@@ -2,12 +2,6 @@
 
 Use measured receipts when weighing delivery assurance against elapsed time. The figures here describe bounded historical Verify runs in this repository; they are not a price list, a model recommendation, or a forecast for another project. The durable receipt identities and hashes are recorded in the [measurement evidence](../backlog/evidence/2026-09-08-adoption-reference-pages-and-verify-measurements.md).
 
-## Historical lane eviction
-
-On 2026-09-06, serial-lane eviction reduced the historical Verify **suite span** from 645.7 seconds to 482.5 seconds for the first eviction, and then to 454.9 seconds for the second. Suite span means the progress-stream interval from the first suite `startedAt` to the last suite `completedAt`. It is not the whole Verify run envelope. The first comparison retained one non-zero suite before and after; the later registration blocker was resolved separately.
-
-This was a historical change to serial scheduling, not a promise that every host or candidate will reproduce the result. Pool-suite durations overlap and must not be added to report wall time.
-
 ## Full-Verify envelopes
 
 The table uses a different measurement: whole-run envelope, from a receipt's `startedAt` to `finishedAt`. Each row names its exact candidate and receipt outcome so a clean result is not confused with a red gate.
@@ -20,6 +14,12 @@ The table uses a different measurement: whole-run envelope, from a receipt's `st
 | 2026-09-08, `37aa24fc327b910e6b74ba26bdcb8e1601605e7a` | 697.804s | 514/517 |
 
 The last two rows are red gates, so neither is a performance improvement. No verified 4.5-minute full-gate result appeared in the bounded examined receipt set. That statement is limited to this set; it does not claim that no such run has ever existed. Timing variation is observational here: do not attribute it to a particular code change or host condition without a controlled experiment.
+
+## Historical lane eviction
+
+On 2026-09-06, serial-lane eviction reduced the historical Verify **suite span** from 645.7 seconds to 482.5 seconds for the first eviction, and then to 454.9 seconds for the second. Suite span means the progress-stream interval from the first suite `startedAt` to the last suite `completedAt`. It is not the whole Verify run envelope. The first comparison retained one non-zero suite before and after; the later registration blocker was resolved separately.
+
+This was a historical change to serial scheduling, not a promise that every host or candidate will reproduce the result. Pool-suite durations overlap and must not be added to report wall time.
 
 ## What remains unmeasured
 

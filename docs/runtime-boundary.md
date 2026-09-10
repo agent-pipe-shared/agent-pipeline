@@ -50,6 +50,25 @@ export, raw-answer retention, auto-apply, second question, or retry. A
 functional-equivalent pass does not establish native sandbox execution, OS
 isolation, or model identity.
 
+## Private review export consent
+
+Private review content can reuse a one-time consent decision bound to the
+physical project, an explicitly declared provider, runner and service, and
+selected source and review-evidence directories. Each invocation still
+discloses its candidate, exact paths and digests, declared recipient, and the
+observed endpoint or `null`. Changing the project, recipient, or data boundary
+requires an amended decision; revocation stops reuse. Secrets, authentication
+files, caches, transcripts, and unrelated projects remain outside the grant.
+
+The installed plugin exposes `scripts/critic-export-consent.mjs`. Its `plan`
+and `check` commands are read-only; `record` binds the displayed plan digest to
+the decision reference and SHA-256; `revoke` invalidates it. The records stay
+in owner-private Git state. This consent does not grant host permission, change
+the sandbox, prove human identity, or promise provider admission. A denied host
+remains denied. The Codex native Critic host validates the saved consent and
+the physical source/evidence bytes before it creates a candidate-bearing child;
+missing, revoked, or mismatching consent fails without launching one.
+
 ## Portable responsibilities
 
 Roles, specifications, evidence, review separation, handover, and the
@@ -115,6 +134,27 @@ Frage begrenzt. Handover, Memory, Mutation, Netzwerkexport,
 Rohantwort-Aufbewahrung, Auto-Apply, eine zweite Frage und Retry sind nicht
 zulässig. Ein Funktionsäquivalenz-Pass bestätigt weder native
 Sandbox-Ausführung noch OS-Isolation oder Modellidentität.
+
+## Zustimmung zum Export privater Review-Inhalte
+
+Private Review-Inhalte können eine einmalige Zustimmung wiederverwenden, die
+an das physische Projekt, den ausdrücklich benannten Provider, Runner und
+Service sowie ausgewählte Source- und Review-Evidence-Verzeichnisse gebunden
+ist. Jeder Aufruf legt weiterhin Kandidat, genaue Pfade und Digests, Empfänger
+und den beobachteten Endpoint oder `null` offen. Ein anderes Projekt, ein
+anderer Empfänger oder Datenumfang braucht eine geänderte Entscheidung; ein
+Widerruf beendet die Wiederverwendung. Secrets, Authentifizierungsdateien,
+Caches, Transkripte und fremde Projekte bleiben ausgeschlossen.
+
+Das installierte Plugin stellt `scripts/critic-export-consent.mjs` bereit.
+`plan` und `check` lesen nur; `record` bindet den angezeigten Plan-Digest an
+Entscheidungsreferenz und SHA-256; `revoke` widerruft ihn. Die Records bleiben
+im privaten Git-State des Owners. Diese Zustimmung erteilt keine Host-
+Berechtigung, ändert keine Sandbox, beweist keine menschliche Identität und
+garantiert keine Provider-Zulassung. Ein abgelehnter Host bleibt abgelehnt.
+Der native Codex-Critic-Host validiert Zustimmung und physische Source-/
+Evidence-Bytes, bevor er ein kandidatentragendes Child startet; fehlende,
+widerrufene oder abweichende Zustimmung scheitert ohne Child-Start.
 
 Rollen, Spezifikationen, Evidenz, Review-Trennung, Handover und die Praxis,
 deterministische Checks vor dem Review auszuführen, funktionieren unter jeder

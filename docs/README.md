@@ -1,8 +1,9 @@
 # Documentation map
 
-Start with the top-level [README](../README.md), then follow this map. It is
-the canonical order for the next documents; `overview.md` and `usage.md` are
-short companion references, not competing front doors.
+The canonical reader path is the top-level [README](../README.md),
+[`SETUP.md`](../SETUP.md), [`usage.md`](usage.md), and then
+[`PIPELINE_FLOW.md`](../PIPELINE_FLOW.md). Use the rest of this map as
+reference; `overview.md` is a short companion, not a competing front door.
 
 `0.6.2` names the next release's documented scope. It is not a tag,
 installation recommendation, production-availability claim, or proof that a

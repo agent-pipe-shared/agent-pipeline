@@ -218,31 +218,9 @@ evidence and approval rules.
 | Spec, scope, evidence, or authority drift | Elephant and human as needed. | Re-plan or re-approve; never carry stale approval into a changed contract. | Return to triage, Spec, readiness, or approval — whichever became stale. |
 | Unknown cause, repeated signature, exhausted budget, or conflict | Human decision-maker. | Continue with a new direction, defer, or stop. | No unbounded retry loop and no success claim without required evidence. |
 
-## Configure a pipeline-source V3 authority without hand-editing projections
-
-In a **pipeline-source checkout**, `pipeline.user.yaml` is the V3 source of
-routing intent. Generated runtime projection files are not a second
-configuration surface. When that source needs the sanctioned migration/apply
-path, review the plan, activate it, then read it back:
-
-```sh
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
-node setup.mjs
-```
-
-The first command lets you inspect the planned projection; the second is explicit
-activation; `node setup.mjs` confirms that source and generated runtime projection
-are current and performs no writes. If a step reports drift or an invalid source,
-stop rather than editing generated `.claude` bytes by hand.
-
-These are not consumer-root setup commands. A fresh consumer first runs the
-mandatory `pipeline-start` skill, which classifies it before any Git/V3 check.
-Follow its plugin-local read-only `inspect` and `plan` actions. An explicit
-user request to create or initialize the project authorizes only the exact
-returned `apply-portable-seed --plan-sha256 <reviewed-plan-digest> --activate`
-action, retaining its root and runner arguments. Partial roots fail closed
-and are never overwritten.
+Pipeline-source migration commands belong to the occasional maintainer path,
+not this consumer lifecycle. See [SETUP](SETUP.md) for that path and for the
+ordered runner binding, restart, classification, and adoption procedure.
 
 ## Support boundary and current scope
 
@@ -251,8 +229,8 @@ not turn a repository rule into host-wide enforcement, a governance path into IA
 a requested route into observed model identity, or a machine gate into proof of
 every semantic property.
 
-`0.6.2` is the current source and plugin release; the scope described here
-is bounded accordingly:
+`0.6.2` names the next release's documented source and plugin scope. It is not
+a tag, installation recommendation, or availability claim:
 
 - The completed Phoenix product strand is integrated as the delivery-governance
   foundation: candidate-bound evidence and approvals, deterministic checks
@@ -484,41 +462,10 @@ eigenen Nachweis- und Freigaberegeln.
 | Spec-, Scope-, Nachweis- oder Authority-Drift | Elephant und nötigenfalls Mensch. | Neu planen oder freigeben; alte Freigabe nie in einen veränderten Vertrag tragen. | Zur Triage, Spec, Readiness oder Freigabe zurück — je nachdem, was veraltet ist. |
 | Unbekannte Ursache, wiederholte Signatur, erschöpftes Budget oder Konflikt | Menschlicher Entscheider. | Mit neuer Richtung fortsetzen, verschieben oder stoppen. | Keine endlose Retry-Schleife und kein Erfolg ohne erforderliche Nachweise. |
 
-## Eine V3-Autorität der Pipeline-Source ohne manuelles Bearbeiten von Projektionen konfigurieren
-
-In einem **Pipeline-Source-Checkout** ist `pipeline.user.yaml` die V3-Quelle
-der Routing-Absicht. Generierte Runtime-Projektionsdateien sind keine zweite
-Konfigurationsoberfläche. Braucht diese Quelle den sanktionierten Migrations-/
-Apply-Pfad, prüfe den Plan, aktiviere ihn und lies ihn dann zurück:
-
-```sh
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
-node setup.mjs
-```
-
-Der erste Befehl zeigt die geplante Projektion; der zweite ist ausdrückliche
-Aktivierung; `node setup.mjs` bestätigt, dass Quelle und generierte
-Runtime-Projektion aktuell sind, und schreibt nichts. Meldet ein Schritt Drift
-oder eine ungültige Quelle, halte dort an, statt generierte `.claude`-Bytes von
-Hand zu bearbeiten.
-
-Das sind keine Setup-Befehle für Consumer-Roots. Ein frischer Consumer startet
-zuerst den verpflichtenden Skill `pipeline-start`, der ihn vor jedem Git-/V3-
-Check klassifiziert; sein Plugin-eigener Pfad `project-onboarding-v3` mit
-inspect → plan → explizitem `apply-portable-seed --plan-sha256 <reviewed-plan-digest> --activate` ist der einzige Initialisierer.
-Eine explizite Bitte, das Projekt zu erstellen/initialisieren, autorisiert Apply;
-partielle Roots schlagen geschlossen fehl und werden nie überschrieben.
-
-## Unified close coordinator (H5)
-
-Feature close uses one restart-safe coordinator: `active → checkpointed →
-feature-close-prepared → tracked-close-finalized → candidate-frozen →
-final-verify-green`. A local close proceeds through cleanup to `closed-local`
-without push. Separately authorized publication/readback is
-`publication-authorized → published → readback-confirmed → delivered`.
-`release-eligible` and `promoted` are optional descendants; Stop guidance names
-the next coordinator transition and is silent at feature terminals.
+Migrationsbefehle für die Pipeline-Source gehören in den gelegentlichen
+Maintainer-Pfad und nicht in diesen Consumer-Lifecycle. [SETUP](SETUP.md)
+beschreibt diesen Pfad sowie die geordnete Runner-Bindung, den Neustart, die
+Klassifizierung und die Übernahme eines Projekts.
 
 ## Supportgrenze und aktueller Scope
 
@@ -528,8 +475,9 @@ Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
 keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis
 jeder semantischen Eigenschaft.
 
-`0.6.2` ist das aktuelle Release für Source und Plugin; der hier
-beschriebene Umfang ist entsprechend begrenzt:
+`0.6.2` bezeichnet den dokumentierten Umfang des nächsten Source- und Plugin-
+Releases. Das ist weder ein Tag noch eine Installations- oder
+Verfügbarkeitsaussage:
 
 - Der abgeschlossene Phoenix-Produktstrang ist als Delivery-Governance-
   Fundament integriert: kandidatengebundene Evidenz und Freigaben,
