@@ -80,8 +80,17 @@ if (!process.exitCode) {
         || item.commandActions.some((action) => !["read", "listFiles", "search"].includes(action?.type))) writeAttempt = true;
     }
     if (item.type === "agentMessage") {
-      if (typeof item.text !== "string" || answer !== null) protocolError = true;
-      else answer = item.text;
+      if (typeof item.text !== "string") { protocolError = true; return; }
+      // Codex emits commentary before final_answer. Missing phase remains
+      // accepted only as the single legacy answer; duplicate finals and
+      // unknown phases stay protocol errors.
+      if (item.phase === "commentary") return;
+      if (item.phase === "final_answer" || item.phase === undefined || item.phase === null) {
+        if (answer !== null) protocolError = true;
+        else answer = item.text;
+        return;
+      }
+      protocolError = true;
     }
   };
   const onMessage = (value) => {

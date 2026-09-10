@@ -4,7 +4,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
@@ -111,5 +114,80 @@ test("wrong model, protocol failure, write attempt, incomplete stdio/exit or cle
       spawnFn: fakeSpawn(result),
     });
     assert.deepEqual(actual, { status: "unavailable", childStarted: true });
+  }
+});
+
+function writeFakeAdvisoryAppServer(directory, items) {
+  const path = join(directory, "fake-codex-app-server.mjs");
+  const source = [
+    "#!/usr/bin/env node",
+    `const items = ${JSON.stringify(items)};`,
+    "let buffer = '';",
+    "const send = (value) => process.stdout.write(JSON.stringify(value) + '\\n');",
+    "const handle = (value) => {",
+    "  if (value.id === 1) return send({ id: 1, result: {} });",
+    "  if (value.id === 2) return send({ id: 2, result: { model: 'gpt-6-astra', modelProvider: 'openai', approvalPolicy: 'never', thread: { id: 'thread-1' } } });",
+    "  if (value.id !== 3 || value.method !== 'turn/start') return;",
+    "  send({ id: 3, result: { turn: { id: 'turn-1' } } });",
+    "  for (const item of items) send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item } });",
+    "  send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });",
+    "};",
+    "process.stdin.on('data', (chunk) => { buffer += chunk.toString('utf8'); let newline; while ((newline = buffer.indexOf('\\n')) >= 0) { const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1); if (line) handle(JSON.parse(line)); } });",
+    "process.stdin.on('end', () => process.exit(0));",
+  ].join("\n");
+  writeFileSync(path, source, { mode: 0o700 });
+  chmodSync(path, 0o700);
+  return path;
+}
+
+function runActualAdvisoryChild(codexPath, scratchPath) {
+  const source = payload();
+  const request = {
+    question: source.question,
+    evidenceBundle: source.evidenceBundle,
+    evidenceSha256: source.sandboxTransport.dispatch.referenceSetSha256,
+    advisoryRoute: source.advisoryRoute,
+    codexPath,
+    cwd: process.cwd(),
+    scratchPath,
+  };
+  const run = spawnSync(join(process.execPath), [join(process.cwd(), "plugins/pipeline-core/scripts/codex-advisory-app-server-child.mjs")], {
+    cwd: process.cwd(), input: JSON.stringify(request), encoding: "utf8", shell: false, timeout: 5_000,
+  });
+  assert.equal(run.error, undefined);
+  const lines = run.stdout.trim().split("\n").filter(Boolean);
+  assert.equal(lines.length, 1, run.stdout);
+  return { status: run.status, result: JSON.parse(lines[0]) };
+}
+
+test("actual advisory child accepts commentary before one final answer and preserves phase validation", () => {
+  const fixture = mkdtempSync(join(process.cwd(), "scratch/advisory-phase-protocol-"));
+  try {
+    const commentaryThenFinal = [
+      { type: "agentMessage", phase: "commentary", text: "intermediate" },
+      { type: "agentMessage", phase: "final_answer", text: "final answer" },
+    ];
+    const fake = writeFakeAdvisoryAppServer(fixture, commentaryThenFinal);
+    const green = runActualAdvisoryChild(fake, fixture);
+    assert.equal(green.status, 0, JSON.stringify(green));
+    assert.equal(green.result.code, "answered");
+    assert.equal(green.result.answer, "final answer");
+
+    for (const phase of [undefined, null]) {
+      const item = { type: "agentMessage", ...(phase === undefined ? {} : { phase }), text: "legacy answer" };
+      const result = runActualAdvisoryChild(writeFakeAdvisoryAppServer(fixture, [item]), fixture);
+      assert.equal(result.status, 0, `legacy ${String(phase)} phase`);
+      assert.equal(result.result.code, "answered", `legacy ${String(phase)} phase`);
+    }
+    for (const items of [
+      [{ type: "agentMessage", phase: "final_answer", text: "one" }, { type: "agentMessage", phase: "final_answer", text: "two" }],
+      [{ type: "agentMessage", phase: "analysis", text: "invalid" }],
+    ]) {
+      const result = runActualAdvisoryChild(writeFakeAdvisoryAppServer(fixture, items), fixture);
+      assert.equal(result.status, 2);
+      assert.equal(result.result.code, "protocol-error");
+    }
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
   }
 });
