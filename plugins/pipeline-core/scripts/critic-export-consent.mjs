@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { constants, closeSync, existsSync, fstatSync, lstatSync, mkdirSync, openSync,
   readFileSync, realpathSync, rmdirSync, statSync } from "node:fs";
-import { resolve, join, basename } from "node:path";
+import { resolve, join, basename, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -11,11 +11,41 @@ import { prepareCriticExportConsent, recordCriticExportConsent, revokeCriticExpo
 
 import { resolveOnboardingPrivateState } from "../lib/codex-onboarding-runtime.mjs";
 import { readPrivateJson, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+
+// Inspection must not call the onboarding resolver: even create=false can
+// harden existing directories. Keep its local Git-common-directory namespace,
+// but only observe physical, owner-controlled parents and private state files.
+function readOnlyStateDirectory(root) {
+  const raw = execFileSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  if (!isAbsolute(raw)) fail("consent-state-directory-invalid");
+  let directory = realpathSync(raw);
+  if (!lstatSync(directory).isDirectory()) fail("consent-state-directory-invalid");
+  let missing = false;
+  for (const part of ["agent-pipeline", "onboarding"]) {
+    directory = join(directory, part);
+    if (missing) continue;
+    let stat;
+    try { stat = lstatSync(directory); }
+    catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      missing = true;
+      continue;
+    }
+    if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(directory) !== directory) fail("consent-state-directory-invalid");
+    if (process.platform === "win32") {
+      if (assessWindowsPrivatePath(directory).status !== "secure") fail("consent-state-directory-invalid");
+    } else if ((stat.mode & 0o022) !== 0 || stat.uid !== process.getuid()) fail("consent-state-directory-invalid");
+  }
+  return directory;
+}
 
 export function resolveCriticExportConsentState(root, create = false) {
-  const state = resolveOnboardingPrivateState(root, "local", { create });
+  const directory = create ? resolveOnboardingPrivateState(root, "local", { create: true }).directory
+    : readOnlyStateDirectory(root);
   const name = `critic-export-consent-${digest(JSON.stringify(physicalProject(root)))}.json`;
-  return { directory: state.directory, path: join(state.directory, name) };
+  return { directory, path: join(directory, name) };
 }
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const fail = (code) => { throw new Error(code); };
@@ -98,9 +128,12 @@ function verifyInvocation(root, invocation) {
     localPath(root, record.path);
     let bytes;
     if (record.dataClass === "repository-candidate") {
-      const listing = git(["ls-tree", invocation.candidate.commit, "--", record.path]).toString();
-      if (!/^(?:100644|100755) blob [a-f0-9]+\t/u.test(listing) || listing.trimEnd().split("\t")[1] !== record.path) fail("consent-candidate-file-invalid");
-      bytes = git(["show", `${invocation.candidate.commit}:${record.path}`]);
+      const listing = git(["--literal-pathspecs", "ls-tree", "-z", invocation.candidate.commit, "--", record.path]).toString();
+      const entry = /^(?:100644|100755) blob ([a-f0-9]+)\t([^\0]+)\0$/u.exec(listing);
+      if (!entry || entry[2] !== record.path) fail("consent-candidate-file-invalid");
+      // ls-tree paths are relative to root, including a nested project. Read
+      // the exact checked object's bytes instead of a repository-root path.
+      bytes = git(["cat-file", "blob", entry[1]]);
     } else bytes = readBound(root, record.path);
     if (digest(bytes) !== record.sha256) fail("consent-input-digest-drift");
   }

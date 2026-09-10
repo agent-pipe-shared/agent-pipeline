@@ -5,16 +5,126 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import * as consentApi from "./critic-export-policy.mjs";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, readFileSync, chmodSync, lstatSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
+import { resolveCriticExportConsentState } from "../scripts/critic-export-consent.mjs";
 
 import { checkCriticExport, deriveCriticExportView, validateCriticExportAuthorization } from "./critic-export-policy.mjs";
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 
 const registry = loadRunnerProfilesV3Registry();
+// Real Git and CLI fixtures exercise path interpretation and filesystem effects.
+function consentCliFixture(t, { nested = false, filename = "a.mjs" } = {}) {
+  const scratch = fileURLToPath(new URL("../../../scratch/", import.meta.url));
+  mkdirSync(scratch, { recursive: true });
+  const repository = mkdtempSync(join(scratch, "consent-cli-"));
+  t.after(() => rmSync(repository, { recursive: true, force: true }));
+  const root = nested ? join(repository, "project") : repository;
+  const git = (...args) => execFileSync("git", ["-C", repository, ...args], { encoding: "utf8" }).trim();
+  git("init", "-q");
+  mkdirSync(join(root, "src"), { recursive: true });
+  const path = `src/${filename}`;
+  writeFileSync(join(root, path), "approved project bytes\n");
+  if (nested) {
+    mkdirSync(join(repository, "src"));
+    writeFileSync(join(repository, path), "outside project bytes\n");
+  }
+  git("add", "--all");
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture");
+  const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const request = { scope: { ...consentScope }, invocation: {
+    candidate: { commit: git("rev-parse", "HEAD"), tree: git("rev-parse", "HEAD^{tree}") },
+    records: [{ path, sha256: sha(readFileSync(join(root, path))), dataClass: "repository-candidate" }],
+  } };
+  delete request.scope.project;
+  const save = () => writeFileSync(join(root, "request.json"), JSON.stringify(request));
+  const cli = fileURLToPath(new URL("../scripts/critic-export-consent.mjs", import.meta.url));
+  const run = (command, ...flags) => {
+    const child = spawnSync(process.execPath, [cli, command, "--root", root, "--request", "request.json", ...flags], { encoding: "utf8" });
+    assert.equal(child.error, undefined);
+    return JSON.parse(child.stdout);
+  };
+  save();
+  const plan = run("plan");
+  assert.equal(run("record", "--plan-sha256", plan.planSha256, "--decision-reference", "user-message:fixture", "--decision-sha256", "e".repeat(64)).code, "consent-recorded");
+  return { repository, root, request, run, save, sha, git };
+}
+
+test("real CLI accepts the nested project's checked blob", (t) => {
+  const fixture = consentCliFixture(t, { nested: true });
+  assert.equal(fixture.run("check").code, "consent-covered");
+});
+
+test("real CLI rejects the parent repository's conflicting blob digest", (t) => {
+  const fixture = consentCliFixture(t, { nested: true });
+  fixture.request.invocation.records[0].sha256 = fixture.sha(readFileSync(join(fixture.repository, "src/a.mjs")));
+  fixture.save();
+  assert.equal(fixture.run("check").code, "consent-input-digest-drift");
+});
+
+for (const filename of ["über.mjs", 'a"quoted.mjs', "a[1].mjs"]) {
+  test(`real CLI handles literal candidate filename ${filename}`, (t) => {
+    const fixture = consentCliFixture(t, { nested: true, filename });
+    assert.equal(fixture.run("check").code, "consent-covered");
+  });
+}
+
+for (const command of ["plan", "check"]) {
+  test(`real CLI ${command} preserves existing mode-0755 state directories`, (t) => {
+    const fixture = consentCliFixture(t);
+    const state = resolveCriticExportConsentState(fixture.root);
+    const privateRoot = join(fixture.repository, ".git", "agent-pipeline");
+    chmodSync(privateRoot, 0o755);
+    chmodSync(state.directory, 0o755);
+    const snapshot = () => [privateRoot, state.directory, state.path].map((path) => {
+      const stat = lstatSync(path, { bigint: true });
+      return { path, mode: stat.mode, ino: stat.ino, size: stat.size, mtimeNs: stat.mtimeNs,
+        ctimeNs: stat.ctimeNs, contents: stat.isDirectory() ? readdirSync(path).sort() : readFileSync(path).toString("hex") };
+    });
+    const before = snapshot();
+    const result = fixture.run(command);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(result.code, command === "check" ? "consent-covered" : "consent-plan-ready");
+  });
+}
+
+test("read-only state resolution retains linked-worktree namespace compatibility", (t) => {
+  const fixture = consentCliFixture(t);
+  const linked = join(fixture.repository, "linked");
+  fixture.git("worktree", "add", "--detach", linked, "HEAD");
+  const state = resolveCriticExportConsentState(linked);
+  const stat = lstatSync(linked, { bigint: true });
+  const identity = { realPath: linked, device: String(stat.dev), inode: String(stat.ino) };
+  assert.equal(state.directory, join(fixture.repository, ".git", "agent-pipeline", "onboarding"));
+  assert.equal(state.path, join(state.directory, `critic-export-consent-${fixture.sha(JSON.stringify(identity))}.json`));
+  assert.notEqual(state.path, resolveCriticExportConsentState(fixture.root).path);
+});
+
+test("real CLI rejects writable state parents without hardening them", (t) => {
+  const fixture = consentCliFixture(t);
+  const directory = resolveCriticExportConsentState(fixture.root).directory;
+  chmodSync(directory, 0o777);
+  const before = lstatSync(directory, { bigint: true });
+  for (const command of ["plan", "check"]) assert.equal(fixture.run(command).code, "consent-state-directory-invalid");
+  const after = lstatSync(directory, { bigint: true });
+  assert.equal(after.mode, before.mode);
+  assert.equal(after.ctimeNs, before.ctimeNs);
+});
+
+test("real CLI rejects a symlink state parent even when onboarding is missing", (t) => {
+  const fixture = consentCliFixture(t);
+  const parent = join(fixture.repository, ".git", "agent-pipeline");
+  rmSync(parent, { recursive: true });
+  const elsewhere = join(fixture.repository, "elsewhere");
+  mkdirSync(elsewhere);
+  symlinkSync(elsewhere, parent);
+  for (const command of ["plan", "check"]) assert.equal(fixture.run(command).code, "consent-state-directory-invalid");
+  assert.deepEqual(readdirSync(elsewhere), []);
+});
+
 test("standing consent preparation is available separately from packet authorization", () => {
   assert.equal(typeof consentApi.prepareCriticExportConsent, "function");
 });
