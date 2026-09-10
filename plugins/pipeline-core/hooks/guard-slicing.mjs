@@ -525,7 +525,7 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
       const groups = groupDispatchMessages(rows);
       const excluded = excludeInFlightGroup(groups, toolName, toolInput);
       runLength = computeTrailingSingleRun(excluded.groups);
-      runFingerprint = sha256Hex(excluded.groups);
+      runFingerprint = sha256Hex(excluded.groups.slice(-runLength));
       lastCompletedGroupIsReset = classifyGroup(excluded.groups[excluded.groups.length - 1]) === "reset";
     }
     // rows === null (unreadable/malformed transcript) -> fail open: runLength stays 0, no nudge

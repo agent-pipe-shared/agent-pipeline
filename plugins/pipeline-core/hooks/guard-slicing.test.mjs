@@ -227,6 +227,17 @@ test("GS5e: a reset and new eligible run observed together is not suppressed by 
   assert.notEqual(newRun.stdout, "", "the newly observed run must emit despite the prior run's advisory");
 });
 
+test("GS5f: compacting an older transcript prefix does not create a repeat advisory", () => {
+  const current = { subagent_type: "pipeline-core:goldfish-mechanic", prompt: "next" };
+  const prefix = [fanoutRow("old1", [["Task", { a: 0 }], ["Agent", { b: 0 }]])];
+  const run = [dispatchRow("m1", "Task"), dispatchRow("m2", "Task"), dispatchRow("m3", "Task")];
+  const store = makeStore({ [ORCH_TRANSCRIPT]: transcriptText([...prefix, ...run]) });
+  const input = { transcript_path: ORCH_TRANSCRIPT, session_id: "s5f", tool_name: "Task", tool_input: current };
+  assert.notEqual(evaluateSlicingGuard(input, baseOptions(store)).stdout, "");
+  store.files.set(ORCH_TRANSCRIPT, transcriptText(run));
+  assert.equal(evaluateSlicingGuard(input, baseOptions(store)).stdout, "", "the same trailing run remains rate limited after prefix compaction");
+});
+
 // --- In-flight-turn exclusion (the correctness crux) ---------------------
 
 test("GS6a: in-flight turn already written to the transcript is excluded by identity, not counted as a 4th single", () => {
