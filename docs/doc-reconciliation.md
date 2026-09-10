@@ -2732,3 +2732,43 @@ The consumer-safe-path checker explicitly classifies the vendored declaration
 as inherited canonical metadata. This does not turn source-checkout paths into
 consumer instructions. Focused ADR consistency, vendored-canon, documentation
 contract and consumer-safe-path checks pass for the source candidate.
+
+## Candidate a60c7f0aef4ab40e6eecd3d03d24275a1d8e362a — 2026-09-11, range 19f99b56..a60c7f0a, simplify public adoption path
+
+- ADR-0003: checked, no change needed.
+- ADR-0004: checked, no change needed.
+- ADR-0005: checked, no change needed.
+- ADR-0006: checked, no change needed.
+- ADR-0009: checked, no change needed.
+- ADR-0011: checked, no change needed.
+- ADR-0014: checked, no change needed.
+- ADR-0015: checked, no change needed.
+- ADR-0018: checked, no change needed.
+- ADR-0020: checked, no change needed.
+- ADR-0023: checked, no change needed.
+- ADR-0024: checked, no change needed.
+- ADR-0026: checked, no change needed.
+- ADR-0033: checked, no change needed.
+- ADR-0043: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0048: checked, no change needed.
+- ADR-0070: checked, no change needed.
+- ADR-0076: checked, no change needed.
+- ADR-0078: checked, no change needed.
+- ADR-0081: checked, no change needed.
+
+The Lektor correction changes the order and level of public guidance without
+changing role authority, rigor, model routing, gate semantics, lifecycle or
+release policy. It removes a duplicate linear README diagram that made
+conditional gates look universal, points the quick start at the real setup
+heading, and makes existing-project adoption a subcase of the common Driver
+path. Optional approval-key and private-overlay setup now follows that complete
+routine path.
+
+The close guide now names the already shipped skill boundary precisely:
+`close-feature` ends a completed active feature, while `close-block` finalizes
+a stopped topic or real runtime transfer. The product-capability inventory
+keeps every active capability and moves only its public anchor target from the
+entry README to SETUP, PIPELINE_FLOW or the normative Operating Model. The
+vendored Operating Model remains byte-identical. No runner support,
+authorization, publication, worker, evidence or Verify contract changes.
