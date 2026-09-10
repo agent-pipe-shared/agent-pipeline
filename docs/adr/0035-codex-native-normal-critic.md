@@ -110,6 +110,22 @@ course gate; do not silently substitute another runner. All existing T1
 triggers, model escalation, evidence, independence, and disposition
 requirements remain unchanged.
 
+### Amendment — session Critic is the normal route (2026-09-10)
+
+The fresh, independently briefed, contractually read-only session Critic is now
+the autonomous default for Codex and every other supported runner. T1 retains
+the higher-capability model, fixed diff, closed refs-only input,
+JSON-schema-shaped verdict, and the literal assurance
+`functional-equivalent-read-only; OS isolation not asserted`.
+
+The native host described by this ADR remains available as an explicitly
+configured or user-requested stronger or detached execution route. It is no
+longer attempted before an ordinary Critic and its consent, transport, or
+startup failure does not create a Pipeline PO gate. If the normal session
+Critic itself cannot run, the coordinator reports a typed runtime failure.
+This amendment supersedes the native-first and PO-course-gate instructions
+above for current operation while preserving them as historical design context.
+
 ### Amendment — Codex execution-context matrix (2026-07-17)
 
 The current Agent-Pipeline Codex policy is surface-specific. The Codex Desktop

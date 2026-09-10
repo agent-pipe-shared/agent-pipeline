@@ -1,6 +1,6 @@
 ---
 name: critic-review
-description: "Independent, diff-scoped Critic review of one finished piece of work. Pass PATHS/REFS ONLY - the Critic constructs its own input (git diff, spec, guardrails, evidence) and never accepts prose context. Runs as a fresh-context read-only subagent; two-phase protocol - adversarial hunt, then evidence-gated honest report. T1 uses the selected runner's native isolation or the explicitly assured standing functional-equivalent lane."
+description: "Independent, diff-scoped Critic review of one finished piece of work. Pass PATHS/REFS ONLY - the Critic constructs its own input (git diff, spec, guardrails, evidence) and never accepts prose context. Runs by default as a fresh-context read-only session subagent; two-phase protocol - adversarial hunt, then evidence-gated honest report. Runner-native isolation is an optional explicit escalation."
 disable-model-invocation: false
 argument-hint: "<spec-path> <fixed-candidate-diff-range> [guardrail-path ...] [evidence:<path> ...] [sha:<ruleset-sha>] [project:<name>] [verdict:yes|no] [assurance:runner-native:<evidence>|functional-equivalent-read-only]"
 context: fork
@@ -9,24 +9,12 @@ agent: critic
 
 # critic-review — independent review run (standard stage)
 
-For an affected Codex host, the Critic call site must first obtain the committed
-`selectionId` and invoke `sandboxed-readonly-host-bridge.mjs` with duty
-`critic`. The documented network-open/read-only transport is read back before
-any child. `host-mode-unavailable` is typed no-child evidence; it cannot be
-replaced by user prose or an alternate route. The bound execution receipt uses
-only `sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted`.
-
-Before selection, run `scripts/codex-app-server-health.mjs --critic-ready
---root <physical-project-root> --candidate-commit <full-candidate-commit>` on
-the same host. The probe resolves the high-risk Critic model from that exact
-candidate's validated V3 authority; the plain form uses the physical cwd and
-committed HEAD only for compatibility. A missing route is
-`CAS-MODEL-ROUTE-UNAVAILABLE`; a running daemon without a successful bounded
-model-start probe is `CAS-MODEL-UNAVAILABLE`, not a usable Critic lane. This
-health result proves only local model admission; it does not replace the
-selected transport receipt.
-The generic `codex exec` CLI is not a selected transport and must never be used
-as a fallback for this governed dispatch.
+The normal call site dispatches one fresh session Critic after the deterministic
+gates and packet preflight pass. It does not launch an external process, export
+a separately assembled packet, or ask the PO for an additional review decision.
+Runner-native hosts and external launchers remain available only when project
+policy explicitly configures them or the user requests stronger or detached
+execution. Their unavailability never invalidates the ordinary session route.
 
 You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, read-only). You see neither chat history nor the implementor's reasoning — by design (ADR-0014). This skill body plus the path arguments below are your ENTIRE dispatch. Canon pointers (agent-pipeline repo, not runtime reads — repo-root paths shown; `roles/critic.md` and `templates/prompts/critic-review.md` also have a plugin-root vendored copy per `pipeline-start` SKILL.md's canon-reference rule, for a hosted project that does read them): `docs/operating-model.md` (*Roles and boundaries* — Critic row; *Evidence, review and recovery*), `harness/review-protocol.md` §2.1 (*Trigger decision table*), `roles/critic.md`, `templates/prompts/critic-review.md`.
 
@@ -37,13 +25,10 @@ spawn, run `scripts/critic-dispatch-preflight.mjs` against the fixed base and
 candidate. Pass the candidate Spec, every declared guardrail, each fresh
 candidate-evidence path and, for a re-review, the separate prior-Critic path.
 Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
-`packet-ready` **and** the separately selected-runner transport has returned a
-usable, candidate-bound execution-readiness result. `packet-ready` has
-`spawnAuthorized: false`: it is never authority to start a generic fallback
-child. Its returned candidate-tree guardrail paths are the paths passed to this
-skill. A rejection or unavailable transport is a coordinator defect, not Critic work: do not spawn a child, create a packet or substitute prose/evidence.
-This preflight is read-only and does not replace the
-selected-runner transport readback required above.
+`packet-ready`. `packet-ready` has `spawnAuthorized: false`: the session
+orchestrator's ordinary agent dispatch remains the execution authority. Its
+returned candidate-tree guardrail paths are the paths passed to this skill.
+This preflight is read-only.
 
 **Evidence artifact shape (confirmed from source, hard — not free-form text):**
 each `evidence:{{PATH}}` file must be JSON (plain text is rejected as
@@ -109,8 +94,8 @@ Parse STRICTLY as:
 7. `verdict:yes|no` = whether a binary pass/fail is requested (default: no),
 8. `assurance:runner-native:<evidence>` = T1 ran in the selected runner's
    usable native isolation, or
-   `assurance:functional-equivalent-read-only` = the standing PO-authorized
-   T1 functional equivalent, whose report MUST carry the literal
+   `assurance:functional-equivalent-read-only` = the default T1 session
+   Critic, whose report MUST carry the literal
    `functional-equivalent-read-only; OS isolation not asserted`.
 
 **Grammar (confirmed, hard — no prose tolerance):** the `args`/parameter field of the
@@ -164,21 +149,21 @@ prior Critic report as an evidence path. Recheck only the prior findings, their 
 
 ## 1. Stage gate (self-enforcing, before any review work)
 
-Construct the touched-file list yourself: `git diff --name-only {{DIFF_RANGE}}`. If it touches **architecture/guardrail/security surfaces** — `hooks/`, `agents/`, `.claude/settings*`, permission/guard config, `guardrails/`, `policies/`, secrets/auth/credentials, or A/G/S-marked `riskZones` from the calibration — it is T1. It MUST be dispatched to the selected runner's usable native-isolation lane, or, only where that isolation is technically unavailable or unusable in the current host setup, to the standing functional-equivalent lane. Do not silently select a Claude-only path or another runner.
+Construct the touched-file list yourself: `git diff --name-only {{DIFF_RANGE}}`. If it touches **architecture/guardrail/security surfaces** — `hooks/`, `agents/`, `.claude/settings*`, permission/guard config, `guardrails/`, `policies/`, secrets/auth/credentials, or A/G/S-marked `riskZones` from the calibration — it is T1. Dispatch the default fresh functional-equivalent session Critic on the higher-capability tier. Runner-native isolation is optional only when explicitly configured or requested.
 
 For T1, first require `verdict:yes` and one `assurance:` argument. Missing,
 contradictory, or unrecognized assurance → report `dispatch defect: T1 requires
 runner-native isolation or the standing functional-equivalent assurance` and
 STOP (no partial review). `assurance:runner-native:*` must run through the
 selected runner's native lane rather than this generic standard-stage skill.
-`assurance:functional-equivalent-read-only` may proceed here only when this is
+`assurance:functional-equivalent-read-only` proceeds here when this is
 ONE fresh independently briefed Critic with no chat/history or implementer
 reasoning, refs-only bounded input, strict read-only/no-write/no-subdelegation,
-fixed candidate commit/diff, and a higher-capability route; otherwise STOP at a
-PO course gate. Its report MUST carry the literal assurance above and never
+fixed candidate commit/diff, and a higher-capability route; otherwise report a
+typed runtime failure and STOP. Its report MUST carry the literal assurance above and never
 claim OS isolation or effective model identity.
 
-> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier AND with the selected runner's usable native isolation; if that isolation is technically unavailable or unusable in the current host setup, the standing PO-authorized functional equivalent is ONE fresh independently briefed, contractually read-only Critic subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
 
 (Canonical English wording, authoritative — word-identical in `harness/review-protocol.md` §2.1, *Trigger decision table*, `roles/critic.md` and ADR-0003/ADR-0014; `docs/operating-model.md` does not carry this wording.)
 

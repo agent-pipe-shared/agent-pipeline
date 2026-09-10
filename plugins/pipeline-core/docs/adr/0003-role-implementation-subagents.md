@@ -32,18 +32,17 @@ multi-runner pipeline. The effective T1 policy supersedes only that operational
 mechanism, not its rigor, evidence, independence, staffing, or disposition
 requirements.
 
-> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier AND with the selected runner's usable native isolation; if that isolation is technically unavailable or unusable in the current host setup, the standing PO-authorized functional equivalent is ONE fresh independently briefed, contractually read-only Critic subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
 
-For T1, retain the selected runner and use its usable native isolation first.
-`claude -p --bare` remains the Claude runner adapter. If the selected runner's
-native isolation is technically unavailable or unusable in the current host,
-the standing PO authorization permits exactly one fresh independently briefed
-Critic subagent with no chat/history or implementer reasoning, refs-only bounded
+For T1, retain the selected runner and use exactly one fresh independently
+briefed Critic subagent with no chat/history or implementer reasoning, refs-only bounded
 input, strict read-only/no-write/no-subdelegation instruction, fixed candidate
 commit and diff, higher-capability route, and a JSON-schema-shaped verdict. The
 assurance literal above is mandatory and never asserts OS isolation or effective
 model identity. If that runner cannot provide even this contractual review,
-stop at a PO course gate; do not silently substitute another runner.
+report a typed runtime failure; do not create a new PO gate or silently
+substitute another runner. Runner-native launchers such as `claude -p --bare`
+remain optional explicit escalations.
 
 ## Consequences
 

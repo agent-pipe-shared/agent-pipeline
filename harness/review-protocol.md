@@ -39,7 +39,7 @@ Evaluate all rows; the **strictest matching row wins** — a diff that superfici
 | Row | Situation | Critic | Model / Effort | Isolation |
 |---|---|---|---|---|
 | **T0** | Mechanical/deterministic diff (lockfiles, generated artifacts, pure formatting, zero semantic delta) | none — auto-pass; evidence = the generating command + the `verify` gate output | — | — |
-| **T1** | A/G/S diff — regardless of diff size and rigor level | MANDATORY | the higher-capability model | selected runner's usable native isolation + JSON-schema-shaped verdict; if unavailable/unusable, the standing PO-authorized functional-equivalent read-only lane |
+| **T1** | A/G/S diff — regardless of diff size and rigor level | MANDATORY | the higher-capability model | fresh functional-equivalent read-only session Critic; runner-native isolation is an optional explicit escalation |
 | **T2** | Risk class high | MANDATORY | the higher-capability model | read-only subagent (Elephant may still choose runner-native isolation) |
 | **T3** | Rigor 2, standard | MANDATORY | the review-tier model FIRST — escalate to the higher-capability model ONLY on (a) a finding ≥ major, (b) an A/G/S touch discovered during review, or (c) a contested/contradictory verdict (T6). The higher-capability model is never the first pass for a non-A/G/S rigor-2 diff. | read-only subagent |
 | **T4** | Rigor 1 standard · risk class medium · rigor 0 WITH risk flag | MANDATORY, BLOCKING | the review-tier model FIRST — same cascade as T3 (escalate to the higher-capability model only on finding ≥ major / discovered A/G/S touch / contested verdict) | read-only subagent |
@@ -54,7 +54,7 @@ Evaluate all rows; the **strictest matching row wins** — a diff that superfici
 
 Canonical trigger wording (word-identical in this file's §2.1, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, ADR-0003 and ADR-0014; `docs/operating-model.md` does not carry this wording — on any divergence the canonical wording wins over the table above):
 
-> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier AND with the selected runner's usable native isolation; if that isolation is technically unavailable or unusable in the current host setup, the standing PO-authorized functional equivalent is ONE fresh independently briefed, contractually read-only Critic subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier in ONE fresh independently briefed, contractually read-only session subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. This session lane is the autonomous default. Selected-runner native isolation is an optional explicitly configured or requested escalation, not a prerequisite for the ordinary Critic and not a Pipeline PO gate. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
 
 **Why staggered:** The Critic is expensive and must not decay into ceremony — a documented discipline-erosion risk; A/G/S zones are exactly where a weaker checker has correlated blind spots. Evidence for the cascade/non-blocking relaxation: the last 3 canon critics after a passed readiness check + first-pass delivery returned PASS with 0 findings; real blockers occurred only on risky live-code changes in a governed project (two blockers, one fail-open major finding). Community evidence: Meta's risk-tiered gating held quality at relaxed gates (incident rate 1/50 baseline).
 **Check:** The gate decision documents the applied row; merge requires a findings report for every mandatory trigger (§2.1).
@@ -70,7 +70,7 @@ Canonical trigger wording (word-identical in this file's §2.1, `roles/critic.md
 5. Metadata: task id, rigor level, risk class, applied trigger row + "criticality → model" (MP-07), ruleset SHA.
 
 **Never in the dispatch:** chat history, Elephant reasoning or summaries of the work, goldfish completion-report rationale, prior Critic verdicts (a fresh run must not anchor).
-**Why:** Two residual contamination channels are structurally bounded: (a) A/G/S uses the selected runner's native isolation where usable, otherwise the standing functional-equivalent lane explicitly discloses its non-OS-isolated limit; (b) Elephant framing → the Critic builds its input itself; the Elephant passes paths, never justifications.
+**Why:** Two residual contamination channels are structurally bounded: (a) the default session Critic explicitly discloses its non-OS-isolated limit, while runner-native isolation remains an explicit escalation; (b) Elephant framing → the Critic builds its input itself; the Elephant passes paths, never justifications.
 **Check:** The dispatch text contains no prose about the solution; the Critic's bootstrap confirmation (`harness/session-bootstrap.md` §6.3); the trajectory section proves the Critic actually pulled diff/spec/evidence itself.
 
 **Correction ranges containing retained prior results:** a prior verdict remains
@@ -119,9 +119,9 @@ coverage obligations, or the exact consecutive correction range.
 
 | Level | Mechanics | When |
 |---|---|---|
-| **Standard** | read-only subagent: tools Read/Grep/Glob + narrowly scoped Bash for `git diff`/`git log`; NO `memory`, NO write tools | all mandatory triggers except T1 |
-| **Runner-native** | the selected runner's strongest usable native isolation. For Claude this is the `claude -p --bare` adapter with a JSON-schema verdict; it skips auto-discovery and requires its own explicit context/auth wiring. Other runners use their own equivalent native mechanism, never a silent Claude substitution. | first choice for T1; optional escalation elsewhere |
-| **Functional equivalent** | **one** fresh independently briefed Critic subagent: no chat/history or implementer reasoning; refs-only bounded input; strict read-only/no-write/no-subdelegation instruction; fixed candidate commit and diff; higher-capability route; JSON-schema-shaped verdict; literal assurance `functional-equivalent-read-only; OS isolation not asserted`. It never asserts OS isolation or effective model identity. | T1 only when the selected runner's native isolation is technically unavailable or unusable in the current host setup, under the standing PO authorization |
+| **Standard** | read-only subagent: tools Read/Grep/Glob + narrowly scoped Bash for `git diff`/`git log`; NO `memory`, NO write tools | all mandatory triggers; T1 uses the higher-capability tier and the assurance below |
+| **Runner-native** | the selected runner's strongest usable native isolation. For Claude this is the `claude -p --bare` adapter with a JSON-schema verdict; it skips auto-discovery and requires its own explicit context/auth wiring. Other runners use their own equivalent native mechanism, never a silent Claude substitution. | optional explicit escalation |
+| **Functional equivalent** | **one** fresh independently briefed Critic subagent: no chat/history or implementer reasoning; refs-only bounded input; strict read-only/no-write/no-subdelegation instruction; fixed candidate commit and diff; higher-capability route for T1; JSON-schema-shaped verdict; literal assurance `functional-equivalent-read-only; OS isolation not asserted`. It never asserts OS isolation or effective model identity. | autonomous default session lane |
 
 **Codex native-host functional-equivalent lane:** Codex maintainer/self-application
 reviews may use the
@@ -136,8 +136,7 @@ directory; each dispatch is single-use. Public receipts contain only closed
 citations and hashes, and both PASS and FAIL emit a disposition receipt through
 a crash-recoverable exclusive publication transaction. Its
 receipt MUST say `functional-equivalent-read-only; OS isolation not asserted`
-for T1. This is the standing PO-authorized functional equivalent when Codex
-native isolation is unavailable or unusable; it creates no OS-isolation,
+for T1. This is an optional explicitly selected Codex host route; it creates no OS-isolation,
 effective-model-identity, or conformance claim (ADR-0035).
 The v0.3 harness requires an explicit clean full Shared ruleset checkout that
 is separate from the candidate source, at the same commit, and byte-matched to
@@ -168,12 +167,12 @@ The host records a monotonic vector over bound tree changes, verified output,
 trace, completed tests and delivered-result bytes. The stagnation interval may
 expire only while no component advances; the maximum elapsed time remains a
 separate resource cap. A verified sandbox/process-isolation failure immediately
-closes that origin lane: there is no same-lane retry. The Coordinator may use
-the standing functional-equivalent lane exactly as specified above — one fresh,
+closes that optional origin lane: there is no same-lane retry. The Coordinator
+uses the default functional-equivalent lane exactly as specified above — one fresh,
 independently briefed Critic with `mayDelegate=false`, frozen input/authority
 bindings, fixed candidate commit/diff, and no state/authority write access. A
-second failure, an unproven environment cause, or any request for another child
-becomes a PO course gate. The assurance is
+failure is reported as a typed runtime problem and does not create a Pipeline
+PO gate. The assurance is
 `functional-equivalent-read-only; OS isolation not asserted`.
 
 Accepted trade-off (ADR-0003): a standard Critic can see runner-injected

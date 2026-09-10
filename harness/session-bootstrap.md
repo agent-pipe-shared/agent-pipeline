@@ -330,20 +330,19 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 - **Input is exhaustively defined:** spec, diff, guardrails/constraints (incl. relevant calibration portions as a check standard) and the evidence artifacts of the work under review. **Explicitly NO handover, NO chat history, NO implementor rationale.** Why: the Critic is meant to judge independently — history context creates exactly the anchoring effects it's meant to neutralize.
 - No staleness check: the Critic checks against the state the assignment names it; keeping the ruleset current is the Elephant's duty.
 - Confirmation that **no write tools** are available. For critical T1 diffs,
-  confirm the selected runner's usable native isolation; `claude -p --bare`
-  remains a Claude runner adapter, not a global critical-review mechanism. If
-  that isolation is technically unavailable or unusable in the current host
-  setup, confirm the standing PO-authorized functional equivalent: **one**
+  confirm the default functional equivalent: **one**
   fresh independently briefed Critic subagent with no chat/history or
   implementer reasoning, refs-only bounded input, strict
   read-only/no-write/no-subdelegation instruction, fixed candidate commit and
   diff, higher-capability route, JSON-schema-shaped verdict, and the literal
   assurance `functional-equivalent-read-only; OS isolation not asserted`. This
-  is a standing authorization, not a per-candidate waiver: it preserves every
+  is the autonomous standard, not a per-candidate waiver: it preserves every
   T1 trigger, higher-capability escalation, evidence, independence, and
   finding-disposition requirement. The contractual read-only equivalent never
-  claims OS isolation or effective provider model identity; if even it cannot
-  be provided, stop at a PO course gate. If writing is possible, the bootstrap
+  claims OS isolation or effective provider model identity. Runner-native
+  launchers such as `claude -p --bare` are optional explicit escalations. If
+  the default lane cannot be provided, report a typed runtime failure rather
+  than creating a PO gate. If writing is possible, the bootstrap
   has failed (wrong agent definition loaded).
 - **Compact confirmation** (field "State" deliberately omitted):
 

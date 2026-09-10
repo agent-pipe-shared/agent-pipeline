@@ -29,16 +29,15 @@ USAGE (Elephant)
    verdict (never a higher-capability first pass for a non-A/G/S class-mittel
    diff); class-niedrig (non-A/G/S) critic runs MAY be non-blocking (parallel to
    the next package). ARCHITECTURE, GUARDRAIL, or SECURITY diffs = the
-   higher-capability review model at max MANDATORY plus the selected runner's
-   usable native isolation with JSON-schema-shaped verdict. If that isolation is
-   technically unavailable or unusable in the current host setup, use the
-   standing PO-authorized functional equivalent: ONE fresh independently
+   higher-capability review model at max MANDATORY in the default
+   functional-equivalent session lane: ONE fresh independently
    briefed, contractually read-only Critic subagent, no chat/history or
    implementer reasoning, refs-only bounded input, strict no-write and
    no-subdelegation, fixed candidate commit/diff, and literal assurance
    `functional-equivalent-read-only; OS isolation not asserted`. Never silently
-   substitute a different runner; if this contractual lane is unavailable, stop
-   at a PO course gate. Record the applied matrix row (incl. cascade stage, if
+   substitute a different runner; runner-native isolation is an optional
+   explicit escalation. If this contractual lane is unavailable, report a typed
+   runtime failure rather than creating a PO gate. Record the applied matrix row (incl. cascade stage, if
    any) and assurance in your gate decision.
 2. Fill ONLY paths and identifiers below. Pass NO reasoning, NO summaries of
    the implementation, NO chat history — the Critic constructs its own input
@@ -102,12 +101,11 @@ USAGE (Elephant)
    stopped.` Do not read the prohibited content, search for a substitute,
    consume a narrative, continue the review, or issue a substantive pass/fail
    judgment.
-3. Standard level: dispatch as read-only subagent (tools: Read/Grep/Glob +
-   git diff/log via Bash; no memory, no write tools). T1 hard level: use the
-   selected runner's usable native isolation first; `claude -p --bare` is the
-   Claude adapter, not a cross-runner default. When native isolation is
-   unavailable or unusable, dispatch the standing functional-equivalent Critic
-   lane specified in item 1 with the JSON schema shape at the end of this file.
+3. Standard level: dispatch as read-only session subagent (tools:
+   Read/Grep/Glob + git diff/log via Bash; no memory, no write tools). T1 uses
+   the same fresh session lane on the higher-capability tier.
+   `claude -p --bare` and corresponding runner-native launchers are optional
+   explicit escalations, not cross-runner defaults or PO gates.
 4. Phase-2.6 bounded re-review: the initial architecture/security review is
    `full`. Every follow-up examines only the exact immediately previous reviewed
    commit through the new correction candidate, its fixes and direct
@@ -129,10 +127,10 @@ USAGE (Elephant)
    bindings only, never report bodies or conclusions. This is methodology,
    not an OS-filtering claim; an incompatible transport stops.
 5. A native-isolation failure is never retried in the same lane. The Coordinator
-   may use exactly one standing functional-equivalent Critic with frozen
-   bindings and `mayDelegate=false`; a second/unproven failure, inability to
-   provide contractual read-only review, or another-child request is a PO course
-   gate. Do not spawn, request, or delegate a recovery yourself. Wall
+   returns to exactly one default functional-equivalent session Critic with
+   frozen bindings and `mayDelegate=false`. Inability to provide contractual
+   read-only review is a typed runtime failure, not a PO gate. Do not spawn,
+   request, or delegate a recovery yourself. Wall
    time, generic liveness, timeout/nonzero/free text and agent self-report are
    not progress or environment proof; retain the stated non-claim about OS
    isolation.

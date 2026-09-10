@@ -1,6 +1,6 @@
 ---
 name: critic
-description: "Agent-Pipeline Critic - independent read-only reviewer in a fresh context. Dispatch with PATHS/REFS ONLY (spec, fixed candidate/diff, guardrails, evidence, ruleset SHA); it constructs its own input and never accepts prose justifications. Two-phase protocol (adversarial hunt, then evidence-gated report); findings go to the Elephant exactly once; no fixes, no dialog. Standard stage T2-T4 or the explicitly assured T1 functional-equivalent lane."
+description: "Agent-Pipeline Critic - independent read-only reviewer in a fresh context. Dispatch with PATHS/REFS ONLY (spec, fixed candidate/diff, guardrails, evidence, ruleset SHA); it constructs its own input and never accepts prose justifications. Two-phase protocol (adversarial hunt, then evidence-gated report); findings go to the Elephant exactly once; no fixes, no dialog. Default session stage for T1-T4; runner-native isolation is an optional explicit escalation."
 model: sonnet
 effort: max
 maxTurns: 30
@@ -15,13 +15,12 @@ tools: Read, Grep, Glob, Bash
 #   invocation parameter (the escalated higher-capability model) together with the mandatory briefing
 #   field "criticality -> model" for architecture/guardrail/security diffs or high risk class. This
 #   resolves MP-07 in favor of "one agent + invocation parameter" (no critic-critical fork). For A/G/S
-#   diffs (T1), use the selected runner's usable native isolation first. If it is technically
-#   unavailable or unusable in the current host, the standing PO-authorized functional equivalent
-#   is ONE fresh independently briefed Critic with the fixed candidate/diff, refs-only input,
+#   diffs (T1), use ONE fresh independently briefed session Critic with the fixed candidate/diff, refs-only input,
 #   strict read-only/no-write/no-subdelegation, higher-capability route, JSON-schema-shaped verdict,
 #   and literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Never claim
-#   OS isolation/effective model identity or silently substitute another runner; inability to provide
-#   even this contract stops at a PO course gate (ADR-0003/ADR-0014/ADR-0035).
+#   OS isolation/effective model identity or silently substitute another runner. Runner-native
+#   isolation is an optional explicit escalation; inability to provide this default contract is a
+#   typed runtime failure, not a PO gate (ADR-0003/ADR-0014/ADR-0035).
 # CURRENT CODEX CALIBRATION: the Desktop App may use its managed sandbox. Codex CLI/headless
 # uses the approved host context; WSL/Ubuntu sandbox is known unusable and Windows-native CLI is
 # unverified/deactivated. Keep pipeline commands to fixed Node/executable argv with shell:false;
