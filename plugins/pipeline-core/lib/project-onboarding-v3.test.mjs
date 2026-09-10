@@ -8042,7 +8042,9 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(afterAnswers.status, "intake-design-questions-required");
     assert.equal(afterAnswers.nextAction.kind, "command");
     assert.equal(afterAnswers.nextAction.argv[1], "intake-generate-plan");
-    assert.match(afterAnswers.diagnostics[0].recommendation, /intake-design-questions-replace/);
+    assert.ok(afterAnswers.diagnostics.some((entry) =>
+      typeof entry.guidance === "string" && entry.guidance.includes("intake-design-questions-replace")),
+    "the ready-to-generate diagnostic exposes the explicit correction command");
 
     const correctedAnswers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely and accessibly." }]);
     const corrected = invoke(["intake-design-questions-replace", "--root", path, "--answers-json", correctedAnswers, "--activate", "--runner", "codex"]);
