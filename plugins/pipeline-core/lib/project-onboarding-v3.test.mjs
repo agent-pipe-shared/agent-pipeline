@@ -4662,11 +4662,12 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     assert.match(String(refused.stderr), /evidence\/verify-latest\.json missing/u);
     assert.match(String(refused.stderr), /Push approval missing/u);
 
-    // (1) The shipped baseline produces honest baseline-only evidence without a PO turn.
-    assert.equal(produceEvidence().status, 0, "the shipped baseline must yield bounded evidence");
-    const baselineEvidence = JSON.parse(readFileSync(join(path, "evidence", "verify-latest.json"), "utf8"));
-    assert.equal(baselineEvidence.coverage, "baseline-only");
-    assert.equal(baselineEvidence.selection.mode, "push");
+    // (1) The shipped baseline validates configuration, but cannot turn a
+    // missing product command into green push evidence.
+    const unconfiguredEvidence = produceEvidence();
+    assert.equal(unconfiguredEvidence.status, 2, "missing product verification must fail closed");
+    assert.match(String(unconfiguredEvidence.stderr), /VEP-NO-COMMAND/u);
+    assert.equal(existsSync(join(path, "evidence", "verify-latest.json")), false);
 
     // (2) The human configures a real verify command; the producer then writes
     // candidate-bound evidence. Both steps the calibration already demands.
