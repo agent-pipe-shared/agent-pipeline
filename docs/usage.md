@@ -85,6 +85,31 @@ actual denials or unavailable execution are reported, never bypassed. Host
 capabilities vary. This workflow preserves expressly defined human gates,
 review admission, isolation, and correction/review limits.
 
+Private review content can have a one-time setup decision bound to this physical
+project, an explicitly declared provider/runner/service, and selected source and
+review-evidence directories. Fresh candidates and freshly named evidence within
+those directories reuse that decision. Every invocation still discloses its
+candidate, exact paths and digests, declared recipient, and independently observed
+endpoint (or `null` when unknown). Changing the project, recipient or approved
+data boundary requires one amendment decision; revocation stops reuse. Secrets,
+authentication files, caches, transcripts and unrelated project files remain
+outside the grant. Path screening does not establish that arbitrary file contents
+are secret-free: the caller must select review material within those data classes.
+
+The installed plugin provides `node <plugin-root>/scripts/critic-export-consent.mjs
+--help`. Its `plan` and `check` commands are read-only; `record` binds the displayed
+plan digest to the actual user decision reference and SHA-256, and `revoke`
+invalidates that saved decision. Records live in owner-private Git state and do
+not dirty the candidate checkout. The decision reference is attribution, not
+cryptographic proof that a human approved. The CLI never calls a review provider.
+Its request shape and flags are printed by `--help`; native coordinators must
+explicitly normalize their selected reference records before using the check.
+
+Consent coverage never grants host permission or changes access mode. A denied
+host remains denied, and additional host checks remain visible. This setup does
+not require Full Access or promise that an external approval reviewer will accept
+a later invocation. It adds no routine PO gate after setup.
+
 ## Know the boundary
 
 `0.6.2` is the current release. The three-runner Greenfield Driver contract

@@ -224,3 +224,122 @@ export function validateCriticExportAuthorization({ receipt, packet, exportView,
   }, { ...options, now: () => receipt.checkedAtMs });
   return expected.ok && JSON.stringify(stable(expected.receipt)) === JSON.stringify(stable(receipt));
 }
+
+// Standing consent is user-decision attribution, not a packet authorization or
+// host permission. Keep its schemas and checks separate from the V3 policy above.
+export const CRITIC_EXPORT_CONSENT_SCHEMA = "pipeline.critic-export-consent.v1";
+export const CRITIC_EXPORT_CONSENT_PLAN_SCHEMA = "pipeline.critic-export-consent-plan.v1";
+const CONSENT_CLASSES = ["repository-candidate", "selected-review-evidence"];
+const CONSENT_EXCLUSIONS = ["secrets", "authentication", "caches", "transcripts", "unrelated-project-files"];
+const digestPattern = /^[a-f0-9]{64}$/u;
+const label = (value) => typeof value === "string" && value.trim() === value
+  && value.length > 0 && value.length <= 512 && !/[\x00-\x1f\x7f]/u.test(value);
+
+export function criticExportConsentPathAllowed(path) {
+  return validPath(path) && !/[\x00-\x1f\x7f]/u.test(path)
+    && !path.split("/").some((part) => /^(?:\.git|\.env(?:\..*)?|\.ssh|\.aws|\.azure|\.cache|node_modules|private|auth(?:entication)?|credentials?|secrets?|transcripts?|sessions?|cache|caches)$/iu.test(part)
+      || /(?:^|[._-])(?:credentials?|secrets?|transcripts?|auth-token)(?:[._-]|$)/iu.test(part)
+      || /\.(?:pem|key|p12|pfx)$/iu.test(part));
+}
+
+function validConsentScope(scope) {
+  return exactKeys(scope, ["project", "recipient", "purpose", "sourceRoots", "evidenceRoots"])
+    && exactKeys(scope.project, ["realPath", "device", "inode"])
+    && label(scope.project.realPath) && isAbsolute(scope.project.realPath)
+    && [scope.project.device, scope.project.inode].every((value) => typeof value === "string" && /^\d+$/u.test(value))
+    && exactKeys(scope.recipient, ["provider", "runner", "service"])
+    && Object.values(scope.recipient).every(label) && scope.purpose === "critic"
+    && [scope.sourceRoots, scope.evidenceRoots].every((roots) => validSortedPaths(roots)
+      && roots.length > 0 && roots.length <= 128 && roots.every(criticExportConsentPathAllowed));
+}
+
+export function prepareCriticExportConsent(scope) {
+  if (!validConsentScope(scope)) return { ok: false, code: "consent-scope-invalid" };
+  const plan = {
+    schema: CRITIC_EXPORT_CONSENT_PLAN_SCHEMA,
+    scope: structuredClone(scope),
+    dataClasses: [...CONSENT_CLASSES], excludedDataClasses: [...CONSENT_EXCLUSIONS],
+    decisionMeaning: "user-decision-attribution-only; external-host-approval-not-granted",
+  };
+  return { ok: true, code: "consent-plan-ready", plan, planSha256: criticExportPolicyDigest(plan) };
+}
+
+export function recordCriticExportConsent({ plan, planSha256, decisionReference, decisionSha256 } = {}) {
+  const prepared = prepareCriticExportConsent(plan?.scope);
+  if (!prepared.ok || !exactPolicy(prepared.plan, plan) || prepared.planSha256 !== planSha256) {
+    return { ok: false, code: "consent-plan-drift" };
+  }
+  if (!label(decisionReference) || !digestPattern.test(decisionSha256 ?? "")) {
+    return { ok: false, code: "consent-decision-required" };
+  }
+  return { ok: true, code: "consent-recorded", consent: {
+    schema: CRITIC_EXPORT_CONSENT_SCHEMA, status: "active", plan: structuredClone(plan), planSha256,
+    decision: { reference: decisionReference, sha256: decisionSha256 },
+  } };
+}
+
+function validConsentRecord(consent) {
+  if (!exactKeys(consent, ["schema", "status", "plan", "planSha256", "decision"])
+    || consent.schema !== CRITIC_EXPORT_CONSENT_SCHEMA || !["active", "revoked"].includes(consent.status)
+    || !exactKeys(consent.decision, ["reference", "sha256"])) return false;
+  return recordCriticExportConsent({ plan: consent.plan, planSha256: consent.planSha256,
+    decisionReference: consent.decision.reference, decisionSha256: consent.decision.sha256 }).ok;
+}
+
+export function revokeCriticExportConsent(consent) {
+  if (!validConsentRecord(consent)) return { ok: false, code: "consent-invalid" };
+  return { ok: true, code: "consent-revoked", consent: { ...structuredClone(consent), status: "revoked" } };
+}
+
+/** Caller supplies verified physical identity and digest-bound selected records.
+ * Native referenceRecords must be explicitly normalized; this does not validate
+ * either a native packet or the classic candidate-packet v1 schema.
+ */
+export function checkCriticExportConsent({ scope, consent, invocation, hostGate = "not-observed",
+  providerGate = "not-observed", observedEndpoint = null } = {}) {
+  const prepared = prepareCriticExportConsent(scope);
+  const result = (code, coverage = "not-covered") => ({
+    schema: "pipeline.critic-export-consent-check.v1", ok: code === "consent-covered", code,
+    coverage, externalGates: { host: hostGate, provider: providerGate },
+    observedEndpoint, declaredRecipient: scope?.recipient ?? null,
+    disclosure: prepared.ok && code !== "consent-invocation-invalid" ? { project: structuredClone(scope.project), purpose: scope.purpose,
+      dataClasses: [...CONSENT_CLASSES], excludedDataClasses: [...CONSENT_EXCLUSIONS],
+      sourceRoots: [...scope.sourceRoots], evidenceRoots: [...scope.evidenceRoots],
+      candidate: validOid(invocation?.candidate?.commit) && validOid(invocation?.candidate?.tree)
+        ? { commit: invocation.candidate.commit, tree: invocation.candidate.tree } : null,
+      selectedRecords: Array.isArray(invocation?.records) ? invocation.records
+        .filter((record) => criticExportConsentPathAllowed(record?.path) && digestPattern.test(record?.sha256 ?? "")
+          && CONSENT_CLASSES.includes(record?.dataClass))
+        .map(({ path, sha256, dataClass }) => ({ path, sha256, dataClass })) : [],
+      invocationSha256: invocation ? criticExportPolicyDigest(invocation) : null,
+      planSha256: prepared.planSha256 } : null,
+    hostApprovalGranted: false,
+  });
+  if (!prepared.ok) return result("consent-scope-invalid");
+  if (!GATE_STATES.has(hostGate) || !GATE_STATES.has(providerGate)
+    || !(observedEndpoint === null || label(observedEndpoint))) return result("external-gate-state-invalid");
+  if (!exactKeys(invocation, ["candidate", "records"])
+    || !exactKeys(invocation.candidate, ["commit", "tree"])
+    || !Object.values(invocation.candidate).every(validOid)
+    || !Array.isArray(invocation.records) || invocation.records.length === 0 || invocation.records.length > 512
+    || !invocation.records.every((record) => exactKeys(record, ["path", "sha256", "dataClass"])
+      && criticExportConsentPathAllowed(record.path) && digestPattern.test(record.sha256 ?? "")
+      && CONSENT_CLASSES.includes(record.dataClass))
+    || new Set(invocation.records.map((record) => record.path)).size !== invocation.records.length) {
+    return result("consent-invocation-invalid");
+  }
+  if (!consent) return result("consent-missing");
+  if (!validConsentRecord(consent)) return result("consent-invalid");
+  if (consent.status === "revoked") return result("consent-revoked");
+  if (!exactPolicy(consent.plan.scope.project, scope.project)) return result("consent-project-not-covered");
+  if (!exactPolicy(consent.plan.scope.recipient, scope.recipient)) return result("consent-recipient-not-covered");
+  if (consent.planSha256 !== prepared.planSha256) return result("consent-scope-not-covered");
+  for (const record of invocation.records) {
+    const roots = record.dataClass === "repository-candidate" ? scope.sourceRoots : scope.evidenceRoots;
+    if (!roots.some((root) => record.path === root || record.path.startsWith(`${root}/`))) {
+      return result("consent-path-not-covered");
+    }
+  }
+  if (hostGate === "denied" || providerGate === "denied") return result("external-gate-denied", "covered");
+  return result("consent-covered", "covered");
+}

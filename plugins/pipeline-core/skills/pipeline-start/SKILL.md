@@ -81,6 +81,18 @@ top-level directory for a kind this table already names a home for.
 
 ### One onboarding consent, not a chain of prompts
 
+Private Critic export has a separate bounded setup decision: use the installed
+`scripts/critic-export-consent.mjs --help` contract when preparing it. Disclose the
+physical project, declared provider/runner/service, approved source/evidence roots,
+and excluded secrets/authentication/caches/transcripts/unrelated files once.
+Record only the actual decision reference and digest against the displayed plan
+digest. Normal candidate and evidence changes inside that scope reuse consent;
+check and disclose exact paths/digests on each invocation without another PO gate.
+Changed project, recipient or scope needs an amendment; revocation stops reuse.
+The saved decision is attribution, never host approval. Preserve denied or
+additional-check-required host status, never infer an endpoint from a model label,
+and never request Full Access as a prerequisite for this consent mechanism.
+
 When the user has directly agreed to use Agent Pipeline for this repository,
 consent authorizes the bounded local onboarding happy path: read-only plans
 and readbacks, portable authority seed, any plan-disclosed local Git init,
