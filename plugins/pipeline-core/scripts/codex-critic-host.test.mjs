@@ -676,11 +676,11 @@ const preparedResult = prepareNativeCritic({
 const preparedRecord = readJsonBounded(preparedPath);
 const prepared = preparedRecord.value;
 
-check("prepare emits the candidate-bound V3 normal Critic route", () => {
+check("T1 prepare and host execution bind the candidate-high-risk V3 route", () => {
   assert.deepEqual(criticGateCalls, [{ rootDir: repo, intent: "dispatch", runner: "codex" }]);
-  assert.equal(preparedResult.model, "gpt-5.6-terra");
-  assert.equal(preparedResult.effort, "high");
-  assert.equal(prepared.route.duty, "critic_normal");
+  assert.equal(preparedResult.model, "gpt-6-astra");
+  assert.equal(preparedResult.effort, "max");
+  assert.equal(prepared.route.duty, "critic_high_risk");
   assert.equal(prepared.route.alias, prepared.route.model);
   assert.equal(prepared.route.candidateCommit, candidate.commit);
   assert.match(prepared.route.sourceSha256, /^[a-f0-9]{64}$/);
@@ -948,6 +948,9 @@ check("non-T1 preparation retains the normal assurance", () => {
   const normalPreparedRecord = readJsonBounded(normalPreparedPath);
   const normalPrepared = normalPreparedRecord.value;
   assert.equal(normalPrepared.assurance, ASSURANCE);
+  assert.equal(normalPrepared.route.duty, "critic_normal");
+  assert.equal(normalPrepared.route.model, "gpt-5.6-terra");
+  assert.equal(normalPrepared.route.effort, "high");
   assert.doesNotThrow(() => validateHostReturn(
     normalPrepared,
     normalPreparedRecord.sha256,
@@ -1098,6 +1101,21 @@ const receiptDir = join(root, "published-receipts");
 mkdirSync(receiptDir);
 const receiptPath = join(receiptDir, "receipt.json");
 writeJson(returnPath, validReturn);
+check("finalize rejects a prepared route mismatched to its T1 trigger", () => {
+  const tampered = structuredClone(prepared);
+  tampered.route = {
+    ...tampered.route,
+    duty: "critic_normal",
+    alias: "gpt-5.6-terra",
+    model: "gpt-5.6-terra",
+    effort: "high",
+  };
+  writeJson(preparedPath, tampered);
+  assert.throws(() => finalizeNativeCritic({
+    repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root, dispatchStatePath, preparedPath, returnPath, receiptPath, observers,
+  }), /prepared route drift/);
+  writeJson(preparedPath, prepared);
+});
 check("finalize transaction paths must be pairwise distinct", () => {
   assert.throws(() => finalizeNativeCritic({
     repoRoot: repo,

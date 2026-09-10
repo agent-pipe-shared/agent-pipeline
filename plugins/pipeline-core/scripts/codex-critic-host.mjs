@@ -1018,14 +1018,15 @@ function assertFingerprintMapEqual(before, after, label) {
   if (JSON.stringify(before) !== JSON.stringify(after)) fail(`${label} repository mutation observed`);
 }
 
-function routeForNormalCritic(repoRoot, candidateCommit) {
+function routeForCriticRequest(repoRoot, request) {
+  const dutyId = request.trigger_row === "T1" ? "critic_high_risk" : "critic_normal";
   const route = resolveV3DutyRoute({
     rootDir: repoRoot,
-    dutyId: "critic_normal",
+    dutyId,
     runner: "codex",
-    candidateCommit,
+    candidateCommit: request.candidate_commit,
   });
-  if (route.state !== "default") fail("normal Critic V3 duty is unavailable");
+  if (route.state !== "default") fail("Critic V3 duty is unavailable for request trigger");
   return {
     duty: route.dutyId,
     runner: route.runner,
@@ -1133,7 +1134,7 @@ export function prepareNativeCritic(options, deps = {}) {
   if (request.ruleset_sha !== request.candidate_commit) fail("self-application requires ruleset_sha and candidate_commit to match");
   const execution = executionBindings(pipelineRoot);
   assertFingerprintMapEqual(protectedBefore, protectedFingerprintMap(repoRoot, pipelineRoot, observers), "ruleset identity");
-  const route = routeForNormalCritic(repoRoot, request.candidate_commit);
+  const route = routeForCriticRequest(repoRoot, request);
   const nonce = (deps.randomBytes ?? nodeRandomBytes)(32).toString("hex");
   const cleanupCapability = (deps.randomBytes ?? nodeRandomBytes)(32).toString("hex");
   const dispatchId = sha256(`${request.task_id}\0${request.candidate_commit}\0${nonce}`).slice(0, 32);
@@ -1487,7 +1488,7 @@ function validatePrepared(prepared, repoRoot) {
     "requestSha256", "referenceSetSha256", "reviewFingerprintSha256", "protectedBefore",
     "roleContractSha256", "promptContractSha256", "verdictSchemaSha256", "hostReturnSchemaSha256", "routingProvenance", "rulesetCheckoutSha", "executionSetSha256",
   ], "prepared bindings");
-  const route = routeForNormalCritic(repoRoot, prepared.request.candidate_commit);
+  const route = routeForCriticRequest(repoRoot, prepared.request);
   if (JSON.stringify(prepared.route) !== JSON.stringify(route)) fail("prepared route drift");
   if (!isAbsolute(prepared.review.root) || prepared.sources.reviewRoot !== prepared.review.root || !isAbsolute(prepared.sources.rulesetRoot)
     || prepared.review.base !== prepared.request.review_base
