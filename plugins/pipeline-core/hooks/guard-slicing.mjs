@@ -426,7 +426,7 @@ function appendLedgerRecord(commonDir, sessionId, record, dependencies) {
 
 function buildLedgerRecord({
   nowFn, sessionId, event, tool, agentType, fanout, pendingCount, batchHash, advisoryEmitted,
-  workflowRecoveredCount,
+  workflowRecoveredCount, runFingerprint,
 }) {
   return {
     schema: LEDGER_SCHEMA,
@@ -441,6 +441,7 @@ function buildLedgerRecord({
     advisoryEmitted: Boolean(advisoryEmitted),
     channel: advisoryEmitted ? NUDGE_CHANNEL : null,
     workflowRecoveredCount: workflowRecoveredCount ?? null,
+    runFingerprint: runFingerprint ?? null,
   };
 }
 
@@ -471,11 +472,12 @@ function triggerBMessage(pendingCount) {
     + "justification.";
 }
 
-function triggerAAlreadyFiredInRun(records) {
+function triggerAAlreadyFiredInRun(records, runFingerprint) {
   for (let index = records.length - 1; index >= 0; index -= 1) {
     const record = records[index];
     if (record?.event === LEDGER_EVENT_FANOUT) return false;
-    if (record?.event === LEDGER_EVENT_DISPATCH && record?.advisoryEmitted === true) return true;
+    if (record?.event === LEDGER_EVENT_DISPATCH && record?.advisoryEmitted === true
+      && record?.runFingerprint === runFingerprint) return true;
   }
   return false;
 }
@@ -515,6 +517,7 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
   // header note (NVA-B-SLICINGFANOUT-1) for why this replaces
   // `inFlightSiblingCount >= 2` rather than supplementing it.
   let lastCompletedGroupIsReset = false;
+  let runFingerprint = null;
 
   if (typeof transcriptPath === "string" && transcriptPath !== "") {
     const rows = (options.readTranscriptRowsFn ?? readTranscriptRows)(transcriptPath, options);
@@ -522,6 +525,7 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
       const groups = groupDispatchMessages(rows);
       const excluded = excludeInFlightGroup(groups, toolName, toolInput);
       runLength = computeTrailingSingleRun(excluded.groups);
+      runFingerprint = sha256Hex(excluded.groups);
       lastCompletedGroupIsReset = classifyGroup(excluded.groups[excluded.groups.length - 1]) === "reset";
     }
     // rows === null (unreadable/malformed transcript) -> fail open: runLength stays 0, no nudge
@@ -585,12 +589,13 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
   const priorRecords = commonDir === null || commonDir === undefined
     ? []
     : (options.readLedgerRecordsFn ?? readLedgerRecords)(ledgerPath(commonDir, sessionId), options);
-  const advisoryEmitted = runLength === SLICING_THRESHOLD && !triggerAAlreadyFiredInRun(priorRecords);
+  const advisoryEmitted = runLength === SLICING_THRESHOLD
+    && !triggerAAlreadyFiredInRun(priorRecords, runFingerprint);
 
   const record = buildLedgerRecord({
     nowFn, sessionId, event: fanout ? LEDGER_EVENT_FANOUT : LEDGER_EVENT_DISPATCH, tool: toolName,
     agentType: resolveAgentTypeHint(toolInput), fanout, pendingCount: null, batchHash: null,
-    advisoryEmitted, workflowRecoveredCount,
+    advisoryEmitted, workflowRecoveredCount, runFingerprint,
   });
   (options.appendLedgerRecordFn ?? appendLedgerRecord)(commonDir, sessionId, record, options);
 

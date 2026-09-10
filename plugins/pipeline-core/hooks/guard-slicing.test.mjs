@@ -209,6 +209,24 @@ test("GS5d: repeated evaluations of the same transcript emit once, then a reset 
   assert.notEqual(independentSession.stdout, "", "ledger rate limiting is isolated by session");
 });
 
+test("GS5e: a reset and new eligible run observed together is not suppressed by the prior run", () => {
+  const current = { subagent_type: "pipeline-core:goldfish-mechanic", prompt: "next" };
+  const oldRun = [dispatchRow("m1", "Task"), dispatchRow("m2", "Task"), dispatchRow("m3", "Task")];
+  const store = makeStore({ [ORCH_TRANSCRIPT]: transcriptText(oldRun) });
+  const input = { transcript_path: ORCH_TRANSCRIPT, session_id: "s5e", tool_name: "Task", tool_input: current };
+  assert.notEqual(evaluateSlicingGuard(input, baseOptions(store)).stdout, "");
+
+  // The hook misses the reset call itself; its next observation sees the reset
+  // and all three singles in the new run at once.
+  store.files.set(ORCH_TRANSCRIPT, transcriptText([
+    ...oldRun,
+    fanoutRow("m4", [["Task", { a: 1 }], ["Agent", { b: 2 }]]),
+    dispatchRow("m5", "Task"), dispatchRow("m6", "Task"), dispatchRow("m7", "Task"),
+  ]));
+  const newRun = evaluateSlicingGuard(input, baseOptions(store));
+  assert.notEqual(newRun.stdout, "", "the newly observed run must emit despite the prior run's advisory");
+});
+
 // --- In-flight-turn exclusion (the correctness crux) ---------------------
 
 test("GS6a: in-flight turn already written to the transcript is excluded by identity, not counted as a 4th single", () => {
