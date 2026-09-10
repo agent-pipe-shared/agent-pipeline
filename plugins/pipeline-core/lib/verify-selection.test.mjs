@@ -38,7 +38,12 @@ const release = planVerifySelection({ ...common, mode: "release", changedPaths: 
 assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: release }, "release"), true);
 assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: impacted }, "release"), false);
 assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "other", exitCode: 0, selection: impacted }, "critic"), false);
+const conservativeCritic = planVerifySelection({ ...common, mode: "critic", changedPaths: ["unknown/new.bin"] });
+assert.equal(conservativeCritic.execution, "full");
+assert.deepEqual(conservativeCritic.unmatchedPaths, ["unknown/new.bin"]);
+assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: conservativeCritic }, "critic"), true);
+assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: conservativeCritic }, "push"), false);
 assert.equal(validateVerifySelection({ ...impacted, omittedSuiteIds: [] }), false);
 assert.equal(validateVerifySelection({ ...impacted, selectionSha256: "0".repeat(64) }), false);
 
-console.log("verify-selection: 11 tests passed");
+console.log("verify-selection: 15 tests passed");
