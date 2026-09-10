@@ -11,8 +11,8 @@ occasional job later in this guide.
 
 Start with the top-level [README](README.md) for the value proposition and
 terminology, continue with this setup guide, then read the operator-facing
-[`docs/usage.md`](docs/usage.md) before the maintained end-to-end flow in
-[`PIPELINE_FLOW.md`](PIPELINE_FLOW.md).
+[`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) before the operator-facing
+[`docs/usage.md`](docs/usage.md).
 
 ## Before you start
 
@@ -84,7 +84,7 @@ the runner's supported integration and follow its setup path. See
 [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for exact controls,
 prerequisites, and manual responsibilities.
 
-## Consumer onboarding details {#consumer-onboarding-details}
+## Consumer onboarding details
 
 <a id="consumer-onboarding-details"></a>
 
@@ -97,10 +97,7 @@ onboarding Driver, exercised across Claude, Codex, and Antigravity: it
 inspects the directory and returns the next structured action, and it owns
 the sequence. Follow the returned action as given and replace only its named
 human-input placeholders instead of reconstructing a private sequence of
-onboarding commands. The digest-bound `apply-portable-seed` command in step 1
-below is what that returned action resolves to for an operator invoking it
-directly; it is the fallback for an attended step, not the primary
-instruction for a first read of this section.
+onboarding commands.
 
 ### 0. Bind the supported runner integration and fully restart its host
 
@@ -352,7 +349,7 @@ node "<absolute-plugin-root>/scripts/po-human-approval.mjs" approve-all --repo-r
 ```
 
 Passkey/WebAuthn, IAM/hardware-key adapters, and remote provisional codes are
-future adapter work, not 0.5.0 CLI features. A code pasted into the same agent
+future adapter work, not current CLI features. A code pasted into the same agent
 chat is visible to that agent and cannot replace final local proof for an
 irreversible action. See [PO approval](docs/po-human-approval.md).
 
@@ -492,8 +489,8 @@ an attended local Codex session and retain the result in the handover.
 ## Where to go next
 
 - [README](README.md) — why the pipeline exists and its core capabilities.
-- [Usage guide](docs/usage.md) — operator-facing commands and routine work.
 - [PIPELINE_FLOW.md](PIPELINE_FLOW.md) — the maintained V3 flow and boundaries.
+- [Usage guide](docs/usage.md) — operator-facing commands and routine work.
 - [Operating Model](docs/operating-model.md) — normative roles, gates, and
   lifecycle rules.
 - [Runtime boundary](docs/runtime-boundary.md) — exact controls, prerequisites,

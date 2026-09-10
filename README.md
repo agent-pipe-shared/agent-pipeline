@@ -8,8 +8,8 @@ inspect later.
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
 > **Newcomer path:** Read this page, then follow [SETUP](SETUP.md) for the
-> normal consumer adoption flow, continue with [Usage](docs/usage.md), and use
-> [PIPELINE_FLOW](PIPELINE_FLOW.md) for the lifecycle. The links below are
+> normal consumer adoption flow, continue with [PIPELINE_FLOW](PIPELINE_FLOW.md)
+> for the lifecycle, and then use [Usage](docs/usage.md). The links below are
 > optional reference.
 
 > **Documentation line: `0.6.2`.** This is the next release's documented scope,
@@ -77,8 +77,8 @@ For a project that will consume the pipeline, go to
 [Activate the pipeline in one project repository](SETUP.md#a-activate-the-pipeline-in-one-project-repository).
 It starts with prerequisites and the runner's
 public onboarding path; it does not ask a consumer to run this repository's
-source-maintainer setup. Continue with [Usage](docs/usage.md), then use
-[PIPELINE_FLOW](PIPELINE_FLOW.md) to choose the delivery route and
+source-maintainer setup. Continue with [PIPELINE_FLOW](PIPELINE_FLOW.md) to
+choose the delivery route, then use [Usage](docs/usage.md), and consult
 [the documentation map](docs/README.md) for evidence, security, cost, and
 runtime-boundary reference.
 
@@ -90,7 +90,9 @@ flowchart LR
     Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
     Goldfish -->|"evidence"| Gates["Deterministic gates<br/>(tests, security, lint)"]
     Gates -.->|"fail"| Goldfish
-    Gates -->|"pass"| Critic["Critic<br/>(independent reviewer)"]
+    Gates -->|"pass"| Review{"Critic required?"}
+    Review -->|"yes"| Critic["Critic<br/>(independent reviewer)"]
+    Review -->|"no"| Elephant
     Critic -->|"findings"| Elephant
     Elephant -->|"decision"| PO
 ```
@@ -98,7 +100,7 @@ flowchart LR
 ## The front door: optional design pre-stage
 
 Before the pipeline itself there's deliberately no mandatory step, just a
-front door (the dotted branch in the diagram above): idea → optional design
+front door: idea → optional design
 brainstorming with any chat AI (guide + standard prompt + lean export
 template under [`docs/design/README.md`](docs/design/README.md)) →
 requirements export → feeds the pipeline. If a requirement looks large at
@@ -204,8 +206,8 @@ einer begrenzten Aufgabe, Maschinenevidenz, unabhängiger Prüfung und einem
 dauerhaften, später einsehbaren Nachweis.
 
 > **Einstieg für Neue:** Lies diese Seite und folge dann [SETUP](SETUP.md) für
-> den normalen Consumer-Ablauf, lies danach [Usage](docs/usage.md) und nutze
-> [PIPELINE_FLOW](PIPELINE_FLOW.md) für den Lifecycle. Die weiteren Links sind
+> den normalen Consumer-Ablauf, nutze danach [PIPELINE_FLOW](PIPELINE_FLOW.md)
+> für den Lifecycle und lies anschließend [Usage](docs/usage.md). Die weiteren Links sind
 > Nachschlagewerk.
 
 > **Dokumentationslinie: `0.6.2`.** Sie beschreibt den dokumentierten Umfang
@@ -277,8 +279,8 @@ Für ein Consumer-Projekt folge in [SETUP dem Abschnitt „Activate the pipeline
 in one project repository“](SETUP.md#a-activate-the-pipeline-in-one-project-repository).
 Dieser Weg beginnt mit Voraussetzungen und dem öffentlichen
 Onboarding-Pfad des Runners; er verlangt nicht die source-maintainer-`setup.mjs`.
-Danach folgt [Usage](docs/usage.md); [PIPELINE_FLOW](PIPELINE_FLOW.md) erklärt
-die Lieferroute, und die [Dokumentationskarte](docs/README.md) verweist auf
+Danach erklärt [PIPELINE_FLOW](PIPELINE_FLOW.md) die Lieferroute; anschließend
+folgt [Usage](docs/usage.md), und die [Dokumentationskarte](docs/README.md) verweist auf
 Evidenz, Security, Kosten und Runner-Grenzen.
 
 ## Wie es funktioniert
@@ -289,7 +291,9 @@ flowchart LR
     Elephant -->|"Spec + Dispatch"| Goldfish["Goldfish<br/>(frischer Kontext)"]
     Goldfish -->|"Nachweis"| Gates["Deterministische Gates<br/>(Tests, Security, Lint)"]
     Gates -.->|"fehlgeschlagen"| Goldfish
-    Gates -->|"bestanden"| Critic["Critic<br/>(unabhängiger Prüfer)"]
+    Gates -->|"bestanden"| Review{"Critic erforderlich?"}
+    Review -->|"ja"| Critic["Critic<br/>(unabhängiger Prüfer)"]
+    Review -->|"nein"| Elephant
     Critic -->|"Befunde"| Elephant
     Elephant -->|"Entscheidung"| PO
 ```
@@ -297,7 +301,7 @@ flowchart LR
 ## Die Vordertür: optionale Design-Vorstufe
 
 Vor der eigentlichen Pipeline steht bewusst kein Pflichtschritt, sondern eine
-Vordertür (im Diagramm oben der gestrichelte Zweig): Idee → optionales
+Vordertür: Idee → optionales
 Design-Brainstorming mit einer beliebigen Chat-KI (Guide + Standard-Prompt +
 schlankes Export-Template unter [`docs/design/README.md`](docs/design/README.md))
 → Requirements-Export → speist die Pipeline. Wirkt eine Anforderung bei der

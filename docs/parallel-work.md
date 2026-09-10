@@ -52,19 +52,6 @@ message. None of those facts alone proves that the model received or acted on
 the message. Fixture tests validate source behavior and registration shapes;
 they are not evidence of live delivery on every runner.
 
-## Current evidence boundary
-
-The accepted [ADR-0080](adr/0080-parallel-dispatch-slicing-enforcement.md)
-records the Claude implementation and its prior channel probe. The current
-native delivery observation confirms checked installed/source parity for the
-Codex slicing files and, after a corrected state-key derivation, confirms that
-one parent-bound `SubagentStart` observation persisted. It does not establish
-a parent `PreToolUse` `spawn_agent` observation, a due nudge, or
-model-visible `additionalContext` delivery. Antigravity live delivery remains
-unproven by that observation as well. The sanitized receipt and its correction
-are recorded in
-[the delivery observation](../backlog/evidence/2026-09-08-native-slicing-delivery-observation.md).
-
 For source details, see the configured Claude
 [`Task|Agent|Workflow|TodoWrite` hook](../plugins/pipeline-core/hooks/hooks.json),
 the Codex [native hook configuration](../plugins/pipeline-core/hooks/codex-hooks.json),

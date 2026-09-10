@@ -1,8 +1,8 @@
 # Documentation map
 
 The canonical reader path is the top-level [README](../README.md),
-[`SETUP.md`](../SETUP.md), [`usage.md`](usage.md), and then
-[`PIPELINE_FLOW.md`](../PIPELINE_FLOW.md). Use the rest of this map as
+[`SETUP.md`](../SETUP.md), [`PIPELINE_FLOW.md`](../PIPELINE_FLOW.md), and then
+[`usage.md`](usage.md). Use the rest of this map as
 reference; `overview.md` is a short companion, not a competing front door.
 
 `0.6.2` names the next release's documented scope. It is not a tag,
@@ -13,9 +13,9 @@ local candidate has passed release gates.
 
 - [`../SETUP.md`](../SETUP.md) — routine consumer adoption, prerequisites, and
   later source-maintainer reference.
-- [`usage.md`](usage.md) — the normal user journey after a project is ready.
 - [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md) — route selection, gates,
   recovery, and close.
+- [`usage.md`](usage.md) — the normal user journey after a project is ready.
 - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
   preview-first migration and the Codex lifecycle V4.
 - [`runtime-boundary.md`](runtime-boundary.md) and
