@@ -1,11 +1,23 @@
 # Current candidate inventory and reader integration audit
 
-This is a technical audit of the named current artifacts at the dispatch's
-exact candidate commit/tree against the accepted local candidate requirements.
-It is not a historical commit-range review or the separate reader exercise.
-The request and receipt must use explicit current-artifact scope and bind all
-submitted source bytes. Judge the current implementation, including reachable
-entry points, error paths and the full direct contracts below.
+The initial technical audit reviews the named current artifacts at the
+dispatch's exact candidate commit/tree against the accepted local candidate
+requirements. Its request and receipt use explicit current-artifact scope and
+bind all submitted source bytes. Judge the current implementation, including
+reachable entry points, error paths and the full direct contracts below.
+This is separate from the reader exercise.
+
+After that initial audit, QG-13 correction reviews use only the immediately
+previous reviewed commit through the new candidate, fixes in that diff and
+their direct regressions. The source lists below define retained initial
+coverage, not instructions to repeat a full audit in each follow-up. Use
+native `reviewBase` with `reviewMode: "full"` for an exact-range follow-up;
+never submit another current-artifact scope to reopen unchanged cleared areas.
+The coordinator preserves actual results, receipt/source bindings, source
+equality and the continuous finding-disposition lineage; the fresh reviewer
+receives no prior verdict prose or findings. Apply the inventory spec's
+explicit actual-PASS criterion and lineage requirements without claiming that
+a later diff receipt itself contains the original eight-source coverage.
 
 ## Inventory and public claims
 

@@ -254,10 +254,12 @@ normative shape is:
    dispatch. The block size is a bound the Elephant states before
    dispatching (e.g. "this sweep's N items"), so a regression cannot ride
    along unreviewed indefinitely. This does not change a single package's
-   correction-review budget: after an initial blocking Critic result, perform
-   at most one fresh re-review of the correction. If that re-review still
-   reports a blocking finding, the Elephant self-verifies the next correction
-   directly; do not dispatch a third Critic round for the same package
+   correction-review rule: QG-13 defaults to one initial round plus one fresh
+   re-review, then self-verification. An explicit actual-PASS delivery criterion
+   permits further fresh reviews of only each immediate correction diff,
+   including fixes and direct regressions, within existing budgets. Preserve
+   the original coverage and continuous review lineage; never reopen unchanged
+   cleared areas or turn self-verification into PASS
    (`guardrails/quality-gates.md` QG-13).
 8. **Close.** Synchronize handover and history, preserve evidence, perform the
    required retro and run close extensions. A feature lifecycle is closed only
@@ -349,9 +351,15 @@ first hunts for defects, then reports only findings it can support. “No
 findings” is valid. The Elephant decides whether each finding is fixed,
 accepted with a reason, or escalated; it must not silently discard one.
 
-A Critic round that ends in a blocking finding gets at most one re-review
-round after rework; a further blocking finding on the same package is
-self-verified directly rather than dispatched a third time
+QG-13 defaults to one initial Critic round plus one fresh re-review, then
+self-verification. When the delivery contract explicitly requires actual
+independent PASS, further reviews may examine only the immediately previous
+reviewed commit through the new correction candidate, its fixes and direct
+regressions. The coordinator must verify retained source coverage and the
+continuous receipt/finding-disposition lineage before a latest diff PASS can
+satisfy that contract. Unchanged cleared areas are not reopened; a diff receipt
+never claims a new whole-artifact review. Self-verification never supplies
+PASS, and execution/cost/course budgets still apply
 (`guardrails/quality-gates.md` QG-13).
 
 If a duty is unavailable, a precondition drifts, evidence is stale, a stop

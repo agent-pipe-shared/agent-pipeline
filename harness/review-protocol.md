@@ -103,19 +103,23 @@ the executing harness/routing/schema set. It does not infer authority from an
 installed plugin cache. Review-checkout cleanup happens only after durable
 receipt publication and is not review evidence.
 
-**Phase 2.6 review economy:** round 1 at an architecture/security boundary is
-always **full**. A later round may be **delta** only when the Coordinator binds
-the exact base/head/tree, changed paths, changed-behaviour claims, an immutable
-prior receipt ID/digest, a complete hash-bound path-to-invariant map, and an
-unambiguous impact confirmation. Missing proof, an unknown path, a new trust
-boundary, or ambiguous impact falls back to full; it never silently narrows.
-There are at most two Critic rounds per package: the initial run plus at most
-one fresh re-Critic for the first correction commit. The host reconciles that
-exact correction range before selecting either full or delta. If that
-re-Critic still reports a blocking finding, the Elephant self-verifies the
-next correction directly rather than dispatching a third Critic round. A
-Critic receives the selected mode and affected invariant IDs, never prior
-verdict prose or findings.
+**Phase 2.6 review economy:** the initial architecture/security review is
+`full`. Every later correction review is limited to the exact immediately
+previous reviewed commit through the new candidate, its fixes and direct
+regressions; unchanged direct contracts are context, not reopened review
+targets. The Coordinator binds base/head/tree, changed paths and the complete
+source/receipt lineage required by QG-13. A transport's `delta` mode additionally
+requires its hash-bound path-to-invariant map and unambiguous impact proof.
+If those proofs are missing, do not dispatch an invented narrow mode or fall
+back to a whole-artifact hunt. A transport that admits exact ranges with
+`reviewMode: "full"` may fully examine that correction range; the mode label
+does not widen the range. In the native API use `reviewBase`, not a repeated
+`reviewScope: { kind: "current-artifacts", ... }`, for these follow-ups.
+QG-13 retains one initial round plus one re-review by default, and permits
+further correction-only reviews only for an explicit actual-PASS delivery
+criterion within existing execution/cost/course budgets. Self-verification
+never becomes a Critic PASS. Prior results and finding dispositions stay in
+the Coordinator's control record, not the fresh Critic's input.
 
 **Progress and recovery:** elapsed time and liveness prose are not progress.
 The host records a monotonic vector over bound tree changes, verified output,
@@ -188,21 +192,19 @@ map's reporting validation rather than silently choosing a replacement control.
 **Rule (validate first):** Findings that violate the skip rule or lack evidence are rejected with a short note — no debate.
 **Rule (disposition):** EVERY blocker/major finding receives exactly one disposition: **fix** (rework dispatch) · **reject with recorded justification** · **escalate to the PO**. Minor findings: fix now, file as backlog item, or reject.
 **Rule (rework):** Rework is a **NEW dispatch with fresh context and a refined briefing** — never continued work in the failed context. BEFORE any re-dispatch or model escalation, run the harness checklist (P1 / `policies/tooling-policy.md` G2): (1) briefing complete and consistent? (2) context clean? (3) tools/permissions right-sized? (4) hooks/gates wired and actually run?
-**Rule (cycle cap, QG-13):** After the initial Critic round for a package, at
-most **one** re-review round follows a FAIL/blocking-finding rework: the
-Elephant dispatches the rework, then re-dispatches a fresh Critic exactly once
-against the reworked diff. If that re-review round also reports a blocking
-finding, the Elephant self-verifies the further rework directly instead of
-dispatching a third Critic round for that package. The cap does not reset by
-re-labeling continued rework on the same finding as a "new" package or task;
-only a genuine scope change (a materially different diff, a newly discovered
-A/G/S touch, or explicit PO direction) licenses a fresh initial round.
+**Rule (cycle cap, QG-13):** apply `guardrails/quality-gates.md` QG-13:
+one initial round plus one fresh re-review by default; further correction-only
+reviews only where the delivery contract explicitly requires actual PASS.
+Each follow-up uses the immediately previous reviewed commit as its base and
+the new correction candidate as its head. Keep all rounds in one lineage;
+renaming or splitting rework cannot reset it. Retain verified unchanged-source
+coverage and unresolved-finding dispositions coordinator-side. A latest diff
+PASS closes only with that complete lineage; self-verification cannot replace it.
 
-**Rule (re-review):** After the first rework, the trigger table (§2.1) re-applies
-to the new diff; mandatory triggers → one NEW fresh Critic run, subject to the
-cycle cap above. A Critic context is never reused — it would anchor on its own
-previous findings (same rationale as the readiness-check repetition rule,
-`docs/operating-model.md` §4 — *The lifecycle*, step 3 "Spec and readiness").
+**Rule (re-review):** the trigger table (§2.1) re-applies to the correction
+diff; mandatory triggers require a NEW fresh Critic within QG-13 and applicable
+budgets. No unchanged cleared area or full current-artifact hunt is reopened.
+A Critic context is never reused and prior verdict prose is never supplied.
 **Rule (no dialogue):** There is never a Critic↔Goldfish dialogue; the Elephant mediates via briefings.
 **Why:** Findings without dispositions rot; unbounded rework cycles are the expensive form of grinding; a reused reviewer stops being fresh.
 **Check:** The gate decision records the applied trigger row, the disposition per finding, and the cycle count; a telemetry line exists per Critic run; merge blocks without a findings report where the trigger was mandatory.
@@ -217,8 +219,8 @@ Model escalation inside rework follows **MP-05** (criterion 3: same task class f
 |---|---|---|
 | 1 | Goldfish itself | one closed product cause may receive one automatic retry; a matching second signature, unknown cause or exhausted budget → course gate + PO decision brief. Harness leashes: `maxTurns` frontmatter; stop-hook cap 8 consecutive blocks |
 | 2 | Critic | delivers findings only — **no dialogue with the goldfish, no own fixes** (read-only) |
-| 3 | Elephant | dispositions every finding (fix / reject with justification / the PO); harness checklist BEFORE re-dispatch or model escalation (G2/P1); rework = fresh local context + refined briefing; at most **one re-review Critic round per package** (QG-13, `guardrails/quality-gates.md`) — a blocking finding on that re-review round is self-verified directly by the Elephant, not escalated for a third Critic round |
-| 4 | the PO | MANDATORY on: blockers, irreversible/externally visible/costly matters, spec↔reality conflict, budget overrun (criterion: `policies/model-policy.md` MP-20) — exceeding the QG-13 Critic-round cap is not by itself a PO-escalation trigger; it routes to Elephant self-verification |
+| 3 | Elephant | dispositions every finding (fix / reject with justification / the PO); harness checklist BEFORE re-dispatch or model escalation (G2/P1); rework = fresh local context + refined briefing; QG-13 default: one initial review plus one re-review, then self-verification; an explicit actual-PASS criterion permits further immediate correction-diff reviews with retained coverage lineage, subject to existing budgets |
+| 4 | the PO | MANDATORY on: blockers, irreversible/externally visible/costly matters, spec↔reality conflict, budget overrun (criterion: `policies/model-policy.md` MP-20) — the QG-13 default round cap alone is not a PO-escalation trigger; apply its self-verification or explicit actual-PASS correction-only route, preserving real budget/course gates |
 
 Normative counterpart: `docs/operating-model.md` — *Evidence, review and recovery* (prose; no flow diagram of this ladder exists — the nearest route overview is the recovery table in `PIPELINE_FLOW.md` — *5. Close deliberately; recover with a bound*). This table is the operational summary of that prose.
 

@@ -108,17 +108,18 @@ USAGE (Elephant)
    Claude adapter, not a cross-runner default. When native isolation is
    unavailable or unusable, dispatch the standing functional-equivalent Critic
    lane specified in item 1 with the JSON schema shape at the end of this file.
-4. Phase-2.6 bounded re-review: the first architecture/security review is
-   `full`. A later `delta` dispatch is admissible only when it names the bound
-   base/head/tree, prior receipt ID/digest, changed paths/behaviour claims and
-   affected invariant IDs. Review only that delta plus those invariants; do not
-   request or read prior verdict prose. Missing/unknown/ambiguous impact means
-   full review, never an invented narrow scope. There are at most two Critic
-   rounds per package: the initial review plus one fresh re-Critic for the
-   first correction commit. If that re-Critic still reports a blocking
-   finding, the Elephant self-verifies the next correction directly rather
-   than dispatching a third Critic round. The host reconciles the exact
-   correction range before it selects either mode.
+4. Phase-2.6 bounded re-review: the initial architecture/security review is
+   `full`. Every follow-up examines only the exact immediately previous reviewed
+   commit through the new correction candidate, its fixes and direct
+   regressions. Read unchanged direct contracts only to understand the change;
+   do not reopen unchanged cleared areas or run another current-artifact hunt.
+   A `delta` mode requires the transport's bound impact/invariant proof; absent
+   proof is not permission to widen scope. An admitted `full` exact-range mode
+   fully examines that range only. QG-13 defaults to two rounds; further fresh
+   correction reviews require an explicit actual-PASS delivery criterion and
+   remain subject to execution/cost/course budgets. The Coordinator reconciles
+   exact ranges and retains receipt/source coverage lineage and finding
+   dispositions. Do not request or read prior verdict prose or findings.
 5. A native-isolation failure is never retried in the same lane. The Coordinator
    may use exactly one standing functional-equivalent Critic with frozen
    bindings and `mayDelegate=false`; a second/unproven failure, inability to
