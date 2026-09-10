@@ -2532,3 +2532,25 @@ Restated per this file's known limitation for ADR-0012/0056/0058: `6100a6cc` is 
 - ADR-0058: checked, no change needed.
 
 Restated per this file's known limitation for ADR-0045/0056/0058: `79e90d2f` is an ancestor and was already fully reconciled above. ADR-0012's only new material is checkpoint 35 itself: the full narrative account of this stretch's backlog triage (1 closed as fixed upstream by Nova, 2 stale items corrected, 2 real fixes dispatched and landed, 145+ durable evidence files tracked, and the concurrent-git-index incident recorded honestly). Additive checkpoint prose only; the canonical-handover decision is untouched.
+
+## Candidate add800048dd077ac98ddff3aef4180762b4cedad — 2026-09-10, range 4b69246f..add80004, normal session Critic restored as the autonomous default
+
+- ADR-0003: changed consistently; its 2026-07-17 amendment now makes the fresh
+  read-only session Critic the default and keeps runner-native launchers as
+  optional explicit escalations.
+- ADR-0014: changed consistently; T1 retains higher-capability staffing,
+  refs-only input, a fixed diff and schema-shaped verdict without a new PO gate.
+- ADR-0035: amended explicitly; the native Codex host remains available for an
+  explicitly configured or requested stronger or detached route.
+- ADR-0001, ADR-0004, ADR-0005, ADR-0006, ADR-0009, ADR-0010, ADR-0015,
+  ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0025, ADR-0026,
+  ADR-0028, ADR-0030, ADR-0041, ADR-0055, ADR-0060, ADR-0061, ADR-0063 and
+  ADR-0069: checked; no change needed. The route change preserves their
+  staffing, role separation, lifecycle, approval, topology and ADR-allocation
+  decisions.
+
+The canonical role, review protocol, checklist, bootstrap, prompt, agent and
+skill surfaces were updated together, and their vendored copies are
+byte-identical. Ordinary Critic execution is autonomous agent work after the
+deterministic gates. A host failure is reported as a typed runtime problem; it
+does not invent a Pipeline PO decision point.
