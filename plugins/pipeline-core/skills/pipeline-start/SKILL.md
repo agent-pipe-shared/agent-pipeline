@@ -366,7 +366,7 @@ routine implementation step.
 
 Once bootstrap is ready and the required plan gate is recorded, continue the
 approved implementation autonomously: scoped edits, focused tests, state
-readback, one-line commits, Verify, Critic execution and ordinary block
+readback, one-line commits, Verify, Critic preparation, execution and ordinary block
 continuation are agent work. A standing approval is not a fresh human touch.
 **"Agent work" here means Goldfish-dispatched work, starting with the very
 first implementation edit of the plan — not this Elephant session writing
