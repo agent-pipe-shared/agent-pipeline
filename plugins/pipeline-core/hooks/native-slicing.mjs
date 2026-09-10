@@ -34,6 +34,12 @@ function boundedPush(values, value, cap) {
   return true;
 }
 
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+}
+
 function sessionId(input, runner) {
   const candidate = input?.session_id ?? input?.sessionId ?? input?.conversationId;
   return typeof candidate === "string" && candidate !== "" ? `${runner}:${candidate}` : null;
@@ -155,7 +161,7 @@ function pendingPlanSet(toolInput) {
   if (!Array.isArray(plan)) return [];
   return plan
     .filter((entry) => entry && typeof entry === "object" && entry.status === "pending")
-    .map((entry) => JSON.stringify(entry))
+    .map((entry) => JSON.stringify(canonicalize(entry)))
     .sort();
 }
 

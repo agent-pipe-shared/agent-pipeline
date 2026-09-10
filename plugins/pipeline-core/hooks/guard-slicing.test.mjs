@@ -779,14 +779,26 @@ test("GS32a: Codex update_plan nudges once per distinct pending set", () => {
   try {
     const base = { cwd: repo, session_id: "codex-plan-dedup", tool_name: "update_plan" };
     const pending = [
-      { step: "one", status: "pending" },
-      { step: "two", status: "pending" },
-      { step: "three", status: "pending" },
+      { step: "one", status: "pending", metadata: { owner: "a", scope: { write: ["one.js"], read: ["shared.js"] } } },
+      { step: "two", status: "pending", metadata: { owner: "b", scope: { write: ["two.js"], read: ["shared.js"] } } },
+      { step: "three", status: "pending", metadata: { owner: "c", scope: { write: ["three.js"], read: ["shared.js"] } } },
     ];
     const first = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_input: { explanation: "initial plan", plan: pending } }, repo);
     assert.match(first.stdout, /disjoint declared write scopes/, "the qualifying pending set emits its advisory");
     const explanationOnly = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_input: { explanation: "edited prose only", plan: pending } }, repo);
     assert.equal(explanationOnly.stdout, "", "an explanation-only edit must not repeat the advisory");
+    const sameWorkDifferentKeyOrder = runNative(CODEX_NATIVE, ["PreToolUse"], {
+      ...base,
+      tool_input: {
+        explanation: "same work, different entry key order",
+        plan: [
+          { status: "pending", step: "one", metadata: { owner: "a", scope: { write: ["one.js"], read: ["shared.js"] } } },
+          { status: "pending", step: "two", metadata: { scope: { read: ["shared.js"], write: ["two.js"] }, owner: "b" } },
+          { status: "pending", step: "three", metadata: { owner: "c", scope: { write: ["three.js"], read: ["shared.js"] } } },
+        ],
+      },
+    }, repo);
+    assert.equal(sameWorkDifferentKeyOrder.stdout, "", "the same pending work with reordered object keys must not repeat the advisory");
     const reordered = runNative(CODEX_NATIVE, ["PreToolUse"], { ...base, tool_input: { explanation: "same work, reordered", plan: [...pending].reverse() } }, repo);
     assert.equal(reordered.stdout, "", "the same pending set in a different order must not repeat the advisory");
     const completedEdit = runNative(CODEX_NATIVE, ["PreToolUse"], {
