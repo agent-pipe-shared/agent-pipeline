@@ -170,10 +170,10 @@ const build = ({ base, baseCommit }, over = {}) => buildReleasePreflight({
   consentPath: "consent.json", lifecyclePath: "lifecycle.json", retentionPolicySha256: POLICY, ...over,
 });
 
-function runCli(context, outPath) {
+function runCli(context, outPath, consentArgs = ["--consent", "consent.json"]) {
   return spawnSync(process.execPath, [
     CLI_PATH, "--preflight-id", "fixture-preflight", "--base", context.baseCommit,
-    "--consent", "consent.json", "--lifecycle", "lifecycle.json", "--retention-policy", POLICY,
+    ...consentArgs, "--lifecycle", "lifecycle.json", "--retention-policy", POLICY,
     "--out", outPath, "--root", context.base,
   ], { encoding: "utf8" });
 }
@@ -242,6 +242,74 @@ function check(name, callback) {
 }
 
 try {
+  for (const kind of ["final", "ancestor", "dangling"]) {
+    check(`RPC-path CLI refuses ${kind} output symlinks before changing external bytes`, () => {
+      const context = fixture({ consentStatus: "declined" });
+      const outside = externalDir();
+      const victim = join(outside, "preflight.json");
+      if (kind !== "dangling") writeFileSync(victim, "preserve external bytes\n");
+      mkdirSync(join(context.base, "evidence"));
+      if (kind === "ancestor") symlinkSync(outside, join(context.base, "evidence", "alias"), "dir");
+      else symlinkSync(victim, join(context.base, "evidence", "preflight.json"));
+      const result = runCli(context, kind === "ancestor" ? "evidence/alias/preflight.json" : "evidence/preflight.json");
+      assert.equal(kind === "dangling" ? existsSync(victim) : readFileSync(victim, "utf8"), kind === "dangling" ? false : "preserve external bytes\n");
+      assert.equal(result.status, 2, result.stderr);
+      assert.match(result.stderr, /RPC-PATH/u);
+    });
+  }
+
+  check("RPC-path CLI creates nested output and replaces an ordinary existing record", () => {
+    const context = fixture({ consentStatus: "declined" });
+    const path = "evidence/nested/preflight.json";
+    assert.equal(runCli(context, path).status, 0);
+    writeFileSync(join(context.base, path), "old record\n");
+    const result = runCli(context, path);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(readFileSync(join(context.base, path), "utf8")).status, "blocked");
+  });
+
+  for (const path of [".", "..", "../escaped-preflight.json"]) {
+    check(`RPC-path CLI refuses output boundary ${path}`, () => {
+      const result = runCli(fixture({ consentStatus: "declined" }), path);
+      assert.equal(result.status, 2, result.stderr);
+      assert.match(result.stderr, /RPC-PATH/u);
+    });
+  }
+
+  check("RPC-path CLI still accepts a real external request and detached proof", () => {
+    const context = fixture();
+    const { keys, publicKey } = keypair();
+    const pair = signedProofPair({ candidate: { commit: context.candidateCommit, tree: context.candidateTree }, subject: subjectFor(context), expiresAt: "2099-01-01T00:00:00.000Z", keys, publicKey });
+    const external = externalDir();
+    const request = writeExternal(external, "request.json", pair.request);
+    const proof = writeExternal(external, "proof.json", pair.proof);
+    const result = runCli(context, "preflight.json", ["--proof-request", request, "--proof", proof]);
+    assert.equal(result.status, 0, result.stderr);
+    const record = JSON.parse(readFileSync(join(context.base, "preflight.json"), "utf8"));
+    assert.equal(record.status, "ready");
+    assert.equal(record.consent.status, "approved");
+  });
+
+  for (const redirected of ["request", "proof"]) {
+    check(`RPC-path CLI refuses an external ancestor alias into repository ${redirected}`, () => {
+      const context = fixture();
+      const { keys, publicKey } = keypair();
+      const pair = signedProofPair({ candidate: { commit: context.candidateCommit, tree: context.candidateTree }, subject: subjectFor(context), expiresAt: "2099-01-01T00:00:00.000Z", keys, publicKey });
+      const external = externalDir();
+      const hidden = join(context.base, "ignored-proof");
+      mkdirSync(hidden);
+      writeFileSync(join(context.base, ".git", "info", "exclude"), "/ignored-proof/\n");
+      const paths = {};
+      for (const name of ["request", "proof"]) paths[name] = writeExternal(name === redirected ? hidden : external, `${name}.json`, pair[name]);
+      symlinkSync(hidden, join(external, "alias"), "dir");
+      paths[redirected] = join(external, "alias", `${redirected}.json`);
+      const result = runCli(context, "preflight.json", ["--proof-request", paths.request, "--proof", paths.proof]);
+      assert.equal(result.status, 2, result.stderr);
+      assert.match(result.stderr, /RPC-PATH/u);
+      assert.equal(existsSync(join(context.base, "preflight.json")), false);
+    });
+  }
+
   check("RPC01 a clean candidate with agreeing surfaces and approved consent is ready", () => {
     const { record } = build(fixture());
     assert.deepEqual(record.reasons, []);

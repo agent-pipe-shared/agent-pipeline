@@ -49,8 +49,8 @@
  * honestly, and nothing was written.
  */
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { canonicalJson, createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
@@ -317,8 +317,51 @@ function readExternalJson(root, path, label) {
   if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || info.size > EXTERNAL_PROOF_ARTIFACT_MAX_BYTES) {
     fail("RPC-INPUT", `${label} must be an unlinked regular file within the size cap`);
   }
-  try { return JSON.parse(readFileSync(path, "utf8")); }
+  // As in pipeline-state's externalPublicJson, externality applies to the
+  // physical file, not just its spelling: an outside ancestor may point inward.
+  let physicalPath;
+  let physicalRoot;
+  try { physicalPath = realpathSync(path); physicalRoot = realpathSync(root); }
+  catch { fail("RPC-INPUT", `${label} is unavailable`); }
+  if (!outsideRepository(physicalRoot, physicalPath)) fail("RPC-PATH", `${label} must resolve outside the repository`);
+  try { return JSON.parse(readFileSync(physicalPath, "utf8")); }
   catch { fail("RPC-INPUT", `${label} is not valid JSON`); }
+}
+
+/** Public evidence keeps ordinary file/directory modes. The private-boundary
+ * writer's mode-0600/DACL contract is therefore not appropriate here; retain its
+ * physical-parent and exclusive-temporary/rename discipline without that policy. */
+function writeOutput(rootDir, outPath, record) {
+  const root = realpathSync(resolve(rootDir));
+  if (isAbsolute(outPath)) fail("RPC-PATH", "out path must be repository-relative");
+  const target = resolve(root, outPath);
+  const rel = relative(root, target);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) fail("RPC-PATH", "out path escapes the repository");
+  const assertTarget = () => {
+    let info;
+    try { info = lstatSync(target); }
+    catch (error) { if (error.code === "ENOENT") return; throw error; }
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) fail("RPC-PATH", "out path must be a single-link regular file or absent");
+  };
+  assertTarget();
+  let parent = root;
+  for (const segment of relative(root, dirname(target)).split(sep).filter(Boolean)) {
+    parent = join(parent, segment);
+    try { mkdirSync(parent); } catch (error) { if (error.code !== "EEXIST") throw error; }
+    const info = lstatSync(parent);
+    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(parent) !== parent) fail("RPC-PATH", "out path parent must be a physical repository directory");
+  }
+  assertTarget();
+  const temporary = `${target}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
+  const descriptor = openSync(temporary, "wx");
+  try {
+    try { writeFileSync(descriptor, `${JSON.stringify(record, null, 2)}\n`); }
+    finally { closeSync(descriptor); }
+    assertTarget();
+    renameSync(temporary, target);
+  } finally {
+    try { unlinkSync(temporary); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
 }
 
 /**
@@ -612,12 +655,7 @@ if (isDirectInvocation(import.meta.url)) {
   try {
     const options = parseArgs(process.argv.slice(2));
     const built = buildReleasePreflight(options);
-    const root = resolve(options.rootDir);
-    if (isAbsolute(options.outPath)) fail("RPC-PATH", "out path must be repository-relative");
-    const target = resolve(root, options.outPath);
-    if (relative(root, target).startsWith(`..${sep}`)) fail("RPC-PATH", "out path escapes the repository");
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, `${JSON.stringify(built.record, null, 2)}\n`);
+    writeOutput(options.rootDir, options.outPath, built.record);
     process.stdout.write(`${JSON.stringify({
       status: built.record.status,
       reasons: built.record.reasons,
