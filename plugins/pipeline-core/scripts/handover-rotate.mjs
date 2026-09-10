@@ -498,10 +498,17 @@ function governancePathOf(line) {
  * simply have nothing to update (`existsSync` guard below) -- this is Pipeline-repo
  * self-hosting, not a general-purpose feature.
  */
-export function registerArchiveInDocGovernance(root, { handoverPath, archivePath }) {
+function planArchiveDocGovernanceRegistration(root, { handoverPath, archivePath }) {
   const governanceFullPath = join(root, DOC_GOVERNANCE_RELATIVE_PATH);
+  assertPathWithinRoot(root, governanceFullPath, "The documentation-governance registry path");
+  // Validate the eventual registry write target before a rotation can create
+  // its archive directory. This handles existing, missing, and dangling path
+  // components without relying on a lexical path check alone.
+  assertArchivePathPhysicallyWithinRoot(root, governanceFullPath);
   if (!existsSync(governanceFullPath)) return { updated: false, reason: "no self-referential doc-governance registry in this project" };
-  const raw = readFileSync(governanceFullPath, "utf8");
+  const resolvedGovernanceFullPath = realpathSync(governanceFullPath);
+  assertPathWithinRoot(realpathSync(root), resolvedGovernanceFullPath, "The resolved documentation-governance registry path");
+  const raw = readFileSync(resolvedGovernanceFullPath, "utf8");
   const lines = raw.split("\n");
   const handoverLineIdx = lines.findIndex(
     (line) => GOVERNANCE_PATH_LINE_RE.test(line) && governancePathOf(line) === handoverPath,
@@ -524,8 +531,14 @@ export function registerArchiveInDocGovernance(root, { handoverPath, archivePath
   const sortedPaths = [...existingPaths, archivePath].sort();
   const newGroupLines = sortedPaths.map((p, i) => `${indent}"${p}"${i < sortedPaths.length - 1 ? "," : ""}`);
   const newLines = [...lines.slice(0, start), ...newGroupLines, ...lines.slice(end + 1)];
-  writeFileSync(governanceFullPath, newLines.join("\n"), "utf8");
-  return { updated: true, path: DOC_GOVERNANCE_RELATIVE_PATH };
+  return { updated: true, path: DOC_GOVERNANCE_RELATIVE_PATH, resolvedGovernanceFullPath, content: newLines.join("\n") };
+}
+
+export function registerArchiveInDocGovernance(root, options) {
+  const registration = planArchiveDocGovernanceRegistration(root, options);
+  if (!registration.updated) return registration;
+  writeFileSync(registration.resolvedGovernanceFullPath, registration.content, "utf8");
+  return { updated: true, path: registration.path };
 }
 
 /** Full I/O orchestration used by the CLI: read, gate on acknowledgment, plan, write. */
@@ -541,19 +554,24 @@ export function rotateHandover({
   const fullArchivePath = join(root, plan.archivePath);
   assertPathWithinRoot(root, fullArchivePath, "The resolved archive path");
   assertArchivePathPhysicallyWithinRoot(root, fullArchivePath);
-  mkdirSync(dirname(fullArchivePath), { recursive: true });
   if (existsSync(fullArchivePath)) {
     throw new HandoverRotationError(
       "HANDOVER-ROTATION-ARCHIVE-EXISTS",
       `${plan.archivePath} already exists. Archive files are append-only-once-written and never overwritten; choose a different --slug.`,
     );
   }
-  // Runs BEFORE any write below: a governance-registration refusal must leave zero mutation,
-  // same as every other typed refusal in this script.
-  const governanceRegistration = registerArchiveInDocGovernance(root, { handoverPath: resolvedHandoverPath, archivePath: plan.archivePath });
+  // Validate the governance write target before any rotation mutation. A
+  // refusal therefore leaves the archive, handover, acknowledgement, and
+  // registry trees byte-identical.
+  const governanceRegistration = planArchiveDocGovernanceRegistration(root, { handoverPath: resolvedHandoverPath, archivePath: plan.archivePath });
+  mkdirSync(dirname(fullArchivePath), { recursive: true });
+  if (governanceRegistration.updated) writeFileSync(governanceRegistration.resolvedGovernanceFullPath, governanceRegistration.content, "utf8");
   writeFileSync(fullArchivePath, plan.archiveContent, "utf8");
   writeFileSync(fullHandoverPath, plan.newLiveContent, "utf8");
-  return { ...plan, governanceRegistration };
+  const publicGovernanceRegistration = governanceRegistration.updated
+    ? { updated: true, path: governanceRegistration.path }
+    : governanceRegistration;
+  return { ...plan, governanceRegistration: publicGovernanceRegistration };
 }
 
 // -- CLI --

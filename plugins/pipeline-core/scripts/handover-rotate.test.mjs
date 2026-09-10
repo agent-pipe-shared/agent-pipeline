@@ -890,6 +890,32 @@ const GOVERNANCE_FIXTURE = [
   }
 }
 
+// == NVA-HANDOVER-GOV-WT-1: acknowledged CLI rotation refuses governance registry symlink escapes before every write ==
+for (const fixture of [
+  { label: "registry-file", install(root, outside) { mkdirSync(join(root, "governance"), { recursive: true }); writeFileSync(join(outside, "observation-doc-governance.json"), GOVERNANCE_FIXTURE, "utf8"); symlinkSync(join(outside, "observation-doc-governance.json"), join(root, "governance", "observation-doc-governance.json")); } },
+  { label: "governance-directory", install(root, outside) { writeFileSync(join(outside, "observation-doc-governance.json"), GOVERNANCE_FIXTURE, "utf8"); symlinkSync(outside, join(root, "governance")); } },
+]) {
+  const root = fixtureRoot(`cli-governance-${fixture.label}-symlink`);
+  const outside = fixtureRoot(`cli-governance-${fixture.label}-symlink-outside`);
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    fixture.install(root, outside);
+    const acknowledged = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--acknowledge-extraction-done", "--section-heading", "Block A"], { encoding: "utf8" });
+    assert.equal(acknowledged.status, 0, acknowledged.stderr);
+    const beforeRoot = snapshotFixture(root);
+    const beforeOutside = snapshotFixture(outside);
+    const rotated = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--section-heading", "Block A", "--summary", "must refuse governance escape", "--rotation-date", "2026-09-10"], { encoding: "utf8" });
+    assert.equal(rotated.status, 1, `an external ${fixture.label} symlink must refuse`);
+    assert.match(rotated.stderr, /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/);
+    assert.deepEqual(snapshotFixture(root), beforeRoot, "refusal must preserve repository, acknowledgement, and archive state");
+    assert.deepEqual(snapshotFixture(outside), beforeOutside, "refusal must preserve external registry bytes");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+}
+
 // == NVA-ARCHIVE-CONTAINMENT-FIX-1: CLI rotation rejects physical archive escapes through a missing directory or dangling filename ==
 {
   const customRoot = fixtureRoot("cli-custom-handover-docs-symlink");
