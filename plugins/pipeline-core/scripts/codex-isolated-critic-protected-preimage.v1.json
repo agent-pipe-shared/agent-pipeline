@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "harness/review-protocol.md",
-      "rawSha256": "f5264d9ecd337a3fa375e1884baba31abaff8184d1302642e9820cfc2ffef7e9"
+      "rawSha256": "223c5e4ca368dfa5058d2b97f35e8aefa540915201c8e03f1cc4c88b8e009d67"
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
