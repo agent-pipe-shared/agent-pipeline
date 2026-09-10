@@ -200,9 +200,9 @@ or V3 authority checks and has these outcomes:
   present) is the supported `fresh-host-managed` variant; never delete,
   overwrite, chmod, ignore, or silently bypass those paths.
 
-Codex currently has no SessionStart hook in its manifest. The mandatory
-`pipeline-start` invocation is proactive for the user's first request; it is
-not an automatic hidden initialization.
+The Codex `SessionStart` registration provides an onboarding hint. The
+mandatory `pipeline-start` invocation remains proactive for the user's first
+request; the hint does not perform automatic hidden initialization.
 
 ### 2. Complete project calibration after onboarding
 

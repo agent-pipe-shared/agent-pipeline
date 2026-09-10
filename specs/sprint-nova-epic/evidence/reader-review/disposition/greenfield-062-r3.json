@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "greenfield-062-r3",
+  "status": "resolved",
+  "findings": [
+    { "id": "RR-R3-01", "class": "reordering", "status": "resolved", "resolutionCommit": "bf304b4f76a7abd9e04d4891e49d4a6fc8b1e0d0" },
+    { "id": "RR-R3-02", "class": "fileline", "status": "resolved", "resolutionCommit": "bf304b4f76a7abd9e04d4891e49d4a6fc8b1e0d0" },
+    { "id": "RR-R3-03", "class": "fileline", "status": "resolved", "resolutionCommit": "bf304b4f76a7abd9e04d4891e49d4a6fc8b1e0d0" },
+    { "id": "RR-R3-04", "class": "cut", "status": "resolved", "resolutionCommit": "bf304b4f76a7abd9e04d4891e49d4a6fc8b1e0d0" },
+    { "id": "RR-R3-05", "class": "cut", "status": "resolved", "resolutionCommit": "bf304b4f76a7abd9e04d4891e49d4a6fc8b1e0d0" },
+    { "id": "RR-R3-06", "class": "fileline", "status": "resolved", "resolutionCommit": "bf304b4f76a7abd9e04d4891e49d4a6fc8b1e0d0" },
+    { "id": "RR-R3-07", "class": "cut", "status": "resolved", "resolutionCommit": "bf304b4f76a7abd9e04d4891e49d4a6fc8b1e0d0" }
+  ]
+}

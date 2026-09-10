@@ -53,8 +53,9 @@ Four deliberately separated roles carry the model:
 
 Around those roles:
 
-- **Two-stage review** — deterministic gates (tests, security scan, lint) run
-  *before* any LLM judgment; only what survives the gates reaches a Critic.
+- **Two-stage result review** — deterministic gates (tests, security scan,
+  lint) run *before* an independent Critic judges the delivered result; only
+  what survives the gates reaches a Critic.
 - **Specs with checkable acceptance criteria** — every task has a Definition of
   Done something or someone can actually check, not a "done"-on-a-feeling.
 - **Git and write-path guardrails** — configured integrations can refuse unsafe
@@ -252,9 +253,9 @@ Vier bewusst getrennte Rollen tragen das Modell:
 
 Ergänzend dazu:
 
-- **Zweistufiges Review** — deterministische Gates (Tests, Security-Scan, Lint)
-  laufen *vor* jedem LLM-Urteil; nur was die Gates übersteht, erreicht einen
-  Critic.
+- **Zweistufiges Ergebnis-Review** — deterministische Gates (Tests,
+  Security-Scan, Lint) laufen, bevor ein unabhängiger Critic das gelieferte
+  Ergebnis beurteilt; nur was die Gates übersteht, erreicht einen Critic.
 - **Specs mit prüfbaren Akzeptanzkriterien** — keine Aufgabe ist „fertig" nach
   Gefühl; jede Aufgabe hat eine Definition of Done, die sich tatsächlich prüfen
   lässt.
