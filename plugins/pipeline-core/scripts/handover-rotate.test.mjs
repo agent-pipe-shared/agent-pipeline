@@ -856,4 +856,38 @@ const GOVERNANCE_FIXTURE = [
   }
 }
 
+// == NVA-ARCHIVE-CONTAINMENT-FIX-1: CLI rotation rejects an archive-directory symlink escaping root before mutation ==
+{
+  const root = fixtureRoot("cli-archive-directory-symlink");
+  const outsideRoot = fixtureRoot("cli-archive-directory-symlink-outside");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    writeFileSync(join(outsideRoot, "sentinel.md"), "outside archive tree must remain unchanged\n", "utf8");
+    symlinkSync(outsideRoot, join(root, "docs", "state-archive"));
+
+    const acknowledged = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--acknowledge-extraction-done", "--section-heading", "Block A"],
+      { encoding: "utf8" },
+    );
+    assert.equal(acknowledged.status, 0, acknowledged.stderr);
+    const beforeRoot = snapshotFixture(root);
+    const beforeOutside = snapshotFixture(outsideRoot);
+
+    const rotated = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--section-heading", "Block A", "--summary", "must refuse outside archive", "--rotation-date", "2026-09-10"],
+      { encoding: "utf8" },
+    );
+    assert.equal(rotated.status, 1, "an outside-root archive directory symlink must refuse");
+    assert.match(rotated.stderr, /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/);
+    assert.deepEqual(snapshotFixture(root), beforeRoot, "refusal must leave the complete handover and acknowledgement tree unchanged");
+    assert.deepEqual(snapshotFixture(outsideRoot), beforeOutside, "refusal must leave the complete external archive tree unchanged");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outsideRoot, { recursive: true, force: true });
+  }
+}
+
 console.log("handover-rotate.test.mjs: all assertions passed");

@@ -505,6 +505,14 @@ export function rotateHandover({
   });
   const fullArchivePath = join(root, plan.archivePath);
   assertPathWithinRoot(root, fullArchivePath, "The resolved archive path");
+  const archiveDirectory = dirname(fullArchivePath);
+  if (existsSync(archiveDirectory)) {
+    assertPathWithinRoot(
+      realpathSync(root),
+      realpathSync(archiveDirectory),
+      "The resolved archive directory",
+    );
+  }
   mkdirSync(dirname(fullArchivePath), { recursive: true });
   if (existsSync(fullArchivePath)) {
     throw new HandoverRotationError(
