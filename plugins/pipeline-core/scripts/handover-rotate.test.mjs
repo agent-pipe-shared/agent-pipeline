@@ -890,4 +890,61 @@ const GOVERNANCE_FIXTURE = [
   }
 }
 
+// == NVA-ARCHIVE-CONTAINMENT-FIX-1: CLI rotation rejects physical archive escapes through a missing directory or dangling filename ==
+{
+  const customRoot = fixtureRoot("cli-custom-handover-docs-symlink");
+  const customOutside = fixtureRoot("cli-custom-handover-docs-symlink-outside");
+  const danglingRoot = fixtureRoot("cli-dangling-archive-filename-symlink");
+  const danglingOutside = fixtureRoot("cli-dangling-archive-filename-symlink-outside");
+  try {
+    writeFileSync(join(customRoot, "state.md"), SAMPLE, "utf8");
+    symlinkSync(customOutside, join(customRoot, "docs"));
+    const customAck = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", customRoot, "--acknowledge-extraction-done", "--handover-path", "state.md", "--section-heading", "Block A"],
+      { encoding: "utf8" },
+    );
+    assert.equal(customAck.status, 0, customAck.stderr);
+    const customBefore = snapshotFixture(customRoot);
+    const customOutsideBefore = snapshotFixture(customOutside);
+    const customRotation = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", customRoot, "--handover-path", "state.md", "--section-heading", "Block A", "--summary", "must refuse missing archive directory", "--slug", "missing-directory", "--rotation-date", "2026-09-10"],
+      { encoding: "utf8" },
+    );
+
+    mkdirSync(join(danglingRoot, "docs", "state-archive"), { recursive: true });
+    writeFileSync(join(danglingRoot, "docs", "state.md"), SAMPLE, "utf8");
+    const danglingTarget = join(danglingOutside, "escaped.md");
+    symlinkSync(danglingTarget, join(danglingRoot, "docs", "state-archive", "2026-09-10--dangling-filename.md"));
+    const danglingAck = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", danglingRoot, "--acknowledge-extraction-done", "--section-heading", "Block A"],
+      { encoding: "utf8" },
+    );
+    assert.equal(danglingAck.status, 0, danglingAck.stderr);
+    const danglingBefore = snapshotFixture(danglingRoot);
+    const danglingOutsideBefore = snapshotFixture(danglingOutside);
+    const danglingRotation = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", danglingRoot, "--section-heading", "Block A", "--summary", "must refuse dangling archive filename", "--slug", "dangling-filename", "--rotation-date", "2026-09-10"],
+      { encoding: "utf8" },
+    );
+
+    assert.equal(customRotation.status, 1, "a custom in-root handover must not allow docs to redirect archive creation outside root");
+    assert.match(customRotation.stderr, /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/);
+    assert.deepEqual(snapshotFixture(customRoot), customBefore, "custom-handover refusal must preserve its full root and acknowledgement tree");
+    assert.deepEqual(snapshotFixture(customOutside), customOutsideBefore, "custom-handover refusal must preserve the external tree");
+    assert.equal(danglingRotation.status, 1, "a dangling archive filename symlink must refuse before following its target");
+    assert.match(danglingRotation.stderr, /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/);
+    assert.deepEqual(snapshotFixture(danglingRoot), danglingBefore, "dangling-filename refusal must preserve its full root and acknowledgement tree");
+    assert.deepEqual(snapshotFixture(danglingOutside), danglingOutsideBefore, "dangling-filename refusal must preserve the external tree");
+  } finally {
+    rmSync(customRoot, { recursive: true, force: true });
+    rmSync(customOutside, { recursive: true, force: true });
+    rmSync(danglingRoot, { recursive: true, force: true });
+    rmSync(danglingOutside, { recursive: true, force: true });
+  }
+}
+
 console.log("handover-rotate.test.mjs: all assertions passed");

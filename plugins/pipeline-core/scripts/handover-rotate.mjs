@@ -42,7 +42,7 @@
  * pinned by this script's own test suite).
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -425,6 +425,36 @@ function assertPathWithinRoot(root, candidatePath, label) {
 }
 
 /**
+ * Verifies the nearest existing archive-path component before mkdir/write follows it.
+ * `lstatSync` deliberately recognizes a dangling final symlink, which `existsSync`
+ * would otherwise treat as absent before `writeFileSync` followed its external target.
+ */
+function assertArchivePathPhysicallyWithinRoot(root, archivePath) {
+  const physicalRoot = realpathSync(root);
+  let existingPath = archivePath;
+  while (true) {
+    try {
+      const stat = lstatSync(existingPath);
+      if (stat.isSymbolicLink()) {
+        const targetPath = resolve(dirname(existingPath), readlinkSync(existingPath));
+        assertPathWithinRoot(physicalRoot, targetPath, "The resolved archive path");
+        if (existsSync(existingPath)) {
+          assertPathWithinRoot(physicalRoot, realpathSync(existingPath), "The resolved archive path");
+        }
+      } else {
+        assertPathWithinRoot(physicalRoot, realpathSync(existingPath), "The resolved archive path");
+      }
+      return;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      const parentPath = dirname(existingPath);
+      if (parentPath === existingPath) throw error;
+      existingPath = parentPath;
+    }
+  }
+}
+
+/**
  * Resolves the configured or explicit handover file for every CLI mode. The
  * lexical check keeps `..` paths out; the realpath check additionally keeps a
  * handover symlink from exposing a target outside the repository root.
@@ -505,14 +535,7 @@ export function rotateHandover({
   });
   const fullArchivePath = join(root, plan.archivePath);
   assertPathWithinRoot(root, fullArchivePath, "The resolved archive path");
-  const archiveDirectory = dirname(fullArchivePath);
-  if (existsSync(archiveDirectory)) {
-    assertPathWithinRoot(
-      realpathSync(root),
-      realpathSync(archiveDirectory),
-      "The resolved archive directory",
-    );
-  }
+  assertArchivePathPhysicallyWithinRoot(root, fullArchivePath);
   mkdirSync(dirname(fullArchivePath), { recursive: true });
   if (existsSync(fullArchivePath)) {
     throw new HandoverRotationError(
