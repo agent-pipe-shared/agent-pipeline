@@ -188,40 +188,18 @@ new term for this case).
   a proposal whose only justification is human-adversary resistance is a
   SEC-10 violation to flag at design review or Critic review.
 
-## SEC-11 — Bash read-scope containment: project root plus a small, resolved exception set, never pattern-matched
+## SEC-11 — Read-only filesystem visibility is host-owned
 
-- `guard-lifecycle-ready.mjs`'s read-only Bash lane (single-command,
-  cat-pipeline, git-pipeline, `&&`-chain and trailing-stderr-redirect
-  families) refuses a read target outside the project root UNLESS it falls
-  under one of a small, explicitly enumerated set of additional roots, each
-  derived by realpath from a value this repository's own code controls —
-  never sampled, guessed, or pattern-matched against a naming scheme owned
-  by something else (the CLI, the OS, a runner). Today's enumerated set:
-  the plugin's own installed root (`BOUNDED_PIPELINE_ADDITIONAL_ROOTS`),
-  this session's own transcript file (exact match only, from the
-  PreToolUse hook's `transcript_path` field), and this session's own
-  `memory/` directory (`claudeSessionMemoryDirectory`, MEMPATH-1). The
-  `rg`-to-`rg`/`rg`-to-`head` bounded pipeline and the cat-pipeline family
-  are known, disclosed exceptions that do not yet honor the session-derived
-  roots or (for the `rg`-pipe family) realpath-safe containment at all —
-  see the ADR below for the current, complete scope-gap inventory.
-- **Why:** a project-root containment check was added 2026-08-29, removed
-  wholesale one day later to meet a real, narrow need (reading an agent's
-  own dispatch transcripts/output) by opening the entire lane instead of
-  widening it precisely, and the trade-off was recorded nowhere but a
-  three-line commit message
-  (`backlog/items/2026-09-01-read-containment-was-removed-a-day-after-it-was-added-with-no-recorded-decision.md`).
-  Restored 2026-09-06 (`NVA-B-READCONTAIN-1`/`-2`) with the narrow,
-  resolved-roots design this rule states, specifically so the next
-  legitimate need is met by enumerating a new resolved root, never by
-  reopening the lane.
-- **Verification:** a design/dispatch proposing a new admitted read root
-  states, explicitly, which repository-controlled field or value it
-  resolves from; a proposal that would admit a root by pattern-matching,
-  sampling, or reconstructing a scheme owned by something outside this
-  repository's own code (e.g. a host tmp-directory layout) is a SEC-11
-  violation to flag at design review or Critic review. Full decision
-  record, current scope-gap inventory (rg-pipe/cat-pipe/grep-pipe lanes;
-  the transcript-file exact-match invariant is now enforced structurally,
-  `NVA-B-GLRMINORS-1`) and consequences:
-  `docs/adr/draft-read-scope-containment-boundary.md`.
+- In its non-ready diagnostic lane, the Pipeline guard classifies command
+  shape and blocks mutation, arbitrary execution, unsupported composition and
+  output redirection. It does not impose a second project-root boundary on
+  commands already proven passive and read-only.
+- **Why:** Codex, Claude Code and Antigravity need to inspect installed
+  plugins, their own transcripts, operator-selected evidence and related
+  checkouts. Repository-root containment repeatedly blocked those normal
+  diagnostics without protecting product state. The host sandbox and OS
+  permissions remain the authority for which files the process can read.
+- **Verification:** positive cases cover in-root and outside-root reads in
+  every supported bounded read shape. Negative cases continue to cover
+  mutation flags, output redirects, execution and unsupported pipelines.
+  Decision history: `docs/adr/draft-read-scope-containment-boundary.md`.

@@ -281,7 +281,7 @@ check("Antigravity run_command fails closed for a malformed explicit Cwd", () =>
   } finally { rmSync(readyRoot, { recursive: true, force: true }); }
 });
 
-check("Antigravity run_command checks relative read targets against its selected Cwd", () => {
+check("Antigravity run_command leaves relative passive-read visibility to the selected host Cwd", () => {
   const firstWorkspace = readyLifecycleFixture();
   const executedWorkspace = readyLifecycleFixture();
   try {
@@ -292,8 +292,7 @@ check("Antigravity run_command checks relative read targets against its selected
         args: { CommandLine: "cat ../outside.txt", Cwd: executedWorkspace },
       },
     }, firstWorkspace, { hookCwd: firstWorkspace }));
-    assert.equal(res.decision, "deny");
-    assert.match(res.reason, /GUARD-CROSS-REPO-MUTATION|outside the project root|outside this repository/);
+    assert.equal(res.decision, "allow");
   } finally {
     rmSync(firstWorkspace, { recursive: true, force: true });
     rmSync(executedWorkspace, { recursive: true, force: true });

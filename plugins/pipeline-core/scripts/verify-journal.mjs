@@ -668,7 +668,13 @@ const SERIAL_LANE_SUITES = Object.freeze(new Set([
 // before the pool starts. `test-tmpdir-tests` (test-tmpdir.test.mjs, read in full) was
 // deliberately NOT added: its own checks (unique-name non-collision, parent-directory reuse)
 // never observe sibling fixture content, so they are immune to concurrent siblings.
-const EXCLUSIVE_SUITES = Object.freeze(new Set(["test-tmpdir-budget-tests"]));
+const EXCLUSIVE_SUITES = Object.freeze(new Set([
+  "test-tmpdir-budget-tests",
+  // This suite intentionally binds a consumer Verify run to the byte digest of the
+  // complete installed plugin tree before and after its nested checks. Any sibling
+  // suite that probes a source file in place can otherwise manufacture VEP-DRIFT.
+  "verify-evidence-producer-tests",
+]));
 
 // A minimal counting semaphore bounding how many suites may have a child process in flight at
 // once. `acquire()` resolves immediately while under the limit; otherwise it queues and is woken

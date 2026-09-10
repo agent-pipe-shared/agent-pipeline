@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0e467a27cda99ffbf9c08480fe4017f9d580437d037fa70ad65aede55c7b6278"
+    "transitionHead": "fd7b2a73fc1cf49acd22c07f92d279aa4ea0d8f466930631d81487af3de82432"
   },
   "counts": {
     "open": 108,
     "in_progress": 0,
-    "closed": 530,
+    "closed": 531,
     "rejected": 3,
     "deferred": 11
   },
@@ -5926,13 +5926,17 @@
     },
     {
       "id": "pipeline.read-scope-denial-code-accuracy-f3",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "T1 Critic review (opus, max) of commit cbc30756252ff1573b53ab2ada34ae2f02569f8d, F3, recorded in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md.",
       "deferred": false,
-      "tracking": "Nova B — NVA-B-READCONTAIN-1's T1 Critic (round 1) finding F3, carried in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md but never given its own backlog/items/ entry. Filed now to close that tracking gap; the underlying behavior is unchanged and non-blocking (the command is still refused end-to-end, only the printed reason code is wrong)."
+      "tracking": "Nova B — NVA-B-READCONTAIN-1's T1 Critic (round 1) finding F3, carried in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md but never given its own backlog/items/ entry. Filed now to close that tracking gap; the underlying behavior is unchanged and non-blocking (the command is still refused end-to-end, only the printed reason code is wrong).",
+      "closedAt": "2026-09-10",
+      "closureRepository": "self",
+      "closureCommit": "96cc357a0d59d602c08636abe7e1160825fe0f21",
+      "closureEvidence": "plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs"
     },
     {
       "id": "pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form",
@@ -6359,6 +6363,15 @@
       "closureRepository": "self",
       "closureCommit": "4950d24addeac9a93df61826d4a9f4a044753480",
       "closureEvidence": "backlog/evidence/2026-09-09-local-candidate-po-decisions.md"
+    },
+    {
+      "id": "pipeline.role-dispatch-payload-errors-fail-before-model-launch",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-10",
+      "source": "PO observation during 0.6.2 candidate review: malformed or incomplete role dispatches repeatedly consumed roughly ten minutes before reporting a coordinator/payload failure. The requirement applies to every role, not only Critic.",
+      "deferred": false
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
