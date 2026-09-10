@@ -1,0 +1,86 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "greenfield-062-r1",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "RR-P1-01",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-02",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-03",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-04",
+      "class": "cut",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-05",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-06",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-07",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-08",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-09",
+      "class": "cut",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-10",
+      "class": "cut",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-11",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-12",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    },
+    {
+      "id": "RR-P1-13",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "19f99b5624ecf60aa1f9aae2b35e77043d8f26ab"
+    }
+  ]
+}
+

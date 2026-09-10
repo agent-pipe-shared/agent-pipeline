@@ -1,5 +1,36 @@
 # Agent-Pipeline Operating Model (V3)
 
+<!-- capability:governance-event-ledger -->
+<a id="capability-governance-event-ledger"></a>
+<!-- capability:agent-decision-journal -->
+<a id="capability-agent-decision-journal"></a>
+<!-- capability:audit-and-evidence-cli -->
+<a id="capability-audit-and-evidence-cli"></a>
+<!-- capability:change-control-cli -->
+<a id="capability-change-control-cli"></a>
+<!-- capability:security-control-catalog -->
+<a id="capability-security-control-catalog"></a>
+<!-- capability:supply-chain-provenance -->
+<a id="capability-supply-chain-provenance"></a>
+<!-- capability:ai-assisted-hardening -->
+<a id="capability-ai-assisted-hardening"></a>
+<!-- capability:critical-human-authorization -->
+<a id="capability-critical-human-authorization"></a>
+<!-- capability:repair-guidance-cli -->
+<a id="capability-repair-guidance-cli"></a>
+<!-- capability:human-override-and-maintenance-window -->
+<a id="capability-human-override-and-maintenance-window"></a>
+<!-- capability:cost-and-benchmark-cli -->
+<a id="capability-cost-and-benchmark-cli"></a>
+<!-- capability:error-register-quality-gate -->
+<a id="capability-error-register-quality-gate"></a>
+<!-- capability:organization-policy-packs -->
+<a id="capability-organization-policy-packs"></a>
+<!-- capability:external-traceability-adapters -->
+<a id="capability-external-traceability-adapters"></a>
+<!-- capability:documentation-quality-gates -->
+<a id="capability-documentation-quality-gates"></a>
+
 > _A German reader copy follows below. English is the normative text._
 
 Agent-Pipeline is a versioned operating model for building software with AI

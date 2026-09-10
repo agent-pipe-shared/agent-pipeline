@@ -953,7 +953,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "SETUP",
           "anchorId": "capability-plugin-distribution-and-publication",
           "status": "active"
         }
@@ -1080,7 +1080,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "FLOW",
           "anchorId": "capability-session-and-delivery-skills",
           "status": "active"
         }
@@ -1214,7 +1214,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "FLOW",
           "anchorId": "capability-specialist-agent-roles",
           "status": "active"
         }
@@ -1312,7 +1312,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "SETUP",
           "anchorId": "capability-starter-templates",
           "status": "active"
         }
@@ -1369,7 +1369,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "SETUP",
           "anchorId": "capability-generated-agent-obligations",
           "status": "active"
         }
@@ -1432,7 +1432,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "FLOW",
           "anchorId": "capability-v3-routed-duties",
           "status": "active"
         }
@@ -1490,7 +1490,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "FLOW",
           "anchorId": "capability-v3-work-profiles",
           "status": "active"
         }
@@ -1547,7 +1547,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "FLOW",
           "anchorId": "capability-handover-hard-size-gate",
           "status": "active"
         }
@@ -1605,7 +1605,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-governance-event-ledger",
           "status": "active"
         }
@@ -1659,7 +1659,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-agent-decision-journal",
           "status": "active"
         }
@@ -1735,7 +1735,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-audit-and-evidence-cli",
           "status": "active"
         }
@@ -1793,7 +1793,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-change-control-cli",
           "status": "active"
         }
@@ -1858,7 +1858,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-security-control-catalog",
           "status": "active"
         }
@@ -1929,7 +1929,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-supply-chain-provenance",
           "status": "active"
         }
@@ -1987,7 +1987,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-ai-assisted-hardening",
           "status": "active"
         }
@@ -2047,7 +2047,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-critical-human-authorization",
           "status": "active"
         }
@@ -2102,7 +2102,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-repair-guidance-cli",
           "status": "active"
         }
@@ -2175,7 +2175,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "FLOW",
           "anchorId": "capability-continuity-and-handover",
           "status": "active"
         }
@@ -2238,7 +2238,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "FLOW",
           "anchorId": "capability-afk-capability-workers",
           "status": "active"
         }
@@ -2297,7 +2297,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "FLOW",
           "anchorId": "capability-local-worker-supervision",
           "status": "active"
         }
@@ -2358,7 +2358,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-cost-and-benchmark-cli",
           "status": "active"
         }
@@ -2415,7 +2415,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-error-register-quality-gate",
           "status": "active"
         }
@@ -2474,7 +2474,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-organization-policy-packs",
           "status": "active"
         }
@@ -2539,7 +2539,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-external-traceability-adapters",
           "status": "active"
         }
@@ -2601,7 +2601,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-human-override-and-maintenance-window",
           "status": "active"
         }
@@ -2668,7 +2668,7 @@
       ],
       "targets": [
         {
-          "document": "README",
+          "document": "OPERATING_MODEL",
           "anchorId": "capability-documentation-quality-gates",
           "status": "active"
         }

@@ -16,6 +16,9 @@ terminology, continue with this setup guide, then read the operator-facing
 
 ## Before you start
 
+<!-- capability:plugin-distribution-and-publication -->
+<a id="capability-plugin-distribution-and-publication"></a>
+
 - Node.js 24 or newer and Git are required for the included scripts.
 - Three scanners back the security gates: `gitleaks` (secrets), `osv-scanner`
   (dependency vulnerabilities), and `semgrep` (static analysis). Install them
@@ -256,6 +259,11 @@ delivery-ready repository lifecycle.
 
 ### 4. Optional manifest, governance, and ritual extensions
 
+<!-- capability:starter-templates -->
+<a id="capability-starter-templates"></a>
+<!-- capability:generated-agent-obligations -->
+<a id="capability-generated-agent-obligations"></a>
+
 Use [`templates/pipeline.yaml.example`](templates/pipeline.yaml.example) only
 when your project directly authors the optional declarative manifest. It can
 declare gates, profiles, governance paths, and an optional release tail. Do
@@ -293,7 +301,39 @@ begins. For a material feature, it also follows the V3 profile and advisory
 rules before writable work. A reminder hook is not a substitute for the
 bootstrap itself.
 
-### 6. Optional human-approval key (one-time setup)
+<a id="c-bring-an-existing-repository-under-the-pipeline"></a>
+
+### Existing repository checklist
+
+The same Driver path applies to an existing repository. Adopt one control at a
+time on a normal change branch:
+
+1. Identify the existing test/build commands, branch policy, sensitive paths,
+   and current documentation location.
+2. Bind the supported runner integration and add calibration plus project
+   guidance through the additive adoption plan, preserving existing settings
+   and instructions.
+3. Create or consolidate the one `verify` command and run it successfully
+   before treating it as the delivery gate.
+4. Name one handover file in calibration and move current state there instead
+   of maintaining competing status copies.
+5. Add project-specific denies, risk zones, and constraints. Enable governance
+   policies only after their paths and checks are real.
+6. Pilot the workflow read-mostly with a small spec, deterministic checks, and
+   independent review. Expand autonomy only when its evidence and operating
+   cost are understood.
+
+Migration changes the project's process, so review it like any architectural
+change. Do not paste a pipeline source's `pipeline.user.yaml` into an
+application repository or make a legacy authority look current by copying
+generated runtime files.
+
+## Optional advanced setup
+
+These additions are not part of routine onboarding. Use them only when the
+project's declared operating model requires them.
+
+### Human-approval key (one-time setup)
 
 Routine implementation, tests, and Critic review remain agent work after the
 approved plan. When a project configures a real human decision gate, create
@@ -316,7 +356,7 @@ future adapter work, not 0.5.0 CLI features. A code pasted into the same agent
 chat is visible to that agent and cannot replace final local proof for an
 irreversible action. See [PO approval](docs/po-human-approval.md).
 
-### Advanced: activate a slim private overlay (optional)
+### Activate a slim private overlay
 
 A slim private overlay contains project configuration and allowlisted inputs,
 not a copied setup program or verification harness. Its project root must have:
@@ -347,33 +387,7 @@ explicit activation, rerun `pipeline-core:pipeline-start`; project calibration,
 handover, Verify, and feature-state checks remain separate and may still fail
 closed even when the overlay bridge is activated.
 
-<a id="c-bring-an-existing-repository-under-the-pipeline"></a>
-
-## B. Bring an existing repository under the pipeline
-
-Do this on a normal change branch and adopt one control at a time:
-
-1. Read the project, identify its existing test/build commands, branch policy,
-   sensitive paths, and current documentation location.
-2. Bind the supported runner integration and add the calibration plus project
-   guidance through the additive adoption plan, preserving existing
-   settings and `CLAUDE.md` instructions.
-3. Create or consolidate the one `verify` command. Run it successfully before
-   treating it as the delivery gate.
-4. Add a handover file and name it in the calibration. Move current state there
-   instead of maintaining several status copies.
-5. Add project-specific denies, risk zones, and constraints. Enable governance
-   policies only after their paths and checks are real.
-6. Pilot the workflow read-mostly: bootstrap, write a small spec, run the
-   deterministic checks, and request an independent review. Expand autonomy
-   only when the evidence and operating cost are understood.
-
-Migration changes your project’s process, so review those changes like any
-other architectural change. Do not paste a pipeline source’s
-`pipeline.user.yaml` into an application repository, and do not make a legacy
-authority look current by copying generated runtime files.
-
-## C. Maintain a shared pipeline source (occasional)
+## B. Maintain a shared pipeline source (occasional)
 
 <!-- capability:setup-and-runtime-projection -->
 <a id="capability-setup-and-runtime-projection"></a>

@@ -73,8 +73,9 @@ Around those roles:
 
 ## Quick start
 
-For a project that will consume the pipeline, go to [SETUP](SETUP.md) and
-follow **Adopt a project**. It starts with prerequisites and the runner's
+For a project that will consume the pipeline, go to
+[Activate the pipeline in one project repository](SETUP.md#a-activate-the-pipeline-in-one-project-repository).
+It starts with prerequisites and the runner's
 public onboarding path; it does not ask a consumer to run this repository's
 source-maintainer setup. Continue with [Usage](docs/usage.md), then use
 [PIPELINE_FLOW](PIPELINE_FLOW.md) to choose the delivery route and
@@ -93,66 +94,6 @@ flowchart LR
     Critic -->|"findings"| Elephant
     Elephant -->|"decision"| PO
 ```
-
-## How a run flows end to end
-
-```mermaid
-flowchart TD
-    ID["Idea"] --> P
-    ID -.->|"optional, advisory"| DS["Design pre-stage<br/>(self-service,<br/>docs/design/)"]
-    DS -.-> P
-    P["Profile / model decision"] --> PL["Plan artifact +<br/>human plan gate"]
-    PL --> R["Readiness check"]
-    R --> D["Dispatch<br/>(fresh context, briefing)"]
-    D --> G["Deterministic gates<br/>(verify, security scan)"]
-    G --> C["Risk-class-dependent Critic"]
-    C --> H["Human completion gate"]
-    H --> M["Merge + doc sync"]
-    M -.->|"optional, if manifest declares release"| REL["Release/Promotion<br/>(optional)"]
-```
-
-Order matters: deterministic gates always run *before* any LLM judgment — a
-Critic never reviews a diff that hasn't already cleared the machine chain.
-
-An optional Release/Promotion tail can hook in after the merge (`REL` above) once
-a project's manifest declares a `release` section — detail in
-[`docs/deploy/README.md`](docs/deploy/README.md).
-
-### Three roots, one direction of dependency
-
-**Public Core** is the portable, committed contract: methodology, plugin,
-templates, and the public `pipeline.user.yaml` authority. Develop it on public
-feature branches. A separately versioned, ignored **Private Extension** (also
-called the Private Overlay) consumes one pinned, immutable Public-Core SHA; it
-does not feed account, owner, repository, or path coordinates back into the
-core. **Local user, PC, and runtime-data roots** hold credentials, marketplace
-and account mappings, absolute paths, local settings, caches, and session data.
-They stay ignored and are never compiled into a public projection. This keeps a
-second device reproducible from the public snapshot plus its matching private
-pin, without copying secrets or local history.
-
-In a **pipeline-source checkout**, `pipeline.user.yaml` is the public source of
-setup intent and `node setup.mjs` compiles its owned runtime projections. A
-consumer project must not copy or run a root `setup.mjs`; its loaded plugin
-classifies fresh, legacy, and partial roots through `pipeline-start` and owns
-the official onboarding/migration path. **Never hand-edit generated runtime
-configuration.** The compiler detects drift rather than silently treating a
-local edit as authority. The maintained consumer guide documents the ordered
-Codex lifecycle — portable seed → runtime initialization → restart/native
-readback → sanctioned kickoff → ready — together with host-managed limits and
-the goal-and-plan-digest-bound kickoff apply contract:
-[`docs/v3-consumer-onboarding.md`](docs/v3-consumer-onboarding.md).
-
-V3 has registered routes for Claude, Codex, and Antigravity. Supported runner
-integrations can enforce configured guards, while roles, evidence, and review
-remain portable. See [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for
-runner-specific controls, prerequisites, and manual responsibilities.
-
-Model routing lives in V3 profiles (`epic`, `feature`, `mini`), with model and
-effort selected per phase and runner.
-Session bootstrap observes Advisor capability locally without a model request.
-An actual Advisor runs only on demand for one concrete, reasoned and
-digest-bound question; start, resume, re-entry and Compact never launch it.
 
 ## The front door: optional design pre-stage
 
@@ -222,95 +163,6 @@ Before your first big feature, a quick look at
 [`docs/design/README.md`](docs/design/README.md) pays off — a self-service
 guide for brainstorming a solid requirement before it enters the pipeline
 (optional, recommended).
-
-## Operational controls in context
-
-The adoption flow uses a small set of connected controls; their detailed local
-contracts live in the linked reference pages, rather than in a second catalog
-here.
-
-<!-- capability:plugin-distribution-and-publication -->
-<a id="capability-plugin-distribution-and-publication"></a>
-<!-- capability:session-and-delivery-skills -->
-<a id="capability-session-and-delivery-skills"></a>
-<!-- capability:specialist-agent-roles -->
-<a id="capability-specialist-agent-roles"></a>
-<!-- capability:starter-templates -->
-<a id="capability-starter-templates"></a>
-<!-- capability:generated-agent-obligations -->
-<a id="capability-generated-agent-obligations"></a>
-<!-- capability:v3-routed-duties -->
-<a id="capability-v3-routed-duties"></a>
-<!-- capability:v3-work-profiles -->
-<a id="capability-v3-work-profiles"></a>
-
-**Plan and delivery.** Distributed plugins, starter templates, V3 profiles and
-routed duties, named specialist roles, generated obligations, and bounded
-session skills make a task and its delivery record explicit. Publication is a
-separate evidence-bound action; a selected route is not an effective-model
-attestation.
-
-<!-- capability:handover-hard-size-gate -->
-<a id="capability-handover-hard-size-gate"></a>
-<!-- capability:governance-event-ledger -->
-<a id="capability-governance-event-ledger"></a>
-<!-- capability:agent-decision-journal -->
-<a id="capability-agent-decision-journal"></a>
-<!-- capability:continuity-and-handover -->
-<a id="capability-continuity-and-handover"></a>
-
-**Continuity.** Size-bounded handovers and explicit continuity, journal, and
-event-ledger tools preserve inspectable state. A library or record does not
-automatically activate a runner integration or create authority.
-
-<!-- capability:audit-and-evidence-cli -->
-<a id="capability-audit-and-evidence-cli"></a>
-<!-- capability:change-control-cli -->
-<a id="capability-change-control-cli"></a>
-<!-- capability:security-control-catalog -->
-<a id="capability-security-control-catalog"></a>
-<!-- capability:supply-chain-provenance -->
-<a id="capability-supply-chain-provenance"></a>
-<!-- capability:ai-assisted-hardening -->
-<a id="capability-ai-assisted-hardening"></a>
-
-**Assurance evidence.** Audit, change-control, security-catalog, provenance,
-and hardening tools are explicit local operations. Their receipts inform
-review; they do not publish externally, install a scanner, or certify security
-or compliance.
-
-<!-- capability:critical-human-authorization -->
-<a id="capability-critical-human-authorization"></a>
-<!-- capability:repair-guidance-cli -->
-<a id="capability-repair-guidance-cli"></a>
-<!-- capability:human-override-and-maintenance-window -->
-<a id="capability-human-override-and-maintenance-window"></a>
-
-**Human boundaries.** Critical authorization, refusal repair, override, and
-maintenance-window paths require an attended, declared procedure. Asking for
-guidance or preparing a request never grants an agent an override.
-
-<!-- capability:afk-capability-workers -->
-<a id="capability-afk-capability-workers"></a>
-<!-- capability:local-worker-supervision -->
-<a id="capability-local-worker-supervision"></a>
-<!-- capability:cost-and-benchmark-cli -->
-<a id="capability-cost-and-benchmark-cli"></a>
-<!-- capability:error-register-quality-gate -->
-<a id="capability-error-register-quality-gate"></a>
-<!-- capability:organization-policy-packs -->
-<a id="capability-organization-policy-packs"></a>
-<!-- capability:external-traceability-adapters -->
-<a id="capability-external-traceability-adapters"></a>
-<!-- capability:documentation-quality-gates -->
-<a id="capability-documentation-quality-gates"></a>
-
-**Operations.** Claude-only analysis workers, explicit local-worker
-supervision, cost/benchmark and quality checks, policy packs, and traceability
-adapters retain their stated boundaries: provider execution, external writes,
-and cross-runner cost comparisons need separate inputs and evidence. This source
-repository's documentation-contract check validates tracked Markdown links,
-anchors, and the calibrated handover authority locally.
 
 ## Runtime
 
@@ -421,8 +273,9 @@ Ergänzend dazu:
 
 ## Schnellstart
 
-Für ein Consumer-Projekt gehe zu [SETUP](SETUP.md) und folge **Adopt a
-project**. Dieser Weg beginnt mit Voraussetzungen und dem öffentlichen
+Für ein Consumer-Projekt folge in [SETUP dem Abschnitt „Activate the pipeline
+in one project repository“](SETUP.md#a-activate-the-pipeline-in-one-project-repository).
+Dieser Weg beginnt mit Voraussetzungen und dem öffentlichen
 Onboarding-Pfad des Runners; er verlangt nicht die source-maintainer-`setup.mjs`.
 Danach folgt [Usage](docs/usage.md); [PIPELINE_FLOW](PIPELINE_FLOW.md) erklärt
 die Lieferroute, und die [Dokumentationskarte](docs/README.md) verweist auf
@@ -440,66 +293,6 @@ flowchart LR
     Critic -->|"Befunde"| Elephant
     Elephant -->|"Entscheidung"| PO
 ```
-
-## Wie ein Durchlauf abläuft
-
-```mermaid
-flowchart TD
-    ID["Idee"] --> P
-    ID -.->|"optional, advisory"| DS["Design-Vorstufe<br/>(Selbstbedienung,<br/>docs/design/)"]
-    DS -.-> P
-    P["Profil-/Modell-Entscheid"] --> PL["Plan-Artefakt +<br/>menschliches Plan-Gate"]
-    PL --> R["Readiness-Check"]
-    R --> D["Dispatch<br/>(frischer Kontext, Briefing)"]
-    D --> G["Deterministische Gates<br/>(verify, Security-Scan)"]
-    G --> C["Risikoklassen-abhängiger Critic"]
-    C --> H["Menschliches Abschluss-Gate"]
-    H --> M["Merge + Doku-Sync"]
-    M -.->|"optional, falls Manifest Release erklärt"| REL["Release/Promotion<br/>(optional)"]
-```
-
-Entscheidend ist die Reihenfolge: Die maschinellen Gates laufen immer VOR jedem
-Urteil eines LLM — ein Critic bewertet nie einen Diff, der die deterministische
-Kette noch nicht durchlaufen hat.
-
-Ein optionaler Release/Promotion-Ausklang kann nach dem Merge andocken (`REL`
-oben), sobald das Manifest eines Projekts einen `release`-Abschnitt erklärt —
-Details in [`docs/deploy/README.md`](docs/deploy/README.md).
-
-### Drei Wurzeln, eine Abhängigkeitsrichtung
-
-Der **Public Core** ist der portable, committete Vertrag: Methodik, Plugin,
-Templates und die öffentliche `pipeline.user.yaml`-Autorität. Seine Entwicklung
-findet auf öffentlichen Feature-Branches statt. Eine separat versionierte,
-ignorierte **Private Extension** (auch Private Overlay genannt) konsumiert genau
-einen gepinnten, unveränderlichen Public-Core-SHA; sie liefert keine Account-,
-Owner-, Repository- oder Pfadkoordinaten zurück in den Core. **Lokale User-,
-PC- und Runtime-Datenwurzeln** enthalten Zugangsdaten, Marketplace- und
-Account-Mappings, absolute Pfade, lokale Einstellungen, Caches und Session-Daten.
-Sie bleiben ignoriert und werden nie in eine öffentliche Projektion kompiliert.
-So ist ein zweites Gerät aus dem öffentlichen Snapshot plus passendem Private-Pin
-reproduzierbar, ohne Secrets oder lokale Historie zu kopieren.
-
-In einem **Pipeline-Source-Checkout** ist `pipeline.user.yaml` die öffentliche
-Quelle der Setup-Absicht, und `node setup.mjs` kompiliert die zugehörigen
-Runtime-Projektionen. Ein Consumer-Projekt darf weder eine Root-`setup.mjs`
-kopieren noch ausführen; sein geladenes Plugin klassifiziert frische, Legacy-
-und partielle Roots durch `pipeline-start` und besitzt den offiziellen
-Onboarding-/Migrationspfad. **Generierte Runtime-Konfiguration wird nie von
-Hand bearbeitet.** Der Compiler erkennt Drift, statt eine lokale Änderung
-stillschweigend zur Autorität zu machen.
-
-V3 hat registrierte Routen für Claude, Codex und Antigravity. Unterstützte
-Runner-Integrationen können konfigurierte Guards durchsetzen; Rollen, Evidenz
-und Review bleiben übertragbar. Die runnerspezifischen Kontrollen,
-Voraussetzungen und manuellen Zuständigkeiten stehen in
-[`docs/runtime-boundary.md`](docs/runtime-boundary.md).
-
-Das Modellrouting liegt in V3-Profilen (`epic`, `feature`, `mini`); Modell und
-Effort werden je Phase und Runner ausgewählt.
-Der Session-Bootstrap beobachtet Advisor-Capability lokal ohne Modellrequest.
-Ein echter Advisor läuft nur on demand für genau eine konkrete, begründete und
-Digest-gebundene Frage; Start, Resume, Re-entry und Compact starten ihn nie.
 
 ## Die Vordertür: optionale Design-Vorstufe
 
@@ -570,38 +363,6 @@ Vor dem ersten großen Feature lohnt ein kurzer Blick in
 [`docs/design/README.md`](docs/design/README.md) — der Selbstbedienungs-Guide
 zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
 (optional, empfohlen).
-
-## Operative Kontrollen im Zusammenhang
-
-Der Übernahme-Ablauf verbindet wenige Kontrollen; ihre detaillierten lokalen
-Verträge stehen in den verlinkten Referenzen statt in einem zweiten Katalog.
-
-**Plan und Lieferung.** Verteilte Plugins, Starter-Templates, V3-Profile und
-geroutete Duties, benannte Spezialrollen, generierte Pflichten und begrenzte
-Session-Skills machen Aufgabe und Liefernachweis explizit. Veröffentlichung
-bleibt eine getrennte evidenzgebundene Aktion; eine gewählte Route attestiert
-kein effektives Modell.
-
-**Kontinuität.** Größenbegrenzte Handover sowie explizite Kontinuitäts-,
-Journal- und Event-Ledger-Werkzeuge erhalten prüfbaren State. Eine Bibliothek
-oder ein Record aktiviert weder automatisch eine Runner-Integration noch
-erzeugt sie Autorität.
-
-**Assurance-Evidenz.** Audit-, Change-Control-, Security-Katalog-,
-Provenance- und Hardening-Werkzeuge sind explizite lokale Operationen. Ihre
-Receipts informieren das Review; sie veröffentlichen nicht extern, installieren
-keinen Scanner und zertifizieren weder Security noch Compliance.
-
-**Menschliche Grenzen.** Critical Authorization, Refusal Repair, Override und
-Maintenance-Window-Pfade verlangen ein betreutes, deklariertes Verfahren. Eine
-Anleitung oder vorbereitete Anfrage verleiht einem Agenten keine Ausnahme.
-
-**Betrieb.** Claude-only Analyse-Worker, explizite Local-Worker-Supervision,
-Kosten-/Benchmark- und Qualitätschecks, Policy Packs und Traceability-Adapter
-behalten ihre genannten Grenzen: Provider-Ausführung, externe Writes und
-runnerübergreifende Kostenvergleiche benötigen getrennte Inputs und Evidenz.
-Der Documentation-Contract-Check dieses Quell-Repositorys prüft getrackte
-Markdown-Links, -Anchors und die kalibrierte Handover-Autorität lokal.
 
 ## Laufzeitumgebung
 

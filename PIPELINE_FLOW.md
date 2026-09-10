@@ -11,6 +11,11 @@ contract. If this guide disagrees with one of them, use that source.
 
 ## Start here: one change, one honest route
 
+<!-- capability:session-and-delivery-skills -->
+<a id="capability-session-and-delivery-skills"></a>
+<!-- capability:specialist-agent-roles -->
+<a id="capability-specialist-agent-roles"></a>
+
 Bring an outcome in plain language: a bug to fix, a feature to add, or a
 refactor to make safer. The **Elephant** turns it into a bounded written task;
 fresh **Goldfish** contexts implement bounded packages; a read-only **Critic**
@@ -95,6 +100,11 @@ returns.
 
 ## 1. Choose the V3 profile first
 
+<!-- capability:v3-routed-duties -->
+<a id="capability-v3-routed-duties"></a>
+<!-- capability:v3-work-profiles -->
+<a id="capability-v3-work-profiles"></a>
+
 | Profile | Enter it when | Owner | Evidence / guard | Rejoin or stop |
 |---|---|---|---|---|
 | `epic` | Work spans architecture, several blocks, or a broad coordinated outcome. | Elephant; human decides material scope. | Registered V3 `epic` route plus model-free V2 capability state and assurance. Consultation exists only for one concrete demand. | Continue to triage immediately; capability `unknown` or `unavailable` is honest evidence, not a bootstrap timeout or consultation result. |
@@ -124,6 +134,11 @@ a *new* reviewer checks it again. Neither an optional readiness decision nor a
 `mini` profile bypasses a mandatory approval.
 
 ## 3. Deliver in independently checkable packages
+
+<!-- capability:afk-capability-workers -->
+<a id="capability-afk-capability-workers"></a>
+<!-- capability:local-worker-supervision -->
+<a id="capability-local-worker-supervision"></a>
 
 <!-- capability:deterministic-verification -->
 <a id="capability-deterministic-verification"></a>
@@ -204,11 +219,17 @@ choosing an update does not itself install, activate, or verify it.
 
 ## 5. Close deliberately; recover with a bound
 
+<!-- capability:handover-hard-size-gate -->
+<a id="capability-handover-hard-size-gate"></a>
+<!-- capability:continuity-and-handover -->
+<a id="capability-continuity-and-handover"></a>
+
 **Close** is not merely “the code merged.” It synchronizes verify evidence,
-result/state, handover, documentation, telemetry, and a self-retro.
-`/pipeline-core:close-block` is the supported close ritual. If a project has a
-release branch, release/promotion follows the close boundary under its own
-evidence and approval rules.
+result/state, handover, documentation, telemetry, and a self-retro. Use
+`/pipeline-core:close-feature` when the active feature lifecycle is complete.
+`/pipeline-core:close-block` is reserved for finalizing a stopped topic or a
+real runtime transfer. If a project has a release branch, release/promotion
+follows the close boundary under its own evidence and approval rules.
 
 | Situation | Owner | Allowed recovery | Rejoin / stop |
 |---|---|---|---|
@@ -450,9 +471,11 @@ die Auswahl installiert, aktiviert oder verifiziert kein Update.
 
 **Close** heißt nicht nur „der Code ist gemergt“. Es synchronisiert
 Verify-Nachweis, Result/State, Handover, Dokumentation, Telemetrie und
-Selbst-Retro. `/pipeline-core:close-block` ist das unterstützte Close-Ritual. Hat
-ein Projekt einen Release-Zweig, folgt Release/Promotion der Close-Grenze unter
-eigenen Nachweis- und Freigaberegeln.
+Selbst-Retro. Ist der aktive Feature-Lifecycle vollständig beendet, dient
+`/pipeline-core:close-feature` seinem Abschluss. `/pipeline-core:close-block`
+ist ausschließlich für ein gestopptes Thema oder einen echten Runtime-Transfer
+vorgesehen. Hat ein Projekt einen Release-Zweig, folgt Release/Promotion der
+Close-Grenze unter eigenen Nachweis- und Freigaberegeln.
 
 | Situation | Owner | Zulässige Recovery | Wiedereinstieg / Stopp |
 |---|---|---|---|

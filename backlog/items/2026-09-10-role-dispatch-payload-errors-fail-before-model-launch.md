@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-09-10
-sprint: nova
+sprint: nova-b
 done_when: manual
 source: "PO observation during 0.6.2 candidate review: malformed or incomplete role dispatches repeatedly consumed roughly ten minutes before reporting a coordinator/payload failure. The requirement applies to every role, not only Critic."
 ---
@@ -57,3 +57,15 @@ This sharpens the acceptance test without changing the planned sprint: every
 role/runner fixture with an invalid required field must terminate during
 `PREPARE`, within the local five-second bound, and prove zero launcher calls.
 See `backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.
+
+## Triage — 2026-09-11
+
+- **Decision:** accepted for Nova B; no additional 0.6.2 release blocker was
+  established after the bounded harness timeouts and normal session-Critic
+  route were restored.
+- **Priority:** first cost-reduction implementation in Nova B. The measured
+  malformed packet spent 30 seconds and 50,629 tokens without a model turn;
+  the shared preflight prevents the same class across every role and runner.
+- **Boundary:** do not implement this as five adapter-local validators. The
+  common verdict and zero-launch tests land first; runner and role extensions
+  consume that result.
