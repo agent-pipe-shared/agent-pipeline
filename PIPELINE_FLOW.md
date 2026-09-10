@@ -5,9 +5,11 @@
 This is the **one maintained visual guide to the user-facing V3 flow**. It helps
 you choose a route and understand who does what. It is not permission to skip a
 gate or change a project. The active PRD and Spec define the work; the
-[Operating Model](docs/operating-model.md), the project's `pipeline.user.yaml`
-and the project calibration at its resolved authority tier (`project/pipeline.yaml`/`project/pipeline.json`, else `.claude/pipeline.yaml`/`.claude/pipeline.json`) define the applicable
-contract. If this guide disagrees with one of them, use that source.
+[Operating Model](docs/operating-model.md), the project's `pipeline.user.yaml`,
+optional `.claude/pipeline.yaml` manifest, and project calibration at its
+resolved authority tier (`project/pipeline.json`, else
+`.claude/pipeline.json`) define the applicable contract. If this guide
+disagrees with one of them, use that source.
 
 ## Start here: one change, one honest route
 
@@ -50,7 +52,7 @@ flowchart TD
     P -->|Mini| T[Triage]
     A --> T
     T --> D{Design useful or required?}
-    D -->|yes| DS[Design phase: options and acceptance criteria]
+    D -->|yes| DS[Design phase: options, UI when applicable, and acceptance criteria]
     D -->|no| RR[Rigor and risk recorded]
     DS --> RR
     RR --> EL{Epic or Feature?}
@@ -75,11 +77,9 @@ flowchart TD
     V -->|red| RC[Classify and recover]
     V -->|green| O{Optional phase configured or triggered?}
     O -->|security| SEC[Security evidence]
-    O -->|UI| UI[UI design evidence]
     O -->|governance| GOV[Guideline or policy evaluation]
     O -->|none| C{Critic required by risk or diff?}
     SEC --> C
-    UI --> C
     GOV --> C
     C -->|yes| CR[Fresh independent Critic]
     C -->|no| CL[Close and record]
@@ -327,7 +327,7 @@ flowchart TD
     P -->|Mini| T[Triage]
     A --> T
     T --> D{Design sinnvoll oder nötig?}
-    D -->|ja| DS[Design-Phase: Optionen und Akzeptanzkriterien]
+    D -->|ja| DS[Design-Phase: Optionen, gegebenenfalls UI und Akzeptanzkriterien]
     D -->|nein| RR[Rigor und Risiko festhalten]
     DS --> RR
     RR --> EL{Epic oder Feature?}
@@ -352,11 +352,9 @@ flowchart TD
     V -->|rot| RC[Ursache einordnen und recovern]
     V -->|grün| O{Optionale Phase konfiguriert oder ausgelöst?}
     O -->|Security| SEC[Security-Nachweis]
-    O -->|UI| UI[UI-Design-Nachweis]
     O -->|Governance| GOV[Guideline- oder Policy-Prüfung]
     O -->|keine| C{Critic laut Risiko oder Diff nötig?}
     SEC --> C
-    UI --> C
     GOV --> C
     C -->|ja| CR[Frischer unabhängiger Critic]
     C -->|nein| CL[Abschließen und festhalten]
