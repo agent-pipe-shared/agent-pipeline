@@ -26,6 +26,11 @@ The protocol (normatively spelled out in [session-bootstrap.md](../../harness/se
 - defines **offline behavior** (working on a cached state is allowed, but never silently — the consumed state is declared) and the **refresh ritual**;
 - ends with a **self-confirmation** of the session in the binding format from [session-bootstrap.md](../../harness/session-bootstrap.md) step 6: ruleset SHA/version, project, calibration, handover state, role; model/effort appears as an **additional line in the Elephant variant** (§6.1, not for Goldfish/Critic) — only then does work begin;
 - defines **failure behavior**: if a mandatory check fails, work does not silently continue on an unknown state (escalation path defined in the protocol).
+- keeps onboarding intake corrections explicit and auditable: the ordinary
+  design-answer apply is idempotent and refuses changed content, while the
+  separately named `intake-design-questions-replace` command may replace the
+  complete answer set only before staging generation. Generated or bound
+  intake uses the normal specification-amendment path.
 
 ## Consequences
 
@@ -74,6 +79,12 @@ Das Protokoll (normativ ausformuliert in [session-bootstrap.md](../../harness/se
 - definiert **Offline-Verhalten** (Arbeit auf Cache-Stand ist zulässig, aber nie still — der konsumierte Stand wird deklariert) und das **Refresh-Ritual**;
 - endet mit einer **Selbstbestätigung** der Session im verbindlichen Format aus [session-bootstrap.md](../../harness/session-bootstrap.md) Schritt 6: Regelwerk-SHA/Version, Projekt, Kalibrierung, Handover-Stand, Rolle; Modell/Effort erscheint als **Zusatzzeile der Elephant-Variante** (§6.1, nicht bei Goldfish/Critic) — erst danach Arbeitsaufnahme;
 - definiert **Fehlverhalten**: Schlägt ein Pflicht-Check fehl, wird nicht still auf unbekanntem Stand weitergearbeitet (Eskalationspfad im Protokoll).
+- hält Korrekturen der Onboarding-Eingaben explizit und auditierbar: Das
+  normale Anwenden der Designantworten ist idempotent und verweigert geänderte
+  Inhalte; der separat benannte Befehl `intake-design-questions-replace` darf
+  den vollständigen Antwortsatz nur vor der Staging-Generierung ersetzen. Für
+  bereits generierte oder gebundene Eingaben gilt der normale
+  Spezifikationsänderungsweg.
 
 ## Konsequenzen
 

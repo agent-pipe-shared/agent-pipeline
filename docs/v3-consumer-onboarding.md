@@ -66,7 +66,10 @@ The normal progress sequence is ordered and fail-closed:
 | `portable-seed-required` | Read-only `plan`, then the returned digest-bound `apply-portable-seed --activate` command. | The portable V3 source/calibration seed validates. It does not prove Codex runtime or operational readiness. |
 | `runtime-initialization-required` | Read-only `plan-runtime`, then the returned digest-bound `initialize-runtime --activate` command. This applies only when Codex does not provide the reserved project runtime mount. | Required generated Codex runtime targets validate and a restart barrier is durable. |
 | `restart-required` | Exit the current process and use the returned one-use restart action. | Only a new process with a fresh native, digest-bound effective-runtime readback can clear the barrier. File presence, mtimes, a user assertion, and App-Server health are not substitutes. |
-| `kickoff-required` | Collect and validate the project goal, then produce the read-only sanctioned kickoff plan. | The plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
+| `intake-required` | Follow the returned consent/capture action to record the project brief and required local identity fields. | The private intake checkpoint contains consent and the captured material input; it is not yet a generated specification. |
+| `intake-design-questions-required` | Answer the one bundled question round, correct wrong answers before generation when needed, then run the returned read-only generation plan and its digest-bound apply. | The complete input is durable and staging generation is bound to its digest. |
+| `bootstrap-binding-required` | Review the generated PRD/Spec, add the requested acknowledgement, then run the returned bind plan/apply. | The generated package becomes the initial project authority only after its own validation and binding readback. |
+| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan. | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
 | `continuity-damaged` | Run the exact read-only `plan-repair`. A supported bounded repair requires a separate digest-bound confirmation; an unsupported result stops with no next action. | Only the recognized active-turn resume mismatch or an established PO-bound pre-continuity state is repairable. Kickoff history is never rewritten. |
 | `ready` | No onboarding mutation. Continue through the intent-appropriate bootstrap/session/dispatch gate. | Repository capability, current source/runtime/readback, continuity, and every capability required by that intent passed together. |
 
@@ -87,6 +90,19 @@ readback. A completed replay makes no unintended write. Terminal states such
 as `partial`, `invalid`, `unsafe`, capability unavailable, projection drift,
 damaged continuity, or an unavailable required App Server are not permission
 to skip ahead or edit generated files manually.
+
+Before intake staging is generated, a mistaken design answer can be replaced
+without deleting or hand-editing the checkpoint. Re-submit the complete answer
+array through the separately named command:
+
+```sh
+node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-design-questions-replace --root /absolute/consumer/root --answers-json '<complete JSON array>' --activate
+```
+
+The ordinary `intake-design-questions-apply` remains idempotent and refuses
+changed content. Replacement increments the checkpoint revision and is refused
+after staging has been generated or bound; later corrections use the normal
+specification-amendment path.
 
 ### Kickoff apply contract
 

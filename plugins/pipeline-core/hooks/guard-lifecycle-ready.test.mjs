@@ -3094,6 +3094,9 @@ test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is a
       "intake-design-questions-apply": {
         "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
       },
+      "intake-design-questions-replace": {
+        "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Correct it." }]),
+      },
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
     };
@@ -3124,6 +3127,9 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
       "intake-capture-apply": { "--text": "requirement material" },
       "intake-design-questions-apply": {
         "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
+      },
+      "intake-design-questions-replace": {
+        "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Correct it." }]),
       },
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },

@@ -175,6 +175,7 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   { name: "intake-consent-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "intake-capture-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "intake-design-questions-apply", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "intake-design-questions-replace", flat: true, mutates: true, automatedArgvShape: null },
   // Wave 4 onboarding coordinator, step 4 (NVA-W4-COORD-2, design.md SSa.5 point 4). Unlike the
   // three apply-only commands above, this IS a plan/apply pair (mirroring every other command in
   // the table, per design): intake-generate-plan needs no operand beyond the bare lifecycle argv
@@ -262,6 +263,7 @@ function usage() {
     "       (--id is a caller-chosen slug for the promoted feature; the `kickoff-` prefix is reserved for this tool's own provisional-anchor naming and is rejected -- choose a plain slug)",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <intake-design-questions-apply|intake-design-questions-replace> --root <project-dir> --answers-json <json-array> --activate",
   ].join("\n");
 }
 function parse(args) {
@@ -730,11 +732,11 @@ export function main(args = process.argv.slice(2), {
     else if (options.command === "intake-capture-apply") output = applyOnboardingIntakeCapture({
       rootDir: options.root, text: resolveIntakeCaptureText(options), activate: options.activate, deps,
     });
-    else if (options.command === "intake-design-questions-apply") {
+    else if (["intake-design-questions-apply", "intake-design-questions-replace"].includes(options.command)) {
       let answers;
       try { answers = JSON.parse(options.answersJson ?? "null"); } catch { answers = null; }
       output = applyOnboardingIntakeDesignQuestions({
-        rootDir: options.root, answers, activate: options.activate, deps,
+        rootDir: options.root, answers, replace: options.command === "intake-design-questions-replace", activate: options.activate, deps,
       });
     }
     else if (options.command === "intake-generate-plan") output = planOnboardingIntakeGenerate({

@@ -5559,13 +5559,14 @@ export function applyOnboardingIntakeCapture({
  * designQuestions, flips transactionState to "ready-to-generate" (design
  * SSa.5 point 3). Requires at least one captured material-input chunk
  * (transactionState already "design-questions-pending") and existing
- * consent. Idempotent only for an exact replay of the same already-answered
- * round; a different answer set after the round is already answered is
- * refused rather than silently overwritten -- the round is asked exactly
- * once.
+ * consent. Idempotent for an exact replay. A different answer set requires
+ * the explicit replacement command and is accepted only while the checkpoint
+ * is still "ready-to-generate". Once staging has been generated or bound,
+ * this writer stays closed and the normal document amendment path owns
+ * corrections.
  */
 export function applyOnboardingIntakeDesignQuestions({
-  rootDir, repositoryCapability = "local", answers, activate = false, deps = {},
+  rootDir, repositoryCapability = "local", answers, replace = false, activate = false, deps = {},
 } = {}) {
   if (activate !== true) fail("INTAKE-DESIGN-QUESTIONS-ACTIVATION-REQUIRED", "intake design-questions apply requires explicit activation");
   if (!Array.isArray(answers) || answers.length === 0) fail("INTAKE-DESIGN-QUESTIONS-EMPTY", "intake design-questions apply requires at least one question/answer pair");
@@ -5593,6 +5594,16 @@ export function applyOnboardingIntakeDesignQuestions({
         const sameContent = (a, b) => a.length === b.length
           && a.every((entry, index) => entry.question === b[index].question && entry.answer === b[index].answer);
         if (base.designQuestions !== null && sameContent(base.designQuestions, candidateEntries)) return null;
+        if (base.transactionState === "ready-to-generate" && replace === true) {
+          const { contentSha256: dropSha, ...baseUnsigned } = base;
+          void dropSha;
+          return {
+            ...baseUnsigned,
+            revision: base.revision + 1,
+            updatedAt: nowIso,
+            designQuestions: candidateEntries,
+          };
+        }
         fail("INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED", "the one bundled design-question round was already answered with different content");
       }
       if (base.transactionState !== "design-questions-pending") {

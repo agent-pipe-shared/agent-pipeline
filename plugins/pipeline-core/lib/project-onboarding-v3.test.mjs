@@ -61,7 +61,8 @@ import {
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import {
   applyOnboardingBootstrapBind, applyOnboardingIntakeGenerate, observeBootstrapBindAcknowledgement,
-  planOnboardingBootstrapBind, planOnboardingIntakeGenerate, readOnboardingSessionCleanupBinding,
+  planOnboardingBootstrapBind, planOnboardingIntakeGenerate, readOnboardingIntakeCheckpoint,
+  readOnboardingSessionCleanupBinding,
 } from "./onboarding-continuity.mjs";
 import {
   cleanupSession, listActiveSessionDescriptors, retireSessionDescriptor, startSessionDescriptor,
@@ -8041,6 +8042,12 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(afterAnswers.status, "intake-design-questions-required");
     assert.equal(afterAnswers.nextAction.kind, "command");
     assert.equal(afterAnswers.nextAction.argv[1], "intake-generate-plan");
+    assert.match(afterAnswers.diagnostics[0].recommendation, /intake-design-questions-replace/);
+
+    const correctedAnswers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely and accessibly." }]);
+    const corrected = invoke(["intake-design-questions-replace", "--root", path, "--answers-json", correctedAnswers, "--activate", "--runner", "codex"]);
+    assert.equal(corrected.code, 0, stderr);
+    assert.equal(readOnboardingIntakeCheckpoint({ rootDir: path, spawn: fakeGit }).value.designQuestions[0].answer, "Ship safely and accessibly.");
 
     // Staging generated: bootstrap-binding-required, nextAction is the real
     // bootstrap-bind-plan command. Called directly (not through onboardingCli):

@@ -3133,7 +3133,7 @@ check("applyOnboardingIntakeDesignQuestions: requires an existing checkpoint at 
   }));
 });
 
-check("applyOnboardingIntakeDesignQuestions: refuses a different answer set once the round is already answered", () => {
+check("applyOnboardingIntakeDesignQuestions: normal apply refuses a different answer set once the round is already answered", () => {
   const root = fixture("intake-design-questions-already-answered");
   captureIntakeMaterial(root);
   applyOnboardingIntakeDesignQuestions({
@@ -3141,6 +3141,34 @@ check("applyOnboardingIntakeDesignQuestions: refuses a different answer set once
   });
   expectIntakeError("INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED", () => applyOnboardingIntakeDesignQuestions({
     rootDir: root, answers: [{ question: "Q2", answer: "A2" }], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: explicit replacement corrects answers before generation", () => {
+  const root = fixture("intake-design-questions-replace");
+  captureIntakeMaterial(root);
+  const first = applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "wrong test value" }], activate: true,
+  });
+  const corrected = applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "real answer" }], replace: true, activate: true,
+  });
+  assert.equal(corrected.mutated, true);
+  assert.equal(corrected.checkpoint.transactionState, "ready-to-generate");
+  assert.equal(corrected.checkpoint.revision, first.checkpoint.revision + 1);
+  assert.equal(corrected.checkpoint.designQuestions[0].answer, "real answer");
+});
+
+check("applyOnboardingIntakeDesignQuestions: explicit replacement is refused after staging generation", () => {
+  const root = fixture("intake-design-questions-replace-after-generation");
+  captureIntakeMaterial(root);
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "A1" }], activate: true,
+  });
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "late replacement" }], replace: true, activate: true,
   }));
 });
 

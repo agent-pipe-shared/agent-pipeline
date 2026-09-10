@@ -2817,7 +2817,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
           "$.continuity",
           "intake_design_questions_required",
           "the design-question round is answered; staging generation has not run yet",
-          "review the read-only intake-generate-plan action, then apply it",
+          "if an answer is wrong, run intake-design-questions-replace before reviewing and applying the read-only intake-generate-plan action",
         )],
       });
     }
