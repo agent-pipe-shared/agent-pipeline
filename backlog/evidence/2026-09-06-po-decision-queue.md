@@ -1,5 +1,20 @@
 # PO decision queue — collected 2026-09-06
 
+## Reusable review-transfer consent — 2026-09-10
+
+The PO explicitly requested implementation and a direct test of a one-time,
+project/service-bound review-transfer consent, while retaining the existing
+access mode. Ordinary candidate commits and new evidence inside its approved
+data areas must reuse the decision. A new recipient, project, purpose or wider
+data area is a scope change; local consent must never be relabelled as host
+approval or used to bypass a denial.
+
+The current gate and host observations, including the completed 517/517 Verify,
+native review timeout and denied bounded starts, are retained in
+[the host-rejection record](2026-09-10-critic-export-host-rejection.md).
+Implementation is in progress; this entry does not claim installed support,
+accepted host authorization, successful review or a test-ready local candidate.
+
 ## Standing autonomous Critic execution, including user projects — 2026-09-10
 
 The PO clarified: "Es darf auch keine Freigabe brauchen! Das sind per operating
