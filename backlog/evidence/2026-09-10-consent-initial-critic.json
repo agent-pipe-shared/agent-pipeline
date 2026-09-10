@@ -1,0 +1,201 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Closed-bootstrap ruleset: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Verified candidate commit 70dc18eeee69e5a76a8fa2ad8f52969055024db2 and tree 557fcaa64f7a547241e5fafef2a4a99ec4c87599. All five current artifacts and thirteen tracked reference files match that candidate. scratch/NVA-CONSENT-REVIEW/consent-initial-1/candidate-source-evidence.json matches the reconstructed scoped diff except for its final newline. scratch/NVA-CONSENT-REVIEW/consent-initial-1/verify.json records node harness/scripts/verify.mjs, exit 0, 517 passing checks without reuse, including consent tests and security scanning, with unchanged clean candidate bindings. Fresh-session authorship remains not verifiable: no stripped dispatch record was supplied, and the candidate has only an AI-Assisted trailer. Additional probes used mocked filesystem/Git operations; the actual nested-directory Git prefix was observed read-only. Native read-only isolation was supplied by the host. No mutation, network access, or delegation was invoked; notes persistence was unavailable. Injected context consisted of the AGENTS.md pointer and runtime/workspace metadata; no session history was inspected.",
+    "findings": [
+      {
+        "gap": "Candidate verification uses different path bases for ls-tree and git show without requiring --root to be the Git worktree root. From a repository subdirectory, ls-tree resolves the selected path beneath that subdirectory, while commit:path in git show resolves it from the repository root.",
+        "risk": "If both locations contain the same relative filename, verification can accept the digest of the parent repository's file despite having checked the subproject file's mode. Consent coverage can therefore describe bytes outside the approved physical project; otherwise valid nested-project requests fail.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/critic-export-consent.mjs:90-105",
+        "spec_ref": "docs/usage.md:88-97 — consent is restricted to the physical project and selected source/evidence directories."
+      },
+      {
+        "gap": "The advertised read-only plan/check commands call readState(), whose resolver can change existing directory permissions even with create=false. resolveOnboardingPrivateState calls chmodSync when existing private directories are not mode 0700.",
+        "risk": "Inspecting an existing checkout with mode-0755 private directories changes both directory levels to 0700. A read-only host refuses those writes, preventing the promised read-only consent inspection. The mocked resolver reproduced both chmod requests.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/critic-export-consent.mjs:15-18",
+        "spec_ref": "docs/usage.md:99-102 — plan and check are read-only."
+      },
+      {
+        "gap": "The CLI compares the raw, tab-separated ls-tree pathname directly with record.path. It neither requests NUL-delimited output nor decodes Git's quoted pathname representation.",
+        "risk": "Accepted paths containing non-ASCII characters under Git's default quoting, or quotation marks, fail with consent-candidate-file-invalid. For example, the policy covers src/über.mjs, but the CLI rejects its C-quoted Git listing.",
+        "severity": "minor",
+        "evidence": "plugins/pipeline-core/scripts/critic-export-consent.mjs:101-102",
+        "spec_ref": "docs/usage.md:88-92 — fresh candidates within approved directories reuse consent; criticExportConsentPathAllowed accepts these filenames."
+      }
+    ],
+    "deliberately_not_flagged": [
+      "Reviewed the complete current artifacts: docs/usage.md; plugins/pipeline-core/lib/critic-export-policy.mjs; plugins/pipeline-core/lib/critic-export-policy.test.mjs; plugins/pipeline-core/scripts/critic-export-consent.mjs; plugins/pipeline-core/skills/pipeline-start/SKILL.md.",
+      "Spec, scope and discoverability: changes are confined to the five named artifacts, and both usage documentation and Pipeline-start identify the CLI and its request contract.",
+      "Consent semantics: ordinary candidate/evidence changes reuse the plan; project, recipient and scope changes fail coverage; revocation stops reuse; decision attribution is explicitly distinguished from human attestation and host approval.",
+      "Normal security/error paths: segment-bound root matching, explicit external denials, symlink rejection, evidence hardlink rejection, digest checks and atomic state replacement were examined. Filename screening is expressly not a claim that arbitrary contents are secret-free.",
+      "Test integrity: the supplied diff removes no tests or assertions. No lifecycle violation was inferred solely from missing authorship evidence.",
+      "Dependencies, language and deployment: no external dependency was added; the new script has an SPDX header; English matches the manifest; no live activation is introduced.",
+      "Guardrails/reference inputs inspected: .claude/pipeline.yaml; governance/examples/guidelines/architecture-guidelines.md; governance/examples/policies/checklist.md; governance/examples/policies/deploy-policy.yaml; governance/examples/policies/deploy-risks.example.md; governance/examples/policies/license-allowlist.json; governance/examples/policies/live-deploy-lock.md; governance/examples/policies/policy-lock.example.yaml; governance/examples/policies/semgrep/dependency-direction.yml; governance/examples/policies/semgrep/example-rule.yml; governance/examples/policies/third-party-licenses.example.json; plugins/pipeline-core/lib/private-boundary.mjs; relevant resolver code in plugins/pipeline-core/lib/codex-onboarding-runtime.mjs.",
+      "Review contracts resolved in order: plugins/pipeline-core/roles/critic.md; plugins/pipeline-core/templates/prompts/critic-review.md; plugins/pipeline-core/scripts/critic-verdict.schema.json."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_csd6lk5nii7aff3pzimutrt6u3",
+    "selectionSha256": "fbc466302513f5d0ff0c587078fb4dabdb7036eecf303a8ec2d62f744bc07674",
+    "repoFingerprint": "446109c0e2979e6c9c029c5b86a72ccb08f9e2a39a71b69bc0823c2e7200c367",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "70dc18eeee69e5a76a8fa2ad8f52969055024db2",
+      "candidateTree": "557fcaa64f7a547241e5fafef2a4a99ec4c87599",
+      "referenceSetSha256": "c837c13b9ad3abacedce4ce89192942b9cdeb5391777c04672b43649453674a7",
+      "requestSha256": "fa69c725aa7331ca64de3979dea3e4c00aae8c81361b7ef1987de0f72b98048f"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "70dc18eeee69e5a76a8fa2ad8f52969055024db2"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.154.0",
+        "sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"
+      },
+      "protocolSchemaSha256": "129a2e193d842e7de0c6a73a8a0eb92123c3088696ef9e2a50398fdd15d3ae34",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "66d2bf86205b2107d4e19cfd7ff6bd59694fcd79e838c2888764f33dcba525c8"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e"
+      }
+    },
+    "smokeReceiptSha256": "9bebb9affd0e0c6e236e84c791e9d35d31ec5f8ce1c8b58dc30ce58d1bcec36c",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 140,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "d592338b2a04fd60a94755ae21d84477dd73bbf2a7eb389256891c44aa7e3375",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        "docs/usage.md",
+        "plugins/pipeline-core/lib/critic-export-policy.mjs",
+        "plugins/pipeline-core/lib/critic-export-policy.test.mjs",
+        "plugins/pipeline-core/scripts/critic-export-consent.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": "docs/usage.md",
+        "blobOid": "dde7b407f73fbcbeeea0314660558929ccb46e81",
+        "sha256": "144d674347e26c9591aaac96edad1250a0be30e52713d15c856e4aeb0a7bc0c5",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-export-policy.mjs",
+        "blobOid": "db5f7c4ec71bd2a94fa3149abfd521af5b0b058c",
+        "sha256": "c3d1b119907e1dfdd2b4ad604a65d6bdc64b2793eef798007671c50109a44fcd",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-export-policy.test.mjs",
+        "blobOid": "8666ce5ceb30e62b51104b1cc57d19efc7f254d6",
+        "sha256": "f0cebf29698b7c29cbfec4fa3bd0dafb643a80d87797336b43cc50217987fc81",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/critic-export-consent.mjs",
+        "blobOid": "35e3ac80b9659410f759aef6a684df0ed56f4ff8",
+        "sha256": "ef8fc3d3fbc019f8c028855c71c015a92c1a85cff912851df6f4e9a4329de9eb",
+        "mode": "100755"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+        "blobOid": "578e2dbcb1aa96892a7cdcea8731365d78f6e87e",
+        "sha256": "ade50ae6bb2f1ebe08b5df952f4de1430670abaa31b616babb3f0f7412e9b64a",
+        "mode": "100644"
+      }
+    ]
+  }
+}
