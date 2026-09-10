@@ -177,6 +177,38 @@ test("GS5c: trigger A fires ONCE per run -- a continuing run past the threshold 
   assert.equal(result.stdout, "", "the run's one nudge already fired at exactly 3 -- the 4th completed single must not fire again");
 });
 
+test("GS5d: repeated evaluations of the same transcript emit once, then a reset permits the next run", () => {
+  const current = { subagent_type: "pipeline-core:goldfish-mechanic", prompt: "next" };
+  const rows = [dispatchRow("m1", "Task"), dispatchRow("m2", "Task"), dispatchRow("m3", "Task")];
+  const store = makeStore({ [ORCH_TRANSCRIPT]: transcriptText(rows) });
+  const input = { transcript_path: ORCH_TRANSCRIPT, session_id: "s5d", tool_name: "Task", tool_input: current };
+
+  const first = evaluateSlicingGuard(input, baseOptions(store));
+  const repeated = evaluateSlicingGuard(input, baseOptions(store));
+  assert.notEqual(first.stdout, "", "the first qualifying evaluation emits");
+  assert.equal(repeated.stdout, "", "the same run must not emit again when the transcript is unchanged");
+
+  store.files.set(ORCH_TRANSCRIPT, transcriptText([
+    ...rows,
+    fanoutRow("m4", [["Task", { a: 1 }], ["Agent", { b: 2 }]]),
+  ]));
+  const afterReset = evaluateSlicingGuard(input, baseOptions(store));
+  assert.equal(afterReset.stdout, "", "the reset itself does not emit");
+
+  store.files.set(ORCH_TRANSCRIPT, transcriptText([
+    fanoutRow("m4", [["Task", { a: 1 }], ["Agent", { b: 2 }]]),
+    dispatchRow("m5", "Task"), dispatchRow("m6", "Task"), dispatchRow("m7", "Task"),
+  ]));
+  const nextRun = evaluateSlicingGuard(input, baseOptions(store));
+  assert.notEqual(nextRun.stdout, "", "a new eligible run emits again after the reset");
+
+  const independentSession = evaluateSlicingGuard(
+    { ...input, session_id: "s5d-independent" },
+    baseOptions(store),
+  );
+  assert.notEqual(independentSession.stdout, "", "ledger rate limiting is isolated by session");
+});
+
 // --- In-flight-turn exclusion (the correctness crux) ---------------------
 
 test("GS6a: in-flight turn already written to the transcript is excluded by identity, not counted as a 4th single", () => {

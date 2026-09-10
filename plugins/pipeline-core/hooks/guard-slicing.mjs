@@ -471,6 +471,15 @@ function triggerBMessage(pendingCount) {
     + "justification.";
 }
 
+function triggerAAlreadyFiredInRun(records) {
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (record?.event === LEDGER_EVENT_FANOUT) return false;
+    if (record?.event === LEDGER_EVENT_DISPATCH && record?.advisoryEmitted === true) return true;
+  }
+  return false;
+}
+
 function evaluateTriggerB({ toolInput, sessionId, commonDir, nowFn, options }) {
   const pending = pendingTodosOf(toolInput);
   const pendingCount = pending.length;
@@ -555,9 +564,9 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
   // refinement. A nudge on every dispatch becomes ambient noise." Since runLength
   // is recomputed fresh from history on every call and grows by exactly one
   // between consecutive non-resetting calls (this hook fires on every dispatch
-  // call once wired), it crosses SLICING_THRESHOLD exactly once per run -- so
-  // "fires once per run" needs no separate rate-limit state, unlike trigger B's
-  // ledger-backed dedup. (A cold-start edge case is accepted, not hidden: if the
+  // call once wired), it crosses SLICING_THRESHOLD at the qualifying boundary.
+  // The session ledger now supplies the separate rate-limit state needed when
+  // multiple hook calls observe that same unchanged transcript. (A cold-start edge case is accepted, not hidden: if the
   // hook starts observing a session whose history already exceeds the threshold
   // -- e.g. wired mid-session -- runLength can start above SLICING_THRESHOLD and
   // this run's one nudge is silently skipped rather than firing late; that is the
@@ -572,8 +581,11 @@ function evaluateTriggerA({ input, toolName, toolInput, sessionId, commonDir, no
   // 4), never firing at exactly 3. Unaffected under the already-written
   // timing, where the in-flight call's own row is the one that legitimately
   // matches and the real preceding single survives untouched.)
-  const advisoryEmitted = runLength === SLICING_THRESHOLD;
   const fanout = toolName === WORKFLOW_TOOL_NAME || isAntigravityFanout || lastCompletedGroupIsReset;
+  const priorRecords = commonDir === null || commonDir === undefined
+    ? []
+    : (options.readLedgerRecordsFn ?? readLedgerRecords)(ledgerPath(commonDir, sessionId), options);
+  const advisoryEmitted = runLength === SLICING_THRESHOLD && !triggerAAlreadyFiredInRun(priorRecords);
 
   const record = buildLedgerRecord({
     nowFn, sessionId, event: fanout ? LEDGER_EVENT_FANOUT : LEDGER_EVENT_DISPATCH, tool: toolName,
