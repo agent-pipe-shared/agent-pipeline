@@ -20,7 +20,7 @@
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
-      "rawSha256": "4bdd5487ec60115232cacda2ac53235200c74a2733db10176bf12081500dfcdf"
+      "rawSha256": "e4511f1ee520b200de2e011ad8df641726accf32b10e38dbb6e4b8237997a5fe"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
