@@ -77,3 +77,22 @@ an incorrect evidence path, is rejected before the passphrase prompt.
 Implemented and merged: discovered that plugins/pipeline-core/scripts/push-prepare.mjs already implements the requested plan-push coordinator in full (clean-tree, verify-evidence freshness, threat-model, and trust-anchor checks, gated before rendering the signature command); docs/push-release-flow.md now names it as the mandatory first step; an independent Critic review was dispatched (task W4-CRITIC-2A).
 
 Commit(s): 1b619225.
+
+## 0.6.2 regression and correction — 2026-09-11
+
+The Claude Code greenfield run exposed a composition regression in the later
+`push-init.mjs` driver. The underlying preflights each reported multiple
+findings, but the driver returned immediately after the first red read-only
+layer. The tester therefore needed three invocations to discover missing
+Verify configuration, candidate-bound evidence, security evidence and the
+threat model in sequence. That behavior violated this item's original
+requirement to report every reason together even though the individual checks
+remained correct.
+
+Commit `e4497682183e66a79022e1887177e84281a4b5ba` corrects the regression. The
+driver now runs every independent read-only layer, returns all current failures
+in one response and still refuses to prepare a signature when any check is
+red. A regression fixture supplies failures from both Satisfiability and
+`push-prepare` and requires all of them in the same result. Detailed measured
+context is retained in
+`backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.

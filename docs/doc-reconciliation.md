@@ -2649,3 +2649,24 @@ This delta changes only the new test assertion from the nonexistent
 `guidance` property. It changes no runtime behavior, authority, runner route,
 approval ceremony or platform contract. The focused onboarding suite passes
 166/166 after the correction.
+
+## Candidate e4497682183e66a79022e1887177e84281a4b5ba — 2026-09-11, range f4e0415a..e4497682, aggregate push prerequisites
+
+- ADR-0033: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0061: amended in e4497682183e66a79022e1887177e84281a4b5ba.
+- ADR-0064: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0077: checked, no change needed.
+
+ADR-0061 now makes the diagnostic consequence of its existing human-ceremony
+rule explicit: an agent-side, read-only preparation driver evaluates all
+independent prerequisites it can already determine and reports every current
+failure together. A red result still blocks signature preparation, so the
+change reduces repeated discovery without weakening the push gate.
+
+The remaining implicated decisions need no amendment. The driver still stops
+before the human signature and never executes approval or push actions; the
+candidate, destination, evidence, threat-model and proof bindings remain owned
+by their existing checks. Canonical and vendored ADR and push-flow copies are
+byte-identical.
