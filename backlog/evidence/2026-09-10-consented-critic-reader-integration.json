@@ -1,0 +1,235 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Ruleset: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Reviewed all eleven named artifacts at commit 5387843b8ce7718c1d1aa9ae4baebf4b91273871, tree 0198aed8e7ae190ae155a24350083421549f0c54. Their bytes match the candidate and candidate-source-evidence.json. The supplied verify.json records the exact clean candidate, 517 unreused successful steps, and exit 0 for node harness/scripts/verify.mjs. Implementer identity remains unverifiable: no stripped dispatch records were supplied, and the candidate has only an AI-Assisted trailer. Path-boundary probes executed extracted production code with in-memory filesystem substitutes; no real files were written. Only the supplied AGENTS.md pointer and dispatch/environment context were injected; no history was inspected. Persistence was unavailable under the read-only constraint.",
+    "findings": [
+      {
+        "gap": "The release CLI enforces output containment lexically, then calls writeFileSync without checking the output file or its parent directories for symlinks.",
+        "risk": "An otherwise valid invocation with --out evidence/preflight.json can overwrite a file outside the repository if that file or an ancestor directory is a symlink. This also occurs when the generated record is blocked, because blocked records are still written.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/release-preflight-cli.mjs:616-620",
+        "spec_ref": "Current candidate artifact audit, Reader binding and release integration: full CLI contract, safe paths, and error paths; the CLI's RPC-PATH repository-containment contract."
+      },
+      {
+        "gap": "The external-proof reader checks lexical externality and only the final path's lstat result. A symlinked ancestor can make a repository-contained request or proof pass this external-only check.",
+        "risk": "Valid request/proof files stored in an ignored repository directory can be consumed through an outside directory symlink, defeating the required separation from repository-managed artifacts.",
+        "severity": "minor",
+        "evidence": "plugins/pipeline-core/scripts/release-preflight-cli.mjs:302-320",
+        "spec_ref": "External-proof transport contract documented in release-preflight-cli.mjs:24-30 and 300-312; current candidate artifact audit's full release CLI contract."
+      }
+    ],
+    "deliberately_not_flagged": [
+      "Reader protocol and checker: fixed eleven-document coverage, closed schemas, raw-blob hashes, mode and size bounds, ancestry, report digests, and disposition validation are enforced. Reader identity and judgment quality are explicitly outside the assurance.",
+      "Release integration exercises the production checker with valid, missing, malformed, and stale committed records. Committed source classification, checker-byte matching, and rejection of escaping checker-parent symlinks are present.",
+      "Consumer-path exceptions for the reader gate are scoped to source-only declarations; ordinary consumer fixtures do not activate that gate.",
+      "Both push-release documents are byte-identical and require separate action-bound PO authority for creating the remote tag and GitHub release.",
+      "Both compatibility entries pin the actual preflight-schema digest a0130aee9c4d437df26fdb1c8e764f0c78e3bc2bc7b5f0d7af218843b7f9a3ce; the regression test reads the shipped schema bytes.",
+      "GG22-9 through GG22-15 reach the real guard with committed debt and unrelated staged files, covering exclusive pathspecs, include flags, traversal, and trailing-slash directories. Existing GG22 implementation was inspected only as their direct contract.",
+      "The named source files carry license identifiers, use existing local or Node dependencies, and follow the manifest's English language assignment."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_dobjx675hwow2prr6hewdeobjb",
+    "selectionSha256": "b20ca744aadb1565e0aeb087d272ce78b512fa016edb20e907bfd28f5ccdbb69",
+    "repoFingerprint": "446109c0e2979e6c9c029c5b86a72ccb08f9e2a39a71b69bc0823c2e7200c367",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "5387843b8ce7718c1d1aa9ae4baebf4b91273871",
+      "candidateTree": "0198aed8e7ae190ae155a24350083421549f0c54",
+      "referenceSetSha256": "d6607f060dbce6ceb6fceb93a75bb10798389d9cd6e15fbaf9f3c706098c529e",
+      "requestSha256": "8f445f9dfb943c0c6c9815b29ae82e17515abefcf8911cbd18367cb58763f5d3"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "5387843b8ce7718c1d1aa9ae4baebf4b91273871"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.154.0",
+        "sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"
+      },
+      "protocolSchemaSha256": "129a2e193d842e7de0c6a73a8a0eb92123c3088696ef9e2a50398fdd15d3ae34",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "66d2bf86205b2107d4e19cfd7ff6bd59694fcd79e838c2888764f33dcba525c8"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e"
+      }
+    },
+    "smokeReceiptSha256": "69409bea843c1ef1e400b7b21c2e5ff93a57c57f99681f75f3a110b49f28fe5f",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 140,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "a5f70409557869975bbad95f7ba5c8d2ff0089cf687d519943305ed0c1288f17",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        "docs/push-release-flow.md",
+        "harness/reader-review-protocol.md",
+        "harness/scripts/check-consumer-safe-paths.mjs",
+        "harness/scripts/check-doc-contracts.test.mjs",
+        "harness/scripts/check-doc-reader-binding.mjs",
+        "plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json",
+        "plugins/pipeline-core/docs/push-release-flow.md",
+        "plugins/pipeline-core/hooks/guard-git.test.mjs",
+        "plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs",
+        "plugins/pipeline-core/scripts/release-preflight-cli.mjs",
+        "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": "docs/push-release-flow.md",
+        "blobOid": "314d5ef45c35905e72d66890e15c1a2fcc4936f8",
+        "sha256": "eb05e31a236ae2184b0bf3ecb927293140844288fb7949a19038a380cb2f9867",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/reader-review-protocol.md",
+        "blobOid": "19db01e40b6e3cad1bb17382ba222159e86c7c39",
+        "sha256": "9347e59408878daedf01f62b2ae1381d182d0bbdcaee47328dc10a8e9d8fad17",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-consumer-safe-paths.mjs",
+        "blobOid": "009247bf3583c11629c31f099be4dd53cbba0b9a",
+        "sha256": "9d42052b22990241aa66ce3e9566365ba2e36d788c65caa8c8a29c9df50c28e7",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-doc-contracts.test.mjs",
+        "blobOid": "119503b96e052cf646c17f1e78cdcee0174075bb",
+        "sha256": "be420def330ca3171ccba355fdcb7fa51d759e3d4ae44837f1073dd8cc559eab",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-doc-reader-binding.mjs",
+        "blobOid": "45d5010d2b90e6cf577bd592d365f6502e3f55d4",
+        "sha256": "061c73c51dd84bfe62319a26547a49a3fac085c142bdbe14e9cc0dfcbcbe9031",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json",
+        "blobOid": "a7e3c03185425b02de61beab3a7480a9b8fe4b4c",
+        "sha256": "943588d9e951d86efe03ddc81783ee328d9735dd56d832639c399105b7d4c40c",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/docs/push-release-flow.md",
+        "blobOid": "314d5ef45c35905e72d66890e15c1a2fcc4936f8",
+        "sha256": "eb05e31a236ae2184b0bf3ecb927293140844288fb7949a19038a380cb2f9867",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+        "blobOid": "92de5bb85170522f858f621e2337626ec49563a5",
+        "sha256": "6a1073cc7609f6222e53f7125c23d629bace95352065fbe66987a84c033d0bdd",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs",
+        "blobOid": "80dd00e7ae04e3eed60ee7f816717d92705035e3",
+        "sha256": "b78071bae98a8403ceafa1fb37314c776f5b977c5202ab67d08abc8174bc5318",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/release-preflight-cli.mjs",
+        "blobOid": "4435fff1c1256ae50e7e8689f02b84018f3ee349",
+        "sha256": "26fa5212f40ca5af8c07ed81936ffe04868aa44ee93e33e636ae13dc5cce2e28",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
+        "blobOid": "16b289a0ddad155b3bfb95b7772ce75d1d4a33df",
+        "sha256": "8afc0d48ec2fa435b4338925bd7c3909aedf0f36d68789592d09a380e5cfd060",
+        "mode": "100644"
+      }
+    ]
+  }
+}
