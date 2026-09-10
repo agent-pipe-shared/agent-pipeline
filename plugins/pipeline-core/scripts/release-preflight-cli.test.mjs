@@ -9,15 +9,17 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ReleasePreflightCliError, buildReleasePreflight } from "./release-preflight-cli.mjs";
+import { snapshotReaderDocumentation } from "../../../harness/scripts/check-doc-reader-binding.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
 
 const POLICY = "c".repeat(64);
 const CLI_PATH = fileURLToPath(new URL("./release-preflight-cli.mjs", import.meta.url));
+const SOURCE_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const roots = [];
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
-function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "approved", dirty = false, dirtyDeleteMember = false, dirtyDeleteChecker = false, symlinkedCheckerParent = false, waiveReleasePreflight = true, globalHumanApproval = null, commitGlobalHumanApproval = true, source = false, omitSourceMember = false, candidateCalibration = "source", sourceCheckerResult = "passed" } = {}) {
+function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "approved", dirty = false, dirtyDeleteMember = false, dirtyDeleteChecker = false, symlinkedCheckerParent = false, waiveReleasePreflight = true, globalHumanApproval = null, commitGlobalHumanApproval = true, source = false, realReader = null, omitSourceMember = false, candidateCalibration = "source", sourceCheckerResult = "passed" } = {}) {
   const base = mkdtempSync(join(tmpdir(), "release-preflight-cli-"));
   roots.push(base);
   const git = (...args) => {
@@ -51,7 +53,7 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
   if (globalHumanApproval !== null) {
     write("pipeline.user.yaml", `schema: "pipeline.user.v3"\ngates:\n  human_approval: "${globalHumanApproval}"\n`);
   }
-  if (source) {
+  if (source && !realReader) {
     // This committed typed stub exercises the producer boundary only. Domain
     // validity belongs to the real checker suite, which owns its Git fixtures.
     const checkerResult = sourceCheckerResult === "malformed"
@@ -69,6 +71,24 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
       "docs/product-capability-inventory.json",
     ]) write(path, "fixture source member\\n");
     write("harness/scripts/check-doc-reader-binding.mjs", `#!/usr/bin/env node\nconst values = new Map();\nfor (let index = 0; index < process.argv.length; index += 2) values.set(process.argv[index], process.argv[index + 1]);\n${checkerResult}\n`);
+  }
+  if (realReader) {
+    write(".claude/pipeline.json", { project: "agent-pipeline", verify: "node harness/scripts/verify.mjs" });
+    for (const path of [
+      "harness/scripts/verify.mjs",
+      "harness/scripts/check-doc-contracts.mjs",
+      "harness/scripts/check-doc-reconciliation.mjs",
+      "harness/scripts/check-doc-reader-binding.mjs",
+      "harness/reader-review-protocol.md",
+      "governance/observation-doc-governance.json",
+      "docs/product-capability-inventory.json",
+      "plugins/pipeline-core/scripts/release-preflight.mjs",
+    ]) write(path, readFileSync(join(SOURCE_ROOT, path), "utf8"));
+    for (const path of [
+      "PIPELINE_FLOW.md", "README.md", "SETUP.md", "docs/README.md", "docs/audit-and-evidence.md",
+      "docs/cost-and-measurement.md", "docs/enforcement.md", "docs/overview.md", "docs/parallel-work.md",
+      "docs/security-controls.md", "docs/usage.md",
+    ]) write(path, `# ${path}\n\nCommitted reader fixture.\n`);
   }
   // ADR-0064 Decision 6: a hand-supplied --consent claiming "approved" now requires an
   // explicit, committed release-preflight waiver. Every fixture that exercises that
@@ -89,10 +109,44 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
   const baseCommit = git("rev-parse", "HEAD");
   if (source && omitSourceMember) rmSync(join(base, "harness/scripts/check-doc-contracts.mjs"));
   if (source && candidateCalibration === "malformed") write(".claude/pipeline.json", "{");
-  write("docs/result.md", "# result\n\nsecond revision\n");
+  if (!realReader) write("docs/result.md", "# result\n\nsecond revision\n");
+  if (realReader) write("reader-candidate-marker.txt", "candidate reader fixture\n");
   git("add", "-A");
   git("commit", "-qm", "candidate");
-  const candidateCommit = git("rev-parse", "HEAD");
+  let candidateCommit = git("rev-parse", "HEAD");
+  if (realReader === "valid" || realReader === "stale") {
+    const snapshot = snapshotReaderDocumentation({ root: base, candidate: baseCommit, featureId: "fixture-feature" });
+    const round = "round-1";
+    const phaseOne = "specs/fixture-feature/evidence/reader-review/phase-one/round-1.md";
+    const phaseTwo = "specs/fixture-feature/evidence/reader-review/phase-two/round-1.md";
+    const disposition = "specs/fixture-feature/evidence/reader-review/disposition/round-1.json";
+    const phaseOneBytes = Buffer.from("# Phase one\n\nNo findings.\n");
+    const phaseTwoBytes = Buffer.from("# Phase two\n\nNo findings.\n");
+    const dispositionBytes = Buffer.from(`${JSON.stringify({ schema: "pipeline.doc-reader-disposition.v1", status: "no-findings", findings: [], round })}\n`);
+    write("specs/fixture-feature/evidence/reader-review/phase-one/round-1.md", phaseOneBytes.toString());
+    write("specs/fixture-feature/evidence/reader-review/phase-two/round-1.md", phaseTwoBytes.toString());
+    write("specs/fixture-feature/evidence/reader-review/disposition/round-1.json", dispositionBytes.toString());
+    write("specs/fixture-feature/evidence/reader-review/record.json", {
+      schema: "pipeline.doc-reader-binding-record.v1",
+      reviewedCommit: baseCommit,
+      reviewedTree: git("rev-parse", `${baseCommit}^{tree}`),
+      coverage: snapshot.coverage,
+      inputs: snapshot.inputs,
+      docsetSha256: snapshot.docsetSha256,
+      phaseOne: { path: phaseOne, sha256: sha256(phaseOneBytes) },
+      phaseTwo: { path: phaseTwo, sha256: sha256(phaseTwoBytes) },
+      disposition: { path: disposition, sha256: sha256(dispositionBytes) },
+    });
+    if (realReader === "stale") write("README.md", "# README.md\n\nStale candidate documentation.\n");
+    git("add", "-A");
+    git("commit", "-qm", "reader evidence");
+    candidateCommit = git("rev-parse", "HEAD");
+  } else if (realReader === "malformed") {
+    write("specs/fixture-feature/evidence/reader-review/record.json", "{\n");
+    git("add", "-A");
+    git("commit", "-qm", "malformed reader evidence");
+    candidateCommit = git("rev-parse", "HEAD");
+  }
   const candidateTree = git("rev-parse", "HEAD^{tree}");
   if (globalHumanApproval !== null && !commitGlobalHumanApproval) {
     write("pipeline.user.yaml", `schema: "pipeline.user.v3"\ngates:\n  human_approval: "${globalHumanApproval}"\n# working tree only\n`);
@@ -531,6 +585,25 @@ try {
     const { record } = build(fixture({ source: true }));
     assert.equal(record.status, "ready");
   });
+
+  check("RPC-reader the release CLI invokes the production checker with valid committed records", () => {
+    const context = fixture({ source: true, realReader: "valid" });
+    const outPath = "real-reader-success.json";
+    const result = runCli(context, outPath);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(readFileSync(join(context.base, outPath), "utf8")).status, "ready");
+  });
+
+  for (const [mode, label] of [["missing", "missing reader records"], ["malformed", "malformed reader records"], ["stale", "stale reader records"]]) {
+    check(`RPC-reader the release CLI rejects ${label} without an output artifact`, () => {
+      const context = fixture({ source: true, realReader: mode });
+      const outPath = `real-reader-${mode}-failure.json`;
+      const result = runCli(context, outPath);
+      assert.equal(result.status, 2, result.stderr);
+      assert.match(result.stderr, /RPC-DOC-READER-BINDING/u);
+      assert.equal(existsSync(join(context.base, outPath)), false);
+    });
+  }
 
   check("RPC-reader a source base cannot disable reader binding by deleting a required candidate member, and no artifact is written", () => {
     const context = fixture({ source: true, omitSourceMember: true });
