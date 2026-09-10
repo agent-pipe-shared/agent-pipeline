@@ -1,0 +1,44 @@
+{
+  "schema": "pipeline.functional-equivalent-critic-result.v1",
+  "recordedAt": "2026-09-10T13:39:05Z",
+  "dispatch": {
+    "taskName": "inventory_session_critic_5c57",
+    "forkTurns": "none",
+    "mayDelegate": false,
+    "checkoutRoot": "branch/detached/candidate-review-fixes-8741613004e7",
+    "base": "5387843b8ce7718c1d1aa9ae4baebf4b91273871",
+    "candidate": {
+      "commit": "5c57d84a4addb3b7ef016a4beaa518ed2c34b3c3",
+      "tree": "8c3eb30ad64bfcfc7d3bcb5b7da3bbba82380c30"
+    },
+    "preparedPacketSha256": "46c58476a47168ba29153c0b069f331fdbeab075b2b891b81adea32524e363ae",
+    "requestSha256": "8b1f28f9a7556e3b4a904ed5b958670ceed133fdd81d8694816b72ab852a467d",
+    "assurance": "functional-equivalent-read-only; OS isolation not asserted",
+    "requestedModel": "gpt-6-astra",
+    "requestedEffort": "max",
+    "effectiveModelIdentity": null
+  },
+  "verdict": {
+    "findings": [
+      {
+        "gap": "The revised German flowchart sends Mini through the shared Advisor decision and permits consultation whenever a question and reason exist. It omits the required Epic/Feature eligibility condition.",
+        "risk": "A reader following the Mini path reaches an unavailable consultation step, contradicting the documented profile restrictions.",
+        "severity": "minor",
+        "evidence": "PIPELINE_FLOW.md:326 routes Mini to T; the new edges at PIPELINE_FLOW.md:335 and PIPELINE_FLOW.md:336 connect the shared path to consultation. PIPELINE_FLOW.md:381 says Mini advisory is disabled; plugins/pipeline-core/skills/advisor-consult/SKILL.md:34 requires epic or feature.",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-10-capability-current-source-review.md — truthful resulting reader-facing claims; docs/operating-model.md:128 — Mini advisory disabled."
+      }
+    ],
+    "deliberately_not_flagged": [
+      "Scope and input integrity: independently reconciled all 18 commits, parent/tree identities, per-commit changes, endpoint changes and the complete 45-path partition. Canonical request and reference-set digests, all 38 reference hashes and five excluded-report bindings match. Excluded report bodies were not exposed.",
+      "Spec fidelity: the updated inventory baseline resolves to the declared ancestor tree; capability identifiers and pending Critic attestation remain unchanged.",
+      "Reachability and effect: SETUP now preserves existing project instructions and uses the installed plugin's actual app-server health entry point.",
+      "Consumer Verify claims: implementation and recorded tests support configured product checks, missing-command refusal, fresh product execution, candidate binding, progress evidence and installed-package operation.",
+      "Review policy: both Operating Model copies match QG-13's correction-range, continuous-lineage and actual-PASS requirements.",
+      "Test integrity, security, dependencies and deferred risks: the reviewed package changes weaken no tests, introduce no dependency or credential, and add no deferred-risk exception. Unchanged runtime packages were read only as direct context."
+    ],
+    "trajectory_verdict": "consistent",
+    "trajectory_evidence": "Requested route: gpt-6-astra at max; effective model identity: unknown. Assurance: functional-equivalent-read-only; OS isolation not asserted. Independently reconstructed the permitted package diff for 5387843b8ce7718c1d1aa9ae4baebf4b91273871..5c57d84a4addb3b7ef016a4beaa518ed2c34b3c3 with external diff and text conversion disabled. The hash-verified Verify artifact records exit 0, 517 successful steps and an exact clean candidate binding to commit 5c57d84a4addb3b7ef016a4beaa518ed2c34b3c3/tree 8c3eb30ad64bfcfc7d3bcb5b7da3bbba82380c30. Tests were inspected, not rerun. Independent dispatch authorship could not be established without stripped dispatch records. Write-capable tools are a residual host limitation; no mutations or delegation were performed. Report persistence was unavailable under the explicit no-write constraint. Injected context comprised runtime instructions, the AGENTS.md pointer and environment metadata.",
+    "briefing_violations": [],
+    "pass": false
+  }
+}
