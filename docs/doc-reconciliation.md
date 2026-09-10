@@ -2672,3 +2672,24 @@ before the human signature and never executes approval or push actions; the
 candidate, destination, evidence, threat-model and proof bindings remain owned
 by their existing checks. Canonical and vendored ADR and push-flow copies are
 byte-identical.
+
+## Candidate 82895f0aad16783cb53172b15eb6da9d88d7c061 — 2026-09-11, range e9790a12..82895f0a, failed aggregate inspection stays read-only
+
+- ADR-0033: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0061: amended in 82895f0aad16783cb53172b15eb6da9d88d7c061.
+- ADR-0064: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0077: checked, no change needed.
+
+The Critic correctly found that `pushPrepareReport()` can perform one narrow
+housekeeping mutation: folding a stale pending approval-state write into a
+commit. The corrected ADR-0061 text therefore requires mutation-free inspection
+while aggregating any red upstream result. `push-init` passes that explicit mode
+to the full report, which leaves `HEAD` unchanged and keeps every diagnostic
+bound to one candidate. The ordinary upstream-green path retains the existing
+fold contract before it computes the final preparation report.
+
+The remaining decisions need no amendment. The fold's existing safety checks,
+the signature boundary and all candidate/destination/evidence bindings remain
+unchanged. Root and vendored ADR and push-flow copies are byte-identical.
