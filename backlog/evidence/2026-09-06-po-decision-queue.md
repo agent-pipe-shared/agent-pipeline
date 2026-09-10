@@ -25,8 +25,11 @@ Verify is still pending at this entry.
   an explicit PO decision, never a silent substitution.
 - **Evidence:** both genuine inventory rounds found blocking defects.
   Initial result: `2026-09-10-current-artifact-critic-round-1.json`.
-  Correction result:
-  `scratch/native-current-artifact/attempt-1789020478349-c9b978eed6f1f60493605ccb/result.json`.
+  Correction result: [retained inventory verdict and receipt](2026-09-10-split-critic-inventory.json).
+  Other retained results: [lifecycle](2026-09-10-split-critic-lifecycle.json),
+  [advisory](2026-09-10-split-critic-advisory.json),
+  [compatibility](2026-09-10-split-critic-compatibility.json), and
+  [handover](2026-09-10-split-critic-handover.json).
   Batch summary:
   `scratch/NVA-CANDIDATE-REVIEW-COMPLETION-1/batch-1789020476965-f8c06b06/summary.json`.
   Governing requirements: [QG-13](../../guardrails/quality-gates.md)
