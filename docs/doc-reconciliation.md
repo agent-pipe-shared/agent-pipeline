@@ -2535,19 +2535,39 @@ Restated per this file's known limitation for ADR-0045/0056/0058: `79e90d2f` is 
 
 ## Candidate add800048dd077ac98ddff3aef4180762b4cedad — 2026-09-10, range 4b69246f..add80004, normal session Critic restored as the autonomous default
 
-- ADR-0003: changed consistently; its 2026-07-17 amendment now makes the fresh
-  read-only session Critic the default and keeps runner-native launchers as
-  optional explicit escalations.
-- ADR-0014: changed consistently; T1 retains higher-capability staffing,
-  refs-only input, a fixed diff and schema-shaped verdict without a new PO gate.
-- ADR-0035: amended explicitly; the native Codex host remains available for an
-  explicitly configured or requested stronger or detached route.
-- ADR-0001, ADR-0004, ADR-0005, ADR-0006, ADR-0009, ADR-0010, ADR-0015,
-  ADR-0018, ADR-0019, ADR-0020, ADR-0023, ADR-0024, ADR-0025, ADR-0026,
-  ADR-0028, ADR-0030, ADR-0041, ADR-0055, ADR-0060, ADR-0061, ADR-0063 and
-  ADR-0069: checked; no change needed. The route change preserves their
-  staffing, role separation, lifecycle, approval, topology and ADR-allocation
-  decisions.
+- ADR-0001: checked, no change needed.
+- ADR-0003: amended in add800048dd077ac98ddff3aef4180762b4cedad.
+- ADR-0004: checked, no change needed.
+- ADR-0005: checked, no change needed.
+- ADR-0006: checked, no change needed.
+- ADR-0009: checked, no change needed.
+- ADR-0010: checked, no change needed.
+- ADR-0014: amended in add800048dd077ac98ddff3aef4180762b4cedad.
+- ADR-0015: checked, no change needed.
+- ADR-0018: checked, no change needed.
+- ADR-0019: checked, no change needed.
+- ADR-0020: checked, no change needed.
+- ADR-0023: checked, no change needed.
+- ADR-0024: checked, no change needed.
+- ADR-0025: checked, no change needed.
+- ADR-0026: checked, no change needed.
+- ADR-0028: checked, no change needed.
+- ADR-0030: checked, no change needed.
+- ADR-0035: amended in add800048dd077ac98ddff3aef4180762b4cedad.
+- ADR-0041: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0060: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0063: checked, no change needed.
+- ADR-0069: checked, no change needed.
+
+ADR-0003 now makes the fresh read-only session Critic the default and keeps
+runner-native launchers as optional explicit escalations. ADR-0014 retains T1
+higher-capability staffing, refs-only input, a fixed diff and schema-shaped
+verdict without a new PO gate. ADR-0035 keeps the native Codex host available
+for an explicitly configured or requested stronger or detached route. The
+remaining ADRs retain their staffing, role separation, lifecycle, approval,
+topology and allocation decisions.
 
 The canonical role, review protocol, checklist, bootstrap, prompt, agent and
 skill surfaces were updated together, and their vendored copies are
