@@ -113,9 +113,13 @@ today blocks the agent from a step whose own design intent says the agent may
 perform it, the guard's scope is the defect — not the human's time.
 
 The same rule applies before the ceremony. A preparation driver must evaluate
-every independent read-only prerequisite it can already determine and report
-all current failures in one result. While aggregating a red result it must
-disable any housekeeping mutation, so every finding binds the same candidate.
+every independent read-only prerequisite it can already determine for one
+candidate and report those current failures in one result. While aggregating a
+red result it must disable any housekeeping mutation. A two-commit
+reconciliation failure for substantive commit S and record commit R must stop
+before an R-bound preparation report; commit-neutral policy checks may still be
+reported with it. Once reconciliation is green, the remaining preparation
+findings all bind R.
 It must not stop at the first red check and force the human or agent through
 repeated repair-and-rerun cycles before the signature can even be prepared.
 Any red check still prevents the ceremony; aggregation changes the diagnostic,

@@ -168,7 +168,7 @@ test("drivePushInit: layer 1b is skipped, not failed, when the project has no ha
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present but --base omitted reports that precondition while collecting the other read-only checks", () => {
+test("drivePushInit: missing reconciliation base reports it with policy checks and stops before the later commit report", () => {
   const root = freshFixtureRoot();
   try {
     mkdirSync(join(root, "harness", "scripts"), { recursive: true });
@@ -180,6 +180,7 @@ test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present but --
     assert.equal(result.outcome, "precondition-unmet");
     assert.equal(result.checks[0].id, "doc-reconciliation");
     assert.equal(result.checks[0].status, "base-required");
+    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability"]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -195,7 +196,7 @@ test("drivePushInit: harness/scripts/check-doc-reconciliation.mjs present, --bas
     assert.equal(result.outcome, "precondition-unmet");
     assert.equal(result.checks[0].id, "doc-reconciliation");
     assert.equal(result.checks[0].status, "candidate-required");
-    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability", "push-prepare"]);
+    assert.deepEqual(result.steps.map((step) => step.id), ["push-gate-satisfiability"]);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -404,9 +405,10 @@ test("drivePushInit: re-entrant -- two consecutive calls from unchanged state pr
 // time (it did: commit b84fd343 turned a real finding this check used to fail into a pass),
 // so this test asserts the INVARIANT that holds either way rather than one fixed shape:
 // step 1 is always the real spawn, argv[0] always names the real script, and the driver's
-// own verdict must be retained, never guessed. A failure remains named while the other two
-// independent read-only preflights still run, so the caller receives every currently visible
-// prerequisite in one response. A pass must never reappear as a failing reconciliation check.
+// own verdict must be retained, never guessed. A failure remains named and the commit-neutral
+// satisfiability preflight still runs. The later record-commit preparation does not run until
+// reconciliation is green, so one result never mixes substantive S and record R findings.
+// A pass must never reappear as a failing reconciliation check.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -448,10 +450,10 @@ test("drivePushInit: real repo -- layer 1b actually spawns check-doc-reconciliat
   assert.equal(typeof reconciliationStep.exitCode, "number", "a real subprocess always reports a numeric exit code");
 
   if (reconciliationStep.ok === false) {
-    // The real script's own real failure is surfaced, while the two independent read-only
-    // preflights still execute and collect their own findings.
+    // The real script's own real failure is surfaced with the commit-neutral policy preflight;
+    // the R-bound push preparation is intentionally deferred.
     assert.equal(result.outcome, "precondition-unmet", JSON.stringify(result, null, 2));
-    assert.deepEqual(result.steps.map((step) => step.id), ["doc-reconciliation", "push-gate-satisfiability", "push-prepare"]);
+    assert.deepEqual(result.steps.map((step) => step.id), ["doc-reconciliation", "push-gate-satisfiability"]);
     const surfaced = result.checks.find((check) => check.id === "doc-reconciliation");
     assert.equal(surfaced?.ok, false);
     assert.equal(typeof surfaced?.message, "string");
@@ -467,4 +469,24 @@ test("drivePushInit: real repo -- layer 1b actually spawns check-doc-reconciliat
       assert.equal(result.checks.some((check) => check.id === "doc-reconciliation"), false, "layer 1b already passed; it must not resurface as a failing check");
     }
   }
+});
+
+test("drivePushInit: a failed S-to-R reconciliation never invokes the R-bound preparation report", () => {
+  const root = freshFixtureRoot();
+  try {
+    mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+    writeFileSync(join(root, "harness", "scripts", "check-doc-reconciliation.mjs"), "// fixture\n");
+    let prepareCalls = 0;
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      base: "base", candidate: "substantive-S", recordRef: "record-R",
+      run: () => ({ status: 2, stdout: "", stderr: "unreconciled" }),
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(),
+      pushPrepareReport: () => { prepareCalls += 1; throw new Error("must not run"); },
+    });
+    assert.equal(result.outcome, "precondition-unmet");
+    assert.equal(prepareCalls, 0);
+    assert.deepEqual(result.steps.map((step) => step.id), ["doc-reconciliation", "push-gate-satisfiability"]);
+    assert.equal(result.checks[0].id, "doc-reconciliation");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

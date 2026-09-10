@@ -48,9 +48,12 @@ exists in the target project; `--base` AND `--candidate` both become required
 the moment it does — this driver never invents either, since which commit is
 the candidate is exactly the same kind of domain decision as which commit is
 the base), the cheap satisfiability preflight, and the full `push-prepare.mjs`
-readiness report in that fixed order. If an earlier read-only layer is red, it
+readiness report in that fixed order. A failed reconciliation still collects
+the commit-neutral satisfiability failures, then stops before the later
+record-commit preparation report so one result cannot mix S-bound and R-bound
+findings. Once reconciliation is green or absent, a red satisfiability result
 runs the full report in inspection mode, which disables `push-prepare`'s
-pending-approval auto-fold. It can then report all currently failing
+pending-approval auto-fold. It can then report the remaining R-bound
 prerequisites together without moving `HEAD`;
 it never asks the caller to repair one known problem merely to reveal another
 on the next run. `--record-ref` stays optional and defaults to `HEAD`, matching

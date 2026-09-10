@@ -26,11 +26,13 @@
  * already holds about its own bootstrap `inspect` call. It never interprets WHY any given
  * precondition failed, never invents a fix, and never runs a remedy on the caller's
  * behalf -- every failing check is reported with the id/message/remedy the underlying
- * script itself already produces, verbatim. When an earlier read-only layer is red, the
- * driver invokes `pushPrepareReport()` in its explicit inspection mode, which suppresses
- * that function's normally permitted pending-approval fold. It can therefore collect the
- * remaining failures without moving HEAD. This prevents a caller from repairing one
- * prerequisite only to discover another on the next run.
+ * script itself already produces, verbatim. The cheap satisfiability report can always be
+ * combined with reconciliation because it is repository-policy-shaped rather than bound
+ * to a commit. A failed reconciliation stops before `pushPrepareReport()`: reconciliation
+ * deliberately checks substantive commit S while push preparation checks later record
+ * commit R, so combining their failures would silently mix candidates. Once reconciliation
+ * is green (or absent in a consumer project), a red satisfiability result uses inspection
+ * mode to collect the remaining R-bound preparation failures without moving HEAD.
  *
  * WHY TWO OF THE THREE STEPS ARE IN-PROCESS IMPORTS, NOT SUBPROCESS SPAWNS. push-gate-
  * satisfiability.mjs and push-prepare.mjs live in this SAME directory, are pure,
@@ -97,10 +99,10 @@
  * RE-ENTRANCY. Reconciliation and satisfiability are read-only. `pushPrepareReport()` has
  * one documented mutation: on the ordinary path it may fold a stale, pending approval
  * state write into its own commit before checking cleanliness. This driver permits that
- * fold only after the preceding layers are green. If either is red, inspection mode
- * disables the fold and the whole aggregate attempt is read-only. Repeating an unchanged
- * red attempt is byte-identical; repeating after a permitted fold converges on the folded
- * candidate and its normal evidence checks.
+ * fold only after the preceding layers are green. A red reconciliation returns before
+ * preparation; a red satisfiability result uses inspection mode. Either red path is
+ * read-only. Repeating an unchanged red attempt is byte-identical; repeating after a
+ * permitted fold converges on the folded candidate and its normal evidence checks.
  */
 
 import { spawnSync } from "node:child_process";
@@ -259,6 +261,15 @@ export function drivePushInit({
   }
   if (!satisfiability.report.satisfiable) {
     failedChecks.push(...satisfiability.report.checks.filter((check) => !check.ok));
+  }
+
+  // Reconciliation validates substantive commit S by reading its record from later commit
+  // R. push-prepare validates R (normally HEAD). A red reconciliation therefore cannot be
+  // aggregated with push-prepare without presenting failures from two different commits as
+  // one candidate-bound report. The cheap satisfiability checks above are policy-shaped and
+  // safe to aggregate; stop here before the R-bound report.
+  if (!reconciliationCheck.ok) {
+    return { schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks };
   }
 
   // Layer 2 (full report) -- push-prepare.mjs, in-process.
