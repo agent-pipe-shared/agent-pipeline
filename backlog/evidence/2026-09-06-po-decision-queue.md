@@ -1,5 +1,22 @@
 # PO decision queue — collected 2026-09-06
 
+## PO authorization of the two completion actions — 2026-09-10
+
+After the exact single-hash proposal and the one-time additional inventory
+review were presented separately, the PO replied:
+
+> Beides okay und machen. Lege mir gerne Befehle vor
+
+This explicitly authorizes the prepared Critic-host digest substitution below,
+performed by a separate mechanical transcriber, and one additional inventory
+correction review after green deterministic gates. The QG-13 exception is for
+this inventory package only, not an unlimited retry allowance. The prior
+inventory result must remain available to the reviewer; already cleared
+unrelated packages are not reopened. QG-16 separation remains mandatory.
+No PASS, publication, installed plugin replacement or push is implied.
+The pending labels in the historical request below are superseded by this
+decision; execution results are recorded separately.
+
 ## Concrete candidate completion decisions — 2026-09-10
 
 The clean repaired candidate `8f68ec7cc0f3f12738d7190e123a00ee893f251c`
