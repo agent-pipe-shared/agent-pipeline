@@ -1,5 +1,24 @@
 # ADR coverage progress — 2026-09-08
 
+## Current source follow-up — 76 of 76 accepted decisions, 2026-09-11
+
+ADR-0081 was accepted after the completed 2026-09-08 inventory and was the
+only current accepted decision without a `Governs:` declaration. Its bounded
+mapping names the Verify selection engine, evidence producer and schema,
+consumer baseline/adapter, onboarding seed, boundary consumers, self-Verify
+entry points and the user-facing contracts that define the same behavior.
+It does not classify test fixtures or unrelated release machinery as owners.
+
+The numbered corpus now has 81 decisions: 76 accepted with declarations,
+three superseded or historical decisions, one provisional decision and one
+proposed decision. ADR-0017, ADR-0022 and ADR-0031 remain historical or
+superseded; ADR-0021 remains provisional; ADR-0039 remains proposed. They are
+explicit residual status exclusions, not missing accepted coverage.
+
+This follow-up completes declaration coverage. It does not claim that every
+implementation conforms to every ADR. The real reconciliation checker and
+full Verify remain required for the exact source and reconciliation commits.
+
 ## Current source checkpoint — 75 of 75 accepted decisions
 
 Source commit `7232b834d41c7441eadaa3d7057370f50bc5dfe0` contains all 80 numbered

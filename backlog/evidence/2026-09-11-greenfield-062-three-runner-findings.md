@@ -78,14 +78,16 @@ possible.
 
 ## Candidate disposition
 
-The 0.6.2 candidate already contains the read-scope correction, bounded review
+The installed local 0.6.2 candidate contains the read-scope correction, bounded review
 input handling, session Critic default, optional external launcher, impacted
 Verify behavior, user-project baseline checks and pre-generation answer
-replacement. The exact pre-follow-up stamped candidate passed 520 of 520 Verify
-suites with Security exit 0, and the independent Critic passed its final
-functional delta. The push-diagnostic aggregation is a later follow-up and must
-receive its own exact Verify and Critic evidence before it can replace that
-candidate.
+replacement. The push-diagnostic aggregation and its two Critic corrections
+are included. The final correction review passed with no blocker or major
+finding. Exact full Verify then passed 520 of 520 suites with Security exit 0
+on stamped commit `18df868103346d4eb987b85219c55960cd39ce6b`, tree
+`04fc11924d8adde3541f37d40d1d9da19bbeb71c`, run
+`verify-1789080348179-424587e2f3c68292`. Local Codex and Claude readback
+confirmed build `20260911004430.61ed1f6`.
 
 No additional blocking or major defect was established by these reports after
 those corrections. The remaining items improve cost, discoverability and

@@ -1,5 +1,7 @@
 # ADR-0081: Verify is impact-scoped at ordinary boundaries and full at release
 
+**Governs:** .github/workflows/verify.yml, docs/operating-model.md, docs/push-release-flow.md, docs/usage.md, guardrails/quality-gates.md, harness/scripts/self-verify-selection.mjs, harness/scripts/verify.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/lib/consumer-baseline-verify.mjs, plugins/pipeline-core/lib/consumer-verify.mjs, plugins/pipeline-core/lib/human-guard-override.mjs, plugins/pipeline-core/lib/project-onboarding-v3.mjs, plugins/pipeline-core/lib/verify-selection.mjs, plugins/pipeline-core/scripts/codex-critic-host.mjs, plugins/pipeline-core/scripts/consumer-verify-check.mjs, plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/scripts/publication-gate-evidence.mjs, plugins/pipeline-core/scripts/push-gate-satisfiability.mjs, plugins/pipeline-core/scripts/push-prepare.mjs, plugins/pipeline-core/scripts/verify-evidence-producer.mjs, plugins/pipeline-core/scripts/verify-evidence.schema.json, plugins/pipeline-core/scripts/verify-journal.mjs
+
 > Agent-Pipeline · Nova sprint (`sprint-nova-epic`) · 2026-09-10
 
 **Status:** accepted (2026-09-10, PO instruction: *"Macht es nicht Sinn die

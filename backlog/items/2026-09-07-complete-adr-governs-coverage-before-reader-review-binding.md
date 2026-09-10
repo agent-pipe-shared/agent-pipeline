@@ -101,3 +101,15 @@ three universal copies are integrated in `0db01ac985ad89161c93f545701eaf91138508
 See `backlog/evidence/2026-09-08-adr-coverage-progress.md` for current proof
 and the actual earlier-source reconciliation diagnostic. No final reconciliation
 or independent candidate review is claimed; this item remains open.
+
+### Progress — 2026-09-11, accepted corpus complete
+
+ADR-0081 was the sole accepted decision added after the 2026-09-08 complete
+inventory without a declaration. Its bounded owner mapping brings the current
+corpus to 76 of 76 accepted decisions with `Governs:` coverage. The five
+remaining numbered files without declarations are explicitly accounted for:
+three historical/superseded, one provisional and one proposed.
+
+The declaration package still needs its exact reconciliation record, focused
+checks and final review before this item can close. Reader-review binding may
+rely on the completed accepted-decision coverage only after those checks pass.
