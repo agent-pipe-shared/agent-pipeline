@@ -537,9 +537,12 @@ release in one step:
 gh release create <tag> --target <sha> --title <title> --notes <notes>
 ```
 
-This is agent-executable once `main` (or whatever ref `<sha>` lives on) is
-already correctly published — it does not itself need a `push`-kind proof,
-because it structurally isn't one.
+This is agent-executable only after a separate, action-bound PO authority has
+explicitly approved this `gh release create` action, including creation of its
+remote tag and GitHub release for `<tag>` at `<sha>`, and once `main` (or
+whatever ref
+`<sha>` lives on) is already correctly published. It does not itself need a
+`push`-kind proof, because it structurally isn't one.
 
 ## Quick reference — who runs each layer
 

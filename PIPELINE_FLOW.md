@@ -498,7 +498,7 @@ Hand zu bearbeiten.
 Das sind keine Setup-Befehle für Consumer-Roots. Ein frischer Consumer startet
 zuerst den verpflichtenden Skill `pipeline-start`, der ihn vor jedem Git-/V3-
 Check klassifiziert; sein Plugin-eigener Pfad `project-onboarding-v3` mit
-inspect → plan → explizitem `apply --activate` ist der einzige Initialisierer.
+inspect → plan → explizitem `apply-portable-seed --plan-sha256 <reviewed-plan-digest> --activate` ist der einzige Initialisierer.
 Eine explizite Bitte, das Projekt zu erstellen/initialisieren, autorisiert Apply;
 partielle Roots schlagen geschlossen fehl und werden nie überschrieben.
 

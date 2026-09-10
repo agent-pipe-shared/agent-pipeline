@@ -328,7 +328,7 @@ approved plan. When a project configures a real human decision gate, create
 the portable external Ed25519 key once:
 
 ```sh
-node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
+node "<absolute-plugin-root>/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
 ```
 
 The directory stays outside the repository. OpenSSL asks for the passphrase
@@ -336,7 +336,7 @@ locally; the agent never receives the key or passphrase. The agent prepares
 and refreshes public candidate-bound requests. The regular human action is:
 
 ```sh
-node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" approve-all --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
+node "<absolute-plugin-root>/scripts/po-human-approval.mjs" approve-all --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
 ```
 
 Passkey/WebAuthn, IAM/hardware-key adapters, and remote provisional codes are
