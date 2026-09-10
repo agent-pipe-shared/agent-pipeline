@@ -2804,3 +2804,13 @@ command as an onboarding hint that does not secretly perform `pipeline-start`.
 The accompanying immutable reader reports retain the existing feature-evidence
 topology. No human-authority, distribution-channel, runner-support or gate
 contract changes.
+
+## Candidate ceeb8921185ecb1fba941e0e838668c1105e9394 — 2026-09-11, range 7bdbf7d1..ceeb8921, reconcile authority and UI flow
+
+- ADR-0045: checked, no change needed.
+
+The flow correction changes no artifact location or authority. It aligns the
+English authority description with the existing JSON calibration and optional
+YAML manifest split, and keeps UI design before Spec/readiness rather than
+duplicating it after Verify. The accompanying immutable reader reports remain
+under the existing feature-evidence topology.
