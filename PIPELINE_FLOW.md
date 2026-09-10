@@ -48,7 +48,9 @@ flowchart TD
     D -->|yes| DS[Design phase: options and acceptance criteria]
     D -->|no| RR[Rigor and risk recorded]
     DS --> RR
-    RR --> AQ{Concrete Advisor question and reason?}
+    RR --> EL{Epic or Feature?}
+    EL -->|yes| AQ{Concrete Advisor question and reason?}
+    EL -->|no (Mini)| S
     AQ -->|yes| AC[Demand-bound fresh read-only consultation]
     AQ -->|no| S
     AC --> S
@@ -329,7 +331,9 @@ flowchart TD
     D -->|ja| DS[Design-Phase: Optionen und Akzeptanzkriterien]
     D -->|nein| RR[Rigor und Risiko festhalten]
     DS --> RR
-    RR --> AQ{Konkrete Advisor-Frage und Grund?}
+    RR --> EL{Epic oder Feature?}
+    EL -->|ja| AQ{Konkrete Advisor-Frage und Grund?}
+    EL -->|nein (Mini)| S
     AQ -->|ja| AC[Bedarfsgebundene frische lesende Beratung]
     AQ -->|nein| S
     AC --> S
