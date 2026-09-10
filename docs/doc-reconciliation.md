@@ -2693,3 +2693,27 @@ fold contract before it computes the final preparation report.
 The remaining decisions need no amendment. The fold's existing safety checks,
 the signature boundary and all candidate/destination/evidence bindings remain
 unchanged. Root and vendored ADR and push-flow copies are byte-identical.
+
+## Candidate acc186ffe46c88e6e61c08b31398daa7b08d3b7d — 2026-09-11, range 197d6bd7..acc186ff, preserve two-commit push bindings
+
+- ADR-0033: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0061: amended in acc186ffe46c88e6e61c08b31398daa7b08d3b7d.
+- ADR-0064: checked, no change needed.
+- ADR-0069: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0077: checked, no change needed.
+
+The second Critic pass correctly distinguished the substantive commit S from
+the later reconciliation-record commit R. ADR-0061 now requires a failed
+S-to-R reconciliation to stop before the R-bound preparation report. The
+driver still evaluates the commit-neutral satisfiability checks in that run;
+after reconciliation passes or in consumer projects where it does not apply,
+it aggregates the remaining R-bound failures in mutation-free inspection
+mode. A regression test proves that a failed two-commit reconciliation never
+invokes `pushPrepareReport()`.
+
+The remaining decisions need no amendment. The signature boundary, proof and
+destination bindings, release promotion contract, ADR numbering rule and
+per-destination approval scope are unchanged. Root and vendored ADR and
+push-flow copies remain byte-identical.
