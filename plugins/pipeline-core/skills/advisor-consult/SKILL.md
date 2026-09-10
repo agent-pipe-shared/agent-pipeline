@@ -93,10 +93,9 @@ success. Every claim says:
 
 ## Claude consultation
 
-After the same trigger gate, Claude uses the unchanged V3 same-runner chain:
-bounded native Fable, native Opus only after repeated Fable failure, then one
-fresh read-only Claude consult only after native-adapter failure. It never
-switches runner or main model. The coordinator persists only the sanitized
+After the same trigger gate, Claude uses the V3 native Opus route: native Opus,
+then one fresh read-only Claude consult only after repeated native-Opus failure.
+It never switches runner or main model. The coordinator persists only the sanitized
 `pipeline.advisory-receipt.v1` plus the V2 consultation record; raw question,
 answer, prompt, trace and adapter error remain runtime-only.
 

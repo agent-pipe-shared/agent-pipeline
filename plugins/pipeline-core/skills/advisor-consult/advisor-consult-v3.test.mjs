@@ -42,8 +42,9 @@ test("Codex consultations bind the V3 route and never synthesize a fallback", ()
 });
 
 test("Claude remains same-runner and bootstrap remains model-free", () => {
-  assert.match(skill, /unchanged V3 same-runner chain/u);
-  assert.match(skill, /native Fable, native Opus only after repeated Fable failure/u);
+  assert.match(skill, /V3 native Opus route/u);
+  assert.match(skill, /native Opus,\s+then one fresh read-only Claude consult only after repeated native-Opus failure/u);
+  assert.doesNotMatch(skill, /Fable/u);
   assert.match(skill, /pipeline\.advisory-capability-preflight\.v2/u);
   assert.match(skill, /never\s+invokes this skill/u);
   assert.match(skill, /Capability state is not consultation success/u);
