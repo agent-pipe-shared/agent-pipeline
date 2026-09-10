@@ -1,0 +1,557 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Loaded ruleset SHA-256: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Candidate: f0e1f5b17c888d374bcdd905a0d4d86995c5868f; tree: 70ab7db873d3797f1acc53f5e58344ced7967062. All 54 named artifact blobs matched that tree. evidence/verify-1788999328347-b2ae127599874ff9.json records the exact candidate clean at start and finish, command node harness/scripts/verify.mjs, exit 0, and 517 successful, non-reused steps. Authorship remains not verifiable: scratch/NVA-REMAINING-CANDIDATE-AUDIT-1/authorship-evidence.json supplies commit metadata but explicitly supplies no dispatch records. Three in-memory source reproductions confirmed the archive-path, advisory-message and plan-deduplication findings; these were simulated boundaries, not live host tests. No files, configuration, git state or external systems were modified. Persistence was unavailable under the no-write constraint. Observed context included the supplied AGENTS.md pointer and host/runtime instructions; no session history was inspected. PARTIAL REVIEW: the prompt contract's default 24-call review budget was reached; full-scope pass/fail is withheld and pass=false grants no approval. Partially examined artifacts: plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs; plugins/pipeline-core/hooks/codex-pretool-guard.mjs; plugins/pipeline-core/hooks/guard-apply-patch.test.mjs; plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs; plugins/pipeline-core/hooks/guard-slicing.mjs; plugins/pipeline-core/hooks/guard-slicing.test.mjs; plugins/pipeline-core/lib/human-guard-override.mjs; plugins/pipeline-core/scripts/advisory-host-bridge.mjs; plugins/pipeline-core/scripts/codex-critic-host.mjs. Substantive examination not completed: plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs; plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs; plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs; plugins/pipeline-core/lib/advisory-coordinator.test.mjs; plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs; plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs; plugins/pipeline-core/lib/human-guard-override.test.mjs; plugins/pipeline-core/lib/runner-profile-migration-v2.mjs; plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs; plugins/pipeline-core/lib/runner-profiles-v3.test.mjs; plugins/pipeline-core/lib/runtime-projection-v3.test.mjs; plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs; plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs. Additional supplied references not substantively examined: plugins/pipeline-core/lib/runner-profile-migration-v3.mjs; plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs; plugins/pipeline-core/scripts/codex-critic-host.test.mjs. Remaining hunt coverage: complete scope, test-integrity, dependency, security and failure-path examination across those incomplete paths. Next-dispatch mechanics: candidate f0e1f5b17c888d374bcdd905a0d4d86995c5868f; the 25 incomplete paths enumerated above; 3 packets; 24 review calls per packet.",
+    "findings": [
+      {
+        "gap": "Archive containment is checked lexically, but the archive directory is never physically resolved before writing.",
+        "risk": "With docs/state-archive symlinked outside the repository, an acknowledged rotation writes the archive outside the authorized root and then removes the archived section from the live handover.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/handover-rotate.mjs:506-519",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md:154-155 — preserve path containment"
+      },
+      {
+        "gap": "The Claude consultation instructions still prescribe native Fable first and Opus only after repeated Fable failure. The associated skill test explicitly preserves this obsolete chain, while the supplied V3 authority selects native Opus.",
+        "risk": "The agent-facing consultation entry directs callers toward an excluded model and contradicts the sole routing authority.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/skills/advisor-consult/SKILL.md:94-99",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md:29-39 — V3 routing authority and Fable exclusion"
+      },
+      {
+        "gap": "The advisory child treats every agentMessage as its answer without checking message phase. A commentary message followed by one final answer therefore sets protocolError.",
+        "risk": "An otherwise successful read-only consultation is discarded as unavailable whenever the model announces its investigation before answering. The configured single-attempt route provides no recovery.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/codex-advisory-app-server-child.mjs:82-85",
+        "spec_ref": "plugins/pipeline-core/skills/advisor-consult/SKILL.md:70-90 — one fresh consultation and validated answer delivery"
+      },
+      {
+        "gap": "Codex plan deduplication hashes the entire tool input instead of the distinct pending set.",
+        "risk": "Changing only the explanation, reordering unchanged pending items, or updating completed items repeatedly emits the same advisory. The in-memory reproduction emitted three nudges for one pending set.",
+        "severity": "minor",
+        "evidence": "plugins/pipeline-core/hooks/native-slicing.mjs:192-197",
+        "spec_ref": "docs/adr/0080-parallel-dispatch-slicing-enforcement.md:283-285 — once per distinct pending set"
+      },
+      {
+        "gap": "Close step 6d still describes repository-wide extraction acknowledgement and a 12,000-byte default. The executable uses section-and-content-bound acknowledgements, and the updated size-check instructions and regression expect a 30,000-byte default.",
+        "risk": "A caller can mistake another section's acknowledgement for clearance to rotate the current section, encounter a predictable refusal, and make rotation decisions using the wrong default cap.",
+        "severity": "minor",
+        "evidence": "plugins/pipeline-core/skills/close-block/SKILL.md:148-151",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md:154-158 — preserve acknowledgement syntax and align close instructions with the executable"
+      }
+    ],
+    "deliberately_not_flagged": [
+      "The examined V3 registry and compatibility projections select Opus for Claude advisory; the obsolete Fable instruction is a separate skill-contract defect.",
+      "The examined Codex Critic and advisory route resolvers read the specified candidate's pipeline.user.yaml and check configured response identity.",
+      "Both override planning and capability consumption check lifecycle-not-ready denials before ordinary eligibility; the examined Codex and Antigravity adapter branches preserve that refusal.",
+      "The handover inspection modes return before mutation, and their regressions compare complete fixture contents, including acknowledgement and governance state.",
+      "Resume guidance distinguishes original intake chunks, answered setup values and recovered summaries, and explicitly preserves original capture order.",
+      "Native slicing remains advisory. ADR-0080 explicitly distinguishes source/fixture coverage from unproven live Codex and Antigravity model delivery.",
+      "Missing dispatch records were not treated as proof of orchestrator authorship."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_hx3ljarhjue5fgya24oivgi6yq",
+    "selectionSha256": "81a2f4ae30f61d32a6f2ab1cdbc88a14185190e92d3365ca878c4aac6e90f103",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "f0e1f5b17c888d374bcdd905a0d4d86995c5868f",
+      "candidateTree": "70ab7db873d3797f1acc53f5e58344ced7967062",
+      "referenceSetSha256": "e985c674253a4ffce6812aca3956a0a47038b60bf614afbec59b6b26875e14d6",
+      "requestSha256": "1da41c50f2649fbd3356ceac0c37722df255c63dd77d00857d3b67fff2b5bd39"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "f0e1f5b17c888d374bcdd905a0d4d86995c5868f"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.153.4",
+        "sha256": "56ef98ab4032d317ab26e9b5e5a175650717351edb16ed9cde0cb6d1734d62da"
+      },
+      "protocolSchemaSha256": "bf15a4a551fabb399babfdb712f5832904a75703256e77d455e96a868cc94087",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "66d2bf86205b2107d4e19cfd7ff6bd59694fcd79e838c2888764f33dcba525c8"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266"
+      }
+    },
+    "smokeReceiptSha256": "914f6ded5b57868f3a04f23dae61348eb01770f44d002aac380db15404d04a34",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "5b90f62956d40600697f8544901ce7c6aea96d14f880d907c4fe148d4940c266",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 135,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "ff4b91f05ee930a07693f8cccc5cf1ae8289411f2cb1c9860c6e7620522df183",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        ".codex/agents/consult-advisor.toml",
+        "plugins/pipeline-core/config/runner-mappings.json",
+        "plugins/pipeline-core/config/runner-profiles-v3.json",
+        "plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json",
+        "plugins/pipeline-core/hooks.json",
+        "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+        "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+        "plugins/pipeline-core/hooks/antigravity-slicing-hint.mjs",
+        "plugins/pipeline-core/hooks/codex-hooks.json",
+        "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+        "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+        "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+        "plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs",
+        "plugins/pipeline-core/hooks/codex-slicing-hint.mjs",
+        "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+        "plugins/pipeline-core/hooks/guard-slicing.mjs",
+        "plugins/pipeline-core/hooks/guard-slicing.test.mjs",
+        "plugins/pipeline-core/hooks/native-slicing.mjs",
+        "plugins/pipeline-core/lib/advisory-coordinator.mjs",
+        "plugins/pipeline-core/lib/advisory-coordinator.test.mjs",
+        "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+        "plugins/pipeline-core/lib/advisory-lifecycle-v2.test.mjs",
+        "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs",
+        "plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs",
+        "plugins/pipeline-core/lib/critic-route-v3.mjs",
+        "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+        "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+        "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+        "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs",
+        "plugins/pipeline-core/lib/runtime-projection-v3.test.mjs",
+        "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+        "plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs",
+        "plugins/pipeline-core/scripts/codex-advisory-app-server-child.mjs",
+        "plugins/pipeline-core/scripts/codex-advisory-app-server.mjs",
+        "plugins/pipeline-core/scripts/codex-advisory-app-server.test.mjs",
+        "plugins/pipeline-core/scripts/codex-critic-app-server.mjs",
+        "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
+        "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+        "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
+        "plugins/pipeline-core/scripts/codex-critic-selected-host.mjs",
+        "plugins/pipeline-core/scripts/codex-host-advisor-route.mjs",
+        "plugins/pipeline-core/scripts/codex-host-advisor-route.test.mjs",
+        "plugins/pipeline-core/scripts/handover-rotate.mjs",
+        "plugins/pipeline-core/scripts/handover-rotate.test.mjs",
+        "plugins/pipeline-core/scripts/repair-map.mjs",
+        "plugins/pipeline-core/scripts/repair-map.test.mjs",
+        "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+        "plugins/pipeline-core/skills/advisor-consult/advisor-consult-v3.test.mjs",
+        "plugins/pipeline-core/skills/close-block/SKILL.md",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+        "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": ".codex/agents/consult-advisor.toml",
+        "blobOid": "b645be4966aee51b283c288f66aaeb4879948e99",
+        "sha256": "495c7b3c91df10ad9d8e2ed5fa58fa267b01a6b1647dc34a9db97b2f35a78900",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/config/runner-mappings.json",
+        "blobOid": "408488409c5d9cb2b1ae46ccadb132c72c5393cf",
+        "sha256": "5b9bbd7f8c41cdecb43be89089ababfe899d77dac1a090dfb218b8dbefd99377",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/config/runner-profiles-v3.json",
+        "blobOid": "fddbb40ebe43acf8b452e796581555a2d83ce649",
+        "sha256": "9a60c29ef91f4c9f1f73a3be203c5dacaf897a871027f5b92f67b970cca18401",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json",
+        "blobOid": "049c83bce40f191b237fd2111c5b937af9513eaf",
+        "sha256": "57758d9699981ba08de31700ce18d2b462d22c192100f15dbcc36d390ddde917",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks.json",
+        "blobOid": "893410f8dcc5b9c0af2d274f309b1147e000e4c8",
+        "sha256": "3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+        "blobOid": "905f8f5bb7cd177834d2e0f039fb35c50ac9a5d4",
+        "sha256": "967e755d67fbc6f5c89827e58ff0f3a5119abf9008fc14a8f029ab56663296b7",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+        "blobOid": "224f4ea7eebf7a7138283b7c6ab5e88036d745bc",
+        "sha256": "089cc25ca34de6aa8b8256410bc08d5b4d4a9a79a8b31ea1f687980b29c2b596",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/antigravity-slicing-hint.mjs",
+        "blobOid": "6f8eaa51cfba7bf5d50321e1879f8646f5f4330e",
+        "sha256": "5438e0ac636a6f1b33e2badb6f612a14b4690510dec042d3e11e2ef685c522e9",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-hooks.json",
+        "blobOid": "78b1e375b47dce06e64742c0142baa30fec80b31",
+        "sha256": "ec7e3d0f9f5df1ab73e8d5af431ab1f271cbe2a615f9c4135b65178a51a24c68",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+        "blobOid": "cc4a339e27cbb8b13ec3c93b1f2c448732a880d5",
+        "sha256": "4cf77ef267649d4a212bd76cff662f8648a2beaff718c7059cae465c10a45878",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+        "blobOid": "60c8726b98d451112670eabc0e1be14271035f98",
+        "sha256": "4e34923efd5e5f143f3566b3277fe03348da31352713f551737aa3afc05b6ff7",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-session-start-hint.mjs",
+        "blobOid": "3cbe18bfd1552fcd92f93bfc6de8097d96502e04",
+        "sha256": "4fca4f3cbc58cbbd8f4b20c39a7180877b7a79b4d76033ed74aab8c83b3dcd3d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs",
+        "blobOid": "63d3754b3b09356cc7401bbaace3a8d7d33e28bc",
+        "sha256": "574236c23ba0220457fc4da4b3506b42c48b3b9b6317179c091b3034dd306688",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-slicing-hint.mjs",
+        "blobOid": "3881b892ef1cd0222beb00fc5cdbf9729984c515",
+        "sha256": "e4ffcbf4b3eae05ab30059fb4bef1f2ae790ed7406a495ef0c6e5209b89e7ef6",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs",
+        "blobOid": "1dc3dd7a9e0770ca58f554675d755af3bf386595",
+        "sha256": "a52b79468c7c8c31f77934abdfe1f10ba2b142d84ea8214ddcf6445f17771aaa",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "blobOid": "1c44f4cc51e20cd4148e5f94f9a1f71b217f7a98",
+        "sha256": "ebc36e006aced73afa51d08d346c00bd893a35e02e7cdf3b6251e8c9cd6e8cde",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+        "blobOid": "142eb71ba38a0a8250cd794889a09432ceb9db57",
+        "sha256": "c44f76cdae49be513e65d253ce7c8956f08129f6b3c263adb1b480ce1a36329e",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-slicing.mjs",
+        "blobOid": "5e75f53eb9f272953d293287fda8d83f58b43c0b",
+        "sha256": "3ba50bc71d03fb7d48ca37d697c532218694deb7a3c8d57c7d14a62bbcb24084",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-slicing.test.mjs",
+        "blobOid": "f17321c0a2b066e8e6e544a2ac0c894573a564dc",
+        "sha256": "79f6413c67b84f8f9dae67bf833efbc611b26c0c11ce0e24ef304945c03886f0",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/native-slicing.mjs",
+        "blobOid": "61b8f5da123ab4f9ded08e6464d1e30a27644ff2",
+        "sha256": "7065cf2aa0eff2deb0bc2749bf6312ae3eac528d1a08aaa3fc2f4022511d94bb",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/advisory-coordinator.mjs",
+        "blobOid": "fc0d46aaadfd58ce43b61b1fd07202b92a2d2afa",
+        "sha256": "c61720efec4bff6727ef395bc9c8e2742b565c9bf805837919cbc0124fdca017",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/advisory-coordinator.test.mjs",
+        "blobOid": "c3b23c0df95c57a416774bf3b5c0533b08918bc9",
+        "sha256": "f57d7c83b6a0c4cc449b5b1320e0cc50f80ba145d1d3f2e3148ca19fb800c5bf",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+        "blobOid": "9f6c163360c443764ac1ef938854e07cd8b9d81f",
+        "sha256": "b356e0048167dbfc2b8452f133721411037d24176b53a7e702f135de8138ab0a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/advisory-lifecycle-v2.test.mjs",
+        "blobOid": "cb680cc8b69c8bf95302fb86874b6856e92cfeaa",
+        "sha256": "84c837c3caf2a6cf5fcdbcc9c1053257c467100410ae5e15002d97e7ed64e388",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs",
+        "blobOid": "9e11d24c985edddfde8481e9e0d8992ad68bd3a6",
+        "sha256": "dd3034b8bf5acbb1068e7070cfa728a981e83ff97c4fcc7f67a9cb51b7f787ed",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs",
+        "blobOid": "d368ab5fd1763292553f2337f8b588873c018079",
+        "sha256": "15f33b34ad82fdc097ad22a0d89f38fab4471e04307e5449a47ec674364c0e80",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/critic-route-v3.mjs",
+        "blobOid": "656a6b2504dc24d0e7c6560e2feb87ebddf54f2c",
+        "sha256": "cf73338a71b8a142b250483d102461b65118a3d9a88044e9801309c953b44b5c",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "blobOid": "4459a35a2a27f6dac09421e6265f1b037bf06d55",
+        "sha256": "c72b9f173af75b99cb201fc06362632450021ae181147aea02cf5a1f2e7fdcac",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+        "blobOid": "b89aac8b63d7d6e76771c8ccc146725af934f3ca",
+        "sha256": "55ccc5cd219f04c651ec61c22079a1fe18720d9d4fda5a786cd66ac0424c4e4f",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+        "blobOid": "b0c66dd772656a791d2a6509970dd54e3e3649a8",
+        "sha256": "5d17f2ac722f367935a17688842d0f08633cadfe816eadae6c8fe1d70d29652a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+        "blobOid": "d252660113e0630ab42fb4a7cde6fcd9bd98ab15",
+        "sha256": "b98af2f9b5b95f4c890bdb3d4b1f7fc872d5c252e214ecce3b17b13521bdcb1d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs",
+        "blobOid": "2fb9b7dfe8cca17545bcc93ab20abf7342229706",
+        "sha256": "dc686bf96049dc3f22b60f646f7315e7c41d807cd246da7659fcab08c686170d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runtime-projection-v3.test.mjs",
+        "blobOid": "ab0689d2cd9eb3149b6bd6e79965de307c60872f",
+        "sha256": "32669e3adf1bf4e7c4b7ddf5c19b1c7cec3421ed1c56fa41a976dd460cac813a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+        "blobOid": "6b88bdc35bbc746e1d4fbfd95d84d3e4b2d24790",
+        "sha256": "1f155f60817c9d0096064305500c28df9eba2b5d32140fe58c35a9b526b52d1c",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs",
+        "blobOid": "4ac5bc49ecb43d68f18caf7fe27416999a3c8ce7",
+        "sha256": "ca5af64372fd7106b8c83d29681e91d26439aca71ffb39f9e9862c796a74e05a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-advisory-app-server-child.mjs",
+        "blobOid": "7947c615fd2fc3d7070a848d782aa8fd1fa9c516",
+        "sha256": "00b51f889b3c71b53a6bb525ac4035c8ebf898ac0ffd0a31075f10c456d14aae",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-advisory-app-server.mjs",
+        "blobOid": "49c66369d144efe60aab9e8efa33e35b0c29c4b4",
+        "sha256": "877b4be63e942f32bfe879a5d84e470292829c291899c9e300d6c5e77dcac9d2",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-advisory-app-server.test.mjs",
+        "blobOid": "11bbaf8c872477be5dae6d09b5600d0e01104d0d",
+        "sha256": "05e19801b651706940983ac01acc0c15f1e3fad3690e4485fccb73e027c32d3f",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-critic-app-server.mjs",
+        "blobOid": "1b6c69911634a0f8fa0c4b2ec22b26b9cca567de",
+        "sha256": "d16a954eb9d9d9e9fd710df1042ebf53ea6cf4440d461c18415e362908bd3ada",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
+        "blobOid": "2df6598470aa86b7fc3f717b3b265d269c5bdb2d",
+        "sha256": "737105cde76fb612bd68a7c1f4e0d42fb5397f4c7a099d21167113dcfe8bfb15",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+        "blobOid": "83303fd4b841d571ea109cecd6fd7c5ee0d356e6",
+        "sha256": "4bdd5487ec60115232cacda2ac53235200c74a2733db10176bf12081500dfcdf",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
+        "blobOid": "60d17010474e2d5ea44457f8069594154589bed3",
+        "sha256": "2194af00a47298d83bdcda8f0ac3f0069346bfd3d25a59cf567b773cccf52777",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-critic-selected-host.mjs",
+        "blobOid": "12ddeb9deba91265a896016f9be45049fb90d1ed",
+        "sha256": "981d9568b706a519ed4761b932c42e4c23479e5d7d44c3362a9ce462443859ea",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-host-advisor-route.mjs",
+        "blobOid": "3b961ebdb0fff43c31d0a4be0d1044094338fdb2",
+        "sha256": "e48c468f50ae41ae4b9b65e44375e579707b94715c64ab019792bba63409f07e",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-host-advisor-route.test.mjs",
+        "blobOid": "b948a87af638bafd9ee346dc6be2b0baae0767ed",
+        "sha256": "ce03ee2f4d376d9a29aef77017fbb360800ed6f8231ddb2e3e407b0dc8811c12",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/handover-rotate.mjs",
+        "blobOid": "4e7b65122ec5d3c5f0dc70108cd48202d909cfe7",
+        "sha256": "f77f4dba94e344c2f8246ab7c9002804cb31a691e16911c2cc9255fc313e0813",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/handover-rotate.test.mjs",
+        "blobOid": "3f8779ada6f7ebc21107a22a99f83aa4d5653290",
+        "sha256": "c052fbfa91884e28d7d35dece94460d7619391f9df7f92f74cb3b3d46ab180e9",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/repair-map.mjs",
+        "blobOid": "5a6e9dd849c5aa975ee3d5a6874c5cff7b856622",
+        "sha256": "ee4dc0c03c78986e26ddaa0fb4ae8660a7f16b68998390a3686b8bd4b7285475",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/repair-map.test.mjs",
+        "blobOid": "3d3cee177ef65e7cfe5e2882296a29ed13c7edea",
+        "sha256": "7df3368f88169cbaf8ac23cf717271c3ad24c098635adee01628b3e29af863b6",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+        "blobOid": "3cd6eeff564bc076f331b31086a236e11436541b",
+        "sha256": "a85e7100174692355949ea5dd71fe2f53770710c212b666bb1b8d2280adf6b8a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/advisor-consult/advisor-consult-v3.test.mjs",
+        "blobOid": "f2a566e4f4241cbc4605fa47994e354afca89941",
+        "sha256": "91d15174e1971fbf66a53f97af1ec7c50b4de7806acbbefc57244f27958962a2",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+        "blobOid": "f94f3eeb9a2d0cb26f9204a7bccdbfe3a6cebe00",
+        "sha256": "b841e55d00416bb10197ffe92a5a43149a01743ae4c184644875b2843b274547",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+        "blobOid": "4faafe8def7e9229aa0c602aa74600e5aea201e5",
+        "sha256": "06870125cf129e1c58000eca5b7fa682f868395a7c37d7eb7850a08a57dc673c",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs",
+        "blobOid": "8176db7e3478757909822b37e4695bef5db52603",
+        "sha256": "f5706edcb647db1df141f916aece51ad08e8e63404cf26a3660c99101a26f6ae",
+        "mode": "100644"
+      }
+    ]
+  }
+}

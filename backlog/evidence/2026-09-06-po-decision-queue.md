@@ -1,5 +1,35 @@
 # PO decision queue — collected 2026-09-06
 
+## Morning review result — 2026-09-10
+
+The PO executed the prepared remaining-candidate review in an external
+terminal. The process completed normally and returned `reviewed`, but its
+verdict is **partial, `pass: false`**. The 54-file packet exhausted its
+24-call review budget. It found three major and two minor defects; it did
+not grant full-scope approval. The packet was too large for that review
+budget and will be split for the remaining coverage, not repeated unchanged.
+
+- **Question/action:** no new PO decision is needed to correct the five
+  findings and complete the remaining authorized review coverage.
+- **Recommendation:** fix archive symlink containment, obsolete Claude
+  Advisor routing instructions, commentary/final answer handling, repeated
+  plan nudges and stale close instructions; preserve all protection rules.
+- **Alternatives/consequences:** leaving these findings unresolved keeps the
+  local candidate pending. A completed process or green test suite alone
+  does not supply the missing review approval.
+- **Evidence:** [actual partial verdict and execution receipt](2026-09-10-remaining-candidate-critic-partial.json),
+  reviewed candidate `f0e1f5b17c888d374bcdd905a0d4d86995c5868f`, and exact clean
+  full Verify `verify-1788999328347-b2ae127599874ff9` (517/517, zero reuse).
+- **Affected package/blocking status:** local candidate completion waits on
+  these corrections and unfinished technical coverage. The separate
+  nineteen-artifact correction has no completed correction verdict yet;
+  its interrupted attempts are not approvals. Inventory attestation and
+  fresh reader closure remain pending.
+- **Operator boundary:** the earlier command was rejected with
+  `GUARD-GATE-STRENGTH-SHELL` and external-operator recovery. The PO's
+  successful terminal execution resolves that particular execution request;
+  it does not authorize guard bypasses, push, release or plugin replacement.
+
 ## Evening continuation — 2026-09-09
 
 The PO requested completing the local 0.6.2 test candidate first, followed by

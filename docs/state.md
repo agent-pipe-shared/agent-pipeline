@@ -69,9 +69,33 @@ It found two major inventory defects (working-directory rather than committed
 baseline discovery, and comment-only public anchors) plus four documentation
 inconsistencies. Reader binding, release integration, compatibility schema pins
 and GG22 regression tests were explicitly cleared within that review's scope.
-Repair these six findings, then run one substantive correction review of the
-same nineteen artifacts against the freshly tested corrected candidate.
+These six findings were corrected in `f0e1f5b1`; focused checker tests passed
+27/27 and full Verify passed 517/517 exact/clean, with zero reuse, at that
+commit (`verify-1788999328347-b2ae127599874ff9`). The separate nineteen-artifact
+correction review has no completed verdict: two interrupted coordinator
+attempts produced neither a result nor a proven termination cause. Complete
+one substantive correction review; do not repeat the completed initial hunt.
 Inventory remains pending; no PASS or attestation is inferred from execution.
+
+The PO's external terminal run completed the remaining 54-artifact review
+process. Its actual report is retained in
+`backlog/evidence/2026-09-10-remaining-candidate-critic-partial.json`: partial,
+`pass: false`, three major and two minor findings. The packet exhausted its
+24-call budget and did not complete whole-scope coverage. Correct archive
+symlink containment, Claude Advisor route instructions, advisory message
+phase handling, pending-plan deduplication and close instructions. Split the
+remaining paths into bounded review packets instead of repeating the same
+54-file invocation. The external execution request is resolved; these
+technical corrections need no new PO decision. See the canonical PO queue's
+morning entry. No source review process was live when correction work began.
+
+The five findings are now corrected in `18a37515`, `ee7aa80c`, `3b47536a`,
+`d5764361`, `babdae8d`, `14c82b8a` and `c3de6d00`. Parent inspection exposed
+additional archive symlink variants before the correction review; permanent
+real CLI tests cover them. Focused tests passed. Full current-candidate
+Verify and independent correction/remaining coverage are still pending.
+Exact scope, actual evidence and the missing pre-edit captures are recorded
+in `backlog/evidence/2026-09-10-remaining-candidate-corrections.md`.
 
 After actual inventory attestation, run fresh two-stage reader review and
 binding, final build stamp, fresh Verify/security and reproducible local test
