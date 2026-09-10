@@ -106,26 +106,10 @@ readback → sanctioned kickoff → ready — together with host-managed limits 
 the goal-and-plan-digest-bound kickoff apply contract:
 [`docs/v3-consumer-onboarding.md`](docs/v3-consumer-onboarding.md).
 
-V3 has registered routes for Claude, Codex, and Antigravity. Claude Code is
-the full-enforcement runtime: its plugin and hooks can enforce configured
-guards. Codex, Antigravity, and other CLIs can use the same roles, evidence,
-and review methodology, but this does not claim Claude hooks, plugin
-installation, automatic guards, or model identity — a requested route is not
-proof of observed model identity, and one runner's evidence does not prove
-another's behavior. Route selection comes from `pipeline.user.yaml`; consult
-the current source rather than treating a document label as a model promise.
-See [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the exact
-division of responsibility and [`docs/runner-support.md`](docs/runner-support.md)
-for the per-runner boundary table.
-
-The native Codex selected-sandbox route remains the preferred, attested route;
-this README does **not** claim that its current host limitation is fixed. After
-exactly one typed `no-child` or `unavailable` result, a PO-authorized exception
-may run one fresh, internal, hard-read-only consult on the same single question.
-It permits no handover, memory, mutation, network export, raw-answer retention,
-auto-apply, second question, or retry. A successful exception is only a
-functional-equivalent pass, never native sandbox success: `no attested
-selected-sandbox execution; OS isolation and model identity are not asserted`.
+V3 has registered routes for Claude, Codex, and Antigravity. Supported runner
+integrations can enforce configured guards, while roles, evidence, and review
+remain portable. See [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for
+runner-specific controls, prerequisites, and manual responsibilities.
 
 Model routing lives in V3 profiles (`epic`, `feature`, `mini`), with model and
 effort selected per phase and runner.
@@ -349,13 +333,9 @@ anchors, and the calibrated handover authority locally.
 
 ## Runtime
 
-Claude Code is the documented full-enforcement environment for its hook and
-plugin layer. Codex has a host-dependent bridge, and Antigravity has native
-plugin/hook integration for the runner-specific controls their evidence
-documents. Those routes do not imply identical hooks, universal enforcement,
-OS isolation, or model identity. The methodology remains portable; see
-[`docs/runtime-boundary.md`](docs/runtime-boundary.md) and
-[`docs/runner-support.md`](docs/runner-support.md) for the current boundaries.
+Supported runner integrations can enforce configured guards. The methodology
+remains portable; see [`docs/runtime-boundary.md`](docs/runtime-boundary.md)
+for current runner boundaries and setup requirements.
 
 ## Learn more
 
@@ -491,28 +471,11 @@ Onboarding-/Migrationspfad. **Generierte Runtime-Konfiguration wird nie von
 Hand bearbeitet.** Der Compiler erkennt Drift, statt eine lokale Änderung
 stillschweigend zur Autorität zu machen.
 
-V3 hat registrierte Routen für Claude, Codex und Antigravity. Claude Code ist
-die Full-Enforcement-Laufzeit: Plugin und Hooks können konfigurierte
-Guardrails durchsetzen. Codex, Antigravity und andere CLIs können dieselbe
-Rollen-, Evidenz- und Review-Methodik nutzen, aber daraus folgt weder ein
-Anspruch auf Claude-Hooks, Plugin-Installation, automatische Guardrails noch
-Modellidentität — eine angefragte Route ist kein Beweis für beobachtete
-Modellidentität, und die Evidenz eines Runners belegt nicht das Verhalten
-eines anderen. Die Routenauswahl folgt `pipeline.user.yaml`; ein
-Dokumentlabel ist keine Modellzusage. Die genaue Zuständigkeitsgrenze steht in
-[`docs/runtime-boundary.md`](docs/runtime-boundary.md),
-die Boundary-Tabelle je Runner in [`docs/runner-support.md`](docs/runner-support.md).
-
-Die native Codex-Selected-Sandbox-Route bleibt der bevorzugte, attestierte Weg;
-diese README behauptet **nicht**, dass die aktuelle Host-Einschränkung behoben
-ist. Nach genau einem typisierten Ergebnis `no-child` oder `unavailable` darf
-eine PO-autorisierte Ausnahme genau einen frischen, internen,
-hard-read-only-Consult zur selben einzelnen Frage ausführen. Sie erlaubt weder
-Handover noch Memory, Mutation, Netzwerkexport, Rohantwort-Aufbewahrung,
-Auto-Apply, zweite Frage oder Retry. Ein erfolgreicher Ausnahmefall ist nur ein
-Funktionsäquivalenz-Pass, nie ein nativer Sandbox-Erfolg: `keine attestierte
-Selected-Sandbox-Ausführung; OS-Isolation und Modellidentität werden nicht
-behauptet`.
+V3 hat registrierte Routen für Claude, Codex und Antigravity. Unterstützte
+Runner-Integrationen können konfigurierte Guards durchsetzen; Rollen, Evidenz
+und Review bleiben übertragbar. Die runnerspezifischen Kontrollen,
+Voraussetzungen und manuellen Zuständigkeiten stehen in
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md).
 
 Das Modellrouting liegt in V3-Profilen (`epic`, `feature`, `mini`); Modell und
 Effort werden je Phase und Runner ausgewählt.
@@ -682,13 +645,9 @@ Markdown-Links, -Anchors und die kalibrierte Handover-Autorität lokal.
 
 ## Laufzeitumgebung
 
-Claude Code ist die dokumentierte Full-Enforcement-Umgebung für seine Hook- und
-Plugin-Schicht. Codex hat eine hostabhängige Bridge, Antigravity eine native
-Plugin-/Hook-Integration für die runnerspezifischen Kontrollen, die ihre Evidenz
-belegt. Daraus folgen weder identische Hooks noch universelles Enforcement,
-OS-Isolation oder Modellidentität. Die Methodik bleibt übertragbar; die aktuellen
-Grenzen stehen in [`docs/runtime-boundary.md`](docs/runtime-boundary.md) und
-[`docs/runner-support.md`](docs/runner-support.md).
+Unterstützte Runner-Integrationen können konfigurierte Guards durchsetzen. Die
+Methodik bleibt übertragbar; die aktuellen Runner-Grenzen und Voraussetzungen
+stehen in [`docs/runtime-boundary.md`](docs/runtime-boundary.md).
 
 ## Mehr erfahren
 

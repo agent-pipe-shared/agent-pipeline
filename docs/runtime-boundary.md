@@ -1,314 +1,123 @@
-# Runtime boundary — Claude Code vs. portable methodology
+# Runtime boundary
 
-> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+Agent-Pipeline has a portable methodology and runner integrations that can
+enforce configured controls. A route in `pipeline.user.yaml` records the V3
+choice; it does not attest to model identity or establish universal parity
+between hosts.
 
-The Agent-Pipeline is two layers stacked on top of each other:
+## Supported integrations
 
-- a **methodology** — roles, an SDLC, a review contract, and a handful of
-  disciplines (spec, evidence, model/token) describing *how* work moves from
-  intent to a shipped change; and
-- an **enforcement layer** — hooks and a plugin that make those disciplines
-  hard to skip by accident.
+Claude Code uses the native plugin and hook integration. Codex uses the
+project's Codex plugin manifest and `PreToolUse` adapter. Antigravity uses its
+native hook integration and translates its tool envelopes into the same guard
+decisions. When installed and loaded, the Codex and Antigravity adapters can
+hard deny commands and file writes. A denied operation does not proceed through
+that adapter; adapter failures also fail closed. The adapters do not provide
+OS isolation, identity attestation, or a guarantee that every possible host
+path is covered.
 
-The methodology is portable: prose and practice, running wherever you and an
-agent can read and follow it. The enforcement layer is not: it is wired into
-Claude Code's hook and plugin system, and nothing outside Claude Code runs it.
-This page draws that line precisely, so you know what you keep and what you
-take over yourself on a different agent runtime.
+The implementation and tests are the authoritative coverage references:
 
-## The one setting that names your side of the line
+| Runner | Blocking entry point | Relevant tests |
+| --- | --- | --- |
+| Claude Code | Native plugin hooks in [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | Hook-specific suites under [`hooks/`](../plugins/pipeline-core/hooks/) |
+| Codex | [`codex-pretool-guard.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.mjs) and [`codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | [`codex-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs) |
+| Antigravity | [`antigravity-pretool-guard.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs) and [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | [`antigravity-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs) |
 
-`pipeline.user.yaml` has a single field for this:
+These adapters invoke the configured provider-neutral guards for the tool
+operations they recognize. Coverage is bounded by the installed manifest,
+project configuration, recognized envelope, and host delivery path. Controls
+that only report, remind, or rely on an attended workflow remain advisory.
+See [`enforcement.md`](enforcement.md) for the generated guard registry and
+[`runner-support.md`](runner-support.md) for the maintained support table.
 
-```yaml
-agent_runtime: claude-code   # claude-code (full enforcement) | other (methodology only)
-```
+## Installation and delivery prerequisites
 
-- **`claude-code`** — the default. The plugin's hooks are live and the gates
-  below actually block.
-- **`other`** — you run the methodology by hand. `setup.mjs` records the
-  choice and prints a one-line reminder pointing here.
+The project must use the current V3 authority and the runner's supported
+integration. Bind or install the runner plugin at the documented project scope,
+generate or refresh its runtime projection through the supported onboarding
+path, and restart the host when that path requires it. Keep source and runtime
+readbacks aligned. A source checkout's generated files are projections; do not
+hand-edit them. If the adapter is absent, stale, disabled, pointed at a
+different project root, or the host does not deliver its native hook event, the
+methodology still applies but that adapter cannot enforce the operation.
 
-Worth stating plainly: choosing `other` does not strip anything out of the
-compiled config. The hooks run through Claude Code's hook system; on any
-other runtime there simply is no hook system to invoke them, so they are
-inherently absent. The setting is a declaration of intent, naming which half
-of the pipeline you rely on — not a switch that rewrites the guards.
+The native Codex selected-sandbox route remains the preferred attested route.
+If that route returns one typed `no-child` or `unavailable` result, the
+PO-authorized exception is limited to one fresh internal hard-read-only consult
+for the same question. It permits no handover, memory, mutation, network
+export, raw-answer retention, auto-apply, second question, or retry. A
+functional-equivalent pass does not establish native sandbox execution, OS
+isolation, or model identity.
 
-## What requires Claude Code — the enforcement layer
+## Portable responsibilities
 
-Everything below is a hook or a plugin component, existing because Claude
-Code exposes `PreToolUse`, `SessionStart`, and `Stop` hook points plus a
-plugin/skill system. Take that away and none of it fires.
-
-### Guard hooks (`PreToolUse`)
-
-| Guard | Fires on | What it blocks |
-|---|---|---|
-| **`guard-git`** | `Bash` / `PowerShell` | Force-pushes, history rewrites, deletion of protected branches or tags, and skipped hooks — regardless of what any agent asks for. |
-| **`guard-push`** | `Bash` / `PowerShell` (after `guard-git`) | An active-gate `git push` unless it is one standalone, unambiguous repo/source operation whose verify/security evidence and approval bind the exact pushed source commit. |
-| **`guard-testpath`** | `Edit` / `Write` | Edits to the test files that gate an implementation, so an implementor cannot quietly weaken or delete its own checks. Config-driven; with no configured paths it does nothing. |
-| **`guard-devplan`** | `Edit` / `Write` (after `guard-testpath`) | Implementation edits while the active feature's plan is not yet approved. Docs, specs, `.claude/`, and backlog paths are exempt. |
-
-The guards remain opt-in through project configuration. Once a push/release
-gate is active, repository/ref ambiguity fails closed; an absent state file is
-not allowed to masquerade as approval.
-
-### Lifecycle hooks (`SessionStart`, `Stop`)
-
-| Hook | Fires on | What it does |
-|---|---|---|
-| **`staleness-check`** | session start / resume / clear | Compares the installed `pipeline-core` plugin against the marketplace remote and surfaces a bootstrap line (fresh) or an upgrade notice (stale). |
-| **`setup-check`** | session start / resume / clear | Reminds you to run `node setup.mjs` if the repo still carries its committed default identity — i.e. personalization has not happened yet. Never blocks. |
-| **`post-compact-reground`** | after `/compact` | Re-grounds the session with a short message naming the active role, feature, and phase, so a compacted session does not lose the thread. Never blocks. |
-| **`stop-suggest`** | end of each turn (`Stop`) | Suggests the next pipeline phase or gate, and raises staged context-budget warnings as the session's token use climbs. |
-
-### Plugin, skills, statusline
-
-The whole thing ships as the `pipeline-core` Claude Code plugin. Beyond the
-hooks, that includes:
-
-- **Skills** invoked by name — `pipeline-start` (session bootstrap protocol),
-  `close-block` (block-close ritual), `critic-review` (independent read-only
-  Critic pass), `conventional-commit` (proposes a commit message from the
-  staged diff), and `advisor-consult` (read-only second-opinion workaround).
-- **Bound subagents** — a fresh-context Critic and the Goldfish
-  implementor/mechanic tiers, dispatched as Claude Code subagents.
-- **A statusline** configured in `.claude/settings.json`.
-
-None of these have an equivalent outside Claude Code. On another runtime
-they become things you do by hand, if at all.
-
-## What is portable — the methodology
-
-No dependency on any runtime: documents and habits that travel with the repo
-and work under any agent that can read a spec and run a command.
-
-- **The four roles.** Product Owner (the human gate), Elephant (long-lived
-  orchestrator), Goldfish (fresh-context implementor reporting evidence, not
-  claims), and Critic (independent read-only reviewer seeing only the
-  result). Seatable under any runtime — a division of responsibility, not a
-  feature.
-- **The SDLC.** Intent → spec → small tasks → implement → review → decision.
-  Lives in [`operating-model.md`](operating-model.md); depends on nothing
-  Claude-Code-specific.
-- **The two-stage review contract.** Deterministic checks (tests, security
-  scan, lint) run first; only what survives reaches a reviewer. On Claude
-  Code the first stage is partly hook-enforced; as a *practice* it's just
-  "run the checks before asking anyone to judge the work" — doable anywhere.
-- **Spec discipline.** Every task carries acceptance criteria something or
-  someone can actually check. A way of writing specs, not a tool.
-- **Evidence discipline.** "Done" means a machine-written log or output, the
-  exact command, and its exit code — never a model's assurance that
-  something "should work." Portable by definition.
-- **The model/token policy as a practice.** Route design, implementation,
-  mechanical, and review work to models matching their complexity; keep an
-  eye on cost. On another runtime you lose the routing *hooks* but keep the
-  *rule*.
-- **Handover discipline.** One canonical handover file that wins on
-  conflict, updated as state changes rather than reconstructed from chat
-  history.
-- **Repository freshness helper.** `repository-freshness.mjs` is a portable,
-  read-only point-in-time check. It fetches remote refs into a disposable bare
-  repository, never the source checkout. Only `equal`/`ahead` permit protocol
-  writes; every uncertain or stale topology stops them. It is not an atomic
-  lock and does not cover user-terminal or non-Git-CLI mutations.
-
-## Running on `other`: you become the enforcement layer
-
-Pick `agent_runtime: other` and the methodology stays intact, but nothing
-stops you from cutting a corner. In practice, each hook-blocked gate becomes
-a manual step you own:
-
-| On Claude Code, enforced by… | On another runtime, you do this by hand |
-|---|---|
-| `guard-git` | Keep your own git hygiene — no force-push, no history rewrite on shared branches, no `--no-verify`. |
-| `guard-push` | Do not push until the tests and security scan are green *for the exact commit you are pushing*, and the human gate has signed off. |
-| `guard-devplan` | Do not start implementing until the plan for the feature is approved. |
-| `guard-testpath` | Do not let the implementor rewrite the tests that judge its own work — review test diffs separately. |
-| two-stage review | Run the deterministic checks yourself, then have a separate, fresh-context reviewer look only at the result. |
-| `stop-suggest` / bootstrap | Keep the handover file current and re-read it at the start of each session. |
-
-The trade is straightforward: on `other` you get the same discipline with
-none of the safety net. Fine for evaluating the methodology, or for running
-it under an agent you already trust — just go in knowing the guards are
-advisory, not active.
-
-## See also
-
-- [`README.md`](../README.md) — what the pipeline is, and the role diagram.
-- [`overview.md`](overview.md) — the roles and the flow between them, end to end.
-- [`SETUP.md`](../SETUP.md) — running `setup.mjs`, the runtime question, and what
-  it compiles.
-- [`migration.md`](migration.md) — bringing an existing project under the pipeline.
-- [`usage.md`](usage.md) — how a day-to-day session runs once a repo is onboarded.
-- [`operating-model.md`](operating-model.md) — the full normative methodology:
-  roles, SDLC, review system, handover.
-- [`design-decisions.md`](design-decisions.md) — the "why" behind the model.
+Roles, specifications, evidence, review separation, handover, and the
+deterministic-check-before-review practice work under any runtime that can read
+the repository and run commands. On a runner without a configured blocking
+integration, the operator must perform those controls manually and preserve the
+same evidence discipline. Consult [`SETUP.md`](../SETUP.md) to bind the
+integration before relying on its blocking behavior.
 
 ---
 
-<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; German reference translation. -->
 
-# Laufzeitgrenze — Claude Code vs. übertragbare Methodik
+# Laufzeitgrenze
 
-Die Agent-Pipeline besteht aus zwei aufeinanderliegenden Schichten:
+Agent-Pipeline hat eine übertragbare Methodik und Runner-Integrationen, die
+konfigurierte Kontrollen durchsetzen können. Eine Route in
+`pipeline.user.yaml` dokumentiert die V3-Auswahl; sie bestätigt weder die
+Modellidentität noch eine universelle Gleichheit zwischen Hosts.
 
-- einer **Methodik** — Rollen, ein SDLC, ein Review-Vertrag und eine Handvoll
-  Disziplinen (Spec, Nachweis, Modell/Token), die beschreiben, *wie* Arbeit von
-  der Absicht zur ausgelieferten Änderung wandert; und
-- einer **Durchsetzungsschicht** — einem Satz Hooks und einem Plugin, die einige
-  dieser Disziplinen praktisch unumgehbar machen.
+## Unterstützte Integrationen
 
-Die Methodik ist übertragbar. Sie ist Text und Praxis; sie läuft überall dort,
-wo du und ein Agent sie lesen und befolgen könnt. Die Durchsetzungsschicht ist
-nicht übertragbar: Sie hängt am Hook- und Plugin-System von Claude Code, und
-außerhalb von Claude Code führt sie niemand aus. Diese Seite zieht genau diese
-Grenze — damit du weißt, was du behältst und was du selbst übernimmst, wenn du
-die Pipeline auf einer anderen Agent-Laufzeitumgebung betreibst.
+Claude Code verwendet die native Plugin- und Hook-Integration. Codex verwendet
+das Codex-Plugin-Manifest des Projekts und den `PreToolUse`-Adapter.
+Antigravity verwendet seine native Hook-Integration und übersetzt seine
+Tool-Umschläge in dieselben Guard-Entscheidungen. Bei korrekter Installation
+und Aktivierung können die Codex- und Antigravity-Adapter Befehle und
+Dateischreibvorgänge hart ablehnen; Adapterfehler führen ebenfalls zu einer
+Ablehnung. Die Adapter liefern weder OS-Isolation noch Identitätsattestierung
+und garantieren keine Abdeckung jedes möglichen Hostpfads.
 
-## Die eine Einstellung, die deine Seite der Grenze benennt
+Die maßgeblichen Abdeckungsquellen sind die Implementierung und ihre Tests:
 
-`pipeline.user.yaml` hat dafür genau ein Feld:
+| Runner | Blockierender Einstiegspunkt | Relevante Tests |
+| --- | --- | --- |
+| Claude Code | Native Plugin-Hooks in [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | Hook-spezifische Suiten unter [`hooks/`](../plugins/pipeline-core/hooks/) |
+| Codex | [`codex-pretool-guard.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.mjs) und [`codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | [`codex-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs) |
+| Antigravity | [`antigravity-pretool-guard.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs) und [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | [`antigravity-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs) |
 
-```yaml
-agent_runtime: claude-code   # claude-code (volles Enforcement) | other (nur Methodik)
-```
+Die Adapter rufen die konfigurierten, runnerneutralen Guards für erkannte
+Werkzeugoperationen auf. Ihre Abdeckung ist durch Manifest,
+Projektkonfiguration, erkanntes Umschlagformat und Host-Zustellung begrenzt.
+Kontrollen, die nur melden, erinnern oder einen betreuten Ablauf voraussetzen,
+sind beratend. Siehe [`enforcement.md`](enforcement.md) für das generierte
+Guard-Register und [`runner-support.md`](runner-support.md) für die gepflegte
+Runner-Tabelle.
 
-- **`claude-code`** — der Default. Die Hooks des Plugins sind aktiv, und die
-  Gates unten blockieren tatsächlich.
-- **`other`** — du führst die Methodik von Hand aus. `setup.mjs` hält die Wahl
-  fest und gibt einen einzeiligen Hinweis aus, der hierher verweist.
+## Voraussetzungen für Installation und Zustellung
 
-Ein Punkt, den man klar aussprechen sollte: `other` entfernt nichts aus der
-kompilierten Config. Die Hooks laufen über das Hook-System von Claude Code; auf
-jeder anderen Laufzeitumgebung existiert schlicht kein Hook-System, das sie
-aufrufen könnte, also fehlen sie von Natur aus. Die Einstellung ist eine
-Absichtserklärung — sie benennt, auf welche Hälfte der Pipeline du dich
-verlässt. Sie ist kein Schalter, der die Guards umschreibt.
+Das Projekt muss die aktuelle V3-Autorität und die unterstützte Integration des
+Runners verwenden. Plugin am dokumentierten Projektpfad binden, die
+Runtime-Projektion über den Onboarding-Pfad erzeugen oder aktualisieren und den
+Host neu starten, wenn der Ablauf das verlangt. Source und Runtime-Readbacks
+müssen zusammenpassen. Fehlt der Adapter, ist er veraltet, deaktiviert, auf ein
+anderes Projektverzeichnis gerichtet oder liefert der Host kein natives Hook-
+Ereignis, bleibt die Methodik anwendbar, aber dieser Adapter kann die Operation
+nicht durchsetzen.
 
-## Was Claude Code voraussetzt — die Durchsetzungsschicht
+Die native Codex-Selected-Sandbox-Route bleibt der bevorzugte attestierte Weg.
+Wenn sie einmalig `no-child` oder `unavailable` meldet, ist die PO-autorisierte
+Ausnahme auf genau einen frischen internen hard-read-only-Consult zur selben
+Frage begrenzt. Handover, Memory, Mutation, Netzwerkexport,
+Rohantwort-Aufbewahrung, Auto-Apply, eine zweite Frage und Retry sind nicht
+zulässig. Ein Funktionsäquivalenz-Pass bestätigt weder native
+Sandbox-Ausführung noch OS-Isolation oder Modellidentität.
 
-Alles in diesem Abschnitt ist ein Hook oder ein Plugin-Bestandteil. Es existiert,
-weil Claude Code die Hook-Punkte `PreToolUse`, `SessionStart` und `Stop` sowie
-ein Plugin-/Skill-System bereitstellt. Nimmt man das weg, feuert nichts davon.
-
-### Guard-Hooks (`PreToolUse`)
-
-| Guard | Feuert bei | Was er blockiert |
-|---|---|---|
-| **`guard-git`** | `Bash` / `PowerShell` | Force-Pushes, History-Rewrites, das Löschen geschützter Branches oder Tags und übersprungene Hooks — egal, worum ein Agent bittet. |
-| **`guard-push`** | `Bash` / `PowerShell` (nach `guard-git`) | Einen Push bei aktivem Gate, sofern er nicht genau eine eigenständige, eindeutige Repo-/Source-Operation ist, deren Verify-/Security-Nachweis und Freigabe exakt an den gepushten Source-Commit gebunden sind. |
-| **`guard-testpath`** | `Edit` / `Write` | Änderungen an den Testdateien, die eine Implementierung absichern, damit ein Implementierer seine eigenen Prüfungen nicht klammheimlich aufweicht oder löscht. Konfigurationsgesteuert; ohne konfigurierte Pfade tut er nichts. |
-| **`guard-devplan`** | `Edit` / `Write` (nach `guard-testpath`) | Implementierungs-Edits, solange der Plan des aktiven Features noch nicht freigegeben ist. Docs, Specs, `.claude/` und Backlog-Pfade sind ausgenommen. |
-
-Die Guards bleiben über die Projektkonfiguration opt-in. Sobald ein Push-/Release-
-Gate aktiv ist, blockieren Repo-/Ref-Mehrdeutigkeit und eine fehlende Freigabe;
-fehlender State darf nicht als Freigabe erscheinen.
-
-### Lifecycle-Hooks (`SessionStart`, `Stop`)
-
-| Hook | Feuert bei | Was er tut |
-|---|---|---|
-| **`staleness-check`** | Session-Start / Resume / Clear | Vergleicht das installierte `pipeline-core`-Plugin mit dem Marketplace-Remote und zeigt eine Bootstrap-Zeile (aktuell) oder einen Upgrade-Hinweis (veraltet). |
-| **`setup-check`** | Session-Start / Resume / Clear | Erinnert an `node setup.mjs`, wenn das Repo noch seine committete Default-Identität trägt — die Personalisierung also noch aussteht. Blockiert nie. |
-| **`post-compact-reground`** | nach `/compact` | Verankert die Session mit einer kurzen Nachricht neu, die aktive Rolle, Feature und Phase benennt, damit eine komprimierte Session den Faden nicht verliert. Blockiert nie. |
-| **`stop-suggest`** | Ende jedes Turns (`Stop`) | Schlägt die nächste Pipeline-Phase oder das nächste Gate vor und meldet gestaffelte Kontext-Budget-Warnungen, wenn der Token-Verbrauch der Session steigt. |
-
-### Plugin, Skills, Statusline
-
-Das Ganze wird als das Claude-Code-Plugin `pipeline-core` ausgeliefert. Neben den
-Hooks gehören dazu:
-
-- **Skills**, die du namentlich aufrufst — `pipeline-start` (das
-  Session-Bootstrap-Protokoll), `close-block` (das Ritual zum Block-Abschluss),
-  `critic-review` (ein unabhängiger Critic-Durchgang mit reinem Lesezugriff),
-  `conventional-commit` (schlägt eine Commit-Nachricht aus dem gestageten Diff
-  vor) und `advisor-consult` (der Zweitmeinungs-Behelf mit reinem Lesezugriff).
-- **Gebundene Subagents** — ein Critic mit frischem Kontext sowie die
-  Goldfish-Stufen für Implementierung und Mechanik, jeweils als
-  Claude-Code-Subagent dispatcht.
-- **Eine Statusline**, konfiguriert in `.claude/settings.json`.
-
-Nichts davon hat außerhalb von Claude Code ein Gegenstück. Auf einer anderen
-Laufzeitumgebung werden daraus Dinge, die du von Hand erledigst — falls du sie
-überhaupt erledigst.
-
-## Was übertragbar ist — die Methodik
-
-Das ist der Teil ohne Abhängigkeit von irgendeiner Laufzeitumgebung. Es sind
-Dokumente und Gewohnheiten; sie reisen mit dem Repo und funktionieren unter jedem
-Agenten, der eine Spec lesen und einen Befehl ausführen kann.
-
-- **Die vier Rollen.** Product Owner (das menschliche Gate), Elephant (der
-  langlebige Orchestrator), Goldfish (ein Implementierer mit frischem Kontext,
-  der Nachweis liefert statt Behauptungen) und Critic (ein unabhängiger Prüfer
-  mit reinem Lesezugriff, der nur das Ergebnis sieht). Diese Rollen lassen sich
-  unter jeder Laufzeitumgebung besetzen; sie sind eine Aufteilung von
-  Verantwortung, kein Feature.
-- **Das SDLC.** Absicht zu Spec zu kleinen Aufgaben zu Implementierung zu Review
-  zu Entscheidung. Der Ablauf steht in
-  [`operating-model.md`](operating-model.md) und hängt an nichts
-  Claude-Code-Spezifischem.
-- **Der zweistufige Review-Vertrag.** Deterministische Prüfungen (Tests,
-  Security-Scan, Lint) laufen zuerst; nur was sie übersteht, erreicht einen
-  Prüfer. Auf Claude Code ist die erste Stufe teils per Hook durchgesetzt; als
-  *Praxis* heißt sie schlicht „lass die Prüfungen laufen, bevor du jemanden um
-  ein Urteil bittest" — und das geht überall.
-- **Spec-Disziplin.** Jede Aufgabe trägt Akzeptanzkriterien, die sich
-  tatsächlich prüfen lassen. Das ist eine Art, Specs zu schreiben, kein Werkzeug.
-- **Nachweis-Disziplin.** „Fertig" heißt: ein maschinell geschriebenes Log oder
-  Ergebnis, der exakte Befehl und dessen Exit-Code — nie die Zusicherung eines
-  Modells, etwas „sollte funktionieren". Übertragbar per Definition.
-- **Die Modell-/Token-Policy als Praxis.** Leite Design-, Implementierungs-,
-  Mechanik- und Review-Arbeit an Modelle, die zu ihrer Komplexität passen, und
-  behalte die Kosten im Blick. Auf einer anderen Laufzeitumgebung verlierst du
-  die Routing-*Hooks*, behältst aber die *Regel*.
-- **Handover-Disziplin.** Eine kanonische Handover-Datei, die im Konfliktfall
-  gewinnt und bei Zustandsänderungen fortgeschrieben wird, statt aus dem
-  Chat-Verlauf rekonstruiert zu werden.
-- **Repository-Freshness-Helper.** `repository-freshness.mjs` ist ein
-  portabler, read-only Zeitpunkt-Check. Remote-Refs landen in einem
-  wegwerfbaren Bare-Repository, nie im Quell-Checkout. Nur `equal`/`ahead`
-  erlauben protokollgebundenes Schreiben; unklare oder stale Topologien stoppen
-  es. Das ist kein atomarer Lock und deckt weder User-Terminal- noch andere
-  Nicht-Git-CLI-Mutationen ab.
-
-## Betrieb auf `other`: Du wirst selbst zur Durchsetzungsschicht
-
-Wähle `agent_runtime: other`, und die Methodik bleibt vollständig — aber nichts
-hält dich davon ab, eine Abkürzung zu nehmen. In der Praxis heißt das: Jedes
-Gate, das sonst ein Hook blockiert, wird zu einem manuellen Schritt in deiner
-Verantwortung.
-
-| Auf Claude Code durchgesetzt von… | Auf einer anderen Laufzeitumgebung machst du das von Hand |
-|---|---|
-| `guard-git` | Halte deine eigene Git-Hygiene — kein Force-Push, kein History-Rewrite auf geteilten Branches, kein `--no-verify`. |
-| `guard-push` | Push erst, wenn Tests und Security-Scan *für genau den Commit, den du pushst* grün sind und das menschliche Gate freigegeben hat. |
-| `guard-devplan` | Beginne nicht mit der Implementierung, bevor der Plan des Features freigegeben ist. |
-| `guard-testpath` | Lass den Implementierer nicht die Tests umschreiben, die seine eigene Arbeit beurteilen — prüfe Test-Diffs getrennt. |
-| zweistufiges Review | Lass die deterministischen Prüfungen selbst laufen und dann einen separaten Prüfer mit frischem Kontext nur auf das Ergebnis blicken. |
-| `stop-suggest` / Bootstrap | Halte die Handover-Datei aktuell und lies sie zu Beginn jeder Session erneut. |
-
-Der Kompromiss ist klar: Auf `other` bekommst du dieselbe Disziplin ohne das
-Sicherheitsnetz. Das ist ein guter Ort, um die Methodik zu bewerten oder sie
-unter einem Agenten zu fahren, dem du ohnehin vertraust — geh nur mit dem Wissen
-hinein, dass die Guards beratend sind, nicht aktiv.
-
-## Siehe auch
-
-- [`README.md`](../README.md) — was die Pipeline ist, samt Rollendiagramm.
-- [`overview.md`](overview.md) — die Rollen und der Fluss zwischen ihnen, von
-  Anfang bis Ende.
-- [`SETUP.md`](../SETUP.md) — `setup.mjs` ausführen, die Runtime-Frage und was
-  dabei kompiliert wird.
-- [`migration.md`](migration.md) — ein bestehendes Projekt unter die Pipeline holen.
-- [`usage.md`](usage.md) — wie eine alltägliche Session abläuft, sobald ein Repo
-  angebunden ist.
-- [`operating-model.md`](operating-model.md) — die vollständige normative
-  Methodik: Rollen, SDLC, Review-System, Handover.
-- [`design-decisions.md`](design-decisions.md) — das „Warum" hinter dem Modell.
-
----
-
-Die deutsche Fassung ist eine Übersetzung des englischen Originals.
+Rollen, Spezifikationen, Evidenz, Review-Trennung, Handover und die Praxis,
+deterministische Checks vor dem Review auszuführen, funktionieren unter jeder
+Runtime, die Repository und Befehle ausführen kann. Ohne blockierende
+Integration führt der Operator diese Kontrollen manuell durch. Vor dem Vertrauen
+auf Blocking zuerst [`SETUP.md`](../SETUP.md) zur Runner-Bindung lesen.

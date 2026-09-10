@@ -74,14 +74,11 @@ routes for Claude, Codex, and Antigravity duties, but a requested route is not
 proof that a host used that model, and one runner's evidence does not prove
 another's behavior.
 
-Claude Code is the supported full-enforcement runtime: its plugin and hooks can
-enforce configured guards and lifecycle checks. On Codex, Antigravity, or
-another runtime, use the same methodology only where that host exposes the
-needed integration; do not assume Claude hooks, plugin installation, or
-automatic guard enforcement exists there. See
-[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the exact boundary
-and manual responsibilities, and [`docs/runner-support.md`](docs/runner-support.md)
-for the per-runner boundary table.
+Supported runner integrations can enforce configured guards and lifecycle
+checks when their adapter is installed and project prerequisites are met. Use
+the runner's supported integration and follow its setup path. See
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for exact controls,
+prerequisites, and manual responsibilities.
 
 ## Consumer onboarding details {#consumer-onboarding-details}
 
