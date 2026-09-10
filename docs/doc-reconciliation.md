@@ -2598,3 +2598,38 @@ role and prompt example now name the standing functional-equivalent lane as
 the T1 default, with runner-native isolation as the same optional escalation.
 Root and vendored role/prompt copies remain byte-identical, and the protected
 preimage hashes bind the corrected canonical bytes.
+
+## Candidate b0fd0d56a1ac8ee30629280df7ba08649e137703 — 2026-09-10, range a471783d..b0fd0d56, pre-generation intake answer correction
+
+- ADR-0010: amended in 8b7dfd05c7604bbfa9de6590c28ba0ee7786fac2.
+- ADR-0037: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0069: checked, no change needed.
+
+ADR-0010 now records the bounded correction contract: ordinary design-answer
+apply remains idempotent and refuses changed content, while the separately
+named replacement command can replace the complete answer set only before
+staging generation. The checkpoint revision, timestamp and digest retain the
+audit trail. Generated or bound intake remains immutable through this command
+and uses the existing specification-amendment path.
+
+ADR-0037's bounded assurance and ADR-0046's authority layering are preserved:
+replacement is a CAS-protected private-checkpoint mutation and cannot rewrite
+generated authority. ADR-0051, ADR-0057 and ADR-0067 need no change because the
+same closed argv registry and guard derivation cover Claude Code, Codex and
+Antigravity. ADR-0054's precedence chain, ADR-0059's signed override model and
+ADR-0061's human approval ceremony are unchanged; this correction is an
+ordinary onboarding mutation with explicit `--activate`, not a new PO gate or
+guard override. ADR-0069 is implicated only because ADR-0010's accepted text
+was amended; no ADR number was allocated or reassigned.
+
+The consumer onboarding guide now lists the active intake statuses and the
+correction command. Root and vendored ADR-0010 copies remain byte-identical.
+Focused evidence is in `onboarding-continuity.test.mjs`,
+`project-onboarding-v3.test.mjs`, and `guard-lifecycle-ready.test.mjs`.
