@@ -257,13 +257,12 @@ copy over, or hand-edit those generated targets. After the initializer and its
 readback, propose project-specific calibration choices to the repository owner
 and apply them through the normal reviewed workflow.
 
-For an existing project that is being adopted (not a fresh initializer), copy
-and adapt these templates in the project repository:
-
-```sh
-cp <pipeline-source>/templates/pipeline.json.example project/pipeline.json
-cp <pipeline-source>/templates/CLAUDE.project.md CLAUDE.md
-```
+For an existing project, follow the reviewed, additive adoption plan. Use
+`templates/pipeline.json.example` and `templates/CLAUDE.project.md` in the
+Pipeline source as references. Create only absent targets; merge the needed
+calibration and guidance into existing files while preserving project settings
+and instructions. Never copy a template over an existing `CLAUDE.md` or
+calibration file.
 
 (A runner-neutral project — one without a `.claude/` directory — targets
 `project/pipeline.json` instead; the calibration is read at its resolved
@@ -427,8 +426,9 @@ Do this on a normal change branch and adopt one control at a time:
 
 1. Read the project, identify its existing test/build commands, branch policy,
    sensitive paths, and current documentation location.
-2. Bind the plugin (where Claude Code is used) and add the calibration plus a
-   lean `CLAUDE.md` from the templates.
+2. Bind the plugin (where Claude Code is used) and add the calibration plus
+   project guidance through the additive adoption plan, preserving existing
+   settings and `CLAUDE.md` instructions.
 3. Create or consolidate the one `verify` command. Run it successfully before
    treating it as the delivery gate.
 4. Add a handover file and name it in the calibration. Move current state there
@@ -448,10 +448,11 @@ authority look current by copying generated runtime files.
 
 If Codex agent threads no longer appear after adoption, inspect its persistent
 local app-server daemon before changing a plan or treating the incident as a
-repository failure:
+repository failure. Replace `<absolute-plugin-root>` with the installed
+Pipeline plugin directory and run from the governed project root:
 
 ```sh
-node plugins/pipeline-core/scripts/codex-app-server-health.mjs
+node "<absolute-plugin-root>/scripts/codex-app-server-health.mjs"
 ```
 
 `CAS-READY` is a current daemon-version observation. It does not prove a model
@@ -459,7 +460,7 @@ child launched or a host background wakeup. For another `CAS-*` result, the
 bounded attended recovery is:
 
 ```sh
-node plugins/pipeline-core/scripts/codex-app-server-health.mjs --recover
+node "<absolute-plugin-root>/scripts/codex-app-server-health.mjs" --recover
 ```
 
 It never loops or changes repository state. If it fails, run `codex doctor` in

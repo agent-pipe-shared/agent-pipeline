@@ -322,14 +322,18 @@ tatsächlich gelaufenen Modells.
 flowchart TD
     I[Absicht: Feature, Fix oder Refactoring] --> B[Session bootstrappen]
     B --> P{V3-Profil wählen}
-    P -->|Epic oder Feature| A[Frische lesende Beratung]
+    P -->|Epic oder Feature| A[Modellfreier Advisor-Capability-Preflight]
     P -->|Mini| T[Triage]
     A --> T
     T --> D{Design sinnvoll oder nötig?}
     D -->|ja| DS[Design-Phase: Optionen und Akzeptanzkriterien]
     D -->|nein| RR[Rigor und Risiko festhalten]
     DS --> RR
-    RR --> S[PRD und Spec soweit nötig]
+    RR --> AQ{Konkrete Advisor-Frage und Grund?}
+    AQ -->|ja| AC[Bedarfsgebundene frische lesende Beratung]
+    AQ -->|nein| S
+    AC --> S
+    S[PRD und Spec soweit nötig]
     S --> R{Readiness nötig oder gewählt?}
     R -->|ja| RD[Frisches lesendes Readiness-Review]
     RD -->|Lücken| S
