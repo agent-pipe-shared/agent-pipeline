@@ -440,6 +440,11 @@ function assertArchivePathPhysicallyWithinRoot(root, archivePath) {
         assertPathWithinRoot(physicalRoot, targetPath, "The resolved archive path");
         if (existsSync(existingPath)) {
           assertPathWithinRoot(physicalRoot, realpathSync(existingPath), "The resolved archive path");
+        } else if (existingPath === archivePath) {
+          throw new HandoverRotationError(
+            "HANDOVER-ROTATION-ARCHIVE-EXISTS",
+            "The resolved archive path is a dangling symlink. Archive files are append-only-once-written and never overwritten; choose a different --slug.",
+          );
         }
       } else {
         assertPathWithinRoot(physicalRoot, realpathSync(existingPath), "The resolved archive path");

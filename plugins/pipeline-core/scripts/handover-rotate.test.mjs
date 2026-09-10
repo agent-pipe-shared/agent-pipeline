@@ -896,6 +896,8 @@ const GOVERNANCE_FIXTURE = [
   const customOutside = fixtureRoot("cli-custom-handover-docs-symlink-outside");
   const danglingRoot = fixtureRoot("cli-dangling-archive-filename-symlink");
   const danglingOutside = fixtureRoot("cli-dangling-archive-filename-symlink-outside");
+  const chainedRoot = fixtureRoot("cli-chained-dangling-archive-filename-symlink");
+  const chainedOutside = fixtureRoot("cli-chained-dangling-archive-filename-symlink-outside");
   try {
     writeFileSync(join(customRoot, "state.md"), SAMPLE, "utf8");
     symlinkSync(customOutside, join(customRoot, "docs"));
@@ -931,6 +933,27 @@ const GOVERNANCE_FIXTURE = [
       { encoding: "utf8" },
     );
 
+    mkdirSync(join(chainedRoot, "docs", "state-archive"), { recursive: true });
+    writeFileSync(join(chainedRoot, "docs", "state.md"), SAMPLE, "utf8");
+    symlinkSync(chainedOutside, join(chainedRoot, "redirect"));
+    symlinkSync(
+      join(chainedRoot, "redirect", "new.md"),
+      join(chainedRoot, "docs", "state-archive", "2026-09-10--chained-dangling.md"),
+    );
+    const chainedAck = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", chainedRoot, "--acknowledge-extraction-done", "--section-heading", "Block A"],
+      { encoding: "utf8" },
+    );
+    assert.equal(chainedAck.status, 0, chainedAck.stderr);
+    const chainedBefore = snapshotFixture(chainedRoot);
+    const chainedOutsideBefore = snapshotFixture(chainedOutside);
+    const chainedRotation = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", chainedRoot, "--section-heading", "Block A", "--summary", "must refuse chained dangling archive filename", "--slug", "chained-dangling", "--rotation-date", "2026-09-10"],
+      { encoding: "utf8" },
+    );
+
     assert.equal(customRotation.status, 1, "a custom in-root handover must not allow docs to redirect archive creation outside root");
     assert.match(customRotation.stderr, /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/);
     assert.deepEqual(snapshotFixture(customRoot), customBefore, "custom-handover refusal must preserve its full root and acknowledgement tree");
@@ -939,11 +962,17 @@ const GOVERNANCE_FIXTURE = [
     assert.match(danglingRotation.stderr, /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/);
     assert.deepEqual(snapshotFixture(danglingRoot), danglingBefore, "dangling-filename refusal must preserve its full root and acknowledgement tree");
     assert.deepEqual(snapshotFixture(danglingOutside), danglingOutsideBefore, "dangling-filename refusal must preserve the external tree");
+    assert.equal(chainedRotation.status, 1, "a chained dangling archive filename symlink must refuse before following a symlinked parent");
+    assert.match(chainedRotation.stderr, /HANDOVER-ROTATION-ARCHIVE-EXISTS/);
+    assert.deepEqual(snapshotFixture(chainedRoot), chainedBefore, "chained dangling-filename refusal must preserve its full root and acknowledgement tree");
+    assert.deepEqual(snapshotFixture(chainedOutside), chainedOutsideBefore, "chained dangling-filename refusal must preserve the external tree");
   } finally {
     rmSync(customRoot, { recursive: true, force: true });
     rmSync(customOutside, { recursive: true, force: true });
     rmSync(danglingRoot, { recursive: true, force: true });
     rmSync(danglingOutside, { recursive: true, force: true });
+    rmSync(chainedRoot, { recursive: true, force: true });
+    rmSync(chainedOutside, { recursive: true, force: true });
   }
 }
 
