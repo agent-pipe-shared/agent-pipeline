@@ -8,7 +8,10 @@ import { existsSync, read, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+import {
+  isSanctionedLifecycleCommand,
+  isSanctionedStartPreflightInvocation,
+} from "./guard-lifecycle-ready.mjs";
 import {
   consumeHumanGuardOverride,
   humanGuardOverrideInternals,
@@ -253,6 +256,13 @@ const lifecycleGoverned = [
   ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
 ].some((marker) => existsSync(join(projectRoot, marker)));
 const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
+// The prescribed bootstrap preflight is a sanctioned lifecycle command, but it
+// is also the lifecycle guard's only receipt-writing entry point. Route this
+// exact invocation through the guard so a dispatched Codex agent can satisfy
+// its first-write obligation; every other sanctioned lifecycle command stays
+// on the existing fast path.
+const isPrescribedBootstrapPreflight = toolName === "Bash"
+  && isSanctionedStartPreflightInvocation(command, projectRoot);
 
 /** Permit only the bootstrap's own immutable identity/read step. */
 export function isBootstrapReadCommand(value, {
@@ -283,7 +293,7 @@ export function isBootstrapReadCommand(value, {
 }
 
 const lifecycleShouldRun = lifecycleGoverned
-  && !isLifecycleTool
+  && (!isLifecycleTool || isPrescribedBootstrapPreflight)
   && !isBootstrapReadCommand(command)
   && ["Bash", "Edit", "Write"].includes(toolName);
 const supportedTools = new Set(["Bash", "apply_patch", "Edit", "Write"]);

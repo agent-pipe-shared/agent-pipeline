@@ -803,6 +803,28 @@ check("governed bootstrap can read only its loaded pipeline-start skill and curr
   }
 });
 
+check("Codex adapter records a dispatched agent's receipt from the prescribed bootstrap before its first absolute-path Write", () => {
+  const root = readyLifecycleFixture("chat");
+  const preflight = join(pluginRoot, "scripts", "pipeline-start-preflight.mjs");
+  const agentId = "codex-bootstrap-receipt-fixture";
+  const identity = { agent_id: agentId, agent_type: "goldfish-implementor" };
+  const bootstrap = run({
+    ...identity,
+    tool_name: "Bash",
+    tool_input: { command: `node "${preflight}"` },
+  }, root);
+  assert.equal(bootstrap.status, 0, bootstrap.stderr);
+  assert.equal(bootstrap.stdout, "");
+
+  const write = run({
+    ...identity,
+    tool_name: "Write",
+    tool_input: { file_path: join(root, "scratch", "bootstrap-receipt-write.txt") },
+  }, root);
+  assert.equal(write.status, 0, write.stderr);
+  assert.equal(write.stdout, "");
+});
+
 check("outer Codex routing admits the exact bounded diagnostic pipeline while non-ready", () => {
   const root = fixture();
   writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
