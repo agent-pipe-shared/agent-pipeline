@@ -54,7 +54,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -62,6 +62,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { runVerifyJournal, sealVerifyCleanupRegistration } from "./verify-journal.mjs";
 import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource } from "../lib/worktree-lifecycle.mjs";
+import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify } from "../lib/consumer-verify.mjs";
 
 export const VERIFY_EVIDENCE_SCHEMA = "pipeline.verify-evidence.v0";
@@ -109,13 +110,30 @@ function readConfiguredVerifyCommand(root) {
 function safeOutPath(root, outPath) {
   if (typeof outPath !== "string" || outPath.length === 0 || isAbsolute(outPath)) fail("VEP-PATH", "Out path must be repository-relative.");
   const target = resolve(root, outPath);
-  if (relative(root, target).startsWith(`..${sep}`) || target === root) fail("VEP-PATH", "Out path escapes the repository.");
+  const rel = relative(root, target);
+  if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) || target === root) fail("VEP-PATH", "Out path escapes the repository.");
+  if (realpathSync(root) !== root) fail("VEP-PATH", "Repository root must be a physical path.");
+  let current = root;
+  for (const component of rel.split(sep)) {
+    current = resolve(current, component);
+    let info;
+    try { info = lstatSync(current); }
+    catch (error) { if (error.code === "ENOENT") break; throw error; }
+    if (info.isSymbolicLink() || realpathSync(current) !== current
+      || (current !== target ? !info.isDirectory() : !info.isFile() || info.nlink !== 1)) {
+      fail("VEP-PATH", "Out path must contain only physical directories and an ordinary file.");
+    }
+  }
   return target;
 }
 
-function writeEvidence(target, evidence) {
+function writeEvidence(root, target, evidence) {
+  safeOutPath(root, relative(root, target));
   mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, `${JSON.stringify(evidence, null, 2)}\n`);
+  safeOutPath(root, relative(root, target));
+  // Refuse a newly appeared leaf, including a symlink or hardlink, rather than
+  // following it when publishing the replacement evidence.
+  writeFileSync(target, `${JSON.stringify(evidence, null, 2)}\n`, { flag: "wx" });
 }
 
 /**
@@ -148,7 +166,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
       steps: [{ name: "candidate-preflight", exitCode: 1 }],
       exitCode: 1,
     };
-    writeEvidence(target, evidence);
+    writeEvidence(root, target, evidence);
     return { status: "dirty", evidence, outPath: target };
   }
 
@@ -197,10 +215,15 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     startedAt,
     finishedAt: new Date().toISOString(),
     steps: run.steps,
-    verifyRun: { runId: run.runId, policySha256: run.policySha256, terminalSha256: run.terminal.terminalSha256 },
+    verifyRun: createPublicVerifyRunEvidence({
+      runId: run.runId, policySha256: run.policySha256,
+      resumePlanSha256: run.plan.planSha256, terminalSha256: run.terminal.terminalSha256,
+      registeredSuiteCount: suites.length, terminalReceiptCount: run.terminal.receipts.length,
+      terminalStatus: run.terminal.status,
+    }),
     exitCode: 0,
   };
-  writeEvidence(target, evidence);
+  writeEvidence(root, target, evidence);
   return { status: "passed", evidence, outPath: target };
 }
 

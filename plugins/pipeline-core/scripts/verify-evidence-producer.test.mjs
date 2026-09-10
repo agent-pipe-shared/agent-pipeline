@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,6 +12,7 @@ import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { prepareConsumerVerify, CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
 import { verifySuiteArtifactName } from "./verify-journal.mjs";
+import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 
 function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
 
@@ -45,6 +46,11 @@ test("a passing verify produces a consumable artifact bound to the exact commit 
     assert.equal(result.evidence.candidate.commit, commit);
     assert.equal(result.evidence.candidate.tree, tree);
     assert.equal(result.evidence.exitCode, 0);
+    assert.deepEqual(result.evidence.verifyRun, createPublicVerifyRunEvidence({
+      ...result.evidence.verifyRun,
+      resumePlanSha256: JSON.parse(readFileSync(join(root, ".git/agent-pipeline/verify/runs", result.evidence.verifyRun.runId, "resume-plan.json"), "utf8")).planSha256,
+      registeredSuiteCount: 4, terminalReceiptCount: 4, terminalStatus: "passed",
+    }));
     assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-verify-contract", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
     const onDisk = JSON.parse(readFileSync(join(root, "evidence", "verify.json"), "utf8"));
     assert.deepEqual(onDisk, result.evidence);
@@ -140,6 +146,25 @@ test("explicit preparation is idempotent, preserves conflicts and the configured
     assert.throws(() => prepareConsumerVerify({ rootDir: root }), /VEP-ADAPTER-CONFLICT/u);
     assert.equal(readFileSync(join(root, CONSUMER_VERIFY_ADAPTER_PATH), "utf8"), "// user owned\n");
   });
+});
+
+test("output aliases cannot delete outside bytes even when configuration is invalid", async () => {
+  const outside = mkdtempSync(join(tmpdir(), "consumer-outside-"));
+  const victim = join(outside, "verify.json");
+  try {
+    await withFixture('node -e "process.exit(0)"', async (root) => {
+      writeFileSync(victim, "outside owned bytes\n");
+      symlinkSync(outside, join(root, "alias"), "dir");
+      writeFileSync(join(root, ".claude/pipeline.json"), "invalid JSON");
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "alias/verify.json" }), (error) => error.code === "VEP-PATH");
+      assert.equal(readFileSync(victim, "utf8"), "outside owned bytes\n");
+      rmSync(join(root, "alias"));
+      symlinkSync(outside, join(root, "evidence"), "dir");
+      writeFileSync(join(outside, "verify-latest.json"), "canonical outside bytes\n");
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root }), (error) => error.code === "VEP-PATH");
+      assert.equal(readFileSync(join(outside, "verify-latest.json"), "utf8"), "canonical outside bytes\n");
+    });
+  } finally { rmSync(outside, { recursive: true, force: true }); }
 });
 
 test("unborn candidates are unavailable and a clean run never seeds a missing adapter", async () => {
