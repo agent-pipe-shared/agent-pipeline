@@ -2633,3 +2633,19 @@ The consumer onboarding guide now lists the active intake statuses and the
 correction command. Root and vendored ADR-0010 copies remain byte-identical.
 Focused evidence is in `onboarding-continuity.test.mjs`,
 `project-onboarding-v3.test.mjs`, and `guard-lifecycle-ready.test.mjs`.
+
+## Candidate f119e8bc6ccfea5e23faeab9ac03aa7b5ae79fa4 — 2026-09-10, range 4adb3328..f119e8bc, diagnostic assertion field correction
+
+- ADR-0010: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0067: checked, no change needed.
+
+This delta changes only the new test assertion from the nonexistent
+`recommendation` property to the lifecycle diagnostic schema's actual
+`guidance` property. It changes no runtime behavior, authority, runner route,
+approval ceremony or platform contract. The focused onboarding suite passes
+166/166 after the correction.
