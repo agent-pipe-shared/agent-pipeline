@@ -2717,3 +2717,18 @@ The remaining decisions need no amendment. The signature boundary, proof and
 destination bindings, release promotion contract, ADR numbering rule and
 per-destination approval scope are unchanged. Root and vendored ADR and
 push-flow copies remain byte-identical.
+
+## Candidate 62dddced0df1cfe46b6e72239e46bf7d3ba72cde — 2026-09-11, range 18df8681..62dddced, complete accepted ADR Governs coverage
+
+- ADR-0069: checked, no change needed.
+
+ADR-0081 was already accepted and numbered on trunk. This follow-up adds its
+bounded `Governs:` declaration and the byte-identical vendored copy; it neither
+allocates nor reassigns an ADR number. The current corpus therefore remains 81
+numbered decisions with no duplicate or dangling number, while every one of
+the 76 accepted decisions now declares its controlled implementation surface.
+
+The consumer-safe-path checker explicitly classifies the vendored declaration
+as inherited canonical metadata. This does not turn source-checkout paths into
+consumer instructions. Focused ADR consistency, vendored-canon, documentation
+contract and consumer-safe-path checks pass for the source candidate.
