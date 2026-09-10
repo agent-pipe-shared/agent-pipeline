@@ -1,0 +1,239 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "findings": [
+      {
+        "gap": "Antigravity checks commands against workspacePaths[0], although native run_command executes in args.Cwd. The lifecycle child receives the first workspace as its root, so relative targets are checked against a different directory from the actual execution directory.",
+        "risk": "With a ready first workspace and an unready second workspace, a command using Cwd in the second workspace can bypass that workspace's containment and readiness checks.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs:338-341",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md:71-79"
+      },
+      {
+        "gap": "Codex skips the lifecycle guard for sanctioned commands, including the exact bootstrap preflight. This skips the receipt producer, while subsequent Edit/Write calls still run the receipt consumer.",
+        "risk": "An accepted payload carrying agent_id and agent_type can receive GUARD-BOOTSTRAP-RECEIPT-MISSING, execute the prescribed preflight, and remain blocked because the adapter never invokes the receipt-recording branch. The supplied receipt tests exercise the lifecycle evaluator directly and miss this adapter path.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs:285-288",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md:53-56"
+      },
+      {
+        "gap": "Slicing Trigger A emits whenever the completed single-dispatch run equals three, without recording whether that run already produced an advisory.",
+        "risk": "Multiple calls in the next assistant message, or retries before the transcript advances, repeat the advisory. A memory-only evaluation of the supplied implementation produced three nudges for two calls in one message followed by a retry, violating the required deduplication and inflating advisory counts.",
+        "severity": "minor",
+        "evidence": "plugins/pipeline-core/hooks/guard-slicing.mjs:575-585",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md:51-52"
+      }
+    ],
+    "deliberately_not_flagged": [
+      "Explicit GUARD-LIFECYCLE-NOT-READY denial sets take precedence before override planning or consumption; the supplied tests also preserve an armed capability when this co-denial appears.",
+      "The supplied native-delivery evidence distinguishes fixture validation from live host delivery. No broader live-delivery claim was inferred.",
+      "Partial review: all named production artifacts, associated test coverage, specifications, guardrails and candidate evidence were examined. Complete body-by-body review of plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs and plugins/pipeline-core/lib/human-guard-override.test.mjs was not reached within the default 24-tool review cap. Full-scope pass/fail is withheld; pass=false denotes no approval.",
+      "Remaining scope/mechanics: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs; plugins/pipeline-core/lib/human-guard-override.test.mjs; 24 tool uses."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "trajectory_evidence": "Candidate commit 8741613004e7ac84e48fa00a0a25e3d08ab682d1 resolves to tree 98e9803caac955aba2f8f8d4c568c93afff96f24; inspected tracked artifact contents matched the candidate. The supplied verification record reports 517 passing steps with matching start/finish candidate identities. Verification was not rerun. Supplemental authorship evidence lacks dispatch records for several relevant implementation commits, so authorship compliance is not fully verifiable. Requested route: openai/gpt-6-astra/max; effective model identity unverified. Supplied ruleset: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Native read-only isolation was used; no files, git state or external systems were modified. Notes persistence was unavailable. Auto-injected context comprised the AGENTS.md pointer and environment metadata; no session history or bootstrap was inspected.",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_6u67pu4uo7xy7szma6r3zo2zjn",
+    "selectionSha256": "4670de567d7879437ed4a539a4d7b614d3766e9e8b0a55228dce00904b6c6af8",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1",
+      "candidateTree": "98e9803caac955aba2f8f8d4c568c93afff96f24",
+      "referenceSetSha256": "a73f6baa9ca64339f16f3e4f058fe6fee153917a5b3837a7d8482733d8d63eaa",
+      "requestSha256": "d804f5b04a535cf6e23a28aeb72c0a4bcaada6af88e75fe34a5739ce9838f67b"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.154.0",
+        "sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"
+      },
+      "protocolSchemaSha256": "129a2e193d842e7de0c6a73a8a0eb92123c3088696ef9e2a50398fdd15d3ae34",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "66d2bf86205b2107d4e19cfd7ff6bd59694fcd79e838c2888764f33dcba525c8"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e"
+      }
+    },
+    "smokeReceiptSha256": "0fdb69eeafc271f126bb83d06fa71834f7f0d8b987e94ae1a411b63e7f0fcfdb",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 140,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "fe04313cd772fd8f5d53d7b66c4166d51dcc74e3c38d9bc84bd5054f69f1bbbc",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+        "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+        "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+        "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+        "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+        "plugins/pipeline-core/hooks/guard-slicing.mjs",
+        "plugins/pipeline-core/hooks/guard-slicing.test.mjs",
+        "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "plugins/pipeline-core/lib/human-guard-override.test.mjs"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+        "blobOid": "905f8f5bb7cd177834d2e0f039fb35c50ac9a5d4",
+        "sha256": "967e755d67fbc6f5c89827e58ff0f3a5119abf9008fc14a8f029ab56663296b7",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+        "blobOid": "224f4ea7eebf7a7138283b7c6ab5e88036d745bc",
+        "sha256": "089cc25ca34de6aa8b8256410bc08d5b4d4a9a79a8b31ea1f687980b29c2b596",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+        "blobOid": "cc4a339e27cbb8b13ec3c93b1f2c448732a880d5",
+        "sha256": "4cf77ef267649d4a212bd76cff662f8648a2beaff718c7059cae465c10a45878",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+        "blobOid": "60c8726b98d451112670eabc0e1be14271035f98",
+        "sha256": "4e34923efd5e5f143f3566b3277fe03348da31352713f551737aa3afc05b6ff7",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs",
+        "blobOid": "1dc3dd7a9e0770ca58f554675d755af3bf386595",
+        "sha256": "a52b79468c7c8c31f77934abdfe1f10ba2b142d84ea8214ddcf6445f17771aaa",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "blobOid": "1c44f4cc51e20cd4148e5f94f9a1f71b217f7a98",
+        "sha256": "ebc36e006aced73afa51d08d346c00bd893a35e02e7cdf3b6251e8c9cd6e8cde",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+        "blobOid": "142eb71ba38a0a8250cd794889a09432ceb9db57",
+        "sha256": "c44f76cdae49be513e65d253ce7c8956f08129f6b3c263adb1b480ce1a36329e",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-slicing.mjs",
+        "blobOid": "5e75f53eb9f272953d293287fda8d83f58b43c0b",
+        "sha256": "3ba50bc71d03fb7d48ca37d697c532218694deb7a3c8d57c7d14a62bbcb24084",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-slicing.test.mjs",
+        "blobOid": "2b80c88c76b6e95810ad514547f8963ceb886fa4",
+        "sha256": "c13e9c0fd2aec505a7c31eeecf95d3f379f599c01e591436936d8b0d80fc64de",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/human-guard-override.mjs",
+        "blobOid": "4459a35a2a27f6dac09421e6265f1b037bf06d55",
+        "sha256": "c72b9f173af75b99cb201fc06362632450021ae181147aea02cf5a1f2e7fdcac",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+        "blobOid": "b89aac8b63d7d6e76771c8ccc146725af934f3ca",
+        "sha256": "55ccc5cd219f04c651ec61c22079a1fe18720d9d4fda5a786cd66ac0424c4e4f",
+        "mode": "100644"
+      }
+    ]
+  }
+}

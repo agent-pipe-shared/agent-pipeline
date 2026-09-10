@@ -1,0 +1,212 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Independently recomputed ruleset SHA: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Reviewed all nine named current artifacts at commit 8741613004e7ac84e48fa00a0a25e3d08ab682d1, tree 98e9803caac955aba2f8f8d4c568c93afff96f24; scoped Git comparison confirmed matching artifact and tracked-reference bytes. evidence/verify-1789018699972-53ebc75c368d86eb.json records node harness/scripts/verify.mjs, exit 0, identical clean start/finish identities, and 517 successful, non-reused steps. Authorship remains partially unverifiable: scratch/NVA-CANDIDATE-REVIEW-COMPLETION-1/authorship-evidence.json explicitly lacks dispatch records for several production changes. Injected context comprised the AGENTS.md pointer and host/environment instructions. No session history was inspected. Read-only restrictions prevented note persistence; no files, Git state, or external systems were modified.",
+    "findings": [
+      {
+        "gap": "The prepare path accepts T1 requests but unconditionally resolves the critic_normal duty. It never selects critic_high_risk for those requests.",
+        "risk": "With the supplied pipeline.user.yaml, a T1 review requests gpt-5.6-terra at high and can receive a passing T1 receipt, although the configured high-risk route requires gpt-6-astra at max. Architecture, guardrail, or security review can therefore pass below its mandated capability.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/codex-critic-host.mjs:1021-1028",
+        "spec_ref": "CR-09"
+      }
+    ],
+    "deliberately_not_flagged": [
+      "Codex advisory resolves its model and effort from candidate-bound V3 authority, passes them into the App Server turn, rejects mismatched responses, and ignores unbound adapter answers.",
+      "Evidence validation checks sorted unique paths, physical file identity, UTF-8 validity, content digests, size limits, and repository-byte drift before model invocation.",
+      "Current regressions cover commentary preceding a final answer, legacy phases, duplicate finals, invalid phases, missing evidence, stale selections, and demand reuse without another consultation.",
+      "No new third-party dependency or live deployment was introduced by the named artifacts. English matches the supplied project calibration.",
+      "Missing authorship records do not establish orchestrator authorship. Fixture results and requested routing were not treated as proof of live execution or effective model identity."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_6iucflwixsuqkjz6h2xjp3355u",
+    "selectionSha256": "7240de32c2e8d5cf2ee3ff3c6a6c04d7e3d08d466f1ff0774bbbee5b7c1a2472",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1",
+      "candidateTree": "98e9803caac955aba2f8f8d4c568c93afff96f24",
+      "referenceSetSha256": "26508a5e310799499e041138e322b7a71060dff0d0eaba722e89a69acf3934d2",
+      "requestSha256": "31016bf90331d0319b5358993dd03df347c0e54ae14933e5e7f8cd8890148b6c"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.154.0",
+        "sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"
+      },
+      "protocolSchemaSha256": "129a2e193d842e7de0c6a73a8a0eb92123c3088696ef9e2a50398fdd15d3ae34",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "66d2bf86205b2107d4e19cfd7ff6bd59694fcd79e838c2888764f33dcba525c8"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e"
+      }
+    },
+    "smokeReceiptSha256": "a74a1640a60c65b30e0e33e0fe0ba7deeac679891ec6412a5f1edc36578dd9f9",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 140,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "62a5cab149e6aed2113771b8056562d6624b1067fe5c3649331301511b973000",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        "plugins/pipeline-core/lib/advisory-coordinator.test.mjs",
+        "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+        "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+        "plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs",
+        "plugins/pipeline-core/scripts/codex-advisory-app-server-child.mjs",
+        "plugins/pipeline-core/scripts/codex-advisory-app-server.test.mjs",
+        "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+        "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+        "plugins/pipeline-core/skills/advisor-consult/advisor-consult-v3.test.mjs"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": "plugins/pipeline-core/lib/advisory-coordinator.test.mjs",
+        "blobOid": "c3b23c0df95c57a416774bf3b5c0533b08918bc9",
+        "sha256": "f57d7c83b6a0c4cc449b5b1320e0cc50f80ba145d1d3f2e3148ca19fb800c5bf",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+        "blobOid": "9f6c163360c443764ac1ef938854e07cd8b9d81f",
+        "sha256": "b356e0048167dbfc2b8452f133721411037d24176b53a7e702f135de8138ab0a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+        "blobOid": "6b88bdc35bbc746e1d4fbfd95d84d3e4b2d24790",
+        "sha256": "1f155f60817c9d0096064305500c28df9eba2b5d32140fe58c35a9b526b52d1c",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs",
+        "blobOid": "4ac5bc49ecb43d68f18caf7fe27416999a3c8ce7",
+        "sha256": "ca5af64372fd7106b8c83d29681e91d26439aca71ffb39f9e9862c796a74e05a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-advisory-app-server-child.mjs",
+        "blobOid": "22cc1671e1315c89dc10875a237143204d8f21ea",
+        "sha256": "7b782662dd9a35fd51043ca8f047a67dcd3cc3c06f2ece1c8454927666fec0e8",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-advisory-app-server.test.mjs",
+        "blobOid": "baba0cad2c2d8924bddd0eba5960c3f42a5b7b38",
+        "sha256": "decce1d487ac5ca61d7ae8fd5cde347665337c9ce77ea0b7dba1b3769f0b9984",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+        "blobOid": "83303fd4b841d571ea109cecd6fd7c5ee0d356e6",
+        "sha256": "4bdd5487ec60115232cacda2ac53235200c74a2733db10176bf12081500dfcdf",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+        "blobOid": "347ad7db0ef8261f84ec28087464730391e16d5b",
+        "sha256": "0397128244d78e9b44246dbcad7d12eab96489323bbfd5ad66d8f61a9a18bed2",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/advisor-consult/advisor-consult-v3.test.mjs",
+        "blobOid": "c18348c847eeb7940bc4874d0f6b5ac41afbca07",
+        "sha256": "dee9b7e6ff4b82d7d274e2d969d062eef3197de07b0d2d7b2da3886c03d48289",
+        "mode": "100644"
+      }
+    ]
+  }
+}

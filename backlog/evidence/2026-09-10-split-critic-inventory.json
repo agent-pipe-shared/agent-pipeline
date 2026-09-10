@@ -1,0 +1,303 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "findings": [
+      {
+        "gap": "The release addendum presents publishing main as sufficient to execute gh release create. It must require separate authority for the tag/release action; prior branch-push approval does not authorize it.",
+        "risk": "An agent following this procedure can attempt a new remote publication without the action-bound PO decision required by the Operating Model.",
+        "severity": "major",
+        "evidence": "docs/push-release-flow.md:527-542",
+        "spec_ref": "docs/operating-model.md:197-211"
+      },
+      {
+        "gap": "Every source-release fixture substitutes a handwritten reader-checker stub. The passing case contains no reader records, while the stale case manufactures a failed result. The required real release CLI-to-checker integration remains untested.",
+        "risk": "The green regression suite does not establish that the production checker launches successfully or that actual invalid, missing and stale records prevent an output artifact at the release entry point.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs:54-71",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-10-current-candidate-artifact-audit.md:44-51"
+      },
+      {
+        "gap": "The consumer approval commands use $REPO both to locate a Pipeline source checkout and to identify the application repository. A consumer installed through the documented plugin route lacks that plugins/pipeline-core path. Resolve the helper from the installed plugin root and pass the application root separately.",
+        "risk": "The documented setup and approve-all commands fail in a normal consumer checkout; pointing $REPO at the Pipeline source instead targets the wrong repository.",
+        "severity": "minor",
+        "evidence": "SETUP.md:324-339",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-10-current-candidate-artifact-audit.md:23-25"
+      },
+      {
+        "gap": "The German onboarding procedure still prescribes apply --activate. The current CLI has no flat apply command and rejects it; the supported action is apply-portable-seed with the reviewed plan digest.",
+        "risk": "Following the advertised initializer stops with an argument error instead of initializing the consumer.",
+        "severity": "minor",
+        "evidence": "PIPELINE_FLOW.md:498-503",
+        "spec_ref": "SETUP.md:118-127"
+      }
+    ],
+    "deliberately_not_flagged": [
+      "The inventory correctly remains pending with a null Critic receipt digest. This audit cannot supply publication attestation or replace the subsequent reader review.",
+      "Reader binding intentionally proves committed-state equality and evidence presence, not reader identity or judgment quality. Those expressly excluded guarantees are not missing implementation.",
+      "Both compatibility pins match the actual supplied preflight schema bytes. Synthetic reducer tests were not treated as evidence of live host compatibility.",
+      "The seven submitted GG22 regressions invoke the real guard against Git fixtures and exercise the required pathspec distinctions. Existing guard implementation was not reopened for a general review.",
+      "Missing historical dispatch evidence does not establish orchestrator authorship and was not converted into a lifecycle-violation finding."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective provider/model identity is unverified. Closed-bootstrap ruleset: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Reviewed candidate: 8741613004e7ac84e48fa00a0a25e3d08ab682d1, tree 98e9803caac955aba2f8f8d4c568c93afff96f24; named tracked artifacts match those committed bytes. evidence/verify-1789018699972-53ebc75c368d86eb.json records node harness/scripts/verify.mjs on this clean candidate, with all 517 suites passing and no reused results. Verification execution is consistent, subject to the integration-coverage finding. scratch/NVA-CANDIDATE-REVIEW-COMPLETION-1/inventory-authorship-evidence.json explicitly lacks a supplied dispatch record and marks effective identity unverified; its Git metadata cannot establish production authorship. Observed context comprised the supplied AGENTS pointer, environment and host instructions; no session history was inspected. Persistence was unavailable under the no-write contract. Tests were inspected, not rerun.",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_ydqy25u3ni233334osezhseoxy",
+    "selectionSha256": "02ef4aa3e3e72396e4500ef014c5257070d25d08542fea5e341480cff9052795",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1",
+      "candidateTree": "98e9803caac955aba2f8f8d4c568c93afff96f24",
+      "referenceSetSha256": "a4fa2c5522270d7a0734826791f781349db93ad9369cd030fce56caa37a13578",
+      "requestSha256": "b306615db364f0ee8b686517316962b88e10fb9dbc9c2cc3bed7f27438366dcf"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.154.0",
+        "sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"
+      },
+      "protocolSchemaSha256": "129a2e193d842e7de0c6a73a8a0eb92123c3088696ef9e2a50398fdd15d3ae34",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "66d2bf86205b2107d4e19cfd7ff6bd59694fcd79e838c2888764f33dcba525c8"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e"
+      }
+    },
+    "smokeReceiptSha256": "689f085e312880c692a1c53198427ae52fa13e184a584ceaeb6a1a3888c6be24",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 140,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "a32576698ae6f30d951771e5409522d2be5045eaac26401403f264d42d30c81f",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        "PIPELINE_FLOW.md",
+        "README.md",
+        "SETUP.md",
+        "docs/operating-model.md",
+        "docs/product-capability-inventory.json",
+        "docs/push-release-flow.md",
+        "harness/reader-review-protocol.md",
+        "harness/scripts/check-consumer-safe-paths.mjs",
+        "harness/scripts/check-doc-contracts.test.mjs",
+        "harness/scripts/check-doc-reader-binding.mjs",
+        "harness/scripts/check-product-capability-inventory.mjs",
+        "harness/scripts/check-product-capability-inventory.test.mjs",
+        "plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json",
+        "plugins/pipeline-core/docs/operating-model.md",
+        "plugins/pipeline-core/docs/push-release-flow.md",
+        "plugins/pipeline-core/hooks/guard-git.test.mjs",
+        "plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs",
+        "plugins/pipeline-core/scripts/release-preflight-cli.mjs",
+        "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": "PIPELINE_FLOW.md",
+        "blobOid": "59880d3a28f626a826d278fec7b3f4c98317ff45",
+        "sha256": "066f028df00562401fe4c066839425efe4d3098c9362251516e681f3af56757c",
+        "mode": "100644"
+      },
+      {
+        "path": "README.md",
+        "blobOid": "d9f4d4f8a431289f93f0e4527230db66b56edef7",
+        "sha256": "61ffeec48b9b40a7e7d7a7993fefd972d9a49be85a31da43b42cc684a4977c01",
+        "mode": "100644"
+      },
+      {
+        "path": "SETUP.md",
+        "blobOid": "343ffdfb5d174bf659f9ddf67a7c87b1e2842ef6",
+        "sha256": "346218589f60984811d18a1b8773a53d528c5ff246cec73d6028c27172cfa558",
+        "mode": "100644"
+      },
+      {
+        "path": "docs/operating-model.md",
+        "blobOid": "679d79c38abd3fa07e6e36e93cb5530da9046682",
+        "sha256": "d4bff6d696ad56402e4f2b34964e0940ce11801f78eb91bcb5b54b51e81d076d",
+        "mode": "100644"
+      },
+      {
+        "path": "docs/product-capability-inventory.json",
+        "blobOid": "46741df3d922903ae4f99cd4ba756b8fd3902502",
+        "sha256": "66c695a7be97ec6d513b6e546116a18fecbe124738f0e4e62f234c01a30e781d",
+        "mode": "100644"
+      },
+      {
+        "path": "docs/push-release-flow.md",
+        "blobOid": "8e9977306206ab5fbf0f1387a7dd352e776c4771",
+        "sha256": "d9c4ea9bcc19b3b9e9744b3dc6cfc7e32e1892e3ae5581456bf0614c88952d1d",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/reader-review-protocol.md",
+        "blobOid": "19db01e40b6e3cad1bb17382ba222159e86c7c39",
+        "sha256": "9347e59408878daedf01f62b2ae1381d182d0bbdcaee47328dc10a8e9d8fad17",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-consumer-safe-paths.mjs",
+        "blobOid": "009247bf3583c11629c31f099be4dd53cbba0b9a",
+        "sha256": "9d42052b22990241aa66ce3e9566365ba2e36d788c65caa8c8a29c9df50c28e7",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-doc-contracts.test.mjs",
+        "blobOid": "119503b96e052cf646c17f1e78cdcee0174075bb",
+        "sha256": "be420def330ca3171ccba355fdcb7fa51d759e3d4ae44837f1073dd8cc559eab",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-doc-reader-binding.mjs",
+        "blobOid": "45d5010d2b90e6cf577bd592d365f6502e3f55d4",
+        "sha256": "061c73c51dd84bfe62319a26547a49a3fac085c142bdbe14e9cc0dfcbcbe9031",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-product-capability-inventory.mjs",
+        "blobOid": "a5bd3766401e3596c4c295ecffcd67e4b3933f18",
+        "sha256": "7143cd4788ed35ab8f7e3a5043396c8f920b5fc1f4768ad9d19819428afeb795",
+        "mode": "100644"
+      },
+      {
+        "path": "harness/scripts/check-product-capability-inventory.test.mjs",
+        "blobOid": "4205e405b48d19a1fd70d8b7b0ae39d64ca1dc2d",
+        "sha256": "27f231279c90c5610fc49db945f197632b2cad9bff3f42dd5facc26530fd22b4",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json",
+        "blobOid": "a7e3c03185425b02de61beab3a7480a9b8fe4b4c",
+        "sha256": "943588d9e951d86efe03ddc81783ee328d9735dd56d832639c399105b7d4c40c",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/docs/operating-model.md",
+        "blobOid": "679d79c38abd3fa07e6e36e93cb5530da9046682",
+        "sha256": "d4bff6d696ad56402e4f2b34964e0940ce11801f78eb91bcb5b54b51e81d076d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/docs/push-release-flow.md",
+        "blobOid": "8e9977306206ab5fbf0f1387a7dd352e776c4771",
+        "sha256": "d9c4ea9bcc19b3b9e9744b3dc6cfc7e32e1892e3ae5581456bf0614c88952d1d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-git.test.mjs",
+        "blobOid": "92de5bb85170522f858f621e2337626ec49563a5",
+        "sha256": "6a1073cc7609f6222e53f7125c23d629bace95352065fbe66987a84c033d0bdd",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs",
+        "blobOid": "80dd00e7ae04e3eed60ee7f816717d92705035e3",
+        "sha256": "b78071bae98a8403ceafa1fb37314c776f5b977c5202ab67d08abc8174bc5318",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/release-preflight-cli.mjs",
+        "blobOid": "4435fff1c1256ae50e7e8689f02b84018f3ee349",
+        "sha256": "26fa5212f40ca5af8c07ed81936ffe04868aa44ee93e33e636ae13dc5cce2e28",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
+        "blobOid": "7b90692521a19beb29870572fc8614a2f4b0bbfb",
+        "sha256": "8fe5d308c88661d4d924aba195f613581fc29d686790b6476c88003e33f55c25",
+        "mode": "100644"
+      }
+    ]
+  }
+}

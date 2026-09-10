@@ -1,0 +1,186 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Ruleset: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Full review bound to commit 8741613004e7ac84e48fa00a0a25e3d08ab682d1 and tree 98e9803caac955aba2f8f8d4c568c93afff96f24; all 26 tracked artifact/reference files matched that candidate. evidence/verify-1789018699972-53ebc75c368d86eb.json records node harness/scripts/verify.mjs, identical clean start/finish identities, 517 non-reused passing steps, and exitCode 0. Verification execution is consistent. Fresh-context authorship is not fully verifiable: scratch/NVA-CANDIDATE-REVIEW-COMPLETION-1/authorship-evidence.json lacks dispatch records for the relevant changes. Commit 175600eae45f4eca39b969dbc162827dde248d24 carries a Goldfish Dispatch trailer; Commit-Act: orchestrator trailers establish the commit actor, not the diff author. Auto-injected context consisted of the AGENTS.md pointer and environment metadata, without session history. Review remained read-only; tests were not rerun and report persistence was unavailable.",
+    "findings": [],
+    "deliberately_not_flagged": [
+      "Complete named artifacts reviewed: plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs; plugins/pipeline-core/lib/runner-profile-migration-v2.mjs; plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs; plugins/pipeline-core/lib/runner-profiles-v3.test.mjs; plugins/pipeline-core/lib/runtime-projection-v3.test.mjs; plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs.",
+      "Spec fidelity and test integrity: routing assertions match pipeline.user.yaml, .claude/pipeline.yaml, plugins/pipeline-core/config/runner-profiles-v3.json, and plugins/pipeline-core/lib/runner-profiles-v3.mjs. Replacing fallback-order reversal with mutation of the sole remaining fallback preserves a meaningful rejection test. Historical V2 Fable fixtures do not establish active V3 routing authority.",
+      "Reachability, compatibility and failure paths: plugins/pipeline-core/lib/runner-profile-migration-v3.mjs and plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs establish the isolated legacy-classification bridge, current V3 routing, authenticated application, rollback, and no-activation semantics for unchanged plans. plugins/pipeline-core/lib/runtime-projection-v3.mjs supports the reviewed projection assertions.",
+      "Concurrency and security: the capability tests exercise real subprocess probes, synchronized descriptor interleavings, foreign-state preservation, failure statuses and cleanup snapshots against plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs. These are fixture executions, without claims of completed live onboarding.",
+      "Bootstrap guidance: the assertions agree with plugins/pipeline-core/skills/pipeline-start/SKILL.md on preserving original material, distinguishing recovered summaries and setup answers, and following onboarding's returned action before authority orientation.",
+      "Scope, guardrails, deferred risks, dependencies and language: assessed against specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md and governance/examples/guidelines/architecture-guidelines.md. The spec supplies rollback and compatibility instructions; the reviewed additions introduce no third-party dependency or live deployment action.",
+      "Policy references inspected: governance/examples/policies/checklist.md; governance/examples/policies/deploy-policy.yaml; governance/examples/policies/deploy-risks.example.md; governance/examples/policies/license-allowlist.json; governance/examples/policies/live-deploy-lock.md; governance/examples/policies/policy-lock.example.yaml; governance/examples/policies/semgrep/dependency-direction.yml; governance/examples/policies/semgrep/example-rule.yml; governance/examples/policies/third-party-licenses.example.json. No applicable violation established.",
+      "Review contracts inspected: plugins/pipeline-core/roles/critic.md, plugins/pipeline-core/templates/prompts/critic-review.md, and plugins/pipeline-core/scripts/critic-verdict.schema.json. Hunt categories 1–11 were covered; authorship uncertainty is disclosed separately rather than treated as proof of orchestrator-written production changes."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": true
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_m5r7nhzd722hl4rfb2zl6tz7ow",
+    "selectionSha256": "8bf316adc657318cc8d7fa044c6769441484eeed04485513ab035fd33d8095cf",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1",
+      "candidateTree": "98e9803caac955aba2f8f8d4c568c93afff96f24",
+      "referenceSetSha256": "96fc626be8374a82b5bddf11bae537e32ae2044971a7f2f33ac0bea513096215",
+      "requestSha256": "c39857bf4ad002710fd748562bfb2b2b6b752f057193d61b6c8b787b5887d2f6"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.154.0",
+        "sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"
+      },
+      "protocolSchemaSha256": "129a2e193d842e7de0c6a73a8a0eb92123c3088696ef9e2a50398fdd15d3ae34",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "66d2bf86205b2107d4e19cfd7ff6bd59694fcd79e838c2888764f33dcba525c8"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e"
+      }
+    },
+    "smokeReceiptSha256": "c402f24062d1e34a038067c4906e7452ffd739c579e56461786f76fbc7f2a250",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 140,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "d20005ca580c8e74e303fbffa6b1ec90d6ded13f87b43812ee1c7f833b67a56f",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        "plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs",
+        "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+        "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+        "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs",
+        "plugins/pipeline-core/lib/runtime-projection-v3.test.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": "plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs",
+        "blobOid": "d368ab5fd1763292553f2337f8b588873c018079",
+        "sha256": "15f33b34ad82fdc097ad22a0d89f38fab4471e04307e5449a47ec674364c0e80",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+        "blobOid": "b0c66dd772656a791d2a6509970dd54e3e3649a8",
+        "sha256": "5d17f2ac722f367935a17688842d0f08633cadfe816eadae6c8fe1d70d29652a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+        "blobOid": "d252660113e0630ab42fb4a7cde6fcd9bd98ab15",
+        "sha256": "b98af2f9b5b95f4c890bdb3d4b1f7fc872d5c252e214ecce3b17b13521bdcb1d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs",
+        "blobOid": "2fb9b7dfe8cca17545bcc93ab20abf7342229706",
+        "sha256": "dc686bf96049dc3f22b60f646f7315e7c41d807cd246da7659fcab08c686170d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/lib/runtime-projection-v3.test.mjs",
+        "blobOid": "ab0689d2cd9eb3149b6bd6e79965de307c60872f",
+        "sha256": "32669e3adf1bf4e7c4b7ddf5c19b1c7cec3421ed1c56fa41a976dd460cac813a",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs",
+        "blobOid": "8176db7e3478757909822b37e4695bef5db52603",
+        "sha256": "f5706edcb647db1df141f916aece51ad08e8e63404cf26a3660c99101a26f6ae",
+        "mode": "100644"
+      }
+    ]
+  }
+}

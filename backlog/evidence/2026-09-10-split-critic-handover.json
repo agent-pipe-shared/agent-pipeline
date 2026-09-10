@@ -1,0 +1,186 @@
+{
+  "schema": "pipeline.codex-native-critic-host-result.v1",
+  "status": "reviewed",
+  "verdict": {
+    "trajectory_evidence": "Requested route: openai / gpt-6-astra / max; effective model identity: unknown. Bootstrap ruleset: 4c9f2af31d5de30eddfd705664ca7e6cde38706e52a76805b19e2068f98c5d3c. Full review bound to commit 8741613004e7ac84e48fa00a0a25e3d08ab682d1, tree 98e9803caac955aba2f8f8d4c568c93afff96f24; all four artifacts and supplied tracked references match that candidate. evidence/verify-1789018699972-53ebc75c368d86eb.json records the exact clean candidate, node harness/scripts/verify.mjs, exit 0, and 517 passing, non-reused suites, including both relevant test suites. Authorship remains partially unverifiable: scratch/NVA-CANDIDATE-REVIEW-COMPLETION-1/authorship-evidence.json marks the original native-slicing and handover CLI commits suppliedDispatchRecord:false. Supplemental probes used memory-only doubles, not live host execution. Injected context comprised the AGENTS pointer and environment instructions; no session history was inspected. Read-only isolation made report persistence unavailable. No filesystem writes, network access, or delegation occurred.",
+    "findings": [
+      {
+        "gap": "The governance registry write bypasses physical path containment. registerArchiveInDocGovernance follows an existing registry-file or governance-directory symlink without checking its resolved destination.",
+        "risk": "A valid, acknowledged rotation can overwrite a governance registry outside the repository. The archive and handover containment checks do not protect this additional write.",
+        "severity": "major",
+        "evidence": "plugins/pipeline-core/scripts/handover-rotate.mjs:501-527",
+        "spec_ref": "specs/sprint-nova-epic/design/2026-09-07-local-candidate-delta.md:148-155 — preserve path containment."
+      },
+      {
+        "gap": "Pending-plan identity depends on each object's property insertion order because entries are hashed through JSON.stringify without canonicalizing their keys.",
+        "risk": "Resending the same three pending steps as {status, step} after {step, status} emits the advisory again. A memory-only probe confirmed both calls return due:true despite identical pending work.",
+        "severity": "minor",
+        "evidence": "plugins/pipeline-core/hooks/native-slicing.mjs:153-159",
+        "spec_ref": "docs/adr/0080-parallel-dispatch-slicing-enforcement.md:283-285 — once per distinct pending set."
+      }
+    ],
+    "deliberately_not_flagged": [
+      "Examined the complete four named current artifacts for spec fidelity, scope, reachability, trajectory, test integrity, failure paths, guardrails, security, deferred risks, dependencies, and language.",
+      "The inspection modes preserve filesystem state: size checks measure configured raw bytes, dry runs validate current section acknowledgements, and malformed or conflicting CLI arguments refuse before mutation. The regression suite exercises the actual CLI and snapshots private markers and governance data.",
+      "Handover traversal, external handover symlinks, archive-directory escapes, and dangling archive symlinks have explicit containment checks. Dry-run is a read-only planning contract; omission of apply-time archive/governance validation is not separately flagged.",
+      "Native advisories retain threshold three, lifecycle overlap reset, bounded hashed bookkeeping, and no permission decision or child launch. Array reordering, explanation edits, and completed-step edits are covered by deduplication tests.",
+      "Native child-session targeting was examined, but the supplied evidence does not establish which child events reach these adapters; no live child-delivery defect is asserted. ADR-0080 already distinguishes fixture behavior from live delivery.",
+      "The two archive mechanisms remain distinct. No new third-party dependency, credential, external activation, or language violation was identified; English matches the supplied calibration.",
+      "Missing original dispatch records do not establish orchestrator authorship; this remains a trajectory evidence limitation."
+    ],
+    "trajectory_verdict": "not verifiable",
+    "briefing_violations": [],
+    "pass": false
+  },
+  "receipt": {
+    "schema": "pipeline.codex-native-critic-execution-receipt.v1",
+    "status": "reviewed",
+    "selectionId": "cncs_2455url2s56hy5mjxazc6cldcr",
+    "selectionSha256": "a2ced7639b3381fb6d871b466e5cbd4411d0ba836f2a16e9467f20a5dc8b6920",
+    "repoFingerprint": "c815e07491465550d90f3aea6102d3e00b5fca1c21c3370d4fc38cbd70663f80",
+    "dispatch": {
+      "queueRevision": 0,
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1",
+      "candidateTree": "98e9803caac955aba2f8f8d4c568c93afff96f24",
+      "referenceSetSha256": "3de7ee0b27c80901b5f4bb28487237f703265036a8bfc45544b81674b0e4690e",
+      "requestSha256": "6644326c73653e5039bed1dd8565e9f9fed938f81bdda1041b66ef4977c91948"
+    },
+    "route": {
+      "dutyId": "critic_high_risk",
+      "runner": "codex",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "sourceSha256": "86301ccc0de7d144d83d490d4c59f12a4e42bdb75d1160ae614ea15417df415c",
+      "candidateCommit": "8741613004e7ac84e48fa00a0a25e3d08ab682d1"
+    },
+    "tuple": {
+      "cli": {
+        "version": "codex-cli 0.154.0",
+        "sha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022"
+      },
+      "protocolSchemaSha256": "129a2e193d842e7de0c6a73a8a0eb92123c3088696ef9e2a50398fdd15d3ae34",
+      "host": {
+        "platformClass": "linux-wsl2",
+        "kernel": {
+          "sysname": "Linux",
+          "release": "6.18.33.2-microsoft-standard-WSL2",
+          "machine": "x64"
+        },
+        "filesystemClass": "wsl2-native",
+        "bootIdSha256": "66d2bf86205b2107d4e19cfd7ff6bd59694fcd79e838c2888764f33dcba525c8"
+      },
+      "policy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e"
+      }
+    },
+    "smokeReceiptSha256": "1cd63e322d8c033ea3f0dd01f5082f50413cd2bdba5f8029320d1da47063df2a",
+    "requestedPolicy": {
+      "threadSandbox": "read-only",
+      "turn": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    },
+    "observed": {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "effort": "max",
+      "initialized": true,
+      "threadStarted": true,
+      "turnStarted": true,
+      "turnCompleted": true,
+      "stdinEnded": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanup": "complete",
+      "writeAttemptKind": null,
+      "requestedNativePolicy": {
+        "threadSandbox": "read-only",
+        "turn": {
+          "type": "readOnly",
+          "networkAccess": false
+        }
+      },
+      "observedThreadSandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      },
+      "observedThreadReasoningEffort": "max",
+      "requestedToolReduction": {
+        "featureConfigSha256": "6855b4d25fb704f1e9406e19ab6eaf120c73b75abbdac6cd3ca03c09004ff056",
+        "mcpReductionCount": 1,
+        "mcpReductionConfigSha256": "f165c6fa4b3cc6026f75956e81b31aef1a7a719a9009fcb4fad631c85a7e9aa1"
+      },
+      "toolSurface": {
+        "configSha256": "abe3e6db3a12a72f61d77b9c7122277bb2fd15639c7528edb940469a8bd4329b",
+        "observationSha256": "1957e83376a8057713ca272c7d4886d2e1eca04965cc16d5bed5549a547a674e",
+        "mcpReductionCount": 1,
+        "featureSnapshot": {
+          "pageCount": 2,
+          "dataCount": 140,
+          "digest": "f7efc4af9368ee21f10867a9bfb34bf1d32dd2b0705f7623c196b60f51af1c2f"
+        },
+        "mcpSnapshot": {
+          "pageCount": 1,
+          "dataCount": 1,
+          "digest": "321ac9740eba8227880ac9cd8416ea0efe765db09ad754eebdad3b85fc053ee4"
+        },
+        "snapshotLimitation": "pre-turn thread configuration snapshot; not atomic with turn start"
+      }
+    },
+    "terminal": {
+      "childStarted": true,
+      "exitCode": 0,
+      "signal": null,
+      "cleanupStatus": "complete"
+    },
+    "verdictSha256": "c395c3b3e43b8c3cbf77f0af6d5dea5b692a320738a205c3b81097216c14e8eb",
+    "assurance": {
+      "class": "native-model-tool-read-only",
+      "literal": "native model-tool read-only; trusted Codex runtime/auth/cache outside boundary"
+    },
+    "reviewScope": {
+      "kind": "current-artifacts",
+      "paths": [
+        "plugins/pipeline-core/hooks/native-slicing.mjs",
+        "plugins/pipeline-core/scripts/handover-rotate.mjs",
+        "plugins/pipeline-core/scripts/handover-rotate.test.mjs",
+        "plugins/pipeline-core/skills/close-block/SKILL.md"
+      ]
+    },
+    "sourceCoverage": [
+      {
+        "path": "plugins/pipeline-core/hooks/native-slicing.mjs",
+        "blobOid": "f2b5f688a01053150caeb59699402621ae9ba1d6",
+        "sha256": "722854068be71d1bd77592dfbf86328a1104a967cfdee5a4bd4873234ee081be",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/handover-rotate.mjs",
+        "blobOid": "075b866e2bace613f0a2989f67e740b9f8e6ad86",
+        "sha256": "a3929e8976920b6d3f2e27307c9a0e6e965859bc5df561d29864dce05238250f",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/handover-rotate.test.mjs",
+        "blobOid": "d605b1fe825d3f57d708c9f19ec6f6b5e97ae90a",
+        "sha256": "c2e72bf4317f286f9a221990d8b04edb0a4ee28a083b57af9cbf5b0666bc163d",
+        "mode": "100644"
+      },
+      {
+        "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+        "blobOid": "9f42cb62d4aaec21bd6ec014c3a17e936b0666fc",
+        "sha256": "7ce35644b1ed85378681165aeb02aa84371ef206911edcb532795a6d5db614b3",
+        "mode": "100644"
+      }
+    ]
+  }
+}
