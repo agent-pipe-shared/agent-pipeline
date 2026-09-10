@@ -8,6 +8,27 @@ The release target is 0.6.2; the local candidate keeps the 0.6.1 base version
 with a distinct Codex build suffix. Invoking source from this checkout does
 not replace the installed plugin or publish the candidate.
 
+## Repair checkpoint — 2026-09-10
+
+The isolated repair checkout is
+`branch/detached/candidate-review-fixes-8741613004e7` under the Nova source
+root. Its tested commit was `8f68ec7cc0f3f12738d7190e123a00ee893f251c`,
+tree `91a36092d278ab5e342d10145586eaaf3cfd8e53`.
+Full Verify completed with 516/517 passing, zero reused results and security
+exit 0. Its receipt is in the main checkout at
+`evidence/verify-1789023969047-0b2e12acd8e3216a.json`.
+This is a repair checkpoint, not the final candidate's gate receipt.
+
+The remaining failure is `codex-isolated-critic-protected-preimage-tests`:
+the repaired Critic host differs from its protected digest. An independent
+mechanical audit found exactly this one mismatch among all nine entries;
+the prepared substitution remains pending explicit PO action authorization.
+The final inventory review also needs the one-time round-cap decision in
+the [PO queue](../../../backlog/evidence/2026-09-06-po-decision-queue.md).
+Neither a completed review process nor this mostly passing Verify run is
+a release approval. Final inventory attestation, both reader stages, build
+identity and the final bound gates remain pending.
+
 ## Test the actual onboarding entry
 
 Run these commands from the eventual frozen candidate checkout. Replace

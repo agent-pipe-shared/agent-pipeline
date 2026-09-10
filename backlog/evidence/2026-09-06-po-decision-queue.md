@@ -1,5 +1,35 @@
 # PO decision queue — collected 2026-09-06
 
+## Concrete candidate completion decisions — 2026-09-10
+
+The clean repaired candidate `8f68ec7cc0f3f12738d7190e123a00ee893f251c`
+completed full Verify with 516/517 passing and security exit 0. Receipt:
+`evidence/verify-1789023969047-0b2e12acd8e3216a.json` in the main checkout.
+The sole failing suite is `codex-isolated-critic-protected-preimage-tests`.
+An independent mechanical audit checked all nine protected hashes and found
+exactly one mismatch, caused by the Critic host repair in
+`7ec7311314ef01ca40da86f9de8ab00274f171ee`.
+
+- **Decision requested, pending:** authorize separate mechanical transcription
+  of exactly the `plugins/pipeline-core/scripts/codex-critic-host.mjs` entry in
+  `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json`:
+  `4bdd5487ec60115232cacda2ac53235200c74a2733db10176bf12081500dfcdf`
+  becomes `e4511f1ee520b200de2e011ad8df641726accf32b10e38dbb6e4b8237997a5fe`.
+  No other pin or test changes are included. QG-16 requires explicit action
+  authorization and separation from the source repair's authorship.
+- **Frozen proposal:** main-checkout
+  `scratch/NVA-CRITIC-PIN-PROPOSAL-1/proposal.json`, with exact before/after
+  files and all nine computed hashes. Proposed inventory byte SHA-256:
+  `aafc9bfcb5650324c5b29c522f791d7decfe622c43d5f385db929f16232d43d5`.
+  This mechanical audit does not supply a correctness verdict.
+- **Second decision requested, pending:** the one-time inventory review
+  exception detailed below, after deterministic gates pass. Neither decision
+  is inferred from the instruction to prepare the local candidate.
+- **Next execution:** after authorization, transcribe the exact pin, run the
+  protected test and full Verify on the resulting bound candidate, then
+  complete the authorized review and required reader closure. No push,
+  release or installed plugin replacement is included.
+
 ## Completed split review batch and inventory decision — 2026-09-10
 
 The external five-job batch completed on candidate
