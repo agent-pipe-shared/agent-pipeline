@@ -43,3 +43,17 @@ This item records the follow-up without changing the current candidate's role
 or launcher architecture. The 0.6.2 hardening fix only adds bounded filters and
 timeouts to affected test harnesses so a local infrastructure stall becomes
 visible promptly.
+
+## Greenfield 0.6.2 evidence — 2026-09-11
+
+The Claude greenfield analysis records a malformed Critic packet that reached
+the expensive path, produced zero model turns, ran for 30 seconds and consumed
+50,629 tokens. A separate Nova candidate-review batch also rejected incomplete
+verdict/assurance fields at packet preparation once the normal session Critic
+route was restored. Long successful model reviews are not evidence for this
+defect; the target is specifically invalid input reaching any launcher.
+
+This sharpens the acceptance test without changing the planned sprint: every
+role/runner fixture with an invalid required field must terminate during
+`PREPARE`, within the local five-second bound, and prove zero launcher calls.
+See `backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.

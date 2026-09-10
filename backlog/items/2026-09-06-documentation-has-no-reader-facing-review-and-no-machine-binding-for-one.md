@@ -129,3 +129,18 @@ the usual honest status tag; it is a candidate, not a commitment.
 - **Rationale:** review inside the documentation block permits normal rework; release preflight checks only a record bound to the reviewed documentation state. Approval does not claim that the binding exists yet.
 - **Assignment (if accepted):** Nova B documentation block; prerequisite: `pipeline.complete-adr-governs-coverage-before-reader-review-binding`. Preserve the reader review's blind phase and invalidate its binding when covered documentation changes.
 - **Date:** 2026-09-07
+
+## Greenfield 0.6.2 evidence — 2026-09-11
+
+The three runner analyses showed that a correct capability inventory is not
+enough to explain why someone should try the product. The first tester-facing
+draft led with audit and guard machinery while underweighting the concrete
+workflow: SDLC phases, specs, model-bound roles, tests, documentation and
+signed approvals. Reordering the draft required the same reader-level judgment
+this item specifies; no structural documentation check identified the problem.
+
+This reinforces the accepted Nova B placement and the existing split: run the
+expensive Lektor inside the documentation block, then make release verification
+check only the binding to the reviewed document state. It creates no new PO
+decision. See
+`backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.

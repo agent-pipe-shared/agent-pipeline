@@ -159,3 +159,17 @@ or one particular renderer is the answer.
   discoverability but does not invalidate the accepted 0.6.0 happy-path
   candidate.
 - **Date:** 2026-08-30
+
+## Greenfield 0.6.2 evidence — 2026-09-11
+
+The new reports reinforce both sides of this item. Claude observed that signed
+delivery and the hash-chained audit route worked. Codex found that ignored
+Verify and dispatch artifacts were difficult to discover and could not serve
+as durable repository evidence by themselves. Copying raw session artifacts
+into Git would expose local paths and operational detail, so it is not the
+answer.
+
+The acceptance criteria remain correct: the overview must explain the
+versioned/local split, candidate binding and absence behavior while keeping
+private payloads local. No duplicate evidence-index item is needed. See
+`backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.

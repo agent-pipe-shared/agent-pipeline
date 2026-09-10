@@ -146,3 +146,13 @@ Not designed here. The two halves want different answers:
   documented as supported. Until then the mitigation is one line: consume each
   proof before the next `sign-intent` runs.
 - **Date:** 2026-08-28
+
+## Greenfield 0.6.2 evidence — 2026-09-11
+
+The Claude greenfield run required two separate signature ceremonies in one
+delivery workflow. It did not establish a new failure mode, but it confirms
+that the back-to-back case in this item is a normal happy-path workload rather
+than an artificial concurrency scenario. The existing Nightwing assignment,
+per-intent artifact direction and consumer-level acceptance test remain the
+right follow-up; no second item is needed. See
+`backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.
