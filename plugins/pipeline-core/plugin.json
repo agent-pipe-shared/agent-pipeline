@@ -1,5 +1,5 @@
 {
   "name": "agent-pipeline-core",
-  "version": "0.6.1+antigravity.20260909160547.a2ce12c",
+  "version": "0.6.2+antigravity.20260910172833.23d7ba3",
   "description": "Agent-Pipeline core enforcement, hooks, and lifecycle runner for Antigravity."
 }
