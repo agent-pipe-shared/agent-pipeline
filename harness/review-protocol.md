@@ -73,6 +73,48 @@ Canonical trigger wording (word-identical in this file's §2.1, `roles/critic.md
 **Why:** Two residual contamination channels are structurally bounded: (a) A/G/S uses the selected runner's native isolation where usable, otherwise the standing functional-equivalent lane explicitly discloses its non-OS-isolated limit; (b) Elephant framing → the Critic builds its input itself; the Elephant passes paths, never justifications.
 **Check:** The dispatch text contains no prose about the solution; the Critic's bootstrap confirmation (`harness/session-bootstrap.md` §6.3); the trajectory section proves the Critic actually pulled diff/spec/evidence itself.
 
+**Correction ranges containing retained prior results:** a prior verdict remains
+forbidden input when it was committed between the review base and head. Before
+dispatch, the Coordinator binds the exact base/head commits and trees, the
+complete enumerated intervening commit list and parent relationships, and the
+package's source paths. It also classifies each changed path in that package as
+review source or a coordinator-only report artifact. Tests, documentation,
+configuration and source-relevant machine evidence remain review source,
+regardless of directory or extension.
+
+An exclusion is admissible only for a positively identified coordinator-only
+report: supply its exact repository path, its role (retained prior result or
+finding-disposition record), and the committed blob identity, SHA-256 and mode
+of every version touched by the enumerated commits, including an explicit
+absence at an addition/deletion boundary. The Coordinator establishes that the
+artifact contains no source or operative contract before dispatch. These are
+bare exclusion bindings, not readable evidence references: do not include the
+report body, findings, verdict label, or a summary. Never exclude `evidence/`,
+JSON, or another directory/file class wholesale. Mixed source/verdict content,
+an unbound version, or an ambiguous role rejects the input preparation; neither
+silently carve out source nor hand the mixed artifact to the fresh reviewer.
+
+The Critic verifies the commit enumeration and complete path partition using
+metadata-only Git observations before requesting any patch body. Include
+per-commit changes as well as the endpoint comparison so an intermediate edit
+cannot disappear from the accounting. Check the bound blob digests without
+emitting excluded bytes. Then reconstruct the actual source diff from those
+Git objects, with external diff/text conversion disabled and exact literal
+source pathspecs. Preserve additions, deletions, both old and new rename paths,
+binary changes and mode changes; a list of files that exist only at head or a
+Coordinator-written replacement patch is insufficient. Any unexplained changed
+path or incomplete binding stops substantive review under the reference-only
+boundary. Do not run an unrestricted patch-producing `git diff` or `git show`
+that would expose an excluded report; unchanged direct contracts remain context
+only under the existing correction-review rule.
+
+This is a methodological input boundary, not an OS or tool-enforced filter.
+If the selected transport cannot present this bounded input without supplying
+prior-result bytes, stop rather than claiming filtering or widening the review.
+Prior-result reconciliation, receipt lineage and finding dispositions remain
+Coordinator-side. The exclusions do not alter PASS criteria, review budgets,
+coverage obligations, or the exact consecutive correction range.
+
 ### 2.3 Isolation levels
 
 | Level | Mechanics | When |

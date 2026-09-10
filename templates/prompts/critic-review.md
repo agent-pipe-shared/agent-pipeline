@@ -120,6 +120,14 @@ USAGE (Elephant)
    remain subject to execution/cost/course budgets. The Coordinator reconciles
    exact ranges and retains receipt/source coverage lineage and finding
    dispositions. Do not request or read prior verdict prose or findings.
+   If the range itself contains retained prior results, prepare the exact
+   source/report partition under `harness/review-protocol.md` §2.2 before
+   dispatch. Bind base/head/trees, every intervening commit and parent, package
+   source paths, and each coordinator-only report's exact path/role plus every
+   touched version's blob/SHA-256/mode or absence. No blanket evidence/JSON
+   exclusions; mixed source/verdict artifacts reject preparation. Supply bare
+   bindings only, never report bodies or conclusions. This is methodology,
+   not an OS-filtering claim; an incompatible transport stops.
 5. A native-isolation failure is never retried in the same lane. The Coordinator
    may use exactly one standing functional-equivalent Critic with frozen
    bindings and `mayDelegate=false`; a second/unproven failure, inability to
@@ -205,10 +213,35 @@ review, or issue a substantive pass/fail judgment.
   "a1b2c3d, e4f5g6h, i7j8k9l"}}; construct the diff yourself, e.g. `git diff
   {{FIRST_SHA}}^..{{LAST_SHA}}` after confirming that range covers EXACTLY the
   enumerated SHAs (or `git show` per SHA), and read the touched files as needed.
+  This unrestricted example applies only when no forbidden report bytes occur
+  in the range; otherwise use the correction-input procedure below first.
   **Uncommitted review target:** the Elephant archives
   the exact reviewed diff as an evidence artifact BEFORE dispatch (a `git diff`
   snapshot stored with the review evidence) so the review stays reproducible
   and A/B-testable — snapshot path: {{REVIEWED_DIFF_SNAPSHOT_PATH}}.
+- Correction input bindings (when retained prior results occur in the range):
+  {{CORRECTION_INPUT_BINDINGS_PATH_OR_NOT_APPLICABLE}}. This metadata reference
+  binds the exact base/head commits and trees, complete intervening commit list
+  and parent relationships, package source paths, and the exact coordinator-only
+  report exclusions. Each exclusion names its path, role (retained prior result
+  or finding-disposition record), and every touched version's blob identity,
+  SHA-256 and mode, with explicit absence at addition/deletion boundaries. It
+  contains no prior verdict label, report body, finding or summary. Exclusion
+  entries are not permission to read those artifacts.
+  First use metadata-only Git observations to reconcile every enumerated
+  commit's changes and the endpoint comparison with the source/report partition;
+  verify excluded blob digests without emitting their bytes. Then reconstruct
+  the actual source diff yourself from the bound Git objects with external
+  diff/text conversion disabled and exact literal source pathspecs. Preserve
+  additions, deletions, both rename paths, binary changes and mode changes; do
+  not substitute a head-only file list or a Coordinator-written source patch.
+  Never exclude all evidence, JSON or any directory/file class. Mixed
+  source/verdict content, unknown roles, unexplained paths or unbound versions
+  trigger the reference-boundary stop above. Do not request an unrestricted
+  patch-producing diff/show that exposes excluded report bytes. This is a
+  methodological boundary, not OS filtering; if the transport cannot respect
+  it, stop. Prior-result reconciliation stays Coordinator-side. Existing
+  correction-range, direct-contract, PASS and review-budget rules still apply.
 - Dispatch-record evidence (authorship evidence — the Critic can only verify
   diff authorship when dispatch records are in the evidence set): a STRIPPED
   projection's path, produced via `node
