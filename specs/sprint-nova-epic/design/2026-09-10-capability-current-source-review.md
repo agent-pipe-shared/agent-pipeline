@@ -21,17 +21,27 @@ package's completed review cycle.
 The inventory remains `required-before-publication` with a null receipt digest
 until a genuine passing review covering this package is retained. The checker
 validates the attestation field's form, not the receipt itself. The coordinator
-must retain the native result and verify its verdict and exact candidate
-binding. The attestation digest is the SHA-256 of the canonical nested native
-execution receipt, as produced by `nativeCriticCanonicalDigest(result.receipt)`.
-Record its path, candidate and reviewed source coverage separately; do not
-claim the checker authenticates them.
+must retain either the native result or, when native execution is proven
+unavailable or unusable, exactly one fresh session functional-equivalent
+result. In the latter case the retained receipt MUST be
+`pipeline.codex-critic-receipt.v1` and MUST state
+`functional-equivalent-read-only; OS isolation not asserted`; it must never be
+described as native execution or OS isolation. In both cases the coordinator
+must verify the verdict and exact candidate binding. For a native result, the
+attestation digest is the SHA-256 of its canonical nested execution receipt,
+as produced by `nativeCriticCanonicalDigest(result.receipt)`. For a session
+functional-equivalent result, it is the SHA-256 of the canonical
+`pipeline.codex-critic-receipt.v1` receipt bytes. Record its path, receipt
+class, candidate and reviewed source coverage separately; do not claim the
+checker authenticates them.
 
 This package explicitly requires actual Critic PASS under QG-13. After the
 initial review, every follow-up is a fresh review of only
 `immediately-previous-reviewed-commit..new-candidate`, including fixes in that
 diff and their direct regressions. Use the native exact-range input
-`reviewBase` with `reviewMode: "full"`; do not repeat the initial eight-source
+`reviewBase` with `reviewMode: "full"`, or the same exact range in the
+session functional-equivalent contract when native execution is unavailable
+or unusable; do not repeat the initial eight-source
 current-artifact audit. Unchanged direct contracts may be read to interpret
 the diff, without reopening cleared areas.
 
@@ -49,9 +59,13 @@ the fresh Critic input; do not pass prior verdict prose or findings.
 
 The latest genuine correction-diff PASS, together with that verified lineage,
 satisfies the technical PASS criterion. Store the digest of that latest real
-nested native execution receipt, not a fabricated eight-source receipt or the
-digest of a coordinator-authored composite. Record separately which coverage
-was carried forward and which diff the latest reviewer actually examined.
+receipt: the canonical nested native execution receipt for the native class,
+or the canonical `pipeline.codex-critic-receipt.v1` receipt for the one
+functional-equivalent session fallback. Never fabricate an eight-source
+receipt or use the digest of a coordinator-authored composite. Record
+separately which coverage was carried forward and which diff the latest
+reviewer actually examined. Preserve the functional-equivalent assurance
+wording and its OS-isolation limitation in the retained record.
 This is a coordinator verification duty; the checker still validates only
 attestation field shape. An attestation-only follow-up must prove that the
 only inventory change is the attestation fields and that capability data and
