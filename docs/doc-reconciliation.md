@@ -2788,3 +2788,19 @@ cuts historical probe forensics from the public parallel-work guide. The
 review reports remain feature evidence under the existing canonical artifact
 topology. No approval, release-channel, model-route, or runner-support contract
 changes.
+
+## Candidate 7bdbf7d1c6bf2bb7a38512abb1c5fc7787f354cb — 2026-09-11, range bf304b4f..7bdbf7d1, correct review and startup claims
+
+- ADR-0011: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0076: checked, no change needed.
+- ADR-0078: checked, no change needed.
+
+The correction keeps the bilingual entry claims aligned with the existing
+lifecycle and generated runner manifest. It narrows the two-stage statement to
+independent result review, because optional Advisor and readiness work can
+precede implementation. It also describes the registered Codex SessionStart
+command as an onboarding hint that does not secretly perform `pipeline-start`.
+The accompanying immutable reader reports retain the existing feature-evidence
+topology. No human-authority, distribution-channel, runner-support or gate
+contract changes.
