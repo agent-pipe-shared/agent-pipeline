@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "d910db6c788f1570843e2d916aa0d074871b43d4",
-    "tree": "aa4bf32e610a5ffd2ad2b4fb7f93e067a0ddf460"
+    "commit": "7db2c9b907f29752cc45383ce74d8764f2b5c0df",
+    "tree": "5a76ef267d036545eb5e21d4a7798b10223a7abf"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -180,7 +180,7 @@
       "id": "deterministic-verification",
       "publicName": "Deterministic verification",
       "problem": "A delivery needs reproducible evidence instead of an informal test claim.",
-      "benefit": "One registered Verify entry point runs the declared suites and records machine-readable results; the macOS-acceptance suite is a synthetic, non-native contract check and never substitutes for Apple Silicon evidence.",
+      "benefit": "Registered Verify runs declared checks with progress and candidate-bound journal evidence. Consumer projects combine pipeline baseline checks with their real configured product command; missing product verification cannot pass. The macOS-acceptance suite remains a synthetic, non-native contract check and never substitutes for Apple Silicon evidence.",
       "status": "shipped",
       "surfaceIds": [
         "verify-phase:harness/scripts/verify.mjs:advisor-capability-preflight-tests",
@@ -620,12 +620,16 @@
         "pipeline-core plugin"
       ],
       "productionEvidence": [
-        "harness/scripts/verify.mjs"
+        "harness/scripts/verify.mjs",
+        "plugins/pipeline-core/lib/consumer-verify.mjs",
+        "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+        "plugins/pipeline-core/scripts/verify-evidence-producer.mjs"
       ],
       "testEvidence": [
         "harness/scripts/check-doc-contracts.test.mjs",
         "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
         "plugins/pipeline-core/lib/finding-lifecycle.test.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
         "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
         "plugins/pipeline-core/lib/provenance-envelope.test.mjs",
         "plugins/pipeline-core/lib/provenance-fixture-matrix.test.mjs",
@@ -643,7 +647,8 @@
         "plugins/pipeline-core/lib/threat-model-discovery.test.mjs",
         "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
         "plugins/pipeline-core/lib/threat-model.test.mjs",
-        "plugins/pipeline-core/scripts/sbom-discovery.test.mjs"
+        "plugins/pipeline-core/scripts/sbom-discovery.test.mjs",
+        "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs"
       ],
       "targets": [
         {

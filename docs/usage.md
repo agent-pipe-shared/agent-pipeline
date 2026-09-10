@@ -25,6 +25,31 @@ A refusal, recovery result, or restart boundary is also an action contract.
 Use its named public recovery step; do not edit generated state or guard files
 by hand to move past it.
 
+## Verify a consumer project
+
+Use the installed plugin's `scripts/verify-evidence-producer.mjs` to run
+Verify in your project. It combines general pipeline checks with your existing
+configured product command, and records progress, individual results and
+candidate-bound evidence through the Verify journal.
+
+New onboarding creates the project adapter. To prepare an existing project,
+run `node <plugin-root>/scripts/verify-evidence-producer.mjs --prepare --root
+<project-root>` and commit the resulting `project/consumer-verify.mjs` with
+the project changes. Preparation preserves your configured verify command;
+it does not replace your tests. A conflicting adapter is reported for repair.
+
+On the clean committed candidate, run
+`node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root>`.
+The pipeline checks calibration, the verify contract and a present runtime
+manifest, then reports the configured project command separately. Missing
+product verification remains unconfigured and cannot produce an overall pass.
+Passing baseline checks alone does not establish product-test coverage.
+
+Eligible baseline results can resume on the same bound candidate; the opaque
+project command runs freshly. A changed candidate, failed run or interrupted
+attempt cannot borrow an old green result as current evidence. Resolve
+`<plugin-root>` from the installed pipeline, not a source checkout path.
+
 ## Choose the human-approval strength deliberately
 
 The optional repository-wide selector is `gates.human_approval` in
@@ -102,8 +127,22 @@ plan digest to the actual user decision reference and SHA-256, and `revoke`
 invalidates that saved decision. Records live in owner-private Git state and do
 not dirty the candidate checkout. The decision reference is attribution, not
 cryptographic proof that a human approved. The CLI never calls a review provider.
-Its request shape and flags are printed by `--help`; native coordinators must
-explicitly normalize their selected reference records before using the check.
+Its request shape and flags are printed by `--help`.
+
+The shipped `invokeCodexNativeCriticHost` entry in
+`scripts/codex-native-critic-host.mjs` checks saved consent automatically after
+validating the selection and physical source/evidence bytes, before creating a
+candidate-bearing child. The coordinator supplies the closed `exportContext`
+object with `provider`, `service`, `hostGate`, `providerGate`, and `observedEndpoint` (`null`
+when unknown). Gate values are `not-observed`, `approved`,
+`additional-check-required`, or `denied`. The provider must explicitly be `OpenAI`
+or `openai` and exactly match the saved grant's label. The service is an explicit declaration
+for the selected OpenAI/Codex review, never inferred from its model name.
+The host normalizes its bound reference records, reads the physical project's
+owner-private consent, and returns `exportConsent` alongside execution evidence.
+Missing context or missing, revoked, or mismatching consent returns a structured
+`consent-unavailable` failure without creating a child. The detailed reason and
+coverage/disclosure remain in `exportConsent`; admission never writes a decision.
 
 Consent coverage never grants host permission or changes access mode. A denied
 host remains denied, and additional host checks remain visible. This setup does
