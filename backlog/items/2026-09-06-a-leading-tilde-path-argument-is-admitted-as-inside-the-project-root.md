@@ -15,6 +15,13 @@ done_when: manual
 source: "Elephant, 2026-09-06, triaging NVA-B-READCONTAIN-1's closure (not a Critic finding; NVA-B-READCONTAIN-1 itself is closed and unaffected by this item)."
 ---
 
+## Superseded policy, 2026-09-10
+
+Leading-tilde passive reads are intentionally admitted under the host-owned
+filesystem-visibility boundary implemented in `96cc357a`. The shell and host
+sandbox resolve visibility; this historical defect no longer defines desired
+behavior. Mutation and unsupported shell expansion remain outside the lane.
+
 # A leading-`~` path argument is admitted as inside the project root
 
 ## The gap
@@ -151,4 +158,3 @@ ADR `NVA-B-READCONTAIN-1`/`-2` owed, authored by the same Elephant session
 that committed to this item's own AC-4 follow-up note above) cross-
 references this item by name and evidence path in its "current scope-gap
 inventory" section.
-

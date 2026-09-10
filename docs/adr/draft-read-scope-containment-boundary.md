@@ -13,6 +13,23 @@ then this file is `docs/adr/draft-read-scope-containment-boundary.md`.
 `backlog/items/2026-08-29-read-scope-guard-admits-single-command-but-blocks-the-piped-form.md`
 (closed, but whose remedy this ADR's restoration re-establishes).
 
+## PO correction, 2026-09-10
+
+The 2026-09-06 re-narrow decision is superseded. The PO clarified from the
+real Codex 0.6.2 Greenfield test that repository-root containment for passive
+reads was never a required Pipeline gate and is too restrictive in practice.
+
+The accepted boundary is now: the Pipeline guard proves a command belongs to
+its closed read-only grammar and continues to refuse mutation, execution,
+unsupported composition and output redirection. Once that classification
+passes, the host sandbox and operating-system permissions decide which files
+are visible. An absolute path outside the active repository is not itself a
+Pipeline denial reason. This rule is runner-neutral and applies to Codex,
+Claude Code and Antigravity through their shared guard policy.
+
+The historical sections below retain the prior decision and its evidence so
+the reversal remains auditable.
+
 ## Context
 
 `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` governs which Bash

@@ -13,6 +13,13 @@ closure_evidence: backlog/items/2026-08-08-a-bounded-diagnostic-outside-the-repo
 source: "Reported by a Goldfish during the 2026-08-08 hardening block and then reproduced and isolated directly by the Elephant."
 ---
 
+## Superseded policy, 2026-09-10
+
+Commit `96cc357a` removes this refusal entirely for closed passive-read
+commands, following the PO's clarified boundary. Host sandbox and OS
+permissions now determine readable paths; mutation and unsafe composition
+remain guarded.
+
 # A bounded diagnostic reading outside the repository is refused under the wrong reason
 
 ## Reproduction, isolated

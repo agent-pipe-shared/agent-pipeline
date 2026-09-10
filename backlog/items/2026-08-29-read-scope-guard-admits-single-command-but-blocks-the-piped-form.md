@@ -10,9 +10,17 @@ closure_repository: self
 closure_commit: 9639d91ee78f42ca0fbe6c3a424321a9d3c492d8
 closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova
-done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs pipeline.read-scope-single-command-root-check
+done_when: manual
 source: "Codex hardening test during the 2026-08-29 three-runner greenfield test, reported inline in chat by the PO (Codex could not persist its own report — see the separate F21/F23 findings)."
 ---
+
+## Superseded by PO correction, 2026-09-10
+
+The PO clarified during the real Codex 0.6.2 Greenfield test that passive
+outside-root reads are not a Pipeline gate. The desired invariant is now
+consistent admission across single and piped read-only shapes, with filesystem
+visibility governed by the host sandbox and OS permissions. The old
+containment predicate is therefore retired rather than silently made green.
 
 # A read-scope boundary is enforced for a piped command but not for the identical single command
 

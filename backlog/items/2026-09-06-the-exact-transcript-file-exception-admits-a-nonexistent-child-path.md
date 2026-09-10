@@ -15,6 +15,13 @@ done_when: manual
 source: "T1 Critic review of NVA-B-READCONTAIN-2 (opus, max), finding F1, backlog/evidence/2026-09-06-nva-b-readcontain-2-findings.md."
 ---
 
+## Superseded policy, 2026-09-10
+
+The transcript-specific read-root exception was retired by `96cc357a` when
+the PO selected host-owned visibility for every closed passive-read shape.
+Existence and path traversal are now resolved by the OS; the historical
+exact-file invariant below is no longer an active Pipeline requirement.
+
 # The exact-transcript-file exception admits a nonexistent child path
 
 ## The gap

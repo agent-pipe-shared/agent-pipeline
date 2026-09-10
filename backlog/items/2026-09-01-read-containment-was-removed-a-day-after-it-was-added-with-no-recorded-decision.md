@@ -15,6 +15,14 @@ done_when: manual
 source: "Surfaced by check-backlog-done-predicate.mjs as a REGRESSION finding on 2026-09-01, then traced to commit c8c7f449 and confirmed empirically in the same session."
 ---
 
+## Superseded policy, 2026-09-10
+
+The PO has now selected this item's former **Accept and document** direction:
+closed passive-read grammar may use every path the host sandbox and OS expose.
+Commit `96cc357a` implements and tests that boundary across all three runners.
+The containment history below remains as the audit record for the reversed
+2026-09-06 decision.
+
 # Read containment was removed a day after it was added, with no decision recorded anywhere
 
 ## How this surfaced

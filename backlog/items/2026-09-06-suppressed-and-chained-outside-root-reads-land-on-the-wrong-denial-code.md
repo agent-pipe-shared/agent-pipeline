@@ -3,13 +3,25 @@ schema: pipeline.backlog-item.v1
 id: pipeline.read-scope-denial-code-accuracy-f3
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-10
+closure_repository: self
+closure_commit: 96cc357a0d59d602c08636abe7e1160825fe0f21
+closure_evidence: plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
 created: 2026-09-06
 sprint: nova-b
 tracking: "Nova B — NVA-B-READCONTAIN-1's T1 Critic (round 1) finding F3, carried in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md but never given its own backlog/items/ entry. Filed now to close that tracking gap; the underlying behavior is unchanged and non-blocking (the command is still refused end-to-end, only the printed reason code is wrong)."
 done_when: manual
 source: "T1 Critic review (opus, max) of commit cbc30756252ff1573b53ab2ada34ae2f02569f8d, F3, recorded in backlog/evidence/2026-09-06-nva-b-readcontain-1-findings.md."
 ---
+
+## Closed by superseding policy, 2026-09-10
+
+The PO clarified that closed passive reads must not be refused merely because
+their target is outside the project root. Commit `96cc357a` therefore removes
+the underlying read-scope denial instead of refining its code. The three-runner
+Greenfield test covers suppressed, chained and external inventory reads while
+retaining the existing mutation and composition denials.
 
 # Suppressed and chained outside-root reads land on the wrong denial code
 
