@@ -12,21 +12,30 @@ not replace the installed plugin or publish the candidate.
 
 The isolated repair checkout is
 `branch/detached/candidate-review-fixes-8741613004e7` under the Nova source
-root. Its tested commit was `8f68ec7cc0f3f12738d7190e123a00ee893f251c`,
-tree `91a36092d278ab5e342d10145586eaaf3cfd8e53`.
-Full Verify completed with 516/517 passing, zero reused results and security
+root. Its tested commit was `c7b991578956dfebfa92c5f5a640649c05628ca3`,
+tree `ba60c32c4bd6e13c7aa6ed1636344f2d57af27d3`.
+Full Verify completed with 517/517 passing, zero reused results and security
 exit 0. Its receipt is in the main checkout at
-`evidence/verify-1789023969047-0b2e12acd8e3216a.json`.
+`evidence/verify-1789027100561-f887115261642078.json`.
 This is a repair checkpoint, not the final candidate's gate receipt.
 
-The remaining failure is `codex-isolated-critic-protected-preimage-tests`:
-the repaired Critic host differs from its protected digest. An independent
-mechanical audit found exactly this one mismatch among all nine entries;
-the prepared substitution remains pending explicit PO action authorization.
-The final inventory review also needs the one-time round-cap decision in
-the [PO queue](../../../backlog/evidence/2026-09-06-po-decision-queue.md).
-Neither a completed review process nor this mostly passing Verify run is
-a release approval. Final inventory attestation, both reader stages, build
+The separately authorized protected-pin transcription is complete. The agent
+also started the authorized native inventory review itself. Attempt
+`attempt-1789032164991-22ba135b13a99089ea9afe92` completed its model turn but
+rejected prior-verdict prose in the briefing and withheld substantive judgment.
+The input boundary needs correction; no inventory PASS has been obtained.
+See the [PO queue](../../../backlog/evidence/2026-09-06-po-decision-queue.md)
+for the retained authorization and current disposition.
+
+For this source and consuming user projects, ordinary Critic preparation,
+execution, monitoring and result readback are agent work after the applicable
+plan and deterministic gates. No extra Pipeline PO question or routine user
+terminal step is required. Use supported host permission mechanisms and
+diagnose real denials; do not bypass them. Existing explicit PO gates and
+review bounds remain in force.
+
+Neither a completed review process nor this passing Verify run is a release
+approval. Final inventory attestation, both reader stages, build
 identity and the final bound gates remain pending.
 
 ## Test the actual onboarding entry

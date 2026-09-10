@@ -1,5 +1,39 @@
 # PO decision queue — collected 2026-09-06
 
+## Standing autonomous Critic execution, including user projects — 2026-09-10
+
+The PO clarified: "Es darf auch keine Freigabe brauchen! Das sind per operating
+model keine definierten Po Gates", "Stelle sicher das der po nicht mehr gefragt
+wird künftig", and "Das muss für User Pipelines auch klar sein".
+
+Ordinary Critic execution is agent work after the applicable plan and
+deterministic gates: prepare the bound input, start the supported review,
+monitor it, read the actual result and continue the authorized work. Do not
+ask for an additional Pipeline PO approval or routinely delegate the command
+to the user's terminal. This applies to consuming projects as well as this
+source repository and belongs in the shipped runtime instructions.
+
+Use the host's supported execution-permission mechanism where necessary;
+it is not an additional Pipeline PO gate. Diagnose actual permission denials
+and unavailable execution honestly without bypassing them. Expressly defined
+decision gates, final acceptance and bounded review rules remain applicable.
+Correct coordinator/input defects within the existing execution mandate;
+retain failed attempts and distinguish briefing rejection from a substantive
+review. No automatic approval or fabricated PASS follows from this decision.
+
+Execution readback: pin transcription completed in
+`0650ef46a94e7ee173c9f17468afd29a18463de9`. Candidate
+`c7b991578956dfebfa92c5f5a640649c05628ca3` passed 517/517 full Verify steps,
+security exit 0, zero reuse (main-checkout receipt
+`evidence/verify-1789027100561-f887115261642078.json`). The agent launched the
+native Critic itself. Corrected attempt
+`attempt-1789032164991-22ba135b13a99089ea9afe92` completed but rejected the
+briefing for including a prior verdict; it explicitly withheld substantive
+judgment. Its `pass: false` with zero findings is not an inventory approval.
+The earlier instruction to keep the prior result available must be reconciled
+with the Critic's prohibition on prior-verdict prose before another dispatch.
+The original receipt remains retained; no new review has been started.
+
 ## PO authorization of the two completion actions — 2026-09-10
 
 After the exact single-hash proposal and the one-time additional inventory
