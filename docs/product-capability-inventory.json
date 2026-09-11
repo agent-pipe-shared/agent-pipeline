@@ -5,9 +5,9 @@
     "tree": "0ffe043df5eb84b235d85c0f63bed53c541c4928"
   },
   "criticReview": {
-    "status": "required-before-publication",
-    "receiptSha256": null,
-    "reason": "Independent candidate-bound review of the capability inventory, checker, and public targets is required before publication."
+    "status": "attested",
+    "receiptSha256": "1840971fff67ea57280d9432e214a52eff533468045fe9b518a80a55d86c0363",
+    "reason": null
   },
   "capabilities": [
     {
