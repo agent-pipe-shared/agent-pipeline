@@ -5,9 +5,9 @@
     "tree": "b956c024b637d05e9d5596768dd327bb0a355696"
   },
   "criticReview": {
-    "status": "required-before-publication",
-    "receiptSha256": null,
-    "reason": "Candidate surfaces changed; Critic review is pending."
+    "status": "attested",
+    "receiptSha256": "376267c3e1a66a462c912473ba826661cf0a459930dfdf1b25991aba4a46a676",
+    "reason": null
   },
   "capabilities": [
     {
