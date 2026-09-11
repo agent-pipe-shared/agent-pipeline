@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-31
 source: "Measured 2026-09-01 during 0.6.0 release preparation, when Layer 1b (check-doc-reconciliation.mjs) was run manually after push-init.mjs's driver contract was inspected."
 sprint: nova-b
 done_when: manual
+closed_at: "2026-09-11"
+closure_repository: "self"
+closure_commit: "f3478069afc226791ccd43b10abb01c750795bf8"
+closure_evidence: "backlog/evidence/2026-09-11-nova-b-push-init-and-worktree-matcher-reverification.md"
 ---
 
 # `push-init.mjs` hardcodes `--candidate HEAD`, which Layer 1b's own record contract can never satisfy
@@ -77,3 +81,19 @@ Left open for the PO to choose among (not decided here):
    any repository where `check-doc-reconciliation.mjs` is present, and
    correct `docs/push-release-flow.md` line 507 to stop presenting it as an
    unqualified fast path for such repositories.
+
+## Closure — 2026-09-11
+
+Closed against `f3478069afc226791ccd43b10abb01c750795bf8`. The driver now
+accepts `--candidate` and `--record-ref`, requires an explicit candidate when
+Layer 1b applies, and forwards the two refs independently. It no longer
+invents `HEAD` as the candidate. The operator documentation uses the same
+contract.
+
+The current entry path was reverified rather than inferred from the source
+shape: the full focused `push-init.test.mjs` suite passed 20/20, including a
+real-repository case whose candidate is distinct from the record ref. The
+documentation-contract suite also passed. The implementing commit is the
+current branch's patch-equivalent of the earlier `7d56917c` closure recorded
+for the duplicate 2026-09-01 item; both have stable patch id
+`2bc7feec77d064727cbd618248ac67e8a7ec8263`.

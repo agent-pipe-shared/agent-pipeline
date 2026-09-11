@@ -87,3 +87,18 @@ needs a human-cleared `guard-human-override.mjs` ceremony in signature mode, the
 same route commit `0859afe6` used to land this hook's registration in the first
 place. It is a one-token change to the matcher string, which makes it a good
 candidate to bundle with the next ceremony rather than to spend one on alone.
+
+## Reverification — 2026-09-11
+
+Still open. The underlying implementation suite passes 33/33 outside the WSL
+process sandbox, including direct `Agent` input detection and real Git
+worktree-count changes. The actual shipped Claude entry path remains
+incomplete, however: the `guard-worktree-isolation.mjs` registration in
+`plugins/pipeline-core/hooks/hooks.json` still has matcher
+`Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write|Workflow`.
+Tokenizing that live matcher confirms `Task` and `Workflow` are present while
+`Agent` is absent. A passing library suite therefore does not satisfy this
+item's Done criterion; the TP-4 matcher correction remains required.
+
+Focused results are recorded in
+`backlog/evidence/2026-09-11-nova-b-push-init-and-worktree-matcher-reverification.md`.
