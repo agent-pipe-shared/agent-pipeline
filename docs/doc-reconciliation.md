@@ -2814,3 +2814,38 @@ English authority description with the existing JSON calibration and optional
 YAML manifest split, and keeps UI design before Spec/readiness rather than
 duplicating it after Verify. The accompanying immutable reader reports remain
 under the existing feature-evidence topology.
+
+## Candidate c3722c10997597dd985311d9e00a4744f7e8ee83 — 2026-09-11, range 18df8681..c3722c10, greenfield report follow-up closure
+
+- ADR-0003: checked, no change needed.
+- ADR-0004: checked, no change needed.
+- ADR-0005: checked, no change needed.
+- ADR-0006: checked, no change needed.
+- ADR-0009: checked, no change needed.
+- ADR-0011: checked, no change needed.
+- ADR-0014: checked, no change needed.
+- ADR-0015: checked, no change needed.
+- ADR-0018: checked, no change needed.
+- ADR-0020: checked, no change needed.
+- ADR-0023: checked, no change needed.
+- ADR-0024: checked, no change needed.
+- ADR-0026: checked, no change needed.
+- ADR-0033: checked, no change needed.
+- ADR-0043: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0048: checked, no change needed.
+- ADR-0069: checked, no change needed.
+- ADR-0070: checked, no change needed.
+- ADR-0076: checked, no change needed.
+- ADR-0078: checked, no change needed.
+- ADR-0081: checked, no change needed.
+
+This cumulative reconciliation covers the complete local follow-up range. It
+adds accepted ADR-0081's missing Governs declaration, redistributes public
+capability anchors without changing the product surface, corrects public
+reader order and conditional lifecycle claims, and records a Critic-attested
+inventory plus a two-phase no-findings reader closure. The existing role,
+rigor, routing, gate, human-authority, distribution, artifact-topology,
+supervision, and impacted-Verify decisions remain unchanged. Root and vendored
+canonical copies are byte-identical, and no ADR number was allocated or
+reassigned.
