@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.verify-case-completion-registry.v1",
+  "title": "Verify case-completion registry",
+  "description": "A required entry claims the standard completion helper is active during normal Verify. A syntactic node:test migration or an opt-in self-probe remains legacy-process-only until that binding exists.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "entries"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.verify-case-completion-registry.v1"] },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "path", "disposition"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "disposition": { "type": "string", "enum": ["required", "legacy-process-only"] },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}

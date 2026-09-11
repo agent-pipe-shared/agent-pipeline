@@ -1,0 +1,1037 @@
+{
+  "schema": "pipeline.verify-case-completion-registry.v1",
+  "entries": [
+    {
+      "name": "agents-adapter-migration-tests",
+      "path": "harness/scripts/check-agents-adapter-migration.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "artifact-topology-tests",
+      "path": "plugins/pipeline-core/scripts/check-artifact-topology.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "async-execution-tests",
+      "path": "plugins/pipeline-core/lib/async-execution.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "bootstrap-payload-budget-tests",
+      "path": "plugins/pipeline-core/lib/bootstrap-payload-budget.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "bootstrap-payload-measure-cli-tests",
+      "path": "plugins/pipeline-core/scripts/bootstrap-payload-measure.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "check-adr-consistency-tests",
+      "path": "harness/scripts/check-adr-consistency.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "check-critic-contract-citations-tests",
+      "path": "harness/scripts/check-critic-contract-citations.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "check-doc-reconciliation-tests",
+      "path": "harness/scripts/check-doc-reconciliation.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "check-ownership-tests",
+      "path": "harness/scripts/check-ownership.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "check-release-state-consistency-tests",
+      "path": "plugins/pipeline-core/scripts/check-release-state-consistency.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "claude-critic-host-tests",
+      "path": "plugins/pipeline-core/scripts/critic-claude-host.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "claude-goal-host-tests",
+      "path": "plugins/pipeline-core/scripts/claude-goal-host.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-app-server-health-tests",
+      "path": "plugins/pipeline-core/scripts/codex-app-server-health.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-critic-host-tests",
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-critic-packet-host-tests",
+      "path": "plugins/pipeline-core/scripts/codex-critic-packet-host.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-critic-probe-split-tests",
+      "path": "plugins/pipeline-core/scripts/codex-critic-probe-split.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-goal-host-tests",
+      "path": "plugins/pipeline-core/scripts/codex-goal-host.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-isolated-critic-claims-tests",
+      "path": "plugins/pipeline-core/scripts/codex-isolated-critic-claims.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-isolated-critic-contract-tests",
+      "path": "plugins/pipeline-core/scripts/codex-isolated-critic-contract.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-isolated-critic-protected-preimage-tests",
+      "path": "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-isolation-control-decomposition-tests",
+      "path": "plugins/pipeline-core/scripts/codex-isolation-control-decomposition.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-onboarding-app-server-tests",
+      "path": "plugins/pipeline-core/lib/codex-onboarding-app-server.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-onboarding-runtime-tests",
+      "path": "plugins/pipeline-core/lib/codex-onboarding-runtime.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-plugin-validator-parity-tests",
+      "path": "plugins/pipeline-core/scripts/codex-plugin-validator-parity.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-sandbox-preflight-host-control-tests",
+      "path": "harness/scripts/codex-sandbox-preflight-host-control.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-session-start-hint-tests",
+      "path": "plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "commit-message-policy-tests",
+      "path": "plugins/pipeline-core/lib/commit-message-policy.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "consumer-baseline-verify-tests",
+      "path": "plugins/pipeline-core/lib/consumer-baseline-verify.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "continuity-host-adapter-tests",
+      "path": "plugins/pipeline-core/lib/continuity-host-adapter.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "continuity-state-tests",
+      "path": "plugins/pipeline-core/lib/continuity-state.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "continuity-status-cli-tests",
+      "path": "plugins/pipeline-core/scripts/continuity-status.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "continuity-status-tests",
+      "path": "plugins/pipeline-core/lib/continuity-status.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "control-catalog-drift-tests",
+      "path": "plugins/pipeline-core/lib/control-catalog-drift.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "control-catalog-migration-tests",
+      "path": "plugins/pipeline-core/lib/control-catalog-migration.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "control-catalog-schema-tests",
+      "path": "plugins/pipeline-core/lib/control-catalog-schema.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "control-evaluation-receipt-tests",
+      "path": "plugins/pipeline-core/lib/control-evaluation-receipt.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "control-execution-exchange-tests",
+      "path": "plugins/pipeline-core/lib/control-execution-exchange.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "control-execution-lifecycle-event-tests",
+      "path": "plugins/pipeline-core/lib/control-execution-lifecycle-event.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "control-waiver-lifecycle-tests",
+      "path": "plugins/pipeline-core/lib/control-waiver-lifecycle.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "credential-lease-tests",
+      "path": "plugins/pipeline-core/lib/credential-lease.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "critic-fail-closed-tests",
+      "path": "harness/scripts/check-critic-fail-closed.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "critic-packet-governance-tests",
+      "path": "plugins/pipeline-core/lib/critic-packet-governance.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "critical-action-approval-request-tests",
+      "path": "plugins/pipeline-core/lib/critical-action-approval-request.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "critical-action-authorization-tests",
+      "path": "plugins/pipeline-core/lib/critical-action-authorization.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "critical-human-proof-gate-tests",
+      "path": "plugins/pipeline-core/scripts/critical-human-proof-gate.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "dispatch-policy-tests",
+      "path": "plugins/pipeline-core/lib/dispatch-policy.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "dispatch-provenance-tests",
+      "path": "harness/scripts/check-dispatch-provenance.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "epic-ac02-publication-check-tests",
+      "path": "plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "epic-file-contract-tests",
+      "path": "harness/scripts/check-epic-file-contract.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "error-register-tests",
+      "path": "harness/scripts/check-error-register.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "feature-package-topology-tests",
+      "path": "plugins/pipeline-core/lib/feature-package-topology.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "gate-estimate-tests",
+      "path": "plugins/pipeline-core/lib/gate-estimate.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "github-actions-permissions-tests",
+      "path": "harness/scripts/check-github-actions-permissions.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "guard-git-phoenix-authority-grant-tests",
+      "path": "plugins/pipeline-core/hooks/guard-git-phoenix-authority-grant.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "guard-git-phoenix-tests",
+      "path": "plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "guard-handover-size-tests",
+      "path": "plugins/pipeline-core/hooks/guard-handover-size.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "handover-rotate-tests",
+      "path": "plugins/pipeline-core/scripts/handover-rotate.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "handover-rotation-tests",
+      "path": "plugins/pipeline-core/lib/handover-rotation.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "harness-lib-plan-spec-state-v2-tests",
+      "path": "harness/lib/plan-spec-state-v2.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "human-role-label-tests",
+      "path": "plugins/pipeline-core/lib/human-role-labels.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "human-role-rendering-tests",
+      "path": "plugins/pipeline-core/lib/human-role-rendering.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "interaction-continuity-tests",
+      "path": "plugins/pipeline-core/lib/interaction-continuity.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "license-contract-tests",
+      "path": "harness/scripts/check-license-contract.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "live-runner-certification-tests",
+      "path": "plugins/pipeline-core/scripts/live-runner-certification.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "local-supervisor-setup-tests",
+      "path": "plugins/pipeline-core/scripts/local-supervisor-setup.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "local-supervisor-state-tests",
+      "path": "plugins/pipeline-core/lib/local-supervisor-state.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "local-worker-pool-tests",
+      "path": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "local-worker-supervisor-cli-tests",
+      "path": "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "local-worker-supervisor-core-tests",
+      "path": "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "main-session-route-tests",
+      "path": "plugins/pipeline-core/lib/main-session-route.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "native-plugin-readback-tests",
+      "path": "plugins/pipeline-core/scripts/native-plugin-readback.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "network-lockdown-tests",
+      "path": "harness/scripts/network-lockdown.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "neutral-range-plan-tests",
+      "path": "plugins/pipeline-core/scripts/neutral-range-plan.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-a8-benchmark-runner-tests",
+      "path": "plugins/pipeline-core/scripts/nova-a8-benchmark-runner.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-b2-gitlab-ci-broker-cli-tests",
+      "path": "plugins/pipeline-core/scripts/gitlab-ci-execution-broker.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-benchmark-tests",
+      "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-candidate-freeze-tests",
+      "path": "plugins/pipeline-core/lib/nova-candidate-freeze.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-critic-lineage-tests",
+      "path": "plugins/pipeline-core/lib/critic-review-lineage.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-critic-packet-tests",
+      "path": "plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-execution-plane-real-tests",
+      "path": "plugins/pipeline-core/lib/execution-plane-contract-real.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-execution-plane-tests",
+      "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-increment-receipt-tests",
+      "path": "plugins/pipeline-core/lib/nova-increment-receipt.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-release-preflight-tests",
+      "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "nova-scheduling-lifecycle-tests",
+      "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "onboarding-consent-mark-tests",
+      "path": "plugins/pipeline-core/scripts/onboarding-consent-mark.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "onboarding-continuity-tests",
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "p3b-runner-conformance-tests",
+      "path": "plugins/pipeline-core/lib/p3b-runner-conformance.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "parallel-dispatch-planner-tests",
+      "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "parallel-sprint-integration-tests",
+      "path": "plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "phase26-invariants-tests",
+      "path": "harness/scripts/check-phase26-invariants.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "phase3-sdlc-coherence-tests",
+      "path": "harness/scripts/check-phase3-sdlc-coherence.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "pipeline-start-v3-tests",
+      "path": "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "pipeline-state-approve-announce-tests",
+      "path": "plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "pipeline-state-inspection-contract-tests",
+      "path": "plugins/pipeline-core/scripts/pipeline-state-inspection-contract.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "pipeline-state-lifecycle-event-tests",
+      "path": "plugins/pipeline-core/scripts/pipeline-state-lifecycle-event.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "plan-spec-state-v2-legacy-tests",
+      "path": "harness/lib/plan-spec-state-v2.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "po-approval-proof-tests",
+      "path": "plugins/pipeline-core/lib/po-approval-proof.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "po-gate-authority-fixture-tests",
+      "path": "plugins/pipeline-core/lib/po-gate-authority.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "po-gate-profile-publisher-tests",
+      "path": "plugins/pipeline-core/lib/po-gate-profile-publisher.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "po-language-projection-tests",
+      "path": "harness/scripts/po-language-projection.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "post-compact-reground-tests",
+      "path": "plugins/pipeline-core/hooks/post-compact-reground.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "pr-contributor-gate-tests",
+      "path": "harness/scripts/check-pr-contributor-gates.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "print-verify-failures-tests",
+      "path": "harness/scripts/print-verify-failures.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "private-overlay-activation-tests",
+      "path": "plugins/pipeline-core/lib/private-overlay-activation.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "product-capability-inventory-tests",
+      "path": "harness/scripts/check-product-capability-inventory.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "project-authority-migration-cli-tests",
+      "path": "plugins/pipeline-core/scripts/project-authority-migration.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "project-authority-tests",
+      "path": "plugins/pipeline-core/lib/project-authority.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "project-onboarding-v3-tests",
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "provenance-attestation-tests",
+      "path": "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "provenance-envelope-tests",
+      "path": "plugins/pipeline-core/lib/provenance-envelope.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "provenance-fixture-matrix-tests",
+      "path": "plugins/pipeline-core/lib/provenance-fixture-matrix.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "provenance-local-builder-tests",
+      "path": "plugins/pipeline-core/lib/provenance-local-builder.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "provenance-release-binding-tests",
+      "path": "plugins/pipeline-core/lib/provenance-release-binding.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "public-baseline-diagnose-tests",
+      "path": "plugins/pipeline-core/scripts/public-baseline-diagnose.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-authority-tests",
+      "path": "plugins/pipeline-core/lib/publication-authority.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-bundle-tests",
+      "path": "plugins/pipeline-core/lib/publication-bundle.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-bundle-v2-tests",
+      "path": "plugins/pipeline-core/lib/publication-bundle-v2.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-capability-preflight-tests",
+      "path": "plugins/pipeline-core/lib/publication-capability-preflight.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-close-journal-tests",
+      "path": "plugins/pipeline-core/scripts/publication-close-journal.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-executor-productive-flow-tests",
+      "path": "plugins/pipeline-core/scripts/publication-executor-productive-flow.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-executor-tests",
+      "path": "plugins/pipeline-core/scripts/publication-executor.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-executor-v2-tests",
+      "path": "plugins/pipeline-core/scripts/publication-executor-v2.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "publication-state-authority-tests",
+      "path": "harness/scripts/publication-state-authority.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "recovery-bridge-approval-tests",
+      "path": "harness/scripts/recovery-bridge-approval.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "release-version-plan-tests",
+      "path": "plugins/pipeline-core/scripts/release-version-plan.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "remote-provisional-receipt-tests",
+      "path": "plugins/pipeline-core/lib/remote-provisional-receipt.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "run-codex-critic-isolation-tests",
+      "path": "plugins/pipeline-core/scripts/run-codex-critic-isolation.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "run-codex-critic-probe-split-tests",
+      "path": "plugins/pipeline-core/scripts/run-codex-critic-probe-split.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "run-codex-isolation-control-decomposition-tests",
+      "path": "plugins/pipeline-core/scripts/run-codex-isolation-control-decomposition.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "runner-native-continuation-tests",
+      "path": "plugins/pipeline-core/lib/runner-native-continuation.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "runner-profile-migration-v2-tests",
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "runner-profile-migration-v3-tests",
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "runner-profiles-v2-tests",
+      "path": "plugins/pipeline-core/lib/runner-profiles-v2.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "runner-profiles-v3-tests",
+      "path": "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "runtime-projection-v2-tests",
+      "path": "plugins/pipeline-core/lib/runtime-projection-v2.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "runtime-projection-v3-tests",
+      "path": "plugins/pipeline-core/lib/runtime-projection-v3.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sbom-discovery-cli-tests",
+      "path": "plugins/pipeline-core/scripts/sbom-discovery.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sbom-discovery-tests",
+      "path": "plugins/pipeline-core/lib/sbom-discovery.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sbom-fixture-matrix-tests",
+      "path": "plugins/pipeline-core/lib/sbom-fixture-matrix.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sbom-lifecycle-tests",
+      "path": "plugins/pipeline-core/lib/sbom-lifecycle.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sbom-manifest-tests",
+      "path": "plugins/pipeline-core/lib/sbom-manifest.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sbom-node-adapter-tests",
+      "path": "plugins/pipeline-core/lib/sbom-node-adapter.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sbom-release-binding-tests",
+      "path": "plugins/pipeline-core/lib/sbom-release-binding.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "scripts-pipeline-state-tests",
+      "path": "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sdlc-efficiency-metrics-tests",
+      "path": "harness/scripts/sdlc-efficiency-metrics.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "sdlc-run-graph-tests",
+      "path": "harness/scripts/sdlc-run-graph.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "security-policy-resolver-tests",
+      "path": "plugins/pipeline-core/lib/security-policy-resolver.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "security-readiness-harness-tests",
+      "path": "harness/scripts/security-readiness/security-readiness.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "self-verify-selection-tests",
+      "path": "harness/scripts/self-verify-selection.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "source-observation-tests",
+      "path": "plugins/pipeline-core/lib/source-observation.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "stack-adapter-contract-tests",
+      "path": "plugins/pipeline-core/lib/stack-adapter-contract.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "stack-capability-plan-tests",
+      "path": "plugins/pipeline-core/lib/stack-capability-plan.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "stack-discovery-tests",
+      "path": "plugins/pipeline-core/lib/stack-discovery.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "stack-dynamic-boundary-tests",
+      "path": "plugins/pipeline-core/lib/stack-dynamic-boundary.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "stack-fuzz-replay-tests",
+      "path": "plugins/pipeline-core/lib/stack-fuzz-replay.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "stack-run-outcome-tests",
+      "path": "plugins/pipeline-core/lib/stack-run-outcome.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "threat-model-approval-request-tests",
+      "path": "plugins/pipeline-core/lib/threat-model-approval-request.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "threat-model-discovery-tests",
+      "path": "plugins/pipeline-core/lib/threat-model-discovery.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "threat-model-fixture-matrix-tests",
+      "path": "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "threat-model-tests",
+      "path": "plugins/pipeline-core/lib/threat-model.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "toolchain-preflight-tests",
+      "path": "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "trust-anchor-bootstrap-circularity-repro-tests",
+      "path": "plugins/pipeline-core/lib/trust-anchor-bootstrap-circularity.repro.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "trusted-tool-resolution-tests",
+      "path": "plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "v3-bootstrap-authority-tests",
+      "path": "plugins/pipeline-core/scripts/v3-bootstrap-authority.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "verify-evidence-root-tests",
+      "path": "harness/scripts/verify-evidence-root.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "verify-selection-tests",
+      "path": "plugins/pipeline-core/lib/verify-selection.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "verify-suite-registration-tests",
+      "path": "harness/scripts/check-verify-suite-registration.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "verify-topology-preflight-tests",
+      "path": "plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "windows-private-state-tests",
+      "path": "plugins/pipeline-core/lib/windows-private-state.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "workflow-runner-boundary-tests",
+      "path": "plugins/pipeline-core/lib/workflow-runner-boundary.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "workflow-writer-preflight-tests",
+      "path": "plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "worktree-target-binding-tests",
+      "path": "plugins/pipeline-core/scripts/worktree-target-binding.test.mjs",
+      "disposition": "legacy-process-only",
+      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    }
+  ]
+}
