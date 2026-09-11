@@ -35,8 +35,9 @@ tests, local commits and reviews remain authorized. Do not repeat historical
 startup diagnosis, missing-record searches or completed review rounds.
 
 Nova-B status reconciliation is active. The pass began at 61 open and 54
-closed `nova-b` items; after eleven evidence-backed closures the canonical
-ledger projection contains 49 open and 66 closed. Every open item's
+closed `nova-b` items; after the evidence-backed closures and scope
+dispositions through 2026-09-11, the canonical ledger projection contains 39
+open and 69 closed. Every open item's
 `done_when` is being checked against the current code before that count is
 treated as remaining work. B3 and B4 are implemented:
 the later native Antigravity runner supersedes Nova's historical Alpha-only
@@ -552,7 +553,8 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
    sanctioned reconciliation batches plus the Codex-dispatch duplicate,
    tilde-mutation, write-lane disposition, ADR-coverage, runtime-identity and
    reader-review and dispatch-record Critic-projection closures leave 49 open
-   and 66 closed. Frontmatter plus
+   and 66 closed at that checkpoint; the 2026-09-11 reconciliation now records
+   39 open and 69 closed. Frontmatter plus
    the append-only ledger remains authoritative, and each further change needs
    checked completion evidence.
 7. **Installed-copy action completed:** the local Codex plugin is running the
@@ -561,6 +563,19 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
    can be claimed as installed behavior.
 8. **Open from the 2026-09-06 design work:** whether the slicing nudge stays
    non-blocking if the channel probe fails.
+
+### 2026-09-11 scope and Verify update
+
+- Native Codex sandbox and App Server evidence under WSL is deferred to a
+  future native-Windows effort. It is neither Nova-B acceptance evidence nor a
+  Nova-B blocker. Platform-neutral contracts and the ordinary fresh Session
+  Critic remain in scope.
+- Boundary-aware impacted Verify is closed by ADR-0081, implementation
+  `2c890778`, correction `5c826023`, and a PASS delta Critic. Invalid impact
+  bases force full execution and the push guard independently verifies strict
+  ancestry; release and publication remain full-only.
+- The current Main-Verify consumer-safe-path false positive was corrected in
+  `23f178b2`; its repository check and 35 focused tests pass.
 
 ## Operational head
 
