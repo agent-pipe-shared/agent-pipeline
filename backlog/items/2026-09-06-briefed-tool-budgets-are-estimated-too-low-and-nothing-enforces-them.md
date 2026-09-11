@@ -10,7 +10,21 @@ sprint: nova-b
 done_when: manual
 ---
 
-# Briefed tool budgets are estimated too low, and nothing enforces them
+# Briefed tool budgets are estimated too low, and enforcement remains incomplete
+
+## Current status (2026-09-11)
+
+Commit `96eb1208` introduced the runner-neutral, side-effect-free dispatch
+budget policy core. The existing Claude hook consumes it and retains its
+current registration, persistence, closing-act behavior, and denial text; its
+focused suite is green at 39 checks. This removes the need for each runner to
+reimplement the budget arithmetic and state transition.
+
+The item remains open for two independent reasons. Codex and Antigravity do
+not yet have authenticated live payload adapters and enforcement wired to the
+shared core. The original estimate-calibration problem also remains: extracting
+the policy did not establish realistic base budgets for different task shapes
+or validate the proposed estimation rule against a broader sample.
 
 ## Description
 
@@ -34,12 +48,13 @@ roughly a factor of two: the reads, the checker runs, the greps that prove a
 negative, the commit and the dispatch record dominate, and none of them appear
 in an edit count.
 
-**Nothing enforces the number.** The budget is a duty the dispatch keeps or
-does not keep. The mechanism that should count it externally,
-`guard-dispatch-budget.mjs`, never counts anything — see the separate item on
-its discriminator. Above the advisory budget sits the real cliff: the agent
-tier's own `maxTurns`, which the harness enforces by cutting the run
-mid-sentence with no report and no closing handover.
+**Enforcement was absent in the measured runs and remains incomplete across
+runners.** The Claude `guard-dispatch-budget.mjs` path now counts the measured
+caller shape and uses the shared runner-neutral policy core. Codex and
+Antigravity have no equivalent authenticated payload adapters or live
+enforcement yet. Above an unenforced advisory budget still sits the real
+cliff: the agent tier's own `maxTurns`, which the harness can enforce by
+cutting the run mid-sentence with no report and no closing handover.
 
 ## Triggering situation
 
@@ -83,8 +98,9 @@ Three parts, cheapest first.
    intervention that helps regardless of whether the estimate or the
    enforcement improves.
 
-External enforcement is tracked separately in the dispatch-budget guard item;
-it is the real fix, and these three are what works while it does not.
+Cross-runner enforcement is tracked separately in the dispatch-budget guard
+item. The shared policy core and the Claude hook now exist, while runner
+adapters and estimate calibration still require the work described here.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

@@ -13,6 +13,26 @@ source: "Direct measurement, 2026-09-06: NVA-B-VERIFYLANE-2 used ~59-61 tool cal
 
 # A dispatch's own tool-budget stop condition cannot fire, because nothing counts the tool calls
 
+## Current status (2026-09-11)
+
+The title and the opening diagnosis record the failure observed on 2026-09-06;
+they no longer describe the whole current implementation. The Claude hook now
+classifies the measured `agent_id` / `agent_type` payload shape, persists a
+per-dispatch count, and restricts an over-cap dispatch to its closing acts. Its
+focused hook suite is green at 39 checks.
+
+Commit `96eb1208` extracted the constants, normalized caller classification,
+working-cap calculation, and count/closing decision into the side-effect-free
+`plugins/pipeline-core/lib/dispatch-budget-core.mjs`. The existing Claude hook
+consumes that core without changing its valid-input behavior. Invalid numeric
+state is denied explicitly, so a corrupt negative, fractional, string, or
+unparseable persisted count cannot silently grant a fresh allowance.
+
+This item remains open. Codex and Antigravity still have no authenticated
+payload adapters that feed their live dispatch calls into the shared core, and
+there is no live enforcement evidence for those runners. The pure policy core
+is the reusable prerequisite; it is not itself cross-runner enforcement.
+
 ## The gap
 
 `templates/prompts/goldfish-task.md` field 5 asks every dispatch to stop when
@@ -80,7 +100,7 @@ That reframes the defect entirely, and makes it worse rather than better:
   least two other guards are stale, so "wired in the repo" is not evidence of
   "enforcing in this session".
 
-## Diagnosis performed 2026-09-06 — four candidate causes eliminated, one remains
+## Historical diagnosis performed 2026-09-06 — four candidate causes eliminated, one remained
 
 Each line below was checked directly rather than reasoned about.
 
@@ -150,7 +170,7 @@ predicts exactly what is observed: two `orchestrator-seen/` markers, no
 counter, and no `unresolved.jsonl`. Confirming it needs a captured real
 payload, which needs a logging hook, not more source reading.
 
-**What remains unknown, and needs a live probe rather than more reading:**
+**What remained unknown at that point, and required a live probe rather than more reading:**
 why the hook does not execute for a subagent's tool call when its matcher
 names the tools that subagent uses and other hooks on sibling matchers do
 fire. One asymmetry worth measuring rather than assuming: hook 9's matcher
@@ -158,14 +178,20 @@ names `Task` but neither `Agent` nor `Workflow`, while the sibling
 registration on the next line does name `Workflow` — dispatches in this
 session are launched through the `Agent` tool.
 
+That uncertainty was later resolved for the Claude adapter: captured payloads
+showed that `agent_id`, rather than the transcript path, is its usable caller
+discriminator. The current focused suite pins that measured payload shape.
+Equivalent authenticated payload evidence and adapters are still missing for
+Codex and Antigravity.
+
 **Consequence for planned work:** a second mechanical dispatch check
 (`guard-slicing.mjs`) is being built alongside this one. Building it without
 resolving this first risks a second guard that is registered, tested, and
 silently inert — the failure this guard's own comment warns about twice.
 
-## Not yet decided (superseded in part by the correction above)
+## Historical candidate directions (superseded in part by the current implementation)
 
-Candidate directions, none chosen:
+Candidate directions recorded before the Claude counter was repaired:
 
 - A `PostToolUse` hook that counts calls per dispatch and injects the running
   count back into the agent's context — the delivery channel for this is now
