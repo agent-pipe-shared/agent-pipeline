@@ -88,14 +88,14 @@ function referenceBlobSha256(packet, reference) {
   });
   return sha256(bytes);
 }
-function dispatchPreparation(packet, options, deps, prompt) {
+function roleDispatchPacket(packet, prompt) {
   const references = refs(packet);
   const requiredPaths = references.map(({ path }) => path).sort();
   const requiredPathSha256 = Object.fromEntries(requiredPaths.map((path) => {
     const reference = references.find((entry) => entry.path === path);
     return [path, referenceBlobSha256(packet, reference)];
   }));
-  const dispatchPacket = {
+  return {
     schema: ROLE_DISPATCH_REQUEST_SCHEMA,
     dispatchId: packet.packetId,
     transport: "direct",
@@ -106,6 +106,9 @@ function dispatchPreparation(packet, options, deps, prompt) {
     requiredPathSha256,
     resultPath: `${packet.packetId}/result.json`,
   };
+}
+function dispatchPreparation(packet, options, deps, prompt) {
+  const dispatchPacket = roleDispatchPacket(packet, prompt);
   const preparation = (deps.preflightRoleDispatch ?? preflightRoleDispatch)({
     root: packet.checkout.realPath,
     resultRoot: options.controlRoot,
@@ -116,11 +119,12 @@ function dispatchPreparation(packet, options, deps, prompt) {
   }
   return preparation;
 }
-function revalidateDispatchPreparation(prepared, deps) {
+function revalidateDispatchPreparation(prepared, authorizedPacket, deps) {
+  const dispatchPacket = roleDispatchPacket(authorizedPacket, promptFor(authorizedPacket));
   const preparation = (deps.preflightRoleDispatch ?? preflightRoleDispatch)({
-    root: prepared.packet.checkout.realPath,
+    root: authorizedPacket.checkout.realPath,
     resultRoot: prepared.controlRoot,
-    packet: prepared.dispatch?.packet,
+    packet: dispatchPacket,
   });
   if (preparation?.status !== "prepared") {
     fail("CLH-DISPATCH-PREFLIGHT", `Claude Critic dispatch preflight rejected: ${preparation?.code ?? "unknown"}.`, { preparation });
@@ -250,7 +254,7 @@ export function executeClaudeNative(prepared, deps = {}) {
   }
   const authorizedPrompt = promptFor(durableAuthorization.packet);
   if (prepared.prompt !== authorizedPrompt) fail("CLH-PROMPT", "Native handoff prompt drifted from the authorized candidate packet.");
-  revalidateDispatchPreparation(prepared, deps);
+  revalidateDispatchPreparation(prepared, durableAuthorization.packet, deps);
   try {
     const result = runNativeBare(prepared.handle, { checkoutRoot: prepared.packet.checkout.realPath, prompt: authorizedPrompt }, deps);
     return { schema: "pipeline.claude-critic-result.v1", mode: "native", assurance: CLAUDE_NATIVE_ASSURANCE, exportAuthorizationSha256: prepared.exportAuthorizationSha256, verdict: result.verdict, outputSha256: result.outputSha256, outputBytes: result.outputBytes };

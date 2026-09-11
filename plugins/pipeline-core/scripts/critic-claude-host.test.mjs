@@ -157,6 +157,7 @@ check("rechecks the result destination immediately before the real native review
       now: new Date("2026-07-18T12:01:00.000Z"),
     });
     assert.equal(calls, 1, "only the bounded native probe has launched");
+    prepared.dispatch.packet.resultPath = "substituted-free-result.json";
     writeFileSync(packetFile(repo, "result.json"), "occupied after prepare\n", { mode: 0o600 });
     assert.throws(
       () => executeClaudeNative(prepared, { spawnFn, now: new Date("2026-07-18T12:01:30.000Z") }),
