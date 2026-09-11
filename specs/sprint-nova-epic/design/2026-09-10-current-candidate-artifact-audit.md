@@ -14,10 +14,10 @@ coverage, not instructions to repeat a full audit in each follow-up. Use
 native `reviewBase` with `reviewMode: "full"` for an exact-range follow-up;
 never submit another current-artifact scope to reopen unchanged cleared areas.
 The coordinator preserves actual results, receipt/source bindings, source
-equality and the continuous finding-disposition lineage. A correction reviewer
-receives the immediately preceding Critic report as an explicitly classified,
-digest-bound correction input, because it must verify the prior-finding scope;
-it receives no other reviewer narrative, proposed verdict or coordinator
+equality and the continuous finding-disposition lineage. It supplies the
+immediately preceding Critic report only to the preflight's dedicated
+coordinator-side input; the fresh reviewer receives neither that report's path
+or bytes nor any other reviewer narrative, proposed verdict or coordinator
 summary. Apply the inventory spec's explicit actual-PASS criterion and lineage
 requirements without claiming that a later diff receipt itself contains the
 original eight-source coverage.
