@@ -67,12 +67,15 @@ const EMPTY_DIR = mkdtempSync(join(tmpdir(), "guard-test-empty-"));
 
 let pass = 0;
 const failures = [];
-function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrEmpty, env = {} } = {}) {
+function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, env = {} } = {}) {
   const { code, stderr } = runGuard(command, projectDir, env);
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit})`);
   for (const needle of [].concat(stderrIncludes ?? [])) {
     if (!stderr.includes(needle)) problems.push(`stderr missing "${needle}"`);
+  }
+  for (const needle of [].concat(stderrExcludes ?? [])) {
+    if (stderr.includes(needle)) problems.push(`stderr unexpectedly contains "${needle}"`);
   }
   if (stderrEmpty && stderr.trim() !== "") problems.push(`stderr not empty: ${stderr.trim().slice(0, 120)}`);
   if (problems.length === 0) {
@@ -734,6 +737,18 @@ check(
   'git commit -m "chore: run git config core.hooksPath"',
   ALLOW,
 );
+for (const [rule, command] of [
+  ["GG-17", 'git commit --no-verify -m "chore: x"'],
+  ["GG-18", 'git commit -n -m "chore: x"'],
+  ["GG-19", 'git -c core.hooksPath=/tmp commit -m "chore: x"'],
+  ["GG-20", "git config core.hooksPath /tmp"],
+]) {
+  check(`R20+ non-overridable ${rule} ignores a correctly shaped arming`,
+    `PIPELINE_GUARD_OVERRIDE='${rule}|token|attempted bypass' ${command}`, BLOCK, {
+      stderrIncludes: [rule, `No agent-side override exists for ${rule}`, "arming is ignored"],
+      stderrExcludes: [`OVERRIDE ${rule}\"`, "OVERRIDE APPLIED"],
+    });
+}
 
 // ---- GIT-03: correlation data in commit metadata (2026-08-06) ------------------------------------
 //
@@ -786,6 +801,37 @@ check("GIT03-7 block  a -F file outside the project root, even with clean conten
   `git commit -F ${join(GIT03_OUTSIDE_DIR, "clean.txt")}`, BLOCK, {
     projectDir: GIT03_DIR,
     stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE", "no override for this rule"],
+  });
+
+const GIT03_BLOCKING_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-blocking-"));
+mkdirSync(join(GIT03_BLOCKING_DIR, ".claude"), { recursive: true });
+writeFileSync(join(GIT03_BLOCKING_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "blocking" }));
+writeFileSync(join(GIT03_BLOCKING_DIR, "bound.txt"),
+  "feat(x): a thing\n\nWhy it matters.\n\nDispatch: NVA-GIT03 (goldfish)\nAI-Assisted: true\n");
+writeFileSync(join(GIT03_BLOCKING_DIR, "marker-only.txt"),
+  "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\n");
+writeFileSync(join(GIT03_BLOCKING_DIR, "body-only.txt"),
+  "feat(x): a thing\n\nDispatch: NVA-GIT03 (goldfish)\nAI-Assisted: true\n\nWhy it matters.\n");
+check("GIT03-8 allow  blocking policy accepts one structurally valid provenance block",
+  "git commit -F bound.txt", ALLOW, { projectDir: GIT03_BLOCKING_DIR });
+check("GIT03-9 block  blocking policy refuses a missing Dispatch binding",
+  "git commit -F marker-only.txt", BLOCK, {
+    projectDir: GIT03_BLOCKING_DIR,
+    stderrIncludes: ["GIT-03-DISPATCH-MISSING"],
+  });
+check("GIT03-10 block  body lines cannot pose as the final provenance block",
+  "git commit -F body-only.txt", BLOCK, {
+    projectDir: GIT03_BLOCKING_DIR,
+    stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING"],
+  });
+
+const GIT03_WARN_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-warn-"));
+mkdirSync(join(GIT03_WARN_DIR, ".claude"), { recursive: true });
+writeFileSync(join(GIT03_WARN_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "warn" }));
+check("GIT03-11 warn  provenance conventions stay non-blocking in warn mode",
+  'git commit -m "chore: bump"', WARN, {
+    projectDir: GIT03_WARN_DIR,
+    stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING", "commitTrailerPolicy is \"warn\""],
   });
 
 // ---- GIT-01: commit subject must start with an admitted Conventional Commit type ----------
@@ -1467,7 +1513,7 @@ check(
 );
 
 // ---- Summary -------------------------------------------------------------------------------------
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, ...SIGNED_ROOTS]) {
+for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, GIT03_DIR, GIT03_OUTSIDE_DIR, GIT03_BLOCKING_DIR, GIT03_WARN_DIR, ...SIGNED_ROOTS]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {

@@ -29,15 +29,18 @@ Rule IDs: `GIT-xx`.
 
 ## GIT-03 — Anonymous AI-assistance trailer (mandatory, all projects)
 
-- **MUST** end every agent-authored commit message with this trailer:
+- **MUST** end every agent-authored commit message with one grounded work-package binding and the anonymous marker in one final, contiguous Git trailer block:
 
   ```text
+  Dispatch: <TASK_ID> (goldfish)
   AI-Assisted: true
   ```
 
+  The other admitted bindings are `Dispatch: stage-0 (elephant)`, `Dispatch: <TASK_ID> (critic)`, and a verified allowlisted generator's `Dispatch: <path> (elephant-generated)` form.
+
 - **MUST NOT** put provider- or model-specific co-author trailers, session URLs or IDs, account identifiers, or any other private correlation data into commit metadata. The anonymous marker is the complete AI-assistance signal; `Dispatch:` may identify a grounded work package but must not encode a provider, account, or session.
 - **Why:** Commit history needs a durable, provider-neutral assistance signal without turning public history into a correlation index. Work-package provenance remains in the versioned dispatch record and its grounded `Dispatch:` trailer; full chat logs are not archived.
-- **Verification:** `git log -1 --format='%(trailers:only=true,unfold=true)' <commit>` samples the marker via structural trailer parsing (not a line-anchored text search) — a wrapped continuation line inside the trailer block breaks git's trailer parser and correctly makes this check report empty, catching the malformed case that a body-text grep like `rg "^AI-Assisted: true$"` would miss; the `/close` ritual checks the current block for prohibited correlation metadata.
+- **Verification:** `git log -1 --format='%(trailers:only=true,unfold=true)' <commit>` samples both entries via structural trailer parsing (not a line-anchored text search). With project `commitTrailerPolicy` set to `warn` or `blocking`, the Git guard applies the same final-block rule before an agent-issued commit; `off` retains only the unconditional correlation-data refusal. A wrapped continuation or blank line inside the block makes the structural check fail instead of accepting body prose as provenance; the `/close` ritual checks the current block for prohibited correlation metadata.
 
 ## GIT-04 — No force-push, no history rewrite, no destructive bulk operations (guard union)
 
@@ -96,7 +99,7 @@ Rule IDs: `GIT-xx`.
 
 - **MUST NOT** rely on the following hook-bypass forms to skip the pre-commit/commit-msg hooks (`git commit`) or the pre-push hook (`git push`) — the git-guard technically blocks each, by rule id: `--no-verify` on any `git` subcommand (`GG-17`); the `git commit -n` short flag (`GG-18` — note `-n` on `git push` means `--dry-run` and on `git merge` means `--no-stat`, neither is a hook-skip, and both stay allowed); `-c`/`--config-env core.hooksPath` transient rebind (`GG-19`); `git config [set] core.hooksPath` persistent rebind (`GG-20`).
 - **MUST NOT** claim hook-bypass is "impossible" — it is not. The following vectors are documented, not silently claimed covered, in the guard header's "WHAT THIS GUARD DOES NOT BLOCK" section (`plugins/pipeline-core/hooks/guard-git.mjs`): the quoted-value form `git -c "core.hooksPath=..."` (the general quote-stripping trade-off, same as elsewhere in this guard); `--config-env` breaking `git commit` adjacency, which evades `GG-18` specifically (`GG-17` still catches the `--no-verify` form of the same intent); `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_<n>`/`GIT_CONFIG_VALUE_<n>` environment-variable config injection; `GIT_CONFIG_GLOBAL=<file>` indirection (uncatchable — the key never appears in the command string); and alias indirection (`git -c alias.x="commit -n" x`).
-- The GIT-04 double-confirmation override mechanism applies to `GG-17`…`GG-20` exactly like every other rule id — no separate procedure.
+- `GG-17`…`GG-20` have no agent-side override route. They protect the hook boundary that evaluates every other Git rule, so letting that same boundary authorize its own bypass would be circular. A supplied arming is ignored and the original command remains blocked (ADR-0079).
 - **Why:** A ruleset that claims more than the guard technically enforces is worse than no rule at all — a false sense of protection invites exactly the bypass it claims to prevent (`docs/operating-model.md`, *What the model protects* — rule 3, "Prefer deterministic checks", gate honesty).
 - **Verification:** `plugins/pipeline-core/hooks/guard-git.test.mjs` carries a BLOCK case and an ALLOW counter-case per rule id (`GG-17`…`GG-20`); `node harness/scripts/verify.mjs` runs the full suite.
 

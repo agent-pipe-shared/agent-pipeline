@@ -49,6 +49,8 @@
  *   PX-<n> (1-based config-list index) or an explicit "id". Every BLOCK message prints
  *   the matching rule's id — the `OVERRIDE <rule-id>` phrase (guardrails/git.md GIT-04
  *   step 3) needs a referent.
+ *   GG-17…GG-20 are the closed exception: ADR-0079 makes hook-bypass rules
+ *   non-overridable because they protect the mechanism evaluating this union.
  *
  *   Arming is visible and inline, inside the command string the PO approves:
  *     Bash:       PIPELINE_GUARD_OVERRIDE="<RULE-ID>|<token>|<reason>" <command>
@@ -1058,6 +1060,15 @@ function blockNormal(rule) {
   lines.push(...notices);
   emit(2, lines);
 }
+function blockNonOverridable(rule) {
+  const lines = [
+    formatBlockHeader(rule),
+    `No agent-side override exists for ${rule.id}: changing or bypassing the hook that evaluates this command would erase the control boundary itself.`,
+  ];
+  if (armingRaw !== null) lines.push(`[git-guard] Any supplied override arming is ignored for non-overridable rule ${rule.id}.`);
+  lines.push(...notices);
+  emit(2, lines);
+}
 function blockOverrideConsumed(rule, priorEntry) {
   const lines = [
     formatBlockHeader(rule),
@@ -1165,9 +1176,17 @@ let inspection;
       return readFileSync(absolute, "utf8");
     },
     requireMarker: markerMode !== "off",
+    requireDispatch: markerMode !== "off",
   });
-  const blocking = inspection.findings.filter((f) => f.code !== "GIT-03-MARKER-MISSING" || markerMode === "blocking");
-  const warningOnly = inspection.findings.filter((f) => f.code === "GIT-03-MARKER-MISSING" && markerMode === "warn");
+  const conventionCodes = new Set([
+    "GIT-03-MARKER-MISSING",
+    "GIT-03-MARKER-AMBIGUOUS",
+    "GIT-03-DISPATCH-MISSING",
+    "GIT-03-DISPATCH-AMBIGUOUS",
+    "GIT-03-DISPATCH-MALFORMED",
+  ]);
+  const blocking = inspection.findings.filter((finding) => !conventionCodes.has(finding.code) || markerMode === "blocking");
+  const warningOnly = inspection.findings.filter((finding) => conventionCodes.has(finding.code) && markerMode === "warn");
   if (blocking.length > 0) {
     emit(2, [
       `BLOCKED (git-guard GIT-03, plugin pipeline-core): this commit message carries ${blocking.map((f) => f.detail).join(" and ")}.`,
@@ -1178,7 +1197,7 @@ let inspection;
     ]);
   }
   if (warningOnly.length > 0) {
-    notices.push("[git-guard] WARN: commit message carries no `AI-Assisted: true` line (GIT-03; commitTrailerPolicy is \"warn\").");
+    notices.push(`[git-guard] WARN: commit message provenance is incomplete (${warningOnly.map((finding) => finding.code).join(", ")}; GIT-03; commitTrailerPolicy is "warn").`);
   }
 }
 
@@ -1448,6 +1467,11 @@ for (const rule of PRENORM_BLOCKERS) if (rule.re.test(c)) matched.push(rule);
 for (const rule of EXTRA_BLOCKERS) if (rule.re.test(normalizedStripped)) matched.push(rule);
 
 if (matched.length > 0) {
+  // ADR-0079: hook-bypass rules protect the mechanism that evaluates every
+  // other Git rule. Letting the same mechanism authorize its own removal is
+  // circular, so these rules stop before token/signature override handling.
+  const nonOverridable = matched.find((rule) => new Set(["GG-17", "GG-18", "GG-19", "GG-20"]).has(rule.id));
+  if (nonOverridable) blockNonOverridable(nonOverridable);
   const overrideCoversAll = arming && !arming.malformed && matched.every((r) => r.id === arming.rule);
   // The signed-push route runs only where the token ritual is the ONLY thing standing
   // between a verified human approval and the push it names: GG-03 alone, no arming of any

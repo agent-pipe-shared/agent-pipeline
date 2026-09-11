@@ -200,6 +200,11 @@ all call this SAME command.
   (`extraDenyPatterns` array, schema in `guard-git.mjs`'s header comment) for
   denies beyond the shipped git-guard union — most new projects start
   with none.
+  When Pipeline agents will author commits, set `commitTrailerPolicy` to
+  `blocking`; this requires exactly one grounded `Dispatch:` binding plus
+  `AI-Assisted: true` in the final Git trailer block. `warn` is suitable only
+  for a dated migration, and `off` is an explicit opt-out from these two
+  provenance conventions.
 - **Branch protection (GitHub Pro, ⚑ the PO-gate):** a Ruleset on `main` —
   block force-push + deletion, mirroring the agent-pipeline repo's own testbed
   setup; add PR-required only if Step

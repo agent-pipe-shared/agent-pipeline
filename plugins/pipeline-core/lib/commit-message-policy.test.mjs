@@ -14,6 +14,7 @@ import {
   commitTypeFindingsForRange,
   GIT01_COMMIT_TYPES,
   markerPolicyMode,
+  parseCommitTrailerBlock,
 } from "./commit-message-policy.mjs";
 
 let checks = 0;
@@ -21,6 +22,7 @@ const check = (label, fn) => { fn(); checks += 1; process.stdout.write(`ok ${lab
 const codes = (result) => result.findings.map((f) => f.code).sort();
 
 const CLEAN = "feat(x): do a thing\n\nWhy it matters.\n\nAI-Assisted: true\n";
+const BOUND = "feat(x): do a thing\n\nWhy it matters.\n\nDispatch: NVA-CMP (goldfish)\nAI-Assisted: true\n";
 const files = new Map();
 const readFile = (path) => {
   if (!files.has(path)) throw new Error("ENOENT");
@@ -94,6 +96,40 @@ check("CMP10 a missing marker is a finding once the project demands it", () => {
 
 check("CMP11 the marker must be the exact line, not a mention of it", () => {
   assert.deepEqual(codes(run('git commit -m "chore: bump" -m "this commit is AI-Assisted: true-ish"', { requireMarker: true })), ["GIT-03-MARKER-MISSING"]);
+});
+
+check("CMP11b provenance is accepted only from one final Git trailer block", () => {
+  files.set("bound.txt", BOUND);
+  assert.deepEqual(codes(run("git commit -F bound.txt", { requireMarker: true, requireDispatch: true })), []);
+  assert.deepEqual(parseCommitTrailerBlock(BOUND), [
+    { key: "Dispatch", value: "NVA-CMP (goldfish)" },
+    { key: "AI-Assisted", value: "true" },
+  ]);
+});
+
+check("CMP11c body mentions do not satisfy either required provenance trailer", () => {
+  files.set("body-only.txt", "feat(x): do a thing\n\nDispatch: NVA-CMP (goldfish)\nAI-Assisted: true\n\nordinary body text\n");
+  assert.deepEqual(codes(run("git commit -F body-only.txt", { requireMarker: true, requireDispatch: true })), [
+    "GIT-03-DISPATCH-MISSING",
+    "GIT-03-MARKER-MISSING",
+  ]);
+});
+
+check("CMP11d a blank line inside the trailer block is rejected", () => {
+  files.set("split.txt", "feat(x): do a thing\n\nDispatch: NVA-CMP (goldfish)\n\nAI-Assisted: true\n");
+  assert.deepEqual(codes(run("git commit -F split.txt", { requireMarker: true, requireDispatch: true })), ["GIT-03-DISPATCH-MISSING"]);
+});
+
+check("CMP11e absent, duplicate and malformed dispatch bindings are distinct findings", () => {
+  const cases = [
+    ["feat(x): x\n\nAI-Assisted: true\n", "GIT-03-DISPATCH-MISSING"],
+    ["feat(x): x\n\nDispatch: A (goldfish)\nDispatch: B (critic)\nAI-Assisted: true\n", "GIT-03-DISPATCH-AMBIGUOUS"],
+    ["feat(x): x\n\nDispatch: invented (elephant)\nAI-Assisted: true\n", "GIT-03-DISPATCH-MALFORMED"],
+  ];
+  for (const [message, expected] of cases) {
+    files.set("case.txt", message);
+    assert.deepEqual(codes(run("git commit -F case.txt", { requireMarker: true, requireDispatch: true })), [expected]);
+  }
 });
 
 // CMP12 -- global options may sit before the verb; a check that missed them would be

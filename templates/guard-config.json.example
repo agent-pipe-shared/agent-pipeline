@@ -1,6 +1,9 @@
 {
   "$comment": "Per-project configuration for the pipeline-core guard family (the git-guard and guard-testpath PreToolUse hooks). Copy to <project>/.claude/guard-config.json, adapt, and COMMIT it. NO CONFIG -> NO-OP: if this file is absent, git-guard applies its built-in union rules only and guard-testpath protects nothing at all - both fail safe and silent, which is the normal case. Keys starting with '$' are documentation and are ignored by the guards; documentation lives ONLY in these sibling keys, never as array members (an array entry without a usable 'pattern' is skipped with a warning). Every value below is example data for the fictional project 'acme-notes' - replace it.",
 
+  "commitTrailerPolicy": "blocking",
+  "$commitTrailerPolicy": "For agent-authored commits: blocking requires exactly one grounded Dispatch binding plus AI-Assisted: true in the final contiguous Git trailer block; warn reports the same defects without blocking; off disables these two conventions but never disables correlation-data refusal.",
+
   "protectedTestPaths": [
     {
       "id": "TP-1",

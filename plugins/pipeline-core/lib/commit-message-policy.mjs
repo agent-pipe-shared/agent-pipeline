@@ -9,7 +9,7 @@
  * 53 of them were already public and unrewritable by the time a human noticed by reading.
  * That was not a gate failing. There was no gate.
  *
- * The rule has two halves and they are NOT the same kind of rule, so they are not enforced
+ * The rule has three parts and they are NOT the same kind of rule, so they are not enforced
  * the same way:
  *
  *   1. **Correlation data must not enter commit metadata.** This is a privacy property, it
@@ -17,10 +17,11 @@
  *      has already lost something it cannot take back — public history is not editable.
  *      Enforced unconditionally, blocking.
  *
- *   2. **`AI-Assisted: true` must be present.** This is a convention. Switching it on
+ *   2. **`AI-Assisted: true` and one grounded `Dispatch:` binding must be present in the
+ *      final Git trailer block.** These are conventions. Switching them on
  *      unconditionally would refuse every ordinary commit in every consumer project that
  *      has not adopted the trailer, which is a large silent behaviour change shipped to
- *      people who did not ask for it. Config-gated (`commitTrailerPolicy` in the project
+ *      people who did not ask for it. Config-gated together (`commitTrailerPolicy` in the project
  *      guard-config), default off.
  *
  * WHAT IT CANNOT SEE, stated rather than discovered later. A commit whose message comes
@@ -60,6 +61,7 @@
  * commits that already exist without re-deriving a shell command for each one.
  */
 import { tokenizeArgv } from "./git-cmd.mjs";
+import { SAFE_TASK_ID } from "./dispatch-record.mjs";
 
 const MAX_MESSAGE_FILE_BYTES = 1_048_576;
 
@@ -76,7 +78,39 @@ const CORRELATION_TRAILER = /^\s*(?:claude-session|session|session-id|session-ur
 /** A session or conversation URL anywhere in the body, trailer or not. */
 const SESSION_URL = /https?:\/\/(?:claude\.ai|chat\.openai\.com|chatgpt\.com|gemini\.google\.com)\/\S+/i;
 
-const MARKER = /^AI-Assisted: true$/m;
+const MARKER_KEY = "AI-Assisted";
+const MARKER_VALUE = "true";
+const DISPATCH_KEY = "Dispatch";
+const DISPATCH_VALUE = /^(\S+) \((goldfish|critic|elephant-generated)\)$/u;
+
+function admittedDispatchValue(value) {
+  if (value === "stage-0 (elephant)") return true;
+  const match = DISPATCH_VALUE.exec(value);
+  if (!match) return false;
+  if (match[2] === "elephant-generated") return /^[A-Za-z0-9._/-]+$/u.test(match[1]) && !match[1].split("/").includes("..");
+  return SAFE_TASK_ID.test(match[1]);
+}
+
+/**
+ * Parse only the final contiguous Git trailer block. A matching line in the
+ * message body is prose, not provenance. The block also needs Git's blank-line
+ * separator from the subject/body; otherwise `%(trailers:only=true)` will not
+ * recognize it either.
+ */
+export function parseCommitTrailerBlock(message) {
+  const lines = String(message ?? "").replace(/\r\n/gu, "\n").split("\n");
+  while (lines.length > 0 && lines.at(-1).trim() === "") lines.pop();
+  const entries = [];
+  let start = lines.length;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const match = /^([A-Za-z][A-Za-z0-9-]*):\s*(.*)$/u.exec(lines[index]);
+    if (!match) break;
+    entries.unshift({ key: match[1], value: match[2].trim() });
+    start = index;
+  }
+  if (entries.length === 0 || start === 0 || lines[start - 1].trim() !== "") return [];
+  return entries;
+}
 
 const CORRELATION_RULES = Object.freeze([
   Object.freeze({
@@ -149,10 +183,10 @@ function heredocBodies(cmd) {
 
 /**
  * @param {string} cmd raw command line, quoting intact
- * @param {{projectDir: string, readFile: (path: string) => string, requireMarker?: boolean}} options
+ * @param {{projectDir: string, readFile: (path: string) => string, requireMarker?: boolean, requireDispatch?: boolean}} options
  * @returns {{inspected: boolean, sources: string[], findings: {code: string, detail: string}[], message: string|null}}
  */
-export function commitMessageFindings(cmd, { readFile, requireMarker = false } = {}) {
+export function commitMessageFindings(cmd, { readFile, requireMarker = false, requireDispatch = false } = {}) {
   if (typeof cmd !== "string" || cmd === "") return { inspected: false, sources: [], findings: [], message: null };
   const tokens = tokenizeArgv(cmd);
   if (!isGitCommit(tokens)) return { inspected: false, sources: [], findings: [], message: null };
@@ -189,7 +223,10 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false } =
   // reported as such.
   if (parts.length === 0 && unreadable.length === 0) return { inspected: false, sources: [], findings: [], message: null };
 
-  const message = parts.join("\n");
+  // Repeated `-m` values are paragraphs in the message Git creates, so keep
+  // the required blank separator rather than concatenating them as adjacent
+  // lines. A single `-F` or heredoc body is unchanged.
+  const message = parts.join("\n\n");
   const findings = CORRELATION_RULES
     .filter((rule) => rule.test.test(message))
     .map((rule) => ({ code: rule.code, detail: rule.detail }));
@@ -201,14 +238,36 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false } =
     });
   }
 
-  if (requireMarker && !MARKER.test(message)) {
-    findings.push({ code: "GIT-03-MARKER-MISSING", detail: "no `AI-Assisted: true` line" });
+  const trailers = parseCommitTrailerBlock(message);
+  if (requireMarker) {
+    const markers = trailers.filter((entry) => entry.key === MARKER_KEY && entry.value === MARKER_VALUE);
+    if (markers.length !== 1) {
+      findings.push({
+        code: markers.length === 0 ? "GIT-03-MARKER-MISSING" : "GIT-03-MARKER-AMBIGUOUS",
+        detail: markers.length === 0
+          ? "no exact `AI-Assisted: true` entry in the final Git trailer block"
+          : "more than one `AI-Assisted: true` entry in the final Git trailer block",
+      });
+    }
+  }
+  if (requireDispatch) {
+    const dispatches = trailers.filter((entry) => entry.key === DISPATCH_KEY);
+    if (dispatches.length === 0) {
+      findings.push({ code: "GIT-03-DISPATCH-MISSING", detail: "no `Dispatch:` entry in the final Git trailer block" });
+    } else if (dispatches.length > 1) {
+      findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
+    } else if (!admittedDispatchValue(dispatches[0].value)) {
+      findings.push({
+        code: "GIT-03-DISPATCH-MALFORMED",
+        detail: `the final \`Dispatch: ${dispatches[0].value}\` entry is not an admitted work-package binding`,
+      });
+    }
   }
   return {
     inspected: true,
     sources: [...sources, ...unreadable.map((entry) => entry.path)],
     findings,
-    message: parts.length > 0 ? parts.join("\n") : null,
+    message: parts.length > 0 ? message : null,
   };
 }
 
