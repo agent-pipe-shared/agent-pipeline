@@ -36,8 +36,8 @@ startup diagnosis, missing-record searches or completed review rounds.
 
 Nova-B status reconciliation is active. The pass began at 61 open and 54
 closed `nova-b` items; after the evidence-backed closures and scope
-dispositions through 2026-09-11, the canonical ledger projection contains 39
-open and 69 closed. Every open item's
+dispositions through 2026-09-11, the canonical ledger projection contains 37
+open and 75 closed. Every open item's
 `done_when` is being checked against the current code before that count is
 treated as remaining work. B3 and B4 are implemented:
 the later native Antigravity runner supersedes Nova's historical Alpha-only
