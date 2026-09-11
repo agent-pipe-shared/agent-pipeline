@@ -24,3 +24,9 @@ intentional failure.
 The independent correction Critic reviewed `de5d32b3..0ce818eb`, recreated
 both the normal and injected executions, and returned PASS with no findings.
 No Full Verify was run for this isolated test-structure slice.
+
+The adjacent pool suite received the same correction in `5366d7f4`. Its six
+existing assertion bodies are now six `node:test` registrations. The normal
+run passed 6/6; the intentionally red LWP03 child wrote the exact sequence
+LWP01 through LWP06 to FD 3, proving later callbacks executed. Its independent
+diff-scoped Critic returned PASS with no findings.

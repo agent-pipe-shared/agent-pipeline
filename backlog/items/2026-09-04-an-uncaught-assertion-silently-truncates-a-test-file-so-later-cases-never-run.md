@@ -132,3 +132,8 @@ repository-wide one-file conversion is not a small fix. The next bounded
 conversion is the adjacent six-case `local-worker-pool-tests` suite; broader
 harness-level completion evidence remains the scalable direction to design.
 See `backlog/evidence/2026-09-11-truncating-suite-inventory.md`.
+
+That bounded conversion is now complete in `5366d7f4`. All six original
+assertion bodies are separately registered; an injected LWP03 failure records
+callback execution through LWP06 over the independent FD-3 channel. The normal
+suite passes 6/6 and an independent Critic returned PASS with no findings.
