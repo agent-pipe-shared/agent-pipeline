@@ -147,6 +147,29 @@ check("binds the real preflight packet and launched native prompt to the exact c
   } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
 });
 
+check("rechecks the result destination immediately before the real native review launch", () => {
+  const repo = repository(); const f = files();
+  try {
+    let calls = 0;
+    const spawnFn = () => { calls += 1; return { status: 0, stdout: stream(), stderr: "" }; };
+    const prepared = prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId, adapter: "claude-host", claimantNonce: "3".repeat(64), executablePath: f.executable, contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, {
+      spawnFn,
+      now: new Date("2026-07-18T12:01:00.000Z"),
+    });
+    assert.equal(calls, 1, "only the bounded native probe has launched");
+    writeFileSync(packetFile(repo, "result.json"), "occupied after prepare\n", { mode: 0o600 });
+    assert.throws(
+      () => executeClaudeNative(prepared, { spawnFn, now: new Date("2026-07-18T12:01:30.000Z") }),
+      (error) => error instanceof ClaudeCriticHostError
+        && error.code === "CLH-DISPATCH-PREFLIGHT"
+        && error.preparation?.code === "RDP-RESULT-DESTINATION"
+        && error.preparation.modelCalls === 0
+        && error.preparation.launcherCalls === 0,
+    );
+    assert.equal(calls, 1, "the real native review must not launch after result-slot drift");
+  } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
+});
+
 check("uses exactly one explicitly weak fresh fallback for an allowlisted pre-verdict failure", () => {
   const repo = repository(); const f = files();
   try {
@@ -257,4 +280,4 @@ check("closes the late fallback dispatch over runner, references and reason", ()
   } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
 });
 
-process.stdout.write(`${passed}/15 checks passed.\n`);
+process.stdout.write(`${passed}/16 checks passed.\n`);

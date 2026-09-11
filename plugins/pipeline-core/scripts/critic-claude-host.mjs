@@ -116,6 +116,17 @@ function dispatchPreparation(packet, options, deps, prompt) {
   }
   return preparation;
 }
+function revalidateDispatchPreparation(prepared, deps) {
+  const preparation = (deps.preflightRoleDispatch ?? preflightRoleDispatch)({
+    root: prepared.packet.checkout.realPath,
+    resultRoot: prepared.controlRoot,
+    packet: prepared.dispatch?.packet,
+  });
+  if (preparation?.status !== "prepared") {
+    fail("CLH-DISPATCH-PREFLIGHT", `Claude Critic dispatch preflight rejected: ${preparation?.code ?? "unknown"}.`, { preparation });
+  }
+  return preparation;
+}
 function fallbackDispatch(packet, reasonCode, exportAuthorizationSha256) {
   return {
     schema: "pipeline.claude-functional-fallback-dispatch.v1",
@@ -239,6 +250,7 @@ export function executeClaudeNative(prepared, deps = {}) {
   }
   const authorizedPrompt = promptFor(durableAuthorization.packet);
   if (prepared.prompt !== authorizedPrompt) fail("CLH-PROMPT", "Native handoff prompt drifted from the authorized candidate packet.");
+  revalidateDispatchPreparation(prepared, deps);
   try {
     const result = runNativeBare(prepared.handle, { checkoutRoot: prepared.packet.checkout.realPath, prompt: authorizedPrompt }, deps);
     return { schema: "pipeline.claude-critic-result.v1", mode: "native", assurance: CLAUDE_NATIVE_ASSURANCE, exportAuthorizationSha256: prepared.exportAuthorizationSha256, verdict: result.verdict, outputSha256: result.outputSha256, outputBytes: result.outputBytes };
