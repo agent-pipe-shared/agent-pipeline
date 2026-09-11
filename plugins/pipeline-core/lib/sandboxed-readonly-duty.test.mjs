@@ -158,13 +158,27 @@ function grantNativeFixture(root, sourceRoots) {
 }
 const nativeConsentRoot = mkdtempSync(join(tmpdir(), "native-transport-consent-"));
 execFileSync("git", ["init", "-q", nativeConsentRoot]);
+execFileSync("git", ["-C", nativeConsentRoot, "config", "user.name", "Fixture"]);
+execFileSync("git", ["-C", nativeConsentRoot, "config", "user.email", "fixture@example.invalid"]);
+mkdirSync(join(nativeConsentRoot, "templates", "prompts"), { recursive: true });
+const nativeReferenceBytes = "Bound native Critic fixture.\n";
+writeFileSync(join(nativeConsentRoot, "templates", "prompts", "critic-review.md"), nativeReferenceBytes);
+execFileSync("git", ["-C", nativeConsentRoot, "add", "templates/prompts/critic-review.md"]);
+execFileSync("git", ["-C", nativeConsentRoot, "commit", "-qm", "native critic fixture"]);
+const NATIVE_COMMIT = execFileSync("git", ["-C", nativeConsentRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const NATIVE_TREE = execFileSync("git", ["-C", nativeConsentRoot, "rev-parse", "HEAD^{tree}"], { encoding: "utf8" }).trim();
+const NATIVE_BLOB = execFileSync("git", ["-C", nativeConsentRoot, "rev-parse", "HEAD:templates/prompts/critic-review.md"], { encoding: "utf8" }).trim();
 grantNativeFixture(nativeConsentRoot, ["templates"]);
 after(() => rmSync(nativeConsentRoot, { recursive: true, force: true }));
-const NATIVE_ROUTE = Object.freeze({ dutyId: "critic_high_risk", runner: "codex", model: "gpt-5.6-terra", effort: "high", sourceSha256: "e".repeat(64), candidateCommit: "b".repeat(40) });
+const NATIVE_ROUTE = Object.freeze({ dutyId: "critic_high_risk", runner: "codex", model: "gpt-5.6-terra", effort: "high", sourceSha256: "e".repeat(64), candidateCommit: NATIVE_COMMIT });
 const NATIVE_FEATURE = Object.freeze({ pageCount: 1, dataCount: NATIVE_CRITIC_PROHIBITED_FEATURES.length, digest: "f".repeat(64) });
 const NATIVE_MCP = Object.freeze({ pageCount: 1, dataCount: 0, digest: "0".repeat(64) });
 const NATIVE_REDUCTION = reduceDiscoveredNativeMcpServers([{ data: [], nextCursor: null }]);
-const NATIVE_RECORDS = Object.freeze([{ path: "templates/prompts/critic-review.md", blobOid: "6".repeat(40), sha256: "7".repeat(64) }]);
+const NATIVE_RECORDS = Object.freeze([{
+  path: "templates/prompts/critic-review.md",
+  blobOid: NATIVE_BLOB,
+  sha256: createHash("sha256").update(nativeReferenceBytes).digest("hex"),
+}]);
 const NATIVE_TUPLE = Object.freeze({
   cli: { version: "0.153.4", sha256: "1".repeat(64) },
   protocolSchemaSha256: "2".repeat(64),
@@ -180,7 +194,7 @@ const NATIVE_SMOKE = Object.freeze({
 function nativeSelection() {
   return buildNativeCriticSelection({
     selectionId: "cncs_aaaaaaaaaaaaaaaaaaaaaaaaaa", repoFingerprint: "4".repeat(64),
-    dispatch: { queueRevision: 7, candidateCommit: "b".repeat(40), candidateTree: "c".repeat(40), referenceSetSha256: nativeCriticCanonicalDigest(NATIVE_RECORDS), requestSha256: "e".repeat(64) },
+    dispatch: { queueRevision: 7, candidateCommit: NATIVE_COMMIT, candidateTree: NATIVE_TREE, referenceSetSha256: nativeCriticCanonicalDigest(NATIVE_RECORDS), requestSha256: "e".repeat(64) },
     route: NATIVE_ROUTE, poDecisionSha256: "5".repeat(64), smokeReceipt: NATIVE_SMOKE, smokeReceiptSha256: nativeCriticCanonicalDigest(NATIVE_SMOKE), createdAt: "2026-09-09T11:59:30.000Z",
   }, { validateRoute: () => NATIVE_ROUTE, expectedTuple: NATIVE_TUPLE, nowMs: NATIVE_NOW, maxSmokeAgeMs: 300_000 });
 }
@@ -204,7 +218,7 @@ function nativeDependencies(response = nativeChild()) {
     observePhysical: () => ({ repoRoot: nativeConsentRoot, scratch: nativeConsentRoot, cliPath: process.execPath, referencePaths: ["templates/prompts/critic-review.md"], rolePath: "roles/critic.md", promptPath: "templates/prompts/critic-review.md", verdictPath: "plugins/pipeline-core/scripts/critic-verdict.schema.json" }),
   };
 }
-function nativeInput() { return { exportContext: EXPORT_CONTEXT, selection: nativeSelection(), expectedTuple: NATIVE_TUPLE, repository: { root: nativeConsentRoot, cliPath: process.execPath }, coordinatorScratch: { path: nativeConsentRoot }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords: NATIVE_RECORDS, reviewBase: "a".repeat(40), reviewMode: "full" }; }
+function nativeInput() { return { exportContext: EXPORT_CONTEXT, selection: nativeSelection(), expectedTuple: NATIVE_TUPLE, repository: { root: nativeConsentRoot, cliPath: process.execPath }, coordinatorScratch: { path: nativeConsentRoot }, referencePaths: ["templates/prompts/critic-review.md"], referenceRecords: NATIVE_RECORDS, reviewBase: NATIVE_COMMIT, reviewMode: "full" }; }
 function nativeArtifactInput() {
   const reviewScope = { kind: "current-artifacts", paths: ["templates/prompts/critic-review.md"] };
   const referenceRecords = [{ ...NATIVE_RECORDS[0], mode: "100644" }];
@@ -233,8 +247,8 @@ test("native Critic consumer accepts and forwards only full exact-range review m
   assert.equal(value.receipt.assurance.class, "native-model-tool-read-only");
   assert.equal(value.receipt.observed.toolSurface.observationSha256, NATIVE_TUPLE.toolSurface.observationSha256);
   assert.equal(childRequest.reviewMode, "full");
-  assert.equal(childRequest.reviewBase, "a".repeat(40));
-  assert.equal(childRequest.candidateCommit, "b".repeat(40));
+  assert.equal(childRequest.reviewBase, NATIVE_COMMIT);
+  assert.equal(childRequest.candidateCommit, NATIVE_COMMIT);
   assert.equal(Object.hasOwn(childRequest, "priorReceipt"), false);
 });
 
@@ -269,7 +283,7 @@ test("native Critic snapshots artifact scope and source coverage before awaiting
 test("native Critic rejects artifact scope omission, mixed input, and stale artifact request digests before child creation", async () => {
   const cases = [
     (input) => { input.referenceRecords[0] = { path: input.referenceRecords[0].path, blobOid: input.referenceRecords[0].blobOid, sha256: input.referenceRecords[0].sha256 }; },
-    (input) => { input.reviewBase = "a".repeat(40); },
+    (input) => { input.reviewBase = NATIVE_COMMIT; },
   ];
   for (const mutate of cases) {
     const input = nativeArtifactInput();

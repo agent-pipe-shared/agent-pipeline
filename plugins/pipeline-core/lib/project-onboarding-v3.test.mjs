@@ -8,7 +8,7 @@ import {
   openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -79,6 +79,26 @@ import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER, validatePoGateAuthorityForRepositor
 import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 import { isDirectInvocation } from "./entrypoint.mjs";
 import { requireProjectOnboardingReady } from "./project-onboarding-ready-gate.mjs";
+
+// CLI-shaped cases use the same production PATH discovery as onboarding.
+// Publish an explicit physical test runtime so the hermetic five-tool CI PATH
+// still proves executable binding without relying on a workstation install.
+const testRuntimeBin = mkdtempSync(join(tmpdir(), "project-onboarding-runtime-"));
+const testRuntimeExecutable = join(testRuntimeBin, process.platform === "win32" ? "codex.exe" : "codex");
+const testRuntimeDaemon = {
+  status: "running", backend: "fixture", managedCodexPath: testRuntimeExecutable, managedCodexVersion: "0.0.0-test",
+  socketPath: join(testRuntimeBin, "app-server.sock"), cliVersion: "0.0.0-test", appServerVersion: "0.0.0-test",
+};
+writeFileSync(testRuntimeExecutable, `#!${process.execPath}\nconst a=process.argv.slice(2);if(a.length===1&&a[0]==="--version")console.log("codex-cli 0.0.0-test");else if(JSON.stringify(a)===JSON.stringify(["app-server","daemon","version"]))console.log(${JSON.stringify(JSON.stringify(testRuntimeDaemon))});else process.exitCode=2;\n`);
+chmodSync(testRuntimeExecutable, 0o755);
+// The host-installed Semgrep used by one push-gate fixture asks only for the
+// kernel name while building its X509 store. Keep that dependency explicit in
+// the fixture rather than widening Verify's five-tool PATH.
+const testUnameExecutable = join(testRuntimeBin, process.platform === "win32" ? "uname.exe" : "uname");
+writeFileSync(testUnameExecutable, `#!${process.execPath}\nif(process.argv.length===3&&process.argv[2]==="-s")console.log("Linux");else process.exitCode=2;\n`);
+chmodSync(testUnameExecutable, 0o755);
+process.env.PATH = `${testRuntimeBin}${delimiter}${process.env.PATH ?? ""}`;
+process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true }));
 
 // This file is BOTH a 166-case suite and the fixture library other suites borrow
 // (`root`, `dispose`, `fakeDeps`, ... are exported below). Until this guard, an
@@ -4740,7 +4760,8 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     assert.equal(state(["materialize-push-threat-model"]).code, 0);
     commit("push threat model");
     assert.equal(produceEvidence().status, 0, "a configured, passing verify command must yield evidence");
-    assert.equal(produceSecurityEvidence().status, 0, "a fresh consumer with no catalog must yield a clean, non-blocking security scan");
+    const securityEvidence = produceSecurityEvidence();
+    assert.equal(securityEvidence.status, 0, `a fresh consumer with no catalog must yield a clean, non-blocking security scan: ${securityEvidence.stderr}${securityEvidence.stdout}`);
 
     // (5) Global Chat is explicitly non-attested: the recorded Chat answer is
     // enough, with no copy-back challenge and no terminal inspection.

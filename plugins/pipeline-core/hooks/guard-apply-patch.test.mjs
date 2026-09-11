@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { closeSync, mkdtempSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, mkdtempSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { delimiter, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -16,6 +16,21 @@ const hookDir = dirname(fileURLToPath(import.meta.url));
 const codexPretoolGuard = join(hookDir, "codex-pretool-guard.mjs");
 const onboardingScript = join(hookDir, "..", "scripts", "project-onboarding-v3.mjs");
 let passed = 0;
+
+// The production lifecycle resolves and binds the physical Codex executable
+// from PATH. CI deliberately exposes only its five core tools, so this suite
+// publishes the Node test process as an explicit, executable Codex fixture
+// instead of weakening runtime discovery or depending on a developer install.
+const testRuntimeBin = mkdtempSync(join(tmpdir(), "guard-apply-patch-runtime-"));
+const testRuntimeExecutable = join(testRuntimeBin, process.platform === "win32" ? "codex.exe" : "codex");
+const testRuntimeDaemon = {
+  status: "running", backend: "fixture", managedCodexPath: testRuntimeExecutable, managedCodexVersion: "0.0.0-test",
+  socketPath: join(testRuntimeBin, "app-server.sock"), cliVersion: "0.0.0-test", appServerVersion: "0.0.0-test",
+};
+writeFileSync(testRuntimeExecutable, `#!${process.execPath}\nconst a=process.argv.slice(2);if(a.length===1&&a[0]==="--version")console.log("codex-cli 0.0.0-test");else if(JSON.stringify(a)===JSON.stringify(["app-server","daemon","version"]))console.log(${JSON.stringify(JSON.stringify(testRuntimeDaemon))});else process.exitCode=2;\n`);
+chmodSync(testRuntimeExecutable, 0o755);
+process.env.PATH = `${testRuntimeBin}${delimiter}${process.env.PATH ?? ""}`;
+process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true }));
 
 function fixture(protectedPattern = null) {
   const root = mkdtempSync(join(tmpdir(), "guard-apply-patch-"));

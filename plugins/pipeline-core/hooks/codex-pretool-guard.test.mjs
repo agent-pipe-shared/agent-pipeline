@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fork, spawnSync } from "node:child_process";
 import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
@@ -26,6 +26,20 @@ const adapter = join(hookDir, "codex-pretool-guard.mjs");
 const humanOverrideScript = join(pluginRoot, "scripts", "guard-human-override.mjs");
 const onboardingScript = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
 let passed = 0;
+
+// Exercise the production PATH resolver even when Verify supplies only its
+// five core tools. The physical test executable is explicit fixture state;
+// no installed Codex binary or relaxed runtime validation is assumed.
+const testRuntimeBin = mkdtempSync(join(tmpdir(), "codex-pretool-runtime-"));
+const testRuntimeExecutable = join(testRuntimeBin, process.platform === "win32" ? "codex.exe" : "codex");
+const testRuntimeDaemon = {
+  status: "running", backend: "fixture", managedCodexPath: testRuntimeExecutable, managedCodexVersion: "0.0.0-test",
+  socketPath: join(testRuntimeBin, "app-server.sock"), cliVersion: "0.0.0-test", appServerVersion: "0.0.0-test",
+};
+writeFileSync(testRuntimeExecutable, `#!${process.execPath}\nconst a=process.argv.slice(2);if(a.length===1&&a[0]==="--version")console.log("codex-cli 0.0.0-test");else if(JSON.stringify(a)===JSON.stringify(["app-server","daemon","version"]))console.log(${JSON.stringify(JSON.stringify(testRuntimeDaemon))});else process.exitCode=2;\n`);
+chmodSync(testRuntimeExecutable, 0o755);
+process.env.PATH = `${testRuntimeBin}${delimiter}${process.env.PATH ?? ""}`;
+process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true }));
 const checkFilter = process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER ?? "";
 const shardIndex = Number.parseInt(process.env.PIPELINE_CODEX_PRETOOL_TEST_SHARD ?? "", 10);
 const shardCount = 3;
