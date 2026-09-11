@@ -15,6 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -223,16 +224,23 @@ try {
     "goldfish-implementor", "goldfish-mechanic", "plan-verifier", "readiness-reviewer",
   ];
   const promptFor = (role) => role.includes("goldfish") ? CLEAN_GOLDFISH : role === "critic" ? CLEAN_CRITIC : "Inspect input.txt with model codex; Ruleset-SHA: 0f38b425.";
-  const packetFor = (role, index, requiredPaths = ["input.txt"]) => ({
-    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
-    dispatchId: `dispatch-${index}`,
-    transport: "direct",
-    role: `pipeline-core:${role}`,
-    prompt: promptFor(role),
-    candidate: { commit, tree },
-    requiredPaths,
-    resultPath: `scratch/result-${index}.json`,
-  });
+  const packetFor = (role, index, requiredPaths = ["input.txt"]) => {
+    const requiredPathSha256 = Object.fromEntries(requiredPaths.map((path) => [
+      path,
+      path === "input.txt" ? createHash("sha256").update("input\n").digest("hex") : "0".repeat(64),
+    ]));
+    return {
+      schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+      dispatchId: `dispatch-${index}`,
+      transport: "direct",
+      role: `pipeline-core:${role}`,
+      prompt: promptFor(role),
+      candidate: { commit, tree },
+      requiredPaths,
+      requiredPathSha256,
+      resultPath: `scratch/result-${index}.json`,
+    };
+  };
 
   check("DP17 the common envelope rejects a stale candidate tree before launch", () => {
     const packet = packetFor("consult-advisor", 17);

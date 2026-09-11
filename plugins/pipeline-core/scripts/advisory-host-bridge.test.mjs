@@ -28,7 +28,7 @@ const candidateTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: p
 const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit, candidateTree };
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const evidenceBundle = () => buildAdvisoryEvidenceBundle(process.cwd(), [
-  "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+  "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
 ]);
 const base = () => {
   const question = "Which boundary is safest?";
@@ -510,7 +510,7 @@ test("advisory evidence binding failures reject before the host adapter starts",
       assert.equal(code, 2, mismatch);
       assert.equal(adapterCalls, 0, mismatch);
       const preparation = events.find((event) => event.type === "dispatch.prepare")?.preparation;
-      assert.equal(preparation?.code, mismatch === "candidate-content" ? "RDP-REQUIRED-PATH-DRIFT" : "RDP-EVIDENCE-BINDING", mismatch);
+      assert.equal(preparation?.code, mismatch === "candidate-content" ? "RDP-REQUIRED-BLOB" : "RDP-EVIDENCE-BINDING", mismatch);
       assert.equal(preparation?.modelCalls, 0, mismatch);
     } finally {
       await rm(root, { recursive: true, force: true });

@@ -454,6 +454,7 @@ function advisoryDispatchPreparation(input, args, root, prepare = preflightRoleD
     prompt: input.question,
     candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree },
     requiredPaths,
+    requiredPathSha256: Object.fromEntries(input.evidenceBundle.references.map(({ path, sha256: digest }) => [path, digest])),
     resultPath: basename(receipt),
   };
   return prepare({ root, resultRoot: dirname(receipt), packet });

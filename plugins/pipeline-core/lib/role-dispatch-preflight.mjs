@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
@@ -13,7 +14,8 @@ export const ROLE_DISPATCH_BATCH_SCHEMA = "pipeline.role-dispatch-batch.v1";
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/u;
 const TRANSPORTS = new Set(["direct", "workflow", "antigravity", "codex"]);
-const PACKET_KEYS = ["candidate", "dispatchId", "prompt", "requiredPaths", "resultPath", "role", "schema", "transport"];
+const PACKET_KEYS = ["candidate", "dispatchId", "prompt", "requiredPathSha256", "requiredPaths", "resultPath", "role", "schema", "transport"];
+const SHA256 = /^[a-f0-9]{64}$/u;
 
 function exactKeys(value, keys) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -48,6 +50,18 @@ function git(root, args) {
   });
   if (result.error || result.status !== 0) return null;
   return String(result.stdout).trim();
+}
+
+function candidateBlobSha256(root, oid) {
+  const result = spawnSync("git", ["-C", root, "cat-file", "blob", oid], {
+    encoding: null,
+    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    shell: false,
+    timeout: 5_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout)) return null;
+  return createHash("sha256").update(result.stdout).digest("hex");
 }
 
 function resultParentIsSafe(root, resultPath) {
@@ -99,6 +113,10 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
     || JSON.stringify([...packet.requiredPaths].sort()) !== JSON.stringify(packet.requiredPaths)) {
     return rejected("RDP-REQUIRED-PATHS", "requiredPaths");
   }
+  if (!exactKeys(packet.requiredPathSha256, packet.requiredPaths)
+    || packet.requiredPaths.some((path) => !SHA256.test(packet.requiredPathSha256[path]))) {
+    return rejected("RDP-REQUIRED-DIGESTS", "requiredPathSha256");
+  }
   if (!normalizedPath(packet.resultPath)) return rejected("RDP-RESULT-PATH", "resultPath");
 
   const policy = dispatchFindings({ subagentType: packet.role, prompt: packet.prompt, transport: packet.transport });
@@ -113,6 +131,9 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
     const match = /^(?:100644|100755) blob ((?:[a-f0-9]{40}|[a-f0-9]{64}))\t/u.exec(row ?? "");
     if (match === null) {
       return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
+    }
+    if (candidateBlobSha256(realRoot, match[1]) !== packet.requiredPathSha256[path]) {
+      return rejected("RDP-REQUIRED-BLOB", `requiredPaths:${path}`);
     }
     const physicalPath = resolve(realRoot, path);
     try {
