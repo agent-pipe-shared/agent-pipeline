@@ -146,6 +146,36 @@ test("plan refuses a settings.json that is valid JSON but not an object", () => 
   }
 });
 
+test("plan and apply preserve present non-object permissions and non-array permissions.allow byte-for-byte", () => {
+  const cases = [
+    { label: "permissions-string", value: { permissions: "allow everything" }, code: "permissions_invalid_shape" },
+    { label: "permissions-null", value: { permissions: null }, code: "permissions_invalid_shape" },
+    { label: "allow-string", value: { permissions: { allow: "Bash(node *)" } }, code: "permissions_allow_invalid_shape" },
+  ];
+  for (const fixture of cases) {
+    const dir = freshDir(fixture.label);
+    try {
+      const bytes = `${JSON.stringify({ unrelated: true, ...fixture.value }, null, 2)}\n`;
+      writeFileSync(settingsPath(dir), bytes, "utf8");
+      const plan = planSettingsAllowlistMerge({ rootDir: dir, candidateSet: "runner-permissions" });
+      assert.equal(plan.status, "unrepairable", fixture.label);
+      assert.equal(plan.diagnostics[0].code, fixture.code, fixture.label);
+      assert.equal(readFileSync(settingsPath(dir), "utf8"), bytes, `${fixture.label}: plan changed bytes`);
+      const applied = applySettingsAllowlistMerge({
+        rootDir: dir,
+        candidateSet: "runner-permissions",
+        planSha256: "0".repeat(64),
+        activate: true,
+      });
+      assert.equal(applied.status, "unrepairable", fixture.label);
+      assert.equal(applied.diagnostics[0].code, fixture.code, fixture.label);
+      assert.equal(readFileSync(settingsPath(dir), "utf8"), bytes, `${fixture.label}: apply changed bytes`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("apply without --activate never writes", () => {
   const dir = freshDir("no-activate");
   try {

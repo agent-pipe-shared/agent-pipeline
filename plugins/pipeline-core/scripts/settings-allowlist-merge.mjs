@@ -22,21 +22,24 @@
 // OWNERSHIP (Direction 3, "shipped with the plugin, written by onboarding, or left to the
 // operator"): this module and its candidate registry are SHIPPED WITH THE PLUGIN -- the
 // data and the merge mechanism are plugin-owned and version-controlled here, not invented
-// ad hoc per project. But applying them to any concrete `.claude/settings.json` is never
-// automatic: nothing in the onboarding apply-* flow calls `applySettingsAllowlistMerge`,
-// and this CLI itself never writes without an operator explicitly running `apply
-// --activate` after reviewing the `plan` output's proposed diff. That split is deliberate
-// and required by this item's own text: an earlier dispatch against this same item edited
+// ad hoc per project. The original `plan`/`apply` candidate set remains an explicit
+// operator-reviewed repair: onboarding never selects it. The narrower
+// `plan-runner-permissions`/`apply-runner-permissions` set contains only the exact entries
+// emitted for every fresh consumer. Lifecycle inspection may return its digest-bound
+// apply command as the typed repair for an already-ready consumer whose project-owned
+// settings contain only part of that fixed set. In either mode this CLI never writes
+// without `--activate`, and apply recomputes the plan against the current preimage before
+// accepting its digest. That split also addresses this item's history: an earlier dispatch
+// against this same item edited
 // this repository's `.claude/settings.json` directly (and, when an `Edit` was refused,
 // routed around the refusal with a `Write`) with no human review of that specific change;
 // the item's own follow-up records that this "needs explicit human review before any
 // settings-file edit is attempted again, and must not route around a classifier refusal by
-// switching tools if one occurs." This mechanism is built so that property is structural,
-// not a promise: `apply` without `--activate` never writes (status
+// switching tools if one occurs." The typed lifecycle action is visible before execution,
+// preserves unrelated settings and existing allow entries, and is authenticated by the
+// exact proposed postimage. `apply` without `--activate` never writes (status
 // "activation-required"), and a stale or mismatched `--plan-sha256` never writes either
-// (status "invalid-plan") -- there is no path from running this CLI to a written file that
-// does not pass through an operator typing `--activate` themselves, after reading the
-// `plan` diff.
+// (status "invalid-plan").
 //
 // This dispatch (NVA-W1-6, 2026-08-18) implements and tests `plan` and `apply` against
 // fixture directories only. It never invokes `apply --activate` against this repository's
@@ -46,13 +49,37 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA = "pipeline.settings-allowlist-merge-plan.v1";
 export const SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA = "pipeline.settings-allowlist-merge-apply.v1";
 const TARGET_RELATIVE = ".claude/settings.json";
+const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
+
+export function pipelineScriptsRunnerAllowlistEntries(scriptsDirAbsolute = SCRIPTS_DIR) {
+  const trimmed = scriptsDirAbsolute.replace(/[\\/]+$/u, "");
+  const forwardSlash = trimmed.replace(/\\/gu, "/");
+  const backslash = trimmed.replace(/\//gu, "\\");
+  const spellings = forwardSlash === backslash ? [forwardSlash] : [forwardSlash, backslash];
+  return ["Bash", "PowerShell"].flatMap((lane) => spellings.map((spelling) => {
+    const glob = spelling.includes("\\") ? `${spelling}\\*` : `${spelling}/*`;
+    return `${lane}(node "${glob}")`;
+  }));
+}
+
+export const RUNNER_PERMISSION_SETTINGS_ALLOWLIST_CANDIDATES = Object.freeze(
+  pipelineScriptsRunnerAllowlistEntries().map((pattern, index) => Object.freeze({
+    id: `onboarding-runner-permission-${index + 1}`,
+    pattern,
+    cliScript: "plugins/pipeline-core/scripts/*",
+    scope: "installed-pipeline-scripts",
+    guardVerification: "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+    rationale: "Fresh onboarding emits this exact lane and separator spelling; Pipeline guards still validate the invoked command independently.",
+  })),
+);
 
 // The ONE registered candidate table (mirrors the "one registered table" convention this
 // plugin already uses for CLI subcommands -- GUARDDERIVE-1 in project-onboarding-v3.mjs --
@@ -93,8 +120,14 @@ function defaultDeps() {
   return { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync };
 }
 
-function candidateSummaries() {
-  return PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES.map(({ id, pattern, cliScript, scope, guardVerification }) => ({ id, pattern, cliScript, scope, guardVerification }));
+function selectedCandidates(candidateSet) {
+  return candidateSet === "runner-permissions"
+    ? RUNNER_PERMISSION_SETTINGS_ALLOWLIST_CANDIDATES
+    : PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES;
+}
+
+function candidateSummaries(candidateSet) {
+  return selectedCandidates(candidateSet).map(({ id, pattern, cliScript, scope, guardVerification }) => ({ id, pattern, cliScript, scope, guardVerification }));
 }
 
 /**
@@ -104,11 +137,12 @@ function candidateSummaries() {
  * (a human, or a report written by one) can review the full diff without ever calling
  * `applySettingsAllowlistMerge`.
  */
-export function planSettingsAllowlistMerge({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateSet = "legacy", deps: overrides = {} } = {}) {
   const fs = { ...defaultDeps(), ...overrides };
   const root = resolve(rootDir);
   const targetPath = join(root, TARGET_RELATIVE);
-  const candidates = candidateSummaries();
+  const selected = selectedCandidates(candidateSet);
+  const candidates = candidateSummaries(candidateSet);
 
   let before = { present: false, bytes: null, sha256: null, parsed: {} };
   if (fs.existsSync(targetPath)) {
@@ -139,15 +173,28 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), deps: over
     before = { present: true, bytes: raw, sha256: sha256(raw), parsed };
   }
 
-  const existingPermissions = before.parsed.permissions && typeof before.parsed.permissions === "object" && !Array.isArray(before.parsed.permissions)
-    ? before.parsed.permissions
-    : {};
-  const existingAllow = Array.isArray(existingPermissions.allow) ? existingPermissions.allow : [];
+  const hasPermissions = Object.hasOwn(before.parsed, "permissions");
+  if (hasPermissions && (before.parsed.permissions === null
+    || typeof before.parsed.permissions !== "object"
+    || Array.isArray(before.parsed.permissions))) {
+    return {
+      schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target: TARGET_RELATIVE,
+      diagnostics: [diagnostic("$.permissions", "permissions_invalid_shape", "existing permissions must be a JSON object", "repair permissions by hand; this mechanism will not replace an existing value")],
+    };
+  }
+  const existingPermissions = hasPermissions ? before.parsed.permissions : {};
+  if (Object.hasOwn(existingPermissions, "allow") && !Array.isArray(existingPermissions.allow)) {
+    return {
+      schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target: TARGET_RELATIVE,
+      diagnostics: [diagnostic("$.permissions.allow", "permissions_allow_invalid_shape", "existing permissions.allow must be an array", "repair permissions.allow by hand; this mechanism will not replace an existing value")],
+    };
+  }
+  const existingAllow = existingPermissions.allow ?? [];
   const existingAllowSet = new Set(existingAllow);
 
   const added = [];
   const skipped = [];
-  for (const candidate of PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES) {
+  for (const candidate of selected) {
     if (existingAllowSet.has(candidate.pattern)) skipped.push(candidate.id);
     else added.push(candidate.id);
   }
@@ -161,7 +208,7 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), deps: over
     };
   }
 
-  const addedPatterns = PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES
+  const addedPatterns = selected
     .filter((candidate) => added.includes(candidate.id))
     .map((candidate) => candidate.pattern);
   const mergedAllow = [...existingAllow, ...addedPatterns];
@@ -184,7 +231,7 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), deps: over
  * (temp file + rename within the same `.claude` directory) and verifies the readback
  * matches the planned bytes before reporting success.
  */
-export function applySettingsAllowlistMerge({ rootDir = process.cwd(), planSha256, activate = false, deps: overrides = {} } = {}) {
+export function applySettingsAllowlistMerge({ rootDir = process.cwd(), candidateSet = "legacy", planSha256, activate = false, deps: overrides = {} } = {}) {
   if (!activate) {
     return {
       schema: SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA, status: "activation-required", root: resolve(rootDir), target: TARGET_RELATIVE,
@@ -192,7 +239,7 @@ export function applySettingsAllowlistMerge({ rootDir = process.cwd(), planSha25
     };
   }
   const fs = { ...defaultDeps(), ...overrides };
-  const plan = planSettingsAllowlistMerge({ rootDir, deps: overrides });
+  const plan = planSettingsAllowlistMerge({ rootDir, candidateSet, deps: overrides });
   if (plan.status === "no-op") {
     return { schema: SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA, status: "no-op", root: plan.root, target: plan.target, diagnostics: [] };
   }
@@ -247,6 +294,8 @@ function usage() {
   return [
     "Usage: settings-allowlist-merge.mjs plan --root <dir>",
     "       settings-allowlist-merge.mjs apply --root <dir> --plan-sha256 <sha256> --activate",
+    "       settings-allowlist-merge.mjs plan-runner-permissions --root <dir>",
+    "       settings-allowlist-merge.mjs apply-runner-permissions --root <dir> --plan-sha256 <sha256> --activate",
     "",
     "Read-only `plan` proposes the plugin-owned Pipeline-CLI allowlist entries",
     "(backlog/items/2026-08-08-the-harness-classifier-blocks-the-onboarding-action-the-pipeline-just-authorized.md)",
@@ -259,7 +308,7 @@ function parse(args) {
   const output = { command: null, root: undefined, planSha256: undefined, activate: false, help: false };
   if (args.length === 0) return { error: "one command is required" };
   if (args[0] === "--help" || args[0] === "-h") return { help: true };
-  if (!["plan", "apply"].includes(args[0])) return { error: `unknown argument: ${args[0]}` };
+  if (!["plan", "apply", "plan-runner-permissions", "apply-runner-permissions"].includes(args[0])) return { error: `unknown argument: ${args[0]}` };
   output.command = args[0];
   for (let index = 1; index < args.length; index += 1) {
     const arg = args[index];
@@ -280,7 +329,7 @@ function parse(args) {
     }
   }
   if (!output.help && !output.root) return { error: "--root is required" };
-  if (output.command === "apply" && !output.help && !output.planSha256) return { error: "apply requires --plan-sha256" };
+  if (output.command.startsWith("apply") && !output.help && !output.planSha256) return { error: "apply requires --plan-sha256" };
   return output;
 }
 
@@ -295,8 +344,9 @@ export function main(args = process.argv.slice(2), {
 
   let output;
   try {
-    if (options.command === "plan") output = planSettingsAllowlistMerge({ rootDir: options.root, deps });
-    else output = applySettingsAllowlistMerge({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
+    const candidateSet = options.command.endsWith("runner-permissions") ? "runner-permissions" : "legacy";
+    if (options.command.startsWith("plan")) output = planSettingsAllowlistMerge({ rootDir: options.root, candidateSet, deps });
+    else output = applySettingsAllowlistMerge({ rootDir: options.root, candidateSet, planSha256: options.planSha256, activate: options.activate, deps });
   } catch (error) {
     writeError(`SETTINGS-ALLOWLIST-MERGE-ERROR: ${String(error?.message ?? "command failed")}\n`);
     return 2;

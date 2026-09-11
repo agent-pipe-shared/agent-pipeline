@@ -188,9 +188,14 @@ all call this SAME command.
 
 ### Step 6 — Guard config, branch protection, push policy
 
-- **Permissions:** commit `.claude/settings.json` with Step 1's binding
-  (`extraKnownMarketplaces` + `enabledPlugins`) plus any needed
-  `permissions.allow` entries.
+- **Permissions:** keep Step 1's plugin binding (`extraKnownMarketplaces` +
+  `enabledPlugins`) and read the onboarding result's `runnerPermissions`
+  field. Fresh onboarding writes and reads back the required Bash/PowerShell
+  `permissions.allow` entries itself; require `current`, or `not-applicable`
+  for host-managed Codex. If this project already owns additional settings,
+  run the returned digest-bound merge action unchanged when inspection reports
+  `projection-drift`; it preserves those settings and reads the exact entries
+  back before onboarding continues.
 - **Guard config (only if needed):** `.claude/guard-config.json`
   (`extraDenyPatterns` array, schema in `guard-git.mjs`'s header comment) for
   denies beyond the shipped git-guard union — most new projects start

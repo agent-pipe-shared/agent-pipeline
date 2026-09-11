@@ -15,6 +15,7 @@ import {
   requireProjectOnboardingReady,
 } from "./project-onboarding-ready-gate.mjs";
 import {
+  expectedPipelineScriptsRunnerAllowlistEntries,
   inspectProjectOnboardingV3,
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
@@ -45,6 +46,12 @@ function fieldPlaceholder(key, rootDir, intent, runner) {
     case "runtime": return {};
     case "continuity": return {};
     case "appServer": return {};
+    case "runnerPermissions": return {
+      target: ".claude/settings.json",
+      status: "current",
+      lanes: ["Bash", "PowerShell"],
+      exactEntries: expectedPipelineScriptsRunnerAllowlistEntries(),
+    };
     case "nextAction": return null;
     case "diagnostics": return [];
     default:
@@ -525,6 +532,15 @@ test("exceptions, malformed envelopes, intent/root mismatch, and false-ready act
     readyResult(path, "session"),
     { ...readyResult(path, "dispatch"), root: `${path}-other` },
     { ...readyResult(path, "dispatch"), runner: null },
+    { ...readyResultWithPushApprovalKeys(path, "dispatch"), runnerPermissions: { status: "current" } },
+    { ...readyResultWithPushApprovalKeys(path, "dispatch"), runnerPermissions: {
+      ...fieldPlaceholder("runnerPermissions", path, "dispatch", "codex"),
+      status: "drifted",
+    } },
+    { ...readyResultWithPushApprovalKeys(path, "dispatch"), runnerPermissions: {
+      ...fieldPlaceholder("runnerPermissions", path, "dispatch", "codex"),
+      exactEntries: expectedPipelineScriptsRunnerAllowlistEntries().filter((entry) => !entry.includes("\\")),
+    } },
     { ...readyResult(path, "dispatch"), nextAction: { kind: "command" } },
     { ...readyResult(path, "dispatch"), diagnostics: [{ code: "false-ready" }] },
     { ...readyResult(path, "dispatch"), status: "future-unknown-status" },

@@ -39,7 +39,7 @@ import {
 } from "./codex-host-layout.mjs";
 // One seed for both manifest tiers.  This is an intentional import cycle
 // (project-onboarding-v3.mjs imports this module); every use is lazy.
-import { freshCalibrationBytes, freshManifestBytes } from "./project-onboarding-v3.mjs";
+import { freshCalibrationBytes, freshManifestBytes, freshSettingsJsonBytes } from "./project-onboarding-v3.mjs";
 import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./runner-profile-migration-v2.mjs";
 import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
 import { CORE_OWNED_V3_SURFACES, loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -85,9 +85,9 @@ const LEGACY_CLASSIFIER_BASELINES = Object.freeze({
 });
 // These seeds exist only in authenticated legacy -> V3 planning memory. They
 // contain the minimum syntax required by the byte-preserving renderer and are
-// never written before the V3-owned values replace them. The preserve-only
-// config seed is deliberately empty: provider, machine and communication
-// preferences are user-owned, not Public migration policy.
+// never written before the V3-owned values replace them. The settings target
+// is preserve-only for existing bytes; when it is absent, the resolver below
+// obtains the fresh onboarding permission seed from its single owner.
 const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
   // Legacy consumer onboarding supports a project with no generated runtime
   // projections. These are renderer inputs only: planning keeps them in
@@ -125,6 +125,7 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
 // the-single-seed-owner.md).
 function resolveLegacyRuntimeSeed(relative) {
   if (relative === ".claude/pipeline.yaml") return freshManifestBytes();
+  if (relative === ".claude/settings.json") return freshSettingsJsonBytes();
   return LEGACY_V3_RUNTIME_SEEDS[relative];
 }
 // A slim private overlay can carry the complete, already-valid V3 source while
@@ -188,6 +189,7 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
 function slimRuntimeSeed(relative, { overlayCalibration = true } = {}) {
   if (relative === ".claude/pipeline.yaml") return freshManifestBytes();
   if (relative === ".claude/pipeline.json" && !overlayCalibration) return freshCalibrationBytes();
+  if (relative === ".claude/settings.json" && !overlayCalibration) return freshSettingsJsonBytes();
   return SLIM_V3_RUNTIME_SEEDS[relative];
 }
 // Direction 2 of backlog/items/2026-08-08-two-manifest-literals-still-bypass-

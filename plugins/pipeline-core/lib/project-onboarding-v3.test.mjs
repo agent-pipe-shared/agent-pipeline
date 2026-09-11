@@ -2164,7 +2164,7 @@ test("blank real root inspect and plan are read-only", () => {
       sessionCapability: "not-required",
       worktreeCapability: "not-required",
     });
-    assert.deepEqual(Object.keys(inspected).sort(), ["appServer", "continuity", "diagnostics", "intent", "nextAction", "repository", "root", "runner", "runtime", "schema", "status"]);
+    assert.deepEqual(Object.keys(inspected).sort(), ["appServer", "continuity", "diagnostics", "intent", "nextAction", "repository", "root", "runner", "runnerPermissions", "runtime", "schema", "status"]);
     const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
@@ -6549,6 +6549,12 @@ test("a recognized read-only host control layout receives portable onboarding wi
     const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path });
     assert.equal(inspected.status, "portable-seed-required");
     assert.equal(inspected.repository.status, "host-managed");
+    assert.deepEqual(inspected.runnerPermissions, {
+      target: ".claude/settings.json",
+      status: "not-applicable",
+      lanes: [],
+      exactEntries: [],
+    });
     assertDiagnostic(inspected, "portable_seed_missing");
     assertSingleLineAction(inspected.nextAction, {
       kind: "command",
@@ -6566,6 +6572,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.state, "fresh-host-managed");
     assert.equal(planned.git.mode, "host-managed");
     assert.equal(planned.git.initializesGit, false);
+    assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
     assert.deepEqual(planned.targets.map((target) => target.path), [
       ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
@@ -6573,6 +6580,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
     assert.equal(applied.git.mode, "host-managed");
+    assert.deepEqual(applied.runnerPermissions, inspected.runnerPermissions);
     assert.equal(applied.authority.runtimeProjection, "missing");
     const cleanupNotNeededDeps = {
       planSessionCleanupRecovery: fakeDeps.planSessionCleanupRecovery,
@@ -8406,6 +8414,79 @@ test("pipelineScriptsRunnerAllowlistEntries() covers both runner lanes, and both
     'PowerShell(node "/home/dev/proj/plugins/pipeline-core/scripts/*")',
     'PowerShell(node "\\home\\dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
   ]);
+});
+
+test("fresh lifecycle writes and reports the exact runner permission seed", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    const expectedBytes = freshSettingsJsonBytes();
+    assert.equal(readFileSync(join(path, ".claude", "settings.json"), "utf8"), expectedBytes);
+    const expectedEntries = JSON.parse(expectedBytes).permissions.allow;
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      deps: fakeDeps,
+      runner: "claude",
+    });
+    assert.deepEqual(observed.runnerPermissions, {
+      target: ".claude/settings.json",
+      status: "current",
+      lanes: ["Bash", "PowerShell"],
+      exactEntries: expectedEntries,
+    });
+  } finally { dispose(path); }
+});
+
+test("a ready one-entry consumer receives and completes the authenticated runner-permission merge", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    completeKickoff(path, "Repair runner permissions", fakeDeps, "ready", "claude");
+    const expectedEntries = JSON.parse(freshSettingsJsonBytes()).permissions.allow;
+    const partial = {
+      statusLine: { type: "command", command: "node user-statusline.mjs" },
+      permissions: { allow: ["Bash(git status *)", expectedEntries[1]] },
+    };
+    writeFileSync(join(path, ".claude", "settings.json"), `${JSON.stringify(partial, null, 2)}\n`);
+
+    const drifted = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
+    assert.equal(drifted.status, "projection-drift");
+    assert.equal(drifted.runnerPermissions.status, "drifted");
+    assert.equal(drifted.nextAction.executable, "node");
+    assert.equal(drifted.nextAction.argv[1], "apply-runner-permissions");
+    const applied = spawnSync(process.execPath, drifted.nextAction.argv, { encoding: "utf8" });
+    assert.equal(applied.status, 0, applied.stderr);
+    assert.equal(JSON.parse(applied.stdout).status, "ready");
+
+    const merged = JSON.parse(readFileSync(join(path, ".claude", "settings.json"), "utf8"));
+    assert.deepEqual(merged.statusLine, partial.statusLine);
+    assert.equal(merged.permissions.allow.includes("Bash(git status *)"), true);
+    for (const entry of expectedEntries) assert.equal(merged.permissions.allow.includes(entry), true, entry);
+    const current = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
+    assert.equal(current.status, "ready");
+    assert.equal(current.runnerPermissions.status, "current");
+    assert.deepEqual(current.runnerPermissions.exactEntries, expectedEntries);
+  } finally { dispose(path); }
+});
+
+test("a ready consumer with malformed permission shapes receives only the typed read-only repair plan", () => {
+  for (const permissions of ["allow everything", null, { allow: "Bash(node *)" }]) {
+    const path = root();
+    try {
+      initializeClaudeOnboardedRoot(path);
+      completeKickoff(path, "Reject malformed runner permissions", fakeDeps, "ready", "claude");
+      const settings = join(path, ".claude", "settings.json");
+      const bytes = `${JSON.stringify({ unrelated: true, permissions }, null, 2)}\n`;
+      writeFileSync(settings, bytes);
+      const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
+      assert.equal(observed.status, "projection-drift");
+      assert.equal(observed.runnerPermissions.status, "drifted");
+      assert.equal(observed.nextAction.executable, "node");
+      assert.equal(observed.nextAction.argv[1], "plan-runner-permissions");
+      assert.equal(observed.nextAction.mutation, false);
+      assert.equal(readFileSync(settings, "utf8"), bytes);
+    } finally { dispose(path); }
+  }
 });
 
 // NVA-B-ROUNDL-F4 regression, one test per remaining delete site. The

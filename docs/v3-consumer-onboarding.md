@@ -73,6 +73,35 @@ The normal progress sequence is ordered and fail-closed:
 | `continuity-damaged` | Run the exact read-only `plan-repair`. A supported bounded repair requires a separate digest-bound confirmation; an unsupported result stops with no next action. | Only the recognized active-turn resume mismatch or an established PO-bound pre-continuity state is repairable. Kickoff history is never rewritten. |
 | `ready` | No onboarding mutation. Continue through the intent-appropriate bootstrap/session/dispatch gate. | Repository capability, current source/runtime/readback, continuity, and every capability required by that intent passed together. |
 
+### Runner permission readback
+
+Claude Code's own command permission layer is separate from Pipeline guards.
+Fresh runtime initialization writes `.claude/settings.json` with the exact
+`Bash(node "<plugin-scripts>/*")` and
+`PowerShell(node "<plugin-scripts>/*")` entries needed for Pipeline commands.
+For a path whose forward-slash and backslash forms differ, both spellings are
+included. This runner setting allows the command to reach the Pipeline; it does
+not weaken or bypass any lifecycle, Git, push, plan, or path guard.
+
+Every V4 lifecycle result exposes the readback as `runnerPermissions`:
+
+- `target` names `.claude/settings.json`.
+- `status` is `pending-runtime-initialization`, `current`, `drifted`,
+  `unavailable`, `not-observed`, or `not-applicable`.
+- `lanes` lists the covered command lanes (`Bash` and `PowerShell`).
+- `exactEntries` lists the entries onboarding requires and has verified when
+  the status is `current`.
+
+A fresh project needs no separate manual permission edit: continue the returned
+runtime-initialization action and require the later readback to report
+`current`. If an otherwise-ready existing consumer has only part of the exact
+set, inspection reports `projection-drift` and returns a digest-bound merge
+action. That action preserves unrelated settings and existing allow entries;
+run the returned command unchanged and require the next inspection to read back
+`current`. A host-managed Codex project does not use this project-owned Claude
+permission layer, so its result explicitly reports `not-applicable` with empty
+lanes and entries.
+
 For the first two write stages, execute the complete `argv` returned by the
 plan rather than reconstructing flags:
 

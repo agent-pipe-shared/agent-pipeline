@@ -5,6 +5,7 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import {
+  expectedPipelineScriptsRunnerAllowlistEntries,
   inspectProjectOnboardingV3,
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
@@ -120,6 +121,23 @@ function exactKeys(value, keys) {
 
 function safeLifecycleStatus(value) {
   return typeof value === "string" && SAFE_STATUS.test(value) ? value : null;
+}
+
+function validRunnerPermissions(value, runner, repository) {
+  if (!exactKeys(value, ["target", "status", "lanes", "exactEntries"])
+    || value.target !== ".claude/settings.json"
+    || !Array.isArray(value.lanes)
+    || !Array.isArray(value.exactEntries)) return false;
+  if (value.status === "not-applicable") {
+    return runner === "codex"
+      && repository?.mode === "host-managed"
+      && value.lanes.length === 0
+      && value.exactEntries.length === 0;
+  }
+  if (value.status !== "current"
+    || JSON.stringify(value.lanes) !== JSON.stringify(["Bash", "PowerShell"])
+    || JSON.stringify(value.exactEntries) !== JSON.stringify(expectedPipelineScriptsRunnerAllowlistEntries())) return false;
+  return true;
 }
 
 function validReadyExpected(value) {
@@ -291,6 +309,7 @@ export function requireProjectOnboardingReady({
     || !plainObject(observed.runtime)
     || !plainObject(observed.continuity)
     || !plainObject(observed.appServer)
+    || !validRunnerPermissions(observed.runnerPermissions, resolvedRunner, observed.repository)
     || !validReadyNextAction(observed.nextAction)
     || !Array.isArray(observed.diagnostics)
     || observed.diagnostics.length !== 0) {

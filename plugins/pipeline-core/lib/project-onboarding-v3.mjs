@@ -73,6 +73,11 @@ import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.
 import { checkVerifyContractConfigured } from "../scripts/push-gate-satisfiability.mjs";
 import { applyInstall as applyPrePushHookInstallOnboarding } from "../scripts/pre-push-hook-install.mjs";
 import { applyInstall as applyPreCommitHookInstallOnboarding } from "../scripts/pre-commit-hook-install.mjs";
+import {
+  pipelineScriptsRunnerAllowlistEntries as registeredPipelineScriptsRunnerAllowlistEntries,
+  planSettingsAllowlistMerge,
+  SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA,
+} from "../scripts/settings-allowlist-merge.mjs";
 import { applySessionCleanupRecovery, planSessionCleanupRecovery, SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -217,6 +222,7 @@ const PROJECT_IGNORE_SEED = [
 // literal array would.
 const REQUIRED_PROJECT_IGNORE_PATTERNS = PROJECT_IGNORE_SEED.split("\n").filter((line) => line.startsWith("/"));
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+const SETTINGS_ALLOWLIST_MERGE_SCRIPT = fileURLToPath(new URL("../scripts/settings-allowlist-merge.mjs", import.meta.url));
 const ONBOARDING_INIT_DRIVER = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
@@ -1202,32 +1208,106 @@ export function freshCriticalHumanProofPolicyBytes(fs = null) {
 // `scriptsDirAbsolute` is this machine's own OS-native absolute path to the
 // installed plugin's `scripts/` directory (see `SCRIPTS_DIR` above) -- never
 // a project-relative path, because a marketplace install is reached from
-// outside the project root. On POSIX, forward- and backslash-normalized
-// forms of a path with no backslashes in it are byte-identical, so only ONE
-// spelling is emitted there; on Windows the two forms differ and both are
-// emitted, matching the item's own "path spelling matters on Windows
-// specifically" framing -- this never invents a spelling the host does not
-// actually need.
+// outside the project root. Both separator spellings are emitted whenever
+// their bytes differ, including for an absolute POSIX path. The second
+// spelling is primarily needed when the same installed Windows path is
+// rendered by different runner lanes, but the permission seed stays
+// platform-independent and deterministic. Only a separator-free input
+// collapses to one spelling.
 export function pipelineScriptsRunnerAllowlistEntries(scriptsDirAbsolute) {
-  const trimmed = scriptsDirAbsolute.replace(/[\\/]+$/u, "");
-  const forwardSlash = trimmed.replace(/\\/gu, "/");
-  const backslash = trimmed.replace(/\//gu, "\\");
-  const spellings = forwardSlash === backslash ? [forwardSlash] : [forwardSlash, backslash];
-  const entries = [];
-  for (const lane of ["Bash", "PowerShell"]) {
-    for (const spelling of spellings) {
-      const glob = spelling.includes("\\") ? `${spelling}\\*` : `${spelling}/*`;
-      entries.push(`${lane}(node "${glob}")`);
-    }
-  }
-  return entries;
+  return registeredPipelineScriptsRunnerAllowlistEntries(scriptsDirAbsolute);
+}
+
+export function expectedPipelineScriptsRunnerAllowlistEntries() {
+  return pipelineScriptsRunnerAllowlistEntries(SCRIPTS_DIR);
 }
 // Materializes `.claude/settings.json`'s fresh-onboarding seed bytes. Kept as
 // its own exported function (mirrors `freshCriticalHumanProofPolicyBytes`,
 // `freshCalibrationBytes` immediately above) so a test can assert on the
 // bytes directly rather than only through the larger `freshBaselines` map.
 export function freshSettingsJsonBytes() {
-  return `${JSON.stringify({ permissions: { allow: pipelineScriptsRunnerAllowlistEntries(SCRIPTS_DIR) } }, null, 2)}\n`;
+  return `${JSON.stringify({ permissions: { allow: expectedPipelineScriptsRunnerAllowlistEntries() } }, null, 2)}\n`;
+}
+
+const RUNNER_PERMISSIONS_TARGET = ".claude/settings.json";
+const RUNNER_PERMISSION_LANES = Object.freeze(["Bash", "PowerShell"]);
+
+function runnerPermissionsReadback({ root = null, runner = null, repository = null, fs = null } = {}) {
+  if (runner === "codex" && repository?.mode === "host-managed") {
+    return {
+      target: RUNNER_PERMISSIONS_TARGET,
+      status: "not-applicable",
+      lanes: [],
+      exactEntries: [],
+    };
+  }
+  const exactEntries = expectedPipelineScriptsRunnerAllowlistEntries();
+  const base = {
+    target: RUNNER_PERMISSIONS_TARGET,
+    status: "not-observed",
+    lanes: [...RUNNER_PERMISSION_LANES],
+    exactEntries,
+  };
+  if (root === null || fs === null) return base;
+  try {
+    const target = safePath(root, RUNNER_PERMISSIONS_TARGET, fs);
+    if (!fs.existsSync(target)) return { ...base, status: "pending-runtime-initialization" };
+    const bytes = decodeUtf8Strict(readBoundPhysicalFile(target, fs), "runner permissions target");
+    const allow = JSON.parse(bytes)?.permissions?.allow;
+    if (!Array.isArray(allow)) return { ...base, status: "drifted" };
+    return { ...base, status: exactEntries.every((entry) => allow.includes(entry)) ? "current" : "drifted" };
+  } catch {
+    return { ...base, status: "unavailable" };
+  }
+}
+
+function withRunnerPermissionsReadback(result, fs) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+  const runnerPermissions = runnerPermissionsReadback({
+    root: result.root ?? null,
+    runner: result.runner ?? null,
+    repository: result.repository ?? null,
+    fs,
+  });
+  const observed = {
+    ...result,
+    runnerPermissions,
+  };
+  if (result.status !== "ready" || runnerPermissions.status === "current"
+    || runnerPermissions.status === "not-applicable") return observed;
+  const plan = planSettingsAllowlistMerge({
+    rootDir: result.root,
+    candidateSet: "runner-permissions",
+    deps: fs,
+  });
+  const nextAction = plan.status === "ready"
+    ? commandAction(
+      [SETTINGS_ALLOWLIST_MERGE_SCRIPT, "apply-runner-permissions", "--root", result.root, "--plan-sha256", plan.planSha256, "--activate"],
+      true,
+      true,
+      SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA,
+      ["ready", "no-op"],
+    )
+    : commandAction(
+      [SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", result.root],
+      false,
+      false,
+      "pipeline.settings-allowlist-merge-plan.v1",
+      ["ready", "no-op", "unrepairable"],
+    );
+  return {
+    ...observed,
+    status: "projection-drift",
+    nextAction,
+    diagnostics: [lifecycleDiagnostic(
+      "$.runnerPermissions",
+      "runner_permissions_drift",
+      "the runner command-permission layer does not contain every exact Pipeline entry",
+      plan.status === "ready"
+        ? "apply the digest-bound settings merge and re-run lifecycle inspection"
+        : "inspect the typed settings merge disposition and repair invalid project-owned settings",
+    )],
+  };
 }
 function freshBaselines(intent, { hostManaged = false, profile = null, fs = null } = {}) {
   const baselines = {
@@ -2443,6 +2523,7 @@ function lifecycleResult({
   runtime,
   continuity = emptyContinuity(),
   appServer = emptyAppServer(),
+  runnerPermissions = runnerPermissionsReadback({ runner, repository }),
   nextAction = null,
   diagnostics = [],
 }) {
@@ -2468,6 +2549,7 @@ function lifecycleResult({
     runtime,
     continuity,
     appServer,
+    runnerPermissions,
     nextAction,
     diagnostics,
   };
@@ -4646,7 +4728,10 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
   // `withPendingOnboardingAsksOnNextActionOnly()`'s own comment for why this
   // merges only into `nextAction.pendingAsks` rather than reusing the
   // apply-portable-seed path's raw per-field side channels.
-  const result = withPendingOnboardingAsksOnNextActionOnly(v4Inspection(rootDir, fs, intent, runner), fs);
+  const result = withRunnerPermissionsReadback(
+    withPendingOnboardingAsksOnNextActionOnly(v4Inspection(rootDir, fs, intent, runner), fs),
+    fs,
+  );
   if (intent === "session" && result?.status === "ready") {
     try {
       clearConsentMarker({ rootDir: result.root ?? rootDir, reason: "onboarding-complete" });
@@ -4697,8 +4782,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     changed: true,
   }));
   const initializesGit = !hostManaged && (inspected.status === "fresh" || !inspected.entries.includes(".git"));
-  const plan = { schema: PLAN_SCHEMA, status: "ready", root: inspected.root, state: inspected.status, intentSha256: sha256(JSON.stringify(stable(intent))), git: hostManaged ? { mode: "host-managed", initialBranch: null, version: null, initializesGit: false } : { mode: "local", initialBranch: "main", version: git.version, initializesGit }, targets, changes: targets.map((target) => target.path), requiresExplicitActivation: true, activation: { command: "apply --activate", createsGitRepository: initializesGit, createsCommit: false } };
-  AUTHENTICATED.set(plan, { signature: JSON.stringify(plan), root: inspected.root, targets: internal, state: inspected.status, initializesGit, hostManaged });
+  const plan = { schema: PLAN_SCHEMA, status: "ready", root: inspected.root, state: inspected.status, intentSha256: sha256(JSON.stringify(stable(intent))), git: hostManaged ? { mode: "host-managed", initialBranch: null, version: null, initializesGit: false } : { mode: "local", initialBranch: "main", version: git.version, initializesGit }, targets, changes: targets.map((target) => target.path), runnerPermissions: runnerPermissionsReadback({ root: inspected.root, runner, repository: { mode: hostManaged ? "host-managed" : "local" }, fs }), requiresExplicitActivation: true, activation: { command: "apply --activate", createsGitRepository: initializesGit, createsCommit: false } };
+  AUTHENTICATED.set(plan, { signature: JSON.stringify(plan), root: inspected.root, targets: internal, state: inspected.status, initializesGit, hostManaged, runner });
   return plan;
 }
 
@@ -5205,6 +5290,12 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     // diagnostic entry the caller has to notice on its own (see
     // `unresolvedAuthorIdentityKeys()`'s doc comment for the full history).
     const missingIdentity = unresolvedAuthorIdentityKeys(root, state.hostManaged, fs);
+    const runnerPermissions = runnerPermissionsReadback({
+      root,
+      runner: state.runner,
+      repository: { mode: state.hostManaged ? "host-managed" : "local" },
+      fs,
+    });
     // Same additive side-channel shape as `missingIdentity`'s `nextAction`
     // above, kept as its own field rather than competing for that single
     // slot: host-managed roots are out of scope (their `.git`/scaffold is
@@ -5215,9 +5306,9 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     const missingIgnorePatterns = state.hostManaged ? [] : missingProjectIgnorePatterns(readProjectIgnoreText(root, fs));
     const projectIgnoreGap = missingIgnorePatterns.length > 0 ? { projectIgnoreGapAction: collectProjectIgnoreGapAction(missingIgnorePatterns) } : {};
     if (missingIdentity.length > 0) {
-      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, prePushHookInstall, preCommitHookInstall, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
+      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
     }
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, prePushHookInstall, preCommitHookInstall, diagnostics: [], ...projectIgnoreGap };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, diagnostics: [], ...projectIgnoreGap };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
@@ -6310,11 +6401,13 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
 }
 
 export function planProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", intent = "onboarding", runner, operatorAuthority = null } = {}) {
-  return planLifecycle(rootDir, deps(overrides), operation, intent, runner, operatorAuthority);
+  const fs = deps(overrides);
+  return withRunnerPermissionsReadback(planLifecycle(rootDir, fs, operation, intent, runner, operatorAuthority), fs);
 }
 
 export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", planSha256, activate = false, intent = "onboarding", runner, operatorAuthority = null } = {}) {
-  return applyLifecycle(rootDir, deps(overrides), operation, planSha256, activate, intent, runner, operatorAuthority);
+  const fs = deps(overrides);
+  return withRunnerPermissionsReadback(applyLifecycle(rootDir, fs, operation, planSha256, activate, intent, runner, operatorAuthority), fs);
 }
 
 // Wave 4 onboarding coordinator, step 6 (design SSe; NVA-W5-COORD-STEP6-1).
