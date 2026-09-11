@@ -6,8 +6,89 @@
   "effort": "xhigh",
   "rulesetSha": "0.6.2+codex.20260911033523.8593a8a",
   "dispatcher": "elephant",
-  "outcome": "completed",
-  "commits": [],
+  "candidateCommit": "ba2b745b91b6ca5a379dc90bd6c0c28eb324da56",
+  "resultSha256": null,
+  "outcome": "pending",
+  "commits": [
+    "ba2b745b91b6ca5a379dc90bd6c0c28eb324da56"
+  ],
+  "log": [
+    {
+      "phase": "migration",
+      "toolUseCount": 0,
+      "note": "Canonical schema correction: previous validation checked only criticRequired, not validateDispatchRecord. Historical tool counts were not recorded; historical entries use 0 as an unmeasured migration baseline, not a claim that no tools ran."
+    },
+    {
+      "phase": "implementation",
+      "toolUseCount": 0,
+      "note": "Owned six-file recovery draft. Fixed foreign-lock removal, rejected malformed UTF-8, preserved authenticated prefix bytes and valid empty-ledger compatibility. Abrupt-death stale-lock recovery remains fail-closed and separately tracked."
+    },
+    {
+      "phase": "test",
+      "toolUseCount": 0,
+      "note": "Baseline node --test plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs: 130/130 passed, exit 0; evidence/NVA-B-HGO-AUDIT-REPAIR-2-baseline-tests.log."
+    },
+    {
+      "phase": "test",
+      "toolUseCount": 0,
+      "note": "Expanded-suite first run exited 1 because the new contention test did not assert the expected HGO-AUDIT-LOCKED exception; corrected the test assertion. Evidence: evidence/NVA-B-HGO-AUDIT-REPAIR-2-focused-tests.log."
+    },
+    {
+      "phase": "test",
+      "toolUseCount": 0,
+      "note": "Final node --test plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs: 144/144 passed, zero failed/skipped, exit 0. Evidence: evidence/NVA-B-HGO-AUDIT-REPAIR-2-final-tests.log."
+    },
+    {
+      "phase": "check",
+      "toolUseCount": 0,
+      "note": "Four node --check commands and the scoped six-path git diff --check passed with exit 0. Exact commands and output: evidence/NVA-B-HGO-AUDIT-REPAIR-2-final-checks.json."
+    },
+    {
+      "phase": "commit",
+      "toolUseCount": 0,
+      "note": "Coordinator committed implementation as ba2b745b91b6ca5a379dc90bd6c0c28eb324da56; parent 67ccaf8fdd0ed0b7e6af8f3b0d47e6df58995009; tree e59ea3d95f1963ee90876ef4eff04d19e8849540. No commit was made by the correction follow-up."
+    },
+    {
+      "phase": "critic",
+      "toolUseCount": 0,
+      "note": "Round-one Critic verdict FAIL. Coordinator-authored durable transcription/disposition: backlog/evidence/2026-09-12-hgo-audit-repair-critic-round1.md. No separate raw execution receipt exists. T1 correction review remains required."
+    },
+    {
+      "phase": "correction",
+      "toolUseCount": 0,
+      "note": "ADR now identifies exact rollback and final corrected-candidate approval binding. Separate stale-lock backlog item is owned by pipeline and due 2026-09-30; left unchanged. Four implementation source files were verified unchanged from the implementation commit."
+    },
+    {
+      "phase": "live-readback",
+      "toolUseCount": 0,
+      "note": "Fresh read-only verify-audit exited 0 with valid status and 6165 authenticated entries. Machine-captured output: backlog/evidence/2026-09-12-hgo-live-audit-readback.json. No live repair was performed; readback does not establish how or when the historical ledger was restored."
+    },
+    {
+      "phase": "acceptance",
+      "toolUseCount": 0,
+      "note": "The backlog item proposes valid live readback plus adversarial fixture coverage for acceptance. Correction review, acceptance of that disposition, final-candidate threat-model approval and PO acceptance remain open. No new full Verify result or test rerun is claimed by the documentation/evidence follow-up."
+    },
+    {
+      "phase": "canonical-validation",
+      "toolUseCount": 3,
+      "note": "This normalization follow-up used two read commands and one correction command. Imported validateDispatchRecord from plugins/pipeline-core/lib/dispatch-record.mjs accepted the normalized record and its disk readback. git diff --check -- evidence/dispatch-record-NVA-B-HGO-AUDIT-REPAIR-2.json exited 0."
+    }
+  ],
+  "report": {
+    "text": "Implementation committed as ba2b745b91b6ca5a379dc90bd6c0c28eb324da56. Focused tests: 144/144 passed; syntax: 4/4; scoped diff checks passed. Evidence pointers and commands are retained in log. Fresh read-only live audit verification passed with 6165 entries; no live repair claimed. Rollback and candidate-bound approval wording corrected; Critic round-one FAIL retained as coordinator-authored transcription/disposition, not raw execution evidence. Implementation source and other agents files unchanged. No correction commit or test rerun. T1 correction review, final-candidate threat-model approval, acceptance of the live-state disposition and PO acceptance remain open. Record stays pending with resultSha256 null until a terminal result is bound.",
+    "changedFiles": [
+      "backlog/evidence/2026-09-12-hgo-audit-repair-critic-round1.md",
+      "backlog/evidence/2026-09-12-hgo-live-audit-readback.json",
+      "backlog/items/2026-09-02-a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20.md",
+      "docs/adr/0059-signed-human-guard-override.md",
+      "docs/human-guard-override-threat-model.md",
+      "evidence/dispatch-record-NVA-B-HGO-AUDIT-REPAIR-2.json",
+      "plugins/pipeline-core/lib/human-guard-override.mjs",
+      "plugins/pipeline-core/lib/human-guard-override.test.mjs",
+      "plugins/pipeline-core/scripts/guard-human-override.mjs",
+      "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
+    ]
+  },
   "criticRequired": {
     "schema": "pipeline.critic-required-decision.v1",
     "trigger": {
@@ -24,107 +105,5 @@
     },
     "appliedRow": "T1",
     "reason": "Authenticated human-override audit recovery changes a guardrail and security boundary."
-  },
-  "log": [
-    {
-      "type": "inspection",
-      "finding": "Taking ownership of the existing six-file audit-repair draft; initial review found a possible lock-ownership cleanup bug and is checking genesis compatibility."
-    },
-    {
-      "type": "test",
-      "command": "node --test plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs",
-      "exitCode": 0,
-      "evidence": "evidence/NVA-B-HGO-AUDIT-REPAIR-2-baseline-tests.log"
-    },
-    {
-      "type": "test",
-      "command": "node --test plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs",
-      "exitCode": 1,
-      "evidence": "evidence/NVA-B-HGO-AUDIT-REPAIR-2-focused-tests.log"
-    },
-    {
-      "type": "test-fix",
-      "finding": "The new contention test initially failed because ordinary denied-event append throws HGO-AUDIT-LOCKED. Added the explicit expected refusal assertion; implementation was correct."
-    },
-    {
-      "type": "test",
-      "command": "node --test plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs",
-      "exitCode": 0,
-      "evidence": "evidence/NVA-B-HGO-AUDIT-REPAIR-2-final-tests.log"
-    },
-    {
-      "type": "check",
-      "command": "node --check plugins/pipeline-core/lib/human-guard-override.mjs",
-      "exitCode": 0,
-      "evidence": "evidence/NVA-B-HGO-AUDIT-REPAIR-2-final-checks.json"
-    },
-    {
-      "type": "check",
-      "command": "node --check plugins/pipeline-core/lib/human-guard-override.test.mjs",
-      "exitCode": 0,
-      "evidence": "evidence/NVA-B-HGO-AUDIT-REPAIR-2-final-checks.json"
-    },
-    {
-      "type": "check",
-      "command": "node --check plugins/pipeline-core/scripts/guard-human-override.mjs",
-      "exitCode": 0,
-      "evidence": "evidence/NVA-B-HGO-AUDIT-REPAIR-2-final-checks.json"
-    },
-    {
-      "type": "check",
-      "command": "node --check plugins/pipeline-core/scripts/guard-human-override.test.mjs",
-      "exitCode": 0,
-      "evidence": "evidence/NVA-B-HGO-AUDIT-REPAIR-2-final-checks.json"
-    },
-    {
-      "type": "check",
-      "command": "git diff --check -- plugins/pipeline-core/lib/human-guard-override.mjs plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs docs/human-guard-override-threat-model.md docs/adr/0059-signed-human-guard-override.md",
-      "exitCode": 0,
-      "evidence": "evidence/NVA-B-HGO-AUDIT-REPAIR-2-final-checks.json"
-    },
-    {
-      "type": "findings",
-      "findings": [
-        "Fixed failed-lock acquisition removing another audit writer lock in both append and repair.",
-        "Rejected malformed UTF-8 rather than authenticating replacement decoding.",
-        "Preserved existing authenticated ledger bytes on ordinary append.",
-        "Preserved valid authenticated empty-ledger compatibility."
-      ],
-      "residual": "Abrupt-death stale locks remain closed; coordinator explicitly deferred safe reclamation. No exact existing backlog item found."
-    }
-  ],
-  "report": {
-    "text": "1. DoD results\nPassed: focused library/CLI tests 144/144; syntax checks 4/4; scoped git diff --check. Strict classification, authenticated prefix/tail repair, preimage drift, one-event interruption retry, terminal tamper, typed attended CLI, and contention are covered.\n\n2. Evidence\nevidence/NVA-B-HGO-AUDIT-REPAIR-2-final-tests.log — node --test plugins/pipeline-core/lib/human-guard-override.test.mjs plugins/pipeline-core/scripts/guard-human-override.test.mjs — exit 0.\nevidence/NVA-B-HGO-AUDIT-REPAIR-2-final-checks.json — four node --check commands and exact scoped git diff --check — all exit 0.\nevidence/dispatch-record-NVA-B-HGO-AUDIT-REPAIR-2.json — v3, structured T1 criticRequired, commits [].\n\n3. Changed files\nplugins/pipeline-core/lib/human-guard-override.mjs — adopted recovery draft; fixed foreign-lock removal, rejected malformed UTF-8, preserved authenticated prefix bytes and valid empty-ledger compatibility.\nplugins/pipeline-core/lib/human-guard-override.test.mjs — authenticated-tail recovery, interruption/idempotency, lock contention, exact-prefix and terminal corruption coverage.\nplugins/pipeline-core/scripts/guard-human-override.mjs — exact attended repair-audit CLI.\nplugins/pipeline-core/scripts/guard-human-override.test.mjs — preparation refusal, typed confirmation, non-attended and terminal refusal, exact flags.\ndocs/human-guard-override-threat-model.md — recovery trust boundary and explicit stale-lock/power-loss limitations.\ndocs/adr/0059-signed-human-guard-override.md — audit-recovery amendment and bounded completion guarantee.\n\n4. Deliberately not changed\nOther agents' dirty files, the real repository ledger, and stale audit locks. No exact stale-HGO-lock backlog item was found; coordinator will track crash-safe ownership/reclamation separately.\n\n5. Deviations from spec\nNo unapproved deviation. Coordinator explicitly bounded interruption recovery to available-lock cases and excluded stale-lock reclamation; abrupt-death stale locks remain HGO-AUDIT-LOCKED. No commits, as requested.\n\n6. Open items\nFull Verify: pending coordinator. Independent review: pending T1 Critic. Live attended ledger repair and verify-audit: pending coordinator/Human. PO acceptance: open. No active stop condition.",
-    "changedFiles": [
-      "docs/adr/0059-signed-human-guard-override.md",
-      "docs/human-guard-override-threat-model.md",
-      "plugins/pipeline-core/lib/human-guard-override.mjs",
-      "plugins/pipeline-core/lib/human-guard-override.test.mjs",
-      "plugins/pipeline-core/scripts/guard-human-override.mjs",
-      "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
-    ]
-  },
-  "finalChecks": {
-    "focusedTests": {
-      "tests": 144,
-      "passed": 144,
-      "failed": 0,
-      "skipped": 0
-    },
-    "syntax": {
-      "passed": 4,
-      "failed": 0
-    },
-    "diffCheck": {
-      "exitCode": 0
-    }
-  },
-  "fileDigests": {
-    "docs/adr/0059-signed-human-guard-override.md": "9c9c391f7de2afb2b2f3a4f6273b72b62357203aecec4958267c0091e69378f7",
-    "docs/human-guard-override-threat-model.md": "5ce57b7ae383cf145e955579c55b3baeb9735d1cb4fa26575c86281e84dfbeaa",
-    "plugins/pipeline-core/lib/human-guard-override.mjs": "cd13c03741745f34a3f92c3d8fc5b00452ca5e6c75c8e7255f70c2d0ebc5f601",
-    "plugins/pipeline-core/lib/human-guard-override.test.mjs": "a6be5c47a823474f7330c6b52d2c0b2288d9f0b56e42579f0b7cb0716a56020d",
-    "plugins/pipeline-core/scripts/guard-human-override.mjs": "3dbd1677d232a00e128bf1cfd448d754eec6f6cfe440fd8af34180c8bb5eaa30",
-    "plugins/pipeline-core/scripts/guard-human-override.test.mjs": "3d240042712471d0c32287adec2dcb06762d7b5344a4862c0cd4782b5f561e8e"
   }
 }

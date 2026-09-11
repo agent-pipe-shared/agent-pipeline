@@ -317,6 +317,17 @@ old head remains terminal-invalid.
 a plan or signable intent. Only the recoverable torn-append classification names
 `repair-audit`; terminal-invalid states retain the ordinary `HGO-AUDIT` refusal.
 
+Rollback is the exact revert of implementation commit
+`ba2b745b91b6ca5a379dc90bd6c0c28eb324da56` plus a focused rerun of the HGO
+library and CLI suites. A rollback never rewrites the audit ledger,
+head, key, request, plan or capability stores. If a live ledger has already been
+reconciled, its authenticated `audit-repaired` event remains immutable history
+and is valid under the earlier reader as an ordinary authenticated audit event.
+The detached threat-model approval must bind the final corrected candidate at
+push preparation. Prepare it after the implementation and correction review are
+frozen; implementation tests and a Critic result do not substitute for that
+approval, and approval of a provisional candidate does not cover later changes.
+
 ## Alternatives considered
 
 - **Build a bespoke signed override for each denial class separately

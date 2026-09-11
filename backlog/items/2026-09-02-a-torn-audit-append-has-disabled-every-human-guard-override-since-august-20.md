@@ -92,3 +92,21 @@ Three separate things, and the first is the important one.
   repairs, and is cited by the `HGO-AUDIT` denial text.
 - This repository's own ledger is reconciled by that operation, and
   `verify-audit` passes.
+
+## Live-state reconciliation — 2026-09-12
+
+The repository ledger is already valid at the
+[captured live readback](../evidence/2026-09-12-hgo-live-audit-readback.json).
+That read-only `guard-human-override.mjs verify-audit` invocation passed with
+6165 authenticated entries. It does not establish how or when the historical
+ledger was restored, or demonstrate a live invocation of the new repair
+operation. The implementation refuses an unnecessary repair of a valid ledger
+with `HGO-AUDIT-REPAIR-NOT-REQUIRED`; deliberately tearing that ledger to repeat
+the historical incident would damage valid production state.
+
+The evidence proposed for the live half of the last criterion is the fresh valid
+readback. Application of the new operation is established by the adversarial
+fixture that creates the exact authenticated-prefix/contiguous-tail state,
+repairs it once, survives interruption between ledger and head, completes
+idempotently and verifies the result. No live ledger bytes are damaged merely
+to recreate an incident that has already been restored.

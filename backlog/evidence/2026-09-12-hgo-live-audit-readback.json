@@ -1,0 +1,11 @@
+{
+  "schema": "pipeline.human-guard-override-audit-verification.v1",
+  "status": "valid",
+  "entries": 6165,
+  "lastMac": "a51e7ba41c30b07a9cfafe297058b7f7ec22bec99e2042d4b443b773cff22101",
+  "observedAt": "2026-09-11T23:15:37.531Z",
+  "command": "node plugins/pipeline-core/scripts/guard-human-override.mjs verify-audit --repo <repository-root>",
+  "commandRoot": "current-repository-root",
+  "exitCode": 0,
+  "note": "Read-only live readback captured by the verification command. No audit repair was performed. This observation does not establish how or when the historical ledger was restored."
+}
