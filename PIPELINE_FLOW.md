@@ -284,10 +284,10 @@ V3-Ablauf**. Sie hilft dir, einen Weg zu wählen und zu verstehen, wer was tut.
 Sie erlaubt nicht, ein Gate zu überspringen oder ein Projekt zu verändern. Das
 aktive PRD und die Spec definieren die Arbeit; das
 [Operating Model](docs/operating-model.md), die `pipeline.user.yaml` des
-Projekts, `.claude/pipeline.yaml` und die Projektkalibrierung auf ihrer
+Projekts, die optionale `.claude/pipeline.yaml` und die Projektkalibrierung auf ihrer
 aufgelösten Autoritätsstufe (`project/pipeline.json`, sonst
 `.claude/pipeline.json`) definieren den anwendbaren Vertrag. Bei einem
-Widerspruch gilt diese Quelle.
+Widerspruch mit einer dieser Authority-Quellen gilt die jeweilige Authority.
 
 ## Hier beginnen: eine Änderung, ein ehrlicher Weg
 

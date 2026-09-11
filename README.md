@@ -121,15 +121,16 @@ nothing new is added. Details: [`docs/operating-model.md`](docs/operating-model.
 A project can bring its own house rules, split into two classes: **guidelines**
 are recommended principles you may deliberately deviate from, as long as the
 deviation is named; **policies** are binding rules that block a gate the moment
-they're violated. Both live under
-[`governance/examples/`](governance/examples/README.md), wired in through the
-`governance` block in `.claude/pipeline.yaml`.
+they're violated. Start from the templates under
+[`governance/examples/`](governance/examples/README.md), copy the selected
+rules into project-owned paths, and configure those paths through the
+`governance` block in the project's manifest.
 
-Enforcement differs by class: guidelines feed into every plan and are the
-Critic's review benchmark — an unnamed deviation is the finding, not the
-deviation itself. Machine-checkable policies automatically fail the
-security-scan gate; the non-machine-checkable checklist gets ticked off by the
-Critic before every push. A pattern played all the way through — from house
+Once configured, enforcement differs by class: applicable guidelines feed into
+the plan and become the Critic's review benchmark — an unnamed deviation is the
+finding, not the deviation itself. Evaluated machine-checkable policies can
+fail their applicable gate; human-checkable items become explicit obligations
+in the applicable review. A pattern played all the way through — from house
 rule to enforced rule — lives in the
 [worked example](governance/examples/worked-example.md).
 
@@ -323,15 +324,17 @@ nichts Neues hinzu. Details: [`docs/operating-model.md`](docs/operating-model.md
 Ein Projekt kann eigene Hausregeln mitbringen — getrennt in zwei Klassen:
 **Guidelines** sind empfohlene Prinzipien, von denen bewusst und benannt
 abgewichen werden darf; **Policies** sind verbindliche Regeln, die ein Gate
-blockieren, sobald sie verletzt werden. Beide leben unter
-[`governance/examples/`](governance/examples/README.md) und werden über den
-`governance`-Block in `.claude/pipeline.yaml` eingebunden.
+blockieren, sobald sie verletzt werden. Nutze die Vorlagen unter
+[`governance/examples/`](governance/examples/README.md) als Ausgangspunkt,
+kopiere die ausgewählten Regeln in projektverwaltete Pfade und konfiguriere
+diese Pfade über den `governance`-Block im Projektmanifest.
 
-Durchgesetzt wird jede Klasse unterschiedlich: Guidelines fließen in jeden Plan
-ein und sind der Prüf-Maßstab des Critic — eine unbenannte Abweichung ist der
-Befund, nicht die Abweichung selbst. Maschinell prüfbare Policies blockieren
-automatisch das Security-Scan-Gate; die nicht-maschinelle Checkliste hakt der
-Critic vor jedem Push ab. Ein Muster komplett durchgespielt — von der
+Nach der Konfiguration wird jede Klasse unterschiedlich durchgesetzt:
+Anwendbare Guidelines fließen in den Plan ein und sind der Prüf-Maßstab des
+Critic — eine unbenannte Abweichung ist der Befund, nicht die Abweichung selbst.
+Ausgewertete maschinell prüfbare Policies können ihr anwendbares Gate
+blockieren; menschenprüfbare Punkte werden explizite Pflichten im anwendbaren
+Review. Ein Muster komplett durchgespielt — von der
 Hausregel bis zur erzwungenen Regel — steht im
 [Worked Example](governance/examples/worked-example.md).
 
