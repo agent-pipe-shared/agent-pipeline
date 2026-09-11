@@ -234,7 +234,7 @@ test("a directly written v2 modelOverride and malformed v2 record cannot mint PA
   const base = {
     schema: "pipeline.dispatch-record.v2", taskId: "DOD-V2", agentType: "goldfish-deep",
     model: "claude-opus-5", effort: "xhigh", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
-    candidateCommit: sha, outcome: "completed", commits: [sha], log: [],
+    candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed", commits: [sha], log: [],
     report: { text: "Done.", changedFiles: ["src/thing.mjs"] },
   };
   const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
@@ -251,7 +251,7 @@ test("v2 records bind the verified full commit through candidateCommit and commi
   const record = {
     schema: "pipeline.dispatch-record.v2", taskId: "DOD-V2-BIND", agentType: "goldfish-implementor",
     model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
-    candidateCommit: sha, outcome: "completed", commits: [sha], log: [],
+    candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed", commits: [sha], log: [],
     report: { text: "Done.", changedFiles: ["src/thing.mjs"] },
   };
   writeRecord("DOD-V2-BIND", record);

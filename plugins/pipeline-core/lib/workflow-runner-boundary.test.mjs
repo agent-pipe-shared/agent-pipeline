@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { normalizeWorkflowRunnerOutcome, runSyntheticWorkflowDispatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { coordinateWorkflowRunnerReturn, normalizeWorkflowRunnerOutcome, runSyntheticWorkflowDispatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
+import { gitDeps, verifyCommit } from "../scripts/dispatch-authorship-verify.mjs";
+import { writeDispatchRecord } from "../scripts/dispatch-record-write.mjs";
 
 let passed = 0;
 const A = "a".repeat(64);
@@ -94,8 +100,9 @@ check("adapter exception is reduced to a log-safe single-call outcome", () => {
   assert.deepEqual(result, { ok: false, code: "WR-ADAPTER-FAILED", mode: "bounded-write", adapterInvocations: 1 });
 });
 
-const identity = { dispatchId: "dispatch-01", attemptId: "attempt-01" };
+const identity = { dispatchId: "P5B-RETURN-1", attemptId: "attempt-01" };
 const expected = { identity, acknowledgedResultSha256: null };
+const recordExpected = { ...expected, taskId: "P5B-RETURN-1", candidateCommit: "c".repeat(40) };
 const hostDiagnostic = { exitCode: 1, signal: null, stdoutBytes: 12, stderrBytes: 20, stdoutOverflow: false, stderrOverflow: false, tailSha256: A, capturedTailBytes: 32 };
 const trustedHost = { structured: true, code: "host-sandbox-bootstrap-rejected", beforeProductStart: true, evidenceSha256: B, diagnostic: hostDiagnostic, calibration: null };
 function observation(state, productVerdict = null, host = null) {
@@ -112,6 +119,131 @@ check("completed without a delivered final remains retrievable", () => {
 check("schema-valid succeeded final exposes only its digest", () => {
   const result = normalizeWorkflowRunnerOutcome(expected, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }));
   assert.equal(result.code, "WR-OUTCOME-FINAL"); assert.equal(result.resultSha256, A); assert.equal(result.faultDomain, "unknown");
+});
+
+check("final native return writes canonical v2 evidence and passes authorship verification", () => {
+  const root = mkdtempSync(join(tmpdir(), "workflow-return-record-"));
+  try {
+    mkdirSync(join(root, "evidence")); mkdirSync(join(root, "requests")); mkdirSync(join(root, "src"));
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Workflow Test"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "workflow@example.test"], { cwd: root });
+    writeFileSync(join(root, "src", "x.mjs"), "export const x = 1;\n");
+    execFileSync("git", ["add", "src/x.mjs"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "feat(test): workflow result\n\nDispatch: P5B-RETURN-1 (goldfish)\nAI-Assisted: true"], { cwd: root });
+    const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const requestPath = "requests/dispatch-return.json";
+    const record = {
+      schema: "pipeline.dispatch-record.v2", taskId: "P5B-RETURN-1",
+      agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+      rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit, resultSha256: A,
+      outcome: "completed", commits: [candidateCommit], log: [{ phase: "done", toolUseCount: 4 }],
+      report: { text: "Workflow dispatch completed.", changedFiles: ["src/x.mjs"] },
+    };
+    writeFileSync(join(root, requestPath), `${JSON.stringify({
+      schema: "pipeline.dispatch-record-write-request.v1",
+      target: "evidence/dispatch-record-P5B-RETURN-1.json",
+      record,
+    })}\n`);
+    const finalObservation = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
+    const result = coordinateWorkflowRunnerReturn({ ...recordExpected, candidateCommit }, finalObservation, {
+      identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit, requestPath,
+    }, {
+      writeDispatchRecord: ({ requestPath: path }) => writeDispatchRecord({ repoRoot: root, requestPath: path }),
+      verifyCommit: (sha) => verifyCommit(sha, gitDeps({ repoRoot: root, evidenceDir: join(root, "evidence") })),
+    });
+    assert.equal(result.ok, true); assert.equal(result.code, "WR-OUTCOME-FINAL-RECORDED");
+    assert.equal(result.record.authorship, "bound"); assert.equal(result.adapterInvocations, 2);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("return coordinator rejects stale bindings before record I/O", () => {
+  let calls = 0;
+  const result = coordinateWorkflowRunnerReturn(recordExpected,
+    observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }), {
+      identity, taskId: "P5B-RETURN-1", resultSha256: B, candidateCommit: "c".repeat(40), requestPath: "requests/write.json",
+    }, { writeDispatchRecord() { calls += 1; }, verifyCommit() { calls += 1; } });
+  assert.equal(result.code, "WR-RECORD-BINDING"); assert.equal(result.adapterInvocations, 0); assert.equal(calls, 0);
+});
+
+check("task and candidate mismatches against dispatch-time authority fail before record I/O", () => {
+  const finalObservation = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
+  for (const completion of [
+    { identity, taskId: "FOREIGN-TASK", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" },
+    { identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "e".repeat(40), requestPath: "requests/write.json" },
+  ]) {
+    let calls = 0;
+    const result = coordinateWorkflowRunnerReturn(recordExpected, finalObservation, completion, {
+      writeDispatchRecord() { calls += 1; }, verifyCommit() { calls += 1; },
+    });
+    assert.equal(result.code, "WR-RECORD-BINDING"); assert.equal(result.adapterInvocations, 0); assert.equal(calls, 0);
+  }
+});
+
+check("written task, candidate and result digest must exactly match the validated return", () => {
+  const finalObservation = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
+  const completion = { identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" };
+  const baseReceipt = {
+    schema: "pipeline.dispatch-record-write-receipt.v1", target: "evidence/dispatch-record-P5B-RETURN-1.json",
+    sha256: B, bytes: 300, taskId: completion.taskId, candidateCommit: completion.candidateCommit, resultSha256: A,
+  };
+  const authorship = {
+    sha: completion.candidateCommit, verdict: "PASS", classification: "bound", reason: "bound",
+    taskId: completion.taskId, modelCheck: { classification: "model-matches", reason: "matches" },
+  };
+  for (const receipt of [
+    { ...baseReceipt, taskId: "FOREIGN-TASK", target: "evidence/dispatch-record-FOREIGN-TASK.json" },
+    { ...baseReceipt, candidateCommit: "e".repeat(40) },
+    { ...baseReceipt, resultSha256: "f".repeat(64) },
+    { ...baseReceipt, target: "other/evidence/dispatch-record-P5B-RETURN-1.json" },
+  ]) {
+    const result = coordinateWorkflowRunnerReturn(recordExpected, finalObservation, completion, {
+      writeDispatchRecord: () => receipt, verifyCommit: () => authorship,
+    });
+    assert.equal(result.ok, false); assert.equal(result.code, "WR-RECORD-UNVERIFIED");
+  }
+});
+
+check("non-final and duplicate native returns never invoke record I/O", () => {
+  let calls = 0;
+  const adapter = { writeDispatchRecord() { calls += 1; }, verifyCommit() { calls += 1; } };
+  const completion = { identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" };
+  const running = coordinateWorkflowRunnerReturn(recordExpected, observation("running"), completion, adapter);
+  assert.equal(running.code, "WR-OUTCOME-RUNNING"); assert.equal(running.adapterInvocations, 0);
+  const duplicate = coordinateWorkflowRunnerReturn({ ...recordExpected, acknowledgedResultSha256: A },
+    observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }), completion, adapter);
+  assert.equal(duplicate.code, "WR-OUTCOME-DUPLICATE"); assert.equal(duplicate.adapterInvocations, 0);
+  assert.equal(calls, 0);
+});
+
+check("return coordinator never reports success when post-write authorship is not bound", () => {
+  const finalObservation = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
+  const result = coordinateWorkflowRunnerReturn(recordExpected, finalObservation, {
+    identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json",
+  }, {
+    writeDispatchRecord: () => ({ schema: "pipeline.dispatch-record-write-receipt.v1", target: "evidence/dispatch-record-P5B-RETURN-1.json", sha256: B, bytes: 300, taskId: "P5B-RETURN-1", candidateCommit: "c".repeat(40), resultSha256: A }),
+    verifyCommit: (sha) => ({ sha, verdict: "FAIL", classification: "record-paths-do-not-cover", reason: "not bound", taskId: "P5B-RETURN-1" }),
+  });
+  assert.equal(result.ok, false); assert.equal(result.code, "WR-RECORD-UNVERIFIED");
+  assert.equal(result.record.authorship, "unverified"); assert.equal(result.adapterInvocations, 2);
+});
+
+check("authorship result admits absent or valid optional orchestrator paths and rejects malformed presence", () => {
+  const finalObservation = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
+  const completion = { identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" };
+  const receipt = { schema: "pipeline.dispatch-record-write-receipt.v1", target: "evidence/dispatch-record-P5B-RETURN-1.json", sha256: B, bytes: 300, taskId: "P5B-RETURN-1", candidateCommit: completion.candidateCommit, resultSha256: A };
+  const authorship = {
+    sha: completion.candidateCommit, verdict: "PASS", classification: "bound", reason: "bound",
+    taskId: "P5B-RETURN-1", modelCheck: { classification: "model-matches", reason: "matches" },
+  };
+  const run = (override) => coordinateWorkflowRunnerReturn(recordExpected, finalObservation, completion, {
+    writeDispatchRecord: () => receipt,
+    verifyCommit: () => ({ ...authorship, ...override }),
+  });
+  assert.equal(run({}).code, "WR-OUTCOME-FINAL-RECORDED", "optional field absent");
+  assert.equal(run({ orchestratorAddedFiles: ["docs/note.md"] }).code, "WR-OUTCOME-FINAL-RECORDED", "valid optional field present");
+  assert.equal(run({ orchestratorAddedFiles: ["docs/note.md", "docs/note.md"] }).code, "WR-RECORD-UNVERIFIED", "duplicates rejected");
+  assert.equal(run({ orchestratorAddedFiles: ["../private.txt"] }).code, "WR-RECORD-UNVERIFIED", "non-repository path rejected");
 });
 check("already acknowledged digest is a duplicate", () => {
   const result = normalizeWorkflowRunnerOutcome({ ...expected, acknowledgedResultSha256: A }, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }));

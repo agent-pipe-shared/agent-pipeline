@@ -9,7 +9,7 @@ const SAFE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,255}$/u;
 const PRIVATE_ABSOLUTE_PATH = /(?<![A-Za-z0-9_%])(?:\/(?:home|Users|mnt\/[A-Za-z]|tmp|var\/tmp|root|private\/var)(?:\/[^\s"'`<>]*)?(?=$|[\s"'`<>,;:)\]])|[A-Za-z]:[\\/][^\s"'`<>]+|\\\\[^\s"'`<>]+)/iu;
 const TOP_LEVEL_KEYS = Object.freeze([
   "schema", "taskId", "agentType", "model", "effort", "rulesetSha", "dispatcher", "candidateCommit",
-  "outcome", "commits", "log", "report", "modelOverride", "criticSkip", "orchestratorAddedFiles",
+  "resultSha256", "outcome", "commits", "log", "report", "modelOverride", "criticSkip", "orchestratorAddedFiles",
 ]);
 
 function fail(code, message) {
@@ -116,7 +116,7 @@ function strictPathList(value, label) {
 }
 
 export function validateDispatchRecord(record) {
-  const required = TOP_LEVEL_KEYS.slice(0, 12);
+  const required = TOP_LEVEL_KEYS.slice(0, 13);
   exactKeys(record, TOP_LEVEL_KEYS, "dispatch record", required);
   // This record is durable evidence. Apply the privacy invariant to every
   // persisted string before field-specific syntax and compatibility checks so
@@ -127,11 +127,13 @@ export function validateDispatchRecord(record) {
   for (const [key, value] of [["agentType", record.agentType], ["model", record.model], ["effort", record.effort], ["rulesetSha", record.rulesetSha], ["dispatcher", record.dispatcher]]) nonempty(value, key);
   if (!SAFE_TOKEN.test(record.agentType) || !SAFE_TOKEN.test(record.effort)) fail("record-field", "agentType or effort is invalid");
   if (!FULL_COMMIT.test(record.candidateCommit)) fail("record-commit", "candidateCommit must be a full lowercase commit SHA");
+  if (record.resultSha256 !== null && (typeof record.resultSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(record.resultSha256))) fail("record-result", "resultSha256 must be null or a lowercase SHA-256 digest");
   if (typeof record.outcome !== "string" || !/^[a-z][a-z0-9-]*$/u.test(record.outcome)) fail("record-outcome", "outcome must be a lowercase slug");
   if (!Array.isArray(record.commits) || record.commits.length > 256 || record.commits.some((sha) => !FULL_COMMIT.test(sha)) || new Set(record.commits).size !== record.commits.length) fail("record-commit", "commits must be unique full lowercase commit SHAs");
   if (isTerminalOutcome(record.outcome) && (record.commits.length === 0 || record.commits.at(-1) !== record.candidateCommit)) {
     fail("record-commit-binding", "terminal dispatch record requires candidateCommit as the final commits entry");
   }
+  if (isTerminalOutcome(record.outcome) && record.resultSha256 === null) fail("record-result", "terminal dispatch record requires resultSha256");
   if (!Array.isArray(record.log) || record.log.length > 2048) fail("record-log", "log must be a bounded array");
   record.log.forEach((entry, index) => {
     exactKeys(entry, ["phase", "toolUseCount", "note"], `log[${index}]`, ["phase", "toolUseCount"]);

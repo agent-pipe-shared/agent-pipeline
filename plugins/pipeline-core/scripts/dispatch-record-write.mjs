@@ -180,7 +180,15 @@ export function writeDispatchRecord({ repoRoot, requestPath }, dependencies = {}
       throw error;
     }
   });
-  return { schema: RECEIPT_SCHEMA, target: targetRelative, sha256: digest, bytes: bytes.length };
+  return {
+    schema: RECEIPT_SCHEMA,
+    target: targetRelative,
+    sha256: digest,
+    bytes: bytes.length,
+    taskId: record.taskId,
+    candidateCommit: record.candidateCommit,
+    resultSha256: record.resultSha256,
+  };
 }
 
 function parseArgs(argv) {

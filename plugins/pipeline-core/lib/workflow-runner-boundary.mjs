@@ -36,6 +36,17 @@ const PREFLIGHT_CODE_MAP = Object.freeze({
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const OUTCOME_STATES = new Set(["running", "completed", "completed-but-undelivered", "failed"]);
+const RETURN_COMPLETION_KEYS = new Set(["identity", "taskId", "resultSha256", "candidateCommit", "requestPath"]);
+const RETURN_ADAPTER_KEYS = new Set(["writeDispatchRecord", "verifyCommit"]);
+const RETURN_RECEIPT_KEYS = new Set(["schema", "target", "sha256", "bytes", "taskId", "candidateCommit", "resultSha256"]);
+const RETURN_AUTHORSHIP_KEYS = new Set([
+  "sha", "verdict", "classification", "reason", "taskId", "modelCheck", "orchestratorAddedFiles",
+]);
+const RETURN_AUTHORSHIP_REQUIRED_KEYS = new Set([
+  "sha", "verdict", "classification", "reason", "taskId", "modelCheck",
+]);
+const FULL_COMMIT = /^[a-f0-9]{40}$/;
+const REPOSITORY_RELATIVE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\\)[A-Za-z0-9._/@:-]+$/;
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -47,6 +58,29 @@ function exactKeys(value, allowed) {
 
 function exactKeyCount(value, allowed) {
   return exactKeys(value, allowed) && Object.keys(value).length === allowed.size;
+}
+
+function normalizedRepositoryPath(value) {
+  if (typeof value !== "string" || !REPOSITORY_RELATIVE_PATH.test(value)) return false;
+  const parts = value.split("/");
+  return parts.every((part) => part !== "" && part !== "." && part !== "..");
+}
+
+function validReturnAuthorship(value) {
+  if (!exactKeys(value, RETURN_AUTHORSHIP_KEYS)
+    || [...RETURN_AUTHORSHIP_REQUIRED_KEYS].some((key) => !Object.hasOwn(value, key))) return false;
+  if (typeof value.sha !== "string" || !FULL_COMMIT.test(value.sha)
+    || value.verdict !== "PASS" || value.classification !== "bound"
+    || typeof value.reason !== "string" || value.reason.length === 0
+    || typeof value.taskId !== "string" || !SAFE_ID.test(value.taskId)
+    || !exactKeyCount(value.modelCheck, new Set(["classification", "reason"]))
+    || value.modelCheck.classification !== "model-matches"
+    || typeof value.modelCheck.reason !== "string" || value.modelCheck.reason.length === 0) return false;
+  if (!Object.hasOwn(value, "orchestratorAddedFiles")) return true;
+  const paths = value.orchestratorAddedFiles;
+  return Array.isArray(paths) && paths.length <= 512
+    && paths.every(normalizedRepositoryPath)
+    && new Set(paths).size === paths.length;
 }
 
 function safeBooleanMap(value) {
@@ -164,7 +198,12 @@ export function runSyntheticWorkflowDispatch(dispatch, adapter) {
  * not a fallback admission or an OS-isolation claim.
  */
 export function normalizeWorkflowRunnerOutcome(expected, observation) {
-  if (!exactKeyCount(expected, new Set(["identity", "acknowledgedResultSha256"]))
+  const hasReturnBinding = Object.hasOwn(expected ?? {}, "taskId") || Object.hasOwn(expected ?? {}, "candidateCommit");
+  const expectedKeys = hasReturnBinding
+    ? new Set(["identity", "acknowledgedResultSha256", "taskId", "candidateCommit"])
+    : new Set(["identity", "acknowledgedResultSha256"]);
+  if (!exactKeyCount(expected, expectedKeys)
+    || (hasReturnBinding && (typeof expected.taskId !== "string" || !SAFE_ID.test(expected.taskId) || !FULL_COMMIT.test(expected.candidateCommit)))
     || !exactKeyCount(expected.identity, new Set(["dispatchId", "attemptId"]))
     || !Object.values(expected.identity).every((value) => typeof value === "string" && SAFE_ID.test(value))
     || (expected.acknowledgedResultSha256 !== null && !SHA256.test(expected.acknowledgedResultSha256))
@@ -238,10 +277,99 @@ export function normalizeWorkflowRunnerOutcome(expected, observation) {
   return { ok: true, code: "WR-OUTCOME-UNKNOWN-FAILED", ...base, faultDomain: "unknown", resultSha256: null };
 }
 
+/**
+ * Close one successfully delivered Workflow/native return through the canonical
+ * dispatch-record writer and authorship verifier.
+ *
+ * The proprietary runner host owns transport and repository I/O. This boundary
+ * therefore accepts two narrow host callbacks rather than raw result prose or a
+ * host path. `completion` is the runner-return binding: the exact identity and
+ * result digest already admitted by `normalizeWorkflowRunnerOutcome`, the landed
+ * commit, and the repository-relative writer request prepared by the host. The
+ * record writer remains the authority for request/record/path/model validation;
+ * this coordinator cannot mint or repair record fields from prose.
+ *
+ * Publication alone is not success. After the exclusive write, the same commit
+ * must pass `dispatch-authorship-verify` as `bound`. A write followed by a failed
+ * check is reported as `WR-RECORD-UNVERIFIED`, never as a successful return.
+ */
+export function coordinateWorkflowRunnerReturn(expected, observation, completion, adapter) {
+  const normalized = normalizeWorkflowRunnerOutcome(expected, observation);
+  const base = {
+    identity: normalized.identity,
+    state: normalized.state,
+    resultSha256: normalized.resultSha256,
+  };
+  if (!normalized.ok || normalized.code !== "WR-OUTCOME-FINAL") {
+    return { ok: false, code: normalized.code, ...base, record: null, adapterInvocations: 0 };
+  }
+  if (typeof expected?.taskId !== "string" || !SAFE_ID.test(expected.taskId)
+    || !FULL_COMMIT.test(expected.candidateCommit)
+    || !exactKeyCount(completion, RETURN_COMPLETION_KEYS)
+    || !exactKeyCount(completion.identity, new Set(["dispatchId", "attemptId"]))
+    || completion.identity.dispatchId !== normalized.identity.dispatchId
+    || completion.identity.attemptId !== normalized.identity.attemptId
+    || completion.taskId !== expected.taskId
+    || completion.candidateCommit !== expected.candidateCommit
+    || completion.resultSha256 !== normalized.resultSha256
+    || !FULL_COMMIT.test(completion.candidateCommit)
+    || typeof completion.requestPath !== "string"
+    || !normalizedRepositoryPath(completion.requestPath)) {
+    return { ok: false, code: "WR-RECORD-BINDING", ...base, record: null, adapterInvocations: 0 };
+  }
+  if (!exactKeys(adapter, RETURN_ADAPTER_KEYS)
+    || typeof adapter.writeDispatchRecord !== "function"
+    || typeof adapter.verifyCommit !== "function") {
+    return { ok: false, code: "WR-RECORD-ADAPTER", ...base, record: null, adapterInvocations: 0 };
+  }
+
+  let receipt;
+  try {
+    receipt = adapter.writeDispatchRecord({ requestPath: completion.requestPath });
+  } catch {
+    return { ok: false, code: "WR-RECORD-WRITE-FAILED", ...base, record: null, adapterInvocations: 1 };
+  }
+  if (!exactKeyCount(receipt, RETURN_RECEIPT_KEYS)
+    || receipt.schema !== "pipeline.dispatch-record-write-receipt.v1"
+    || typeof receipt.target !== "string"
+    || !normalizedRepositoryPath(receipt.target)
+    || !SHA256.test(receipt.sha256)
+    || !Number.isSafeInteger(receipt.bytes) || receipt.bytes <= 0) {
+    return { ok: false, code: "WR-RECORD-WRITE-FAILED", ...base, record: null, adapterInvocations: 1 };
+  }
+
+  let authorship;
+  try {
+    authorship = adapter.verifyCommit(completion.candidateCommit);
+  } catch {
+    return { ok: false, code: "WR-RECORD-UNVERIFIED", ...base, record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "unverified" }, adapterInvocations: 2 };
+  }
+  if (receipt.taskId !== expected.taskId
+    || receipt.candidateCommit !== completion.candidateCommit
+    || receipt.resultSha256 !== normalized.resultSha256
+    || !validReturnAuthorship(authorship)
+    || authorship.sha !== completion.candidateCommit
+    || authorship.verdict !== "PASS"
+    || authorship.classification !== "bound"
+    || authorship.taskId !== expected.taskId
+    || receipt.target !== `evidence/dispatch-record-${expected.taskId}.json`) {
+    return { ok: false, code: "WR-RECORD-UNVERIFIED", ...base, record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "unverified" }, adapterInvocations: 2 };
+  }
+  return {
+    ok: true,
+    code: "WR-OUTCOME-FINAL-RECORDED",
+    ...base,
+    record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "bound" },
+    adapterInvocations: 2,
+  };
+}
+
 export const WORKFLOW_RUNNER_CODES = Object.freeze([
   "WR-SCHEMA", "WR-ADAPTER-CAPABILITY", "WR-PREFLIGHT", "WR-ADAPTER-FAILED", "WR-ACCEPTED",
   "WR-OUTCOME-SCHEMA", "WR-OUTCOME-STALE", "WR-OUTCOME-RUNNING",
   "WR-OUTCOME-COMPLETED-UNDELIVERED", "WR-OUTCOME-DUPLICATE", "WR-OUTCOME-CONFLICT", "WR-OUTCOME-FINAL",
   "WR-OUTCOME-PRODUCT-FAILED", "WR-OUTCOME-ENVIRONMENT-FAILED", "WR-OUTCOME-UNKNOWN-FAILED",
+  "WR-RECORD-BINDING", "WR-RECORD-ADAPTER", "WR-RECORD-WRITE-FAILED", "WR-RECORD-UNVERIFIED",
+  "WR-OUTCOME-FINAL-RECORDED",
   ...Object.values(PREFLIGHT_CODE_MAP),
 ]);

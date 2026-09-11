@@ -4,8 +4,8 @@ import test from "node:test";
 import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, validateDispatchRecord } from "./dispatch-record.mjs";
 
 const SHA = "a".repeat(40);
-const opening = () => ({ schema: "pipeline.dispatch-record.v2", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, outcome: "in-progress", commits: [], log: [], report: null });
-const terminal = () => ({ ...opening(), candidateCommit: "b".repeat(40), outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "verify", toolUseCount: 12, note: "focused checks passed" }], report: { text: "Done.", changedFiles: ["plugins/pipeline-core/lib/x.mjs - implementation", { path: "plugins/pipeline-core/lib/x.test.mjs" }] } });
+const opening = () => ({ schema: "pipeline.dispatch-record.v2", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null, outcome: "in-progress", commits: [], log: [], report: null });
+const terminal = () => ({ ...opening(), candidateCommit: "b".repeat(40), resultSha256: "d".repeat(64), outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "verify", toolUseCount: 12, note: "focused checks passed" }], report: { text: "Done.", changedFiles: ["plugins/pipeline-core/lib/x.mjs - implementation", { path: "plugins/pipeline-core/lib/x.test.mjs" }] } });
 
 test("opening and terminal records share the strict closed contract", () => {
   assert.deepEqual(validateDispatchRecord(opening()), opening());
@@ -23,6 +23,7 @@ test("missing, unknown and malformed fields fail closed", () => {
     { ...opening(), model: "" }, { ...opening(), effort: "" }, { ...opening(), candidateCommit: "abc" },
     { ...opening(), outcome: "In Progress" }, { ...opening(), unknown: true }, { ...opening(), taskId: "../x" },
     { ...opening(), outcome: "completed" },
+    { ...terminal(), resultSha256: null }, { ...terminal(), resultSha256: "bad" },
     { ...terminal(), commits: [] },
     { ...terminal(), candidateCommit: "c".repeat(40) },
     { ...terminal(), commits: ["b".repeat(40), "c".repeat(40)], candidateCommit: "b".repeat(40) },

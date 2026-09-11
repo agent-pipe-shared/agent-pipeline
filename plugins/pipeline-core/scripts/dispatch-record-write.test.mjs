@@ -9,7 +9,8 @@ import { VERDICT, verifyCommit } from "./dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "./dispatch-record-write.mjs";
 
 const SHA = "a".repeat(40);
-function record(overrides = {}) { return { schema: "pipeline.dispatch-record.v2", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report: { text: "Done.", changedFiles: ["src/x.mjs"] }, ...overrides }; }
+const RESULT_SHA = "d".repeat(64);
+function record(overrides = {}) { return { schema: "pipeline.dispatch-record.v2", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: RESULT_SHA, outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report: { text: "Done.", changedFiles: ["src/x.mjs"] }, ...overrides }; }
 function fixture(value = record(), target = `evidence/dispatch-record-${value.taskId}.json`) {
   const root = mkdtempSync(join(tmpdir(), "dispatch-record-write-"));
   mkdirSync(join(root, "evidence")); mkdirSync(join(root, "requests"));
@@ -25,6 +26,8 @@ test("writer validates, atomically publishes exclusively, and returns matching r
     const persisted = validateDispatchRecord(JSON.parse(raw));
     assert.deepEqual(persisted, record());
     assert.equal(receipt.bytes, raw.length); assert.match(receipt.sha256, /^[a-f0-9]{64}$/u);
+    assert.equal(receipt.taskId, persisted.taskId); assert.equal(receipt.candidateCommit, persisted.candidateCommit);
+    assert.equal(receipt.resultSha256, persisted.resultSha256);
     const authorship = verifyCommit("b".repeat(40), {
       readCommitMessage: () => "feat(x): done\n\nDispatch: NVA-WRITE-1 (goldfish)\nAI-Assisted: true\n",
       readChangedPaths: () => ["src/x.mjs"], readRecord: () => persisted,
@@ -45,6 +48,8 @@ test("malformed, missing, computed and mismatched records fail before publicatio
     [record({ report: { text: "from /private/var/folders/xy/result", changedFiles: ["src/x.mjs"] } }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record({ commits: [] }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record({ candidateCommit: SHA }), "evidence/dispatch-record-NVA-WRITE-1.json"],
+    [record({ resultSha256: null }), "evidence/dispatch-record-NVA-WRITE-1.json"],
+    [record({ resultSha256: "bad" }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record({ outcome: "completed", report: null }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record({ report: { text: "Done.", changedFiles: ["src/$FILE"] } }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record(), "evidence/dispatch-record-OTHER.json"],
