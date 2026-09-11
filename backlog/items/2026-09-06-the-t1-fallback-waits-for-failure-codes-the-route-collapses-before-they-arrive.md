@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-09-06
 source: "NVA-B-T1WIRE-1 orientation findings, verified independently by the dispatcher: codex-sandbox-select.mjs:240 preflightFailure() and codex-critic-selected-host.mjs:236 runSelectedCriticHost(). The dispatch delivered the CLI (b3b7cb7e) and stopped before the consumer rather than wiring a path that cannot fire."
-sprint: nova-b
+sprint: none
 done_when: manual
 ---
 
