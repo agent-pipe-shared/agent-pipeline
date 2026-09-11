@@ -128,3 +128,17 @@ This item remains open until the Codex, Claude and Antigravity installation or
 update coordinators produce the external receipt and bootstrap consumes it for
 the actually loaded plugin. The core deliberately cannot self-attest from
 inside the package it is checking.
+
+Commit `f1ce7417` completes that host action and bootstrap consumption for a
+Codex local-development installation. The host coordinator reads a restricted
+0600 source locator, writes and reads back an installer-owned attestation, and
+keeps the public result free of the private source path. Bootstrap now treats a
+missing, stale or mismatched attestation as the hard
+`plugin-attestation-required` state, exposes one exact host action, and proceeds
+only after an identical preflight rerun is ready. This repair is routine
+installation maintenance and does not introduce a PO gate.
+
+The five new or changed test suites emit required case-completion evidence in
+normal Verify execution. Focused tests and an independent correction Critic
+passed. The item remains open for the equivalent Claude and Antigravity host
+coordinators and for the acceptance criteria's live resync/reachability probes.

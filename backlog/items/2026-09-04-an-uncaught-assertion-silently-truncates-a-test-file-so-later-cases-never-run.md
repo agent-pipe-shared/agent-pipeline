@@ -177,6 +177,10 @@ receipt cannot satisfy either required suite. Direct developer runs remain
 usable without minting a receipt. Focused tests and an independent Critic
 passed.
 
-The registry is now explicit: **2 required and 170 legacy-process-only**. The
-item stays open for the remaining staged migration; this commit does not claim
-that all registered suites have case-level completion evidence.
+The registry is now explicit: **8 required and 169 legacy-process-only**. Five
+new installer/dispatch suites entered as required in `f1ce7417`, and
+`pipeline-start-v3-tests` migrated in `0ecf0f1f` rather than becoming a newly
+touched legacy exception. The exact candidate-bound check from `9b98aa3e`
+through `0ecf0f1f` passes. The item stays open for the remaining staged
+migration; these commits do not claim that all registered suites have
+case-level completion evidence.
