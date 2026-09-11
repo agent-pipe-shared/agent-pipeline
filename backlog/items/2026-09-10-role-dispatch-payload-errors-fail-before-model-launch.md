@@ -167,10 +167,11 @@ It also migrated directly to required case-completion evidence as DPT01 through
 DPT31; the exact candidate-bound registry check passes. See
 `backlog/evidence/2026-09-11-dispatch-destination-preflight-pass.md`.
 
-The item remains open for coordinator wiring: native and selected Codex Critic
-routes come next. The disabled worker supervisor requires its own candidate and
-workspace binding, and Antigravity requires a real production caller before an
-adapter-level completion claim is possible.
+The item remains open for coordinator wiring. The disabled native Codex worker
+supervisor is outside Nova B and moves with the dedicated native-Windows Codex
+sandbox package. Antigravity still requires a real production caller before an
+adapter-level completion claim is possible; no placeholder launcher will be
+invented merely to close this item.
 
 The eighth slice in `85921a11` wires both shipped Codex Critic coordinators.
 The native host passes candidate blobs through the shared role-dispatch
@@ -185,10 +186,21 @@ The native host suite passes 8/8 and the selected host suite passes 133/133 at
 the real WSL host boundary. The generic read-only bridge suite passes 10/10.
 Separate independent correction reviews returned PASS with no findings for
 both coordinators. Their normal Verify registrations now require exact
-case-completion evidence. The item remains open for the disabled local worker
-supervisor, which still needs candidate/workspace binding, and for an
-Antigravity production caller that can consume the common contract without
-inventing a launch surface.
+case-completion evidence. These focused WSL results validate the platform-neutral
+packet contract only; they are not native Codex sandbox acceptance evidence.
+The item remains open in Nova B only for a real Antigravity production caller
+that can consume the common contract without inventing a launch surface. The
+disabled local Codex worker supervisor is assigned to the future native-Windows
+package and does not block this item or Nova B.
+
+## Scope correction — 2026-09-11
+
+The PO explicitly deferred all native Codex sandbox, App Server and Selected
+lane acceptance work under WSL. Native Codex sandbox behavior is technically
+unreliable in that environment and will be investigated later on native
+Windows. Nova B therefore retains only the runner-neutral preflight contract,
+ordinary fresh-session Critic path and real non-native adapter integration.
+No WSL result may be promoted into a native-sandbox readiness claim.
 
 ## Greenfield 0.6.2 evidence — 2026-09-11
 
