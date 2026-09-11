@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0cc8177d2005a728762e76f339257a02f9901fcadfe3b7451cf347a9d99ef760"
+    "transitionHead": "313c9bc8a0626743ee1ca201b9a7d0ab9de1e74cdc0139baea67b7b3ffae4fae"
   },
   "counts": {
-    "open": 81,
+    "open": 80,
     "in_progress": 0,
-    "closed": 559,
+    "closed": 560,
     "rejected": 3,
     "deferred": 11
   },
@@ -3719,12 +3719,16 @@
     },
     {
       "id": "pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "ADR-0079 (docs/adr/0079-hook-bypass-is-never-agent-overridable.md), recording the PO decision (2026-09-01, in session) that hook-bypass has no agent-side override route.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "b94b83c06504a45374c90570c04801e7a6811f58",
+      "closureEvidence": "backlog/evidence/2026-09-11-git-boundary-critic-pass.md"
     },
     {
       "id": "pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant",
