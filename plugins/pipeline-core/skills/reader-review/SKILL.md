@@ -16,18 +16,26 @@ gates.
 
 ## Choose the binding mode
 
-When repository identity confirms the Agent-Pipeline source checkout, resolve
-exactly one tracked file named `reader-review-protocol.md` and exactly one
-tracked script named `check-doc-reader-binding.mjs` with `git ls-files`. Use
-the source-bound procedure below only when both unique results exist. The
-checker owns the exact document set and evidence schema; do not copy its path
-list into this skill or silently add files.
+Confirm Agent-Pipeline source-checkout identity before selecting the
+source-bound procedure. Require both `.claude/pipeline.json` and
+`.claude-plugin/marketplace.json` to be tracked regular files at the Git root;
+parse them as JSON and require the former's `project` to equal
+`agent-pipeline`, the latter's `name` and `owner.name` to equal
+`agent-pipeline`, and exactly one marketplace plugin named `pipeline-core`
+whose source is `./plugins/pipeline-core`. Then resolve exactly one tracked file
+named `reader-review-protocol.md` and exactly one tracked script named
+`check-doc-reader-binding.mjs` with `git ls-files`. Use the source-bound
+procedure only when every check passes. The checker owns the exact document set
+and evidence schema; do not copy its path list into this skill or silently add
+files.
 
-In a consuming repository without that checker, review only the explicit
-user-facing document paths supplied by its plan or documentation task. Preserve
-both reports and the disposition under the project's normal evidence location,
-but do not claim the Agent-Pipeline source binding, invent `record.json`, or
-make release readiness depend on a contract that the project has not adopted.
+In a repository that does not satisfy that complete identity check, review only
+the explicit user-facing document paths supplied by its plan or documentation
+task. Preserve both reports and the disposition under the project's normal
+evidence location, but do not claim the Agent-Pipeline source binding, invent
+`record.json`, or make release readiness depend on a contract that the project
+has not adopted. Independently owned files with the same protocol or checker
+basenames never select source-bound mode.
 
 ## Source-bound procedure
 
