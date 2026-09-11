@@ -25,6 +25,7 @@ assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selecti
 for (const [label, input, reason] of [
   ["release is always full", { ...common, mode: "release", changedPaths: ["src/a.mjs"] }, "full-boundary"],
   ["missing base is full", { ...common, mode: "work", baseCommit: null, changedPaths: ["src/a.mjs"] }, "missing-binding"],
+  ["equal base is full", { ...common, mode: "push", baseCommit: "b", changedPaths: [] }, "invalid-base"],
   ["unknown path is full", { ...common, mode: "push", changedPaths: ["secrets/new.bin"] }, "unclassified-change"],
   ["unclassified suite is full", { ...common, mode: "candidate", registeredSuiteIds: [...common.registeredSuiteIds, "orphan"], changedPaths: ["src/a.mjs"] }, "unclassified-suite"],
 ]) {
@@ -33,6 +34,11 @@ for (const [label, input, reason] of [
   assert.equal(result.fallbackReason, reason, label);
   assert.deepEqual(result.omittedSuiteIds, [], label);
 }
+
+const forced = planVerifySelection({ ...common, mode: "push", changedPaths: ["src/a.mjs", "unknown/new.bin"], forceFullReason: "invalid-base" });
+assert.equal(forced.execution, "full");
+assert.deepEqual(forced.changedPaths, ["src/a.mjs", "unknown/new.bin"]);
+assert.deepEqual(forced.unmatchedPaths, ["unknown/new.bin"]);
 
 const release = planVerifySelection({ ...common, mode: "release", changedPaths: [] });
 assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: release }, "release"), true);

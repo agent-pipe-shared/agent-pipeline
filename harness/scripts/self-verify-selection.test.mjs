@@ -16,6 +16,7 @@ const suites = [
 ];
 const spawn = (command, args) => {
   if (args[0] === "rev-parse") return { status: 0, stdout: "basecommit\n" };
+  if (args[0] === "merge-base") return { status: 0, stdout: "" };
   if (args[0] === "diff") return { status: 0, stdout: "docs/guide.md\0" };
   throw new Error("unexpected git call");
 };
@@ -23,13 +24,30 @@ const docs = resolveSelfVerifySelection({ repoRoot: "/repo", candidateCommit: "c
 assert.equal(docs.selection.execution, "impacted");
 assert.deepEqual(docs.suites.map((suite) => suite.name), ["doc-contract-tests"]);
 
-const unknownSpawn = (command, args) => args[0] === "rev-parse" ? { status: 0, stdout: "basecommit\n" } : { status: 0, stdout: "unknown.bin\0" };
+const unknownSpawn = (command, args) => args[0] === "rev-parse"
+  ? { status: 0, stdout: "basecommit\n" }
+  : args[0] === "merge-base" ? { status: 0, stdout: "" } : { status: 0, stdout: "unknown.bin\0" };
 const unknown = resolveSelfVerifySelection({ repoRoot: "/repo", candidateCommit: "candidate", registeredSuites: suites, invocation: { mode: "push", base: "main" }, spawn: unknownSpawn });
 assert.equal(unknown.selection.execution, "full");
 assert.equal(unknown.suites.length, 2);
+
+const equalBase = resolveSelfVerifySelection({
+  repoRoot: "/repo", candidateCommit: "candidate", registeredSuites: suites, invocation: { mode: "push", base: "HEAD" },
+  spawn: (command, args) => args[0] === "rev-parse" ? { status: 0, stdout: "candidate\n" } : (() => { throw new Error("unexpected git call"); })(),
+});
+assert.equal(equalBase.selection.execution, "full");
+assert.equal(equalBase.selection.fallbackReason, "invalid-base");
+assert.equal(equalBase.suites.length, 2);
+
+const unrelatedBase = resolveSelfVerifySelection({
+  repoRoot: "/repo", candidateCommit: "candidate", registeredSuites: suites, invocation: { mode: "push", base: "other" },
+  spawn: (command, args) => args[0] === "rev-parse" ? { status: 0, stdout: "other\n" } : { status: 1, stdout: "" },
+});
+assert.equal(unrelatedBase.selection.execution, "full");
+assert.equal(unrelatedBase.selection.fallbackReason, "invalid-base");
 
 const release = resolveSelfVerifySelection({ repoRoot: "/repo", candidateCommit: "candidate", registeredSuites: suites, invocation: { mode: "release", base: null }, spawn });
 assert.equal(release.selection.execution, "full");
 assert.equal(release.suites.length, 2);
 
-console.log("self-verify-selection: 11 tests passed");
+console.log("self-verify-selection: 13 tests passed");

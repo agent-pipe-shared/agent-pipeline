@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
@@ -290,6 +291,23 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 1, commit: head });
   check("PG06 block  blocking + red exitCode in verify evidence", PUSH_CMD, dir, BLOCK, {
     stderrIncludes: ["exitCode=1"],
+  });
+}
+
+// ---- PG06a impacted evidence must name a strict ancestor of the pushed source ----------
+{
+  const { dir, head } = freshRepo("verify-unrelated-base");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
+  const unrelated = gitAt(dir, "commit-tree", tree, "-m", "unrelated root").stdout.trim();
+  const selection = planVerifySelection({
+    mode: "push", baseCommit: unrelated, candidateCommit: head, changedPaths: ["README.md"],
+    registeredSuiteIds: ["fixture-suite"],
+    policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "fixture", paths: ["**"], suites: ["fixture-suite"] }] },
+  });
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head, selection });
+  check("PG06a block  impacted Verify base is unrelated to pushed source", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["impacted Verify base is not a strict ancestor"],
   });
 }
 

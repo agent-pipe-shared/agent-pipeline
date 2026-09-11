@@ -1949,6 +1949,15 @@ function checkEvidenceFreshness(relPath) {
   if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && !verifyEvidenceSatisfiesBoundary(data, "push")) {
     failures.push(`${relPath}: Verify evidence was not produced for the push boundary`);
   }
+  if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && data?.selection?.execution === "impacted") {
+    const base = data.selection.baseCommit;
+    const ancestry = typeof base === "string" && base !== sourceCommit
+      ? spawnSync("git", ["-C", evidenceProjectDir, "merge-base", "--is-ancestor", base, sourceCommit], { encoding: "utf8", timeout: 5000 })
+      : null;
+    if (ancestry === null || ancestry.status !== 0) {
+      failures.push(`${relPath}: impacted Verify base is not a strict ancestor of the pushed source commit`);
+    }
+  }
   return failures;
 }
 

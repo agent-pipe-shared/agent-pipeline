@@ -73,14 +73,17 @@ export function planVerifySelection({ mode, baseCommit = null, candidateCommit, 
   const normalizedChanges = changedPaths === null ? null : normalizePaths(changedPaths);
   let fallbackReason = typeof forceFullReason === "string" && forceFullReason !== "" ? forceFullReason : null;
   if (FULL_ONLY_MODES.has(mode)) fallbackReason = "full-boundary";
-  else if (typeof baseCommit !== "string" || baseCommit === "" || typeof candidateCommit !== "string" || candidateCommit === "") fallbackReason = "missing-binding";
-  else if (normalizedChanges === null) fallbackReason = "changed-paths-unavailable";
-  else if (normalizedPolicy.coveredSuites.size !== registered.length) fallbackReason = "unclassified-suite";
+  else if (fallbackReason === null) {
+    if (typeof baseCommit !== "string" || baseCommit === "" || typeof candidateCommit !== "string" || candidateCommit === "") fallbackReason = "missing-binding";
+    else if (baseCommit === candidateCommit) fallbackReason = "invalid-base";
+    else if (normalizedChanges === null) fallbackReason = "changed-paths-unavailable";
+    else if (normalizedPolicy.coveredSuites.size !== registered.length) fallbackReason = "unclassified-suite";
+  }
 
   const selected = new Set(normalizedPolicy.baseline);
   const matchedAreas = new Set();
   const unmatchedPaths = [];
-  if (fallbackReason === null) {
+  if (normalizedChanges !== null) {
     for (const path of normalizedChanges) {
       const matchesForPath = normalizedPolicy.areas.filter((area) => area.paths.some((pattern) => matches(pattern, path)));
       if (matchesForPath.length === 0) unmatchedPaths.push(path);
@@ -89,7 +92,7 @@ export function planVerifySelection({ mode, baseCommit = null, candidateCommit, 
         area.suites.forEach((id) => selected.add(id));
       }
     }
-    if (unmatchedPaths.length > 0) fallbackReason = "unclassified-change";
+    if (fallbackReason === null && unmatchedPaths.length > 0) fallbackReason = "unclassified-change";
   }
   if (fallbackReason !== null) registered.forEach((id) => selected.add(id));
   const selectedSuiteIds = [...selected].sort();

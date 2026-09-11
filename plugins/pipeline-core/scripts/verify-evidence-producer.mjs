@@ -103,9 +103,12 @@ function resolveCommit(root, ref) {
 
 function selectionInputs(root, mode, base, candidateCommit) {
   const baseCommit = resolveCommit(root, base) ?? (mode === "release" ? null : resolveCommit(root, "HEAD^1"));
-  if (baseCommit === null) return { baseCommit, changedPaths: null };
+  if (baseCommit === null) return { baseCommit, changedPaths: null, forceFullReason: null };
+  if (baseCommit === candidateCommit) return { baseCommit, changedPaths: null, forceFullReason: "invalid-base" };
+  try { git(root, ["merge-base", "--is-ancestor", baseCommit, candidateCommit]); }
+  catch { return { baseCommit, changedPaths: null, forceFullReason: "invalid-base" }; }
   try { return { baseCommit, changedPaths: git(root, ["diff", "--name-only", "-z", baseCommit, candidateCommit, "--"]).split("\0").filter(Boolean) }; }
-  catch { return { baseCommit, changedPaths: null }; }
+  catch { return { baseCommit, changedPaths: null, forceFullReason: null }; }
 }
 
 function safeOutPath(root, outPath) {
@@ -193,17 +196,17 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   let registry = [...standardSuites, ...configuredBaselineSuites, ...configuredAreaSuites];
   let areas = configuration.areas.map((area) => ({ id: area.id, paths: area.paths, suites: area.commands.map((entry) => `project-${entry.id}`) }));
   if (mode === "release") {
-    registry = [...standardSuites, ...configuredBaselineSuites, fullSuite];
+    registry = [...standardSuites, ...configuredBaselineSuites, ...configuredAreaSuites, fullSuite];
     areas = [{ id: "whole-project", paths: ["**"], suites: registry.map((suite) => suite.name) }];
   } else if (areas.length === 0) {
     if (fullSuite !== null) registry.push(fullSuite);
     areas = [{ id: "whole-project", paths: ["**"], suites: registry.map((suite) => suite.name) }];
   }
-  let selection = planVerifySelection({ mode, baseCommit: selectionInput.baseCommit, candidateCommit: started.commit, changedPaths: selectionInput.changedPaths, registeredSuiteIds: registry.map((suite) => suite.name), policy: { schema: "pipeline.verify-selection.v1", baseline: baselineIds, areas } });
+  let selection = planVerifySelection({ mode, baseCommit: selectionInput.baseCommit, candidateCommit: started.commit, changedPaths: selectionInput.changedPaths, registeredSuiteIds: registry.map((suite) => suite.name), policy: { schema: "pipeline.verify-selection.v1", baseline: baselineIds, areas }, forceFullReason: selectionInput.forceFullReason });
   if (selection.execution === "full" && fullSuite !== null && !registry.some((suite) => suite.name === fullSuite.name)) {
     const fallbackReason = selection.fallbackReason;
-    registry = [...standardSuites, ...configuredBaselineSuites, fullSuite];
-    selection = planVerifySelection({ mode, baseCommit: selectionInput.baseCommit, candidateCommit: started.commit, changedPaths: [], registeredSuiteIds: registry.map((suite) => suite.name), policy: { schema: "pipeline.verify-selection.v1", baseline: baselineIds, areas: [{ id: "whole-project", paths: ["**"], suites: registry.map((suite) => suite.name) }] }, forceFullReason: fallbackReason });
+    registry = [...standardSuites, ...configuredBaselineSuites, ...configuredAreaSuites, fullSuite];
+    selection = planVerifySelection({ mode, baseCommit: selectionInput.baseCommit, candidateCommit: started.commit, changedPaths: selectionInput.changedPaths, registeredSuiteIds: registry.map((suite) => suite.name), policy: { schema: "pipeline.verify-selection.v1", baseline: baselineIds, areas }, forceFullReason: fallbackReason });
   }
   const selected = new Set(selection.selectedSuiteIds);
   const suites = registry.filter((suite) => selected.has(suite.name));

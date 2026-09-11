@@ -37,14 +37,20 @@ export function resolveSelfVerifySelection({ repoRoot, candidateCommit, register
   let baseCommit = invocation.base === null ? null : gitText(repoRoot, ["rev-parse", "--verify", `${invocation.base}^{commit}`], spawn);
   if (baseCommit === null && invocation.mode === "work") baseCommit = gitText(repoRoot, ["rev-parse", "--verify", "HEAD^1"], spawn);
   let changedPaths = null;
+  let forceFullReason = null;
   if (baseCommit !== null && candidateCommit !== null) {
-    const diff = spawn("git", ["diff", "--name-only", "-z", baseCommit, candidateCommit, "--"], { encoding: "utf8", cwd: repoRoot, shell: false });
-    if (diff.status === 0) changedPaths = diff.stdout.split("\0").filter(Boolean);
+    const ancestor = baseCommit !== candidateCommit
+      && spawn("git", ["merge-base", "--is-ancestor", baseCommit, candidateCommit], { encoding: "utf8", cwd: repoRoot, shell: false }).status === 0;
+    if (!ancestor) forceFullReason = "invalid-base";
+    else {
+      const diff = spawn("git", ["diff", "--name-only", "-z", baseCommit, candidateCommit, "--"], { encoding: "utf8", cwd: repoRoot, shell: false });
+      if (diff.status === 0) changedPaths = diff.stdout.split("\0").filter(Boolean);
+    }
   }
   const baseline = ids.filter((id) => /(?:verify-selection|verify-suite-registration|doc-contract|artifact-lifecycle|backlog-state|validate-manifest|security-scan)/u.test(id));
   const documentation = ids.filter((id) => /(?:doc|adr|backlog|artifact|spec|reader|markdown|link|inventory|state|handover|release|verify-selection|verify-suite-registration|validate-manifest|security-scan)/u.test(id));
   const selection = planVerifySelection({
-    mode: invocation.mode, baseCommit, candidateCommit, changedPaths, registeredSuiteIds: ids,
+    mode: invocation.mode, baseCommit, candidateCommit, changedPaths, registeredSuiteIds: ids, forceFullReason,
     policy: {
       schema: "pipeline.verify-selection.v1",
       baseline,

@@ -13,6 +13,7 @@ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { prepareConsumerVerify, CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
 import { verifySuiteArtifactName } from "./verify-journal.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
+import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 
 function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
 
@@ -141,6 +142,42 @@ test("critic mode runs baseline and the changed project area without invoking un
     assert.equal(result.evidence.selection.omittedSuiteIds.includes("project-source"), true);
     assert.equal(existsSync(join(root, ".git", "baseline-ran")), true);
     assert.equal(existsSync(join(root, ".git", "docs-ran")), true);
+  });
+});
+
+test("push mode cannot turn an equal base into empty impacted evidence", async () => {
+  await withFixture('node -e "require(\'fs\').writeFileSync(\'.git/full-ran\', \'yes\')"', async (root) => {
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "push", base: "HEAD" });
+    assert.equal(result.evidence.selection.execution, "full");
+    assert.equal(result.evidence.selection.fallbackReason, "invalid-base");
+    assert.equal(result.evidence.selection.omittedSuiteIds.length, 0);
+    assert.equal(existsSync(join(root, ".git", "full-ran")), true);
+    assert.equal(verifyEvidenceSatisfiesBoundary(result.evidence, "push"), true);
+  });
+});
+
+test("consumer full fallback preserves the changed and unmatched paths", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const calibrationPath = join(root, ".claude", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    calibration.verifyImpact = {
+      schema: "pipeline.project-verify-impact.v1",
+      baseline: [],
+      areas: [{ id: "docs", paths: ["docs/**"], commands: [{ id: "docs", command: 'node -e "process.exit(0)"' }] }],
+    };
+    writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "impact policy"]);
+    writeFileSync(join(root, "unknown.bin"), "changed\n");
+    git(root, ["add", "unknown.bin"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "unknown change"]);
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate", base: "HEAD^1" });
+    assert.equal(result.evidence.selection.execution, "full");
+    assert.equal(result.evidence.selection.fallbackReason, "unclassified-change");
+    assert.deepEqual(result.evidence.selection.changedPaths, ["unknown.bin"]);
+    assert.deepEqual(result.evidence.selection.unmatchedPaths, ["unknown.bin"]);
+    assert.equal(result.evidence.steps.some(({ name }) => name === "project-docs"), true);
+    assert.equal(result.evidence.steps.some(({ name }) => name === "configured-verify"), true);
   });
 });
 
