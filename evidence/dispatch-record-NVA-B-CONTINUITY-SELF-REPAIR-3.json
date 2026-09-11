@@ -1,0 +1,58 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "NVA-B-CONTINUITY-SELF-REPAIR-3",
+  "agentType": "goldfish-deep",
+  "model": "gpt-6-astra",
+  "effort": "xhigh",
+  "rulesetSha": "0.6.2+codex.20260911033523.8593a8a",
+  "dispatcher": "elephant",
+  "candidateCommit": "3123003f54fed7c91d7bf3bc4f57eab427edaa47",
+  "resultSha256": null,
+  "outcome": "pending",
+  "commits": [
+    "3123003f54fed7c91d7bf3bc4f57eab427edaa47"
+  ],
+  "log": [
+    {
+      "phase": "correction",
+      "toolUseCount": 0,
+      "note": "Round-one findings were corrected in 3123003f54fed7c91d7bf3bc4f57eab427edaa47: repair records now resolve exact live feature IDs and pointers, preserve path/digest bindings, require quarantined assertions absent, reject claimant reuse, and refuse overlapping repairs before State replacement."
+    },
+    {
+      "phase": "test",
+      "toolUseCount": 0,
+      "note": "Focused host-bound validation passed: continuity 280, onboarding 173, guard and repair-map 261, observation governance 197 documents, plus git diff --check."
+    },
+    {
+      "phase": "commit",
+      "toolUseCount": 0,
+      "note": "Coordinator committed the correction and round-one Critic transcription as 3123003f54fed7c91d7bf3bc4f57eab427edaa47 with tree 4afaf2a9d2ff0ea261fbc2fc1217329e3911fc1d. Independent round-two review remains required."
+    }
+  ],
+  "report": {
+    "text": "Critic round-one correction is committed as 3123003f54fed7c91d7bf3bc4f57eab427edaa47 and awaits independent round-two review. Repair records bind exact live feature IDs, pointers and preserved path/digest, require quarantined assertions absent, reject cross-record claimant reuse, and refuse overlapping repairs before State replacement. ADR-0082 defines rollback and reserves detached approval for the frozen final candidate at its push boundary. No provisional approval is claimed. Focused host-bound validation passed: continuity 280, onboarding 173, guard and repair-map 261, observation governance 197 documents, and git diff --check.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "docs/adr/0082-bounded-continuity-self-repair.md",
+      "evidence/dispatch-record-NVA-B-CONTINUITY-SELF-REPAIR-3.json"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "high",
+      "riskFlag": true,
+      "diff": {
+        "mechanical": false,
+        "architecture": true,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T1",
+    "reason": "Independent rereview must validate the corrected repair-record bindings and final-candidate threat-model boundary."
+  }
+}
