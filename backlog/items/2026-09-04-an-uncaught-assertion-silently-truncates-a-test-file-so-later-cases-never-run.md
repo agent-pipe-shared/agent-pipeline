@@ -184,3 +184,9 @@ touched legacy exception. The exact candidate-bound check from `9b98aa3e`
 through `0ecf0f1f` passes. The item stays open for the remaining staged
 migration; these commits do not claim that all registered suites have
 case-level completion evidence.
+
+`dispatch-policy-tests` migrated in `2ea74dba`, bringing the registry to
+**9 required and 168 legacy-process-only** without changing its total of 177.
+All 31 DPT cases are registered before fixture reads or Git setup, and Verify
+requires their exact terminal evidence. The candidate-bound migration check
+passes and an independent review found no completion-protocol issue.

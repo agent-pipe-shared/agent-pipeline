@@ -148,6 +148,30 @@ the prior runner behavior without leaving a documented hook surface that no
 longer exists. A rollback must rerun the dispatch-policy, runner-hook,
 capability-inventory and documentation-contract checks before restamping.
 
+The seventh slice in `2ea74dba` makes the shared result contract usable by the
+remaining native coordinators before wiring them. Existing `resultPath`
+packets retain their file semantics; explicit destinations now distinguish a
+validated file from a truthful `return` or `stream` result, so a native return
+does not invent a path. Batch preparation propagates an external result root
+and checks legacy and explicit file paths in one collision namespace.
+
+The first review found a time-of-check/time-of-launch race for later packets.
+The correction preserves the all-packets PREPARE barrier and re-runs the full
+packet preflight immediately before each individual launcher. An occupied
+result, replaced symlink parent or changed required input blocks that later
+launcher as `RDB-PREPARATION-STALE`. The affected launcher is never called.
+Malformed destinations use a real launcher spy and prove zero calls.
+
+The suite passed 31/31 and an independent correction review returned PASS.
+It also migrated directly to required case-completion evidence as DPT01 through
+DPT31; the exact candidate-bound registry check passes. See
+`backlog/evidence/2026-09-11-dispatch-destination-preflight-pass.md`.
+
+The item remains open for coordinator wiring: native and selected Codex Critic
+routes come next. The disabled worker supervisor requires its own candidate and
+workspace binding, and Antigravity requires a real production caller before an
+adapter-level completion claim is possible.
+
 ## Greenfield 0.6.2 evidence — 2026-09-11
 
 The Claude greenfield analysis records a malformed Critic packet that reached
