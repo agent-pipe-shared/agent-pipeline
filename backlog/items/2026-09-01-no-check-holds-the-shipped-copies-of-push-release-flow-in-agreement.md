@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 246f44aa056ce0e61d42ea9f3871b6023a792c27
+closure_evidence: plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs
 sprint: nova-b
 done_when: manual
 source: "Round-K Critic finding F3 and the NVA-B-ROUNDK-FIX dispatch's own measurement of TEMPLATE_PAIRS in plugins/pipeline-core/scripts/check-vendored-template-sync.mjs and of plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs."
@@ -68,3 +72,18 @@ agree with each other and are both wrong.
 - That check is registered in `harness/scripts/verify.mjs`.
 - The check is proved by breaking one copy, confirming RED, restoring,
   confirming green.
+
+## Resolution — 2026-09-11
+
+The missing contract landed earlier in `246f44aa`. The registered
+`push-release-flow-docs-contract-tests` step extracts every documented
+`push-init.mjs` invocation from both full document copies and the installed
+push-approval reference, then submits those argv shapes to the real closed
+parser. The vendored-canon generator separately requires the two full
+documents to remain byte-identical and its negative fixture proves a changed
+copy is red.
+
+This closure audit reran the focused document contract at the current Nova B
+tree: all 10 cases passed. The item had remained open after all three stated
+acceptance conditions were already implemented and registered; closing it
+changes no runtime behavior.
