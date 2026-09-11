@@ -222,6 +222,7 @@ check("GitHub Verify uses full credential-free history and runs topology before 
   const verify = workflow.indexOf("harness/scripts/verify.mjs");
   assert.equal(topology >= 0 && verify > topology, true);
   assert.match(workflow, /Runner-free offline Core Verify/u);
+  assert.match(workflow, /ln -s "\$\(command -v uname\)" "\$\{core_path\}\/uname"/u);
   assert.match(workflow, /if: github\.event_name == 'workflow_dispatch' && inputs\.live_certification/u);
   assert.match(workflow, /environment: live-runner-certification/u);
   assert.match(workflow, /live-runner-certification\.mjs/u);

@@ -8700,7 +8700,7 @@ function rbScratchBase() {
  * `true`, for the one real (non-guard-mediated) spawn below that actually needs `core.editor=true`
  * to resolve. `.github/workflows/verify.yml`'s "Runner-free
  * offline Core Verify" step runs this whole suite under a synthetic `PATH` admitting only
- * node/git/bash/sh/openssl -- `true` is deliberately not among them, so a bare `git rebase
+ * node/git/bash/sh/openssl/uname -- `true` is deliberately not among them, so a bare `git rebase
  * --continue` there cannot start its editor and the spawn fails with "cannot run true: No such file
  * or directory". The assertion under test is that the guard's own PUBLISHED continuation really
  * finishes a rebase, not that the host provides coreutils, so the fix supplies `true` to the spawn's

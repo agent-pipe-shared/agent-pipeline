@@ -107,7 +107,7 @@ const GREENFIELD_MACHINE_STATES = [
 // NVA-B-CIGREEN-1. The driver executes the selected runner's OWN executable, so
 // this fixture silently depended on the host having `codex`/`claude`/
 // `antigravity` installed: it isolated HOME and never isolated PATH. Under the
-// verify workflow's synthetic PATH (node, git, bash, sh, openssl and nothing
+// verify workflow's synthetic PATH (node, git, bash, sh, openssl, uname and nothing
 // else) the runtime readback found no runner executable, reported
 // `runtime_executable_unavailable` / `runtime-readback-unavailable`, and the
 // suite failed on the CI runner while passing on any developer machine that
