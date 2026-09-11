@@ -31,3 +31,16 @@ making imports execute tests.
 
 The item remains open after this package because residual serial-lane analysis
 and subsequent release-boundary trend evidence are separate follow-up work.
+
+## Recovery and follow-up boundary
+
+This test-runner-only package has no production rollout or persisted-data
+migration. If a later environment exposes a sharding defect, revert commit
+`72617333eb5fe0fa0740fe0e174c87759b3eca31`; the suite then returns to its
+previous single-process execution without changing product behavior or test
+declarations.
+
+The pipeline owner retains the residual serial-lane analysis. Reassess it with
+the first 0.6.2 release-boundary Verify evidence, or by 2026-09-18 if that
+release has not occurred. That date bounds this measurement follow-up; it is
+not a new PO gate or a reason to run full Verify at ordinary work boundaries.

@@ -97,9 +97,32 @@ import { requireProjectOnboardingReady } from "./project-onboarding-ready-gate.m
 const SHARD_COUNT = 4;
 const DIRECT_INVOCATION = isDirectInvocation(import.meta.url);
 const shardArgument = DIRECT_INVOCATION ? process.argv.slice(2) : [];
-const shardMatch = shardArgument.length === 1 ? /^--pipeline-internal-shard=([0-3])\/4$/u.exec(shardArgument[0]) : null;
-if (DIRECT_INVOCATION && shardArgument.length > 0 && shardMatch === null) throw new Error("unsupported project-onboarding-v3 test argument");
-const shard = shardMatch === null ? null : Number(shardMatch[1]);
+function parseShardArgument(args) {
+  if (args.length === 0) return null;
+  const match = args.length === 1 ? /^--pipeline-internal-shard=([0-3])\/4$/u.exec(args[0]) : null;
+  if (match === null) throw new Error("unsupported project-onboarding-v3 test argument");
+  return Number(match[1]);
+}
+function failedShardResults(results) {
+  return results.filter((result) => result.code !== 0 || result.signal !== null || result.error !== null);
+}
+function assertShardControllerContract() {
+  assert.equal(parseShardArgument([]), null);
+  assert.equal(parseShardArgument(["--pipeline-internal-shard=3/4"]), 3);
+  for (const args of [
+    ["--pipeline-internal-shard=4/4"],
+    ["--pipeline-internal-shard=0/3"],
+    ["--pipeline-internal-shard=0/4", "extra"],
+  ]) assert.throws(() => parseShardArgument(args), /unsupported project-onboarding-v3 test argument/u);
+  const synthetic = [
+    { index: 0, code: 0, signal: null, error: null },
+    { index: 1, code: 2, signal: null, error: null },
+    { index: 2, code: 0, signal: "SIGTERM", error: null },
+    { index: 3, code: null, signal: null, error: new Error("spawn failed") },
+  ];
+  assert.deepEqual(failedShardResults(synthetic).map(({ index }) => index), [1, 2, 3]);
+}
+const shard = DIRECT_INVOCATION ? parseShardArgument(shardArgument) : null;
 const ORCHESTRATING_SHARDS = DIRECT_INVOCATION && shard === null;
 const RUNNING_AS_SUITE = DIRECT_INVOCATION;
 let declared = 0; let passed = 0; const failures = [];
@@ -8716,8 +8739,10 @@ test("F4 portable rollback preserves foreign content when a created target's ino
 });
 
 if (ORCHESTRATING_SHARDS) {
+  assertShardControllerContract();
+  console.log("project-onboarding-v3 controller: malformed coordinates and child failure outcomes fail closed");
   const results = await runShards();
-  const failed = results.filter((result) => result.code !== 0 || result.signal !== null || result.error !== null);
+  const failed = failedShardResults(results);
   console.log(`\nproject-onboarding-v3: ${declared} cases across ${SHARD_COUNT} shards, ${failed.length} shards failed`);
   if (failed.length > 0) {
     for (const result of failed) console.error(`shard ${result.index}: ${result.error?.stack ?? result.signal ?? `exit ${result.code}`}`);
