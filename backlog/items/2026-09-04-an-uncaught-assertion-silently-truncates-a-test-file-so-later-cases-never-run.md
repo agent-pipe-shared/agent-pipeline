@@ -115,3 +115,20 @@ present in order, and returned PASS with no findings. See
 
 The item remains open while the repository-wide population described above is
 quantified and any remaining single-test/many-check suites are dispositioned.
+
+### Repository inventory
+
+The requested inventory is no longer an unknown. Of 520 registered Verify
+steps, 490 are test registrations covering 488 files. A conservative syntax
+scan followed by wrapper inspection found 166 vulnerable registrations in 165
+files: 82 direct throwing `check(name, fn)` suites, 77 top-level assertion
+suites without `node:test`, and seven single-`node:test` suites containing
+multiple assertion sites. Catch-and-continue wrappers were excluded.
+
+The counts are triage data rather than semantic test-case counts: the scanner
+found 1,330 direct check calls, 5,058 syntactic assertion sites in the
+top-level group and 52 in the single-test group. This establishes that a
+repository-wide one-file conversion is not a small fix. The next bounded
+conversion is the adjacent six-case `local-worker-pool-tests` suite; broader
+harness-level completion evidence remains the scalable direction to design.
+See `backlog/evidence/2026-09-11-truncating-suite-inventory.md`.
