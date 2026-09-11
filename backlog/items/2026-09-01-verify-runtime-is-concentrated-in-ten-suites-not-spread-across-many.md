@@ -113,6 +113,21 @@ Durable method, bindings, raw-output hashes, and limitations are recorded in
 `backlog/evidence/2026-09-11-project-onboarding-v3-sharding.md` and its linked
 machine evidence.
 
+The next serial-lane slice reduces `codex-pretool-guard-tests` without moving
+or weakening it. Its 36 isolated integration cases now run in three
+deterministic child shards and are reported in declaration order. The first
+implementation exposed a partial-suite environment switch; the Critic found
+it, and the correction restricts shard mode to children with the controller's
+Node IPC channel. The controller also requires exactly 36 unique contiguous
+ordinals and propagates child errors, signals, malformed output and failed
+cases.
+
+An exact detached-candidate run at `298614da` passed 36/36 in 12.90s, down
+from the 29.73s unchanged-suite baseline on the same machine (56.6% less wall
+time). The named serial debug filter remains available, while a direct forged
+shard invocation exits non-zero. See
+`backlog/evidence/2026-09-11-codex-pretool-guard-sharding.md`.
+
 ## Wall-clock boundary decision
 
 Release-mode full Verify is the regular measurement boundary. Each such run
