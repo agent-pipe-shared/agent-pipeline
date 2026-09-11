@@ -467,12 +467,18 @@ export function queryResumeHintDelivery({
   const cardRecord = readResumeHintCardDigest({ rootDir, fs, spawnSyncFn });
   if (cardRecord === null) return { outcome: "no-card" };
   const dir = resolvePrivateStateDir(rootDir, { spawnSyncFn });
-  const delivery = dir === null ? null : readJsonRecord(join(dir, "delivery-record.json"), fs);
+  const deliveryPath = dir === null ? null : join(dir, "delivery-record.json");
+  const markerExists = deliveryPath !== null && fs.existsSync(deliveryPath);
+  const delivery = markerExists ? readJsonRecord(deliveryPath, fs) : null;
+  if (!markerExists) return { outcome: "not-delivered", cardDigest: cardRecord.cardDigest };
   if (!delivery || !exact(delivery, ["schema", "sessionId", "cardDigest", "recordedAt"])
     || delivery.schema !== DELIVERY_RECORD_SCHEMA
     || typeof delivery.sessionId !== "string" || delivery.sessionId.trim().length === 0
-    || !SHA256.test(delivery.cardDigest) || delivery.cardDigest !== cardRecord.cardDigest
+    || !SHA256.test(delivery.cardDigest)
     || !validTimestamp(delivery.recordedAt)) {
+    return { outcome: "invalid-delivery", cardDigest: cardRecord.cardDigest };
+  }
+  if (delivery.cardDigest !== cardRecord.cardDigest) {
     return { outcome: "not-delivered", cardDigest: cardRecord.cardDigest };
   }
   return {

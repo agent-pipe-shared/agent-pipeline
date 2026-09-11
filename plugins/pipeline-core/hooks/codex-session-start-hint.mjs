@@ -144,18 +144,27 @@ function resumeHintContextLines(root, sessionId) {
   if (observed?.status !== "available" || !observed.hint?.context) return [];
   // NVA-R11-RESUMECONSUME: this is the actual bootstrap consumption step -- the card's
   // content is about to be surfaced into the session's own context below, unbidden, on
-  // every startup|resume|clear. Record a consumption receipt for it now, best-effort and
-  // never blocking: the receipt's DIGEST is always re-derived by recordResumeHintConsumption
+  // every startup|resume|clear. Persist delivery first, then record consumption. The
+  // receipt's DIGEST is always re-derived by recordResumeHintConsumption
   // itself from the card's own recorded bytes (readResumeHintCardDigest), never asserted
-  // here, so this call can never attest to a reading that did not happen. A missing/invalid
-  // sessionId, an absent digest record (a card captured outside the CLI path), or any I/O
-  // failure must never prevent the card's content from still reaching the session below --
-  // observation-only, mirroring inspectResumeHint's own "Passive observation only" contract.
-  if (typeof sessionId === "string" && sessionId.trim().length > 0) {
-    try {
-      recordResumeHintDelivery({ rootDir: root, sessionId });
-      recordResumeHintConsumption({ rootDir: root, sessionId });
-    } catch { /* best-effort, never blocking */ }
+  // here, so this call can never attest to a reading that did not happen. If delivery cannot
+  // be persisted, keep the card pending and withhold its content so Verify cannot report a
+  // delivered-but-unconsumed card as freshly captured.
+  const hasSessionId = typeof sessionId === "string" && sessionId.trim().length > 0;
+  let delivery;
+  try {
+    delivery = recordResumeHintDelivery({
+      rootDir: root,
+      sessionId: hasSessionId ? sessionId : "session-id-unavailable",
+    });
+  } catch { delivery = { status: "unavailable" }; }
+  if (delivery.status !== "recorded") {
+    return [
+      "A Resume-Hint card is pending, but its digest-bound delivery marker could not be recorded. Defer surfacing its content until a later SessionStart can record delivery; do not claim that the card was read.",
+    ];
+  }
+  if (hasSessionId) {
+    try { recordResumeHintConsumption({ rootDir: root, sessionId }); } catch { /* Verify sees the delivery without a receipt. */ }
   }
   const { intent, scope, constraints, questions, progress } = observed.hint.context;
   const lines = [

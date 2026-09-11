@@ -119,14 +119,9 @@ try {
   });
   writeFileSync(join(root, "project", "resume-hint.json"), `${JSON.stringify(hint, null, 2)}\n`);
   const withHint = sessionStartDecision(root);
-  assert.match(withHint.context, /MUST be read now/u);
-  assert.match(withHint.context, /Resume-hint intent: Resume the resume-hint mandatory-read work\./u);
-  assert.match(withHint.context, /Resume-hint scope: SessionStart hook only/u);
-  assert.match(withHint.context, /Resume-hint constraints: No transcript reading/u);
-  assert.match(withHint.context, /Resume-hint questions: Any remaining gap\?/u);
-  assert.match(withHint.context, /Resume-hint progress: hit a lifecycle-not-ready denial; resolved via typed inspection/u);
-  assert.match(withHint.context, /distilled fields are a recovered summary, never verbatim material input/u);
-  assert.match(withHint.context, /never manufacture a verbatim materialInput chunk from it/u);
+  assert.match(withHint.context, /card is pending/u);
+  assert.match(withHint.context, /delivery marker could not be recorded/u);
+  assert.doesNotMatch(withHint.context, /Resume-hint intent:/u);
   // The rest of the governed message/context is unchanged, only extended.
   assert.match(withHint.context, /A guard denial is not by itself a human gate/u);
   assert.equal(withHint.message, governed.message);
@@ -229,8 +224,17 @@ try {
     captureResumeHint({ rootDir: consumptionRoot, context });
     const { cardDigest } = recordResumeHintCardDigest({ rootDir: consumptionRoot, card: context });
 
-    // No sessionId at all: the card content still reaches context (unchanged behaviour),
-    // and nothing is recorded -- best-effort, observation-only, never a silent requirement.
+    // An I/O failure cannot surface content without leaving durable delivery evidence.
+    const blockedDeliveryPath = join(consumptionRoot, ".git", "agent-pipeline", "resume-hint", "delivery-record.json");
+    mkdirSync(blockedDeliveryPath);
+    const unavailableDelivery = sessionStartDecision(consumptionRoot, undefined, "session-write-failed");
+    assert.match(unavailableDelivery.context, /delivery marker could not be recorded/u);
+    assert.doesNotMatch(unavailableDelivery.context, /Resume-hint intent:/u);
+    assert.equal(queryResumeHintConsumption({ rootDir: consumptionRoot, sessionId: "session-write-failed" }).outcome, "not-consumed");
+    rmSync(blockedDeliveryPath, { recursive: true, force: true });
+
+    // No sessionId at all: delivery is still recorded honestly, but no per-session
+    // consumption receipt can be created.
     const noSession = sessionStartDecision(consumptionRoot);
     assert.match(noSession.context, /Resume-hint intent: Resume the resume-consumption wiring work\./u);
     assert.equal(
@@ -238,7 +242,8 @@ try {
       "not-consumed",
       "no receipt should exist yet for any session",
     );
-    assert.equal(queryResumeHintDelivery({ rootDir: consumptionRoot }).outcome, "not-delivered");
+    assert.equal(queryResumeHintDelivery({ rootDir: consumptionRoot }).outcome, "delivered");
+    assert.equal(queryResumeHintDelivery({ rootDir: consumptionRoot }).sessionId, "session-id-unavailable");
 
     // A real sessionId: the SAME call that surfaces the card's content into context must
     // also record a matching consumption receipt for that exact session.
@@ -311,6 +316,7 @@ try {
       questions: ["Any remaining gap?"],
     };
     captureResumeHint({ rootDir: verbatimRoot, context: verbatimContext });
+    recordResumeHintCardDigest({ rootDir: verbatimRoot, card: verbatimContext });
 
     // Card available, but no intake checkpoint at all yet -- unchanged: no new lines.
     const noCheckpoint = sessionStartDecision(verbatimRoot);

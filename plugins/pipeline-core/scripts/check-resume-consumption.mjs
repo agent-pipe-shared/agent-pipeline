@@ -204,6 +204,13 @@ export function checkResumeConsumptionAnySession({
       message: "a Resume-Hint card was available but its delivery state could not be bound to a card digest" + DISPOSITION_GUIDANCE,
     };
   }
+  if (delivery.outcome === "invalid-delivery") {
+    return {
+      ok: false, schema: SCHEMA, code: "RH-CHECK-DELIVERY-INVALID", cardStatus: inspected.status,
+      cardDigest: queried.cardDigest, receiptCount: queried.receiptCount,
+      message: "a Resume-Hint delivery marker exists but is malformed or unverifiable" + DISPOSITION_GUIDANCE,
+    };
+  }
   // queried.outcome === "not-found": a digest is recorded but no receipt anywhere matches it.
   return {
     ok: false, schema: SCHEMA, code: "RH-CHECK-RH-RECEIPT-ABSENT-ANY", cardStatus: inspected.status,

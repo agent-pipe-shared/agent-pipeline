@@ -13,7 +13,7 @@ import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { checkResumeConsumption, checkResumeConsumptionAnySession, SCHEMA } from "./check-resume-consumption.mjs";
@@ -326,6 +326,21 @@ test("checkResumeConsumptionAnySession PASS: a freshly captured card has not yet
     assert.equal(result.code, "RH-CHECK-PENDING-DELIVERY");
     assert.equal(result.cardStatus, "available");
     assert.equal(result.receiptCount, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("checkResumeConsumptionAnySession FATAL: an existing malformed delivery marker is not pending", () => {
+  const root = gitInitRoot("check-resume-consumption-any-invalid-delivery-");
+  try {
+    captureWithDigest(root);
+    const deliveryPath = join(root, ".git", "agent-pipeline", "resume-hint", "delivery-record.json");
+    mkdirSync(dirname(deliveryPath), { recursive: true });
+    writeFileSync(deliveryPath, "{ malformed\n");
+    const result = checkResumeConsumptionAnySession({ rootDir: root });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "RH-CHECK-DELIVERY-INVALID");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

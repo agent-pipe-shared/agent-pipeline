@@ -616,9 +616,9 @@ test("resume-hint delivery: a fresh card is pending until a bootstrap records it
       forged: true,
     })}\n`);
     assert.deepEqual(queryResumeHintDelivery({ rootDir: root }), {
-      outcome: "not-delivered",
+      outcome: "invalid-delivery",
       cardDigest,
-    }, "a malformed or extended private marker must not activate the Verify failure state");
+    }, "a malformed or extended private marker must activate the fail-closed Verify state");
 
     recordResumeHintDelivery({ rootDir: root, sessionId: "bootstrap-a" });
 
