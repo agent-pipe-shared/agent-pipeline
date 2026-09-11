@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { createLocalWorkerPool } from "./local-worker-pool.mjs";
@@ -228,10 +230,26 @@ function schemaAccepts(schema, value, root, documents) {
   return true;
 }
 
+const injectedFailure = process.env.PIPELINE_LWS_TEST_INJECT_FAILURE ?? "";
+if (injectedFailure === "") {
+  const probe = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
+    encoding: "utf8",
+    env: { ...process.env, PIPELINE_LWS_TEST_INJECT_FAILURE: "LWS07" },
+    shell: false,
+    timeout: 10_000,
+  });
+  assert.notEqual(probe.status, 0, "the early-failure probe must remain red");
+  assert.match(probe.stdout, /LWS15 /u, "the last case must still be reported after LWS07 fails");
+  assert.match(probe.stdout, /tests 15/u, "the failure probe must execute the complete corpus");
+  assert.match(probe.stdout, /pass 14/u);
+  assert.match(probe.stdout, /fail 1/u);
+}
+
 let registered = 0;
 function check(name, fn) {
   registered += 1;
-  test(`LWS${String(registered).padStart(2, "0")} ${name}`, fn);
+  const id = `LWS${String(registered).padStart(2, "0")}`;
+  test(`${id} ${name}`, injectedFailure === id ? () => { throw new Error("intentional early-failure probe"); } : fn);
 }
 
 check("accepts one closed request bound to pool, runner, instructions, Git, and recovery reserve", () => {
