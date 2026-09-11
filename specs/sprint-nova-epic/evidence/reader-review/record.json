@@ -1,69 +1,36 @@
 {
+  "schema": "pipeline.doc-reader-binding-record.v1",
+  "reviewedCommit": "ceeb8921185ecb1fba941e0e838668c1105e9394",
+  "reviewedTree": "acd467c469f2c7b62a656769bb4a1090f7c48a68",
+  "docsetSha256": "2a9d411bab6761ddcab21610f0426374e7e9c6ecf99b26acd84407e98cda9ed6",
   "coverage": [
-    {
-      "path": "PIPELINE_FLOW.md",
-      "sha256": "86bc51068b691e5f98e10f9e94a5d3054e241c190bc44c5932b0f70e27d54609"
-    },
-    {
-      "path": "README.md",
-      "sha256": "024c71b80c529e848285d47e9b14212a4d86ba79fea7ba752c995cfc7d01c180"
-    },
-    {
-      "path": "SETUP.md",
-      "sha256": "2d5070cde598bca11505211d8daf0a268c96ad8773b359760a705da28a41d4d5"
-    },
-    {
-      "path": "docs/README.md",
-      "sha256": "028e501207b5cb2c2da6d7d0173340b01e56ecb3a665554d0ce8e23ec4c95611"
-    },
-    {
-      "path": "docs/audit-and-evidence.md",
-      "sha256": "3f702f98e2c9780020b7df5cd2d12ab075bd7b2ae2b84e6a70abf846805cdaef"
-    },
-    {
-      "path": "docs/cost-and-measurement.md",
-      "sha256": "72f111f4b8afed8a4cf2cba73b7aaf7cb1c946bb6a9633f963bbf21bdb1547d3"
-    },
-    {
-      "path": "docs/enforcement.md",
-      "sha256": "10bb030aecdc372293110f93f4314ad6f5e82813df7ac6dd3e4bd59c58f8bf84"
-    },
-    {
-      "path": "docs/overview.md",
-      "sha256": "4d0e6b62ae3797cf3728d386754a83b4aaebd3f3d765dc913d4cbccfdc500e4d"
-    },
-    {
-      "path": "docs/parallel-work.md",
-      "sha256": "9229dc44611acfbdcc07f02cb8f0cf69b9300633f39f077a391bc8545cc5b848"
-    },
-    {
-      "path": "docs/security-controls.md",
-      "sha256": "c3e11b50bb798a68d0821931180ac153f403efec27934ae7cac44457dd72715c"
-    },
-    {
-      "path": "docs/usage.md",
-      "sha256": "bd2c839406efa5c91e10871d63eda8834982b97728ab897e690470521f92c0f5"
-    }
+    { "path": "PIPELINE_FLOW.md", "sha256": "837bd6cdfe88cb9d65d931f63e79b9ac17b2fdb173ead43ba6440374571a3558" },
+    { "path": "README.md", "sha256": "b68b78f7393ad05e2140c430b0562bcecfab37a708e0500329e9ac3dc4f13d85" },
+    { "path": "SETUP.md", "sha256": "29a3b352e465395319b616f449fbfdd57cec3b96281b599c60b978b02e448ad3" },
+    { "path": "docs/README.md", "sha256": "737223e7b4958a6d866846567a72eff91c921dc81b2c4a5fb1cb5e0e3dec3c55" },
+    { "path": "docs/audit-and-evidence.md", "sha256": "3f702f98e2c9780020b7df5cd2d12ab075bd7b2ae2b84e6a70abf846805cdaef" },
+    { "path": "docs/cost-and-measurement.md", "sha256": "95950facb7dd90df63c99ea2889ab26b7ed9f161307efea05c38e1e03b49fecc" },
+    { "path": "docs/enforcement.md", "sha256": "10bb030aecdc372293110f93f4314ad6f5e82813df7ac6dd3e4bd59c58f8bf84" },
+    { "path": "docs/overview.md", "sha256": "03c7e1589841ac67fc1e233dc55907867a09ff26f8a5ec958af298b63fec1449" },
+    { "path": "docs/parallel-work.md", "sha256": "ad42b385a9e751adf89e273a14634b3dcb5b4c458f69e0da568cb9e9c75457e8" },
+    { "path": "docs/security-controls.md", "sha256": "c3e11b50bb798a68d0821931180ac153f403efec27934ae7cac44457dd72715c" },
+    { "path": "docs/usage.md", "sha256": "d66a17fe382db5e082a1311effd26c0c735723153311f0144d1d50a88b7194ae" }
   ],
-  "disposition": {
-    "path": "specs/sprint-nova-epic/evidence/reader-review/disposition/1.json",
-    "sha256": "5e41e37efc9e882de3dda5e43f08415350d29686c14e13a23c682d9c73dddbeb"
-  },
-  "docsetSha256": "cf6fff6eb2b074ed2e4c12cf5a8160b7b5d488baea9e7c9ec41b9f463cb90984",
   "inputs": {
-    "capabilityInventorySha256": "6ec26179088cb33071a13a04934685afba540b1f54b909653f61df5b42a5ab6a",
-    "governanceSha256": "45bf8700361375eadf341afa42cd024a98b7ad720ecf022db6e9544d5540bede",
+    "capabilityInventorySha256": "ff5a5761d3772296c9cb16f8ac49a023cf882eb7d8462c062d49686978b4e080",
+    "governanceSha256": "3e9f350f088d917139651f8523d294fd6521b930e0c576af7c7b01d11669375c",
     "readerProtocolSha256": "9347e59408878daedf01f62b2ae1381d182d0bbdcaee47328dc10a8e9d8fad17"
   },
   "phaseOne": {
-    "path": "specs/sprint-nova-epic/evidence/reader-review/phase-one/1.md",
-    "sha256": "811ffaef62d7158aa59f052eb529b0b38e3fae26077ca7a652841fb5b483cf76"
+    "path": "specs/sprint-nova-epic/evidence/reader-review/phase-one/greenfield-062-r6.md",
+    "sha256": "903ce14492f163a7ed84200bfbf2b76b39b88679f91e23df4ce30018a3181ca5"
   },
   "phaseTwo": {
-    "path": "specs/sprint-nova-epic/evidence/reader-review/phase-two/1.md",
-    "sha256": "f120a68bdd5d2bc943c8ec6d53a61dfcfbf93e4a6bbf6d05ae815268516f2811"
+    "path": "specs/sprint-nova-epic/evidence/reader-review/phase-two/greenfield-062-r6.md",
+    "sha256": "25561d4190094337cb86ba4d118a8d86cde8628a4800bd3f7bce050be62725c9"
   },
-  "reviewedCommit": "7fc1bc503473339bfe1b15c34082e86a175eba43",
-  "reviewedTree": "b67fd1d032396fd848f0ebb740b54b52c2c36ce7",
-  "schema": "pipeline.doc-reader-binding-record.v1"
+  "disposition": {
+    "path": "specs/sprint-nova-epic/evidence/reader-review/disposition/greenfield-062-r6.json",
+    "sha256": "f268c3691bd76cd4a6ec64cbec0788e8607d66ba5e54d700bf80ff38681a5f99"
+  }
 }
