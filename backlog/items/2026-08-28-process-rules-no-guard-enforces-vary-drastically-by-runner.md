@@ -94,3 +94,20 @@ prompt-only limits failed in the original test.
   transition fails closed with a typed unavailable result and no mutation.
 - A dispatch record that does not satisfy its schema is rejected at write time.
 - The budget is either counted or removed.
+
+## Progress reconciliation — 2026-09-12
+
+The dispatch-record axis is now complete and must not be rebuilt. The create-only
+writer `dispatch-record-write.mjs` decodes a bounded physical request, validates
+the complete v3 record before publication, rejects malformed or underspecified
+records, binds the declared model, publishes only the canonical task path and
+performs inode/content/digest readback. `workflow-runner-boundary.mjs` then
+requires the writer receipt and commit-authorship verification before reporting
+a recorded final. The focused writer and record suites passed together on
+2026-09-12. This satisfies the third acceptance criterion, including the
+historical 175-byte-stub class.
+
+The item remains open. Product-retry enforcement is already documented above;
+the trusted real environment-reroute consumer and authenticated cross-runner
+budget adapters remain absent. See
+`backlog/evidence/2026-09-12-dispatch-record-and-budget-progress.md`.

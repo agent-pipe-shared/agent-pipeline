@@ -108,3 +108,20 @@ adapters and estimate calibration still require the work described here.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+## Progress reconciliation — 2026-09-12
+
+Proposal 1 is complete and must not be dispatched again. Both canonical
+Goldfish templates state the shipped `maxTurns` values (50 for implementor and
+mechanic, 80 for deep), define the work budget as a base plus five closing
+calls, retain safety margin below the harness cliff and require rescaling for a
+different agent definition. They also disclose that only Claude currently has
+an authenticated live-call counter; the shared core alone is not presented as
+cross-runner enforcement.
+
+`dispatch-budget-core.mjs` supplies the common caller classification,
+working-cap calculation, closing allowance and typed exhausted/invalid results;
+its six focused cases passed on 2026-09-12. The item remains open because no
+broader empirical sample validates the proposed estimation rule and Codex/AGY
+still lack authenticated live adapters. See
+`backlog/evidence/2026-09-12-dispatch-record-and-budget-progress.md`.
