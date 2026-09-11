@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync, realpathSync } from "node:fs";
+import test from "node:test";
 
 import { createLocalWorkerPool } from "./local-worker-pool.mjs";
 import {
@@ -227,11 +228,10 @@ function schemaAccepts(schema, value, root, documents) {
   return true;
 }
 
-let passed = 0;
+let registered = 0;
 function check(name, fn) {
-  fn();
-  passed += 1;
-  console.log(`PASS LWS${String(passed).padStart(2, "0")} ${name}`);
+  registered += 1;
+  test(`LWS${String(registered).padStart(2, "0")} ${name}`, fn);
 }
 
 check("accepts one closed request bound to pool, runner, instructions, Git, and recovery reserve", () => {
@@ -530,4 +530,4 @@ check("pins observeRunner's Codex --version and --help probe argument vectors to
   assert.equal(observeRunnerSource.includes("sandbox_workspace_write.network_access"), false);
 });
 
-console.log(`${passed}/15 checks passed.`);
+assert.equal(registered, 15, "the complete LWS corpus must be registered before execution begins");
