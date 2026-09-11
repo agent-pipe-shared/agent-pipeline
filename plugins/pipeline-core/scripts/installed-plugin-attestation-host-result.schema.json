@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/installed-plugin-attestation-host-result.schema.json",
+  "title": "Installed plugin attestation host result",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "status", "provider", "plugin", "receiptId", "requestSha256"],
+      "properties": {
+        "schema": { "const": "pipeline.installed-plugin-attestation-host-result.v1" },
+        "status": { "const": "written" },
+        "provider": { "const": "codex" },
+        "plugin": {
+          "type": "object", "additionalProperties": false, "required": ["name", "version"],
+          "properties": { "name": { "const": "pipeline-core" }, "version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$" } }
+        },
+        "receiptId": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "requestSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false, "required": ["schema", "status", "reason"],
+      "properties": {
+        "schema": { "const": "pipeline.installed-plugin-attestation-host-result.v1" },
+        "status": { "const": "rejected" },
+        "reason": { "type": "string", "pattern": "^IPA-[A-Z0-9-]+$" }
+      }
+    }
+  ]
+}

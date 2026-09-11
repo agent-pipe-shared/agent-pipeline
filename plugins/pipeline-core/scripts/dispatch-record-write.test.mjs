@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
 import { validateDispatchRecord } from "../lib/dispatch-record.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { VERDICT, verifyCommit } from "./dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "./dispatch-record-write.mjs";
 
 const SHA = "a".repeat(40);
 const RESULT_SHA = "d".repeat(64);
+const cases = [];
+function check(name, run) {
+  cases.push({ id: `DRW${String(cases.length + 1).padStart(2, "0")}`, name, run });
+}
 function record(overrides = {}) { return { schema: "pipeline.dispatch-record.v2", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: RESULT_SHA, outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report: { text: "Done.", changedFiles: ["src/x.mjs"] }, ...overrides }; }
 function fixture(value = record(), target = `evidence/dispatch-record-${value.taskId}.json`) {
   const root = mkdtempSync(join(tmpdir(), "dispatch-record-write-"));
@@ -18,7 +22,7 @@ function fixture(value = record(), target = `evidence/dispatch-record-${value.ta
   return root;
 }
 
-test("writer validates, atomically publishes exclusively, and returns matching readback digest", () => {
+check("writer validates, atomically publishes exclusively, and returns matching readback digest", () => {
   const root = fixture();
   try {
     const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" });
@@ -38,7 +42,7 @@ test("writer validates, atomically publishes exclusively, and returns matching r
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("malformed, missing, computed and mismatched records fail before publication", () => {
+check("malformed, missing, computed and mismatched records fail before publication", () => {
   const cases = [
     [record({ effort: "" }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record({ model: "claude-opus-5" }), "evidence/dispatch-record-NVA-WRITE-1.json"],
@@ -64,7 +68,7 @@ test("malformed, missing, computed and mismatched records fail before publicatio
   }
 });
 
-test("request and target aliases are rejected without following them", (t) => {
+check("request and target aliases are rejected without following them", (t) => {
   const root = fixture();
   try {
     try { symlinkSync(join(root, "requests", "write.json"), join(root, "request-link.json")); }
@@ -77,7 +81,7 @@ test("request and target aliases are rejected without following them", (t) => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("an existing target symlink and duplicate JSON keys are rejected before publication", (t) => {
+check("an existing target symlink and duplicate JSON keys are rejected before publication", (t) => {
   const root = fixture();
   try {
     const target = join(root, "evidence", "dispatch-record-NVA-WRITE-1.json");
@@ -93,7 +97,7 @@ test("an existing target symlink and duplicate JSON keys are rejected before pub
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("exclusive publication race cannot overwrite another record", () => {
+check("exclusive publication race cannot overwrite another record", () => {
   const root = fixture();
   try {
     const target = join(root, "evidence", "dispatch-record-NVA-WRITE-1.json");
@@ -104,7 +108,7 @@ test("exclusive publication race cannot overwrite another record", () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("unsupported directory fsync does not turn a durable file publication into a false failure", () => {
+check("unsupported directory fsync does not turn a durable file publication into a false failure", () => {
   const root = fixture();
   try {
     const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" }, {
@@ -114,7 +118,7 @@ test("unsupported directory fsync does not turn a durable file publication into 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("a request-parent swap after inode pinning cannot redirect the read", (t) => {
+check("a request-parent swap after inode pinning cannot redirect the read", (t) => {
   const root = fixture(); const external = mkdtempSync(join(tmpdir(), "dispatch-record-external-request-"));
   try {
     writeFileSync(join(external, "write.json"), "{\"schema\":\"attacker\"}\n");
@@ -131,7 +135,7 @@ test("a request-parent swap after inode pinning cannot redirect the read", (t) =
   } finally { rmSync(root, { recursive: true, force: true }); rmSync(external, { recursive: true, force: true }); }
 });
 
-test("a target-parent swap after inode pinning cannot redirect publication outside the repository", (t) => {
+check("a target-parent swap after inode pinning cannot redirect publication outside the repository", (t) => {
   const root = fixture(); const external = mkdtempSync(join(tmpdir(), "dispatch-record-external-target-"));
   try {
     try {
@@ -147,7 +151,7 @@ test("a target-parent swap after inode pinning cannot redirect publication outsi
   } finally { rmSync(root, { recursive: true, force: true }); rmSync(external, { recursive: true, force: true }); }
 });
 
-test("same-inode request mutation during descriptor read is detected before publication", () => {
+check("same-inode request mutation during descriptor read is detected before publication", () => {
   const root = fixture();
   try {
     assert.throws(() => writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" }, {
@@ -163,7 +167,7 @@ test("same-inode request mutation during descriptor read is detected before publ
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("target replacement after hard-link admission is detected without reading the replacement", (t) => {
+check("target replacement after hard-link admission is detected without reading the replacement", (t) => {
   const root = fixture(); const external = join(root, "external-secret.txt"); writeFileSync(external, "private-canary\n");
   try {
     const targetName = "dispatch-record-NVA-WRITE-1.json";
@@ -177,4 +181,14 @@ test("target replacement after hard-link admission is detected without reading t
       assert.equal(readFileSync(external, "utf8"), "private-canary\n");
     } catch (error) { if (["EPERM", "EACCES", "ENOTSUP"].includes(error?.code)) t.skip("target symlink replacement unavailable"); else throw error; }
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 10, "the complete dispatch-record writer corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
 });

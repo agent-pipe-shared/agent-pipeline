@@ -39,6 +39,11 @@ import {
 } from "../lib/worktree-lifecycle.mjs";
 import { planInstall } from "./pre-push-hook-install.mjs";
 import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
+import {
+  DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
+  resolveCodexRegistrySource,
+  verifyLocalDevelopmentInstalledPluginReceipt,
+} from "./installed-plugin-attestation-host.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 /**
@@ -805,6 +810,7 @@ export function observePipelineStartPreflight({
   observePrePushHookInstallationFn = observePrePushHookInstallation,
   observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
+  verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
   observe,
   // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
   // descriptor (if any) is "this" call's own, so it is excluded from the
@@ -827,8 +833,14 @@ export function observePipelineStartPreflight({
   const runner = resolveActiveRunner({ env, read });
   const version = resolvePluginManifestVersion(pluginRoot, runner, read);
   const resolvedPluginList = pluginList ?? (() => readInstalledPluginList(runner));
-  const installedIdentity = installedPipelineIdentity(resolvedPluginList, runner, knownMarketplaces, cwd);
+  let pluginListSnapshot = null;
+  try { pluginListSnapshot = resolvedPluginList(); } catch { /* unavailable registry stays null */ }
+  const installedIdentity = installedPipelineIdentity(() => pluginListSnapshot, runner, knownMarketplaces, cwd);
   const installedVersion = installedIdentity?.version ?? null;
+  const selfApplicationGit = pluginRootHasSelfApplicationGit(pluginRoot);
+  const registrySourcePluginRoot = version && runner === "codex" && installedIdentity?.source === "local-development"
+    ? resolveCodexRegistrySource({ plugin: { name: "pipeline-core", version }, readPluginList: () => pluginListSnapshot })
+    : null;
   const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
     && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
   const token = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TOKEN")
@@ -867,6 +879,43 @@ export function observePipelineStartPreflight({
   const attestationFailed = evaluateSelfApplicationAttestation({
     pluginRoot, runner, version, observe: captureObserve,
   }).failed;
+  // Gitless Codex local-development installs require the external receipt
+  // produced by the host install/update coordinator after copy + readback.
+  // Bootstrap only consumes its request-selected receipt and restricted
+  // source locator; it never writes either authority artifact.
+  const rawInstalledPluginAttestation = version && runner === "codex"
+    && !selfApplicationGit && installedIdentity?.source === "local-development"
+    ? registrySourcePluginRoot === null
+      ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-SOURCE-UNAVAILABLE"] }
+      : verifyLocalInstalledPluginReceiptFn({
+        provider: "codex",
+        plugin: { name: "pipeline-core", version },
+        installedPluginRoot: pluginRoot,
+        registrySourcePluginRoot,
+        protectedPaths: DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
+      })
+    : { schema: "pipeline.installed-plugin-attestation-bootstrap.v1", status: "not-required", reasonCodes: [] };
+  const installedPluginAttestation = rawInstalledPluginAttestation.status === "unavailable"
+    ? {
+        ...rawInstalledPluginAttestation,
+        setupAction: {
+          schema: "pipeline.installed-plugin-attestation-setup-action.v1",
+          kind: "host-postinstall",
+          executable: "node",
+          argv: [
+            resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
+            "write-local-from-codex-registry", "--version", version,
+            "--installed-plugin-root", pluginRoot,
+          ],
+          mutation: true,
+          requiresPoApproval: false,
+          executionBoundary: "host",
+          expected: { schema: "pipeline.installed-plugin-attestation-host-result.v1", status: "written" },
+        },
+      }
+    : rawInstalledPluginAttestation;
+  const installedPluginAttestationFailed = installedPluginAttestation.status !== "not-required"
+    && installedPluginAttestation.status !== "verified";
   // NVA-ARMEDPROOF-1: computed once, here, so both the `status` decision
   // below and the `antigravityHardEnforcement` field on the result (see the
   // `result` object further down) reuse the SAME observation -- never
@@ -886,8 +935,10 @@ export function observePipelineStartPreflight({
   const unseenRemotePush = observeUnseenPushToRemoteFn({ rootDir: cwd });
   const status = !version
     ? "plugin-identity-unavailable"
-    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
-      ? "plugin-refresh-required"
+    : installedPluginAttestationFailed
+      ? "plugin-attestation-required"
+      : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
+        ? "plugin-refresh-required"
       // Fail-closed (NVA-ARMEDPROOF-1): a session whose Antigravity hard-
       // enforcement layer did not fire this session must never report
       // "ready" -- a plausible but actually-unenforced session is strictly
@@ -914,7 +965,6 @@ export function observePipelineStartPreflight({
     // else (no attested installed identity at all) -> "unavailable". This
     // repo has no private-marketplace distinction today, so that class is
     // never selected here.
-    const selfApplicationGit = pluginRootHasSelfApplicationGit(pluginRoot);
     const sourceClass = selfApplicationGit
       ? "self-application"
       : installedIdentity?.source === "local-development"
@@ -929,12 +979,16 @@ export function observePipelineStartPreflight({
     // local-development copy -- see the linked backlog item for the
     // out-of-scope question of whether those topologies should eventually
     // get a stronger mechanism).
-    const identityAvailable = selfApplicationGit && capturedObservation?.status === "ready";
+    const installedReceiptIdentity = installedPluginAttestation.status === "verified"
+      ? installedPluginAttestation.request.installedContentSha256
+      : null;
+    const identityAvailable = selfApplicationGit && capturedObservation?.status === "ready"
+      || installedReceiptIdentity !== null;
     const loadedIdentity = identityAvailable
-      ? { status: "available", algorithm: "content-sha256", value: capturedObservation.plugin.contentSha256 }
+      ? { status: "available", algorithm: "content-sha256", value: installedReceiptIdentity ?? capturedObservation.plugin.contentSha256 }
       : { status: "unavailable" };
     const installedIdentityForSource = identityAvailable
-      ? { status: "available", algorithm: "content-sha256", value: capturedObservation.plugin.contentSha256 }
+      ? { status: "available", algorithm: "content-sha256", value: installedReceiptIdentity ?? capturedObservation.plugin.contentSha256 }
       : { status: "unavailable" };
     // selectedPlugin.id: reuses the self-application observation's own
     // resolved plugin name when one was actually derived (the same value
@@ -943,7 +997,9 @@ export function observePipelineStartPreflight({
     // already uses internally for installed-registry eligibility, chosen by
     // the same `local-development` vs. everything-else split as `source.class`.
     const selectedPluginId = identityAvailable
-      ? capturedObservation.plugin.name
+      ? installedReceiptIdentity !== null
+        ? LOCAL_PLUGIN_ID
+        : capturedObservation.plugin.name
       : installedIdentity?.source === "local-development"
         ? LOCAL_PLUGIN_ID
         : PLUGIN_ID;
@@ -987,12 +1043,15 @@ export function observePipelineStartPreflight({
     version,
     installedVersion,
     installedSource: installedIdentity?.source ?? "unknown",
+    installedPluginAttestation,
     executionBoundary,
     pluginRoot,
     rulesetSource,
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
     concurrentSessionWarning,
-    nextAction: status === "ready"
+    nextAction: status === "plugin-attestation-required"
+      ? installedPluginAttestation.setupAction ?? null
+      : status === "ready"
       ? projectOnboardingNotReady
         // NVA-K-DRIVERREACH: point discovery at the guided driver -- the one place this
         // skill already instructs an agent to execute the returned action verbatim, so

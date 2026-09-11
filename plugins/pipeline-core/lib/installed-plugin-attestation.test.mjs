@@ -3,12 +3,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { cpSync, chmodSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, chmodSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import test from "node:test";
 import { validateInstalledProtectedFiles, verifyInstalledPluginAttestation } from "./installed-plugin-attestation.mjs";
 import { createProvenanceAttestationPayload } from "./provenance-envelope.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 function canonical(value) {
@@ -17,6 +17,11 @@ function canonical(value) {
   return JSON.stringify(value);
 }
 const receiptId = (receipt) => hash(canonical(receipt));
+
+const cases = [];
+function check(name, run) {
+  cases.push({ id: `IPA${String(cases.length + 1).padStart(2, "0")}`, name, run });
+}
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -84,7 +89,7 @@ function localAuthority(repo, mutate = (value) => value) {
   };
 }
 
-test("verifies an external local-development receipt against one clean source copy and complete stable tree", (t) => {
+check("verifies an external local-development receipt against one clean source copy and complete stable tree", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   let authorityRequest;
   const result = verifyInstalledPluginAttestation(repo.input(), { readExternalReceipt(request) { authorityRequest = request; return localAuthority(repo)(request); } });
@@ -95,7 +100,7 @@ test("verifies an external local-development receipt against one clean source co
   assert.deepEqual(Object.keys(result).sort(), ["externalReceiptIdentitySha256", "receiptId", "request", "schema", "status"]);
 });
 
-test("rejects replay across provider, version, physical root, source provenance, and protected graph", (t) => {
+check("rejects replay across provider, version, physical root, source provenance, and protected graph", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   const mutations = [
     (r) => ({ ...r, provider: "other" }),
@@ -110,7 +115,7 @@ test("rejects replay across provider, version, physical root, source provenance,
   }
 });
 
-test("rejects package-local authority, permissive modes, dirty source, symlink and hardlink structures", (t) => {
+check("rejects package-local authority, permissive modes, dirty source, symlink and hardlink structures", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   const local = localAuthority(repo);
   const packageLocal = verifyInstalledPluginAttestation(repo.input(), { readExternalReceipt(request) {
@@ -136,7 +141,7 @@ test("rejects package-local authority, permissive modes, dirty source, symlink a
   try { symlinkSync(target, symlink); assert.equal(verifyInstalledPluginAttestation(repo.input(), { readExternalReceipt: local }).status, "rejected"); } catch { /* platform lacks symlinks */ }
 });
 
-test("input cannot select a receipt, public key, or key policy and a tree change during authority read is rejected", (t) => {
+check("input cannot select a receipt, public key, or key policy and a tree change during authority read is rejected", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   const local = localAuthority(repo);
   assert.equal(verifyInstalledPluginAttestation({ ...repo.input(), receiptPath: "/chosen" }, { readExternalReceipt: local }).reasonCodes[0], "IPA-INPUT");
@@ -149,7 +154,7 @@ test("input cannot select a receipt, public key, or key policy and a tree change
   assert.equal(changed.reasonCodes[0], "IPA-INSTALLED-CHANGED");
 });
 
-test("local-development rebinds source Git and source-installed equivalence after the authority read", (t) => {
+check("local-development rebinds source Git and source-installed equivalence after the authority read", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   const beforeCommit = git(repo.sourceRoot, ["rev-parse", "HEAD"]);
   const result = verifyInstalledPluginAttestation(repo.input(), {
@@ -170,7 +175,7 @@ test("local-development rebinds source Git and source-installed equivalence afte
   assert.equal(Object.hasOwn(result, "receiptId"), false, "must not return a verified receipt with the old candidate attribution");
 });
 
-test("a committed source-only replacement during authority read cannot retain the old candidate attribution", (t) => {
+check("a committed source-only replacement during authority read cannot retain the old candidate attribution", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   const beforeCommit = git(repo.sourceRoot, ["rev-parse", "HEAD"]);
   const result = verifyInstalledPluginAttestation(repo.input(), {
@@ -221,7 +226,7 @@ function releaseReceipt(repo, request, keys, { keyReference = "release-key", bui
     };
 }
 
-test("signed release requires the installer-supplied key policy and a signature over all release identity claims", (t) => {
+check("signed release requires the installer-supplied key policy and a signature over all release identity claims", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   const keys = generateKeyPairSync("ed25519");
   const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
@@ -236,7 +241,7 @@ test("signed release requires the installer-supplied key policy and a signature 
   assert.equal(result.status, "verified", JSON.stringify(result));
 });
 
-test("release receipt cannot select its own arbitrary key or smuggle a key policy", (t) => {
+check("release receipt cannot select its own arbitrary key or smuggle a key policy", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   const trustedKeys = generateKeyPairSync("ed25519");
   const attackerKeys = generateKeyPairSync("ed25519");
@@ -266,7 +271,7 @@ test("release receipt cannot select its own arbitrary key or smuggle a key polic
   assert.equal(called, false);
 });
 
-test("the structural schema explicitly delegates protected-file key uniqueness and ordering to the runtime verifier", () => {
+check("the structural schema explicitly delegates protected-file key uniqueness and ordering to the runtime verifier", () => {
   const schema = JSON.parse(readFileSync(new URL("../scripts/installed-plugin-attestation.schema.json", import.meta.url), "utf8"));
   assert.match(schema.title, /Structural schema/u);
   assert.match(schema.description, /runtime verifier is authoritative/u);
@@ -293,4 +298,14 @@ test("the structural schema explicitly delegates protected-file key uniqueness a
     assert.equal(schemaAccepts(sample.files), sample.schema, sample.runtime);
     assert.equal(validateInstalledProtectedFiles(sample.files).code, sample.runtime);
   }
+});
+
+assert.equal(cases.length, 9, "the complete installed-plugin-attestation corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
 });

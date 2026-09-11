@@ -1,24 +1,30 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import test from "node:test";
+import { openSync } from "node:fs";
 import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, validateDispatchRecord } from "./dispatch-record.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const SHA = "a".repeat(40);
 const opening = () => ({ schema: "pipeline.dispatch-record.v2", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null, outcome: "in-progress", commits: [], log: [], report: null });
 const terminal = () => ({ ...opening(), candidateCommit: "b".repeat(40), resultSha256: "d".repeat(64), outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "verify", toolUseCount: 12, note: "focused checks passed" }], report: { text: "Done.", changedFiles: ["plugins/pipeline-core/lib/x.mjs - implementation", { path: "plugins/pipeline-core/lib/x.test.mjs" }] } });
 
-test("opening and terminal records share the strict closed contract", () => {
+const cases = [];
+function check(name, run) {
+  cases.push({ id: `DRC${String(cases.length + 1).padStart(2, "0")}`, name, run });
+}
+
+check("opening and terminal records share the strict closed contract", () => {
   assert.deepEqual(validateDispatchRecord(opening()), opening());
   assert.deepEqual(validateDispatchRecord(terminal()), terminal());
   assert.match(dispatchRecordSha256(terminal()), /^[a-f0-9]{64}$/u);
 });
-test("terminality and legacy briefing/path extraction retain verifier semantics", () => {
+check("terminality and legacy briefing/path extraction retain verifier semantics", () => {
   assert.equal(isTerminalOutcome("stopped-tool-budget"), true);
   assert.equal(isTerminalOutcome("in progress"), false);
   assert.deepEqual(missingBriefingFields({ model: "x", rulesetSha: "y", report: {} }), ["report"]);
   assert.deepEqual(declaredPaths(terminal()), ["plugins/pipeline-core/lib/x.mjs", "plugins/pipeline-core/lib/x.test.mjs"]);
 });
-test("missing, unknown and malformed fields fail closed", () => {
+check("missing, unknown and malformed fields fail closed", () => {
   for (const value of [
     { ...opening(), model: "" }, { ...opening(), effort: "" }, { ...opening(), candidateCommit: "abc" },
     { ...opening(), outcome: "In Progress" }, { ...opening(), unknown: true }, { ...opening(), taskId: "../x" },
@@ -29,13 +35,13 @@ test("missing, unknown and malformed fields fail closed", () => {
     { ...terminal(), commits: ["b".repeat(40), "c".repeat(40)], candidateCommit: "b".repeat(40) },
   ]) assert.throws(() => validateDispatchRecord(value));
 });
-test("computed, escaping and duplicate paths are rejected", () => {
+check("computed, escaping and duplicate paths are rejected", () => {
   for (const path of ["../x", "/tmp/x", "src\\x", "src/$NAME", "src/$(pwd)", "src/*.mjs", "src//x"])
     assert.throws(() => normalizeDispatchRecordPath(path));
   for (const changedFiles of [["../x"], ["src/$NAME"], ["src/x", { path: "src/x" }], [{ path: "src/x", extra: true }]])
     assert.throws(() => validateDispatchRecord({ ...terminal(), report: { text: "Done.", changedFiles } }));
 });
-test("durable prose rejects private Unix, Windows and WSL absolute paths", () => {
+check("durable prose rejects private Unix, Windows and WSL absolute paths", () => {
   for (const text of [
     "read /home/alice/private/report.json", "opened C:\\Users\\Alice\\secret.txt",
     "copied from /mnt/c/Users/Alice/OneDrive/key.pem", "visited \\\\wsl.localhost\\Ubuntu\\home\\alice\\src",
@@ -52,7 +58,7 @@ test("durable prose rejects private Unix, Windows and WSL absolute paths", () =>
   }));
 });
 
-test("every persisted string lane rejects Unix, Windows, WSL and UNC private paths", () => {
+check("every persisted string lane rejects Unix, Windows, WSL and UNC private paths", () => {
   const paths = [
     "/home/alice/private/report.json",
     "C:\\Users\\Alice\\secret.txt",
@@ -96,4 +102,14 @@ test("every persisted string lane rejects Unix, Windows, WSL and UNC private pat
       );
     }
   }
+});
+
+assert.equal(cases.length, 6, "the complete dispatch-record corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
 });

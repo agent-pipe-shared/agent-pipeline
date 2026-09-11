@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/installed-plugin-attestation-setup-action.schema.json",
+  "title": "One-time installed plugin attestation setup action",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "kind", "executable", "argv", "mutation", "requiresPoApproval", "executionBoundary", "expected"],
+  "properties": {
+    "schema": { "const": "pipeline.installed-plugin-attestation-setup-action.v1" },
+    "kind": { "const": "host-postinstall" },
+    "executable": { "const": "node" },
+    "argv": { "type": "array", "minItems": 6, "items": { "type": "string", "minLength": 1 } },
+    "mutation": { "const": true },
+    "requiresPoApproval": { "const": false },
+    "executionBoundary": { "const": "host" },
+    "expected": {
+      "type": "object", "additionalProperties": false, "required": ["schema", "status"],
+      "properties": {
+        "schema": { "const": "pipeline.installed-plugin-attestation-host-result.v1" },
+        "status": { "const": "written" }
+      }
+    }
+  }
+}

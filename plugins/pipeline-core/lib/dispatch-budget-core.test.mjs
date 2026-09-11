@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { openSync } from "node:fs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 import {
   CLOSING_ALLOWANCE,
@@ -12,7 +13,12 @@ import {
   dispatchWorkingCap,
 } from "./dispatch-budget-core.mjs";
 
-test("classifyDispatchBudgetCaller keeps authenticated, absent, and malformed identities distinct", () => {
+const cases = [];
+function check(name, run) {
+  cases.push({ id: `DBC${String(cases.length + 1).padStart(2, "0")}`, name, run });
+}
+
+check("classifyDispatchBudgetCaller keeps authenticated, absent, and malformed identities distinct", () => {
   assert.deepEqual(
     classifyDispatchBudgetCaller({ agentIdPresent: true, agentId: "agent-1", agentTypePresent: true, agentType: "worker" }),
     { kind: "subagent", agentId: "agent-1", agentType: "worker" },
@@ -32,14 +38,14 @@ test("classifyDispatchBudgetCaller keeps authenticated, absent, and malformed id
   );
 });
 
-test("classifyDispatchBudgetCaller preserves the existing permissive agent-type normalization", () => {
+check("classifyDispatchBudgetCaller preserves the existing permissive agent-type normalization", () => {
   assert.deepEqual(
     classifyDispatchBudgetCaller({ agentIdPresent: true, agentId: "agent-1", agentTypePresent: true, agentType: 42 }),
     { kind: "subagent", agentId: "agent-1", agentType: undefined },
   );
 });
 
-test("dispatchWorkingCap reserves five closing and ten safety calls with a zero floor", () => {
+check("dispatchWorkingCap reserves five closing and ten safety calls with a zero floor", () => {
   assert.equal(CLOSING_ALLOWANCE, 5);
   assert.equal(SAFETY_MARGIN, 10);
   assert.equal(DENIAL_CODE, "DISPATCH-BUDGET-EXHAUSTED");
@@ -51,13 +57,13 @@ test("dispatchWorkingCap reserves five closing and ten safety calls with a zero 
   assert.equal(dispatchWorkingCap(-1), null);
 });
 
-test("decideDispatchBudgetCall counts and allows calls through the working cap", () => {
+check("decideDispatchBudgetCall counts and allows calls through the working cap", () => {
   assert.deepEqual(decideDispatchBudgetCall({ maxTurns: 20, currentCount: 4, isClosingAct: false }), {
     allowed: true, decision: "working", nextCount: 5, workingCap: 5,
   });
 });
 
-test("decideDispatchBudgetCall counts a post-cap closing call and blocks a post-cap working call", () => {
+check("decideDispatchBudgetCall counts a post-cap closing call and blocks a post-cap working call", () => {
   assert.deepEqual(decideDispatchBudgetCall({ maxTurns: 20, currentCount: 5, isClosingAct: true }), {
     allowed: true, decision: "closing", nextCount: 6, workingCap: 5,
   });
@@ -66,7 +72,7 @@ test("decideDispatchBudgetCall counts a post-cap closing call and blocks a post-
   });
 });
 
-test("decideDispatchBudgetCall denies invalid numeric and closing inputs with a typed result", () => {
+check("decideDispatchBudgetCall denies invalid numeric and closing inputs with a typed result", () => {
   for (const [input, reason] of [
     [{ maxTurns: Infinity, currentCount: 0, isClosingAct: false }, "max-turns-must-be-a-positive-safe-integer"],
     [{ maxTurns: -1, currentCount: 0, isClosingAct: false }, "max-turns-must-be-a-positive-safe-integer"],
@@ -86,4 +92,14 @@ test("decideDispatchBudgetCall denies invalid numeric and closing inputs with a 
       workingCap: null,
     });
   }
+});
+
+assert.equal(cases.length, 6, "the complete dispatch-budget corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
 });

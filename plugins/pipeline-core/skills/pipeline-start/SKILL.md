@@ -19,12 +19,26 @@ Resolve the plugin root, then run exactly:
 
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"`
 
-Accept only schema `pipeline.start-preflight.v1`, status `ready` or
-`plugin-refresh-required`, absolute matching `pluginRoot`, valid
+Accept only schema `pipeline.start-preflight.v1`, status `ready`,
+`plugin-refresh-required`, or the hard recovery status below, absolute matching `pluginRoot`, valid
 version/source/boundary/handoff, and a read-only `nextAction` when ready.
 Goldfish/Critic validate but never execute onboarding; Elephant executes the
 returned action at its declared boundary. Resolve role before preflight:
 conflicting or unknown carriers stop — Critic is closed, never Elephant.
+
+Status `plugin-attestation-required` is a closed hard recovery, never the
+soft `plugin-refresh-required` advisory. Accept it only with
+`nextAction.schema: pipeline.installed-plugin-attestation-setup-action.v1`,
+`kind: host-postinstall`, `executionBoundary: host`, `mutation: true`,
+`requiresPoApproval: false`, executable `node`, and expected result schema
+`pipeline.installed-plugin-attestation-host-result.v1` with status `written`.
+Elephant executes that exact action once at the declared host boundary without
+asking the PO, accepts only its exact expected result, then reruns the identical
+`pipeline-start-preflight.mjs` command. Continue only when that fresh readback is
+`ready`; a missing, malformed or failed action, another
+`plugin-attestation-required`, or any other non-ready status stops bootstrap.
+Goldfish and Critic never perform this mutation and remain blocked for Elephant
+recovery. Never reconstruct the argv or add a source path from conversation.
 
 Print only after a ready result:
 
@@ -132,7 +146,8 @@ you will wait for a yes. Never volunteer whether the Pipeline fits the task;
 that call is the human's — if asked, state cost/benefit neutrally, not a
 recommendation.
 
-1. **Step 0 / V4 onboarding:** `nextAction.kind: "advisory"` runs nothing --
+1. **Step 0 / V4 onboarding:** First complete the
+   `plugin-attestation-required` recovery above. `nextAction.kind: "advisory"` runs nothing --
    go to Step 2, surfaced. Otherwise execute the exact action returned by
    preflight, verbatim, never hand-constructed from memory. For a project
    that is not yet ready, that action names the guided driver,

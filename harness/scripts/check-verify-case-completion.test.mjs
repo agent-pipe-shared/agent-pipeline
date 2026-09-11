@@ -89,8 +89,8 @@ function git(root, args) {
 test("the repository registry covers all arrays and excludes the two required descriptor suites from the vulnerable count", () => {
   const result = checkVerifyCaseCompletion({ root: REPO_ROOT });
   assert.equal(result.ok, true, result.findings.join("\n"));
-  assert.equal(result.vulnerableCount, 168);
-  assert.equal(result.registryCount, 172);
+  assert.equal(result.vulnerableCount, 173);
+  assert.equal(result.registryCount, 177);
 });
 
 test("the closed classifier distinguishes vulnerable and separately registered cases", () => {

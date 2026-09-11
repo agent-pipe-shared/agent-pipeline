@@ -5,9 +5,9 @@
     "tree": "7de7f5db6446adc43651af5158f29d35917a1ec0"
   },
   "criticReview": {
-    "status": "attested",
-    "receiptSha256": "cd9627fba8b08ede452974b60b95f0415d4a1d09978cb83eaa22b4702f496247",
-    "reason": null
+    "status": "required-before-publication",
+    "receiptSha256": null,
+    "reason": "Candidate surfaces changed; Critic review is pending."
   },
   "capabilities": [
     {
@@ -289,8 +289,11 @@
         "verify-phase:harness/scripts/verify.mjs:decision-reference-dual-evaluation-tests",
         "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-authorship-verify-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-record-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-record-write-tests",
         "verify-phase:harness/scripts/verify.mjs:entrypoint-reachability-tests",
         "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:evidence-view-model-tests",
@@ -564,6 +567,7 @@
         "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
         "verify-phase:harness/scripts/verify.mjs:suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
+        "verify-phase:harness/scripts/verify.mjs:test-case-completion-tests",
         "verify-phase:harness/scripts/verify.mjs:test-tmpdir-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:test-tmpdir-tests",
         "verify-phase:harness/scripts/verify.mjs:threat-model-approval-request-tests",
@@ -577,6 +581,9 @@
         "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-case-completion-check",
+        "verify-phase:harness/scripts/verify.mjs:verify-case-completion-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-case-completion-registry-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-evidence-producer-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-evidence-root-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-evidence-writer-tests",
@@ -910,7 +917,9 @@
         "publication:plugins/pipeline-core/.claude-plugin/plugin.json:plugin-manifest",
         "publication:plugins/pipeline-core/scripts/public-baseline-diagnose.mjs:public-baseline-diagnose",
         "publication:plugins/pipeline-core/scripts/publication-close-journal.mjs:publication-close-journal",
-        "release:plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs:codex-plugin-validator-parity"
+        "release:plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs:codex-plugin-validator-parity",
+        "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-tests"
       ],
       "runners": [
         "antigravity",

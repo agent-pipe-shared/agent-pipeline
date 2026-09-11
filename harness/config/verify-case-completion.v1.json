@@ -272,6 +272,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "dispatch-budget-core-tests",
+      "path": "plugins/pipeline-core/lib/dispatch-budget-core.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "dispatch-policy-tests",
       "path": "plugins/pipeline-core/lib/dispatch-policy.test.mjs",
       "disposition": "legacy-process-only",
@@ -282,6 +287,16 @@
       "path": "harness/scripts/check-dispatch-provenance.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "dispatch-record-tests",
+      "path": "plugins/pipeline-core/lib/dispatch-record.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "dispatch-record-write-tests",
+      "path": "plugins/pipeline-core/scripts/dispatch-record-write.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "epic-ac02-publication-check-tests",
@@ -366,6 +381,16 @@
       "path": "plugins/pipeline-core/lib/human-role-rendering.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "installed-plugin-attestation-host-tests",
+      "path": "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "installed-plugin-attestation-tests",
+      "path": "plugins/pipeline-core/lib/installed-plugin-attestation.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "interaction-continuity-tests",

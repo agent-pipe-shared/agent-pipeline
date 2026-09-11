@@ -152,8 +152,8 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "bootstrapPayload", "concurrentSessionWarning", "executionBoundary", "handoff", "installedSource",
-    "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
+    "bootstrapPayload", "concurrentSessionWarning", "executionBoundary", "handoff", "installedPluginAttestation",
+    "installedSource", "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
     "version",
   ]);
   assert.equal(result.schema, SCHEMA);
@@ -163,6 +163,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   assert.equal(result.version, "0.4.5+test");
   assert.equal(result.installedVersion, "0.4.5+test");
   assert.equal(result.installedSource, "remote");
+  assert.equal(result.installedPluginAttestation.status, "not-required");
   assert.equal(result.executionBoundary, "default");
   assert.equal(result.handoff, "none");
   assert.equal(result.bootstrapPayload.schema, "pipeline.bootstrap-payload-receipt.v1");
@@ -842,6 +843,72 @@ test("the Claude local-development id is accepted only from an attested director
       null,
     );
   }
+});
+
+test("a Gitless Codex local-development install is ready only with its installer-owned receipt", (t) => {
+  const base = mkdtempSync(join(tmpdir(), "preflight-installed-receipt-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const installedRoot = join(base, "cache", "pipeline-core", "0.4.5-test");
+  const marketplaceRoot = join(base, "marketplace");
+  const registrySourcePluginRoot = join(marketplaceRoot, "plugins", "pipeline-core");
+  mkdirSync(join(installedRoot, "scripts"), { recursive: true });
+  mkdirSync(registrySourcePluginRoot, { recursive: true });
+  const scriptUrl = pathToFileURL(join(installedRoot, "scripts", "pipeline-start-preflight.mjs")).href;
+  const localPluginList = () => JSON.stringify({ installed: [{
+    pluginId: "pipeline-core@agent-pipeline-local", name: "pipeline-core", marketplaceName: "agent-pipeline-local",
+    version: "0.4.5+test", installed: true, enabled: true,
+    source: { source: "local", path: registrySourcePluginRoot },
+    marketplaceSource: { sourceType: "local", source: marketplaceRoot },
+  }], available: [] });
+  const contentSha256 = "9".repeat(64);
+  const verified = preflight({
+    env: {}, pluginList: localPluginList,
+    read: () => manifest, scriptUrl,
+    verifyLocalInstalledPluginReceiptFn(input) {
+      assert.equal(input.installedPluginRoot, installedRoot);
+      assert.equal(input.provider, "codex");
+      assert.equal(input.registrySourcePluginRoot, registrySourcePluginRoot);
+      return {
+        schema: "pipeline.installed-plugin-attestation-verification.v1", status: "verified",
+        request: { installedContentSha256: contentSha256 }, receiptId: "a".repeat(64), externalReceiptIdentitySha256: "b".repeat(64),
+      };
+    },
+  });
+  assert.equal(verified.status, "ready");
+  assert.equal(verified.installedPluginAttestation.status, "verified");
+  assert.deepEqual(verified.rulesetSource.loadedIdentity, { status: "available", algorithm: "content-sha256", value: contentSha256 });
+  assert.deepEqual(verified.rulesetSource.installedIdentity, verified.rulesetSource.loadedIdentity);
+
+  const unavailable = preflight({
+    env: {}, pluginList: localPluginList,
+    read: () => manifest, scriptUrl,
+    verifyLocalInstalledPluginReceiptFn: () => ({
+      schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-LOCATOR-UNAVAILABLE"],
+    }),
+  });
+  assert.equal(unavailable.status, "plugin-attestation-required");
+  assert.equal(pipelineStartPreflightExitCode(unavailable), 2);
+  assert.equal(unavailable.installedPluginAttestation.reasonCodes[0], "IPA-HOST-LOCATOR-UNAVAILABLE");
+  assert.equal(unavailable.installedPluginAttestation.setupAction.kind, "host-postinstall");
+  assert.equal(unavailable.installedPluginAttestation.setupAction.requiresPoApproval, false);
+  assert.equal(unavailable.installedPluginAttestation.setupAction.argv.includes("write-local-from-codex-registry"), true);
+  assert.equal(unavailable.nextAction.kind, "host-postinstall");
+  assert.equal(unavailable.nextAction.executionBoundary, "host");
+
+  const mismatchedRegistry = () => JSON.stringify({ installed: [{
+    pluginId: "pipeline-core@agent-pipeline-local", name: "pipeline-core", marketplaceName: "agent-pipeline-local",
+    version: "0.4.4+test", installed: true, enabled: true,
+    source: { source: "local", path: registrySourcePluginRoot },
+    marketplaceSource: { sourceType: "local", source: marketplaceRoot },
+  }], available: [] });
+  const mismatch = preflight({
+    env: {}, pluginList: mismatchedRegistry, read: () => manifest, scriptUrl,
+    verifyLocalInstalledPluginReceiptFn: () => { throw new Error("missing attestation must be resolved before soft refresh"); },
+  });
+  assert.equal(mismatch.status, "plugin-attestation-required");
+  assert.equal(pipelineStartPreflightExitCode(mismatch), 2);
+  assert.notEqual(mismatch.nextAction.kind, "advisory");
+  assert.equal(mismatch.nextAction.kind, "host-postinstall");
 });
 
 test("a non-local Claude installation id reports unknown source without touching the host marketplace registry", () => {
