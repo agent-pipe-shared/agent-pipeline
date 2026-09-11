@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-cannot-rerun-fresh-at-unchanged-tree
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 0eba7f80f050d1affc819940e3a834db6cbc18b0
+closure_evidence: backlog/evidence/2026-09-11-verify-fresh-same-candidate-pass.md
 tracking: "Nova B -- there is no way to force a fresh full verify run at an unchanged tree. candidateIdentity() keys on HEAD^{tree} and, with allowCrossCandidateReuse false (verify.mjs's real call shape), every suite's prior receipt is reused. Consequence: repeat-run evidence at an unchanged HEAD is vacuous -- it re-reports cached results, so it can never surface a race, a flake, or an environment-dependent failure. Every 'ran it twice, green both times' claim made at an unchanged HEAD in this repository proves nothing."
 source: "NVA-B-VERIFYLANE-1 dispatch, 2026-09-06: found while trying to satisfy a briefed race-evidence DoD ('run the full gate at least 3 times, all runs must agree'). The dispatch correctly stopped rather than produce evidence it had determined was meaningless."
 ---
@@ -64,3 +68,17 @@ the design question and should be answered before a ceremony is seeded.
 - If the mechanism can live wholly outside `verify.mjs`, it does, and the
   TP-3 ceremony is avoided; if it cannot, the ceremony scope is stated
   before it is seeded.
+
+## Resolution, 2026-09-11
+
+Commit `0eba7f80f050d1affc819940e3a834db6cbc18b0` adds the supported
+`--no-reuse` option to the repository Verify command and the installed
+consumer Verify producer. Valid receipts remain reusable by default. An
+explicit fresh run instead records matching prior receipts as
+`reuse-disabled`, executes every selected suite, and exposes the policy as
+`verifyRun.receiptReuse` in public evidence.
+
+A release-mode run at the unchanged implementation candidate executed and
+passed all 520 suites with zero reused steps. The focused tests, exact run
+bindings, and independent Critic PASS are recorded in
+`backlog/evidence/2026-09-11-verify-fresh-same-candidate-pass.md`.

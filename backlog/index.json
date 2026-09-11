@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "196bb4405798a8cc159126e58bf834223a7096cc5854e2754702b218d04eb936"
+    "transitionHead": "d18da61bd5cbf72d620b27b1a805466c3e86d4a3464a7b26befc6c2a77d8e554"
   },
   "counts": {
-    "open": 104,
+    "open": 103,
     "in_progress": 0,
-    "closed": 536,
+    "closed": 537,
     "rejected": 3,
     "deferred": 11
   },
@@ -7778,13 +7778,17 @@
     },
     {
       "id": "pipeline.verify-cannot-rerun-fresh-at-unchanged-tree",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "NVA-B-VERIFYLANE-1 dispatch, 2026-09-06: found while trying to satisfy a briefed race-evidence DoD ('run the full gate at least 3 times, all runs must agree'). The dispatch correctly stopped rather than produce evidence it had determined was meaningless.",
       "deferred": false,
-      "tracking": "Nova B -- there is no way to force a fresh full verify run at an unchanged tree. candidateIdentity() keys on HEAD^{tree} and, with allowCrossCandidateReuse false (verify.mjs's real call shape), every suite's prior receipt is reused. Consequence: repeat-run evidence at an unchanged HEAD is vacuous -- it re-reports cached results, so it can never surface a race, a flake, or an environment-dependent failure. Every 'ran it twice, green both times' claim made at an unchanged HEAD in this repository proves nothing."
+      "tracking": "Nova B -- there is no way to force a fresh full verify run at an unchanged tree. candidateIdentity() keys on HEAD^{tree} and, with allowCrossCandidateReuse false (verify.mjs's real call shape), every suite's prior receipt is reused. Consequence: repeat-run evidence at an unchanged HEAD is vacuous -- it re-reports cached results, so it can never surface a race, a flake, or an environment-dependent failure. Every 'ran it twice, green both times' claim made at an unchanged HEAD in this repository proves nothing.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "0eba7f80f050d1affc819940e3a834db6cbc18b0",
+      "closureEvidence": "backlog/evidence/2026-09-11-verify-fresh-same-candidate-pass.md"
     },
     {
       "id": "pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it",
