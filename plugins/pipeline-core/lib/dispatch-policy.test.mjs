@@ -16,12 +16,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { dispatchFindings } from "./dispatch-policy.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import {
   ROLE_DISPATCH_REQUEST_SCHEMA,
   preflightRoleDispatch,
@@ -46,8 +47,10 @@ function filledTemplateBody(relativePath) {
   return body;
 }
 
-let checks = 0;
-const check = (label, fn) => { fn(); checks += 1; process.stdout.write(`ok ${label}\n`); };
+const cases = [];
+const check = (label, run) => {
+  cases.push({ id: `DPT${String(cases.length + 1).padStart(2, "0")}`, name: label, run });
+};
 const codes = (result) => result.findings.map((f) => f.code).sort();
 
 const REAL_BRIEFING = `Independent Critic review. Construct your own input from the refs and paths below.
@@ -207,8 +210,12 @@ check("DP16 an unrelated host role remains outside the pipeline registry", () =>
   assert.deepEqual(codes(result), []);
 });
 
-const dispatchFixture = mkdtempSync(join(tmpdir(), "pipeline-role-dispatch-"));
-try {
+let dispatchFixture;
+let commit;
+let tree;
+function ensureDispatchFixture() {
+  if (dispatchFixture !== undefined) return;
+  dispatchFixture = mkdtempSync(join(tmpdir(), "pipeline-role-dispatch-"));
   execFileSync("git", ["init", "-q"], { cwd: dispatchFixture });
   execFileSync("git", ["config", "user.email", "dispatch@example.invalid"], { cwd: dispatchFixture });
   execFileSync("git", ["config", "user.name", "Dispatch fixture"], { cwd: dispatchFixture });
@@ -217,14 +224,18 @@ try {
   writeFileSync(join(dispatchFixture, "README.md"), "fixture\n");
   execFileSync("git", ["add", "input.txt", "README.md"], { cwd: dispatchFixture });
   execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: dispatchFixture });
-  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dispatchFixture, encoding: "utf8" }).trim();
-  const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dispatchFixture, encoding: "utf8" }).trim();
-  const roles = [
-    "afk-claude-worker", "consult-advisor", "critic", "goldfish-deep",
-    "goldfish-implementor", "goldfish-mechanic", "plan-verifier", "readiness-reviewer",
-  ];
-  const promptFor = (role) => role.includes("goldfish") ? CLEAN_GOLDFISH : role === "critic" ? CLEAN_CRITIC : "Inspect input.txt with model codex; Ruleset-SHA: 0f38b425.";
-  const packetFor = (role, index, requiredPaths = ["input.txt"]) => {
+  commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dispatchFixture, encoding: "utf8" }).trim();
+  tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dispatchFixture, encoding: "utf8" }).trim();
+}
+process.once("exit", () => {
+  if (dispatchFixture !== undefined) rmSync(dispatchFixture, { recursive: true, force: true });
+});
+const roles = [
+  "afk-claude-worker", "consult-advisor", "critic", "goldfish-deep",
+  "goldfish-implementor", "goldfish-mechanic", "plan-verifier", "readiness-reviewer",
+];
+const promptFor = (role) => role.includes("goldfish") ? CLEAN_GOLDFISH : role === "critic" ? CLEAN_CRITIC : "Inspect input.txt with model codex; Ruleset-SHA: 0f38b425.";
+const packetFor = (role, index, requiredPaths = ["input.txt"]) => {
     const requiredPathSha256 = Object.fromEntries(requiredPaths.map((path) => [
       path,
       path === "input.txt" ? createHash("sha256").update("input\n").digest("hex") : "0".repeat(64),
@@ -240,9 +251,13 @@ try {
       requiredPathSha256,
       resultPath: `scratch/result-${index}.json`,
     };
-  };
+};
+const fixtureCheck = (label, run) => check(label, async () => {
+  ensureDispatchFixture();
+  await run();
+});
 
-  check("DP17 the common envelope rejects a stale candidate tree before launch", () => {
+  fixtureCheck("DP17 the common envelope rejects a stale candidate tree before launch", () => {
     const packet = packetFor("consult-advisor", 17);
     packet.candidate.tree = "0".repeat(40);
     const result = preflightRoleDispatch({ root: dispatchFixture, packet });
@@ -251,13 +266,13 @@ try {
     assert.equal(result.launcherCalls, 0);
   });
 
-  check("DP18 the common envelope rejects an unusable result destination", () => {
+  fixtureCheck("DP18 the common envelope rejects an unusable result destination", () => {
     const packet = packetFor("consult-advisor", 18);
     packet.resultPath = "missing-parent/result.json";
     assert.equal(preflightRoleDispatch({ root: dispatchFixture, packet }).code, "RDP-RESULT-DESTINATION");
   });
 
-  check("DP18b a coordinator-owned result root is validated separately from candidate inputs", () => {
+  fixtureCheck("DP18b a coordinator-owned result root is validated separately from candidate inputs", () => {
     const resultRoot = mkdtempSync(join(tmpdir(), "pipeline-role-result-"));
     try {
       const packet = packetFor("consult-advisor", 182);
@@ -273,7 +288,77 @@ try {
     }
   });
 
-  check("DP18a required source names are literal paths, never Git pathspecs", () => {
+  fixtureCheck("DP18d explicit file destinations preserve the validated file contract", () => {
+    const resultRoot = mkdtempSync(join(tmpdir(), "pipeline-role-explicit-result-"));
+    try {
+      const packet = packetFor("consult-advisor", 184);
+      delete packet.resultPath;
+      packet.resultDestination = { kind: "file", path: "result.json" };
+      const prepared = preflightRoleDispatch({ root: dispatchFixture, resultRoot, packet });
+      assert.equal(prepared.status, "prepared");
+      assert.deepEqual(prepared.packet, packet);
+
+      packet.resultDestination.path = "../result.json";
+      const rejected = preflightRoleDispatch({ root: dispatchFixture, resultRoot, packet });
+      assert.equal(rejected.code, "RDP-RESULT-PATH");
+      assert.equal(rejected.field, "resultDestination.path");
+      assert.equal(rejected.modelCalls, 0);
+      assert.equal(rejected.launcherCalls, 0);
+    } finally {
+      rmSync(resultRoot, { recursive: true, force: true });
+    }
+  });
+
+  fixtureCheck("DP18e return and stream destinations require no fabricated result path", () => {
+    for (const [index, kind] of ["return", "stream"].entries()) {
+      const packet = packetFor("consult-advisor", 185 + index);
+      delete packet.resultPath;
+      packet.resultDestination = { kind };
+      const prepared = preflightRoleDispatch({
+        root: dispatchFixture,
+        resultRoot: join(dispatchFixture, "missing-result-root"),
+        packet,
+      });
+      assert.equal(prepared.status, "prepared", kind);
+      assert.deepEqual(prepared.packet.resultDestination, { kind });
+      assert.equal("resultPath" in prepared.packet, false);
+    }
+  });
+
+  fixtureCheck("DP18f malformed explicit destination forms fail closed through the batch runner", async () => {
+    const malformedDestinations = [
+      null,
+      {},
+      { kind: "file" },
+      { kind: "return", path: "scratch/fake.json" },
+      { kind: "stream", channel: "stdout" },
+      { kind: "unknown" },
+    ];
+    let malformedLaunches = 0;
+    const malformedResults = [];
+    for (const [index, resultDestination] of malformedDestinations.entries()) {
+      const packet = packetFor("consult-advisor", 190 + index);
+      delete packet.resultPath;
+      packet.resultDestination = resultDestination;
+      malformedResults.push(await runRoleDispatchBatch({
+        root: dispatchFixture,
+        packets: [packet],
+        launch: async () => { malformedLaunches += 1; },
+      }));
+    }
+    for (const [index, rejectedBatch] of malformedResults.entries()) {
+      const rejected = rejectedBatch.preparations[0];
+      const resultDestination = malformedDestinations[index];
+      assert.equal(rejectedBatch.code, "RDB-PREPARATION-FAILED", JSON.stringify(resultDestination));
+      assert.equal(rejected.code, "RDP-RESULT-DESTINATION", JSON.stringify(resultDestination));
+      assert.equal(rejected.field, "resultDestination");
+      assert.equal(rejected.modelCalls, 0);
+      assert.equal(rejected.launcherCalls, 0);
+    }
+    assert.equal(malformedLaunches, 0);
+  });
+
+  fixtureCheck("DP18a required source names are literal paths, never Git pathspecs", () => {
     const packet = packetFor("consult-advisor", 181, [":README.md"]);
     const result = preflightRoleDispatch({ root: dispatchFixture, packet });
     assert.equal(result.code, "RDP-REQUIRED-PATH");
@@ -281,7 +366,7 @@ try {
     assert.equal(result.launcherCalls, 0);
   });
 
-  check("DP18c a modified tracked source is rejected before launch", () => {
+  fixtureCheck("DP18c a modified tracked source is rejected before launch", () => {
     writeFileSync(join(dispatchFixture, "input.txt"), "modified after candidate\n");
     try {
       const result = preflightRoleDispatch({ root: dispatchFixture, packet: packetFor("consult-advisor", 183) });
@@ -293,15 +378,15 @@ try {
     }
   });
 
-  const invalidPackets = roles.map((role, index) => packetFor(role, 100 + index, ["missing.txt"]));
-  let invalidLaunches = 0;
-  const invalidStarted = Date.now();
-  const invalidBatch = await runRoleDispatchBatch({
-    root: dispatchFixture,
-    packets: invalidPackets,
-    launch: async () => { invalidLaunches += 1; },
-  });
-  check("DP19 every shipped role fails in PREPARE with zero launcher calls", () => {
+  fixtureCheck("DP19 every shipped role fails in PREPARE with zero launcher calls", async () => {
+    const invalidPackets = roles.map((role, index) => packetFor(role, 100 + index, ["missing.txt"]));
+    let invalidLaunches = 0;
+    const invalidStarted = Date.now();
+    const invalidBatch = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: invalidPackets,
+      launch: async () => { invalidLaunches += 1; },
+    });
     assert.equal(invalidBatch.status, "rejected");
     assert.equal(invalidBatch.code, "RDB-PREPARATION-FAILED");
     assert.equal(invalidBatch.preparations.length, roles.length);
@@ -311,21 +396,142 @@ try {
     assert.ok(Date.now() - invalidStarted < 5_000);
   });
 
-  const validPackets = roles.map((role, index) => packetFor(role, 200 + index));
-  const launched = [];
-  const validBatch = await runRoleDispatchBatch({
-    root: dispatchFixture,
-    packets: validPackets,
-    launch: async (packet) => { launched.push(packet); return { role: packet.role }; },
-  });
-  check("DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged", () => {
+  fixtureCheck("DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged", async () => {
+    const validPackets = roles.map((role, index) => packetFor(role, 200 + index));
+    const launched = [];
+    const validBatch = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: validPackets,
+      launch: async (packet) => { launched.push(packet); return { role: packet.role }; },
+    });
     assert.equal(validBatch.status, "completed");
     assert.equal(validBatch.launcherCalls, roles.length);
     assert.deepEqual(launched, validPackets);
     assert.deepEqual(validBatch.results, validPackets.map(({ role }) => ({ role })));
   });
-} finally {
-  rmSync(dispatchFixture, { recursive: true, force: true });
-}
 
-process.stdout.write(`\n${checks}/${checks} dispatch policy checks passed\n`);
+  fixtureCheck("DP21 batch execution propagates resultRoot and preserves mixed destinations", async () => {
+    const batchResultRoot = mkdtempSync(join(tmpdir(), "pipeline-role-batch-result-"));
+    try {
+    const externalOnlyParent = `result-parent-${createHash("sha256").update(batchResultRoot).digest("hex").slice(0, 12)}`;
+    mkdirSync(join(batchResultRoot, externalOnlyParent));
+    const filePacket = packetFor("consult-advisor", 301);
+    filePacket.resultPath = `${externalOnlyParent}/file-result.json`;
+    assert.equal(
+      preflightRoleDispatch({ root: dispatchFixture, packet: filePacket }).code,
+      "RDP-RESULT-DESTINATION",
+      "the fixture must fail if the batch forgets its coordinator-owned resultRoot",
+    );
+    const returnPacket = packetFor("critic", 302);
+    delete returnPacket.resultPath;
+    returnPacket.resultDestination = { kind: "return" };
+    const streamPacket = packetFor("goldfish-implementor", 303);
+    delete streamPacket.resultPath;
+    streamPacket.resultDestination = { kind: "stream" };
+    const packets = [filePacket, returnPacket, streamPacket];
+    const received = [];
+    const result = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      resultRoot: batchResultRoot,
+      packets,
+      launch: async (packet) => { received.push(packet); return packet.dispatchId; },
+    });
+      assert.equal(result.status, "completed");
+      assert.equal(result.launcherCalls, 3);
+      assert.deepEqual(received, packets);
+      assert.deepEqual(result.results, packets.map(({ dispatchId }) => dispatchId));
+    } finally {
+      rmSync(batchResultRoot, { recursive: true, force: true });
+    }
+  });
+
+  fixtureCheck("DP22 legacy and explicit file destinations share one collision namespace", async () => {
+    const duplicateLegacy = packetFor("consult-advisor", 304);
+    duplicateLegacy.resultPath = "scratch/shared-result.json";
+    const duplicateExplicit = packetFor("critic", 305);
+    delete duplicateExplicit.resultPath;
+    duplicateExplicit.resultDestination = { kind: "file", path: "scratch/shared-result.json" };
+    let duplicateLaunches = 0;
+    const duplicateBatch = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: [duplicateLegacy, duplicateExplicit],
+      launch: async () => { duplicateLaunches += 1; },
+    });
+    assert.equal(duplicateBatch.code, "RDB-DUPLICATE-BINDING");
+    assert.equal(duplicateLaunches, 0);
+    assert.equal(duplicateBatch.launcherCalls, 0);
+  });
+
+  for (const mode of ["occupied", "symlink-parent"]) {
+    fixtureCheck(`DP23 ${mode} replacement after PREPARE blocks the affected launcher`, async () => {
+      const resultRoot = mkdtempSync(join(tmpdir(), `pipeline-role-stale-${mode}-`));
+      const outsideRoot = mkdtempSync(join(tmpdir(), "pipeline-role-stale-outside-"));
+      try {
+      mkdirSync(join(resultRoot, "second-parent"));
+      const first = packetFor("consult-advisor", mode === "occupied" ? 306 : 308);
+      first.resultPath = "first.json";
+      const second = packetFor("critic", mode === "occupied" ? 307 : 309);
+      second.resultPath = "second-parent/result.json";
+      const launchedIds = [];
+      const result = await runRoleDispatchBatch({
+        root: dispatchFixture,
+        resultRoot,
+        packets: [first, second],
+        launch: async (packet) => {
+          launchedIds.push(packet.dispatchId);
+          if (mode === "occupied") writeFileSync(join(resultRoot, second.resultPath), "occupied\n");
+          else {
+            rmSync(join(resultRoot, "second-parent"), { recursive: true });
+            symlinkSync(outsideRoot, join(resultRoot, "second-parent"));
+          }
+          return packet.dispatchId;
+        },
+      });
+        assert.equal(result.code, "RDB-PREPARATION-STALE");
+        assert.equal(result.failedPreparation.code, "RDP-RESULT-DESTINATION");
+        assert.deepEqual(launchedIds, [first.dispatchId]);
+        assert.equal(result.launcherCalls, 1);
+      } finally {
+        rmSync(resultRoot, { recursive: true, force: true });
+        rmSync(outsideRoot, { recursive: true, force: true });
+      }
+    });
+  }
+
+  fixtureCheck("DP24 required-input drift after PREPARE blocks the affected launcher", async () => {
+    const staleInputRoot = mkdtempSync(join(tmpdir(), "pipeline-role-stale-input-result-"));
+    try {
+    const first = packetFor("consult-advisor", 310);
+    first.resultPath = "first.json";
+    const second = packetFor("critic", 311);
+    second.resultPath = "second.json";
+    const launchedIds = [];
+    const result = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      resultRoot: staleInputRoot,
+      packets: [first, second],
+      launch: async (packet) => {
+        launchedIds.push(packet.dispatchId);
+        writeFileSync(join(dispatchFixture, "input.txt"), "mutated after PREPARE\n");
+        return packet.dispatchId;
+      },
+    });
+      assert.equal(result.code, "RDB-PREPARATION-STALE");
+      assert.equal(result.failedPreparation.code, "RDP-REQUIRED-PATH-DRIFT");
+      assert.deepEqual(launchedIds, [first.dispatchId]);
+      assert.equal(result.launcherCalls, 1);
+    } finally {
+      writeFileSync(join(dispatchFixture, "input.txt"), "input\n");
+      rmSync(staleInputRoot, { recursive: true, force: true });
+    }
+  });
+
+assert.equal(cases.length, 31, "the complete dispatch-policy corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

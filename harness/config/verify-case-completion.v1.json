@@ -279,8 +279,7 @@
     {
       "name": "dispatch-policy-tests",
       "path": "plugins/pipeline-core/lib/dispatch-policy.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "dispatch-provenance-tests",

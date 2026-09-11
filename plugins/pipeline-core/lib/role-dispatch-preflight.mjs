@@ -15,6 +15,7 @@ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/u;
 const TRANSPORTS = new Set(["direct", "workflow", "antigravity", "codex"]);
 const PACKET_KEYS = ["candidate", "dispatchId", "prompt", "requiredPathSha256", "requiredPaths", "resultPath", "role", "schema", "transport"];
+const EXPLICIT_DESTINATION_PACKET_KEYS = ["candidate", "dispatchId", "prompt", "requiredPathSha256", "requiredPaths", "resultDestination", "role", "schema", "transport"];
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 function exactKeys(value, keys) {
@@ -85,19 +86,9 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
   if (typeof root !== "string" || root.length === 0) return rejected("RDP-ROOT", "root");
   let realRoot;
   try { realRoot = realpathSync(root); } catch { return rejected("RDP-ROOT", "root"); }
-  let realResultRoot;
-  try {
-    const lexicalResultRoot = resolve(resultRoot);
-    const lexicalResultStat = lstatSync(lexicalResultRoot);
-    realResultRoot = realpathSync(lexicalResultRoot);
-    // Inspect the coordinator-supplied directory before resolving it. This
-    // catches a symlinked destination without rejecting platform-standard
-    // ancestors such as macOS /var -> /private/var.
-    if (!lexicalResultStat.isDirectory() || lexicalResultStat.isSymbolicLink()) {
-      return rejected("RDP-RESULT-ROOT", "resultRoot");
-    }
-  } catch { return rejected("RDP-RESULT-ROOT", "resultRoot"); }
-  if (!exactKeys(packet, PACKET_KEYS) || packet.schema !== ROLE_DISPATCH_REQUEST_SCHEMA) {
+  const legacyPacket = exactKeys(packet, PACKET_KEYS);
+  const explicitPacket = exactKeys(packet, EXPLICIT_DESTINATION_PACKET_KEYS);
+  if ((!legacyPacket && !explicitPacket) || packet.schema !== ROLE_DISPATCH_REQUEST_SCHEMA) {
     return rejected("RDP-PACKET-SHAPE", "packet");
   }
   if (!ID.test(packet.dispatchId)) return rejected("RDP-DISPATCH-ID", "dispatchId");
@@ -117,7 +108,20 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
     || packet.requiredPaths.some((path) => !SHA256.test(packet.requiredPathSha256[path]))) {
     return rejected("RDP-REQUIRED-DIGESTS", "requiredPathSha256");
   }
-  if (!normalizedPath(packet.resultPath)) return rejected("RDP-RESULT-PATH", "resultPath");
+  let destination;
+  if (legacyPacket) {
+    if (!normalizedPath(packet.resultPath)) return rejected("RDP-RESULT-PATH", "resultPath");
+    destination = { kind: "file", path: packet.resultPath };
+  } else if (exactKeys(packet.resultDestination, ["kind", "path"])
+    && packet.resultDestination.kind === "file") {
+    if (!normalizedPath(packet.resultDestination.path)) return rejected("RDP-RESULT-PATH", "resultDestination.path");
+    destination = packet.resultDestination;
+  } else if (exactKeys(packet.resultDestination, ["kind"])
+    && (packet.resultDestination.kind === "return" || packet.resultDestination.kind === "stream")) {
+    destination = packet.resultDestination;
+  } else {
+    return rejected("RDP-RESULT-DESTINATION", "resultDestination");
+  }
 
   const policy = dispatchFindings({ subagentType: packet.role, prompt: packet.prompt, transport: packet.transport });
   if (policy.findings.length > 0) return rejected(policy.findings[0].code, "role");
@@ -145,8 +149,26 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
     const physicalBlob = git(realRoot, ["--literal-pathspecs", "hash-object", "--no-filters", "--", path]);
     if (physicalBlob !== match[1]) return rejected("RDP-REQUIRED-PATH-DRIFT", `requiredPaths:${path}`);
   }
-  if (!resultParentIsSafe(realResultRoot, packet.resultPath)) return rejected("RDP-RESULT-DESTINATION", "resultPath");
-  if (realRoot === realResultRoot && packet.requiredPaths.includes(packet.resultPath)) return rejected("RDP-RESULT-ALIASES-INPUT", "resultPath");
+  if (destination.kind === "file") {
+    let realResultRoot;
+    try {
+      const lexicalResultRoot = resolve(resultRoot);
+      const lexicalResultStat = lstatSync(lexicalResultRoot);
+      realResultRoot = realpathSync(lexicalResultRoot);
+      // Inspect the coordinator-supplied directory before resolving it. This
+      // catches a symlinked destination without rejecting platform-standard
+      // ancestors such as macOS /var -> /private/var.
+      if (!lexicalResultStat.isDirectory() || lexicalResultStat.isSymbolicLink()) {
+        return rejected("RDP-RESULT-ROOT", "resultRoot");
+      }
+    } catch { return rejected("RDP-RESULT-ROOT", "resultRoot"); }
+    if (!resultParentIsSafe(realResultRoot, destination.path)) {
+      return rejected("RDP-RESULT-DESTINATION", explicitPacket ? "resultDestination.path" : "resultPath");
+    }
+    if (realRoot === realResultRoot && packet.requiredPaths.includes(destination.path)) {
+      return rejected("RDP-RESULT-ALIASES-INPUT", explicitPacket ? "resultDestination.path" : "resultPath");
+    }
+  }
 
   return {
     schema: ROLE_DISPATCH_PREFLIGHT_SCHEMA,
@@ -159,14 +181,19 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
   };
 }
 
-export function prepareRoleDispatchBatch({ root, packets } = {}) {
+export function prepareRoleDispatchBatch({ root, resultRoot = root, packets } = {}) {
   if (!Array.isArray(packets) || packets.length === 0 || packets.length > 64) {
     return { schema: ROLE_DISPATCH_BATCH_SCHEMA, status: "rejected", code: "RDB-PACKETS", preparations: [], modelCalls: 0, launcherCalls: 0 };
   }
-  const preparations = packets.map((packet) => preflightRoleDispatch({ root, packet }));
+  const preparations = packets.map((packet) => preflightRoleDispatch({ root, resultRoot, packet }));
   const ids = packets.map((packet) => packet?.dispatchId);
-  const destinations = packets.map((packet) => packet?.resultPath);
-  const duplicate = new Set(ids).size !== ids.length || new Set(destinations).size !== destinations.length;
+  const fileDestinations = packets.flatMap((packet) => {
+    if (typeof packet?.resultPath === "string") return [packet.resultPath];
+    return packet?.resultDestination?.kind === "file" && typeof packet.resultDestination.path === "string"
+      ? [packet.resultDestination.path]
+      : [];
+  });
+  const duplicate = new Set(ids).size !== ids.length || new Set(fileDestinations).size !== fileDestinations.length;
   if (duplicate || preparations.some(({ status }) => status !== "prepared")) {
     return {
       schema: ROLE_DISPATCH_BATCH_SCHEMA,
@@ -180,13 +207,26 @@ export function prepareRoleDispatchBatch({ root, packets } = {}) {
   return { schema: ROLE_DISPATCH_BATCH_SCHEMA, status: "prepared", code: "RDB-PREPARED", preparations, modelCalls: 0, launcherCalls: 0 };
 }
 
-export async function runRoleDispatchBatch({ root, packets, launch } = {}) {
-  const prepared = prepareRoleDispatchBatch({ root, packets });
+export async function runRoleDispatchBatch({ root, resultRoot = root, packets, launch } = {}) {
+  const prepared = prepareRoleDispatchBatch({ root, resultRoot, packets });
   if (prepared.status !== "prepared") return prepared;
   if (typeof launch !== "function") {
     return { ...prepared, status: "rejected", code: "RDB-LAUNCHER", launcherCalls: 0 };
   }
   const results = [];
-  for (const preparation of prepared.preparations) results.push(await launch(structuredClone(preparation.packet)));
+  for (const preparation of prepared.preparations) {
+    const current = preflightRoleDispatch({ root, resultRoot, packet: preparation.packet });
+    if (current.status !== "prepared") {
+      return {
+        ...prepared,
+        status: "rejected",
+        code: "RDB-PREPARATION-STALE",
+        failedPreparation: current,
+        results,
+        launcherCalls: results.length,
+      };
+    }
+    results.push(await launch(structuredClone(current.packet)));
+  }
   return { ...prepared, status: "completed", code: "RDB-COMPLETED", results, launcherCalls: prepared.preparations.length };
 }
