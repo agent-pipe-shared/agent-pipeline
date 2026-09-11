@@ -128,6 +128,14 @@ with reuse disabled on the final correction and the independent Critic
 returned PASS with no findings; see
 `backlog/evidence/2026-09-11-advisory-dispatch-preflight-critic-pass.md`.
 
+The sixth slice wires the same coordinator contract into the direct Claude
+Critic host before its bounded native probe or real review can start. The
+late launch recheck reconstructs its packet from the durable authorization,
+so mutation of the earlier preparation view cannot redirect the result or
+weaken candidate and source bindings. The focused host suite passes 16/16;
+an independent correction Critic returned PASS with no findings. See
+`backlog/evidence/2026-09-11-claude-critic-dispatch-preflight-pass.md`.
+
 **Owner and due date:** Pipeline team, due 2026-09-30. The reusable envelope
 and all-packets barrier now exist, but the item remains open until the shipped
 model-launching coordinators call them and adapter-level tests prove that each
