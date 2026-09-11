@@ -63,6 +63,17 @@ coordinator envelope for required paths, candidate commit/tree binding and
 result destination, and batch coordinators still need an all-packets `PREPARE`
 barrier before their first `START`.
 
+**Owner and due date:** Pipeline team, due 2026-09-30. Until that slice lands,
+the structured zero-launch claim is limited to the native packet fields listed
+above; it does not claim coordinator binding or an all-packets batch barrier.
+
+**Rollback:** revert the implementation commit that wires the shared packet
+verdict into the runner manifests, regenerate `docs/enforcement.md`, and move
+the capability inventory baseline back to the resulting commit. This restores
+the prior runner behavior without leaving a documented hook surface that no
+longer exists. A rollback must rerun the dispatch-policy, runner-hook,
+capability-inventory and documentation-contract checks before restamping.
+
 ## Greenfield 0.6.2 evidence — 2026-09-11
 
 The Claude greenfield analysis records a malformed Critic packet that reached
