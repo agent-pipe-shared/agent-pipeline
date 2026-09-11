@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: "2026-08-31"
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: b757f6a6f8321ac607e4765c2480173242a4eca3
+closure_evidence: backlog/evidence/2026-09-11-resume-delivery-gate-closure.md
 sprint: nova-b
 done_when: manual
 source: "Observed live on 2026-08-31 during release preparation. The Elephant captured a Resume-Hint card for compact safety; the next full verify.mjs run went red on resume-consumption-check, and push-prepare.mjs requires green candidate-bound verify evidence."
