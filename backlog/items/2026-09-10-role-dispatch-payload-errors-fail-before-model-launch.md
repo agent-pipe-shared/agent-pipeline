@@ -63,6 +63,15 @@ coordinator envelope for required paths, candidate commit/tree binding and
 result destination, and batch coordinators still need an all-packets `PREPARE`
 barrier before their first `START`.
 
+The second shared slice closes a correction-review dispatch ambiguity found
+during Nova B itself. Critic preflight now emits an explicit
+`dispatch.reviewerInput` containing only the frozen refs and current source,
+guardrail and evidence paths. A prior Critic report is retained separately as
+`coordinatorOnly.priorCriticEvidence`; the review skill forbids copying that
+path or its bytes into a fresh Critic input. This aligns the executable handoff
+with QG-13 and prevents a valid correction from spending a review run only to
+discover that its dispatch was contaminated by the previous verdict.
+
 **Owner and due date:** Pipeline team, due 2026-09-30. Until that slice lands,
 the structured zero-launch claim is limited to the native packet fields listed
 above; it does not claim coordinator binding or an all-packets batch barrier.

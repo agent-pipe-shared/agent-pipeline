@@ -59,7 +59,17 @@ test("read-only dispatch preflight binds candidate, candidate-tree governance, a
   assert.equal(result.spec.path, "specs/spec.md");
   assert.deepEqual(result.guardrails.map(({ path }) => path), [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"]);
   assert.equal(result.evidence[0].candidate.commit, fx.candidate);
-  assert.equal(result.priorCriticEvidence.path, "evidence/prior-critic.json");
+  assert.equal(result.coordinatorOnly.priorCriticEvidence.path, "evidence/prior-critic.json");
+  assert.equal(Object.hasOwn(result, "priorCriticEvidence"), false);
+  assert.deepEqual(result.dispatch.reviewerInput, {
+    baseCommit: fx.base,
+    candidateCommit: fx.candidate,
+    candidateTree: fx.tree,
+    specPath: "specs/spec.md",
+    guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"],
+    evidencePaths: ["evidence/verify.json"],
+  });
+  assert.equal(JSON.stringify(result.dispatch.reviewerInput).includes("prior-critic"), false);
   assert.equal(result.dispatch.childCreated, false);
   assert.equal(result.dispatch.spawnAuthorized, false);
   assert.equal(result.dispatch.requiredNextGate, "selected-runner-transport");

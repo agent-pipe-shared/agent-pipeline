@@ -23,12 +23,15 @@ You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, rea
 **Dispatch admission (Elephant, mandatory):** immediately before every Critic
 spawn, run `scripts/critic-dispatch-preflight.mjs` against the fixed base and
 candidate. Pass the candidate Spec, every declared guardrail, each fresh
-candidate-evidence path and, for a re-review, the separate prior-Critic path.
+candidate-evidence path and, for a re-review, the separate prior-Critic path
+to the preflight only.
 Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
 `packet-ready`. `packet-ready` has `spawnAuthorized: false`: the session
 orchestrator's ordinary agent dispatch remains the execution authority. Its
-returned candidate-tree guardrail paths are the paths passed to this skill.
-This preflight is read-only.
+returned `dispatch.reviewerInput` is the complete path/ref input passed to this
+skill. The `coordinatorOnly.priorCriticEvidence` binding is retained for range
+and lineage checks and must never be copied into the reviewer input. This
+preflight is read-only.
 A rejected packet is a coordinator defect, not Critic work: do not spawn a child, create a packet or substitute prose/evidence.
 
 **Evidence artifact shape (confirmed from source, hard — not free-form text):**
@@ -146,7 +149,14 @@ to expand this review. Ordinary scope-adjacent ideas are dropped.
 For a fresh re-review after fixes, the diff range MUST start at the exact
 candidate commit reviewed by the immediately preceding Critic and end at the
 new fixed candidate (`PREVIOUS_CRITIC_CANDIDATE..NEW_CANDIDATE`). Supply the
-prior Critic report as an evidence path. Recheck only the prior findings, their fixes, and direct regressions introduced by those fixes. A broad range (for example `main..HEAD`) on a re-review is a dispatch defect unless the PO explicitly authorizes a larger new review scope. Do not restart a broad hunt, reopen cleared categories, or create a Critic-of-Critic loop otherwise.
+prior Critic report only to the coordinator-side preflight through its
+dedicated prior-report input. Never supply its path or bytes as reviewer
+evidence. Review the correction diff against the unchanged specification and
+recheck only the corrected behavior and direct regressions introduced by the
+fixes. Prior-finding reconciliation remains coordinator-side. A broad range
+(for example `main..HEAD`) on a re-review is a dispatch defect unless the PO
+explicitly authorizes a larger new review scope. Do not restart a broad hunt,
+reopen cleared categories, or create a Critic-of-Critic loop otherwise.
 
 ## 1. Stage gate (self-enforcing, before any review work)
 

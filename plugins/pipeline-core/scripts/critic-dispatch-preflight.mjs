@@ -289,10 +289,18 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     guardrails: guardrailReadback,
     governance,
     evidence: evidenceReadback,
-    priorCriticEvidence: priorReadback,
+    coordinatorOnly: { priorCriticEvidence: priorReadback },
     dispatch: {
       mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
       spawnAuthorized: false, requiredNextGate: "selected-runner-transport",
+      reviewerInput: {
+        ...(scope === null ? { baseCommit } : { reviewScope: scope }),
+        candidateCommit,
+        candidateTree,
+        specPath: specReadback.path,
+        guardrailPaths: guardrailReadback.map(({ path }) => path),
+        evidencePaths: evidenceReadback.map(({ path }) => path),
+      },
     },
   };
 }
