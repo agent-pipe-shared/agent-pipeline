@@ -7,14 +7,17 @@ test entries reference 488 distinct `.test.mjs` files. Six additional scoped
 or Windows assurance suites are registered through arrays and were counted
 separately from the static entries.
 
-A conservative syntax scan classified 166 vulnerable registrations in 165
+A first conservative syntax scan classified 166 vulnerable registrations in
+165 files. It parsed only the main Verify array and missed mixed
+`node:test`/throwing-wrapper shapes. The closed registry checker now accounts
+for every Verify array and classifies 170 vulnerable registrations in 169
 files:
 
 | Category | Registrations | Syntactic sites |
 |---|---:|---:|
-| direct `check(name, fn)` wrapper that throws/does not continue | 82 | 1,330 check calls |
+| direct `check(name, fn)` or `run(name, fn)` wrapper that throws/does not continue | 85 | 1,288 wrapper calls |
 | top-level assertions without `node:test` or a callback wrapper | 77 | 5,058 assertion sites |
-| one `node:test` registration containing multiple assertions | 7 | 52 assertion sites |
+| one `node:test` registration containing multiple assertions | 8 | 141 assertion sites |
 
 Catch-and-continue wrappers were inspected and excluded because an assertion
 there does not prevent later cases from running. Assertion-site totals are
@@ -28,12 +31,14 @@ assertion sites), `runner-profile-migration-v3-tests` (448),
 `harness/lib/plan-spec-state-v2.test.mjs` file is registered twice under two
 step names.
 
-The scan extracted static `{ name, file: join(...) }` registrations, counted
-`assert` and `check` call syntax, required a real `node:test` import, inspected
-direct wrapper execution/catch behavior, and then manually checked wrapper
-definitions and call locations. This is a triage inventory; a production
-completion detector needs a declared protocol rather than these heuristics.
+The production checker parses the main, scoped and Windows assurance arrays,
+rejects registrations outside its closed literal grammar, applies the
+versioned registry schema, and conservatively classifies wrapper, top-level and
+single-test shapes. Its 172-entry registry also retains two already-migrated
+files that still use a special self-probe rather than the normal descriptor
+path. Every entry remains `legacy-process-only` until the shipped helper is
+bound to its ordinary Verify invocation.
 
-The smallest next conversion is
-`plugins/pipeline-core/lib/local-worker-pool.test.mjs`: six compact direct
-checks adjacent to the already corrected supervisor suite.
+The local worker pool and supervisor source conversions are complete. The next
+step is their normal Verify descriptor integration, followed by incremental
+migration of the remaining registry entries.

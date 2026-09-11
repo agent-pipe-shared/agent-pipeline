@@ -113,24 +113,28 @@ also recreated the injected failure: exit status 1, with all 15 callback IDs
 present in order, and returned PASS with no findings. See
 `backlog/evidence/2026-09-11-local-worker-supervisor-complete-corpus.md`.
 
-The item remains open while the repository-wide population described above is
-quantified and any remaining single-test/many-check suites are dispositioned.
+The item remains open while the registered legacy population is migrated into
+the completion protocol and Verify consumes the resulting evidence.
 
 ### Repository inventory
 
 The requested inventory is no longer an unknown. Of 520 registered Verify
-steps, 490 are test registrations covering 488 files. A conservative syntax
-scan followed by wrapper inspection found 166 vulnerable registrations in 165
-files: 82 direct throwing `check(name, fn)` suites, 77 top-level assertion
-suites without `node:test`, and seven single-`node:test` suites containing
-multiple assertion sites. Catch-and-continue wrappers were excluded.
+steps, 490 are test registrations covering 488 files. The first static scan
+reported 166 vulnerable registrations in 165 files, but it parsed only the
+main Verify array and missed mixed `node:test`/throwing-wrapper shapes. The
+closed checker now parses every Verify registration array and reports 170
+vulnerable registrations in 169 files: 85 direct throwing `check(name, fn)` or
+`run(name, fn)` suites, 77 top-level assertion suites without `node:test`, and
+eight single-`node:test` suites containing multiple assertion sites.
+Catch-and-continue wrappers are excluded.
 
-The counts are triage data rather than semantic test-case counts: the scanner
-found 1,330 direct check calls, 5,058 syntactic assertion sites in the
-top-level group and 52 in the single-test group. This establishes that a
+The counts are triage data rather than semantic test-case counts: the corrected
+classifier found 1,288 direct wrapper calls, 5,058 syntactic assertion sites in
+the top-level group and 141 in the single-test group. This establishes that a
 repository-wide one-file conversion is not a small fix. The next bounded
-conversion is the adjacent six-case `local-worker-pool-tests` suite; broader
-harness-level completion evidence remains the scalable direction to design.
+integration is to bind the already-converted local worker pool and supervisor
+to the normal descriptor path; broader harness-level completion evidence
+remains the scalable direction.
 See `backlog/evidence/2026-09-11-truncating-suite-inventory.md`.
 
 That bounded conversion is now complete in `5366d7f4`. All six original
@@ -154,3 +158,11 @@ even when the process exits. ADR-0081 selection applies this only to selected
 suites without claiming omitted work. User repositories can opt commands into
 the same protocol; opaque commands remain honestly process-only. See
 `backlog/evidence/2026-09-11-verify-case-completion-design.md`.
+
+The helper landed in `0a163a26`. The versioned schema, complete registry and
+fail-closed checker landed in `ee35f669` after an independent correction review
+returned PASS. The registry contains 172 entries because it also retains two
+syntactically migrated supervisor/pool registrations whose current self-probe
+mode is not the normal standardized descriptor path. All entries therefore
+remain honestly `legacy-process-only`; no suite earns `required` until its
+normal Verify invocation imports the shipped helper and emits the bound stream.

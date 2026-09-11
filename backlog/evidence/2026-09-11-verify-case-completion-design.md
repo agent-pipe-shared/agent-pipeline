@@ -4,7 +4,7 @@ Date: 2026-09-11
 
 The existing Verify journal proves process completion and binds exit/log
 bytes. It cannot prove that a suite declared and disposed every intended test
-case. Parsing a final stdout line would cover only a subset of the 165 affected
+case. Parsing a final stdout line would cover only a subset of the 169 affected
 files and would remain forgeable or absent in legitimate red runs.
 
 The proposed incremental contract is:
@@ -14,7 +14,7 @@ The proposed incremental contract is:
    unique ordered case set with `node:test`, emits `DECLARED`, emits one
    `DISPOSED` record from every callback `finally`, and emits `TERMINAL` with
    the exact set/count/digest. A failed case stays red while siblings continue.
-2. A closed registry inventories all 166 affected Verify registrations as
+2. A closed registry inventories all 170 affected Verify registrations as
    `required` or `legacy-process-only`. New suites cannot start as legacy.
    Touching a legacy test requires migration in the same candidate.
 3. Verify captures and validates the bounded descriptor independently of the
@@ -39,4 +39,9 @@ transport. Focused acceptance includes early-failure continuation, missing or
 malformed terminal data, ordinary-red-but-complete behavior, policy-bound
 reuse, legacy compatibility, impacted omission and consumer FD propagation.
 
-This is a design checkpoint, not an implementation or a Full Verify claim.
+The helper is implemented in `0a163a26`; the schema, 172-entry registry and
+checker are implemented in `ee35f669`. The extra two entries retain migrated
+source suites whose self-probe invocation is not yet the normal standardized
+descriptor path. All entries remain `legacy-process-only`, so Verify capture,
+receipt binding and incremental suite migration remain open. No Full Verify is
+claimed by this checkpoint.
