@@ -1621,7 +1621,7 @@
       "created": "2026-08-30",
       "source": "PO, 2026-08-30: 'das hatten wir ja schon bei vielen themen mit codex und da sollte dann aber immer automatisch als folge schritt eine anweisung sein, dass bei diesen fehler eine andere art der sandbox nötig ist! dazu hatten wir eigentlich schon mal ein extra profil konfiguriert aber das muss halt auch im bootstrap abgefragt werden und dann anders starten.'",
       "deferred": true,
-      "tracking": "Nova B -- Nova A's danger-full-access quick fix is landed and re-verified; the remaining scope is the PO-recalled custom, safer sandbox profile with bootstrap-time selection."
+      "tracking": "Deferred by PO on 2026-09-11 to a future native-Windows Codex sandbox package; WSL is not an acceptance environment for this scope."
     },
     {
       "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",
@@ -6670,7 +6670,7 @@
       "created": "2026-09-06",
       "source": "T1 Critic finding F3 on aefe0e9c/6ca241f1, 2026-09-06, on the NVA-B-CRITICXPORT-1 transport. Filed late: the round-1 registry dispositioned it as 'filed, not fixed here' and no item existed; the closing round tested that claim and found nothing -- this item is the correction.",
       "deferred": true,
-      "tracking": "Nova B -- the selected-Codex-Critic lane (codex-critic-app-server.mjs) resolves roles/critic.md, templates/prompts/critic-review.md and the verdict schema against the live checkout with only an lstat, hands their paths into the child's prompt, and binds no digest of the briefed bytes into either receipt it constructs. The sibling native lane in codex-critic-host.mjs enforces pipelineRoot !== repoRoot, refuses a dirty ruleset checkout, and binds roleContractSha256/promptContractSha256/verdictSchemaSha256 into the prepared packet and the receipt. Under SEC-10's threat model an agent can edit roles/critic.md in the working tree, dispatch its own reviewer through the selected lane, and the tamper-evident execution receipt cannot show it."
+      "tracking": "Future native-Windows Codex sandbox package -- the selected-Codex-Critic lane (codex-critic-app-server.mjs) resolves roles/critic.md, templates/prompts/critic-review.md and the verdict schema against the live checkout with only an lstat, hands their paths into the child's prompt, and binds no digest of the briefed bytes into either receipt it constructs. The sibling native lane in codex-critic-host.mjs enforces pipelineRoot !== repoRoot, refuses a dirty ruleset checkout, and binds roleContractSha256/promptContractSha256/verdictSchemaSha256 into the prepared packet and the receipt. Under SEC-10's threat model an agent can edit roles/critic.md in the working tree, dispatch its own reviewer through the selected lane, and the tamper-evident execution receipt cannot show it."
     },
     {
       "id": "pipeline.self-application-integrity-check-absent",
