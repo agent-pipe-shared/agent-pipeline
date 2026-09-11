@@ -90,6 +90,13 @@ retain their earlier native-envelope hook and consume the same role-policy
 verdict. Actual coordinators must call the batch API rather than recreate its
 barrier locally before this item can close.
 
+The initial Critic found one Git pathspec ambiguity in `requiredPaths`:
+`:README.md` could select a real `README.md` while not naming that file. The
+correction uses Git's literal-pathspec mode and adds the exact zero-launch
+regression. Exact Verify passed 520/520 and the focused correction Critic
+returned PASS with no findings; see
+`backlog/evidence/2026-09-11-role-dispatch-preflight-critic-pass.md`.
+
 **Owner and due date:** Pipeline team, due 2026-09-30. The reusable envelope
 and all-packets barrier now exist, but the item remains open until the shipped
 model-launching coordinators call them and adapter-level tests prove that each
