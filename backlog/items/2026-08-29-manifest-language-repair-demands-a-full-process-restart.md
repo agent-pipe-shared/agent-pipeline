@@ -5,6 +5,8 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-29
+closed_at: 2026-09-11
+closure_repository: self
 sprint: nova-b
 done_when: manual
 closure_commit: a2b952e4bef09375326e084cbc45d3b75cd37d06
