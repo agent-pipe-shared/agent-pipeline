@@ -44,8 +44,7 @@
  * pass. The SEPARATE `--any-session` mode (added by NVA-CF-RESUMECHECKANYSESSION, commit
  * `2437d338`) answers a session-independent question instead. A later Nova B correction
  * distinguishes a freshly captured card from one a bootstrap has attempted to deliver: the
- * former is pending and passes, while the latter requires a matching receipt. This mode IS
- * registered in `harness/scripts/verify.mjs` as suite
+ * former is pending and passes, while the latter requires a matching receipt. This mode IS now registered in `harness/scripts/verify.mjs` as suite
  * `resume-consumption-check` (commit `03c1edcd`, TP-3 signed-override ceremony) -- it is a live
  * verify-gate check, not merely observed. `check-suite-registration.mjs`'s own
  * `DELIBERATELY_UNREGISTERED` opt-out list carries no entry for either mode: the single-session
