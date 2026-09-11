@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8328d7647a87f952b18829bbea9f97d909db9a6f0fa3c4481ff8f27311468f9b"
+    "transitionHead": "71d818a306974de6eb3e43857ca18eab92013f86b798cbadf1f999e0c98fba06"
   },
   "counts": {
-    "open": 89,
+    "open": 88,
     "in_progress": 0,
-    "closed": 551,
+    "closed": 552,
     "rejected": 3,
     "deferred": 11
   },
@@ -113,13 +113,17 @@
     },
     {
       "id": "pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-04",
       "source": "Reported by the round-2 Critic on the capture-evidence package, 2026-09-04, as briefing violation 1 (contaminated dispatch). The dispatch was built by the Elephant from templates/prompts/critic-review.md and referenced evidence/dispatch-record-NVA-B-REDFIX-1.json as authorship evidence, which the template itself prescribes.",
       "deferred": false,
-      "tracking": "Nova B — the dispatch record is the only artifact that binds a commit to its work package, so a Critic needs it; it also carries the implementor's narrative, which the Critic contract forbids as input. There is no way to hand over one without the other."
+      "tracking": "Nova B — the dispatch record is the only artifact that binds a commit to its work package, so a Critic needs it; it also carries the implementor's narrative, which the Critic contract forbids as input. There is no way to hand over one without the other.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "85921a119f69a785dd2916b1986ae39cad200cba",
+      "closureEvidence": "backlog/evidence/2026-09-11-dispatch-record-critic-projection-closure.md"
     },
     {
       "id": "pipeline.a-doc-edit-silently-obligates-its-vendored-copy",

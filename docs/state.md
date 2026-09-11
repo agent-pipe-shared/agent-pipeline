@@ -36,7 +36,7 @@ startup diagnosis, missing-record searches or completed review rounds.
 
 Nova-B status reconciliation is active. The pass began at 61 open and 54
 closed `nova-b` items; after eleven evidence-backed closures the canonical
-ledger projection contains 50 open and 65 closed. Every open item's
+ledger projection contains 49 open and 66 closed. Every open item's
 `done_when` is being checked against the current code before that count is
 treated as remaining work. B3 and B4 are implemented:
 the later native Antigravity runner supersedes Nova's historical Alpha-only
@@ -551,7 +551,8 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
    items. The current audit started at 61 open and 54 closed; its first two
    sanctioned reconciliation batches plus the Codex-dispatch duplicate,
    tilde-mutation, write-lane disposition, ADR-coverage, runtime-identity and
-   reader-review closures leave 50 open and 65 closed. Frontmatter plus
+   reader-review and dispatch-record Critic-projection closures leave 49 open
+   and 66 closed. Frontmatter plus
    the append-only ledger remains authoritative, and each further change needs
    checked completion evidence.
 7. **Installed-copy action completed:** the local Codex plugin is running the

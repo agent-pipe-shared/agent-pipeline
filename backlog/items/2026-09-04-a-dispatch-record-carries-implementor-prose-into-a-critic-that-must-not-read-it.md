@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-04
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 85921a119f69a785dd2916b1986ae39cad200cba
+closure_evidence: backlog/evidence/2026-09-11-dispatch-record-critic-projection-closure.md
 tracking: "Nova B — the dispatch record is the only artifact that binds a commit to its work package, so a Critic needs it; it also carries the implementor's narrative, which the Critic contract forbids as input. There is no way to hand over one without the other."
 source: "Reported by the round-2 Critic on the capture-evidence package, 2026-09-04, as briefing violation 1 (contaminated dispatch). The dispatch was built by the Elephant from templates/prompts/critic-review.md and referenced evidence/dispatch-record-NVA-B-REDFIX-1.json as authorship evidence, which the template itself prescribes."
 ---
@@ -86,3 +90,21 @@ come first:
 - `plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs` — the consumer
   whose needs define the minimum safe field set
 - `roles/critic.md` — CR-02/EL-09, the input contract
+
+## Closure
+
+Commit `85921a119f69a785dd2916b1986ae39cad200cba` closes the collision with a
+fail-closed Critic projection. The dispatch-side stripper now exposes only a
+digest-shaped `rulesetSha`, unique hexadecimal commit tokens and normalized
+repository-relative changed paths. It removes report prose, outcome, task and
+runner identity, model selection, the complete model override and every
+unknown field. Legacy `"path - rationale"` entries retain only the validated
+path; malformed, absolute, traversing or prose-bearing path shapes reject the
+whole projection.
+
+The canonical Critic templates describe that exact reduced contract. The
+registered DRS01 through DRS11 corpus covers the safe set, prose removal,
+closed digest/path grammars, malformed input and purity, and emits required
+case-completion evidence. Independent review returned PASS only after the
+broader initial allowlist and then `taskId` were removed. See the closure
+evidence for the review sequence and focused validation.
