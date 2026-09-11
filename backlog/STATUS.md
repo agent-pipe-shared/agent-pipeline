@@ -147,7 +147,7 @@
 | pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | 2026-08-18 | — |
-| pipeline.consumer-must-allowlist-every-runner-lane | open | workflow-improvement | pipeline | 2026-08-28 | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
+| pipeline.consumer-must-allowlist-every-runner-lane | closed | workflow-improvement | pipeline | 2026-08-28 | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -269,7 +269,7 @@
 | pipeline.guard-lifecycle-ready-runner-allowlist-incomplete | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-maintenance-window-repofingerprint-shares-the-fixed-path-bound-defect | closed | defect | pipeline | 2026-08-27 | — |
-| pipeline.guard-override-message-misassigns-roles-and-omits-signing | open | defect | pipeline | 2026-09-07 | — |
+| pipeline.guard-override-message-misassigns-roles-and-omits-signing | closed | defect | pipeline | 2026-09-07 | — |
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | 2026-08-08 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 88
+- open: 86
 - in_progress: 0
-- closed: 552
+- closed: 554
 - rejected: 3
 - deferred: 11
