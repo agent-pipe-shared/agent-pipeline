@@ -35,6 +35,7 @@
  * Usage:
  *   node verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]
  *   node verify-evidence-producer.mjs --prepare [--root <repo>]
+ *   node verify-evidence-producer.mjs --root <repo> --mode <boundary> [--base <ref>] [--no-reuse]
  *
  * Existing projects explicitly prepare and commit the deterministic adapter
  * first; onboarding seeds it in the portable transaction. Runs never seed it.
@@ -141,7 +142,7 @@ function writeEvidence(root, target, evidence) {
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
  */
-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, mode = "candidate", base = null }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, mode = "candidate", base = null, reuseReceipts = true }) {
   const root = resolve(rootDir);
   const target = safeOutPath(root, outPath);
   // Invalidate prior success before configuration, candidate checks or execution.
@@ -211,7 +212,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     repoRoot: root,
     gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
     candidate: { commit: started.commit, tree: started.tree },
-    suites, policyInputs: { ...policyInputs, selectionSha256: selection.selectionSha256 }, allowCrossCandidateReuse: selection.execution === "impacted",
+    suites, policyInputs: { ...policyInputs, selectionSha256: selection.selectionSha256 }, allowCrossCandidateReuse: selection.execution === "impacted", reuseReceipts,
     registerRun({ runId, runPath }) {
       const descriptor = startSessionDescriptor(root);
       const resourceId = `consumer-${attempt}`;
@@ -246,6 +247,7 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
       resumePlanSha256: run.plan.planSha256, terminalSha256: run.terminal.terminalSha256,
       registeredSuiteCount: suites.length, terminalReceiptCount: run.terminal.receipts.length,
       terminalStatus: run.terminal.status,
+      receiptReuse: reuseReceipts ? "allowed" : "disabled",
     }),
     selection,
     coverage: "project-calibrated",
@@ -260,6 +262,7 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === "--prepare") { value.prepare = true; continue; }
+    if (flag === "--no-reuse") { value.reuseReceipts = false; continue; }
     if (!["--root", "--out", "--mode", "--base"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
     const next = argv[++index];
     if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) {
@@ -269,7 +272,7 @@ function parseArgs(argv) {
   }
   const mode = value["--mode"] ?? "candidate";
   if (!["work", "critic", "push", "candidate", "release"].includes(mode)) fail("VEP-USAGE", `Unknown Verify mode: ${mode}`);
-  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, mode, base: value["--base"] ?? null };
+  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, mode, base: value["--base"] ?? null, reuseReceipts: value.reuseReceipts !== false };
 }
 
 if (isDirectInvocation(import.meta.url)) {

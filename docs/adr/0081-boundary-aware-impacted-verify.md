@@ -39,6 +39,9 @@ and `release`.
 - Evidence records mode, base, candidate, changed paths, complete registry,
   selected and omitted suites, matched areas, unmatched paths, fallback reason,
   rule digest, changed-input digest and selection digest.
+- `--no-reuse` forces every selected suite to execute again at the same
+  candidate. Receipt reuse remains enabled by default, and public evidence
+  records the selected reuse policy plus every step's actual reuse disposition.
 - Consumers enforce their own boundary. Critic requires `critic`, normal push
   requires `push`, and publication requires full `release` evidence.
 

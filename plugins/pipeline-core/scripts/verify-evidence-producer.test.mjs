@@ -50,6 +50,7 @@ test("a passing verify produces a consumable artifact bound to the exact commit 
       ...result.evidence.verifyRun,
       resumePlanSha256: JSON.parse(readFileSync(join(root, ".git/agent-pipeline/verify/runs", result.evidence.verifyRun.runId, "resume-plan.json"), "utf8")).planSha256,
       registeredSuiteCount: 5, terminalReceiptCount: 5, terminalStatus: "passed",
+      receiptReuse: "allowed",
     }));
     assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
     assert.equal(result.evidence.coverage, "project-calibrated");
@@ -235,6 +236,18 @@ test("real product assertions stay fresh while eligible baselines resume with du
   });
 });
 
+test("no-reuse re-executes eligible consumer receipts and marks public evidence", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    await produceVerifyEvidence({ rootDir: root });
+    const fresh = await produceVerifyEvidence({ rootDir: root, reuseReceipts: false });
+    assert.equal(fresh.evidence.verifyRun.receiptReuse, "disabled");
+    assert.ok(fresh.evidence.steps.every((step) => step.reused === false));
+    const planPath = join(root, ".git/agent-pipeline/verify/runs", fresh.evidence.verifyRun.runId, "resume-plan.json");
+    const plan = JSON.parse(readFileSync(planPath, "utf8"));
+    assert.ok(plan.reasons.some((reason) => reason.code === "reuse-disabled"));
+  });
+});
+
 test("invalid manifests and the legacy placeholder fail closed at every boundary", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
     writeFileSync(join(root, ".claude/pipeline.yaml"), "invalid: manifest\n");
@@ -278,9 +291,10 @@ test("an external installed package works and implementation changes invalidate 
       execFileSync(process.execPath, [entry, "--root", root, "--mode", "release"]);
       const dependency = join(installed, "scripts/consumer-verify-check.mjs");
       writeFileSync(dependency, `${readFileSync(dependency, "utf8")}\n// changed installed implementation\n`);
-      execFileSync(process.execPath, [entry, "--root", root, "--mode", "release"]);
+      execFileSync(process.execPath, [entry, "--root", root, "--mode", "release", "--no-reuse"]);
       const evidence = JSON.parse(readFileSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH), "utf8"));
       assert.ok(evidence.steps.every((s) => !s.reused));
+      assert.equal(evidence.verifyRun.receiptReuse, "disabled");
       assert.equal(deriveGateEvidence({ rootDir: root, gate: "verify", sourcePath: VERIFY_EVIDENCE_DEFAULT_PATH }).evidence.status, "passed");
     });
   } finally { rmSync(installed, { recursive: true, force: true }); }

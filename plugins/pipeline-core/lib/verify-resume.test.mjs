@@ -204,11 +204,26 @@ test("a dependency cycle names the suite id at which it was detected", () => {
 });
 
 test("public run evidence cannot report pass with incomplete terminal coverage", () => {
-  const complete = createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 2, terminalReceiptCount: 2, terminalStatus: "passed" });
+  const complete = createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 2, terminalReceiptCount: 2, terminalStatus: "passed", receiptReuse: "disabled" });
   assert.equal(complete.status, "passed");
-  const incomplete = createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 2, terminalReceiptCount: 1, terminalStatus: "passed" });
+  assert.equal(complete.receiptReuse, "disabled");
+  const incomplete = createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 2, terminalReceiptCount: 1, terminalStatus: "passed", receiptReuse: "allowed" });
   assert.equal(incomplete.status, "failed");
-  assert.throws(() => createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 1, terminalReceiptCount: 2, terminalStatus: "passed" }));
+  assert.throws(() => createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 1, terminalReceiptCount: 2, terminalStatus: "passed", receiptReuse: "allowed" }));
+  assert.throws(() => createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 1, terminalReceiptCount: 1, terminalStatus: "passed" }));
+});
+
+test("explicitly disabled reuse invalidates a matching receipt with a visible reason", () => {
+  const artifacts = { alpha: receipt(suites[0]), beta: receipt(suites[1]) };
+  const logs = { alpha: log("alpha"), beta: log("beta") };
+  const result = plan(artifacts, logs, { reuseReceipts: false });
+  assert.deepEqual(result.reusable, []);
+  assert.deepEqual(result.rerun, ["alpha", "beta"]);
+  assert.deepEqual(result.reasons, [
+    { suite: "alpha", code: "reuse-disabled", dependency: null },
+    { suite: "beta", code: "reuse-disabled", dependency: null },
+  ]);
+  assert.throws(() => planVerifyResume({ runId: "verify-next", candidate, suites: [suite("alpha")], policySha256: C, reuseReceipts: "no" }));
 });
 
 test("closed Verify schemas expose the exact Spec root keys and public run coverage", () => {
@@ -227,6 +242,6 @@ test("closed Verify schemas expose the exact Spec root keys and public run cover
     assert.equal(oid.test("1".repeat(64)), true);
   }
   const evidence = JSON.parse(readFileSync(join(scriptDir, "verify-evidence.schema.json"), "utf8"));
-  assert.deepEqual(evidence.$defs.verifyRun.required, ["runId", "policySha256", "resumePlanSha256", "terminalSha256", "registeredSuiteCount", "terminalReceiptCount", "status"]);
+  assert.deepEqual(evidence.$defs.verifyRun.required, ["runId", "policySha256", "resumePlanSha256", "terminalSha256", "registeredSuiteCount", "terminalReceiptCount", "receiptReuse", "status"]);
   assert.equal(evidence.$defs.verifyRun.additionalProperties, false);
 });

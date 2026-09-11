@@ -838,8 +838,9 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
 // calibration > DEFAULT_VERIFY_CONCURRENCY), raising real production concurrency above 1 for the
 // first time. `environment` mirrors compileVerifySuites' own existing convention (defaults to
 // `process.env`, overridable so a test never depends on ambient environment or leaks into it).
-export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, environment = process.env, clock = Date.now, spawn = spawnAsync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, concurrency = resolveDefaultConcurrency(repoRoot, environment), serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
+export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, environment = process.env, clock = Date.now, spawn = spawnAsync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, reuseReceipts = true, concurrency = resolveDefaultConcurrency(repoRoot, environment), serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new TypeError("VERIFY-JOURNAL-CONCURRENCY");
+  if (typeof reuseReceipts !== "boolean") throw new TypeError("VERIFY-JOURNAL-REUSE");
   const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree, tierBDeclarations, environment });
   // ADR-0065 coupling (3): this digest no longer covers `suites: registrations`, so one suite's
   // registration changing no longer invalidates every OTHER suite's receipt via
@@ -858,7 +859,7 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
   let terminalWritten = false;
   try {
     const prior = loadVerifyResumeArtifacts({ runsRoot: run.runsRoot, currentRunId: runId, suites: registrations });
-    const plan = planVerifyResume({ runId, candidate, suites: registrations, receipts: prior.receipts, logs: prior.logs, policySha256, allowCrossCandidateReuse });
+    const plan = planVerifyResume({ runId, candidate, suites: registrations, receipts: prior.receipts, logs: prior.logs, policySha256, allowCrossCandidateReuse, reuseReceipts });
     atomicJson(join(run.runDir, "resume-plan.json"), plan);
     // durationMs (inside runSuitePool) is derived from each receipt's OWN startedAt/completedAt,
     // never borrowed from a prior run's receipt. For a freshly executed suite that is its real

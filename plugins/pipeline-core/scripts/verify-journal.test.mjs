@@ -76,6 +76,21 @@ test("a terminal matching receipt is reused and still produces complete current 
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("reuseReceipts false re-executes a terminal matching receipt and records why", async () => {
+  const f = fixture();
+  let calls = 0;
+  const spawn = () => { calls += 1; return spawnPass(); };
+  try {
+    const clock = makeClock();
+    await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-fresh-one", spawn, registerRun, clock });
+    const fresh = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-fresh-two", spawn, registerRun, clock, reuseReceipts: false });
+    assert.equal(calls, 2);
+    assert.deepEqual(fresh.plan.reusable, []);
+    assert.deepEqual(fresh.plan.reasons, [{ suite: "fixture-suite", code: "reuse-disabled", dependency: null }]);
+    assert.equal(fresh.steps[0].reused, false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 test("a freshly executed suite carries a durationMs derived from its own receipt timing", async () => {
   const f = fixture();
   try {

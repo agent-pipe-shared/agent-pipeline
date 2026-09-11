@@ -882,6 +882,7 @@ if (startedCandidate.status === "dirty") {
               selectionSha256: verifySelection.selectionSha256,
             },
             allowCrossCandidateReuse: verifySelection.execution === "impacted",
+            reuseReceipts: invocation.reuseReceipts,
           });
           steps.push(...verifyRun.steps.map(({ name, exitCode, durationMs, reused }) => ({ name, exitCode, durationMs, reused })));
           verifyRunEvidence = createPublicVerifyRunEvidence({
@@ -892,6 +893,7 @@ if (startedCandidate.status === "dirty") {
             registeredSuiteCount: resolvedSelection.suites.length,
             terminalReceiptCount: verifyRun.terminal.receipts.length,
             terminalStatus: verifyRun.terminal.status,
+            receiptReuse: invocation.reuseReceipts ? "allowed" : "disabled",
           });
           if (verifyRunEvidence.status !== "passed" && steps.every((step) => step.exitCode === 0)) {
             steps.push({ name: "verify-terminal-coverage", exitCode: 1 });

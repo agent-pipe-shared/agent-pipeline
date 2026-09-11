@@ -10,7 +10,7 @@ export const VERIFY_RESUME_PLAN_SCHEMA = "pipeline.verify-resume-plan.v1";
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const REASONS = new Set(["missing-receipt", "corrupt-receipt", "not-successful", "suite-identity-drift", "candidate-drift", "suite-implementation-drift", "declared-input-drift", "environment-contract-drift", "verify-policy-drift", "missing-log", "corrupt-log", "truncated-log", "dependency-invalidated"]);
+const REASONS = new Set(["missing-receipt", "reuse-disabled", "corrupt-receipt", "not-successful", "suite-identity-drift", "candidate-drift", "suite-implementation-drift", "declared-input-drift", "environment-contract-drift", "verify-policy-drift", "missing-log", "corrupt-log", "truncated-log", "dependency-invalidated"]);
 const ROOT_RECEIPT_KEYS = ["schema", "runId", "candidate", "suite", "implementationSha256", "inputs", "environmentContractSha256", "policySha256", "status", "exitCode", "log", "startedAt", "completedAt", "receiptSha256"];
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -120,16 +120,13 @@ export function sealVerifySuiteReceipt(fields) {
 // forbids `--allow-child-process` rather than merely discouraging it, rather than a claim that a
 // Tier-B suite cannot reach anything outside its declaration.
 //
-// ADR-0065's Decision 8 leaves open, for the PO to answer, whether cross-candidate receipt reuse
-// should be permitted for the evidence that backs a candidate freeze or a push, with the accepted
-// conservative default that push/release-bound Verify runs force full re-execution (`--no-reuse`).
+// ADR-0081 now permits cross-candidate receipt reuse at ordinary impacted boundaries while release
+// remains full. `reuseReceipts: false` is the independent explicit escape for race, flake and
+// environment checks that must re-execute selected suites at an unchanged candidate.
 // `allowCrossCandidateReuse` (threaded through `context` from `planVerifyResume`'s caller) is that
 // switch: it defaults to false/absent, so a Tier-B suite is gated by candidate-drift exactly like
-// Tier A unless a caller explicitly opts in. The top-level Verify entry point -- the one
-// production caller -- is TP-3-protected with no active Guard Maintenance Window, so it cannot
-// currently be edited to pass `true`; its unmodified call therefore gets the safe default
-// automatically, which makes the conservative behaviour the real production behaviour today, not
-// a placeholder pending a later change.
+// Tier A unless a caller explicitly opts in. This flag controls reuse across candidates;
+// `reuseReceipts` controls whether any receipt may be reused in the current run.
 function isTierARegistration(suite) {
   return suite.inputs.nonFiles.some((entry) => entry.kind.startsWith("declared-tree:"));
 }
@@ -168,11 +165,12 @@ function assertAcyclic(suites) {
 
 export function verifyResumePlanSha256(plan) { const { planSha256: omitted, ...body } = plan ?? {}; return digestJson(body); }
 
-export function createPublicVerifyRunEvidence({ runId, policySha256, resumePlanSha256, terminalSha256, registeredSuiteCount, terminalReceiptCount, terminalStatus }) {
+export function createPublicVerifyRunEvidence({ runId, policySha256, resumePlanSha256, terminalSha256, registeredSuiteCount, terminalReceiptCount, terminalStatus, receiptReuse }) {
   if (!ID.test(runId) || ![policySha256, resumePlanSha256, terminalSha256].every((value) => SHA256.test(value))
     || !Number.isSafeInteger(registeredSuiteCount) || registeredSuiteCount < 1
     || !Number.isSafeInteger(terminalReceiptCount) || terminalReceiptCount < 0 || terminalReceiptCount > registeredSuiteCount
-    || !["passed", "failed"].includes(terminalStatus)) throw new TypeError("Verify run evidence is invalid");
+    || !["passed", "failed"].includes(terminalStatus)
+    || !["allowed", "disabled"].includes(receiptReuse)) throw new TypeError("Verify run evidence is invalid");
   return Object.freeze({
     runId,
     policySha256,
@@ -180,12 +178,13 @@ export function createPublicVerifyRunEvidence({ runId, policySha256, resumePlanS
     terminalSha256,
     registeredSuiteCount,
     terminalReceiptCount,
+    receiptReuse,
     status: terminalStatus === "passed" && terminalReceiptCount === registeredSuiteCount ? "passed" : "failed",
   });
 }
 
-export function planVerifyResume({ runId, candidate: currentCandidate, suites, receipts = {}, logs = {}, policySha256, allowCrossCandidateReuse = false }) {
-  if (!ID.test(runId) || !candidate(currentCandidate) || !Array.isArray(suites) || suites.length === 0 || !SHA256.test(policySha256)) throw new TypeError("Verify registration is invalid");
+export function planVerifyResume({ runId, candidate: currentCandidate, suites, receipts = {}, logs = {}, policySha256, allowCrossCandidateReuse = false, reuseReceipts = true }) {
+  if (!ID.test(runId) || !candidate(currentCandidate) || !Array.isArray(suites) || suites.length === 0 || !SHA256.test(policySha256) || typeof reuseReceipts !== "boolean") throw new TypeError("Verify registration is invalid");
   const ids = new Set();
   for (const [index, suite] of suites.entries()) {
     if (!validSuite(suite)) throw new TypeError(`Verify suite registration is invalid: ${suiteLocation(suite, index)} ${suiteDefect(suite)}`);
@@ -199,7 +198,11 @@ export function planVerifyResume({ runId, candidate: currentCandidate, suites, r
   assertAcyclic(suites);
 
   const reasons = new Map();
-  for (const suite of suites) reasons.set(suite.id, receipts[suite.id] === undefined ? { code: "missing-receipt", dependency: null } : { code: firstDrift(suite, receipts[suite.id], { candidate: currentCandidate, logs, policySha256, allowCrossCandidateReuse }), dependency: null });
+  for (const suite of suites) reasons.set(suite.id, receipts[suite.id] === undefined
+    ? { code: "missing-receipt", dependency: null }
+    : !reuseReceipts
+      ? { code: "reuse-disabled", dependency: null }
+      : { code: firstDrift(suite, receipts[suite.id], { candidate: currentCandidate, logs, policySha256, allowCrossCandidateReuse }), dependency: null });
   let changed = true;
   while (changed) {
     changed = false;

@@ -9,20 +9,22 @@ const MODES = new Set(["work", "critic", "push", "candidate", "release"]);
 export function parseVerifyInvocation(argv = [], environment = {}) {
   let mode = environment.PIPELINE_VERIFY_MODE ?? "work";
   let base = environment.PIPELINE_VERIFY_BASE || null;
+  let reuseReceipts = true;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--mode") mode = argv[++index];
     else if (argument?.startsWith("--mode=")) mode = argument.slice(7);
     else if (argument === "--base") base = argv[++index];
     else if (argument?.startsWith("--base=")) base = argument.slice(7);
+    else if (argument === "--no-reuse") reuseReceipts = false;
     else throw new Error(`VERIFY-ARGUMENT: unsupported argument ${JSON.stringify(argument)}`);
   }
   if (!MODES.has(mode) || (base !== null && (typeof base !== "string" || base === ""))) throw new Error("VERIFY-ARGUMENT");
-  return Object.freeze({ mode, base });
+  return Object.freeze({ mode, base, reuseReceipts });
 }
 
 export function renderVerifyCommand(invocation) {
-  return `node harness/scripts/verify.mjs --mode ${invocation.mode}${invocation.base === null ? "" : ` --base ${invocation.base}`}`;
+  return `node harness/scripts/verify.mjs --mode ${invocation.mode}${invocation.base === null ? "" : ` --base ${invocation.base}`}${invocation.reuseReceipts === false ? " --no-reuse" : ""}`;
 }
 
 function gitText(repoRoot, args, spawn) {

@@ -4,9 +4,10 @@
 import assert from "node:assert/strict";
 import { parseVerifyInvocation, renderVerifyCommand, resolveSelfVerifySelection } from "./self-verify-selection.mjs";
 
-assert.deepEqual(parseVerifyInvocation([], {}), { mode: "work", base: null });
-assert.deepEqual(parseVerifyInvocation(["--mode", "critic", "--base=main"], {}), { mode: "critic", base: "main" });
-assert.equal(renderVerifyCommand({ mode: "push", base: "abc" }), "node harness/scripts/verify.mjs --mode push --base abc");
+assert.deepEqual(parseVerifyInvocation([], {}), { mode: "work", base: null, reuseReceipts: true });
+assert.deepEqual(parseVerifyInvocation(["--mode", "critic", "--base=main", "--no-reuse"], {}), { mode: "critic", base: "main", reuseReceipts: false });
+assert.equal(renderVerifyCommand({ mode: "push", base: "abc", reuseReceipts: true }), "node harness/scripts/verify.mjs --mode push --base abc");
+assert.equal(renderVerifyCommand({ mode: "push", base: "abc", reuseReceipts: false }), "node harness/scripts/verify.mjs --mode push --base abc --no-reuse");
 assert.throws(() => parseVerifyInvocation(["--unknown"], {}), /VERIFY-ARGUMENT/u);
 
 const suites = [
@@ -31,4 +32,4 @@ const release = resolveSelfVerifySelection({ repoRoot: "/repo", candidateCommit:
 assert.equal(release.selection.execution, "full");
 assert.equal(release.suites.length, 2);
 
-console.log("self-verify-selection: 9 tests passed");
+console.log("self-verify-selection: 11 tests passed");

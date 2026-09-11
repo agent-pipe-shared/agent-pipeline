@@ -49,6 +49,11 @@ node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode release --base <release-base>
 ```
 
+Add `--no-reuse` when a race, flake, or environment check must execute every
+selected suite again at the same commit. The default continues to reuse valid
+receipts. Public evidence records `verifyRun.receiptReuse` as `disabled` or
+`allowed`, and each step records whether it was reused.
+
 `work`, `critic`, `candidate`, and `push` run the fixed baseline plus commands
 registered for changed areas. `release` always runs the full project command.
 Unknown paths, missing bindings and incomplete policies fall back to full.
