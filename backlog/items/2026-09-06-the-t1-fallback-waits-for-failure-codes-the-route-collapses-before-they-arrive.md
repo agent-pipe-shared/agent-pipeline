@@ -98,7 +98,12 @@ should be wired on an agent's judgment.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** deferred — decide and exercise this native Selected-Critic
+  fallback in the dedicated native-Windows Codex work package outside Nova B.
+- **Rationale:** The PO confirmed on 2026-09-11 that native Codex sandboxing is
+  technically unreliable under WSL. This fallback changes assurance class and
+  depends on that native route, so a WSL-only implementation or acceptance
+  claim would be misleading. The ordinary fresh-session Critic remains the
+  supported autonomous route meanwhile.
+- **Assignment (if accepted):** future native-Windows Codex sandbox hardening
+- **Date:** 2026-09-11

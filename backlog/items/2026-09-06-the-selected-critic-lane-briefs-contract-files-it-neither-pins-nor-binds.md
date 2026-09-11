@@ -84,3 +84,16 @@ Gitless Selected-Critic packages need an installer-owned attestation and
 verifier before this route can run from a normal plugin cache. Until that
 authority exists, this special Selected route fails closed. The ordinary
 fresh-session Critic route does not depend on this installed Selected route.
+
+## Triage
+
+- **Decision:** deferred — retain the completed source-checkout hardening, but
+  move installed-package activation and native App-Server/sandbox acceptance
+  to the dedicated native-Windows Codex work package outside Nova B.
+- **Rationale:** The PO confirmed on 2026-09-11 that native Codex sandboxing is
+  not a reliable acceptance environment under WSL. The special Selected route
+  already fails closed, while the ordinary fresh-session Critic remains the
+  supported autonomous route. Revisit when the lane can be exercised on
+  native Windows without treating WSL behavior as proof.
+- **Assignment:** future native-Windows Codex sandbox hardening
+- **Date:** 2026-09-11

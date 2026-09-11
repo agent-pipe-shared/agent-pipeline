@@ -120,11 +120,16 @@ the PO is recalling can actually be found/reconstructed.
 
 ## Triage
 
-- **Decision:** accepted, Nova A (quick fix landed); proper custom-profile
-  fix remains open, Nova B
-- **Rationale:** PO-prioritized, recurring defect across multiple prior
-  Codex sessions per the PO's own account, not a one-off
-- **Date:** 2026-08-30
+- **Decision:** deferred — the Nova A quick fix remains the supported path;
+  native Codex sandbox-profile reconstruction and acceptance move to a
+  dedicated Windows-host work package outside Nova B.
+- **Rationale:** On 2026-09-11 the PO confirmed that native Codex sandboxing is
+  technically unreliable under WSL and must not hold the Nova B candidate
+  open. Revisit only on native Windows, where the sandbox profile can be
+  exercised and evidenced on its intended host. WSL results must not be used
+  to claim native-sandbox readiness.
+- **Assignment:** future native-Windows Codex sandbox hardening
+- **Date:** 2026-09-11
 
 ## Critic review (delta `c1d0a447^..4955c0ca`), 2026-08-30
 
