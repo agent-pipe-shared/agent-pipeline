@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-binding-guards-are-not-os-level-sandboxing
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: b4908639ac14e53832a3ec6f3b2a68bf06a2fed7
+closure_evidence: backlog/evidence/2026-09-11-agent-binding-os-boundary-disposition.md
 created: 2026-08-25
 sprint: nova-b
 done_when: manual
@@ -219,3 +223,16 @@ read-only property is enforced by `roles/critic.md` CR-08's discipline and by th
 absence of a `Write`/`Edit` tool grant in its agent definition — not by any
 mechanical check. A remedy that assumes the guard can distinguish a Critic from a
 Goldfish is assuming machinery that does not exist.
+
+## Resolution — 2026-09-11
+
+The umbrella is closed on the PO's recorded scope decision, rather than by
+claiming OS isolation the product does not provide. The supported guard threat
+model remains cooperative or accidentally drifting agents. Resistance to a
+deliberately malicious process issuing its own syscalls is outside that claim.
+
+The two buildable consequences already have their own closed, mechanically
+evidenced items: the default-installed Git pre-push backstop and the protected
+path integrity/pre-commit detection route. Native Codex sandbox acceptance is a
+separate future Windows package and is neither evidence for this closure nor a
+Nova B blocker. The closure evidence records the exact boundary and dependencies.
