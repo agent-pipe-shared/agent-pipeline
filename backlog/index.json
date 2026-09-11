@@ -1983,6 +1983,7 @@
       "created": "2026-09-12",
       "source": "Goldfish-deep review NVA-B-HGO-AUDIT-REPAIR-2: the bounded torn-append repair correctly refuses to unlink an unowned audit.lock, but a writer killed after acquiring that lock leaves every later append and repair fail-closed with no safe reclamation route.",
       "deferred": false,
+      "due": "2026-09-30",
       "sprint": "nova-b"
     },
     {
