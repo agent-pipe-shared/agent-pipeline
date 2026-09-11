@@ -90,3 +90,15 @@ live Alfred readiness, runner comparison measurements, installation, push or
 release. A passing technical verdict permits the coordinator to proceed with
 the specified inventory attestation and the separately required fresh
 two-stage reader review; it does not replace those steps.
+
+## Inventory-delta rollback
+
+If a newly assigned surface, source baseline or review state is found to be
+wrong before publication, revert the inventory-only commit, restore the last
+attested inventory bytes and rerun the suite-registration and final inventory
+checks. If later source changes make that prior baseline incomplete, keep the
+inventory at `required-before-publication` with a null receipt, correct the
+surface assignment or baseline in a new commit and obtain a new independent
+delta review. Never retain an old receipt digest across changed inventory
+bytes, and never weaken or remove a discovered product surface merely to make
+the inventory checker pass.
