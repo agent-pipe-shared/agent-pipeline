@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-12
 sprint: nova-b
 source: "Independently reported by three separate goldfish dispatches (NVA-BL-40-FIX, NVA-BL-42-FIX, NVA-BL-64) in one wave, 2026-08-12, each hitting the same shared-single-slot evidence artifact while running their own closing `verify.mjs`."
 done_when: manual
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 9364887d6b29ff9ef846741a118357bec8e38ab1
+closure_evidence: backlog/evidence/2026-09-11-shared-verify-evidence-slot-critic-pass.md
 ---
 
 # `evidence/verify-latest.json` is a single shared slot; concurrent dispatches on one checkout overwrite each other's closing evidence
@@ -144,3 +148,21 @@ atomic temp-file-plus-rename write matching `verify-journal.mjs`'s own
 check-then-write on `listActiveSessionDescriptors` in
 `establishSessionLessCleanupBinding`. Outside this item's scope, not filed
 separately yet.
+
+## Resolution, 2026-09-11
+
+The Verify runner now writes a unique durable evidence file for every run and
+updates the shared latest path through atomic sibling-file replacement. The
+phase-aware pair writer invalidates the shared latest result before attempting
+the startup per-run write, while terminal completion persists the per-run result
+before updating the shared pointer. A stopped startup therefore cannot leave an
+older green latest result in place, and a failed terminal pointer update cannot
+erase the run's own result.
+
+Focused tests cover concurrent atomic writes, distinct per-run paths, both
+two-file orders, injected failures on the second write, and the real detached
+worktree evidence-root route. A fresh exact-candidate Verify passed all 520
+registered suites with zero reused receipts, and an independent Critic reported
+no findings and PASS. The exact commands, candidate bindings, limitation, and
+review result are recorded in
+`backlog/evidence/2026-09-11-shared-verify-evidence-slot-critic-pass.md`.

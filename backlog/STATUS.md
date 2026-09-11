@@ -546,7 +546,7 @@
 | pipeline.setup-promises-a-human-name-repair-it-cannot-perform | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.seven-unregistered-suites-are-red | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof | closed | defect | pipeline | 2026-08-11 | — |
-| pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches | open | defect | pipeline | 2026-08-12 | — |
+| pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.shell-grammar-reads-quoted-content-as-shell-syntax | closed | defect | pipeline | 2026-08-27 | NOW / Nova A — PO decision 2026-08-28: admit `&&`, and secure it. This item is the prerequisite half; the admission is unsafe until the parser stops reading quoted content as syntax. |
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 103
+- open: 102
 - in_progress: 0
-- closed: 537
+- closed: 538
 - rejected: 3
 - deferred: 11

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d18da61bd5cbf72d620b27b1a805466c3e86d4a3464a7b26befc6c2a77d8e554"
+    "transitionHead": "2ebc4e3468c64bcc9e7e394014928a5fcaec7d812af71c2d043da38c9693f5b3"
   },
   "counts": {
-    "open": 103,
+    "open": 102,
     "in_progress": 0,
-    "closed": 537,
+    "closed": 538,
     "rejected": 3,
     "deferred": 11
   },
@@ -6784,12 +6784,16 @@
     },
     {
       "id": "pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-12",
       "source": "Independently reported by three separate goldfish dispatches (NVA-BL-40-FIX, NVA-BL-42-FIX, NVA-BL-64) in one wave, 2026-08-12, each hitting the same shared-single-slot evidence artifact while running their own closing `verify.mjs`.",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "9364887d6b29ff9ef846741a118357bec8e38ab1",
+      "closureEvidence": "backlog/evidence/2026-09-11-shared-verify-evidence-slot-critic-pass.md"
     },
     {
       "id": "pipeline.shell-grammar-reads-quoted-content-as-shell-syntax",
