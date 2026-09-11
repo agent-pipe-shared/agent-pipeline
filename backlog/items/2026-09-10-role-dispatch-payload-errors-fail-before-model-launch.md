@@ -110,6 +110,24 @@ Critic returned PASS with no findings. The item remains open for its stated
 final condition: every shipped model-launching coordinator must consume the
 common batch preflight before its first launch.
 
+The fifth slice wires the common contract into the real Advisory host bridge
+for Claude Code, Codex and Antigravity. The bridge validates the complete
+evidence bundle, candidate commit/tree, physical repository root and
+coordinator-owned result directory before it can obtain an adapter or enter
+the selected Codex sandbox route. Every required path now carries the SHA-256
+of the bytes that will actually be transported; the preflight compares that
+digest directly with the immutable candidate blob and separately rejects a
+dirty physical path. This closes both stale-bundle and check/use replacement
+windows.
+
+Bridge-level tests prove zero adapter calls for untracked or modified inputs,
+candidate-foreign transported bytes, evidence digest/reference drift and a
+symlinked receipt directory. A valid Codex fixture proves the launch receives
+the exact physical root admitted by preflight. Fresh Verify passed 520/520
+with reuse disabled on the final correction and the independent Critic
+returned PASS with no findings; see
+`backlog/evidence/2026-09-11-advisory-dispatch-preflight-critic-pass.md`.
+
 **Owner and due date:** Pipeline team, due 2026-09-30. The reusable envelope
 and all-packets barrier now exist, but the item remains open until the shipped
 model-launching coordinators call them and adapter-level tests prove that each
