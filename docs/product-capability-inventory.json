@@ -1,13 +1,13 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "045cb2d4fead88edf5b9467199a4c2c2d7c49d9f",
-    "tree": "20329abc933d326ba6c27eb9cd3ae7a06432e040"
+    "commit": "db1ceabeaab0a410ed36a00cc95a5b3ee46900fd",
+    "tree": "82613f132cce1cf1f874c79a68a08b9bb9673b53"
   },
   "criticReview": {
-    "status": "required-before-publication",
-    "receiptSha256": null,
-    "reason": "The newly registered commit-message hook verification surface requires an independent inventory-delta review."
+    "status": "attested",
+    "receiptSha256": "7754cadb6063089639c3025cf8ae61fb66cc9163a7e3effa2d46fa34e2720772",
+    "reason": null
   },
   "capabilities": [
     {
