@@ -7,6 +7,7 @@ status: open
 created: 2026-09-12
 sprint: nova-b
 done_when: manual
+due: 2026-09-30
 source: "Goldfish-deep review NVA-B-HGO-AUDIT-REPAIR-2: the bounded torn-append repair correctly refuses to unlink an unowned audit.lock, but a writer killed after acquiring that lock leaves every later append and repair fail-closed with no safe reclamation route."
 ---
 
@@ -48,5 +49,5 @@ behavior is therefore correct, but it has no autonomous recovery path.
 
 - **Decision:** accepted as a separate residual from authenticated torn-append recovery.
 - **Rationale:** crash recovery expands lock ownership and concurrency semantics; keeping it separate avoids weakening the reviewed repair with racy stale-path deletion.
-- **Assignment:** Nova B, after the current HGO repair is independently reviewed.
+- **Assignment:** Pipeline team, Nova B, due 2026-09-30, after the current HGO repair is independently reviewed.
 - **Date:** 2026-09-12

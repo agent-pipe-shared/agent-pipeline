@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7635e0b7ad2e0f40a1f7be54e84063f56d1ea51847377dda7186f9894697b4fa"
+    "transitionHead": "4782c2049c3bd02ac7b0551483da457de7d3e2df9e55eca3c870dde7efe14603"
   },
   "counts": {
-    "open": 77,
+    "open": 78,
     "in_progress": 0,
     "closed": 563,
     "rejected": 3,
@@ -1974,6 +1974,16 @@
       "closureRepository": "self",
       "closureCommit": "09f9a971f2b157c7ae09965a7c3bd1d41d5e4dcf",
       "closureEvidence": "plugins/pipeline-core/scripts/ruleset-freshness.test.mjs"
+    },
+    {
+      "id": "pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-12",
+      "source": "Goldfish-deep review NVA-B-HGO-AUDIT-REPAIR-2: the bounded torn-append repair correctly refuses to unlink an unowned audit.lock, but a writer killed after acquiring that lock leaves every later append and repair fail-closed with no safe reclamation route.",
+      "deferred": false,
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.critic-and-verify-cadence-may-be-too-fine-grained",
