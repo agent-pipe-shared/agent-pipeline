@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "greenfield-062-r7",
+  "status": "resolved",
+  "findings": [
+    { "id": "RR-R7-01", "class": "fileline", "status": "resolved", "resolutionCommit": "37e4693341dfc4c50b50c5d483183eeed6a11c26" },
+    { "id": "RR-R7-02", "class": "fileline", "status": "resolved", "resolutionCommit": "37e4693341dfc4c50b50c5d483183eeed6a11c26" }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "greenfield-062-r8",
+  "status": "no-findings",
+  "findings": []
+}
