@@ -2,7 +2,7 @@
   "schema": "pipeline.doc-reader-binding-record.v1",
   "reviewedCommit": "37e4693341dfc4c50b50c5d483183eeed6a11c26",
   "reviewedTree": "3c68fd47caf6b0cae48a97f976656983867b820a",
-  "docsetSha256": "e376a84ce3d0d1ddcab21610f0426374e7e9c6ecf99b26acd84407e98cda9ed6",
+  "docsetSha256": "e376a84ce3d0d1ff044a62fa8f95c7e0ad813e28ccf838286928f9bc8f7ed11c",
   "coverage": [
     { "path": "PIPELINE_FLOW.md", "sha256": "328da805cbe45e50de8867f8e1616d5a41b71be422fe4d8408d27db6163c5198" },
     { "path": "README.md", "sha256": "93bbcc91a20a11379204e91a9ee8563e446f8fffc94dc57c5d01b81ed0136121" },
