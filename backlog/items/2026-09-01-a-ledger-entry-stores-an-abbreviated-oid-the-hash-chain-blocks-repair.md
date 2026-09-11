@@ -151,3 +151,21 @@ tamper-evidence is intact.
 abbreviated value would turn both DRIFT lines green by corrupting the correct
 record to match the incorrect one. It is the cheapest-looking fix and the only
 destructive one.
+
+## Resolution, 2026-09-11
+
+Direction 3 is implemented without weakening the general OID check. The
+checker now binds the accepted disposition to the exact immutable event 403
+record, including its physical position, sequence, transition identity, actor,
+chain hashes, and evidence tuple. The two surviving findings remain visible
+and are labelled as the known accepted abbreviated OID; mutations and later
+lookalikes remain undispositioned. The existing historical unreachable-commit
+batch also has an explicit machine-readable accepted reason.
+
+The append-only ledger and the affected closed item's correct full
+`closure_commit` were not changed. Focused regression tests cover the real
+record and negative mutations. Full Verify passed 520/520 on the implementation
+candidate, the documentation-only correction passed its exact 82/82 impact
+Verify, and the independent correction Critic returned PASS with no findings.
+The durable review record is
+`backlog/evidence/2026-09-11-ledger-oid-403-critic-pass.md`.
