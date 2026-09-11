@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
 sprint: nova-b
 source: "PO, 2026-08-16 push-flow analysis: 'der push ist durch zu viele sachen viel zu schwierig und umständlich geworden. Man kann nicht zeitnah einfach mal pushen selbst nach freigabe nicht.' Named Block F in that session and agreed for filing; the measurements below were taken in the same session."
 done_when: manual
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 5c826023a728070b12a3af356e2733f1e382a29e
+closure_evidence: backlog/evidence/2026-09-11-boundary-aware-verify-closure.md
 ---
 
 # Every gate binds the whole tree, so any following commit voids it and all work serializes
@@ -261,3 +265,20 @@ in production). Recommend Decision 8 be raised alongside the
 maintenance-window ceremony rather than deferred again: the mechanism it would
 activate is already built and tested, and the gap it closes is this item's own
 core scenario.
+
+## Resolution, 2026-09-11
+
+ADR-0081 supersedes ADR-0065 Decision 8 for ordinary work, Critic, candidate and
+push boundaries. Those boundaries now select registered checks from the exact
+changed paths and may reuse only declared-input receipts whose envelope remains
+valid. Unknown paths, unknown suites, missing bindings, equal bases and
+non-ancestor bases all increase work to a full run. The push guard independently
+requires the base of impacted evidence to be a strict ancestor of the pushed
+candidate.
+
+Release, tag, marketplace and publication boundaries remain full-registry and
+exact-candidate bound. An impacted receipt cannot be promoted across that
+boundary. This closes the item's common-path serialization problem without the
+file-extension exemption the item rejected and without weakening the release
+claim. The implementation, correction, focused tests and independent review are
+recorded in the closure evidence.
