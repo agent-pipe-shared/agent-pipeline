@@ -474,7 +474,7 @@
 | pipeline.push-gate-unsatisfiable-in-consumer-deployment | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire. |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.push-init-cannot-satisfy-its-own-doc-reconciliation-check | closed | defect | pipeline | 2026-09-01 | — |
-| pipeline.push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy | open | defect | pipeline | 2026-08-31 | — |
+| pipeline.push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy | closed | defect | pipeline | 2026-08-31 | — |
 | pipeline.push-path-has-no-driver | closed | workflow-improvement | pipeline | 2026-08-28 | Nova B — PO-raised 2026-08-28 on seeing the guided onboarding reach ready: 'dann braucht der push pfad auch so was weil der kostet auch mega viel'. Deliberately NOT Nova A: the candidate must not grow a second driver before its first one is reviewed. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.quote-style-fragility-in-shell-command-admission | closed | defect | pipeline | 2026-08-29 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 80
+- open: 79
 - in_progress: 0
-- closed: 560
+- closed: 561
 - rejected: 3
 - deferred: 11
