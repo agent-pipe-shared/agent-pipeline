@@ -227,6 +227,7 @@ function stableFile(root, path, relativePath, afterOpen) {
       sha256: createHash("sha256").update(bytes).digest("hex"),
       byteLength: bytes.length,
       bytes,
+      identity: descriptorAfter,
     };
   } catch (error) {
     if (error instanceof ObservationError) throw error;
@@ -250,10 +251,12 @@ function lexical(left, right) {
 function snapshotPluginRoot(pluginRoot, afterOpen, rootCode) {
   const { path: root, info: rootIdentity } = physicalDirectory(pluginRoot, rootCode);
   const directories = [];
+  const directoryIdentities = [];
   const files = [];
   function visit(directory, parts, expectedIdentity) {
     const relativeDirectory = parts.join("/");
     if (relativeDirectory !== "") directories.push(relativeDirectory);
+    directoryIdentities.push({ path: relativeDirectory, identity: expectedIdentity });
     assertDirectoryStable(directory, root, expectedIdentity);
     let names;
     try { names = readdirSync(directory).sort(lexical); } catch { fail("SNT-A2-PLUGIN-UNREADABLE"); }
@@ -280,7 +283,19 @@ function snapshotPluginRoot(pluginRoot, afterOpen, rootCode) {
   const contentSha256 = createHash("sha256")
     .update(JSON.stringify(content))
     .digest("hex");
-  return { files, directories, content, contentSha256 };
+  directoryIdentities.sort((left, right) => lexical(left.path, right.path));
+  return { root, rootIdentity, files, directories, directoryIdentities, content, contentSha256 };
+}
+
+/**
+ * Stable, complete physical-tree snapshot primitive shared by trust-boundary
+ * verifiers. It opens every file with O_NOFOLLOW, rejects non-regular and
+ * multiply-linked files, and detects identity changes during traversal.
+ * Callers receive bytes and captured identities; this function grants no
+ * authority by itself.
+ */
+export function snapshotPhysicalPluginRoot(pluginRoot, { afterOpen, rootCode = "SNT-A2-INSTALLED-ROOT-UNSAFE" } = {}) {
+  return snapshotPluginRoot(pluginRoot, afterOpen, rootCode);
 }
 
 function parseManifest(snapshot, side, hostPluginVersion) {
