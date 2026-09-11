@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2ebc4e3468c64bcc9e7e394014928a5fcaec7d812af71c2d043da38c9693f5b3"
+    "transitionHead": "ccf38fd295871ba27ff86f1db772c66489642fdf19856f93f754318b97d9df76"
   },
   "counts": {
-    "open": 102,
+    "open": 101,
     "in_progress": 0,
-    "closed": 538,
+    "closed": 539,
     "rejected": 3,
     "deferred": 11
   },
@@ -4391,12 +4391,16 @@
     },
     {
       "id": "pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Round-K Critic finding F3 and the NVA-B-ROUNDK-FIX dispatch's own measurement of TEMPLATE_PAIRS in plugins/pipeline-core/scripts/check-vendored-template-sync.mjs and of plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "246f44aa056ce0e61d42ea9f3871b6023a792c27",
+      "closureEvidence": "plugins/pipeline-core/scripts/push-release-flow-docs-contract.test.mjs"
     },
     {
       "id": "pipeline.no-check-validates-prose-section-citations",

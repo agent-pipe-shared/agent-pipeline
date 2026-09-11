@@ -359,7 +359,7 @@
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.nine-test-suites-run-in-no-verify-invocation | closed | defect | pipeline | 2026-08-27 | — |
-| pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.no-check-validates-prose-section-citations | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 102
+- open: 101
 - in_progress: 0
-- closed: 538
+- closed: 539
 - rejected: 3
 - deferred: 11
