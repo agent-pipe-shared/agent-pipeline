@@ -68,16 +68,44 @@ general lifecycle override remains unavailable.
 | Altered plan, State, calibration, handover, history, or evidence | Reject the digest or full preimage check; preserve the existing State. |
 | Foreign or malformed State lock | Return the existing typed lock refusal; no new bypass or retry loop. |
 | Readback bytes differ, even if continuity independently validates | Return committed readback failure; never report ready or overwrite a later writer by rolling back. |
-| Forged quarantine relationships | Reject malformed records, repeated claimant pointers or IDs, and quarantined bindings that actually match the observed proof. |
+| Forged quarantine relationships | Resolve every pointer to the same unique live feature ID; require the preserved live assertion's exact path/digest and absent quarantined live assertions. Reject nonexistent or unrelated entries and any claimant ID or pointer reused across records. |
 | Extra flags, foreign root/script, missing activation or digest | Keep the lifecycle guard's closed argument grammar. |
 
 Earlier repair records remain byte-for-byte values in subsequent replacements.
+Their live closed-feature entries remain the identity anchors. A proposed
+repair that would reuse one of those entries is refused before State is
+replaced; only repairs over disjoint claimant sets may append another record.
 Their former assertions are historical evidence, never executable authority or
 new live artifact bindings. This is an append-only writer contract, not a
 claim that an attacker with arbitrary State write access cannot replace history.
 The State lock serializes cooperating writers. It cannot lock external editors
 of evidence; full rechecks and final readback detect observed drift, and a
 failure after the atomic replacement reports `committed: true`.
+
+## Rollback and final-candidate approval
+
+Before the atomic State replacement, a refused or interrupted repair leaves
+the preimage intact and removes only its own temporary file when ownership is
+known. After replacement, a readback or durability failure reports
+`committed: true`; it must not restore the old State over a later writer,
+remove the audit record, reinstate mismatching assertions, or rewrite evidence.
+Preserve the observed bytes and use a separately specified, authorized forward
+correction if the committed result needs repair. This feature supplies no
+automatic post-commit rollback command.
+
+To withdraw the implementation, prepare a forward code revert of this repair
+slice against the actual current candidate and run its required Verify,
+Security and independent Critic checks. The revert must preserve existing
+repair records and valid repaired States; withdrawing the planner/apply route
+does not authorize deleting runtime history. Any remote publication of the
+revert remains subject to the configured push authorization.
+
+Detached threat-model approval binds the exact final candidate and its push
+boundary. Prepare that approval only after implementation and correction are
+frozen and the final candidate is known. This ADR, a review result, a draft
+digest, or an implementation dispatch is not a provisional approval. Any
+subsequent candidate change requires a fresh exact-candidate approval before
+the corresponding push; no provisional approval is fabricated or reused.
 
 ## Consequences
 

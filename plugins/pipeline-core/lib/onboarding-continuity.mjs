@@ -304,8 +304,35 @@ function validStateRepairRecord(record) {
 }
 
 function validStateRepairRecords(state) {
-  return state.stateRepairs === undefined
-    || (Array.isArray(state.stateRepairs) && state.stateRepairs.every(validStateRepairRecord));
+  if (state.stateRepairs === undefined) return true;
+  if (!Array.isArray(state.stateRepairs) || !state.stateRepairs.every(validStateRepairRecord)) return false;
+  if (state.stateRepairs.length === 0) return true;
+  if (!Array.isArray(state.closedFeatures)
+    || new Set(state.closedFeatures.map((entry) => entry?.id)).size !== state.closedFeatures.length) return false;
+
+  // The record describes assertions on these exact append-only closed-feature
+  // entries. An internally coherent record is insufficient: its pointers and
+  // IDs must resolve to the same live entries, and another record cannot claim
+  // the same preserved or removed assertion again.
+  const featureIds = new Set();
+  const pointers = new Set();
+  for (const record of state.stateRepairs) {
+    for (const claimant of [record.preservedClaimant, ...record.quarantinedAssertions]) {
+      const index = Number(claimant.jsonPointer.split("/")[2]);
+      if (!Number.isSafeInteger(index)
+        || featureIds.has(claimant.featureId) || pointers.has(claimant.jsonPointer)) return false;
+      const entry = state.closedFeatures[index];
+      if (!closedEntryStaticShape(entry) || entry.id !== claimant.featureId) return false;
+      featureIds.add(claimant.featureId);
+      pointers.add(claimant.jsonPointer);
+      if (claimant === record.preservedClaimant) {
+        if (entry.continuityClose === undefined
+          || entry.continuityClose.closeEvidence.path !== record.evidence.path
+          || entry.continuityClose.closeEvidence.sha256 !== claimant.expectedSha256) return false;
+      } else if (entry.continuityClose !== undefined) return false;
+    }
+  }
+  return true;
 }
 
 function validClosedFeatureEntry(root, entry) {
@@ -1314,6 +1341,9 @@ function repairedSharedCloseEvidenceState(state, observed, diagnosis) {
     affectedFeatureIds: [matching[0].featureId, ...mismatching.map((claimant) => claimant.featureId)],
   };
   next.stateRepairs = [...(next.stateRepairs ?? []), record];
+  if (!validStateRepairRecords(next)) {
+    fail("CONTINUITY-REPAIR-AUDIT-CONFLICT", "proposed continuity repair conflicts with recorded claimant bindings");
+  }
   return {
     reason: "repair-shared-close-evidence-path",
     state: next,
