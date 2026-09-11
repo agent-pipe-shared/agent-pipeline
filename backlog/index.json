@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3f5719ff7f72f5bc36cf339ea7b85bdd11b9a51143999bc1d8b82f4609dfff66"
+    "transitionHead": "6f72f5168e41147f0a93bfac8b970c89f6feb88568350459d66b56549f5edcd0"
   },
   "counts": {
-    "open": 84,
+    "open": 83,
     "in_progress": 0,
-    "closed": 556,
+    "closed": 557,
     "rejected": 3,
     "deferred": 11
   },
@@ -4260,13 +4260,17 @@
     },
     {
       "id": "pipeline.manifest-language-repair-demands-a-full-process-restart",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Codex/WSL report, delivered inline in chat by the PO (priority 6 in that report), during the 2026-08-29 three-runner greenfield test.",
       "deferred": false,
-      "tracking": "Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker"
+      "tracking": "Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "a2b952e4bef09375326e084cbc45d3b75cd37d06",
+      "closureEvidence": "backlog/evidence/2026-09-11-manifest-language-live-recovery-closure.md"
     },
     {
       "id": "pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex",

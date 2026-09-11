@@ -345,7 +345,7 @@
 | pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.managed-onboarding-success-contract | deferred | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet | closed | defect | pipeline | 2026-08-29 | — |
-| pipeline.manifest-language-repair-demands-a-full-process-restart | open | defect | pipeline | 2026-08-29 | Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker |
+| pipeline.manifest-language-repair-demands-a-full-process-restart | closed | defect | pipeline | 2026-08-29 | Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.marketplace-install-topology-unattested | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate | closed | defect | pipeline | 2026-08-19 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 84
+- open: 83
 - in_progress: 0
-- closed: 556
+- closed: 557
 - rejected: 3
 - deferred: 11
