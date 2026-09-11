@@ -262,6 +262,24 @@ test("v2 records bind the verified full commit through candidateCommit and commi
   assert.equal(other.classification, "record-names-different-commit");
 });
 
+test("v3 records bind authorship and carry exactly one Critic disposition", () => {
+  const sha = "9".repeat(40);
+  const base = {
+    schema: "pipeline.dispatch-record.v3", taskId: "DOD-V3-BIND", agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed", commits: [sha], log: [],
+    report: { text: "Done.", changedFiles: ["src/thing.mjs"] },
+    criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: "T5" },
+  };
+  const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V3-BIND (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  writeRecord("DOD-V3-BIND", base);
+  assert.equal(verifyCommit(sha, deps).verdict, VERDICT.pass);
+  writeRecord("DOD-V3-BIND", { ...base, criticSkip: undefined });
+  const missing = verifyCommit(sha, deps);
+  assert.equal(missing.verdict, VERDICT.fail);
+  assert.equal(missing.classification, "record-v3-invalid");
+});
+
 test("(m) a record without agentType (pre-NVA-BL-78 corpus) is unaffected -- classification stays bound, no regression", () => {
   writeRecord("DOD-M", {
     taskId: "DOD-M",

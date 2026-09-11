@@ -115,9 +115,9 @@ import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 import {
-  DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
+  DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
   declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
-  validateDispatchRecord,
+  validateDispatchRecord, validateLegacyDispatchRecord,
 } from "../lib/dispatch-record.mjs";
 export {
   NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
@@ -465,15 +465,17 @@ export function verifyCommit(sha, deps) {
   if (typeof record.taskId === "string" && record.taskId.trim() !== "" && record.taskId.trim() !== taskId) {
     return result(sha, VERDICT.fail, "record-taskid-mismatch", `trailer names \`${taskId}\`, record's own taskId is \`${record.taskId}\``, { taskId });
   }
-  const isV2 = record.schema === DISPATCH_RECORD_SCHEMA;
-  if (Object.hasOwn(record, "schema") && !isV2) {
+  const isV3 = record.schema === DISPATCH_RECORD_SCHEMA;
+  const isV2 = record.schema === LEGACY_DISPATCH_RECORD_SCHEMA;
+  if (Object.hasOwn(record, "schema") && !isV2 && !isV3) {
     return result(sha, VERDICT.fail, "record-schema-unsupported", `record for \`${taskId}\` declares an unsupported schema`, { taskId });
   }
-  if (isV2) {
+  if (isV2 || isV3) {
     try {
-      record = validateDispatchRecord(record);
+      record = isV3 ? validateDispatchRecord(record) : validateLegacyDispatchRecord(record);
     } catch (error) {
-      return result(sha, VERDICT.fail, "record-v2-invalid", `record for \`${taskId}\` fails the ${DISPATCH_RECORD_SCHEMA} contract: ${error.message}`, { taskId });
+      const version = isV3 ? "v3" : "v2";
+      return result(sha, VERDICT.fail, `record-${version}-invalid`, `record for \`${taskId}\` fails the ${record.schema} contract: ${error.message}`, { taskId });
     }
   }
   if (Object.hasOwn(record, "modelOverride")) {
@@ -489,10 +491,10 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.fail, "record-not-terminal", `record outcome \`${record.outcome ?? "(absent)"}\` is not terminal`, { taskId });
   }
   const declaredShas = declaredCommits(record);
-  if (isV2 && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
-    return result(sha, VERDICT.fail, "record-names-different-commit", `v2 record is bound to a different candidate commit`, { taskId, declaredShas });
+  if ((isV2 || isV3) && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
+    return result(sha, VERDICT.fail, "record-names-different-commit", `${isV3 ? "v3" : "v2"} record is bound to a different candidate commit`, { taskId, declaredShas });
   }
-  if (!isV2 && declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
+  if (!isV2 && !isV3 && declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
     return result(sha, VERDICT.fail, "record-names-different-commit", `record names commit(s) \`${declaredShas.join("`, `")}\``, { taskId, declaredShas });
   }
 

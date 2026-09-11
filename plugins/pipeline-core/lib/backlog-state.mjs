@@ -1186,6 +1186,8 @@ export function projectBacklog(items, events) {
       deferred: isTriageDeferred(body),
     };
     if (own(metadata, "tracking")) output.tracking = metadata.tracking;
+    if (own(metadata, "due")) output.due = metadata.due;
+    if (own(metadata, "sprint")) output.sprint = metadata.sprint;
     if (metadata.status === "closed") {
       output.closedAt = metadata.closed_at;
       output.closureRepository = metadata.closure_repository;
@@ -1211,9 +1213,9 @@ export function projectBacklog(items, events) {
     "> Generated from `backlog/items/*.md` and `backlog/transitions.ndjson`; do not edit manually.",
     "> Item status is operational work tracking, never the active feature lifecycle authority.",
     "",
-    "| ID | Status | Type | Owner | Created | Tracking |",
-    "| --- | --- | --- | --- | --- | --- |",
-    ...projectedItems.map((item) => `| ${markdownCell(item.id)} | ${markdownCell(item.status)} | ${markdownCell(item.type)} | ${markdownCell(item.owner)} | ${markdownCell(item.created)} | ${markdownCell(item.tracking)} |`),
+    "| ID | Status | Type | Owner | Sprint | Created | Due | Tracking |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...projectedItems.map((item) => `| ${markdownCell(item.id)} | ${markdownCell(item.status)} | ${markdownCell(item.type)} | ${markdownCell(item.owner)} | ${markdownCell(item.sprint)} | ${markdownCell(item.created)} | ${markdownCell(item.due)} | ${markdownCell(item.tracking)} |`),
     "",
     "## Counts",
     "",

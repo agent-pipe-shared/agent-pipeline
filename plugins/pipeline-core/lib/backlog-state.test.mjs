@@ -487,6 +487,16 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
     [validateTransitionLedger(chain, items).join("; "), projection.statusText].join(" | "));
 }
 {
+  const scheduled = item({ due: "2026-08-01", sprint: "nova-b" });
+  const projection = projectBacklog([scheduled], [event()]);
+  check("BS02g projections expose validated due and sprint declarations in machine and human views",
+    projection.index.items[0].due === "2026-08-01"
+      && projection.index.items[0].sprint === "nova-b"
+      && projection.statusText.includes("| Sprint | Created | Due | Tracking |")
+      && projection.statusText.includes("| nova-b | 2026-07-17 | 2026-08-01 |"),
+    projection.statusText);
+}
+{
   const requirement = item({ type: "requirement" });
   const unknown = item({ type: "roadmap-note" });
   check("BS02a the canonical taxonomy accepts requirement and rejects an unknown type",

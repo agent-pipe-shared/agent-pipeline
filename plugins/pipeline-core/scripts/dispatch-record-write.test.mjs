@@ -14,7 +14,7 @@ const cases = [];
 function check(name, run) {
   cases.push({ id: `DRW${String(cases.length + 1).padStart(2, "0")}`, name, run });
 }
-function record(overrides = {}) { return { schema: "pipeline.dispatch-record.v2", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: RESULT_SHA, outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report: { text: "Done.", changedFiles: ["src/x.mjs"] }, ...overrides }; }
+function record(overrides = {}) { return { schema: "pipeline.dispatch-record.v3", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: RESULT_SHA, outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report: { text: "Done.", changedFiles: ["src/x.mjs"] }, criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: "T5" }, ...overrides }; }
 function fixture(value = record(), target = `evidence/dispatch-record-${value.taskId}.json`) {
   const root = mkdtempSync(join(tmpdir(), "dispatch-record-write-"));
   mkdirSync(join(root, "evidence")); mkdirSync(join(root, "requests"));
@@ -44,6 +44,8 @@ check("writer validates, atomically publishes exclusively, and returns matching 
 
 check("malformed, missing, computed and mismatched records fail before publication", () => {
   const cases = [
+    [record({ schema: "pipeline.dispatch-record.v2" }), "evidence/dispatch-record-NVA-WRITE-1.json"],
+    [record({ criticSkip: undefined }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record({ effort: "" }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record({ model: "claude-opus-5" }), "evidence/dispatch-record-NVA-WRITE-1.json"],
     [record({ modelOverride: { model: "claude-opus-5", effort: "high", rationale: "MP-05 reviewed exception" } }), "evidence/dispatch-record-NVA-WRITE-1.json"],

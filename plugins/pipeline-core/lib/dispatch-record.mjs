@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import { createHash } from "node:crypto";
 
-export const DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v2";
+export const DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v3";
+export const LEGACY_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v2";
 export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
 export const SAFE_TASK_ID = /^[A-Za-z0-9._-]+$/u;
 const FULL_COMMIT = /^[a-f0-9]{40}$/u;
@@ -9,7 +10,7 @@ const SAFE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,255}$/u;
 const PRIVATE_ABSOLUTE_PATH = /(?<![A-Za-z0-9_%])(?:\/(?:home|Users|mnt\/[A-Za-z]|tmp|var\/tmp|root|private\/var)(?:\/[^\s"'`<>]*)?(?=$|[\s"'`<>,;:)\]])|[A-Za-z]:[\\/][^\s"'`<>]+|\\\\[^\s"'`<>]+)/iu;
 const TOP_LEVEL_KEYS = Object.freeze([
   "schema", "taskId", "agentType", "model", "effort", "rulesetSha", "dispatcher", "candidateCommit",
-  "resultSha256", "outcome", "commits", "log", "report", "modelOverride", "criticSkip", "orchestratorAddedFiles",
+  "resultSha256", "outcome", "commits", "log", "report", "modelOverride", "criticSkip", "criticEvidence", "orchestratorAddedFiles",
 ]);
 
 function fail(code, message) {
@@ -115,14 +116,16 @@ function strictPathList(value, label) {
   if (new Set(paths).size !== paths.length) fail("record-path", `${label} contains duplicate paths`);
 }
 
-export function validateDispatchRecord(record) {
+function validateRecord(record, { legacy }) {
   const required = TOP_LEVEL_KEYS.slice(0, 13);
-  exactKeys(record, TOP_LEVEL_KEYS, "dispatch record", required);
+  const allowed = legacy ? TOP_LEVEL_KEYS.filter((key) => key !== "criticEvidence") : TOP_LEVEL_KEYS;
+  exactKeys(record, allowed, "dispatch record", required);
   // This record is durable evidence. Apply the privacy invariant to every
   // persisted string before field-specific syntax and compatibility checks so
   // no newly added or annotation-bearing string lane can bypass it.
   denyPrivateAbsolutePaths(record, "dispatch record");
-  if (record.schema !== DISPATCH_RECORD_SCHEMA) fail("record-schema", `dispatch record schema must be ${DISPATCH_RECORD_SCHEMA}`);
+  const expectedSchema = legacy ? LEGACY_DISPATCH_RECORD_SCHEMA : DISPATCH_RECORD_SCHEMA;
+  if (record.schema !== expectedSchema) fail("record-schema", `dispatch record schema must be ${expectedSchema}`);
   if (!isSafeTaskId(record.taskId)) fail("record-task-id", "dispatch record taskId is unsafe");
   for (const [key, value] of [["agentType", record.agentType], ["model", record.model], ["effort", record.effort], ["rulesetSha", record.rulesetSha], ["dispatcher", record.dispatcher]]) nonempty(value, key);
   if (!SAFE_TOKEN.test(record.agentType) || !SAFE_TOKEN.test(record.effort)) fail("record-field", "agentType or effort is invalid");
@@ -157,7 +160,26 @@ export function validateDispatchRecord(record) {
     if (record.criticSkip.schema !== "pipeline.critic-skip-decision.v1") fail("record-field", "criticSkip schema is invalid");
     if (Object.hasOwn(record.criticSkip, "reason")) nonempty(record.criticSkip.reason, "criticSkip.reason");
   }
+  if (Object.hasOwn(record, "criticEvidence")) {
+    exactKeys(record.criticEvidence, ["schema", "taskId", "candidateCommit", "path", "sha256"], "criticEvidence");
+    if (record.criticEvidence.schema !== "pipeline.critic-evidence-reference.v1") fail("record-field", "criticEvidence schema is invalid");
+    if (record.criticEvidence.taskId !== record.taskId) fail("record-critic-binding", "criticEvidence taskId must match dispatch record taskId");
+    if (record.criticEvidence.candidateCommit !== record.candidateCommit) fail("record-critic-binding", "criticEvidence candidateCommit must match dispatch record candidateCommit");
+    normalizeDispatchRecordPath(record.criticEvidence.path, "criticEvidence.path");
+    if (!/^(?:evidence|backlog\/evidence)\//u.test(record.criticEvidence.path)) fail("record-critic-binding", "criticEvidence.path must be under evidence/ or backlog/evidence/");
+    if (!/^[a-f0-9]{64}$/u.test(record.criticEvidence.sha256)) fail("record-critic-binding", "criticEvidence.sha256 must be a lowercase SHA-256 digest");
+  }
+  if (!legacy) {
+    const dispositions = Number(Object.hasOwn(record, "criticSkip")) + Number(Object.hasOwn(record, "criticEvidence"));
+    if (dispositions !== 1) fail("record-critic-disposition", "dispatch record v3 requires exactly one of criticSkip or criticEvidence");
+  }
   return structuredClone(record);
+}
+
+export function validateDispatchRecord(record) { return validateRecord(record, { legacy: false }); }
+
+export function validateLegacyDispatchRecord(record) {
+  return validateRecord(record, { legacy: true });
 }
 
 export function dispatchRecordSha256(record) {

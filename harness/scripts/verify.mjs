@@ -459,6 +459,8 @@ const TEST_SUITES = [
   // The ledger drifted for weeks because nothing gated it. Remedy when this goes red:
   // node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate
   { name: "backlog-state-check", file: join(pluginScriptsDir, "check-backlog-state.mjs") },
+  { name: "deferred-backlog-tests", file: join(pluginScriptsDir, "check-deferred-backlog.test.mjs") },
+  { name: "deferred-backlog-check", file: join(pluginScriptsDir, "check-deferred-backlog.mjs") },
   { name: "parallel-dispatch-planner-tests", file: join(libDir, "parallel-dispatch-planner.test.mjs") },
   { name: "parallel-sprint-integration-tests", file: join(libDir, "parallel-sprint-integration.test.mjs") },
   { name: "epic-ac02-publication-check-tests", file: join(pluginScriptsDir, "check-epic-ac02-publication.test.mjs") },
@@ -788,6 +790,7 @@ const TEST_SUITES = [
   { name: "print-verify-failures-tests", file: join(scriptDir, "print-verify-failures.test.mjs") },
   { name: "guard-push-release-tag-ancestry-tests", file: join(hooksDir, "guard-push-release-tag-ancestry.test.mjs") },
   { name: "check-critic-skip-coverage-tests", file: join(pluginScriptsDir, "check-critic-skip-coverage.test.mjs") },
+  { name: "critic-skip-coverage-check", file: join(pluginScriptsDir, "check-critic-skip-coverage.mjs") },
   { name: "measure-tofu-push-e2e-tests", file: join(pluginScriptsDir, "measure-tofu-push-e2e.test.mjs") },
   { name: "suite-registration-check", file: join(pluginScriptsDir, "check-suite-registration.mjs") },
   { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },

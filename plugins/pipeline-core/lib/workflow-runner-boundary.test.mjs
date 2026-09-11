@@ -121,7 +121,7 @@ check("schema-valid succeeded final exposes only its digest", () => {
   assert.equal(result.code, "WR-OUTCOME-FINAL"); assert.equal(result.resultSha256, A); assert.equal(result.faultDomain, "unknown");
 });
 
-check("final native return writes canonical v2 evidence and passes authorship verification", () => {
+check("final native return writes canonical v3 evidence and passes authorship verification", () => {
   const root = mkdtempSync(join(tmpdir(), "workflow-return-record-"));
   try {
     mkdirSync(join(root, "evidence")); mkdirSync(join(root, "requests")); mkdirSync(join(root, "src"));
@@ -134,11 +134,12 @@ check("final native return writes canonical v2 evidence and passes authorship ve
     const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
     const requestPath = "requests/dispatch-return.json";
     const record = {
-      schema: "pipeline.dispatch-record.v2", taskId: "P5B-RETURN-1",
+      schema: "pipeline.dispatch-record.v3", taskId: "P5B-RETURN-1",
       agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
       rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit, resultSha256: A,
       outcome: "completed", commits: [candidateCommit], log: [{ phase: "done", toolUseCount: 4 }],
       report: { text: "Workflow dispatch completed.", changedFiles: ["src/x.mjs"] },
+      criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: "fixture exercises the no-Critic disposition" },
     };
     writeFileSync(join(root, requestPath), `${JSON.stringify({
       schema: "pipeline.dispatch-record-write-request.v1",

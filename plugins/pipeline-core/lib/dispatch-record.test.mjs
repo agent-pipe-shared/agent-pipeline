@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { openSync } from "node:fs";
-import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, validateDispatchRecord } from "./dispatch-record.mjs";
+import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, validateDispatchRecord, validateLegacyDispatchRecord } from "./dispatch-record.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const SHA = "a".repeat(40);
-const opening = () => ({ schema: "pipeline.dispatch-record.v2", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null, outcome: "in-progress", commits: [], log: [], report: null });
+const opening = () => ({ schema: "pipeline.dispatch-record.v3", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null, outcome: "in-progress", commits: [], log: [], report: null, criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: "T5: no mandatory review trigger" } });
 const terminal = () => ({ ...opening(), candidateCommit: "b".repeat(40), resultSha256: "d".repeat(64), outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "verify", toolUseCount: 12, note: "focused checks passed" }], report: { text: "Done.", changedFiles: ["plugins/pipeline-core/lib/x.mjs - implementation", { path: "plugins/pipeline-core/lib/x.test.mjs" }] } });
 
 const cases = [];
@@ -17,6 +17,27 @@ check("opening and terminal records share the strict closed contract", () => {
   assert.deepEqual(validateDispatchRecord(opening()), opening());
   assert.deepEqual(validateDispatchRecord(terminal()), terminal());
   assert.match(dispatchRecordSha256(terminal()), /^[a-f0-9]{64}$/u);
+});
+check("v2 is explicit read-only legacy evidence while v3 requires exactly one Critic disposition", () => {
+  const legacy = { ...opening(), schema: "pipeline.dispatch-record.v2" };
+  delete legacy.criticSkip;
+  assert.deepEqual(validateLegacyDispatchRecord(legacy), legacy);
+  assert.throws(() => validateDispatchRecord(legacy), (error) => error?.code === "record-schema");
+  const missing = opening(); delete missing.criticSkip;
+  assert.throws(() => validateDispatchRecord(missing), (error) => error?.code === "record-critic-disposition");
+  assert.throws(() => validateDispatchRecord({ ...opening(), criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "NVA-B-1", candidateCommit: SHA, path: "evidence/critic-NVA-B-1.json", sha256: "e".repeat(64) } }), (error) => error?.code === "record-critic-disposition");
+});
+check("Critic evidence is bound to this task, candidate and repository-local artifact digest", () => {
+  const evidenced = opening();
+  delete evidenced.criticSkip;
+  evidenced.criticEvidence = { schema: "pipeline.critic-evidence-reference.v1", taskId: evidenced.taskId, candidateCommit: evidenced.candidateCommit, path: "backlog/evidence/critic-NVA-B-1.md", sha256: "e".repeat(64) };
+  assert.deepEqual(validateDispatchRecord(evidenced), evidenced);
+  for (const criticEvidence of [
+    { ...evidenced.criticEvidence, taskId: "OTHER" },
+    { ...evidenced.criticEvidence, candidateCommit: "f".repeat(40) },
+    { ...evidenced.criticEvidence, path: "docs/critic.md" },
+    { ...evidenced.criticEvidence, sha256: "bad" },
+  ]) assert.throws(() => validateDispatchRecord({ ...evidenced, criticEvidence }), (error) => error?.code === "record-critic-binding");
 });
 check("terminality and legacy briefing/path extraction retain verifier semantics", () => {
   assert.equal(isTerminalOutcome("stopped-tool-budget"), true);
@@ -104,7 +125,7 @@ check("every persisted string lane rejects Unix, Windows, WSL and UNC private pa
   }
 });
 
-assert.equal(cases.length, 6, "the complete dispatch-record corpus must be registered before execution begins");
+assert.equal(cases.length, 8, "the complete dispatch-record corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
