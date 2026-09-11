@@ -12,6 +12,7 @@ import {
   commitMessageFindings,
   commitTypeFindings,
   commitTypeFindingsForRange,
+  finishedCommitMessageFindings,
   GIT01_COMMIT_TYPES,
   markerPolicyMode,
   parseCommitTrailerBlock,
@@ -163,6 +164,25 @@ check("CMP14 the marker policy defaults to blocking unless explicitly weakened",
   assert.equal(markerPolicyMode({ commitTrailerPolicy: "off" }), "off");
   assert.equal(markerPolicyMode({ commitTrailerPolicy: "blocking" }), "blocking");
   assert.equal(markerPolicyMode({ commitTrailerPolicy: "warn" }), "warn");
+});
+
+check("CMP15 the finished-message boundary completes any declared provenance block", () => {
+  assert.deepEqual(codes(finishedCommitMessageFindings(BOUND, { requireProvenanceWhenSignaled: true })), []);
+  assert.deepEqual(
+    codes(finishedCommitMessageFindings("feat: x\n\nDispatch: NVA-CMP (goldfish)\n\nAI-Assisted: true\n", { requireProvenanceWhenSignaled: true })),
+    ["GIT-03-DISPATCH-MISSING"],
+  );
+  assert.deepEqual(
+    codes(finishedCommitMessageFindings("feat: x\n\nAI-Assisted: true\n", { requireProvenanceWhenSignaled: true })),
+    ["GIT-03-DISPATCH-MISSING"],
+  );
+});
+
+check("CMP16 the finished-message boundary leaves signal-free human commits alone", () => {
+  assert.deepEqual(
+    codes(finishedCommitMessageFindings("docs: explain the release\n", { requireProvenanceWhenSignaled: true })),
+    [],
+  );
 });
 
 // GIT-01 -- the second gap this test file exists to close. `6decf59` used commit type

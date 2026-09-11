@@ -19,6 +19,9 @@ ADR-0079 and the canonical backlog. It does not redefine the approved epic.
   mode.
 - Project bootstrap guidance and the example guard configuration make the
   available blocking policy discoverable to consuming repositories.
+- Onboarding installs a separately owned `commit-msg` backstop that evaluates
+  the finished message. It refuses correlation data unconditionally and
+  requires a complete provenance pair whenever either provenance key appears.
 
 ## Acceptance evidence
 
@@ -27,6 +30,8 @@ ADR-0079 and the canonical backlog. It does not redefine the approved epic.
 - Unit coverage includes valid, missing, duplicated, malformed, and misplaced
   provenance trailers, including repeated `git commit -m` paragraphs.
 - Documentation and consumer-safe-path contract checks pass.
+- Installer and onboarding coverage proves install, upgrade, removal, foreign
+  hook refusal, valid messages, and both measured malformed-trailer shapes.
 
 ## Security model and rollback
 
@@ -53,3 +58,11 @@ guard configuration. Existing projects may explicitly select `warn` for a
 dated migration or `off` as an opt-out. The repository's two authority-tier
 guard configurations also state `blocking` explicitly so their intended policy
 is visible without relying on the default.
+
+Git does not expose a trustworthy agent-vs-human authorship bit to a
+`commit-msg` hook. A spawned process that creates a message with neither
+Pipeline provenance key is therefore indistinguishable from an ordinary human
+commit at that boundary. The direct agent-command guard closes the normal
+agent-issued path; the finished-message backstop closes every measured
+blank-line, marker-only and dispatch-only case without falsely rejecting
+signal-free human commits.

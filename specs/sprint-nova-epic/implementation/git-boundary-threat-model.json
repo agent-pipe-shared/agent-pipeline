@@ -21,7 +21,8 @@
       "label": "agent-to-git-command",
       "relationships": [
         "threat-1443f45aa713c2be",
-        "threat-6780fcce026a9446"
+        "threat-6780fcce026a9446",
+        "threat-98d3883e82810ab4"
       ]
     },
     {
@@ -50,6 +51,20 @@
       "id": "mitigation-a2e9f3d1107e6cdf",
       "kind": "mitigation",
       "label": "final-trailer-block-validation",
+      "relationships": []
+    },
+    {
+      "id": "threat-98d3883e82810ab4",
+      "kind": "threat",
+      "label": "finished-message-bypasses-pretool-inspection",
+      "relationships": [
+        "mitigation-43b36d44f7742f65"
+      ]
+    },
+    {
+      "id": "mitigation-43b36d44f7742f65",
+      "kind": "mitigation",
+      "label": "onboarding-installed-commit-msg-validation",
       "relationships": []
     }
   ],

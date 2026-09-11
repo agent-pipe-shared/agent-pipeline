@@ -23,12 +23,13 @@
  *      `warn` for a dated migration or explicitly select `off`; absence and unknown values
  *      fail closed to `blocking`.
  *
- * WHAT IT CANNOT SEE, stated rather than discovered later. A commit whose message comes
- * from the editor (`git commit` with no `-m`/`-F`) has no message at the moment the hook
- * runs — the guard is a PreToolUse check on a command line, not a `commit-msg` hook. Those
- * are reported as `inspected: false` and the caller allows them. Closing that gap needs a
- * real `commit-msg` hook installed in the repository, which is a different mechanism with
- * its own install story. Anyone reading this should not mistake the check for total.
+ * TWO BOUNDARIES. A commit whose message comes from the editor (`git commit` with no
+ * `-m`/`-F`) has no message when the PreToolUse guard runs and is reported as
+ * `inspected: false`. The onboarding-installed `commit-msg` hook later evaluates the
+ * finished bytes. Git exposes no trustworthy agent-vs-human authorship bit, so that hook
+ * always rejects correlation data and requires a complete provenance pair once either
+ * Pipeline provenance key appears. The PreToolUse lane remains responsible for requiring
+ * the pair on directly observable agent commands.
  *
  * A `-F`/`--file` reference IS a message source even when its content cannot be read (out of
  * bounds for the caller's `readFile`, gone, unreadable). That case must never collapse to the
@@ -81,6 +82,7 @@ const MARKER_KEY = "AI-Assisted";
 const MARKER_VALUE = "true";
 const DISPATCH_KEY = "Dispatch";
 const DISPATCH_VALUE = /^(\S+) \((goldfish|critic|elephant-generated)\)$/u;
+const PROVENANCE_SIGNAL = /^\s*(?:AI-Assisted|Dispatch)\s*:/imu;
 
 function admittedDispatchValue(value) {
   if (value === "stage-0 (elephant)") return true;
@@ -109,6 +111,57 @@ export function parseCommitTrailerBlock(message) {
   }
   if (entries.length === 0 || start === 0 || lines[start - 1].trim() !== "") return [];
   return entries;
+}
+
+/**
+ * Inspect a finished commit message without depending on argv, files, Git or
+ * process state. This is the shared policy seam for PreToolUse inspection and
+ * the real `commit-msg` boundary.
+ *
+ * `requireProvenanceWhenSignaled` is intentionally narrower than an unconditional
+ * marker requirement: Git does not expose whether a commit was authored by a
+ * human or an agent. Once either Pipeline provenance key appears anywhere in the
+ * message, however, the author has declared that this is a Pipeline provenance
+ * block and both structural entries must be complete and grounded.
+ */
+export function finishedCommitMessageFindings(message, {
+  requireMarker = false,
+  requireDispatch = false,
+  requireProvenanceWhenSignaled = false,
+} = {}) {
+  const text = String(message ?? "");
+  const provenanceSignaled = PROVENANCE_SIGNAL.test(text);
+  const enforceProvenance = requireProvenanceWhenSignaled && provenanceSignaled;
+  const findings = CORRELATION_RULES
+    .filter((rule) => rule.test.test(text))
+    .map((rule) => ({ code: rule.code, detail: rule.detail }));
+  const trailers = parseCommitTrailerBlock(text);
+
+  if (requireMarker || enforceProvenance) {
+    const markers = trailers.filter((entry) => entry.key === MARKER_KEY && entry.value === MARKER_VALUE);
+    if (markers.length !== 1) {
+      findings.push({
+        code: markers.length === 0 ? "GIT-03-MARKER-MISSING" : "GIT-03-MARKER-AMBIGUOUS",
+        detail: markers.length === 0
+          ? "no exact `AI-Assisted: true` entry in the final Git trailer block"
+          : "more than one `AI-Assisted: true` entry in the final Git trailer block",
+      });
+    }
+  }
+  if (requireDispatch || enforceProvenance) {
+    const dispatches = trailers.filter((entry) => entry.key === DISPATCH_KEY);
+    if (dispatches.length === 0) {
+      findings.push({ code: "GIT-03-DISPATCH-MISSING", detail: "no `Dispatch:` entry in the final Git trailer block" });
+    } else if (dispatches.length > 1) {
+      findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
+    } else if (!admittedDispatchValue(dispatches[0].value)) {
+      findings.push({
+        code: "GIT-03-DISPATCH-MALFORMED",
+        detail: `the final \`Dispatch: ${dispatches[0].value}\` entry is not an admitted work-package binding`,
+      });
+    }
+  }
+  return { findings, trailers, provenanceSignaled };
 }
 
 const CORRELATION_RULES = Object.freeze([
@@ -226,9 +279,7 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
   // the required blank separator rather than concatenating them as adjacent
   // lines. A single `-F` or heredoc body is unchanged.
   const message = parts.join("\n\n");
-  const findings = CORRELATION_RULES
-    .filter((rule) => rule.test.test(message))
-    .map((rule) => ({ code: rule.code, detail: rule.detail }));
+  const findings = finishedCommitMessageFindings(message, { requireMarker, requireDispatch }).findings;
 
   for (const { path, reason } of unreadable) {
     findings.push({
@@ -237,31 +288,6 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
     });
   }
 
-  const trailers = parseCommitTrailerBlock(message);
-  if (requireMarker) {
-    const markers = trailers.filter((entry) => entry.key === MARKER_KEY && entry.value === MARKER_VALUE);
-    if (markers.length !== 1) {
-      findings.push({
-        code: markers.length === 0 ? "GIT-03-MARKER-MISSING" : "GIT-03-MARKER-AMBIGUOUS",
-        detail: markers.length === 0
-          ? "no exact `AI-Assisted: true` entry in the final Git trailer block"
-          : "more than one `AI-Assisted: true` entry in the final Git trailer block",
-      });
-    }
-  }
-  if (requireDispatch) {
-    const dispatches = trailers.filter((entry) => entry.key === DISPATCH_KEY);
-    if (dispatches.length === 0) {
-      findings.push({ code: "GIT-03-DISPATCH-MISSING", detail: "no `Dispatch:` entry in the final Git trailer block" });
-    } else if (dispatches.length > 1) {
-      findings.push({ code: "GIT-03-DISPATCH-AMBIGUOUS", detail: "more than one `Dispatch:` entry in the final Git trailer block" });
-    } else if (!admittedDispatchValue(dispatches[0].value)) {
-      findings.push({
-        code: "GIT-03-DISPATCH-MALFORMED",
-        detail: `the final \`Dispatch: ${dispatches[0].value}\` entry is not an admitted work-package binding`,
-      });
-    }
-  }
   return {
     inspected: true,
     sources: [...sources, ...unreadable.map((entry) => entry.path)],

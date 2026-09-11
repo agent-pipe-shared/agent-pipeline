@@ -202,6 +202,10 @@ const DYNAMIC_IMPORT_EDGES = {
     "./check-protected-path-integrity.mjs",
     "../lib/handover-rotation.mjs",
   ],
+  "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs": [
+    "../lib/commit-message-policy.mjs",
+    "../lib/project-authority.mjs",
+  ],
 };
 
 // Spawn-edge scanner (pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges): see

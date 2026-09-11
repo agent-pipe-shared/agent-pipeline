@@ -73,6 +73,7 @@ import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.
 import { checkVerifyContractConfigured } from "../scripts/push-gate-satisfiability.mjs";
 import { applyInstall as applyPrePushHookInstallOnboarding } from "../scripts/pre-push-hook-install.mjs";
 import { applyInstall as applyPreCommitHookInstallOnboarding } from "../scripts/pre-commit-hook-install.mjs";
+import { applyInstall as applyCommitMsgHookInstallOnboarding } from "../scripts/commit-msg-hook-install.mjs";
 import {
   pipelineScriptsRunnerAllowlistEntries as registeredPipelineScriptsRunnerAllowlistEntries,
   planSettingsAllowlistMerge,
@@ -5281,6 +5282,17 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
           try { return applyPreCommitHookInstallOnboarding({ rootDir: root }); }
           catch (error) { return { status: "install-error", detail: String(error?.message ?? error) }; }
         })();
+    // The finished-message boundary complements PreToolUse: editor commits and a
+    // commit spawned by an already-admitted process never expose their message to
+    // the command guard. The dedicated installer owns only `commit-msg`, refuses
+    // foreign hooks, and is best-effort for the same reasons as the two hook
+    // installs above.
+    const commitMsgHookInstall = state.hostManaged
+      ? { status: "host-managed-skip" }
+      : (() => {
+          try { return applyCommitMsgHookInstallOnboarding({ rootDir: root }); }
+          catch (error) { return { status: "install-error", detail: String(error?.message ?? error) }; }
+        })();
     const gitResult = state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitIdentity !== null, initialBranch: "main", committed: false };
     const authority = { status: "portable-seed", runtimeProjection: "missing" };
     // The transaction (Git init + scaffold writes) is unconditionally done by
@@ -5306,9 +5318,9 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     const missingIgnorePatterns = state.hostManaged ? [] : missingProjectIgnorePatterns(readProjectIgnoreText(root, fs));
     const projectIgnoreGap = missingIgnorePatterns.length > 0 ? { projectIgnoreGapAction: collectProjectIgnoreGapAction(missingIgnorePatterns) } : {};
     if (missingIdentity.length > 0) {
-      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
+      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
     }
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, diagnostics: [], ...projectIgnoreGap };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, diagnostics: [], ...projectIgnoreGap };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };

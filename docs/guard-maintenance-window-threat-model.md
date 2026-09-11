@@ -70,8 +70,10 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
   `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
+  `lib/commit-message-policy.mjs`,
   `lib/critic-route-v3.mjs`,
   `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
+  `lib/dispatch-record.mjs`,
   `lib/entrypoint.mjs`, `lib/feature-package-topology.mjs`,
   `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,
   `lib/human-guard-override.mjs`, `lib/human-role-labels.mjs`,
@@ -95,6 +97,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`,
   `scripts/continuity-status.mjs`, `scripts/pipeline-state.mjs`,
   `scripts/po-gate-profile-repair.mjs`, `scripts/project-onboarding-v3.mjs`,
+  `scripts/settings-allowlist-merge.mjs`,
   `scripts/publication-close-journal.mjs`, and
   `scripts/v3-bootstrap-authority.mjs`. A second closure gap (VFX2-GMW,
   `sprint_phoenix` merge, 2026-08-26) added: `lib/agent-decision-journal.mjs`,
@@ -184,7 +187,11 @@ below assumes it holds and is written to catch a change that would break it.
   static imports (`guard-gate-strength.mjs`, `protected-test-paths.mjs`,
   `entrypoint.mjs`) are all already kernel above, so no further hops are needed.
   Added: `scripts/pre-commit-hook-install.mjs` and
-  `scripts/check-protected-path-integrity.mjs`. An unrelated pre-existing gap
+  `scripts/commit-msg-hook-install.mjs` and
+  `scripts/check-protected-path-integrity.mjs`. The commit-msg installer is
+  reached from the same onboarding kernel and dynamically imports the shared
+  commit-message policy plus project-authority resolver through install-time
+  paths declared in the closure test. An unrelated pre-existing gap
   GMWKC01 found already open at this dispatch's base commit --
   `lib/onboarding-continuity.mjs` and `lib/project-onboarding-v3.mjs` (both
   already kernel above) already imported `lib/onboarding-language-correction.mjs`

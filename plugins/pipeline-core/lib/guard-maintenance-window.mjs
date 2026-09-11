@@ -163,6 +163,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
   "plugins/pipeline-core/lib/continuity-state.mjs",
   "plugins/pipeline-core/lib/continuity-status.mjs",
+  "plugins/pipeline-core/lib/commit-message-policy.mjs",
   "plugins/pipeline-core/lib/critic-export-policy.mjs",
   // NVA-B-CRITIC-HEALTH-ROUTING-2: codex-app-server-health.mjs is already
   // kernel-protected below and resolves its high-risk Critic model through this
@@ -171,6 +172,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/critic-route-v3.mjs",
   "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
   "plugins/pipeline-core/lib/document-hooks.mjs",
+  "plugins/pipeline-core/lib/dispatch-record.mjs",
   "plugins/pipeline-core/lib/entrypoint.mjs",
   // pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges: GMWKC01 now also walks
   // process-spawn edges (a kernel file handing a first-party script path to
@@ -246,6 +248,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // Pre-existing, unrelated static-import gap (see protected-test-paths.mjs note above):
   // guard-lifecycle-ready.mjs already imported this before this dispatch touched anything.
   "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+  "plugins/pipeline-core/scripts/settings-allowlist-merge.mjs",
   "plugins/pipeline-core/scripts/publication-close-journal.mjs",
   "plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs",
   // VFX2-GMW (sprint_phoenix merge, 2026-08-26): GMWKC01 found this second closure gap
@@ -391,6 +394,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // (guard-gate-strength.mjs, protected-test-paths.mjs, entrypoint.mjs) are all already
   // kernel above, so no further hops are needed.
   "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+  // NVA-B-COMMITMSG: project-onboarding-v3.mjs installs the finished-message
+  // backstop. Its generated implementation dynamically imports the shared
+  // commit-message policy and project-authority resolver, declared in the
+  // closure test because both paths are install-time-bound.
+  "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs",
   "plugins/pipeline-core/scripts/check-protected-path-integrity.mjs",
   // Unrelated pre-existing gap GMWKC01 found already open at this dispatch's base
   // commit (see the "unrelated pre-existing gap" notes above for the same pattern):

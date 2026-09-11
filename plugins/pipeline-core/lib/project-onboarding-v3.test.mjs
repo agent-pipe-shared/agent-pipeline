@@ -45,6 +45,8 @@ import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs"
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-migration-v3.mjs";
 import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
+import { planInstall as planPreCommitHookInstall } from "../scripts/pre-commit-hook-install.mjs";
+import { planInstall as planCommitMsgHookInstall } from "../scripts/commit-msg-hook-install.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -5301,6 +5303,60 @@ test("onboarding installs the pre-push git hook by default -- no confirmation, n
     const postInstallPlan = planPrePushHookInstall({ rootDir: path });
     assert.equal(postInstallPlan.status, "ready-to-upgrade", JSON.stringify(postInstallPlan));
     assert.equal(existsSync(join(path, ".git", "hooks", "pre-push")), true);
+  } finally { dispose(path); }
+});
+
+test("onboarding installs the pre-commit and commit-msg backstops by default", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.preCommitHookInstall.status, "installed");
+    assert.equal(applied.commitMsgHookInstall.status, "installed");
+    assert.equal(planPreCommitHookInstall({ rootDir: path }).status, "ready-to-upgrade");
+    assert.equal(planCommitMsgHookInstall({ rootDir: path }).status, "ready-to-upgrade");
+    assert.equal(existsSync(join(path, ".git", "hooks", "pre-commit")), true);
+    assert.equal(existsSync(join(path, ".git", "hooks", "commit-msg")), true);
+  } finally { dispose(path); }
+});
+
+test("onboarding leaves foreign pre-commit and commit-msg hooks byte-identical", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const hooksDir = join(path, ".git", "hooks");
+    mkdirSync(hooksDir, { recursive: true });
+    const bytes = "#!/bin/sh\necho 'project-owned hook'\nexit 0\n";
+    for (const name of ["pre-commit", "commit-msg"]) {
+      writeFileSync(join(hooksDir, name), bytes, { mode: 0o755 });
+      chmodSync(join(hooksDir, name), 0o755);
+    }
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.preCommitHookInstall.status, "refused-foreign-hook");
+    assert.equal(applied.commitMsgHookInstall.status, "refused-foreign-hook");
+    for (const name of ["pre-commit", "commit-msg"]) {
+      assert.equal(readFileSync(join(hooksDir, name), "utf8"), bytes);
+    }
+  } finally { dispose(path); }
+});
+
+test("the commit-msg hook onboarding installs rejects a structurally broken provenance block", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    const hookPath = join(path, ".git", "hooks", "commit-msg");
+    const messagePath = join(path, ".git", "COMMIT_EDITMSG");
+    writeFileSync(messagePath, "feat: x\n\nDispatch: stage-0 (elephant)\n\nAI-Assisted: true\n");
+    const result = spawnSync(hookPath, [messagePath], { cwd: path, encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /GIT-03-DISPATCH-MISSING/u);
   } finally { dispose(path); }
 });
 
