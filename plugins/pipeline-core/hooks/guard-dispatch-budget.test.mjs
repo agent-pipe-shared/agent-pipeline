@@ -46,6 +46,7 @@ const SUBAGENT_TRANSCRIPT = "/fake/session/subagents/agent-abc123.jsonl";
 const META_PATH = "/fake/session/subagents/agent-abc123.meta.json";
 const ORCHESTRATOR_TRANSCRIPT = "/fake/session/top-level.jsonl";
 const COMMON_DIR = "/fake/.git";
+const COUNTER_PATH = `${COMMON_DIR}/agent-pipeline/dispatch-budget/abc123.json`;
 
 const agentDefPath = (name) => `${FAKE_ROOT}/plugins/pipeline-core/agents/${name}.md`;
 const AGENT_DEF_PATH = agentDefPath("goldfish-deep");
@@ -278,6 +279,27 @@ test("evaluateDispatchBudgetGuard: refuses a non-closing working call once the c
   const { DENIAL_CODE } = results[0];
   assert.equal(results[6].exitCode, 2);
   assert.match(results[6].stderr, new RegExp(DENIAL_CODE));
+});
+
+test("evaluateDispatchBudgetGuard: malformed persisted counts fail closed without being reset or overwritten", () => {
+  for (const rawCounter of [
+    JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", count: -1 }),
+    JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", count: 1.5 }),
+    JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", count: "4" }),
+    "{not-json",
+  ]) {
+    const { results } = run({
+      rootDir: FAKE_ROOT,
+      files: { ...seedSubagentFiles(20), [COUNTER_PATH]: rawCounter },
+      steps: [
+        { op: "guard", input: readInputObj({ file_path: "/x" }) },
+        { op: "getFile", path: COUNTER_PATH },
+      ],
+    });
+    assert.equal(results[0].exitCode, 2);
+    assert.match(results[0].stderr, /DISPATCH-BUDGET-INPUT-INVALID/u);
+    assert.equal(results[1], rawCounter, "invalid persisted evidence must remain intact and must not grant a fresh budget");
+  }
 });
 
 test("evaluateDispatchBudgetGuard: each permitted closing act still passes after the cap", () => {
