@@ -16,7 +16,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
 
@@ -27,6 +27,56 @@ const humanOverrideScript = join(pluginRoot, "scripts", "guard-human-override.mj
 const onboardingScript = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
 let passed = 0;
 const checkFilter = process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER ?? "";
+const shardIndex = Number.parseInt(process.env.PIPELINE_CODEX_PRETOOL_TEST_SHARD ?? "", 10);
+const shardCount = 3;
+const shardResults = [];
+if (Number.isInteger(shardIndex) && (shardIndex < 0 || shardIndex >= shardCount)) {
+  throw new Error(`PIPELINE_CODEX_PRETOOL_TEST_SHARD must be between 0 and ${shardCount - 1}`);
+}
+
+// This integration suite intentionally starts the production adapter and its nested
+// guards as real processes. Its cases use isolated temporary repositories, so the
+// default entry point can safely execute three balanced workers concurrently. A
+// named filter keeps the old single-process path for focused debugging.
+if (!Number.isInteger(shardIndex) && checkFilter === "") {
+  const testPath = fileURLToPath(import.meta.url);
+  const workers = Array.from({ length: shardCount }, (_, index) => new Promise((resolveWorker) => {
+    const child = spawn(process.execPath, [testPath], {
+      cwd: process.cwd(),
+      env: { ...process.env, PIPELINE_CODEX_PRETOOL_TEST_SHARD: String(index) },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", (error) => resolveWorker({ index, code: 1, signal: null, stdout, stderr: `${stderr}${error.stack}\n` }));
+    child.on("close", (code, signal) => resolveWorker({ index, code, signal, stdout, stderr }));
+  }));
+  const outcomes = await Promise.all(workers);
+  const results = [];
+  let failed = false;
+  for (const outcome of outcomes) {
+    if (outcome.stderr !== "") process.stderr.write(outcome.stderr);
+    try {
+      const parsed = JSON.parse(outcome.stdout);
+      results.push(...parsed.results);
+    } catch {
+      failed = true;
+      process.stderr.write(`not ok - shard ${outcome.index} returned invalid output\n${outcome.stdout}\n`);
+    }
+    if (outcome.code !== 0 || outcome.signal !== null) failed = true;
+  }
+  results.sort((left, right) => left.ordinal - right.ordinal);
+  for (const [index, result] of results.entries()) {
+    process.stdout.write(`${result.ok ? "ok" : "not ok"} ${index + 1} - ${result.name}\n`);
+    if (!result.ok) failed = true;
+  }
+  process.stdout.write(`1..${results.length}\n`);
+  process.exit(failed ? 1 : 0);
+}
 
 /**
  * authorizeHumanGuardOverride()'s chat-mode/pipeline-author-repair activation now requires
@@ -163,15 +213,44 @@ function run(input, root = fixture(), {
   }
 }
 
+let checkOrdinal = 0;
+const readyChatChecks = new Set([
+  "attended Human override admits only the exact next tool call and is then consumed",
+  "Pipeline Author Repair selects one exact source root and consumes one patch",
+  "local plugin-cache installation offers the human-gated HGO route without an audit retry loop",
+  "a safe Bash local-plugin-install denial does not expose the original command outside HGO",
+  "a secret-bearing Bash cross-repository-boundary denial never carries the secret verbatim",
+  "override persistence failure remains a sanitized fail-closed denial",
+  "Codex routes a documented Git override prefix to the Push-Gate's actual command",
+  "Codex adapter records a dispatched agent's receipt from the prescribed bootstrap before its first absolute-path Write",
+  "NVA-CROSSREPOGUIDANCE-1: an ordinary in-root denial still prints the session's own root, unchanged",
+]);
+
+function selectedShard(name, ordinal) {
+  if (readyChatChecks.has(name)) return 0;
+  if (name.startsWith("ADR-0059 Decision 4:")) return 1;
+  return 1 + (ordinal % 2);
+}
+
 function check(name, fn) {
+  const ordinal = checkOrdinal++;
   if (checkFilter !== "" && !name.includes(checkFilter)) return;
+  if (Number.isInteger(shardIndex) && selectedShard(name, ordinal) !== shardIndex) return;
+  const startedAt = process.hrtime.bigint();
   try {
     fn();
     passed++;
-    process.stdout.write(`ok ${passed} - ${name}\n`);
+    if (Number.isInteger(shardIndex)) shardResults.push({ ordinal, name, ok: true });
+    else process.stdout.write(`ok ${passed} - ${name}\n`);
   } catch (error) {
     process.stderr.write(`not ok - ${name}\n${error.stack}\n`);
     process.exitCode = 1;
+    if (Number.isInteger(shardIndex)) shardResults.push({ ordinal, name, ok: false });
+  } finally {
+    if (process.env.PIPELINE_CODEX_PRETOOL_PROFILE === "1") {
+      const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+      process.stderr.write(`# profile ${elapsedMs.toFixed(1)}ms - ${name}\n`);
+    }
   }
 }
 
@@ -1096,5 +1175,9 @@ check("lifecycle-not-ready denial does not advertise a human override ceremony",
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-if (process.exitCode) process.exit(process.exitCode);
-process.stdout.write(`1..${passed}\n`);
+if (Number.isInteger(shardIndex)) {
+  process.stdout.write(`${JSON.stringify({ results: shardResults })}\n`);
+} else {
+  if (process.exitCode) process.exit(process.exitCode);
+  process.stdout.write(`1..${passed}\n`);
+}
