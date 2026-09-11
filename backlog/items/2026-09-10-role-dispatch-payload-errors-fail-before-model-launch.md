@@ -72,9 +72,28 @@ path or its bytes into a fresh Critic input. This aligns the executable handoff
 with QG-13 and prevents a valid correction from spending a review run only to
 discover that its dispatch was contaminated by the previous verdict.
 
-**Owner and due date:** Pipeline team, due 2026-09-30. Until that slice lands,
-the structured zero-launch claim is limited to the native packet fields listed
-above; it does not claim coordinator binding or an all-packets batch barrier.
+The third shared slice introduces the runner-neutral coordinator envelope in
+`role-dispatch-preflight.mjs`. Before a launcher can be called it binds the
+role and transport to the existing shared dispatch policy, resolves the exact
+candidate commit and tree, proves every required source path is a regular file
+in that candidate, and rejects an absent, existing, escaping or symlinked
+result destination. Rejections name the failed field and report zero model and
+launcher calls.
+
+Its batch API prepares every packet before it invokes the first supplied
+launcher. The registered dispatch-policy suite covers all eight shipped roles:
+one invalid required path in each packet rejects the batch with zero launches,
+while a completely valid batch reaches the launcher with each role envelope
+unchanged. The invalid batch also asserts the required local five-second
+bound. This is the reusable coordinator contract; individual runner adapters
+retain their earlier native-envelope hook and consume the same role-policy
+verdict. Actual coordinators must call the batch API rather than recreate its
+barrier locally before this item can close.
+
+**Owner and due date:** Pipeline team, due 2026-09-30. The reusable envelope
+and all-packets barrier now exist, but the item remains open until the shipped
+model-launching coordinators call them and adapter-level tests prove that each
+configured runner stops before its launch boundary.
 
 **Rollback:** revert the implementation commit that wires the shared packet
 verdict into the runner manifests, regenerate `docs/enforcement.md`, and move

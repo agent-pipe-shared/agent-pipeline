@@ -14,11 +14,18 @@
  * either template's field wording is exactly what this suite exercises.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { dispatchFindings } from "./dispatch-policy.mjs";
+import {
+  ROLE_DISPATCH_REQUEST_SCHEMA,
+  preflightRoleDispatch,
+  runRoleDispatchBatch,
+} from "./role-dispatch-preflight.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -198,5 +205,82 @@ check("DP16 an unrelated host role remains outside the pipeline registry", () =>
   const result = dispatchFindings({ subagentType: "general-purpose", prompt: "find where X is defined", transport: "workflow" });
   assert.deepEqual(codes(result), []);
 });
+
+const dispatchFixture = mkdtempSync(join(tmpdir(), "pipeline-role-dispatch-"));
+try {
+  execFileSync("git", ["init", "-q"], { cwd: dispatchFixture });
+  execFileSync("git", ["config", "user.email", "dispatch@example.invalid"], { cwd: dispatchFixture });
+  execFileSync("git", ["config", "user.name", "Dispatch fixture"], { cwd: dispatchFixture });
+  mkdirSync(join(dispatchFixture, "scratch"));
+  writeFileSync(join(dispatchFixture, "input.txt"), "input\n");
+  execFileSync("git", ["add", "input.txt"], { cwd: dispatchFixture });
+  execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: dispatchFixture });
+  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dispatchFixture, encoding: "utf8" }).trim();
+  const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dispatchFixture, encoding: "utf8" }).trim();
+  const roles = [
+    "afk-claude-worker", "consult-advisor", "critic", "goldfish-deep",
+    "goldfish-implementor", "goldfish-mechanic", "plan-verifier", "readiness-reviewer",
+  ];
+  const promptFor = (role) => role.includes("goldfish") ? CLEAN_GOLDFISH : role === "critic" ? CLEAN_CRITIC : "Inspect input.txt with model codex; Ruleset-SHA: 0f38b425.";
+  const packetFor = (role, index, requiredPaths = ["input.txt"]) => ({
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId: `dispatch-${index}`,
+    transport: "direct",
+    role: `pipeline-core:${role}`,
+    prompt: promptFor(role),
+    candidate: { commit, tree },
+    requiredPaths,
+    resultPath: `scratch/result-${index}.json`,
+  });
+
+  check("DP17 the common envelope rejects a stale candidate tree before launch", () => {
+    const packet = packetFor("consult-advisor", 17);
+    packet.candidate.tree = "0".repeat(40);
+    const result = preflightRoleDispatch({ root: dispatchFixture, packet });
+    assert.equal(result.code, "RDP-CANDIDATE-TREE");
+    assert.equal(result.modelCalls, 0);
+    assert.equal(result.launcherCalls, 0);
+  });
+
+  check("DP18 the common envelope rejects an unusable result destination", () => {
+    const packet = packetFor("consult-advisor", 18);
+    packet.resultPath = "missing-parent/result.json";
+    assert.equal(preflightRoleDispatch({ root: dispatchFixture, packet }).code, "RDP-RESULT-DESTINATION");
+  });
+
+  const invalidPackets = roles.map((role, index) => packetFor(role, 100 + index, ["missing.txt"]));
+  let invalidLaunches = 0;
+  const invalidStarted = Date.now();
+  const invalidBatch = await runRoleDispatchBatch({
+    root: dispatchFixture,
+    packets: invalidPackets,
+    launch: async () => { invalidLaunches += 1; },
+  });
+  check("DP19 every shipped role fails in PREPARE with zero launcher calls", () => {
+    assert.equal(invalidBatch.status, "rejected");
+    assert.equal(invalidBatch.code, "RDB-PREPARATION-FAILED");
+    assert.equal(invalidBatch.preparations.length, roles.length);
+    assert.ok(invalidBatch.preparations.every((row) => row.code === "RDP-REQUIRED-PATH"));
+    assert.equal(invalidLaunches, 0);
+    assert.equal(invalidBatch.modelCalls, 0);
+    assert.ok(Date.now() - invalidStarted < 5_000);
+  });
+
+  const validPackets = roles.map((role, index) => packetFor(role, 200 + index));
+  const launched = [];
+  const validBatch = await runRoleDispatchBatch({
+    root: dispatchFixture,
+    packets: validPackets,
+    launch: async (packet) => { launched.push(packet); return { role: packet.role }; },
+  });
+  check("DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged", () => {
+    assert.equal(validBatch.status, "completed");
+    assert.equal(validBatch.launcherCalls, roles.length);
+    assert.deepEqual(launched, validPackets);
+    assert.deepEqual(validBatch.results, validPackets.map(({ role }) => ({ role })));
+  });
+} finally {
+  rmSync(dispatchFixture, { recursive: true, force: true });
+}
 
 process.stdout.write(`\n${checks}/${checks} dispatch policy checks passed\n`);
