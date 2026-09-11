@@ -67,10 +67,15 @@ function resultParentIsSafe(root, resultPath) {
   }
 }
 
-export function preflightRoleDispatch({ root, packet } = {}) {
+export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) {
   if (typeof root !== "string" || root.length === 0) return rejected("RDP-ROOT", "root");
   let realRoot;
   try { realRoot = realpathSync(root); } catch { return rejected("RDP-ROOT", "root"); }
+  let realResultRoot;
+  try {
+    realResultRoot = realpathSync(resultRoot);
+    if (!lstatSync(realResultRoot).isDirectory()) return rejected("RDP-RESULT-ROOT", "resultRoot");
+  } catch { return rejected("RDP-RESULT-ROOT", "resultRoot"); }
   if (!exactKeys(packet, PACKET_KEYS) || packet.schema !== ROLE_DISPATCH_REQUEST_SCHEMA) {
     return rejected("RDP-PACKET-SHAPE", "packet");
   }
@@ -102,8 +107,8 @@ export function preflightRoleDispatch({ root, packet } = {}) {
       return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
     }
   }
-  if (!resultParentIsSafe(realRoot, packet.resultPath)) return rejected("RDP-RESULT-DESTINATION", "resultPath");
-  if (packet.requiredPaths.includes(packet.resultPath)) return rejected("RDP-RESULT-ALIASES-INPUT", "resultPath");
+  if (!resultParentIsSafe(realResultRoot, packet.resultPath)) return rejected("RDP-RESULT-DESTINATION", "resultPath");
+  if (realRoot === realResultRoot && packet.requiredPaths.includes(packet.resultPath)) return rejected("RDP-RESULT-ALIASES-INPUT", "resultPath");
 
   return {
     schema: ROLE_DISPATCH_PREFLIGHT_SCHEMA,

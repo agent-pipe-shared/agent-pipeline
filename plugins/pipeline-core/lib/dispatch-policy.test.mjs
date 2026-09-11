@@ -249,6 +249,22 @@ try {
     assert.equal(preflightRoleDispatch({ root: dispatchFixture, packet }).code, "RDP-RESULT-DESTINATION");
   });
 
+  check("DP18b a coordinator-owned result root is validated separately from candidate inputs", () => {
+    const resultRoot = mkdtempSync(join(tmpdir(), "pipeline-role-result-"));
+    try {
+      const packet = packetFor("consult-advisor", 182);
+      packet.resultPath = "result.json";
+      const prepared = preflightRoleDispatch({ root: dispatchFixture, resultRoot, packet });
+      assert.equal(prepared.status, "prepared");
+      writeFileSync(join(resultRoot, "occupied.json"), "occupied\n");
+      packet.resultPath = "occupied.json";
+      assert.equal(preflightRoleDispatch({ root: dispatchFixture, resultRoot, packet }).code, "RDP-RESULT-DESTINATION");
+      assert.equal(preflightRoleDispatch({ root: dispatchFixture, resultRoot: join(resultRoot, "missing"), packet }).code, "RDP-RESULT-ROOT");
+    } finally {
+      rmSync(resultRoot, { recursive: true, force: true });
+    }
+  });
+
   check("DP18a required source names are literal paths, never Git pathspecs", () => {
     const packet = packetFor("consult-advisor", 181, [":README.md"]);
     const result = preflightRoleDispatch({ root: dispatchFixture, packet });

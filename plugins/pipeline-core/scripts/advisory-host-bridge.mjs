@@ -11,7 +11,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, unlink } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
@@ -39,6 +39,7 @@ import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { executeSandboxedReadonlyDuty } from "./sandboxed-readonly-host-bridge.mjs";
 import { observeHostAdvisorWorkspace } from "./host-advisor-workspace.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 
 const USAGE = "usage: advisory-host-bridge.mjs --input <json> --receipt <json> [--timeout-ms <1000..600000>]";
 
@@ -415,6 +416,32 @@ function emit(event) {
   process.stdout.write(`${JSON.stringify(event)}\n`);
 }
 
+function advisoryDispatchPreparation(input, args, root, prepare = preflightRoleDispatch) {
+  const demand = validateAdvisoryDemand(input?.demand, {
+    runner: input?.runner,
+    profile: input?.profile,
+    question: input?.question,
+    dispatch: input?.dispatch,
+  });
+  const disposition = demand.ok ? advisoryConsultationDisposition(input.demand, input.priorConsultation) : null;
+  const consentDeclined = input?.advisorExport?.consent === "declined";
+  if (!demand.ok || !disposition?.ok || disposition.disposition === "reuse-no-repeat"
+    || input?.profile === "mini" || consentDeclined) return null;
+  const requiredPaths = input?.evidenceBundle?.references?.map(({ path }) => path);
+  const receipt = resolve(args.receipt);
+  const packet = {
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId: input.dispatch.dispatchId,
+    transport: input.runner === "codex" ? "codex" : input.runner === "antigravity" ? "antigravity" : "direct",
+    role: "pipeline-core:consult-advisor",
+    prompt: input.question,
+    candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree },
+    requiredPaths,
+    resultPath: basename(receipt),
+  };
+  return prepare({ root, resultRoot: dirname(receipt), packet });
+}
+
 function makeHostAdapter(iterator, timeoutMs) {
   return async (payload) => {
     const requestId = `host-${randomUUID()}`;
@@ -556,6 +583,33 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   const iterator = lines[Symbol.asyncIterator]();
   try {
+    const repositoryRoot = dependencies.repoRoot ?? process.cwd();
+    const preparation = advisoryDispatchPreparation(
+      input,
+      args,
+      repositoryRoot,
+      dependencies.preflightRoleDispatch ?? preflightRoleDispatch,
+    );
+    if (preparation !== null) {
+      emit({ schema: "pipeline.advisory-host.v1", type: "dispatch.prepare", preparation });
+      if (preparation.status !== "prepared") {
+        emit({
+          schema: "pipeline.advisory-host.v1",
+          type: "advisory.completed",
+          ok: false,
+          code: "role_dispatch_preflight_rejected",
+          answer: null,
+          receiptPath: null,
+          directoryDurability: null,
+          attempts: [],
+          consultationRecord: null,
+          consultationRecordPath: null,
+          sandboxBinding: null,
+          agentDecisionEvent: null,
+        });
+        return 2;
+      }
+    }
     let result;
     let execution = null;
     let agentDecisionEvent = null;
@@ -575,7 +629,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       // honest default of null rather than reporting a gap for a decision
       // that was never actually made.
       if (result.ok === true && result.receipt?.observed?.status === "answered") {
-        agentDecisionEvent = await recordAdvisoryDecisionEvent(result.receipt, { repoRoot: dependencies.repoRoot ?? process.cwd() });
+        agentDecisionEvent = await recordAdvisoryDecisionEvent(result.receipt, { repoRoot: repositoryRoot });
       }
     }
     let reported = result;

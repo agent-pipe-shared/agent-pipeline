@@ -24,7 +24,8 @@ import {
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 
 const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: process.cwd(), encoding: "utf8" }).trim();
-const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit, candidateTree: "b".repeat(40) };
+const candidateTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: process.cwd(), encoding: "utf8" }).trim();
+const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit, candidateTree };
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const evidenceBundle = () => buildAdvisoryEvidenceBundle(process.cwd(), [
   "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
@@ -49,7 +50,7 @@ const base = () => {
 function selectedAdvisory() {
   const referenceSetSha256 = base().sandboxContext.referenceSetSha256;
   const requestSha256 = buildSandboxRequest({
-    repoFingerprint: "c".repeat(64), duty: "advisory", queueRevision: 1, candidateCommit, candidateTree: "b".repeat(40),
+    repoFingerprint: "c".repeat(64), duty: "advisory", queueRevision: 1, candidateCommit, candidateTree,
     referenceSetSha256, runner: "codex", model: "gpt-6-astra",
   }).requestSha256;
   return {
@@ -308,7 +309,21 @@ async function governanceRepoRoot() {
   await mkdir(join(root, "governance/events"), { recursive: true });
   await writeFile(join(root, "governance/events/registry.json"), `${canonicalizeJson(agentGovernanceRegistryFixture(fingerprint))}\n`);
   await writeFile(join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(agentGovernanceCapturePolicyFixture())}\n`);
-  return { root, fingerprint };
+  return { root, fingerprint, ...await commitAdvisoryFixture(root) };
+}
+
+async function commitAdvisoryFixture(root) {
+  const evidencePath = "evidence-input.md";
+  await writeFile(join(root, evidencePath), "# Advisory evidence\n");
+  execFileSync("git", ["-c", "user.name=Pipeline Test", "-c", "user.email=pipeline@example.invalid", "add", "."], { cwd: root });
+  execFileSync("git", ["-c", "user.name=Pipeline Test", "-c", "user.email=pipeline@example.invalid", "commit", "-qm", "test: advisory fixture"], { cwd: root });
+  return {
+    dispatchCandidate: {
+      candidateCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
+      candidateTree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim(),
+    },
+    evidence: buildAdvisoryEvidenceBundle(root, [evidencePath]),
+  };
 }
 
 /** Captures the bridge's stdout adapter-protocol emissions (the CLI's only externally observable result shape) without altering runAdvisoryHostBridge's own output contract. */
@@ -324,21 +339,25 @@ async function captureStdout(run) {
   }
 }
 
-function nativeClaudeAdvisoryInput(dispatch, question) {
+function nativeClaudeAdvisoryInput(dispatch, question, evidence) {
   const demand = createAdvisoryDemand({
-    runner: "claude", profile: "epic", reason: "risk-review", question, evidenceSha256: "e".repeat(64), dispatch,
+    runner: "claude", profile: "epic", reason: "risk-review", question,
+    evidenceSha256: advisoryEvidenceBundleSha256(evidence), dispatch,
   }).demand;
-  return { runner: "claude", profile: "epic", question, dispatch, demand };
+  return {
+    runner: "claude", profile: "epic", question, dispatch, demand,
+    references: evidence.references.map(({ path }) => path), evidenceBundle: evidence,
+  };
 }
 
 test("A-AC-05: an answered coordinateAdvisory receipt is durably recorded on the agent governance stream", async () => {
-  const { root, fingerprint } = await governanceRepoRoot();
+  const { root, fingerprint, dispatchCandidate, evidence } = await governanceRepoRoot();
   const inputRoot = await mkdtemp(join(tmpdir(), "host-advisor-aac05-"));
   try {
     const inputPath = join(inputRoot, "input.json");
     const receiptPath = join(inputRoot, "receipt.json");
-    const dispatch = { dispatchId: "aac05-dispatch-01", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) };
-    await writeFile(inputPath, JSON.stringify(nativeClaudeAdvisoryInput(dispatch, "Which route is safest for this cutover?")));
+    const dispatch = { dispatchId: "aac05-dispatch-01", queueRevision: 1, ...dispatchCandidate };
+    await writeFile(inputPath, JSON.stringify(nativeClaudeAdvisoryInput(dispatch, "Which route is safest for this cutover?", evidence)));
     const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
       ["--input", inputPath, "--receipt", receiptPath],
       {
@@ -350,6 +369,7 @@ test("A-AC-05: an answered coordinateAdvisory receipt is durably recorded on the
       },
     ));
     assert.equal(code, 0);
+    assert.equal(events.find((event) => event.type === "dispatch.prepare")?.preparation?.status, "prepared");
     const completed = events.find((event) => event.type === "advisory.completed");
     assert.equal(completed.ok, true);
     assert.equal(completed.code, "answered");
@@ -384,12 +404,13 @@ test("A-AC-05: a governance-event append failure never withholds the advisory an
   // convention governanceRepoRoot() above follows for the success case.
   const root = await mkdtemp(join(tmpdir(), "advisory-decision-broken-"));
   execFileSync("git", ["init", "-q", root]);
+  const { dispatchCandidate, evidence } = await commitAdvisoryFixture(root);
   const inputRoot = await mkdtemp(join(tmpdir(), "host-advisor-aac05-fail-"));
   try {
     const inputPath = join(inputRoot, "input.json");
     const receiptPath = join(inputRoot, "receipt.json");
-    const dispatch = { dispatchId: "aac05-dispatch-02", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) };
-    await writeFile(inputPath, JSON.stringify(nativeClaudeAdvisoryInput(dispatch, "Is this rollback reversible?")));
+    const dispatch = { dispatchId: "aac05-dispatch-02", queueRevision: 1, ...dispatchCandidate };
+    await writeFile(inputPath, JSON.stringify(nativeClaudeAdvisoryInput(dispatch, "Is this rollback reversible?", evidence)));
     const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
       ["--input", inputPath, "--receipt", receiptPath],
       {
@@ -401,12 +422,50 @@ test("A-AC-05: a governance-event append failure never withholds the advisory an
       },
     ));
     assert.equal(code, 0, "an unrelated governance-recording failure must not turn a real advisory answer into a non-zero exit");
+    assert.equal(events.find((event) => event.type === "dispatch.prepare")?.preparation?.status, "prepared");
     const completed = events.find((event) => event.type === "advisory.completed");
     assert.equal(completed.ok, true);
     assert.equal(completed.answer, "Yes, it is reversible.", "the advisory answer must survive the append failure intact");
     assert.equal(completed.agentDecisionEvent.appended, false);
     assert.equal(typeof completed.agentDecisionEvent.code, "string");
     assert.equal(Object.hasOwn(completed.agentDecisionEvent, "eventId"), false, "a failed append must not claim an eventId it never persisted");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(inputRoot, { recursive: true, force: true });
+  }
+});
+
+test("role-dispatch preflight rejects an untracked advisory input before the host adapter starts", async () => {
+  const root = await mkdtemp(join(tmpdir(), "advisory-preflight-reject-"));
+  const inputRoot = await mkdtemp(join(tmpdir(), "advisory-preflight-input-"));
+  execFileSync("git", ["init", "-q", root]);
+  try {
+    await writeFile(join(root, "tracked.md"), "tracked\n");
+    execFileSync("git", ["-c", "user.name=Pipeline Test", "-c", "user.email=pipeline@example.invalid", "add", "."], { cwd: root });
+    execFileSync("git", ["-c", "user.name=Pipeline Test", "-c", "user.email=pipeline@example.invalid", "commit", "-qm", "test: tracked baseline"], { cwd: root });
+    await writeFile(join(root, "untracked-evidence.md"), "must not launch\n");
+    const evidence = buildAdvisoryEvidenceBundle(root, ["untracked-evidence.md"]);
+    const dispatch = {
+      dispatchId: "preflight-reject-01", queueRevision: 1,
+      candidateCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
+      candidateTree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim(),
+    };
+    const inputPath = join(inputRoot, "input.json");
+    const receiptPath = join(inputRoot, "receipt.json");
+    await writeFile(inputPath, JSON.stringify(nativeClaudeAdvisoryInput(dispatch, "Should this launch?", evidence)));
+    let adapterCalls = 0;
+    const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
+      ["--input", inputPath, "--receipt", receiptPath],
+      { repoRoot: root, makeHostAdapter: () => async () => { adapterCalls += 1; return { status: "answered", answer: "unsafe" }; } },
+    ));
+    assert.equal(code, 2);
+    assert.equal(adapterCalls, 0);
+    const preparation = events.find((event) => event.type === "dispatch.prepare")?.preparation;
+    assert.equal(preparation?.status, "rejected");
+    assert.equal(preparation?.code, "RDP-REQUIRED-PATH");
+    const completed = events.find((event) => event.type === "advisory.completed");
+    assert.equal(completed?.code, "role_dispatch_preflight_rejected");
+    await assert.rejects(readFile(receiptPath, "utf8"), { code: "ENOENT" });
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(inputRoot, { recursive: true, force: true });
