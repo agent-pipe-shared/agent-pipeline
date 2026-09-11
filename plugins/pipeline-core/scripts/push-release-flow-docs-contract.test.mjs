@@ -29,6 +29,8 @@ import { parseHumanArgs } from "./po-human-approval.mjs";
 import { parseArgs as parsePushInitArgs, usage as pushInitUsage } from "./push-init.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const READER_REVIEW_SKILL = join(REPO_ROOT, "plugins", "pipeline-core", "skills", "reader-review", "SKILL.md");
+const CAPABILITY_INVENTORY = join(REPO_ROOT, "docs", "product-capability-inventory.json");
 
 const NOW = () => "2026-08-18T00:00:00.000Z";
 const COMMIT = "a".repeat(40);
@@ -39,6 +41,29 @@ const FIXED_GIT_CANDIDATE = () => ({ ok: true, commit: COMMIT, tree: TREE });
 function freshDir(prefix) {
   return mkdtempSync(join(tmpdir(), `push-release-flow-docs-contract-${prefix}-`));
 }
+
+test("source release documentation names the shipped reader-review workflow and preserves its binding contract", () => {
+  const skill = readFileSync(READER_REVIEW_SKILL, "utf8");
+  assert.match(skill, /^name: reader-review$/mu);
+  for (const contract of [
+    /Resolve `\$ARGUMENTS` as a safe feature ID and optional full candidate commit/u,
+    /Dispatch phase one as a fresh read-only subagent with no conversation\s+history/u,
+    /Dispatch phase two as a different fresh read-only subagent/u,
+    /If any covered document\s+changes,[\s\S]*restart both phases with a new round/u,
+    /Derive `record\.json` from a fresh checker snapshot,[\s\S]*Accept only `status: passed` with no findings/u,
+  ]) assert.match(skill, contract, `reader-review lost required source-bound procedure: ${contract}`);
+
+  const inventory = JSON.parse(readFileSync(CAPABILITY_INVENTORY, "utf8"));
+  const capability = inventory.capabilities.find(({ id }) => id === "session-and-delivery-skills");
+  assert.equal(capability.status, "shipped");
+  assert.ok(capability.surfaceIds.includes("skill:plugins/pipeline-core/skills/reader-review/SKILL.md:reader-review"));
+  assert.deepEqual(capability.runners, ["antigravity", "claude", "codex", "runner-neutral"]);
+  for (const relativePath of ["docs/push-release-flow.md", "plugins/pipeline-core/docs/push-release-flow.md"]) {
+    const document = readFileSync(join(REPO_ROOT, relativePath), "utf8");
+    assert.match(document, /`pipeline-core:reader-review`/u, `${relativePath} must point operators to the executable reader-review workflow`);
+    assert.match(document, /release preflight only consumes its committed binding/u, `${relativePath} must preserve the no-review-loop placement`);
+  }
+});
 
 // Captures stderr so a test can tell a flag-SHAPE refusal (a renamed/missing documented flag)
 // apart from a content-level refusal reached only once the argv shape was already accepted --

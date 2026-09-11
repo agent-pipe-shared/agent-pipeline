@@ -284,6 +284,11 @@ the new final state. Commit the final phase reports and disposition, then add
 the binding record as a record-only descendant **C**. Do not change a covered
 document, the inventory, governance input, or reader protocol between Y and C.
 
+Run this block through the installed `pipeline-core:reader-review` skill with
+the release feature ID and frozen candidate. The skill owns the fresh-reader
+dispatch, report/disposition paths, restart rule, and final checker invocation;
+the release preflight only consumes its committed binding.
+
 The release producer invokes the committed candidate checker for C before it
 writes any preflight record. A pass proves only that committed evidence is
 present and that its bound document/input hashes still equal Y. It does not
