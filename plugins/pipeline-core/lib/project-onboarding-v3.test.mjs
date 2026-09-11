@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   chmodSync, closeSync, copyFileSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
   openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
@@ -80,21 +80,49 @@ import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt 
 import { isDirectInvocation } from "./entrypoint.mjs";
 import { requireProjectOnboardingReady } from "./project-onboarding-ready-gate.mjs";
 
-// This file is BOTH a 109-case suite and the fixture library other suites borrow
+// This file is BOTH a 166-case suite and the fixture library other suites borrow
 // (`root`, `dispose`, `fakeDeps`, ... are exported below). Until this guard, an
 // importer paid for the whole suite as an import side effect: the lifecycle
-// recovery contract test needed four helpers and ran 109 unrelated cases to get
+// recovery contract test needed four helpers and ran every unrelated case to get
 // them, which is minutes of wall clock and a confusing double report.
 //
 // Guarding `test()` rather than extracting the fixtures is deliberate. The
 // helpers are woven through the suite's own setup; lifting them into a separate
 // module would mean moving code out of a 109-case file to save an import, and a
 // mis-lift there is exactly the kind of change whose breakage looks like a
-// fixture problem. This is two lines, changes nothing when the file is run
-// directly, and fixes it for every importer that will ever exist.
-const RUNNING_AS_SUITE = isDirectInvocation(import.meta.url);
-let passed = 0; const failures = [];
-function test(name, run) { if (!RUNNING_AS_SUITE) return; try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
+// fixture problem. Imports still execute zero cases. A direct invocation owns
+// the full result and distributes the independently rooted cases across fixed
+// child-process shards; an explicitly labelled child invocation is only ever a
+// partial result and says so in its summary.
+const SHARD_COUNT = 4;
+const DIRECT_INVOCATION = isDirectInvocation(import.meta.url);
+const shardArgument = DIRECT_INVOCATION ? process.argv.slice(2) : [];
+const shardMatch = shardArgument.length === 1 ? /^--pipeline-internal-shard=([0-3])\/4$/u.exec(shardArgument[0]) : null;
+if (DIRECT_INVOCATION && shardArgument.length > 0 && shardMatch === null) throw new Error("unsupported project-onboarding-v3 test argument");
+const shard = shardMatch === null ? null : Number(shardMatch[1]);
+const ORCHESTRATING_SHARDS = DIRECT_INVOCATION && shard === null;
+const RUNNING_AS_SUITE = DIRECT_INVOCATION;
+let declared = 0; let passed = 0; const failures = [];
+function test(name, run) {
+  if (!RUNNING_AS_SUITE) return;
+  const index = declared; declared += 1;
+  if (ORCHESTRATING_SHARDS || index % SHARD_COUNT !== shard) return;
+  try { run(); passed += 1; console.log(`PASS  ${name}`); }
+  catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); }
+}
+
+async function runShards() {
+  const suitePath = fileURLToPath(import.meta.url);
+  const children = Array.from({ length: SHARD_COUNT }, (_, index) => new Promise((resolvePromise) => {
+    const child = spawn(process.execPath, [suitePath, `--pipeline-internal-shard=${index}/${SHARD_COUNT}`], {
+      cwd: process.cwd(), env: { ...process.env }, shell: false, stdio: "inherit",
+    });
+    let error = null;
+    child.once("error", (value) => { error = value; });
+    child.once("close", (code, signal) => resolvePromise({ index, code, signal, error }));
+  }));
+  return Promise.all(children);
+}
 // `root`, `dispose`, `fakeDeps`, `fakeGit`, `initializeRestartRequiredRoot`,
 // `clearRuntimeBarrier`, `completeKickoff` and `PLUGIN_PIPELINE_STATE_SCRIPT`
 // are exported below so the contract suite
@@ -8687,7 +8715,15 @@ test("F4 portable rollback preserves foreign content when a created target's ino
   } finally { dispose(ownedRoot); }
 });
 
-if (RUNNING_AS_SUITE) {
-  console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);
+if (ORCHESTRATING_SHARDS) {
+  const results = await runShards();
+  const failed = results.filter((result) => result.code !== 0 || result.signal !== null || result.error !== null);
+  console.log(`\nproject-onboarding-v3: ${declared} cases across ${SHARD_COUNT} shards, ${failed.length} shards failed`);
+  if (failed.length > 0) {
+    for (const result of failed) console.error(`shard ${result.index}: ${result.error?.stack ?? result.signal ?? `exit ${result.code}`}`);
+    process.exitCode = 1;
+  }
+} else if (shard !== null) {
+  console.log(`\nproject-onboarding-v3 shard ${shard + 1}/${SHARD_COUNT}: ${passed} passed, ${failures.length} failed`);
   if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
 }
