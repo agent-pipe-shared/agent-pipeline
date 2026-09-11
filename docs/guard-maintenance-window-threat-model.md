@@ -111,7 +111,9 @@ below assumes it holds and is written to catch a change that would break it.
   dynamic `import()` edges, resolved via a declared table rather than the
   static scanner, plus two unrelated pre-existing gaps GMWKC01 found already
   open) added: `hooks/guard-dispatch-budget.mjs`,
-  `lib/plan-authority-staging-guard.mjs`, `lib/security-completeness-gate.mjs`,
+  followed by `lib/dispatch-budget-core.mjs` in the 2026-09-11 closure refresh;
+  the original group continues with `lib/plan-authority-staging-guard.mjs`,
+  `lib/security-completeness-gate.mjs`,
   `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`, and
   `scripts/pre-push-hook-install.mjs`. A fourth closure gap (NVA-KERNELDOC-1,
   2026-08-27) added: `lib/onboarding-staging-authoring.mjs`, imported by both
@@ -133,8 +135,13 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/copy-safe-command.mjs`, `lib/public-core-observation.mjs`,
   `lib/public-core-origin-allowlist.mjs`, `lib/ruleset-source.mjs`,
   `lib/self-application-attestation-gate.mjs`,
-  `lib/trusted-tool-resolution.mjs`, `scripts/pipeline-start-preflight.mjs`,
-  `lib/verify-selection.mjs`,
+  followed in the 2026-09-11 closure refresh by
+  `lib/installed-plugin-attestation.mjs`, `lib/provenance-attestation.mjs`,
+  `lib/provenance-envelope.mjs`; the original group continues with
+  `lib/trusted-tool-resolution.mjs`,
+  `lib/verify-selection.mjs`, `scripts/pipeline-start-preflight.mjs`,
+  followed in that same refresh by
+  `scripts/installed-plugin-attestation-host.mjs`; then
   `scripts/pipeline-update-channel.mjs`, `scripts/po-approval-request.mjs`,
   `scripts/po-human-approval.mjs` (the script the human uses to sign),
   `scripts/push-gate-satisfiability.mjs`, `scripts/push-prepare.mjs`,

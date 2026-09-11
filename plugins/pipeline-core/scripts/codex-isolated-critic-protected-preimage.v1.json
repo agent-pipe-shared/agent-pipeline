@@ -20,7 +20,7 @@
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
-      "rawSha256": "1c92b27c2f65334c9a2c1c02a788c395b0dd6a864dfc6a3d7043e05015e54541"
+      "rawSha256": "2b69ddc9371bcee684ba282b2a40a8780cbe79c5181f1d9f29c6b0a265d98b84"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
@@ -40,7 +40,7 @@
     },
     {
       "path": "templates/prompts/critic-review.md",
-      "rawSha256": "9d5e50144a65407c621ab1a74d04310cd3cefe206e846ef4612993e25e55748d"
+      "rawSha256": "2ca87e853f09103b28bc0bb62282fd29a4cea0409d6795e44a556f54b7cbe7da"
     }
   ]
 }

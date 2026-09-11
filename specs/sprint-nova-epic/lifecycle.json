@@ -177,10 +177,15 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/nova-b.md",
-      "sha256": "bb82311614f798cd9305ca4433196d0fa69b733a832cb2cac33a1cc4835a79a7",
+      "sha256": "996a0a739041021cd897125a241ea9ac789a418e8c16f03738f5ed2b8bfc5f4d",
       "authority": false,
       "mutability": "mutable",
-      "retention": "retain"
+      "retention": "retain",
+      "amendment": {
+        "at": "2026-09-11T16:21:52.182Z",
+        "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
+        "previousSha256": "bb82311614f798cd9305ca4433196d0fa69b733a832cb2cac33a1cc4835a79a7"
+      }
     },
     {
       "class": "candidate-evidence",

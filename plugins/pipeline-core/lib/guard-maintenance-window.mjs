@@ -282,6 +282,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // found already open at this dispatch's base commit -- caught by the same
   // non-decomposable closure assertion, not by the dynamic-import fix.
   "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+  "plugins/pipeline-core/lib/dispatch-budget-core.mjs",
   "plugins/pipeline-core/lib/plan-authority-staging-guard.mjs",
   "plugins/pipeline-core/lib/security-completeness-gate.mjs",
   "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
@@ -317,9 +318,13 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/public-core-origin-allowlist.mjs",
   "plugins/pipeline-core/lib/ruleset-source.mjs",
   "plugins/pipeline-core/lib/self-application-attestation-gate.mjs",
+  "plugins/pipeline-core/lib/installed-plugin-attestation.mjs",
+  "plugins/pipeline-core/lib/provenance-attestation.mjs",
+  "plugins/pipeline-core/lib/provenance-envelope.mjs",
   "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
   "plugins/pipeline-core/lib/verify-selection.mjs",
   "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+  "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
   "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
   "plugins/pipeline-core/scripts/po-approval-request.mjs",
   "plugins/pipeline-core/scripts/po-human-approval.mjs",
