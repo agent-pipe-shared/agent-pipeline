@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critic-skip-not-an-explicit-logged-decision
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: 0b34dbc111f98dd4b3b6d1408ef012a924cd9d63
+closure_evidence: backlog/evidence/2026-09-12-critic-disposition-path-bound-correction.md
 sprint: nova-b
 done_when: contains plugins/pipeline-core/lib/critic-skip-decision.mjs pipeline.critic-skip-wired-into-real-dispatch
 source: "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.1, §10.6), cited by scratch/greenfield-triage-2026-08-29.md finding F16, observed during the 2026-08-29 three-runner greenfield test."

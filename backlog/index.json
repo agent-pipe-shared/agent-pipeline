@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0bc99a9b32289c180f8fe08d0d76895a46fd0f98c065bc493948ec45b5d0bb3f"
+    "transitionHead": "7635e0b7ad2e0f40a1f7be54e84063f56d1ea51847377dda7186f9894697b4fa"
   },
   "counts": {
-    "open": 78,
+    "open": 77,
     "in_progress": 0,
-    "closed": 562,
+    "closed": 563,
     "rejected": 3,
     "deferred": 11
   },
@@ -2059,13 +2059,17 @@
     },
     {
       "id": "pipeline.critic-skip-not-an-explicit-logged-decision",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.1, §10.6), cited by scratch/greenfield-triage-2026-08-29.md finding F16, observed during the 2026-08-29 three-runner greenfield test.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-12",
+      "closureRepository": "self",
+      "closureCommit": "0b34dbc111f98dd4b3b6d1408ef012a924cd9d63",
+      "closureEvidence": "backlog/evidence/2026-09-12-critic-disposition-path-bound-correction.md"
     },
     {
       "id": "pipeline.critical-command-kinds-excludes-feature-package-reconcile",

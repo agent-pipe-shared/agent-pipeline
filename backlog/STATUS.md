@@ -160,7 +160,7 @@
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | open | defect | pipeline | alfred | 2026-08-11 | 2026-08-25 | — |
-| pipeline.critic-skip-not-an-explicit-logged-decision | open | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | — |
+| pipeline.critic-skip-not-an-explicit-logged-decision | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | — |
 | pipeline.critical-command-kinds-excludes-feature-package-reconcile | closed | defect | pipeline | — | 2026-08-16 | 2026-09-15 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | closed | defect | pipeline | — | 2026-08-05 | 2026-09-05 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 78
+- open: 77
 - in_progress: 0
-- closed: 562
+- closed: 563
 - rejected: 3
 - deferred: 11
