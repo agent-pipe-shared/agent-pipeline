@@ -5,8 +5,7 @@ description: "Run a fresh two-stage reader review of user-facing documentation, 
 
 # Reader review — documentation from the reader's position
 
-This skill coordinates the reader-facing review defined by
-`harness/reader-review-protocol.md`. It improves comprehensibility, order,
+This skill coordinates a reader-facing review of comprehensibility, order,
 granularity and weighting. It does not review implementation correctness and
 does not replace the Critic.
 
@@ -17,10 +16,12 @@ gates.
 
 ## Choose the binding mode
 
-When the repository contains the protocol and
-`harness/scripts/check-doc-reader-binding.mjs`, use the source-bound procedure
-below. The checker owns the exact document set and evidence schema; do not copy
-its path list into this skill or silently add files.
+When repository identity confirms the Agent-Pipeline source checkout, resolve
+exactly one tracked file named `reader-review-protocol.md` and exactly one
+tracked script named `check-doc-reader-binding.mjs` with `git ls-files`. Use
+the source-bound procedure below only when both unique results exist. The
+checker owns the exact document set and evidence schema; do not copy its path
+list into this skill or silently add files.
 
 In a consuming repository without that checker, review only the explicit
 user-facing document paths supplied by its plan or documentation task. Preserve
@@ -44,8 +45,8 @@ make release readiness depend on a contract that the project has not adopted.
 4. Dispatch phase two as a different fresh read-only subagent. Pass the same
    candidate documents, the immutable phase-one report,
    `docs/product-capability-inventory.json`,
-   `governance/observation-doc-governance.json`, and
-   `harness/reader-review-protocol.md`. Request findings about weighting,
+   `governance/observation-doc-governance.json`, and the source protocol
+   resolved above. Request findings about weighting,
    order, granularity and comprehensibility. Keep it separate from technical
    Critic review.
 5. Save phase two unchanged at the matching `phase-two/<round>.md`. Record every
