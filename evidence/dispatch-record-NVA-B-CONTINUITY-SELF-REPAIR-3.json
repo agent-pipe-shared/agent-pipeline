@@ -27,10 +27,15 @@
       "phase": "commit",
       "toolUseCount": 0,
       "note": "Coordinator committed the correction and round-one Critic transcription as 3123003f54fed7c91d7bf3bc4f57eab427edaa47 with tree 4afaf2a9d2ff0ea261fbc2fc1217329e3911fc1d. Independent round-two review remains required."
+    },
+    {
+      "phase": "critic-round-two",
+      "toolUseCount": 0,
+      "note": "Round-two Critic returned FAIL on a coordinator input defect: the supplied range included the later dispatch-record commit 4b568965 although this create-only record binds implementation commit 3123003f, and resolved governance paths were omitted. It found no remaining implementation defect. Coordinator transcription: backlog/evidence/2026-09-12-continuity-self-repair-critic-round2.md. QG-13 permits no third automatic loop."
     }
   ],
   "report": {
-    "text": "Critic round-one correction is committed as 3123003f54fed7c91d7bf3bc4f57eab427edaa47 and awaits independent round-two review. Repair records bind exact live feature IDs, pointers and preserved path/digest, require quarantined assertions absent, reject cross-record claimant reuse, and refuse overlapping repairs before State replacement. ADR-0082 defines rollback and reserves detached approval for the frozen final candidate at its push boundary. No provisional approval is claimed. Focused host-bound validation passed: continuity 280, onboarding 173, guard and repair-map 261, observation governance 197 documents, and git diff --check.",
+    "text": "Critic round-one correction is committed as 3123003f54fed7c91d7bf3bc4f57eab427edaa47. Repair records bind exact live feature IDs, pointers and preserved path/digest, require quarantined assertions absent, reject cross-record claimant reuse, and refuse overlapping repairs before State replacement. Focused host-bound validation passed: continuity 280, onboarding 173, guard and repair-map 261, observation governance 197 documents, and git diff --check. Round-two Critic found no remaining implementation defect but returned FAIL because the coordinator included this later dispatch-record commit in the reviewed range and omitted resolved governance paths. QG-13 permits no third automatic loop; no PASS or provisional approval is claimed. Final detached approval remains frozen-candidate and push-bound.",
     "changedFiles": [
       "plugins/pipeline-core/lib/onboarding-continuity.mjs",
       "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
