@@ -133,7 +133,27 @@ actions that would clear the verdict.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted; deliver the three levels incrementally, keeping the
+  fail-closed guard boundary intact.
+- **Rationale:** the PO's source statement already requires an autonomous exit
+  from this class, and the item's prevention/diagnosis/recovery split avoids a
+  broad lifecycle bypass.
+- **Assignment (if accepted):** Nova B.
+- **Date:** 2026-09-11
+
+## Implementation progress — 2026-09-11
+
+The prevention level is already complete in commit
+`6677d70b21b70ab094feef1b3030b72ba3ed7552`. Before writing State,
+`close-feature` compares the proposed close-evidence path with every prior
+closed feature. A collision exits 2, names the path and holding feature, and
+leaves State byte-identical. Distinct paths and older entries without close
+evidence remain admissible. The current full `pipeline-state.test.mjs` run,
+including these regressions, exits 0.
+
+The item stays open. The damaged-state diagnosis still collapses to broad
+continuity-invalid/not-ready outcomes, and no narrowly admitted, recorded
+repair command yet restores an already damaged evidence binding. Those two
+levels require their own bounded design and threat-model review; the existing
+prevention must not be mistaken for recovery of repositories damaged before
+the fix.
