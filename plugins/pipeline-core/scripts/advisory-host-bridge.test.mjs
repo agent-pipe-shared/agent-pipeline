@@ -477,13 +477,21 @@ test("role-dispatch preflight rejects an untracked advisory input before the hos
 });
 
 test("advisory evidence binding failures reject before the host adapter starts", async () => {
-  for (const mismatch of ["bundle-content", "reference-list", "demand-digest"]) {
+  for (const mismatch of ["bundle-content", "candidate-content", "reference-list", "demand-digest"]) {
     const { root, dispatchCandidate, evidence } = await governanceRepoRoot();
     const inputRoot = await mkdtemp(join(tmpdir(), `advisory-evidence-${mismatch}-`));
     try {
       const dispatch = { dispatchId: `evidence-${mismatch}`, queueRevision: 1, ...dispatchCandidate };
-      const input = nativeClaudeAdvisoryInput(dispatch, "Is the evidence bound?", evidence);
+      let input = nativeClaudeAdvisoryInput(dispatch, "Is the evidence bound?", evidence);
       if (mismatch === "bundle-content") await writeFile(join(root, "evidence-input.md"), "changed after bundle creation\n");
+      if (mismatch === "candidate-content") {
+        await writeFile(join(root, "evidence-input.md"), "modified tracked evidence\n");
+        input = nativeClaudeAdvisoryInput(
+          dispatch,
+          "Is the evidence bound?",
+          buildAdvisoryEvidenceBundle(root, ["evidence-input.md"]),
+        );
+      }
       if (mismatch === "reference-list") input.references = ["different.md"];
       if (mismatch === "demand-digest") {
         input.demand = createAdvisoryDemand({
@@ -502,7 +510,7 @@ test("advisory evidence binding failures reject before the host adapter starts",
       assert.equal(code, 2, mismatch);
       assert.equal(adapterCalls, 0, mismatch);
       const preparation = events.find((event) => event.type === "dispatch.prepare")?.preparation;
-      assert.equal(preparation?.code, "RDP-EVIDENCE-BINDING", mismatch);
+      assert.equal(preparation?.code, mismatch === "candidate-content" ? "RDP-REQUIRED-PATH-DRIFT" : "RDP-EVIDENCE-BINDING", mismatch);
       assert.equal(preparation?.modelCalls, 0, mismatch);
     } finally {
       await rm(root, { recursive: true, force: true });

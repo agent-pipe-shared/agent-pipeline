@@ -273,6 +273,18 @@ try {
     assert.equal(result.launcherCalls, 0);
   });
 
+  check("DP18c a modified tracked source is rejected before launch", () => {
+    writeFileSync(join(dispatchFixture, "input.txt"), "modified after candidate\n");
+    try {
+      const result = preflightRoleDispatch({ root: dispatchFixture, packet: packetFor("consult-advisor", 183) });
+      assert.equal(result.code, "RDP-REQUIRED-PATH-DRIFT");
+      assert.equal(result.modelCalls, 0);
+      assert.equal(result.launcherCalls, 0);
+    } finally {
+      writeFileSync(join(dispatchFixture, "input.txt"), "input\n");
+    }
+  });
+
   const invalidPackets = roles.map((role, index) => packetFor(role, 100 + index, ["missing.txt"]));
   let invalidLaunches = 0;
   const invalidStarted = Date.now();

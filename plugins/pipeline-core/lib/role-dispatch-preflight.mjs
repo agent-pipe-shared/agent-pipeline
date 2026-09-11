@@ -76,8 +76,12 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
     const lexicalResultRoot = resolve(resultRoot);
     const lexicalResultStat = lstatSync(lexicalResultRoot);
     realResultRoot = realpathSync(lexicalResultRoot);
-    if (!lexicalResultStat.isDirectory() || lexicalResultStat.isSymbolicLink()
-      || lexicalResultRoot !== realResultRoot) return rejected("RDP-RESULT-ROOT", "resultRoot");
+    // Inspect the coordinator-supplied directory before resolving it. This
+    // catches a symlinked destination without rejecting platform-standard
+    // ancestors such as macOS /var -> /private/var.
+    if (!lexicalResultStat.isDirectory() || lexicalResultStat.isSymbolicLink()) {
+      return rejected("RDP-RESULT-ROOT", "resultRoot");
+    }
   } catch { return rejected("RDP-RESULT-ROOT", "resultRoot"); }
   if (!exactKeys(packet, PACKET_KEYS) || packet.schema !== ROLE_DISPATCH_REQUEST_SCHEMA) {
     return rejected("RDP-PACKET-SHAPE", "packet");
@@ -106,9 +110,19 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
   if (tree !== packet.candidate.tree) return rejected("RDP-CANDIDATE-TREE", "candidate.tree");
   for (const path of packet.requiredPaths) {
     const row = git(realRoot, ["--literal-pathspecs", "ls-tree", "-z", commit, "--", path]);
-    if (row === null || !/^(?:100644|100755) blob (?:[a-f0-9]{40}|[a-f0-9]{64})\t/u.test(row)) {
+    const match = /^(?:100644|100755) blob ((?:[a-f0-9]{40}|[a-f0-9]{64}))\t/u.exec(row ?? "");
+    if (match === null) {
       return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
     }
+    const physicalPath = resolve(realRoot, path);
+    try {
+      const physical = lstatSync(physicalPath);
+      if (!physical.isFile() || physical.isSymbolicLink() || realpathSync(physicalPath) !== physicalPath) {
+        return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
+      }
+    } catch { return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`); }
+    const physicalBlob = git(realRoot, ["--literal-pathspecs", "hash-object", "--no-filters", "--", path]);
+    if (physicalBlob !== match[1]) return rejected("RDP-REQUIRED-PATH-DRIFT", `requiredPaths:${path}`);
   }
   if (!resultParentIsSafe(realResultRoot, packet.resultPath)) return rejected("RDP-RESULT-DESTINATION", "resultPath");
   if (realRoot === realResultRoot && packet.requiredPaths.includes(packet.resultPath)) return rejected("RDP-RESULT-ALIASES-INPUT", "resultPath");
