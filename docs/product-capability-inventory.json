@@ -1,13 +1,13 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "22944b8250bc4523e2c8760019c1819a72fe9176",
-    "tree": "e14d61066f66033c5c455c43d0efcf187e3f6fa7"
+    "commit": "7c34f6159445777f59c7c4146a478dcee185917f",
+    "tree": "d6deca4ad9c951c81fc142100587fff8dd0aab7d"
   },
   "criticReview": {
     "status": "required-before-publication",
     "receiptSha256": null,
-    "reason": "Awaiting independent review of the 22944b82 capability delta."
+    "reason": "Awaiting bounded re-review of the 7c34f615 correction delta."
   },
   "capabilities": [
     {
