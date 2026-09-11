@@ -44,11 +44,13 @@ the measured Codex artifact digest, permission-profile digests, event-chain
 digest, canary manifest and semantic result vectors. This repeats the original
 10/10 actual-source result with current tracked machine output.
 
-The focused suite was also run on the clean predecessor candidate: 26 passed,
+The focused suite was also run on the clean evidence candidate: 26 passed,
 zero failed and one honestly skipped fixture transport case. Its EOF-sensitive
 case `payload keeps app-server stdin open until initialize can respond` passed.
-That console observation is supporting regression evidence; the ten producer-
-written live receipts above are the durable integration evidence.
+The machine-written `focused-suite.txt` transcript and
+`focused-suite-candidate.txt` commit/tree binding beside the receipts retain
+that result. The ten producer-written live receipts above remain the distinct
+integration evidence.
 
 ## Limits
 

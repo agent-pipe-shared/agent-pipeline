@@ -1,0 +1,8 @@
+command: git show -s --format=%H%n%T HEAD
+label: eof-focused-suite-candidate
+exitCode: 0
+--- stdout ---
+a770c0a0f21ea518484e28fb13cd75f4baa1d1d5
+4d61644e51ac3161439e89aa1b6cf019ffb76a6f
+
+--- stderr ---

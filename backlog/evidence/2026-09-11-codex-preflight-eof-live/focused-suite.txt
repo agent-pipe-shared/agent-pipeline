@@ -1,0 +1,41 @@
+command: node --test plugins/pipeline-core/scripts/codex-sandbox-preflight.test.mjs
+label: eof-focused-suite
+exitCode: 0
+--- stdout ---
+✔ all 14 documented terminal codes are the exact, closed contract vocabulary (0.594232ms)
+✔ committed profile intents are closed and have distinct assurance boundaries [profile-error] (0.682602ms)
+✔ profile compilation binds physical nonoverlapping roots and fixed shell-free invocation (2.028296ms)
+✔ profile compilation rejects root aliases [profile-error] (0.698412ms)
+✔ platform classification distinguishes native Linux, WSL native and DrvFS (0.272231ms)
+✔ platform classification fails closed on unmatched or ambiguous mount evidence [platform-unknown] (0.13251ms)
+✔ strong and intermediate receipts never share an assurance boundary [ok] (1.787145ms)
+✔ the affected lost-stdio vector is ineligible while the documented network-open profile is positive [child-stdio-error] (0.922203ms)
+✔ stdio mismatch and canary drift fail closed [child-stdio-error, canary-drift] (1.794085ms)
+✔ missing no-model app-server initialization fails closed [child-stdio-error] (0.653451ms)
+✔ per-side app-server diagnosis names which of the four conditions failed and with which errorClass [child-stdio-error] (1.392193ms)
+✔ all four app-server conditions true keeps appServerInitEquivalent true and carries a null errorClass on both sides [ok] (0.562562ms)
+✔ an unknown key in either side's semantic observation is rejected, not silently accepted [profile-error] (0.513401ms)
+✔ permission and network probe failures are typed, never diagnostic success [permission-mismatch, network-mismatch] (1.027413ms)
+✔ profile readback and network drift block before eligibility [permission-mismatch] (0.224411ms)
+✔ duration and stream-byte budgets are enforced as receipt-level terminal codes [total-timeout, output-truncated] (1.375863ms)
+✔ receipt sanitizer rejects private paths and remote material [internal-error] (0.31707ms)
+✔ an out-of-vocabulary terminal code observation is normalized to internal-error, never silently accepted [internal-error] (0.330321ms)
+✔ PID heartbeats never renew first-event or semantic leases [first-event-timeout, lifecycle-stall] (0.147591ms)
+✔ cleanup rebinds process-group ownership before TERM and KILL [cleanup-not-owned, cleanup-failed] (0.16204ms)
+✔ receipt shape is validated against the committed JSON schema, not merely by convention (0.587262ms)
+✔ PREFLIGHT_BUDGETS is the exact, frozen contract every timeout/byte-cap check above is measured against (0.07387ms)
+✔ bounded runner accepts only semantic payload lifecycle and keeps shell disabled (20.744428ms)
+✔ strong runtime resolver enumerates files without the :minimal macro (58.438121ms)
+✔ public payload is inert and contains no Critic or network invocation (0.21445ms)
+✔ payload keeps app-server stdin open until initialize can respond (2105.546498ms)
+﹣ the fixture-driven payload actually runs and drives an eligible intermediate receipt (48.561743ms) # the real fixture subprocess did not complete cleanly in this environment (child-stdio-error)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 2299.19103
+
+--- stderr ---
