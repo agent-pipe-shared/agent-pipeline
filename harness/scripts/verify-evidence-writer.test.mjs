@@ -8,7 +8,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { writeEvidenceAtomic } from "./verify-evidence-writer.mjs";
+import { writeEvidenceAtomic, writeVerifyEvidencePair } from "./verify-evidence-writer.mjs";
 
 const writerModulePath = fileURLToPath(new URL("./verify-evidence-writer.mjs", import.meta.url));
 
@@ -59,6 +59,71 @@ test("writeEvidenceAtomic overwrites an existing file completely (no merge of ol
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("running evidence invalidates latest before writing the per-run record", () => {
+  const latestPath = "/evidence/verify-latest.json";
+  const runPath = "/evidence/verify-run.json";
+  const writes = [];
+  writeVerifyEvidencePair({
+    runPath,
+    latestPath,
+    value: { exitCode: 1 },
+    phase: "running",
+    write(path) { writes.push(path); },
+  });
+  assert.deepEqual(writes, [latestPath, runPath]);
+});
+
+test("interrupted running write cannot leave the prior green latest evidence", () => {
+  const latestPath = "/evidence/verify-latest.json";
+  const runPath = "/evidence/verify-run.json";
+  const files = new Map([[latestPath, { exitCode: 0 }]]);
+  assert.throws(() => writeVerifyEvidencePair({
+    runPath,
+    latestPath,
+    value: { exitCode: 1 },
+    phase: "running",
+    write(path, value) {
+      if (path === runPath) throw new Error("simulated interruption");
+      files.set(path, value);
+    },
+  }), /simulated interruption/);
+  assert.deepEqual(files.get(latestPath), { exitCode: 1 });
+  assert.equal(files.has(runPath), false);
+});
+
+test("terminal evidence preserves the per-run result before updating latest", () => {
+  const latestPath = "/evidence/verify-latest.json";
+  const runPath = "/evidence/verify-run.json";
+  const files = new Map();
+  assert.throws(() => writeVerifyEvidencePair({
+    runPath,
+    latestPath,
+    value: { exitCode: 0 },
+    phase: "terminal",
+    write(path, value) {
+      if (path === latestPath) throw new Error("simulated latest failure");
+      files.set(path, value);
+    },
+  }), /simulated latest failure/);
+  assert.deepEqual(files.get(runPath), { exitCode: 0 });
+  assert.equal(files.has(latestPath), false);
+});
+
+test("evidence pair rejects ambiguous paths and phases", () => {
+  assert.throws(() => writeVerifyEvidencePair({
+    runPath: "/same",
+    latestPath: "/same",
+    value: {},
+    phase: "running",
+  }), /must be distinct/);
+  assert.throws(() => writeVerifyEvidencePair({
+    runPath: "/run",
+    latestPath: "/latest",
+    value: {},
+    phase: "unknown",
+  }), /phase must be running or terminal/);
 });
 
 // Real-process concurrency proof. Two REAL child processes hammer the SAME shared target path

@@ -53,7 +53,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { duplicateSuiteIds } from "./check-verify-suite-registration.mjs";
 import { UNREPLACED_MANUAL_CHECK_PLACEHOLDER, computeManualVerifyStep } from "./manual-check-logic.mjs";
-import { writeEvidenceAtomic } from "./verify-evidence-writer.mjs";
+import { writeVerifyEvidencePair } from "./verify-evidence-writer.mjs";
 import {
   NOVA_APPROVAL_PENDING_BINDING,
   NOVA_APPROVAL_PENDING_STATUS,
@@ -129,9 +129,13 @@ const evidencePath = join(evidenceDir, "verify-latest.json");
 const runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`;
 const runEvidencePath = join(evidenceDir, `${runId}.json`);
 const verifyStartedAt = new Date().toISOString();
-function writeEvidence(evidence) {
-  writeEvidenceAtomic(runEvidencePath, evidence);
-  writeEvidenceAtomic(evidencePath, evidence);
+function writeEvidence(evidence, phase) {
+  writeVerifyEvidencePair({
+    runPath: runEvidencePath,
+    latestPath: evidencePath,
+    value: evidence,
+    phase,
+  });
 }
 // Invalidate an older result before any suite can begin.  If this process is
 // killed, crashes, or loses its host while a suite is running, a later reader
@@ -148,7 +152,7 @@ writeEvidence({
   steps: [{ name: "verify-running", exitCode: 1 }],
   verifyRun: null,
   exitCode: 1,
-});
+}, "running");
 const SCOPED_VERIFY_SUITES = Object.freeze([
   Object.freeze({
     name: "scoped-verify-registration-tests",
@@ -949,7 +953,7 @@ const evidence = {
   exitCode: overallExitCode,
 };
 
-writeEvidence(evidence);
+writeEvidence(evidence, "terminal");
 
 console.log(`\nEvidence written: ${evidencePath} (run record: ${runEvidencePath})`);
 console.log(`Overall: ${steps.map((s) => `${s.name}=${s.exitCode}`).join(", ")} -> exit ${overallExitCode}`);

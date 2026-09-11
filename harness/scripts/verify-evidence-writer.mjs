@@ -24,6 +24,11 @@
  * unexported) atomicJson() already uses for every one of its own writes -- this file is the
  * unprotected, exported equivalent for verify.mjs's evidence slot.
  *
+ * `writeVerifyEvidencePair()` additionally makes the order between the two independently atomic
+ * files explicit.  At startup it writes the shared red invalidation first, so an interruption
+ * cannot leave an older green `verify-latest.json` behind.  At completion it writes the durable
+ * per-run result first, so that result survives even if updating the shared pointer fails.
+ *
  * What this does NOT do: it does not give the shared "verify-latest.json" pointer any run
  * identity or resolve WHICH concurrent run's result that pointer ends up naming -- that stays a
  * last-writer-wins design choice, made explicit and disclosed at verify.mjs's call site, not
@@ -58,4 +63,31 @@ export function writeEvidenceAtomic(path, value) {
   }
   renameSync(temp, path);
   return path;
+}
+
+/**
+ * Persist one Verify payload to its durable per-run record and shared latest pointer.
+ * The two-file order depends on whether this is the startup invalidation or terminal result.
+ *
+ * @param {{runPath:string, latestPath:string, value:unknown, phase:"running"|"terminal", write?:(path:string,value:unknown)=>unknown}} options
+ * @returns {{runPath:string, latestPath:string, phase:"running"|"terminal"}}
+ */
+export function writeVerifyEvidencePair({
+  runPath,
+  latestPath,
+  value,
+  phase,
+  write = writeEvidenceAtomic,
+}) {
+  if (typeof runPath !== "string" || runPath.length === 0) throw new TypeError("runPath must be a non-empty string");
+  if (typeof latestPath !== "string" || latestPath.length === 0) throw new TypeError("latestPath must be a non-empty string");
+  if (runPath === latestPath) throw new TypeError("runPath and latestPath must be distinct");
+  if (phase !== "running" && phase !== "terminal") throw new TypeError("phase must be running or terminal");
+  if (typeof write !== "function") throw new TypeError("write must be a function");
+
+  const orderedPaths = phase === "running"
+    ? [latestPath, runPath]
+    : [runPath, latestPath];
+  for (const path of orderedPaths) write(path, value);
+  return { runPath, latestPath, phase };
 }
