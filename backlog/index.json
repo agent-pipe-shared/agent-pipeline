@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b6f61e753b24433b8f3db9621c779c981d23bfeb4fcdd58d28a7f5ca2c2e74e4"
+    "transitionHead": "80d1aab30342308658555cefba9162ab4bd2da110bea459e3080a95fbd4718a8"
   },
   "counts": {
-    "open": 96,
+    "open": 95,
     "in_progress": 0,
-    "closed": 544,
+    "closed": 545,
     "rejected": 3,
     "deferred": 11
   },
@@ -7014,12 +7014,16 @@
     },
     {
       "id": "pipeline.standing-critic-consent-reprompts-host-approval",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-09",
       "source": "PO-requested investigation, 2026-09-09; durable standing-consent and reprompt observations in backlog/evidence/2026-09-09-local-candidate-po-decisions.md and backlog/evidence/2026-09-09-standing-critic-consent-reprompt.md.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "16569ac8dd427deace90b2d4df0b7a4d354fe948",
+      "closureEvidence": "backlog/items/2026-09-09-standing-critic-consent-reprompts-host-approval.md"
     },
     {
       "id": "pipeline.stateful-design-contract-template",

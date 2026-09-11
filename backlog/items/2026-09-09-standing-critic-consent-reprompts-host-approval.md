@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.standing-critic-consent-reprompts-host-approval
 type: requirement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 16569ac8dd427deace90b2d4df0b7a4d354fe948
+closure_evidence: backlog/items/2026-09-09-standing-critic-consent-reprompts-host-approval.md
 created: 2026-09-09
 source: "PO-requested investigation, 2026-09-09; durable standing-consent and reprompt observations in backlog/evidence/2026-09-09-local-candidate-po-decisions.md and backlog/evidence/2026-09-09-standing-critic-consent-reprompt.md."
 sprint: none
@@ -74,3 +78,18 @@ child while approval is absent or rejected.
 - **Rationale:** Future scheduling and the host capability are unconfirmed.
 - **Assignment (if accepted):**
 - **Date:**
+
+## Closure — 2026-09-11
+
+The product route was simplified instead of teaching repository code to
+suppress an external host decision. Commit `16569ac8` makes the fresh
+functional-equivalent session Critic the autonomous default for this repository
+and consuming user projects. It requires no additional Pipeline PO approval or
+terminal relay. Runner-native/external launchers remain optional explicit
+escalations and retain their host's own permission boundary.
+
+The current Nova-B run exercised repeated independent session Critics for the
+Capture-Evidence, Dispatch-Record and Installed-Attestation corrections. They
+started, returned substantive verdicts and completed without a PO approval
+prompt. This closes the recurring default-path interruption while preserving a
+truthful distinction for an explicitly selected external launcher.
