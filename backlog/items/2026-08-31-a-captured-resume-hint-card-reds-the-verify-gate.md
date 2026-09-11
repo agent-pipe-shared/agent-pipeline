@@ -119,3 +119,22 @@ Owner: PO, for assignment. Ordered by cost, and deliberately not pre-deciding.
    keeps the same id while genuinely being a new bootstrap.
 3. **Do not fix it by exempting the check from `verify.mjs`.** The gate coupling is
    the thing that made this visible at all.
+
+## Nova B implementation — 2026-09-11
+
+The implementation separates a freshly captured card from a card whose later
+bootstrap actually began delivery. Capture writes a digest but no delivery
+marker, so `--any-session` returns `RH-CHECK-PENDING-DELIVERY`. An identified
+SessionStart persists an exact, digest-bound delivery marker before it surfaces
+the card, then records consumption. If delivery persistence fails, or the hook
+has no usable session identity, content remains pending and is not claimed as
+read. If consumption persistence fails after delivery, Verify sees the durable
+delivery without a receipt and fails. A malformed delivery marker fails closed;
+a well-formed marker for an older, replaced card remains stale and does not
+poison the replacement.
+
+Rollback is a direct revert of commits `6988f1ed` and the later correction
+commit while retaining the existing `resume-consumption-check` registration.
+That restores the former conservative behavior in which any available card
+without a receipt fails Verify. No schema migration is required: the added
+private delivery marker is non-authoritative and ignored by the prior reader.

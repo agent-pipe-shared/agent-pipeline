@@ -151,11 +151,16 @@ function resumeHintContextLines(root, sessionId) {
   // be persisted, keep the card pending and withhold its content so Verify cannot report a
   // delivered-but-unconsumed card as freshly captured.
   const hasSessionId = typeof sessionId === "string" && sessionId.trim().length > 0;
+  if (!hasSessionId) {
+    return [
+      "A Resume-Hint card is pending, but this SessionStart supplied no usable session identity. Defer surfacing its content until a later identified SessionStart can record delivery and consumption; do not claim that the card was read.",
+    ];
+  }
   let delivery;
   try {
     delivery = recordResumeHintDelivery({
       rootDir: root,
-      sessionId: hasSessionId ? sessionId : "session-id-unavailable",
+      sessionId,
     });
   } catch { delivery = { status: "unavailable" }; }
   if (delivery.status !== "recorded") {
@@ -163,9 +168,7 @@ function resumeHintContextLines(root, sessionId) {
       "A Resume-Hint card is pending, but its digest-bound delivery marker could not be recorded. Defer surfacing its content until a later SessionStart can record delivery; do not claim that the card was read.",
     ];
   }
-  if (hasSessionId) {
-    try { recordResumeHintConsumption({ rootDir: root, sessionId }); } catch { /* Verify sees the delivery without a receipt. */ }
-  }
+  try { recordResumeHintConsumption({ rootDir: root, sessionId }); } catch { /* Verify sees the delivery without a receipt. */ }
   const { intent, scope, constraints, questions, progress } = observed.hint.context;
   const lines = [
     "A resume-hint card from a prior session is available and MUST be read now: incorporate it into this session's understanding before continuing -- noting its availability without reading its content does not satisfy this step.",

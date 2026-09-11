@@ -16,6 +16,7 @@ import {
 import {
   applyOnboardingIntakeCapture, applyOnboardingIntakeConsent, resolveIntakeCheckpointPaths,
 } from "../lib/onboarding-continuity.mjs";
+import { checkResumeConsumptionAnySession } from "../scripts/check-resume-consumption.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "codex-session-start-hint-"));
 const script = fileURLToPath(new URL("./codex-session-start-hint.mjs", import.meta.url));
@@ -120,7 +121,7 @@ try {
   writeFileSync(join(root, "project", "resume-hint.json"), `${JSON.stringify(hint, null, 2)}\n`);
   const withHint = sessionStartDecision(root);
   assert.match(withHint.context, /card is pending/u);
-  assert.match(withHint.context, /delivery marker could not be recorded/u);
+  assert.match(withHint.context, /no usable session identity/u);
   assert.doesNotMatch(withHint.context, /Resume-hint intent:/u);
   // The rest of the governed message/context is unchanged, only extended.
   assert.match(withHint.context, /A guard denial is not by itself a human gate/u);
@@ -233,17 +234,18 @@ try {
     assert.equal(queryResumeHintConsumption({ rootDir: consumptionRoot, sessionId: "session-write-failed" }).outcome, "not-consumed");
     rmSync(blockedDeliveryPath, { recursive: true, force: true });
 
-    // No sessionId at all: delivery is still recorded honestly, but no per-session
-    // consumption receipt can be created.
+    // No sessionId at all: content and delivery both remain pending, because no
+    // matching consumption receipt could be created for this bootstrap.
     const noSession = sessionStartDecision(consumptionRoot);
-    assert.match(noSession.context, /Resume-hint intent: Resume the resume-consumption wiring work\./u);
+    assert.match(noSession.context, /no usable session identity/u);
+    assert.doesNotMatch(noSession.context, /Resume-hint intent:/u);
     assert.equal(
       queryResumeHintConsumption({ rootDir: consumptionRoot, sessionId: "session-none" }).outcome,
       "not-consumed",
       "no receipt should exist yet for any session",
     );
-    assert.equal(queryResumeHintDelivery({ rootDir: consumptionRoot }).outcome, "delivered");
-    assert.equal(queryResumeHintDelivery({ rootDir: consumptionRoot }).sessionId, "session-id-unavailable");
+    assert.equal(queryResumeHintDelivery({ rootDir: consumptionRoot }).outcome, "not-delivered");
+    assert.equal(checkResumeConsumptionAnySession({ rootDir: consumptionRoot }).code, "RH-CHECK-PENDING-DELIVERY");
 
     // A real sessionId: the SAME call that surfaces the card's content into context must
     // also record a matching consumption receipt for that exact session.
@@ -319,7 +321,7 @@ try {
     recordResumeHintCardDigest({ rootDir: verbatimRoot, card: verbatimContext });
 
     // Card available, but no intake checkpoint at all yet -- unchanged: no new lines.
-    const noCheckpoint = sessionStartDecision(verbatimRoot);
+    const noCheckpoint = sessionStartDecision(verbatimRoot, undefined, "verbatim-no-checkpoint");
     assert.match(noCheckpoint.context, /Resume-hint intent: Resume the resume-hint verbatim surfacing work\./u);
     assert.doesNotMatch(noCheckpoint.context, /Resume-hint answered onboarding values/u);
     assert.doesNotMatch(noCheckpoint.context, /Resume-hint material input chunk/u);
@@ -327,7 +329,7 @@ try {
     // Consent granted but nothing answered/captured yet -- an empty checkpoint is still
     // "unchanged" output, never a bare label with no content.
     applyOnboardingIntakeConsent({ rootDir: verbatimRoot, granted: true, activate: true });
-    const emptyCheckpoint = sessionStartDecision(verbatimRoot);
+    const emptyCheckpoint = sessionStartDecision(verbatimRoot, undefined, "verbatim-empty-checkpoint");
     assert.doesNotMatch(emptyCheckpoint.context, /Resume-hint answered onboarding values/u);
     assert.doesNotMatch(emptyCheckpoint.context, /Resume-hint material input chunk/u);
 
@@ -342,7 +344,7 @@ try {
     applyOnboardingIntakeCapture({ rootDir: verbatimRoot, text: first, activate: true });
     applyOnboardingIntakeCapture({ rootDir: verbatimRoot, text: second, activate: true });
 
-    const withVerbatim = sessionStartDecision(verbatimRoot);
+    const withVerbatim = sessionStartDecision(verbatimRoot, undefined, "verbatim-content");
     // Existing distilled-card lines stay present, unchanged, only extended.
     assert.match(withVerbatim.context, /Resume-hint intent: Resume the resume-hint verbatim surfacing work\./u);
     // New: answered onboarding values.
@@ -369,7 +371,7 @@ try {
     const { checkpoint: checkpointPath } = resolveIntakeCheckpointPaths({ rootDir: verbatimRoot });
     const validBytes = readFileSync(checkpointPath);
     writeFileSync(checkpointPath, "{ not valid json");
-    const withMalformed = sessionStartDecision(verbatimRoot);
+    const withMalformed = sessionStartDecision(verbatimRoot, undefined, "verbatim-malformed");
     assert.match(withMalformed.context, /Resume-hint intent: Resume the resume-hint verbatim surfacing work\./u);
     assert.doesNotMatch(withMalformed.context, /Resume-hint answered onboarding values/u);
     assert.doesNotMatch(withMalformed.context, /Resume-hint material input chunk/u);
