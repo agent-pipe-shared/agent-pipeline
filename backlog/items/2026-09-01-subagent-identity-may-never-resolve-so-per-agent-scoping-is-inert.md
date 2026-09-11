@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 771587abfc94917095548e95e2d907b62829c725
+closure_evidence: backlog/evidence/2026-09-11-runtime-subagent-identity-closure.md
 source: "Round-F Critic finding F-1 (scratch/findings-registry-round-F.md), corroborated by an independent live investigation dispatched as NVA-B-SUBIDENT (scratch/subagent-identity-investigation.md); both verified against plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs live source."
 ---
 
@@ -219,3 +223,16 @@ for an implementor.
 The AC-4 regression test's own weakness stands as recorded: it manufactures the
 transcript shape it needs, so it will keep passing either way and has to be
 replaced by fixtures carrying the two real key sets.
+
+## Closure — 2026-09-11
+
+Commit `771587ab` added the lifecycle-local runtime identity resolver and uses
+it at all three affected sites: bootstrap receipt production, the GL-09 gate
+and denial-trim scoping. The real `agent_id`/`agent_type` payload shape is now
+covered for Edit, Write and NotebookEdit, sibling isolation and malformed
+identity handling. The former Codex adapter bypass was corrected separately in
+`9b10d0ad`.
+
+An independent closure Critic returned PASS. The post-refresh live subagent
+probe remains explicitly unclaimed as a deployment follow-up; it was never an
+item acceptance criterion and does not weaken the code/test closure.

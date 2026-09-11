@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3d59773e7a61a6e1b7fbd67bb0d241016a9c7e1f2e786e383287629468ad6120"
+    "transitionHead": "8473b19c22d1f1584c93f4d6afd31a05611b852a6bd31b025546bb4c0e3d589c"
   },
   "counts": {
-    "open": 92,
+    "open": 90,
     "in_progress": 0,
-    "closed": 548,
+    "closed": 550,
     "rejected": 3,
     "deferred": 11
   },
@@ -1710,12 +1710,16 @@
     },
     {
       "id": "pipeline.complete-adr-governs-coverage-before-reader-review-binding",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-07",
       "source": "PO decision 2026-09-07, decision queue items 10 and 12: follow the recommended separate ADR coverage package before depending on reconciliation for the reader-review binding.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "62dddced0df1cfe46b6e72239e46bf7d3ba72cde",
+      "closureEvidence": "backlog/evidence/2026-09-11-adr-governs-coverage-closure.md"
     },
     {
       "id": "pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches",
@@ -7059,12 +7063,16 @@
     },
     {
       "id": "pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Round-F Critic finding F-1 (scratch/findings-registry-round-F.md), corroborated by an independent live investigation dispatched as NVA-B-SUBIDENT (scratch/subagent-identity-investigation.md); both verified against plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs live source.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "771587abfc94917095548e95e2d907b62829c725",
+      "closureEvidence": "backlog/evidence/2026-09-11-runtime-subagent-identity-closure.md"
     },
     {
       "id": "pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry",

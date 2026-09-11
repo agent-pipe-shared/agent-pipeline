@@ -143,7 +143,7 @@
 | pipeline.compact-nudge-cadence-too-aggressive-and-not-configurable | open | idea | pipeline | 2026-08-26 | — |
 | pipeline.compaction-stable-bootstrap-lease | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | 2026-08-10 | — |
-| pipeline.complete-adr-governs-coverage-before-reader-review-binding | open | requirement | pipeline | 2026-09-07 | — |
+| pipeline.complete-adr-governs-coverage-before-reader-review-binding | closed | requirement | pipeline | 2026-09-07 | — |
 | pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | 2026-08-18 | — |
@@ -565,7 +565,7 @@
 | pipeline.standing-critic-consent-reprompts-host-approval | closed | requirement | pipeline | 2026-09-09 | — |
 | pipeline.stateful-design-contract-template | deferred | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.strip-for-dispatch-misses-resolution-heading | closed | defect | pipeline | 2026-09-06 | Nova B — discovered while assembling the T1 Critic dispatch for NVA-B-TILDEFIX-1. The backlog item being cited as spec had accumulated a '## Resolution' section (implementor narrative: which commit fixed it, how, and why the fix is believed correct) after its originating dispatch landed. backlog-item-strip-for-dispatch.mjs's output still carried that section verbatim — it only strips known Triage/Closure verdict-shaped headings, and 'Resolution' is not one of the patterns it recognizes. |
-| pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry | closed | workflow-improvement | pipeline | 2026-08-29 | — |
 | pipeline.t1-governance-path-preflight | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | closed | workflow-improvement | pipeline | 2026-08-07 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 92
+- open: 90
 - in_progress: 0
-- closed: 548
+- closed: 550
 - rejected: 3
 - deferred: 11

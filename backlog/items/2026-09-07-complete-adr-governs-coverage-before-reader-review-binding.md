@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.complete-adr-governs-coverage-before-reader-review-binding
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-07
 source: "PO decision 2026-09-07, decision queue items 10 and 12: follow the recommended separate ADR coverage package before depending on reconciliation for the reader-review binding."
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 62dddced0df1cfe46b6e72239e46bf7d3ba72cde
+closure_evidence: backlog/evidence/2026-09-11-adr-governs-coverage-closure.md
 ---
 
 # Complete ADR governing-path coverage before adding reader-review binding
@@ -113,3 +117,12 @@ three historical/superseded, one provisional and one proposed.
 The declaration package still needs its exact reconciliation record, focused
 checks and final review before this item can close. Reader-review binding may
 rely on the completed accepted-decision coverage only after those checks pass.
+
+### Closure — 2026-09-11
+
+The exact reconciliation record landed in `3974a52525764b9db46461d441a255b7b470acc0`
+after the source candidate and binds candidate `62dddced` to base `18df8681`.
+The real checker reports the one implicated ADR reconciled. Current focused
+checks pass, and an independent closure Critic returned PASS with no findings.
+The closure evidence records the five explicit non-accepted dispositions and
+the limits of this claim.
