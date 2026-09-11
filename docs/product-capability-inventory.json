@@ -1,13 +1,13 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "85921a119f69a785dd2916b1986ae39cad200cba",
-    "tree": "26ebde564e0377c1b310f61e7d0503789505db8a"
+    "commit": "045cb2d4fead88edf5b9467199a4c2c2d7c49d9f",
+    "tree": "20329abc933d326ba6c27eb9cd3ae7a06432e040"
   },
   "criticReview": {
-    "status": "attested",
-    "receiptSha256": "0ae2f1a7adc61ce3b403ee6f0a5f124bca9c5bba1862e5ca12996d0b9b617e6c",
-    "reason": null
+    "status": "required-before-publication",
+    "receiptSha256": null,
+    "reason": "The newly registered commit-message hook verification surface requires an independent inventory-delta review."
   },
   "capabilities": [
     {
@@ -273,6 +273,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-install-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-baseline-verify-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
