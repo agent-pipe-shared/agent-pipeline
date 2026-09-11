@@ -216,6 +216,23 @@ role/runner fixture with an invalid required field must terminate during
 `PREPARE`, within the local five-second bound, and prove zero launcher calls.
 See `backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.
 
+The ninth slice hardens the public Antigravity headless host wrapper. Raw
+process spawning is module-private; `invokeAgy()` now requires the complete
+packet, physical repository root and result root, then checks the exact
+candidate, required inputs, role, transport and result destination immediately
+before launch. All eight configured roles reject an invalid required path in
+under five seconds with zero launches, while the valid path preserves the
+prompt bytes and admitted working directory. The focused suite passes 18/18,
+its normal Verify registration now requires exact case-completion evidence, and
+both independent reviews returned PASS with no findings. See
+`backlog/evidence/2026-09-11-antigravity-preflight-and-case-completion-pass.md`.
+
+The item remains open because no in-repository production coordinator calls
+this wrapper. The safe launch boundary exists and is tested; creating a fake
+caller would not prove product integration. The remaining closure decision is
+whether the external Antigravity host provides that real call boundary or a
+repository-owned coordinator must be added.
+
 ## Triage — 2026-09-11
 
 - **Decision:** accepted for Nova B; no additional 0.6.2 release blocker was

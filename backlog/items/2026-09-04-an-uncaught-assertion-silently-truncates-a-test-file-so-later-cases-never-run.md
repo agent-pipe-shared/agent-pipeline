@@ -199,3 +199,13 @@ and 167 legacy-process-only** entries, 180 total. NCH01–NCH08, CCH001–CCH133
 DRS01–DRS11 and VCR01–VCR14 all completed, and the exact candidate-bound
 registry check passed. The item remains open because 167 registered suites
 still have only process-level evidence.
+
+The next migration in `db1ceabe` moves
+`local-worker-supervisor-cli-tests` and `antigravity-execution-host-tests` onto
+the normal required descriptor path. Their exact `LWSC01`–`LWSC10` and
+`EPH01`–`EPH18` policies are supplied by Verify, and every callback is declared
+before execution begins. Focused runs passed 10/10 and 18/18; the independent
+Critic returned PASS with no findings. The registry now contains **15 required
+and 166 legacy-process-only** entries, 181 total. The item remains open for the
+staged migration of the remaining legacy population. See
+`backlog/evidence/2026-09-11-antigravity-preflight-and-case-completion-pass.md`.
