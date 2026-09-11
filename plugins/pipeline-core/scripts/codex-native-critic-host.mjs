@@ -28,6 +28,7 @@ import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256
 import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { admitNativeCriticExport } from "../lib/native-critic-export-admission.mjs";
+import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = realpathSync(resolve(HERE, ".."));
@@ -49,7 +50,7 @@ const TREE = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const REGULAR_MODE = new Set(["100644", "100755"]);
 const SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGPIPE"]);
 const FAILURE_CODES = new Set([
-  "input-invalid", "selection-invalid", "route-invalid", "physical-proof-unavailable", "physical-proof-drift", "consent-unavailable",
+  "input-invalid", "selection-invalid", "route-invalid", "physical-proof-unavailable", "physical-proof-drift", "consent-unavailable", "dispatch-invalid",
   "child-spawn-failed", "child-timeout", "child-stream-overflow", "child-output-invalid", "child-policy-invalid",
   "child-lifecycle-invalid", "child-verdict-invalid", "child-write-attempt", "child-request-invalid",
   "child-prompt-invalid", "child-protocol-error", "child-exit-error", "child-terminal-invalid",
@@ -320,6 +321,74 @@ export async function runFixedChild(request, dependencies = {}) {
   return { result, heartbeat, terminal: { ...terminal, started: terminal.error === null, cleanup: terminal.error === null && terminal.signal === null ? "complete" : "incomplete" }, stdoutBytes, stderrBytes, overflow, timedOut };
 }
 
+export function nativeCriticRoleDispatchPacket({ selection, referenceRecords, boundRuleset }) {
+  const requiredRecords = referenceRecords
+    .filter((record) => record.blobOid !== undefined)
+    .sort((left, right) => left.path.localeCompare(right.path));
+  const requiredPaths = requiredRecords.map(({ path }) => path);
+  const requiredPathSha256 = Object.fromEntries(requiredRecords.map(({ path, sha256 }) => [path, sha256]));
+  return {
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId: selection.selectionId,
+    transport: "codex",
+    role: "pipeline-core:critic",
+    prompt: `Independent Critic review for candidate ${selection.dispatch.candidateCommit}. Ruleset-SHA: ${boundRuleset.provenance.identity}; Model: ${selection.route.model}; effort ${selection.route.effort}. Construct your own input from the required paths.`,
+    candidate: { commit: selection.dispatch.candidateCommit, tree: selection.dispatch.candidateTree },
+    requiredPaths,
+    requiredPathSha256,
+    resultDestination: { kind: "return" },
+  };
+}
+
+export class NativeCriticDispatchPreflightError extends Error {
+  constructor(preparation) {
+    super(`native Critic role dispatch rejected: ${preparation?.code ?? "unknown"}`);
+    this.name = "NativeCriticDispatchPreflightError";
+    this.preparation = preparation;
+  }
+}
+
+export function preflightNativeCriticCoordinatorEvidence({ root, records } = {}) {
+  if (!Array.isArray(records)) return { status: "rejected", code: "NCH-EVIDENCE-SHAPE" };
+  let repoRoot;
+  try { repoRoot = directoryRealpath(root, "repository"); }
+  catch { return { status: "rejected", code: "NCH-EVIDENCE-ROOT" }; }
+  for (const record of records) {
+    if (!record || typeof record !== "object" || Array.isArray(record) || record.blobOid !== undefined
+      || typeof record.path !== "string" || !SHA256.test(record.sha256)
+      || !COMMIT.test(record.candidate?.commit) || !TREE.test(record.candidate?.tree)) {
+      return { status: "rejected", code: "NCH-EVIDENCE-RECORD" };
+    }
+    try {
+      const absolute = regularRealpath(resolve(repoRoot, record.path), "coordinator evidence");
+      if (!inside(repoRoot, absolute)) return { status: "rejected", code: "NCH-EVIDENCE-PATH" };
+      const bytes = readFileSync(absolute);
+      if (createHash("sha256").update(bytes).digest("hex") !== record.sha256) return { status: "rejected", code: "NCH-EVIDENCE-DRIFT" };
+      const candidate = nativeCriticEvidenceCandidate(JSON.parse(bytes));
+      if (candidate?.commit !== record.candidate.commit || candidate?.tree !== record.candidate.tree) {
+        return { status: "rejected", code: "NCH-EVIDENCE-CANDIDATE" };
+      }
+    } catch { return { status: "rejected", code: "NCH-EVIDENCE-PATH" }; }
+  }
+  return { status: "prepared", code: "NCH-EVIDENCE-PREPARED", records: structuredClone(records) };
+}
+
+export async function runPreflightedFixedChild({ root, packet, evidenceRecords = [], request }, dependencies = {}) {
+  const preflight = dependencies.preflightRoleDispatch ?? preflightRoleDispatch;
+  const preflightEvidence = dependencies.preflightCoordinatorEvidence ?? preflightNativeCriticCoordinatorEvidence;
+  const prepared = preflight({ root, packet });
+  if (prepared?.status !== "prepared") throw new NativeCriticDispatchPreflightError(prepared);
+  const evidencePrepared = preflightEvidence({ root, records: evidenceRecords });
+  if (evidencePrepared?.status !== "prepared") throw new NativeCriticDispatchPreflightError(evidencePrepared);
+  // Recheck both exact preparations at the last possible point. No unrelated
+  // work may open a drift window before the child.
+  const current = preflight({ root, packet: prepared.packet });
+  if (current?.status !== "prepared") throw new NativeCriticDispatchPreflightError(current);
+  const evidenceCurrent = preflightEvidence({ root, records: evidencePrepared.records });
+  if (evidenceCurrent?.status !== "prepared") throw new NativeCriticDispatchPreflightError(evidenceCurrent);
+  return runFixedChild(request, dependencies);
+}
+
 function validateChild(result, selection, tuple, verdictSchema, terminal) {
   const observed = result?.observed;
   const lifecycle = { ...observed, stdoutBytes: terminal.stdoutBytes, stderrBytes: terminal.stderrBytes };
@@ -404,9 +473,17 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
     ...(input.reviewScope === undefined ? { reviewBase: input.reviewBase } : { reviewScope: input.reviewScope }),
     reviewMode: input.reviewMode, sandboxMode: "native-tools-read-only",
   };
+  const dispatchPacket = nativeCriticRoleDispatchPacket({ selection, referenceRecords: input.referenceRecords, boundRuleset });
   let child;
-  try { child = await runFixedChild(request, dependencies); }
-  catch { return executionFailure("child-spawn-failed"); }
+  try {
+    child = await runPreflightedFixedChild({
+      root: physical.repoRoot,
+      packet: dispatchPacket,
+      evidenceRecords: input.referenceRecords.filter((record) => record.blobOid === undefined),
+      request,
+    }, dependencies);
+  }
+  catch (error) { return executionFailure(error instanceof NativeCriticDispatchPreflightError ? "dispatch-invalid" : "child-spawn-failed"); }
   const terminal = childTerminal(child.terminal);
   const lifecycle = { ...child.heartbeat, ...(child.result?.observed ?? {}), stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes };
   if (child.timedOut) return executionFailure("child-timeout", terminal, lifecycle);

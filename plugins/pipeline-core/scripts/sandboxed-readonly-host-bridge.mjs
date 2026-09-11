@@ -18,6 +18,13 @@ function exactKeys(value, keys, label) {
 }
 function equal(left, right) { return canonicalJson(left) === canonicalJson(right); }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
+function classifyPreLaunchFailure(error, classifier) {
+  if (typeof classifier !== "function") return null;
+  try {
+    const code = classifier(error);
+    return typeof code === "string" && code.length > 0 ? code : null;
+  } catch { return null; }
+}
 function dutyReceiptSchema(duty) { return duty === "advisory" ? "pipeline.advisory-receipt.v1" : `pipeline.${duty}-receipt.v1`; }
 function usableDutyStatus(duty) { return duty === "advisory" ? "answered" : "reviewed"; }
 function requestedRoute(value) {
@@ -124,7 +131,12 @@ export async function runSandboxedReadonlyHostBridge({ selectionId, duty, reques
   let launched;
   try {
     launched = await dependencies.launch({ selectionId, duty, selection: structuredClone(selection), requested: structuredClone(requested), references: [...safeReferences], profile: structuredClone(profile), scratch: structuredClone(scratch) });
-  } catch {
+  } catch (error) {
+    // A role PREPARE rejection occurs before the host protocol emits its
+    // execution.launch record. Preserve that typed no-child fact instead of
+    // fabricating the post-launch/lost-stdio incident used for ambiguous
+    // errors after a launcher may have started.
+    if (classifyPreLaunchFailure(error, dependencies.classifyPreLaunchFailure) !== null) throw error;
     try { await dependencies.resealScratch({ selectionId, duty, profile: structuredClone(profile) }); } catch {}
     return postLaunchFailure(selection, duty, requested);
   }
@@ -150,7 +162,8 @@ export async function runSandboxedReadonlyHostBridge({ selectionId, duty, reques
 export async function executeSandboxedReadonlyDuty(request, dependencies = {}) {
   const { references = [], ...selectionRequest } = request ?? {};
   const built = buildSandboxedReadonlyRequest(selectionRequest);
-  const selection = await selectCodexSandbox({
+  const selectSandbox = dependencies.selectCodexSandbox ?? selectCodexSandbox;
+  const selection = await selectSandbox({
     repoFingerprint: built.repoFingerprint,
     duty: built.duty,
     queueRevision: built.dispatch.queueRevision,
@@ -201,10 +214,24 @@ export async function executeSandboxedReadonlyDuty(request, dependencies = {}) {
       return resultForExecution(execution, journal);
     }
     if (current.phase !== "selected") fail("sandbox journal phase is invalid");
-    const execution = await runSandboxedReadonlyHostBridge({ selectionId: selection.selectionId, duty: built.duty, requested: built.requested, references }, {
-      ...dependencies.bridge,
-      readSelection: async (selectionId) => dependencies.store.readSelection(selectionId),
-    });
+    let execution;
+    try {
+      execution = await runSandboxedReadonlyHostBridge({ selectionId: selection.selectionId, duty: built.duty, requested: built.requested, references }, {
+        ...dependencies.bridge,
+        readSelection: async (selectionId) => dependencies.store.readSelection(selectionId),
+      });
+    } catch (error) {
+      const preparationCode = classifyPreLaunchFailure(error, dependencies.bridge?.classifyPreLaunchFailure);
+      if (preparationCode === null) throw error;
+      return {
+        status: "unavailable",
+        failureClass: "role-dispatch-preflight-rejected",
+        preparationCode,
+        childStarted: false,
+        selectionId: selection.selectionId,
+        assurance: { ...NO_USABLE_REVIEW_ASSURANCE },
+      };
+    }
     if (!execution.terminal.childStarted) {
       return { status: "unavailable", failureClass: "host-mode-unavailable", childStarted: false, selectionId: selection.selectionId, assurance: structuredClone(execution.assurance) };
     }

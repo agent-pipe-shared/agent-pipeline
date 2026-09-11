@@ -25,16 +25,39 @@
  * the duty receipt records the failure.
  */
 import { createHash } from "node:crypto";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
 import { executeSandboxedReadonlyDuty } from "./sandboxed-readonly-host-bridge.mjs";
 import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
 import { resolveCriticHighRiskRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const OID = /^[a-f0-9]{40,64}$/;
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
+const SELECTED_PREPARATION_CODES = new Set([
+  "RDP-ROOT", "RDP-PACKET-SHAPE", "RDP-DISPATCH-ID", "RDP-TRANSPORT", "RDP-ROLE", "RDP-PROMPT",
+  "RDP-CANDIDATE-SHAPE", "RDP-CANDIDATE-COMMIT", "RDP-CANDIDATE-TREE", "RDP-REQUIRED-PATHS",
+  "RDP-REQUIRED-DIGESTS", "RDP-REQUIRED-PATH", "RDP-REQUIRED-BLOB", "RDP-REQUIRED-PATH-DRIFT",
+  "RDP-RESULT-PATH", "RDP-RESULT-DESTINATION", "RDP-RESULT-ROOT", "RDP-RESULT-ALIASES-INPUT",
+  "RDP-ROUTE", "RDP-ROUTE-CANDIDATE", "RDP-ROUTE-DRIFT", "RDP-INPUT",
+]);
+
+class SelectedCriticDispatchPreflightError extends Error {
+  constructor(preparation) {
+    super(`selected Critic role dispatch rejected${preparation?.code ? `: ${preparation.code}` : ""}`);
+    this.preparation = preparation;
+  }
+}
+
+function classifySelectedPreLaunchFailure(error) {
+  if (!(error instanceof SelectedCriticDispatchPreflightError)) return null;
+  const code = error.preparation?.code;
+  return SELECTED_PREPARATION_CODES.has(code) ? code : null;
+}
 
 function fail(message) { throw new Error(message); }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
@@ -43,6 +66,66 @@ function equal(left, right) { return canonicalJson(left) === canonicalJson(right
 function exactKeys(value, keys, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)
     || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...keys].sort())) fail(`${label} is not closed`);
+}
+
+function safeReferencePath(value) {
+  return typeof value === "string" && value.length > 0 && value.length <= 240
+    && value.trim() === value && !value.includes("\\") && !/[\u0000-\u001f\u007f]/u.test(value)
+    && !isAbsolute(value) && !value.startsWith("./") && !value.endsWith("/")
+    && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+}
+
+function rejectedPreparation(code, field) {
+  return {
+    schema: "pipeline.role-dispatch-preflight.v1",
+    status: "rejected",
+    code,
+    field,
+    modelCalls: 0,
+    launcherCalls: 0,
+  };
+}
+
+/** Build and run the common role PREPARE from physical, refs-only candidate input. */
+export function prepareSelectedCriticRoleDispatch({ input, route, resultDestination = { kind: "return" }, prepare = preflightRoleDispatch } = {}) {
+  let boundRoute;
+  try { boundRoute = validateCriticHighRiskRoute(route); }
+  catch { return rejectedPreparation("RDP-ROUTE", "route"); }
+  if (boundRoute.candidateCommit !== input?.dispatch?.candidateCommit) return rejectedPreparation("RDP-ROUTE-CANDIDATE", "route.candidateCommit");
+  const paths = input?.referencePaths ?? input?.references;
+  if (!Array.isArray(paths) || paths.length === 0 || paths.length > 128 || paths.some((path) => !safeReferencePath(path))
+    || new Set(paths).size !== paths.length || JSON.stringify([...paths].sort()) !== JSON.stringify(paths)) {
+    return rejectedPreparation("RDP-REQUIRED-PATHS", "requiredPaths");
+  }
+  let root;
+  const requiredPathSha256 = {};
+  try {
+    const lexicalRoot = resolve(input.sandboxRuntime.repoRoot);
+    const rootStat = lstatSync(lexicalRoot);
+    root = realpathSync(lexicalRoot);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) return rejectedPreparation("RDP-ROOT", "root");
+    for (const path of paths) {
+      const lexical = resolve(root, path);
+      const rel = relative(root, lexical);
+      if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return rejectedPreparation("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
+      const stat = lstatSync(lexical);
+      if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(lexical) !== lexical) return rejectedPreparation("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
+      requiredPathSha256[path] = sha256(readFileSync(lexical));
+    }
+  } catch { return rejectedPreparation("RDP-REQUIRED-PATH", "requiredPaths"); }
+  const dispatchId = `selected-critic-${sha256(canonicalJson({ candidate: input.dispatch, paths, route: boundRoute })).slice(0, 24)}`;
+  const packet = {
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId,
+    transport: "codex",
+    role: "pipeline-core:critic",
+    prompt: `Independent Critic review from requiredPaths only. Ruleset-SHA: ${boundRoute.sourceSha256}; Model: ${boundRoute.model}; effort ${boundRoute.effort}.`,
+    candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree },
+    requiredPaths: [...paths],
+    requiredPathSha256,
+    resultDestination: structuredClone(resultDestination),
+  };
+  return prepare({ root, packet });
 }
 
 function validateSelectedCriticInput(input) {
@@ -134,7 +217,7 @@ function matchesSelectedHostExecution(value, selected) {
  * directly as hostBridge. Treat it as unconfirmed either way -- not fixed
  * here since that file is out of scope for this task.)
  */
-export function selectedCriticInProcessBridge(input, { route, verifyRoute = null, invokeAppServer = invokeCodexCriticAppServer, captureFailureDiagnostic = null } = {}) {
+export function selectedCriticInProcessBridge(input, { route, verifyRoute = null, dispatchPreparation = null, prepareRoleDispatch = preflightRoleDispatch, invokeAppServer = invokeCodexCriticAppServer, captureFailureDiagnostic = null } = {}) {
   const boundRoute = validateCriticHighRiskRoute(route);
   const completed = new Map();
   const launch = async (request) => {
@@ -142,13 +225,22 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
     if (request.duty !== "critic") fail("selected Critic launch duty is invalid");
     validateRequestedCriticRoute(request.requested);
     if (request.requested.runner !== boundRoute.runner || request.requested.model !== boundRoute.model) fail("selected Critic generic request drifted from bound route");
-    if (typeof verifyRoute === "function" && !equal(verifyRoute(), boundRoute)) fail("selected Critic authority drifted before launch");
+    if (typeof verifyRoute === "function") {
+      let currentRoute;
+      try { currentRoute = validateCriticHighRiskRoute(verifyRoute()); }
+      catch { throw new SelectedCriticDispatchPreflightError({ code: "RDP-ROUTE-DRIFT" }); }
+      if (!equal(currentRoute, boundRoute)) throw new SelectedCriticDispatchPreflightError({ code: "RDP-ROUTE-DRIFT" });
+    }
     if (!equal(request.references, input.referencePaths)) fail("selected Critic references drifted");
     if (request.scratch?.repoRoot !== input.sandboxRuntime.repoRoot) fail("selected Critic scratch repository drifted");
     if (request.selection?.dispatch?.candidateCommit !== input.dispatch.candidateCommit
       || request.selection?.dispatch?.candidateTree !== input.dispatch.candidateTree
       || request.selection?.dispatch?.referenceSetSha256 !== input.dispatch.referenceSetSha256) {
       fail("selected Critic dispatch binding drifted");
+    }
+    if (dispatchPreparation !== null) {
+      const current = prepareRoleDispatch({ root: input.sandboxRuntime.repoRoot, packet: dispatchPreparation.packet });
+      if (current?.status !== "prepared") throw new SelectedCriticDispatchPreflightError(current);
     }
     const sandboxTransport = {
       selectionId: request.selectionId,
@@ -249,6 +341,7 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
   };
   return {
     bridge: { launch, finalize },
+    classifyPreLaunchFailure: classifySelectedPreLaunchFailure,
     take(selectionId) {
       const value = completed.get(selectionId);
       if (!value?.receipt || !value?.execution) return null;
@@ -285,9 +378,10 @@ function validateFailureDiagnostic(value, input, sandboxTransport) {
   return structuredClone(value);
 }
 
-function unavailableResult(code, selected = null, failureDiagnostic = null) {
+function unavailableResult(code, selected = null, failureDiagnostic = null, preparationCode = null) {
   const result = { ok: false, code, selectionId: selected?.selectionId ?? null, sandboxBinding: null };
   if (failureDiagnostic) result.failureDiagnostic = structuredClone(failureDiagnostic);
+  if (preparationCode !== null) result.preparationCode = preparationCode;
   return result;
 }
 
@@ -300,7 +394,9 @@ function unavailableResult(code, selected = null, failureDiagnostic = null) {
  * "no child ran".
  */
 export async function runSelectedCriticHost(rawInput, transport = {}) {
-  const input = validateSelectedCriticInput(rawInput);
+  let input;
+  try { input = validateSelectedCriticInput(rawInput); }
+  catch { return unavailableResult("selected-critic-role-dispatch-rejected", null, null, "RDP-INPUT"); }
   const resolveRoute = transport.resolveCriticRoute ?? resolveCriticHighRiskRoute;
   const routeInput = {
     rootDir: input.sandboxRuntime.repoRoot,
@@ -314,16 +410,27 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
   } catch {
     return unavailableResult("selected-critic-route-invalid");
   }
+  const prepare = transport.preflightRoleDispatch ?? preflightRoleDispatch;
+  const dispatchPreparation = prepareSelectedCriticRoleDispatch({ input, route, resultDestination: { kind: "return" }, prepare });
+  if (dispatchPreparation?.status !== "prepared") {
+    const preparationCode = SELECTED_PREPARATION_CODES.has(dispatchPreparation?.code) ? dispatchPreparation.code : null;
+    return unavailableResult("selected-critic-role-dispatch-rejected", null, null, preparationCode);
+  }
   let capturedFailureDiagnostic = null;
   const selectedHost = selectedCriticInProcessBridge(input, {
     route,
     verifyRoute: resolveBoundRoute,
+    dispatchPreparation,
+    prepareRoleDispatch: prepare,
     invokeAppServer: transport.invokeCodexCriticAppServer ?? invokeCodexCriticAppServer,
     captureFailureDiagnostic: (diagnostic) => { capturedFailureDiagnostic = diagnostic; },
   });
   let dependencies = transport.dependencies;
   if (dependencies !== undefined) {
-    dependencies = { ...dependencies, bridge: { ...dependencies.bridge, ...selectedHost.bridge } };
+    dependencies = {
+      ...dependencies,
+      bridge: { ...dependencies.bridge, ...selectedHost.bridge, classifyPreLaunchFailure: selectedHost.classifyPreLaunchFailure },
+    };
   }
   if (dependencies === undefined) {
     try {
@@ -332,6 +439,10 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
         sandboxRuntime: input.sandboxRuntime,
         hostBridge: selectedHost.bridge,
       });
+      dependencies = {
+        ...dependencies,
+        bridge: { ...dependencies.bridge, classifyPreLaunchFailure: selectedHost.classifyPreLaunchFailure },
+      };
     } catch {
       return unavailableResult("selected-sandbox-required", null, capturedFailureDiagnostic);
     }
@@ -345,7 +456,9 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
       requested: { runner: route.runner, model: route.model },
       references: [...input.referencePaths],
     }, dependencies);
-  } catch {
+  } catch (error) {
+    const preparationCode = selectedHost.classifyPreLaunchFailure(error);
+    if (preparationCode !== null) return unavailableResult("selected-critic-role-dispatch-rejected", null, capturedFailureDiagnostic, preparationCode);
     return unavailableResult("selected-sandbox-required", null, capturedFailureDiagnostic);
   }
   if (!selected || selected.status === "unavailable" || selected.childStarted !== true) {

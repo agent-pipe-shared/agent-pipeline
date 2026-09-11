@@ -82,8 +82,7 @@
     {
       "name": "codex-critic-host-tests",
       "path": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "codex-critic-packet-host-tests",
@@ -126,6 +125,11 @@
       "path": "plugins/pipeline-core/scripts/codex-isolation-control-decomposition.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "codex-native-critic-host-tests",
+      "path": "plugins/pipeline-core/scripts/codex-native-critic-host.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "codex-onboarding-app-server-tests",
@@ -286,6 +290,11 @@
       "path": "harness/scripts/check-dispatch-provenance.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "dispatch-record-strip-for-critic-tests",
+      "path": "plugins/pipeline-core/lib/dispatch-record-strip-for-critic.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "dispatch-record-tests",
@@ -1005,6 +1014,11 @@
       "path": "plugins/pipeline-core/scripts/v3-bootstrap-authority.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "verify-case-completion-registry-tests",
+      "path": "harness/scripts/check-verify-case-completion.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "verify-evidence-root-tests",

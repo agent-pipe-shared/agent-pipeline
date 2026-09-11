@@ -79,10 +79,10 @@ USAGE (Elephant)
    the backlog-item rule above: the raw record's `report.text` is
    implementor narrative, exactly what CR-02/EL-09 forbid as Critic input
    (confirmed live 2026-09-04, `backlog/items/2026-09-04-a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it.md`).
-   The stripped copy carries only `taskId`, `agentType`, `model`, `effort`,
-   `rulesetSha`, `commits`, `report.changedFiles` (normalized to
-   bare paths) and `modelOverride.{model,effort}` — enough to verify
-   authorship, never the "why" or a completion-status claim (`outcome` is
+   The stripped copy carries only a digest-shaped `rulesetSha`, `commits`, and
+   `report.changedFiles` normalized to bare paths — enough to
+   verify the candidate/path authorship link without carrying free-form
+   model or override fields, never the "why" or a completion-status claim (`outcome` is
    deliberately excluded, not merely normalized — a Critic finding, F1,
    2026-09-04). The stripping is the Elephant's job before
    dispatch, not a disregard instruction asked of the Critic.

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { arch, release, tmpdir, type } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -10,9 +10,9 @@ import { PassThrough } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 import { invokeCodexNativeCriticHost, nativeCriticEvidenceCandidate, nativeCriticHeartbeatSnapshot, nativeCriticReportedChildFailure } from "./codex-native-critic-host.mjs";
-import { runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
+import { prepareSelectedCriticRoleDispatch, runSelectedCriticHost, selectedCriticInProcessBridge } from "./codex-critic-selected-host.mjs";
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
-import { runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
+import { executeSandboxedReadonlyDuty, runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
 import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 import {
   NATIVE_CRITIC_PROHIBITED_FEATURES,
@@ -25,8 +25,10 @@ import {
 import { buildNativeCriticSelection, nativeCriticArtifactRequestDigest, nativeCriticCanonicalDigest } from "../lib/codex-native-critic-policy.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { readCriticExportConsentState, resolveCriticExportConsentState, runCriticExportConsent } from "./critic-export-consent.mjs";
 import { prepareCriticExportConsent, recordCriticExportConsent } from "../lib/critic-export-policy.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 import {
   ASSURANCE,
@@ -40,8 +42,10 @@ import {
   normalizeRepoRelativePath,
   parseCliArgs,
   parseObserverArgs,
+  prepareSelectedCriticCliDispatch,
   prepareNativeCritic as prepareNativeCriticRaw,
   readJsonBounded,
+  selectedCriticHostBridge,
   sha256,
   validateCriticRequest,
   validateHostReturn,
@@ -55,7 +59,26 @@ import {
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
-let passed = 0;
+const EXPECTED_CASE_COUNT = 133;
+const caseResults = Array.from({ length: EXPECTED_CASE_COUNT }, () => {
+  let resolveCase;
+  let rejectCase;
+  const promise = new Promise((resolve, reject) => { resolveCase = resolve; rejectCase = reject; });
+  return { promise, resolve: resolveCase, reject: rejectCase };
+});
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: caseResults.map((result, index) => ({
+    id: `CCH${String(index + 1).padStart(3, "0")}`,
+    name: `Codex Critic host case ${String(index + 1).padStart(3, "0")}`,
+    run: async () => result.promise,
+  })),
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});
+let declaredCases = 0;
 
 check("native Critic evidence accepts a direct clean candidate and an exact clean Verify window only", () => {
   const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
@@ -126,15 +149,17 @@ let symlinkCapable = true;
   if (!symlinkCapable) process.stdout.write("[capability: symlink unavailable] skipping symlink-specific checks\n");
 }
 function check(name, fn) {
-  fn();
-  passed += 1;
-  process.stdout.write(`ok ${passed} - ${name}\n`);
+  const result = caseResults[declaredCases++];
+  if (!result) throw new Error(`unexpected Codex Critic host case: ${name}`);
+  try { fn(); result.resolve(); }
+  catch (error) { result.reject(error); }
 }
 
 async function checkAsync(name, fn) {
-  await fn();
-  passed += 1;
-  process.stdout.write(`ok ${passed} - ${name}\n`);
+  const result = caseResults[declaredCases++];
+  if (!result) throw new Error(`unexpected Codex Critic host case: ${name}`);
+  try { await fn(); result.resolve(); }
+  catch (error) { result.reject(error); }
 }
 
 function run(command, args, cwd) {
@@ -1411,6 +1436,120 @@ function validCriticVerdict() {
 const SELECTED_CRITIC_ROUTE = Object.freeze({ dutyId: "critic_high_risk", runner: "codex", model: "gpt-6-astra", effort: "max", sourceSha256: "a".repeat(64), candidateCommit: null });
 function selectedRouteFor(input) { return { ...SELECTED_CRITIC_ROUTE, candidateCommit: input.dispatch.candidateCommit }; }
 
+function realSelectedInput(paths = ["roles/critic.md"]) {
+  return {
+    repoFingerprint: "b".repeat(64),
+    dispatch: { queueRevision: 1, candidateCommit: candidate.commit, candidateTree: candidate.tree, referenceSetSha256: "e".repeat(64) },
+    referencePaths: paths,
+    reviewBase: candidate.base,
+    sandboxRuntime: { repoRoot: repo },
+  };
+}
+
+await checkAsync("selected Critic runs common PREPARE before sandbox selection and binds exact candidate, sorted physical references and V3 route", async () => {
+  const input = realSelectedInput(["policies/guard.md", "roles/critic.md"]);
+  let preparations = 0;
+  let selections = 0;
+  const result = await runSelectedCriticHost(input, {
+    resolveCriticRoute: () => selectedRouteFor(input),
+    preflightRoleDispatch(value) {
+      preparations += 1;
+      const prepared = preflightRoleDispatch(value);
+      assert.deepEqual(prepared.packet?.candidate, { commit: candidate.commit, tree: candidate.tree });
+      assert.deepEqual(prepared.packet?.requiredPaths, input.referencePaths);
+      assert.deepEqual(prepared.packet?.resultDestination, { kind: "return" });
+      assert.match(prepared.packet?.prompt ?? "", new RegExp(`Ruleset-SHA: ${SELECTED_CRITIC_ROUTE.sourceSha256}.*Model: ${SELECTED_CRITIC_ROUTE.model}.*effort ${SELECTED_CRITIC_ROUTE.effort}`, "u"));
+      return prepared;
+    },
+    dependencies: { async executeSandboxedReadonlyDuty() { selections += 1; return { status: "unavailable", childStarted: false, selectionId: null }; } },
+  });
+  assert.equal(preparations, 1);
+  assert.equal(selections, 1);
+  assert.equal(result.code, "selected-sandbox-required");
+});
+
+await checkAsync("invalid missing dirty candidate-foreign and duplicate selected references reject before sandbox selection", async () => {
+  const original = readFileSync(join(repo, "roles/critic.md"));
+  const cases = [
+    [realSelectedInput(["missing.md"]), "RDP-REQUIRED-PATH"],
+    [realSelectedInput(["roles/critic.md", "roles/critic.md"]), "RDP-INPUT"],
+    [realSelectedInput(["roles/critic.md", "policies/guard.md"]), "RDP-REQUIRED-PATHS"],
+    [realSelectedInput(Array.from({ length: 129 }, (_, index) => `missing-${String(index).padStart(3, "0")}.md`)), "RDP-REQUIRED-PATHS"],
+  ];
+  for (const [input, expectedPreparationCode] of cases) {
+    let selections = 0;
+    const result = await runSelectedCriticHost(input, {
+      resolveCriticRoute: () => selectedRouteFor(input),
+      dependencies: { async executeSandboxedReadonlyDuty() { selections += 1; } },
+    });
+    assert.equal(result.code, "selected-critic-role-dispatch-rejected");
+    assert.equal(result.preparationCode, expectedPreparationCode);
+    assert.equal(selections, 0);
+  }
+  try {
+    writeFileSync(join(repo, "roles/critic.md"), "candidate-foreign bytes\n");
+    let selections = 0;
+    const input = realSelectedInput();
+    const result = await runSelectedCriticHost(input, {
+      resolveCriticRoute: () => selectedRouteFor(input),
+      dependencies: { async executeSandboxedReadonlyDuty() { selections += 1; } },
+    });
+    assert.equal(result.code, "selected-critic-role-dispatch-rejected");
+    assert.equal(result.preparationCode, "RDP-REQUIRED-BLOB");
+    assert.equal(selections, 0);
+  } finally { writeFileSync(join(repo, "roles/critic.md"), original); }
+});
+
+await checkAsync("selected in-process return and CLI stream bridges recheck physical references immediately before their launcher", async () => {
+  const input = realSelectedInput();
+  const route = selectedRouteFor(input);
+  const original = readFileSync(join(repo, "roles/critic.md"));
+  for (const kind of ["return", "stream"]) {
+    const preparation = prepareSelectedCriticRoleDispatch({ input, route, resultDestination: { kind } });
+    assert.equal(preparation.status, "prepared");
+    let invoked = false;
+    const bridge = kind === "return"
+      ? selectedCriticInProcessBridge(input, {
+          route, dispatchPreparation: preparation,
+          invokeAppServer: async () => { invoked = true; return { status: "reviewed" }; },
+        }).bridge
+      : selectedCriticHostBridge({ next: async () => { invoked = true; return { done: true }; } }, {
+          root: repo, preparation,
+        });
+    try {
+      writeFileSync(join(repo, "roles/critic.md"), `late ${kind} drift\n`);
+      await assert.rejects(bridge.launch({
+        selectionId: "css_test", duty: "critic",
+        selection: { dispatch: { ...input.dispatch }, repoFingerprint: "b".repeat(64), toolchain: { cliSha256: "1".repeat(64) } },
+        requested: { runner: route.runner, model: route.model }, references: [...input.referencePaths],
+        profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
+        scratch: { path: "/tmp/x", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: repo, codexPath: "/codex" },
+      }), /role dispatch rejected/u);
+      assert.equal(invoked, false);
+    } finally { writeFileSync(join(repo, "roles/critic.md"), original); }
+  }
+});
+
+check("selected CLI PREPARE binds a stream destination before constructing its external bridge", () => {
+  const input = realSelectedInput();
+  const request = {
+    schema: "pipeline.codex-critic-selected-request.v1",
+    repoFingerprint: input.repoFingerprint,
+    dispatch: input.dispatch,
+    requested: { runner: SELECTED_CRITIC_ROUTE.runner, model: SELECTED_CRITIC_ROUTE.model },
+    references: input.referencePaths,
+    sandboxRuntime: input.sandboxRuntime,
+  };
+  let preflights = 0;
+  const preparation = prepareSelectedCriticCliDispatch(request, {
+    resolveCriticRoute: () => selectedRouteFor(input),
+    preflightRoleDispatch(value) { preflights += 1; return preflightRoleDispatch(value); },
+  });
+  assert.equal(preflights, 1);
+  assert.deepEqual(preparation.preparation.packet.resultDestination, { kind: "stream" });
+  assert.deepEqual(preparation.preparation.packet.requiredPaths, input.referencePaths);
+});
+
 check("the selected Critic route resolves model and effort from validated V3 project authority", () => {
   const candidateCommit = "c".repeat(40);
   const source = readFileSync(join(DEFAULT_PIPELINE_ROOT, "pipeline.user.yaml"), "utf8");
@@ -2229,8 +2368,106 @@ await checkAsync("selectedCriticInProcessBridge rejects a candidate-bound V3 sou
     requested: { runner: route.runner, model: route.model }, references: [...input.referencePaths],
     profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
     scratch: { path: "/tmp/x", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" },
-  }), /authority drifted/);
+  }), /role dispatch rejected: RDP-ROUTE-DRIFT/u);
   assert.equal(invoked, false);
+
+  const cliInput = realSelectedInput();
+  const cliRoute = selectedRouteFor(cliInput);
+  const cliPreparation = prepareSelectedCriticRoleDispatch({ input: cliInput, route: cliRoute, resultDestination: { kind: "stream" } });
+  let streamRequested = false;
+  const cliBridge = selectedCriticHostBridge({ next: async () => { streamRequested = true; return { done: true }; } }, {
+    root: repo,
+    preparation: cliPreparation,
+    boundRoute: cliRoute,
+    verifyRoute: () => ({ ...cliRoute, effort: "high", sourceSha256: "f".repeat(64) }),
+  });
+  await assert.rejects(cliBridge.launch({}), /RDP-ROUTE-DRIFT/u);
+  assert.equal(streamRequested, false);
+
+  const selection = criticSelectionFixture(cliInput);
+  const productionResult = await executeSandboxedReadonlyDuty({
+    duty: "critic",
+    repoFingerprint: cliInput.repoFingerprint,
+    dispatch: cliInput.dispatch,
+    requested: { runner: cliRoute.runner, model: cliRoute.model },
+    references: cliInput.referencePaths,
+  }, {
+    selectCodexSandbox: async () => selection,
+    store: {
+      readSelection: () => selection,
+      readJournal: () => ({ phase: "selected" }),
+      readExecution: () => { throw new Error("execution must not exist"); },
+      writeExecution: async () => { throw new Error("no preflight rejection may be persisted as an execution"); },
+      bindDuty: async () => { throw new Error("no preflight rejection may bind a duty"); },
+      runSerialized: async (_selectionId, runSelected) => runSelected(),
+    },
+    bridge: {
+      readback: async ({ profile }) => profile,
+      resolveScratch: async ({ profile }) => ({ sha256: profile.scratchRootSha256 }),
+      resealScratch: async () => {},
+      ...cliBridge,
+      classifyPreLaunchFailure: cliBridge.classifyPreLaunchFailure,
+    },
+  });
+  assert.deepEqual(productionResult, {
+    status: "unavailable",
+    failureClass: "role-dispatch-preflight-rejected",
+    preparationCode: "RDP-ROUTE-DRIFT",
+    childStarted: false,
+    selectionId: selection.selectionId,
+    assurance: { class: "no-usable-review", literal: null },
+  });
+  assert.equal(streamRequested, false);
+
+  let lookalikeLaunches = 0;
+  const lookalike = await runSandboxedReadonlyHostBridge({
+    selectionId: selection.selectionId,
+    duty: "critic",
+    requested: { runner: cliRoute.runner, model: cliRoute.model },
+    references: cliInput.referencePaths,
+  }, {
+    readSelection: async () => selection,
+    readback: async ({ profile }) => profile,
+    resolveScratch: async ({ profile }) => ({ sha256: profile.scratchRootSha256 }),
+    resealScratch: async () => {},
+    classifyPreLaunchFailure: cliBridge.classifyPreLaunchFailure,
+    launch: async () => {
+      lookalikeLaunches += 1;
+      throw Object.assign(new Error("ordinary launcher failure"), {
+        code: "ROLE_DISPATCH_PREFLIGHT_REJECTED",
+        preparationCode: "RDP-ROUTE-DRIFT",
+      });
+    },
+    finalize: async () => { throw new Error("must not finalize"); },
+  });
+  assert.equal(lookalikeLaunches, 1);
+  assert.equal(lookalike.terminal.childStarted, true);
+  assert.equal(lookalike.terminal.stdioStatus, "lost");
+  assert.equal(lookalike.terminal.cleanupStatus, "pending");
+
+  const unknownBridge = selectedCriticHostBridge({ next: async () => { throw new Error("must not consume the result stream"); } }, {
+    root: repo,
+    preparation: cliPreparation,
+    boundRoute: cliRoute,
+    verifyRoute: () => cliRoute,
+    prepare: () => ({ status: "rejected", code: "RDP-INVENTED" }),
+  });
+  const unknown = await runSandboxedReadonlyHostBridge({
+    selectionId: selection.selectionId,
+    duty: "critic",
+    requested: { runner: cliRoute.runner, model: cliRoute.model },
+    references: cliInput.referencePaths,
+  }, {
+    readSelection: async () => selection,
+    readback: async ({ profile }) => profile,
+    resolveScratch: async ({ profile }) => ({ sha256: profile.scratchRootSha256 }),
+    resealScratch: async () => {},
+    ...unknownBridge,
+    classifyPreLaunchFailure: unknownBridge.classifyPreLaunchFailure,
+  });
+  assert.equal(unknown.terminal.childStarted, true);
+  assert.equal(unknown.terminal.stdioStatus, "lost");
+  assert.equal(unknown.terminal.cleanupStatus, "pending");
 });
 
 function criticSelectionFixture(input) {
@@ -2273,13 +2510,7 @@ async function assertSharedSelectedBridgeNoChild(invokeAppServer) {
 }
 
 await checkAsync("runSelectedCriticHost composes the real in-process bridge and the real consumer end to end, faking only the child process and the generic selected-duty executor", async () => {
-  const input = {
-    repoFingerprint: "b".repeat(64),
-    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
-    referencePaths: ["roles/critic.md"],
-    reviewBase: "9".repeat(40),
-    sandboxRuntime: { repoRoot: repo },
-  };
+  const input = realSelectedInput();
   const selection = criticSelectionFixture(input);
   let childRequest;
   const transport = {
@@ -2345,13 +2576,7 @@ await checkAsync("selectedCriticInProcessBridge.finalize refuses when the select
 });
 
 await checkAsync("runSelectedCriticHost reports selected-sandbox-required when no selection/child is available", async () => {
-  const input = {
-    repoFingerprint: "b".repeat(64),
-    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
-    referencePaths: ["roles/critic.md"],
-    reviewBase: "9".repeat(40),
-    sandboxRuntime: { repoRoot: repo },
-  };
+  const input = realSelectedInput();
   const result = await runSelectedCriticHost(input, {
     resolveCriticRoute: ({ candidateCommit }) => ({ ...SELECTED_CRITIC_ROUTE, candidateCommit }),
     dependencies: { async executeSandboxedReadonlyDuty() { return { status: "unavailable", childStarted: false, selectionId: null }; } },
@@ -2360,13 +2585,7 @@ await checkAsync("runSelectedCriticHost reports selected-sandbox-required when n
 });
 
 await checkAsync("runSelectedCriticHost reports selected-critic-transport-failed rather than collapsing a completed-but-invalid child into no-child evidence", async () => {
-  const input = {
-    repoFingerprint: "b".repeat(64),
-    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
-    referencePaths: ["roles/critic.md"],
-    reviewBase: "9".repeat(40),
-    sandboxRuntime: { repoRoot: repo },
-  };
+  const input = realSelectedInput();
   const failedAssurance = { class: "sandbox-read-only-except-coordinator-scratch-network-open", literal: "sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted" };
   const result = await runSelectedCriticHost(input, {
     resolveCriticRoute: ({ candidateCommit }) => ({ ...SELECTED_CRITIC_ROUTE, candidateCommit }),
@@ -2386,11 +2605,7 @@ await checkAsync("runSelectedCriticHost reports selected-critic-transport-failed
 });
 
 await checkAsync("runSelectedCriticHost carries the real app-server failure projection from the selected bridge to the selected transport error without accepting caller-supplied diagnostic data", async () => {
-  const input = {
-    repoFingerprint: "b".repeat(64),
-    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
-    referencePaths: ["roles/critic.md"], reviewBase: "9".repeat(40), sandboxRuntime: { repoRoot: repo },
-  };
+  const input = realSelectedInput();
   const selection = criticSelectionFixture(input);
   const result = await runSelectedCriticHost(input, {
     resolveCriticRoute: ({ candidateCommit }) => ({ ...SELECTED_CRITIC_ROUTE, candidateCommit }),
@@ -2509,13 +2724,7 @@ await checkAsync("the real runSandboxedReadonlyHostBridge resolves a genuinely u
 });
 
 await checkAsync("runSelectedCriticHost returns selected-sandbox-required, not selected-critic-transport-failed, when the real bridge chain observes no child started", async () => {
-  const input = {
-    repoFingerprint: "b".repeat(64),
-    dispatch: { queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64) },
-    referencePaths: ["roles/critic.md"],
-    reviewBase: "9".repeat(40),
-    sandboxRuntime: { repoRoot: repo },
-  };
+  const input = realSelectedInput();
   const selection = criticSelectionFixture(input);
   const scratch = { path: root, sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: input.sandboxRuntime.repoRoot, codexPath: "/codex" };
   const transport = {
@@ -2743,4 +2952,4 @@ await checkAsync("codex-critic-app-server binds a source ruleset to a completely
   } finally { rmSync(fixtureRoot, { recursive: true, force: true }); }
 });
 
-process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
+assert.equal(declaredCases, EXPECTED_CASE_COUNT, "Codex Critic host Completion case count drifted");

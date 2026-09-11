@@ -48,7 +48,9 @@ import {
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import { routingProvenance } from "../lib/routing-projection.mjs";
-import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
+import { resolveCriticHighRiskRoute, resolveV3DutyRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+import { prepareSelectedCriticRoleDispatch } from "./codex-critic-selected-host.mjs";
 import { PROGRESS_COMPONENTS, admitReviewAttempt, evaluateProgress } from "../lib/review-economy.mjs";
 import { executeSandboxedReadonlyDuty, runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
@@ -91,6 +93,26 @@ const MAX_REVIEW_COMMITS = 256;
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{2,79}$/;
+const SELECTED_PREPARATION_CODES = new Set([
+  "RDP-ROOT", "RDP-PACKET-SHAPE", "RDP-DISPATCH-ID", "RDP-TRANSPORT", "RDP-ROLE", "RDP-PROMPT",
+  "RDP-CANDIDATE-SHAPE", "RDP-CANDIDATE-COMMIT", "RDP-CANDIDATE-TREE", "RDP-REQUIRED-PATHS",
+  "RDP-REQUIRED-DIGESTS", "RDP-REQUIRED-PATH", "RDP-REQUIRED-BLOB", "RDP-REQUIRED-PATH-DRIFT",
+  "RDP-RESULT-PATH", "RDP-RESULT-DESTINATION", "RDP-RESULT-ROOT", "RDP-RESULT-ALIASES-INPUT",
+  "RDP-ROUTE", "RDP-ROUTE-CANDIDATE", "RDP-ROUTE-DRIFT", "RDP-INPUT",
+]);
+
+class SelectedCriticDispatchPreflightError extends Error {
+  constructor(preparation) {
+    super(`selected Critic role dispatch rejected${preparation?.code ? `: ${preparation.code}` : ""}`);
+    this.preparation = preparation;
+  }
+}
+
+function classifySelectedPreLaunchFailure(error) {
+  if (!(error instanceof SelectedCriticDispatchPreflightError)) return null;
+  const code = error.preparation?.code;
+  return SELECTED_PREPARATION_CODES.has(code) ? code : null;
+}
 const CRITIC_PARENT_AUTHORITY = Object.freeze({
   operations: Object.freeze(["read"]),
   paths: Object.freeze([".claude/**", "docs/**", "evidence/**", "governance/**", "plugins/**", "policies/**", "roles/**", "specs/**", "templates/**"]),
@@ -129,7 +151,7 @@ export async function runSelectedCodexCritic({ selectionId, requested, reference
  * The production Critic composition point: dispatch facts enter the closed
  * selector first; only its persisted exact-ID record can reach a child.
  */
-export async function runCodexCriticThroughSelectedSandbox({ sandboxRuntime, hostBridge, ...request } = {}, transport = undefined) {
+export async function runCodexCriticThroughSelectedSandbox({ sandboxRuntime, hostBridge, classifyPreLaunchFailure = null, ...request } = {}, transport = undefined) {
   let dependencies = transport;
   if (dependencies === undefined) {
     try {
@@ -150,13 +172,16 @@ export async function runCodexCriticThroughSelectedSandbox({ sandboxRuntime, hos
       };
     }
   }
+  if (typeof classifyPreLaunchFailure === "function") {
+    dependencies = { ...dependencies, bridge: { ...dependencies.bridge, classifyPreLaunchFailure } };
+  }
   return (dependencies.executeSandboxedReadonlyDuty ?? executeSandboxedReadonlyDuty)({
     ...request,
     duty: "critic",
   }, dependencies);
 }
 
-function selectedCriticHostBridge(iterator) {
+export function selectedCriticHostBridge(iterator, { root = null, preparation = null, boundRoute = null, verifyRoute = null, prepare = preflightRoleDispatch } = {}) {
   const receive = async (requestId) => {
     const next = await iterator.next();
     if (next.done) fail("selected Critic host closed before the child result");
@@ -168,8 +193,18 @@ function selectedCriticHostBridge(iterator) {
     }
     return response.execution;
   };
-  return {
+  const bridge = {
     async launch(request) {
+      if (boundRoute !== null && typeof verifyRoute === "function") {
+        let currentRoute;
+        try { currentRoute = validateCriticHighRiskRoute(verifyRoute()); }
+        catch { throw new SelectedCriticDispatchPreflightError({ code: "RDP-ROUTE-DRIFT" }); }
+        if (canonicalJson(currentRoute) !== canonicalJson(boundRoute)) throw new SelectedCriticDispatchPreflightError({ code: "RDP-ROUTE-DRIFT" });
+      }
+      if (preparation !== null) {
+        const current = prepare({ root, packet: preparation.packet });
+        if (current?.status !== "prepared") throw new SelectedCriticDispatchPreflightError(current);
+      }
       const requestId = `selected-${nodeRandomBytes(12).toString("hex")}`;
       process.stdout.write(`${JSON.stringify({
         schema: "pipeline.codex-critic-selected-host.v1",
@@ -186,6 +221,31 @@ function selectedCriticHostBridge(iterator) {
     },
     async finalize({ launched }) { return launched.execution; },
   };
+  Object.defineProperty(bridge, "classifyPreLaunchFailure", { value: classifySelectedPreLaunchFailure });
+  return bridge;
+}
+
+/** PREPARE for the external selected CLI while retaining its launch/result JSON-line protocol. */
+export function prepareSelectedCriticCliDispatch(selectedRequest, dependencies = {}) {
+  const resolveRoute = dependencies.resolveCriticRoute ?? resolveCriticHighRiskRoute;
+  let route;
+  try {
+    route = validateCriticHighRiskRoute(resolveRoute({
+      rootDir: selectedRequest?.sandboxRuntime?.repoRoot,
+      candidateCommit: selectedRequest?.dispatch?.candidateCommit,
+    }));
+  } catch { throw new SelectedCriticDispatchPreflightError({ code: "RDP-ROUTE" }); }
+  if (selectedRequest?.requested?.runner !== route.runner || selectedRequest?.requested?.model !== route.model) {
+    throw new SelectedCriticDispatchPreflightError({ code: "RDP-ROUTE-DRIFT" });
+  }
+  const preparation = prepareSelectedCriticRoleDispatch({
+    input: selectedRequest,
+    route,
+    resultDestination: { kind: "stream" },
+    prepare: dependencies.preflightRoleDispatch ?? preflightRoleDispatch,
+  });
+  if (preparation?.status !== "prepared") throw new SelectedCriticDispatchPreflightError(preparation);
+  return { preparation, route };
 }
 
 function assuranceForRequest(request) {
@@ -1828,15 +1888,27 @@ async function main() {
       const selectedRequest = readJsonBounded(args.input).value;
       exactKeys(selectedRequest, ["schema", "repoFingerprint", "dispatch", "requested", "references", "sandboxRuntime"], "selected Critic request");
       if (selectedRequest.schema !== "pipeline.codex-critic-selected-request.v1") fail("selected Critic request schema is invalid");
+      const cliDispatch = prepareSelectedCriticCliDispatch(selectedRequest);
+      const { preparation, route } = cliDispatch;
       const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
       try {
+        const hostBridge = selectedCriticHostBridge(lines[Symbol.asyncIterator](), {
+          root: selectedRequest.sandboxRuntime.repoRoot,
+          preparation,
+          boundRoute: route,
+          verifyRoute: () => resolveCriticHighRiskRoute({
+            rootDir: selectedRequest.sandboxRuntime.repoRoot,
+            candidateCommit: selectedRequest.dispatch.candidateCommit,
+          }),
+        });
         const result = await runCodexCriticThroughSelectedSandbox({
           repoFingerprint: selectedRequest.repoFingerprint,
           dispatch: selectedRequest.dispatch,
           requested: selectedRequest.requested,
           references: selectedRequest.references,
           sandboxRuntime: selectedRequest.sandboxRuntime,
-          hostBridge: selectedCriticHostBridge(lines[Symbol.asyncIterator]()),
+          hostBridge,
+          classifyPreLaunchFailure: hostBridge.classifyPreLaunchFailure,
         });
         process.stdout.write(canonicalJson(result));
       } finally { lines.close(); }
@@ -1867,6 +1939,18 @@ async function main() {
         });
     process.stdout.write(canonicalJson(result));
   } catch (error) {
+    const preparationCode = classifySelectedPreLaunchFailure(error);
+    if (preparationCode !== null) {
+      process.stdout.write(canonicalJson({
+        status: "unavailable",
+        failureClass: "role-dispatch-preflight-rejected",
+        preparationCode,
+        childStarted: false,
+        assurance: { class: "no-usable-review", literal: null },
+      }));
+      process.exitCode = 2;
+      return;
+    }
     const detail = error instanceof ProjectOnboardingReadyError
       ? `${error.code}: project onboarding readiness denied the Critic dispatch`
       : error.message;

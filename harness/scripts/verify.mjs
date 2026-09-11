@@ -223,7 +223,8 @@ const TEST_SUITES = [
   { name: "pipeline-update-channel-tests", file: join(pluginScriptsDir, "pipeline-update-channel.test.mjs") },
   { name: "bootstrap-env-check-tests", file: join(pluginScriptsDir, "bootstrap-env-check.test.mjs") },
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },
-  { name: "codex-critic-host-tests", file: join(pluginScriptsDir, "codex-critic-host.test.mjs") },
+  { name: "codex-critic-host-tests", file: join(pluginScriptsDir, "codex-critic-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 133 }, (_, index) => `CCH${String(index + 1).padStart(3, "0")}`), maxBytes: 65_536 } },
+  { name: "codex-native-critic-host-tests", file: join(pluginScriptsDir, "codex-native-critic-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `NCH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "codex-critic-isolation-tests", file: join(pluginScriptsDir, "codex-critic-isolation.test.mjs") },
   { name: "codex-isolated-critic-contract-tests", file: join(pluginScriptsDir, "codex-isolated-critic-contract.test.mjs") },
   { name: "claude-critic-host-tests", file: join(pluginScriptsDir, "critic-claude-host.test.mjs") },
@@ -506,7 +507,7 @@ const TEST_SUITES = [
   { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
   { name: "test-case-completion-tests", file: join(libDir, "test-case-completion.test.mjs") },
   { name: "verify-case-completion-receipt-tests", file: join(libDir, "verify-case-completion-receipt.test.mjs") },
-  { name: "verify-case-completion-registry-tests", file: join(scriptDir, "check-verify-case-completion.test.mjs") },
+  { name: "verify-case-completion-registry-tests", file: join(scriptDir, "check-verify-case-completion.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 14 }, (_, index) => `VCR${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "verify-case-completion-check", file: join(scriptDir, "check-verify-case-completion.mjs") },
   { name: "afk-assumption-mode-tests", file: join(libDir, "afk-assumption-mode.test.mjs") },
   { name: "afk-capability-worker-tests", file: join(libDir, "afk-capability-worker.test.mjs") },
@@ -791,7 +792,7 @@ const TEST_SUITES = [
   { name: "pre-gate-tests", file: join(scriptDir, "pre-gate.test.mjs") },
   { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
   { name: "verify-evidence-writer-tests", file: join(scriptDir, "verify-evidence-writer.test.mjs") },
-  { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs") },
+  { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 11 }, (_, index) => `DRS${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at

@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
+
+import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
 
 import {
   DEFAULT_REGISTRY,
@@ -16,7 +17,7 @@ import {
 } from "./check-verify-case-completion.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const SCHEMA_SOURCE = readFileSync(join(REPO_ROOT, DEFAULT_SCHEMA), "utf8");
+const schemaSource = () => readFileSync(join(REPO_ROOT, DEFAULT_SCHEMA), "utf8");
 const REASON = "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md";
 const LEGACY = `import assert from "node:assert/strict";
 function check(name, fn) { fn(); console.log(name); }
@@ -27,8 +28,9 @@ const TOP_LEVEL = `import assert from "node:assert/strict";
 assert.equal(1, 1);
 assert.equal(2, 2);
 `;
-const REQUIRED = `import assert from "node:assert/strict";
-import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+const IMPORT_KEYWORD = "import";
+const REQUIRED = `${IMPORT_KEYWORD} assert from "node:assert/strict";
+${IMPORT_KEYWORD} { registerTestCaseCompletion } from "./test-case-completion.mjs";
 registerTestCaseCompletion({
   cases: [{ id: "case-one", name: "runs a real case", run: () => { assert.equal(1, 1); } }],
   fd: 3,
@@ -40,6 +42,11 @@ import test from "node:test";
 test("one", () => assert.equal(1, 1));
 test("two", () => assert.equal(2, 2));
 `;
+
+const cases = [];
+function check(id, name, run) {
+  cases.push({ id, name, run });
+}
 
 function write(root, relPath, content) {
   const target = join(root, relPath);
@@ -66,7 +73,7 @@ const TEST_SUITES = [
   write(root, "plugins/pipeline-core/lib/scoped.test.mjs", TOP_LEVEL);
   write(root, "plugins/pipeline-core/lib/windows.test.mjs", LEGACY);
   write(root, REASON, "# tracked migration reason\n");
-  write(root, DEFAULT_SCHEMA, SCHEMA_SOURCE);
+  write(root, DEFAULT_SCHEMA, schemaSource());
   const registry = {
     schema: "pipeline.verify-case-completion-registry.v1",
     entries: [
@@ -86,14 +93,14 @@ function git(root, args) {
   return result.stdout.trim();
 }
 
-test("the repository registry covers all arrays and excludes the two required descriptor suites from the vulnerable count", () => {
+check("VCR01", "the repository registry covers all arrays and excludes the two required descriptor suites from the vulnerable count", () => {
   const result = checkVerifyCaseCompletion({ root: REPO_ROOT });
   assert.equal(result.ok, true, result.findings.join("\n"));
-  assert.equal(result.vulnerableCount, 173);
-  assert.equal(result.registryCount, 177);
+  assert.equal(result.vulnerableCount, 174);
+  assert.equal(result.registryCount, 180);
 });
 
-test("the closed classifier distinguishes vulnerable and separately registered cases", () => {
+check("VCR02", "the closed classifier distinguishes vulnerable and separately registered cases", () => {
   assert.equal(classifyVulnerableSuite(LEGACY)?.classification, "throwing-check-wrapper");
   assert.equal(classifyVulnerableSuite(TOP_LEVEL)?.classification, "top-level-assertions");
   assert.equal(classifyVulnerableSuite(REQUIRED), null);
@@ -128,7 +135,7 @@ registry.test("method two");
   assert.equal(result.vulnerableCount, 3, "scoped and Windows arrays must be scanned too");
 });
 
-test("missing, new, duplicate, and stale registry entries fail closed", () => {
+check("VCR03", "missing, new, duplicate, and stale registry entries fail closed", () => {
   const context = fixture();
   context.registry.entries = context.registry.entries.filter((entry) => entry.name !== "scoped-legacy");
   context.registry.entries.push({ name: "legacy", path: "plugins/pipeline-core/lib/legacy.test.mjs", disposition: "legacy-process-only", reason: REASON });
@@ -141,7 +148,7 @@ test("missing, new, duplicate, and stale registry entries fail closed", () => {
   assert.ok(result.findings.some((finding) => finding.startsWith("REGISTRY-STALE gone")));
 });
 
-test("unknown fields and missing backlog reasons cannot widen the registry", () => {
+check("VCR04", "unknown fields and missing backlog reasons cannot widen the registry", () => {
   const context = fixture();
   context.registry.entries[0].extra = true;
   context.registry.entries[0].reason = "docs/not-a-backlog-item.md";
@@ -152,7 +159,7 @@ test("unknown fields and missing backlog reasons cannot widen the registry", () 
   assert.ok(result.findings.some((finding) => finding.startsWith("REGISTRY-REASON registry entry 0")));
 });
 
-test("a touched legacy suite must migrate in the same candidate", () => {
+check("VCR05", "a touched legacy suite must migrate in the same candidate", () => {
   const context = fixture();
   const red = checkVerifyCaseCompletion({ root: context.root, changedPaths: ["plugins/pipeline-core/lib/legacy.test.mjs"] });
   assert.equal(red.ok, false);
@@ -164,7 +171,7 @@ test("a touched legacy suite must migrate in the same candidate", () => {
   assert.equal(green.ok, true, green.findings.join("\n"));
 });
 
-test("base/candidate mode reads the candidate registry and enforces same-candidate migration", () => {
+check("VCR06", "base/candidate mode reads the candidate registry and enforces same-candidate migration", () => {
   const context = fixture();
   git(context.root, ["init", "-q"]);
   git(context.root, ["config", "user.email", "fixture@example.invalid"]);
@@ -190,7 +197,7 @@ test("base/candidate mode reads the candidate registry and enforces same-candida
   assert.equal(green.ok, true, green.findings.join("\n"));
 });
 
-test("required cannot claim protocol coverage from separate node:test cases alone", () => {
+check("VCR07", "required cannot claim protocol coverage from separate node:test cases alone", () => {
   const context = fixture();
   write(context.root, "plugins/pipeline-core/lib/required.test.mjs", FALSE_REQUIRED);
   const result = checkVerifyCaseCompletion({ root: context.root });
@@ -198,7 +205,7 @@ test("required cannot claim protocol coverage from separate node:test cases alon
   assert.ok(result.findings.includes("REQUIRED-PROTOCOL required does not import and invoke registerTestCaseCompletion"));
 });
 
-test("required cannot claim an unreachable helper call as normal suite setup", () => {
+check("VCR08", "required cannot claim an unreachable helper call as normal suite setup", () => {
   for (const unreachable of [
     `import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 function dormant() { registerTestCaseCompletion({ cases: [], fd: 3, maxBytes: 4096 }); }
@@ -223,7 +230,7 @@ registerTestCaseCompletion({ cases: [], fd: 3, maxBytes: 4096 });
   }
 });
 
-test("required cannot alias a recorder or use an open registration configuration", () => {
+check("VCR09", "required cannot alias a recorder or use an open registration configuration", () => {
   for (const impostor of [
     `import { createTestCaseCompletionRecorder as registerTestCaseCompletion } from "./test-case-completion.mjs";
 registerTestCaseCompletion({ cases: [], fd: 3, maxBytes: 4096 });
@@ -244,7 +251,7 @@ registerTestCaseCompletion(configuration);
   }
 });
 
-test("required must resolve the import to the shipped completion helper", () => {
+check("VCR10", "required must resolve the import to the shipped completion helper", () => {
   const context = fixture();
   write(context.root, "plugins/pipeline-core/lib/required.test.mjs", REQUIRED.replace(
     'from "./test-case-completion.mjs"',
@@ -256,7 +263,7 @@ test("required must resolve the import to the shipped completion helper", () => 
   assert.ok(result.findings.includes("REQUIRED-PROTOCOL required does not import and invoke registerTestCaseCompletion"));
 });
 
-test("every Verify array entry must use the closed literal registration grammar", () => {
+check("VCR11", "every Verify array entry must use the closed literal registration grammar", () => {
   for (const mutation of [
     (source) => source.replace(
       "const TEST_SUITES = [",
@@ -280,7 +287,7 @@ test("every Verify array entry must use the closed literal registration grammar"
   }
 });
 
-test("the candidate schema is loaded and enforced in worktree and Git blob modes", () => {
+check("VCR12", "the candidate schema is loaded and enforced in worktree and Git blob modes", () => {
   const context = fixture();
   git(context.root, ["init", "-q"]);
   git(context.root, ["config", "user.email", "fixture@example.invalid"]);
@@ -289,7 +296,7 @@ test("the candidate schema is loaded and enforced in worktree and Git blob modes
   git(context.root, ["commit", "-qm", "base"]);
   const base = git(context.root, ["rev-parse", "HEAD"]);
 
-  const schema = JSON.parse(SCHEMA_SOURCE);
+  const schema = JSON.parse(schemaSource());
   schema.required.push("candidateMarker");
   schema.properties.candidateMarker = { type: "string" };
   write(context.root, DEFAULT_SCHEMA, `${JSON.stringify(schema, null, 2)}\n`);
@@ -305,7 +312,7 @@ test("the candidate schema is loaded and enforced in worktree and Git blob modes
   assert.ok(blob.findings.some((finding) => finding.includes('missing required property "candidateMarker"')));
 });
 
-test("a newly registered existing suite cannot enter as legacy", () => {
+check("VCR13", "a newly registered existing suite cannot enter as legacy", () => {
   const context = fixture();
   write(context.root, "plugins/pipeline-core/lib/dormant.test.mjs", LEGACY);
   git(context.root, ["init", "-q"]);
@@ -335,10 +342,20 @@ test("a newly registered existing suite cannot enter as legacy", () => {
   assert.ok(result.findings.includes("LEGACY-NEW dormant is a new Verify registration and must start as required"));
 });
 
-test("the CLI rejects unpaired refs and unknown arguments", () => {
+check("VCR14", "the CLI rejects unpaired refs and unknown arguments", () => {
   const script = fileURLToPath(new URL("./check-verify-case-completion.mjs", import.meta.url));
   for (const args of [["--base", "HEAD"], ["--wat"]]) {
     const result = spawnSync(process.execPath, [script, ...args], { cwd: REPO_ROOT, encoding: "utf8", shell: false });
     assert.equal(result.status, 2);
   }
+});
+
+assert.equal(cases.length, 14, "the complete Verify case-completion registry corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
 });

@@ -1,19 +1,25 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import test from "node:test";
+import { openSync } from "node:fs";
 
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import {
   DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS,
   stripDispatchRecordForCritic,
 } from "./dispatch-record-strip-for-critic.mjs";
 
+const cases = [];
+function check(id, name, run) {
+  cases.push({ id, name, run });
+}
+
 // Realistic shape mirroring the real corpus under evidence/dispatch-record-*.json:
 // a bare-string changedFiles entry with a " - <rationale>" suffix (house style, e.g.
 // evidence/dispatch-record-NVA-B-SCANNER.json), an object-shaped {path, rationale}
 // entry (e.g. evidence/dispatch-record-NVA-B-DRPATH-1.json), a bare path string with
-// no suffix at all, non-empty report.text implementor prose, and a modelOverride
-// carrying a free-text rationale alongside its bounded model/effort fields.
+// no suffix at all, non-empty report.text implementor prose, and model-selection
+// metadata that the authorship-only projection does not need.
 const FULL_RECORD = {
   taskId: "NVA-B-CRITICINPUT-1",
   agentType: "goldfish-deep",
@@ -47,7 +53,7 @@ const FULL_RECORD = {
   },
 };
 
-test("stripDispatchRecordForCritic drops report.text, log, dispatcher, criticSkip and modelOverride.rationale, and normalizes changedFiles to bare path strings", () => {
+check("DRS01", "stripDispatchRecordForCritic drops narrative and model metadata, and normalizes changedFiles to bare path strings", () => {
   const stripped = stripDispatchRecordForCritic(FULL_RECORD);
   const serialized = JSON.stringify(stripped);
 
@@ -55,6 +61,9 @@ test("stripDispatchRecordForCritic drops report.text, log, dispatcher, criticSki
   assert.equal(stripped.log, undefined);
   assert.equal(stripped.dispatcher, undefined);
   assert.equal(stripped.criticSkip, undefined);
+  assert.equal(stripped.taskId, undefined);
+  assert.equal(stripped.model, undefined);
+  assert.equal(stripped.modelOverride, undefined);
 
   assert.ok(!serialized.includes("F1 fixed"));
   assert.ok(!serialized.includes("crashed on an empty trailer block"));
@@ -69,24 +78,21 @@ test("stripDispatchRecordForCritic drops report.text, log, dispatcher, criticSki
   ]);
 });
 
-test("stripDispatchRecordForCritic passes the declared safe top-level fields through unchanged", () => {
+check("DRS02", "stripDispatchRecordForCritic passes the declared safe top-level fields through unchanged", () => {
   const stripped = stripDispatchRecordForCritic(FULL_RECORD);
-  assert.equal(stripped.taskId, "NVA-B-CRITICINPUT-1");
-  assert.equal(stripped.agentType, "goldfish-deep");
-  assert.equal(stripped.model, "claude-sonnet-5");
-  assert.equal(stripped.effort, "xhigh");
+  assert.equal(stripped.taskId, undefined);
   assert.equal(stripped.rulesetSha, "5b2ce43");
   assert.deepEqual(stripped.commits, ["a1b2c3d4"]);
-  // Nothing beyond the declared safe set (plus report/modelOverride) survives.
+  // Nothing beyond the declared safe set (plus the normalized report) survives.
   for (const key of Object.keys(stripped)) {
     assert.ok(
-      DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS.includes(key) || key === "report" || key === "modelOverride",
+      DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS.includes(key) || key === "report",
       `unexpected surviving top-level key: ${key}`,
     );
   }
 });
 
-test("stripDispatchRecordForCritic drops outcome entirely, even when it carries real-corpus free-text prose", () => {
+check("DRS03", "stripDispatchRecordForCritic drops outcome entirely, even when it carries real-corpus free-text prose", () => {
   assert.equal(stripDispatchRecordForCritic(FULL_RECORD).outcome, undefined);
   assert.ok(!("outcome" in stripDispatchRecordForCritic(FULL_RECORD)));
 
@@ -101,18 +107,61 @@ test("stripDispatchRecordForCritic drops outcome entirely, even when it carries 
   }
 });
 
-test("stripDispatchRecordForCritic keeps modelOverride.model/.effort while dropping modelOverride.rationale", () => {
+check("DRS04", "stripDispatchRecordForCritic omits all model override fields including hyphenated prose", () => {
   const stripped = stripDispatchRecordForCritic(FULL_RECORD);
-  assert.deepEqual(stripped.modelOverride, { model: "claude-opus-5", effort: "max" });
+  assert.equal(stripped.modelOverride, undefined);
 });
 
-test("stripDispatchRecordForCritic does not throw on a record missing every optional field", () => {
+check("DRS05", "stripDispatchRecordForCritic omits hyphenated model prose and rejects a hyphenated ruleset claim", () => {
+  const stripped = stripDispatchRecordForCritic({
+    taskId: "this-task-id-claims-the-entire-change-is-correct",
+    model: "selected-because-this-model-is-fast",
+    modelOverride: { model: "chosen-because-this-change-is-risky", effort: "very-high" },
+  });
+  assert.equal(stripped.model, undefined);
+  assert.equal(stripped.modelOverride, undefined);
+  assert.equal(stripped.taskId, undefined);
+  assert.ok(!JSON.stringify(stripped).includes("claims-the-entire-change"));
+  assert.ok(!JSON.stringify(stripped).includes("selected-because"));
+  assert.ok(!JSON.stringify(stripped).includes("chosen-because"));
+
+  assert.throws(
+    () => stripDispatchRecordForCritic({ taskId: "NVA-X-TOKEN-2", rulesetSha: "ruleset-selected-because-it-is-current" }),
+    /Git digest or a SHA-256 digest/u,
+  );
+});
+
+check("DRS06", "stripDispatchRecordForCritic fails closed on unsafe object paths while retaining only a safe legacy string path", () => {
+  const unsafeEntries = [
+    { path: "src/file.mjs because I fixed the guard" },
+    { path: "../private/notes.md" },
+    { path: "src//file.mjs" },
+    { path: "C:/Users/Alice/private.txt" },
+    { path: "src/file.mjs", unexpected: "implementor prose" },
+  ];
+  for (const entry of unsafeEntries) {
+    assert.throws(
+      () => stripDispatchRecordForCritic({ taskId: "NVA-X-PATH-1", report: { changedFiles: [entry] } }),
+      TypeError,
+    );
+  }
+
+  assert.deepEqual(
+    stripDispatchRecordForCritic({
+      taskId: "NVA-X-PATH-2",
+      report: { changedFiles: ["src/safe-file.mjs - fixed traversal without exposing the rationale"] },
+    }).report.changedFiles,
+    ["src/safe-file.mjs"],
+  );
+});
+
+check("DRS07", "stripDispatchRecordForCritic does not throw on a record missing every optional field", () => {
   const minimal = { taskId: "NVA-X-MIN-1" };
   const stripped = stripDispatchRecordForCritic(minimal);
-  assert.deepEqual(stripped, { taskId: "NVA-X-MIN-1" });
+  assert.deepEqual(stripped, {});
 });
 
-test("stripDispatchRecordForCritic omits report when report.changedFiles is absent, and omits modelOverride when absent", () => {
+check("DRS08", "stripDispatchRecordForCritic omits report when report.changedFiles is absent, and omits modelOverride when absent", () => {
   const record = {
     taskId: "NVA-X-NOREPORT-1",
     model: "claude-sonnet-5",
@@ -123,10 +172,10 @@ test("stripDispatchRecordForCritic omits report when report.changedFiles is abse
   const stripped = stripDispatchRecordForCritic(record);
   assert.equal(stripped.report, undefined);
   assert.equal(stripped.modelOverride, undefined);
-  assert.equal(stripped.taskId, "NVA-X-NOREPORT-1");
+  assert.equal(stripped.taskId, undefined);
 });
 
-test("stripDispatchRecordForCritic throws (not silently drops) on a changedFiles entry with an out-of-contract shape", () => {
+check("DRS09", "stripDispatchRecordForCritic throws (not silently drops) on a changedFiles entry with an out-of-contract shape", () => {
   for (const malformed of [42, null, { rationale: "no path field on this entry" }]) {
     const record = {
       taskId: "NVA-X-MALFORMED-1",
@@ -138,14 +187,24 @@ test("stripDispatchRecordForCritic throws (not silently drops) on a changedFiles
   }
 });
 
-test("stripDispatchRecordForCritic rejects a non-object record", () => {
+check("DRS10", "stripDispatchRecordForCritic rejects a non-object record", () => {
   assert.throws(() => stripDispatchRecordForCritic(null), TypeError);
   assert.throws(() => stripDispatchRecordForCritic("not an object"), TypeError);
   assert.throws(() => stripDispatchRecordForCritic(["array"]), TypeError);
 });
 
-test("stripDispatchRecordForCritic is a pure function that never mutates its input", () => {
+check("DRS11", "stripDispatchRecordForCritic is a pure function that never mutates its input", () => {
   const copy = JSON.parse(JSON.stringify(FULL_RECORD));
   stripDispatchRecordForCritic(FULL_RECORD);
   assert.deepEqual(FULL_RECORD, copy);
+});
+
+assert.equal(cases.length, 11, "the complete dispatch-record strip corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
 });

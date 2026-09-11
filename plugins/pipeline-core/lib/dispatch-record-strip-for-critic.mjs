@@ -36,13 +36,13 @@
 
 /** The exact top-level fields carried through unchanged when present. */
 export const DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS = Object.freeze([
-  "taskId",
-  "agentType",
-  "model",
-  "effort",
   "rulesetSha",
   "commits",
 ]);
+
+const SAFE_COMMIT = /^[a-f0-9]{7,40}$/u;
+const SAFE_RULESET_DIGEST = /^(?:[a-f0-9]{7,40}|[a-f0-9]{64})$/u;
+const SAFE_REPO_PATH = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/u;
 
 /**
  * The house-style rationale separator inside a `report.changedFiles` bare-
@@ -52,6 +52,31 @@ export const DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS = Object.freeze([
  * at the earliest boundary, never mistaken for part of the path.
  */
 const RATIONALE_SEPARATOR = " - ";
+
+function safeRulesetDigest(value) {
+  if (typeof value !== "string" || !SAFE_RULESET_DIGEST.test(value)) {
+    throw new TypeError("rulesetSha must be an abbreviated/full Git digest or a SHA-256 digest");
+  }
+  return value;
+}
+
+function safeRepoRelativePath(value, label) {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > 512 ||
+    value.trim() !== value ||
+    value.startsWith("/") ||
+    !SAFE_REPO_PATH.test(value)
+  ) {
+    throw new TypeError(`${label} is not a literal repository-relative path`);
+  }
+  const parts = value.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) {
+    throw new TypeError(`${label} is not normalized`);
+  }
+  return value;
+}
 
 /**
  * Reduce one `report.changedFiles` entry to a bare repo-relative path string,
@@ -65,14 +90,16 @@ const RATIONALE_SEPARATOR = " - ";
  * @param {unknown} entry
  * @returns {string|null}
  */
-function normalizeChangedFileEntry(entry) {
+function normalizeChangedFileEntry(entry, label) {
   if (typeof entry === "string") {
     const separatorIndex = entry.indexOf(RATIONALE_SEPARATOR);
     const path = separatorIndex === -1 ? entry : entry.slice(0, separatorIndex);
-    return path.trim();
+    return safeRepoRelativePath(path, label);
   }
-  if (entry && typeof entry === "object" && !Array.isArray(entry) && typeof entry.path === "string") {
-    return entry.path.trim();
+  if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+    const unknown = Object.keys(entry).filter((key) => key !== "path" && key !== "rationale");
+    if (unknown.length > 0 || typeof entry.path !== "string") return null;
+    return safeRepoRelativePath(entry.path, `${label}.path`);
   }
   return null;
 }
@@ -92,7 +119,7 @@ function normalizeChangedFileEntry(entry) {
 function normalizeChangedFiles(changedFiles) {
   const normalized = [];
   changedFiles.forEach((entry, index) => {
-    const path = normalizeChangedFileEntry(entry);
+    const path = normalizeChangedFileEntry(entry, `report.changedFiles[${index}]`);
     if (typeof path !== "string" || path === "") {
       throw new TypeError(
         `report.changedFiles[${index}] has an out-of-contract shape (${JSON.stringify(entry)}); ` +
@@ -106,31 +133,14 @@ function normalizeChangedFiles(changedFiles) {
 }
 
 /**
- * `modelOverride` is kept ONLY as `{ model, effort }` — both bounded,
- * non-prose values — never `.rationale`, which is exactly the class of
- * free-text implementor justification this mechanism exists to remove
- * (MP-05/MP-07 requires the rationale for a real briefing, but a Critic
- * verifying authorship never needs to read WHY a model was overridden, only
- * THAT one was).
- *
- * @param {unknown} modelOverride
- * @returns {{model?: string, effort?: string}|undefined}
- */
-function stripModelOverride(modelOverride) {
-  if (!modelOverride || typeof modelOverride !== "object" || Array.isArray(modelOverride)) return undefined;
-  const stripped = {};
-  if (typeof modelOverride.model === "string") stripped.model = modelOverride.model;
-  if (typeof modelOverride.effort === "string") stripped.effort = modelOverride.effort;
-  return stripped;
-}
-
-/**
  * Reduce a full, already-parsed dispatch-record object to the strictly
- * bounded safe field set: `taskId`, `agentType`, `model`, `effort`,
- * `rulesetSha`, `commits`, `report.changedFiles` (normalized to bare path
- * strings), and `modelOverride.{model,effort}` when present. Everything
+ * bounded safe field set: digest-shaped `rulesetSha`, `commits`, and
+ * `report.changedFiles` normalized to bare path strings. Everything
  * else — `report.text`, `log`, `dispatcher`, `criticSkip`, `outcome`,
- * `modelOverride.rationale`, and any other field — is dropped. `outcome` is
+ * task/runner/model selection, `modelOverride`, and any other field — is dropped.
+ * Model identity is briefing metadata, not evidence needed to verify which
+ * paths and commits belong to the author; omitting it closes an otherwise
+ * unnecessary prose-bearing lane. `outcome` is
  * deliberately excluded even though it looks bounded: the real corpus carries
  * free-form implementor self-assessment prose there (e.g.
  * `"stopped-mechanism-established-no-fix-applied"`), not an enum, and it has
@@ -150,18 +160,24 @@ export function stripDispatchRecordForCritic(record) {
   const stripped = {};
   for (const field of DISPATCH_RECORD_SAFE_TOP_LEVEL_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(record, field)) {
-      stripped[field] = record[field];
+      if (field === "rulesetSha") stripped[field] = safeRulesetDigest(record[field]);
+      else if (field === "commits") {
+        if (
+          !Array.isArray(record.commits) ||
+          record.commits.length > 256 ||
+          record.commits.some((commit) => typeof commit !== "string" || !SAFE_COMMIT.test(commit)) ||
+          new Set(record.commits).size !== record.commits.length
+        ) {
+          throw new TypeError("commits must be unique hexadecimal commit tokens");
+        }
+        stripped.commits = [...record.commits];
+      }
     }
   }
 
   const changedFiles = record.report && typeof record.report === "object" ? record.report.changedFiles : undefined;
   if (Array.isArray(changedFiles)) {
     stripped.report = { changedFiles: normalizeChangedFiles(changedFiles) };
-  }
-
-  const strippedModelOverride = stripModelOverride(record.modelOverride);
-  if (strippedModelOverride !== undefined) {
-    stripped.modelOverride = strippedModelOverride;
   }
 
   return stripped;
