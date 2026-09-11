@@ -61,3 +61,26 @@ review rounds the transport package was allowed under the cap are spent.
   only, leaving the sandbox execution receipt's schema untouched.
 
 `due` is set so the item cannot age silently past the 0.6.2 candidate.
+
+## Nova B implementation — 2026-09-11
+
+Commit `61177860` closes the source-checkout execution gap. The selected lane
+now requires a physically separate and completely clean ruleset checkout,
+compares the three contracts and the complete static child module graph with
+`HEAD`, snapshots those verified bytes into a private read-only directory, and
+executes that snapshot. Its receipt binds the role, prompt, verdict-schema,
+child-executable and module-graph digests plus the ruleset Git identity. An
+adversarial test replaces the original child after validation and proves the
+snapshot still executes against a local model-free App Server.
+
+The correction also removes caller-provided install provenance. Gitless and
+other pre-spawn refusals now remain typed `ruleset-unavailable` with
+`childStarted: false` through the shared bridge. The focused host suite passes
+129/129, the protected-preimage suite passes 4/4, and the independent
+correction Critic returned PASS with no findings.
+
+The item remains open for one deliberately unclaimed surface: installed
+Gitless Selected-Critic packages need an installer-owned attestation and
+verifier before this route can run from a normal plugin cache. Until that
+authority exists, this special Selected route fails closed. The ordinary
+fresh-session Critic route does not depend on this installed Selected route.
