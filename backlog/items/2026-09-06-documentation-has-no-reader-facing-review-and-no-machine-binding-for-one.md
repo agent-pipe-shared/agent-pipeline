@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.documentation-has-no-reader-facing-review-and-no-machine-binding-for-one
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
 source: "PO ruling 2026-09-06 in session: documentation work must end with a reader's Critic who reads as a user and checks comprehensibility, order, granularity and weighting; the PO also asked where it belongs mechanically (push, preflight, release preflight) and named the candidate-regress problem himself. First round run the same day as NVA-B-DOCREADER-1, evidence backlog/evidence/2026-09-06-doc-reader-review-round1.md"
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 0611d0ecfc6272eaf814657cc896bba1c7a9c414
+closure_evidence: backlog/evidence/2026-09-11-reader-review-binding-closure.md
 ---
 
 # Documentation has no reader-facing review, and no machine binding for one
@@ -163,3 +167,12 @@ This item remains open until its separately accepted prerequisite,
 `pipeline.complete-adr-governs-coverage-before-reader-review-binding`, has its
 final source-candidate reconciliation and review rather than only complete
 accepted-ADR declarations.
+
+## Closure — 2026-09-11
+
+The prerequisite closed after exact source-candidate reconciliation and an
+independent PASS review. The shipped reader-review workflow, machine binding,
+release-preflight consumer and both operator-facing release-guide copies are
+therefore complete for this item. Existing focused tests and the independent
+correction Critic are recorded in the closure evidence; no publication or
+release action is implied.

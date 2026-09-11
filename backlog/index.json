@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8473b19c22d1f1584c93f4d6afd31a05611b852a6bd31b025546bb4c0e3d589c"
+    "transitionHead": "8328d7647a87f952b18829bbea9f97d909db9a6f0fa3c4481ff8f27311468f9b"
   },
   "counts": {
-    "open": 90,
+    "open": 89,
     "in_progress": 0,
-    "closed": 550,
+    "closed": 551,
     "rejected": 3,
     "deferred": 11
   },
@@ -2287,12 +2287,16 @@
     },
     {
       "id": "pipeline.documentation-has-no-reader-facing-review-and-no-machine-binding-for-one",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "PO ruling 2026-09-06 in session: documentation work must end with a reader's Critic who reads as a user and checks comprehensibility, order, granularity and weighting; the PO also asked where it belongs mechanically (push, preflight, release preflight) and named the candidate-regress problem himself. First round run the same day as NVA-B-DOCREADER-1, evidence backlog/evidence/2026-09-06-doc-reader-review-round1.md",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "0611d0ecfc6272eaf814657cc896bba1c7a9c414",
+      "closureEvidence": "backlog/evidence/2026-09-11-reader-review-binding-closure.md"
     },
     {
       "id": "pipeline.documentation-information-architecture",
