@@ -30,12 +30,12 @@
  *   4. Recorded model vs. agent definition (NVA-BL-78, `lib/agent-model-registry.mjs`). Silent
  *      when the record predates the `agentType` convention (see LIMITS); where `agentType` IS
  *      declared, the record's `model`/`effort` are checked against that agent's own definition
- *      file rather than trusted as hand-typed text. A disagreement without a declared
- *      `modelOverride` (with a non-empty `rationale`, the MP-05/07 requirement) downgrades a
- *      would-be PASS to FAIL, classification `model-mismatch` — this is what makes the check
- *      have teeth rather than being an informational aside. A well-formed override is HONOURED
- *      (stays PASS) and reported as `model-override-declared`, distinguishable from both the
- *      ordinary "agrees" case and an accidental mismatch.
+ *      file rather than trusted as hand-typed text. A disagreement downgrades a would-be PASS
+ *      to FAIL. A record's own `modelOverride` is never authorization: without a separate
+ *      trusted receipt it is UNVERIFIABLE, for both historical and v2 records.
+ *   5. V2 contract and exact commit binding. A record declaring `pipeline.dispatch-record.v2`
+ *      must pass the complete closed validator, and its full `candidateCommit` plus terminal
+ *      `commits` list must bind exactly to the commit being checked.
  *
  * A FIFTH, STRONGER FORM (Direction 3 Option B of the same item): `Dispatch:
  * <generator-script-path> (elephant-generated)`, e.g. `Dispatch:
@@ -77,8 +77,9 @@
  *   - THE EVIDENCE REMAINS SELF-REPORTED. Both artifacts are written by the party being
  *     vouched for. This script raises the cost of an inconsistent story; it does not make
  *     the story externally observed.
- *   - ABSENT A `commit` FIELD, THERE IS NO SHA BINDING. Most existing records predate the
- *     convention, so dimension 1 is frequently silent rather than satisfied.
+ *   - ABSENT A `commit` FIELD, A LEGACY RECORD HAS NO SHA BINDING. Most existing records predate
+ *     the convention, so dimension 1 is frequently silent rather than satisfied. V2 records
+ *     cannot use this compatibility path: terminal v2 evidence requires exact full-SHA binding.
  *   - THE EVIDENCE IS READ FROM THE WORKING TREE, NEVER FROM THE COMMIT'S OWN GIT TREE.
  *     Records are resolved under `DEFAULT_EVIDENCE_DIR` in the CURRENT working tree, and
  *     `evidence/` is gitignored. A PASS is therefore a statement about this checkout at this
@@ -113,6 +114,15 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+import {
+  DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
+  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
+  validateDispatchRecord,
+} from "../lib/dispatch-record.mjs";
+export {
+  NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
+  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
+};
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 export const DEFAULT_EVIDENCE_DIR = join(REPO_ROOT, "evidence");
@@ -122,8 +132,6 @@ export const DEFAULT_EVIDENCE_DIR = join(REPO_ROOT, "evidence");
  * header on why this is a denylist. `stopped-*` outcomes are terminal: the run ended, and
  * the record is a truthful account of a run that stopped.
  */
-export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
-
 export const VERDICT = Object.freeze({ pass: "PASS", fail: "FAIL", unverifiable: "UNVERIFIABLE" });
 
 /** The one sanctioned Elephant-direct form (`agent-obligations.md` §6). */
@@ -214,12 +222,6 @@ export function runGeneratorInIsolatedParentTree({ repoRoot, parentRef, scriptRe
  * fragment BEFORE it reaches the filesystem, so a crafted id (`../../..`) is refused as an
  * invalid trailer rather than resolving somewhere outside `evidenceDir`.
  */
-export const SAFE_TASK_ID = /^[A-Za-z0-9._-]+$/u;
-
-export function isSafeTaskId(taskId) {
-  return typeof taskId === "string" && SAFE_TASK_ID.test(taskId);
-}
-
 /**
  * Parse the trailer block: the trailing contiguous run of `Key: value` lines. Anchoring on
  * the block rather than on `/^Dispatch:/m` anywhere means a `Dispatch:` mentioned in the
@@ -264,27 +266,6 @@ export function parseDispatchTrailer(message) {
   return { raw: trailer.value, id: match[1], role: match[2].trim().toLowerCase(), malformed: false };
 }
 
-export function isTerminalOutcome(outcome) {
-  if (typeof outcome !== "string") return false;
-  const normalized = outcome.trim().toLowerCase();
-  if (normalized === "") return false;
-  return !NON_TERMINAL_OUTCOMES.includes(normalized);
-}
-
-/**
- * The SHAs a record claims. A dispatch that commits as soon as each piece is green — which
- * is exactly what the briefings ask for, because a commit that exists survives a truncated
- * run — produces SEVERAL commits under one task id, so a single `commit` field cannot bind
- * them all. Both `commit` (string) and `commits` (array) are read, and binding succeeds if
- * ANY declared sha binds. Returns null when the record declares none, which leaves this
- * dimension silent rather than failed: most existing records predate the convention.
- */
-export function declaredCommits(record) {
-  const raw = record?.commits ?? record?.commit;
-  const list = (Array.isArray(raw) ? raw : [raw]).filter((entry) => typeof entry === "string" && entry.trim() !== "");
-  return list.length > 0 ? list : null;
-}
-
 /** Two SHAs bind if either is a prefix of the other — records abbreviate inconsistently. */
 export function shasBind(a, b) {
   const left = String(a ?? "").trim().toLowerCase();
@@ -296,74 +277,22 @@ export function shasBind(a, b) {
 /**
  * Pull declared orchestrator paths out of `report.orchestratorAddedFiles` or top-level `orchestratorAddedFiles`.
  */
-export function declaredOrchestratorPaths(record) {
-  const orchestrator = record?.report?.orchestratorAddedFiles ?? record?.orchestratorAddedFiles;
-  if (!Array.isArray(orchestrator)) return [];
-  const paths = [];
-  for (const entry of orchestrator) {
-    const text = typeof entry === "string" ? entry : entry?.path;
-    if (typeof text !== "string") continue;
-    const token = text.trim().replace(/^[`'"]+/u, "").split(/[\s`'",]+/u)[0];
-    if (token) paths.push(token.replace(/[.,;:]+$/u, ""));
-  }
-  return paths;
-}
-
 /**
  * Pull declared paths out of `report.changedFiles` and optional `orchestratorAddedFiles`. Entries are either objects with a
  * `path`, or strings shaped `"<path> - why it changed"` (the house style). Returns null —
  * distinct from an empty array — when the record has no machine-readable path field, which
  * is what makes the caller answer UNVERIFIABLE instead of FAIL.
  */
-export function declaredPaths(record) {
-  const changed = record?.report?.changedFiles ?? record?.changedFiles;
-  if (!Array.isArray(changed)) return null;
-  const paths = [];
-  const orchestrator = record?.report?.orchestratorAddedFiles ?? record?.orchestratorAddedFiles;
-  for (const list of [changed, orchestrator]) {
-    if (!Array.isArray(list)) continue;
-    for (const entry of list) {
-      const text = typeof entry === "string" ? entry : entry?.path;
-      if (typeof text !== "string") continue;
-      const token = text.trim().replace(/^[`'"]+/u, "").split(/[\s`'",]+/u)[0];
-      if (token) paths.push(token.replace(/[.,;:]+$/u, ""));
-    }
-  }
-  return paths;
-}
-
 /**
  * A commit path is covered by an exact match or by a declared DIRECTORY prefix. Basename
  * matching is deliberately not accepted: `test.mjs` covering any `test.mjs` anywhere would
  * make coverage mean nothing.
  */
-export function coveringPath(commitPath, declared) {
-  const target = commitPath.replace(/^\.\//u, "");
-  return (
-    declared.find((entry) => {
-      const candidate = entry.replace(/^\.\//u, "").replace(/\/$/u, "");
-      return candidate === target || target.startsWith(`${candidate}/`);
-    }) ?? null
-  );
-}
-
 function result(sha, verdict, classification, reason, extra = {}) {
   return { sha, verdict, classification, reason, ...extra };
 }
 
-function isNonEmptyString(value) {
-  return typeof value === "string" && value.trim() !== "";
-}
-
 /** Truthy AND not merely an empty container (`""`, `[]`, `{}`) -- the "non-empty" half of the minimum shape. */
-export function isNonEmptyValue(value) {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "string") return value.trim() !== "";
-  if (Array.isArray(value)) return value.length > 0;
-  if (typeof value === "object") return Object.keys(value).length > 0;
-  return Boolean(value);
-}
-
 /**
  * The minimum shape a genuine dispatch record should carry, per this repository's own
  * template (`templates/prompts/goldfish-task.md`, "Dispatch record (standard evidence)"):
@@ -372,14 +301,6 @@ export function isNonEmptyValue(value) {
  * fully-shaped record would carry them too); see
  * `backlog/items/2026-08-29-dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome.md`.
  */
-export function missingBriefingFields(record) {
-  const missing = [];
-  if (!isNonEmptyString(record?.model)) missing.push("model");
-  if (!isNonEmptyString(record?.rulesetSha)) missing.push("rulesetSha");
-  if (!isNonEmptyValue(record?.report)) missing.push("report");
-  return missing;
-}
-
 /**
  * The pure core. All I/O arrives through `deps` so the regression suite can drive synthetic
  * commits without building a git fixture repository.
@@ -544,11 +465,34 @@ export function verifyCommit(sha, deps) {
   if (typeof record.taskId === "string" && record.taskId.trim() !== "" && record.taskId.trim() !== taskId) {
     return result(sha, VERDICT.fail, "record-taskid-mismatch", `trailer names \`${taskId}\`, record's own taskId is \`${record.taskId}\``, { taskId });
   }
+  const isV2 = record.schema === DISPATCH_RECORD_SCHEMA;
+  if (Object.hasOwn(record, "schema") && !isV2) {
+    return result(sha, VERDICT.fail, "record-schema-unsupported", `record for \`${taskId}\` declares an unsupported schema`, { taskId });
+  }
+  if (isV2) {
+    try {
+      record = validateDispatchRecord(record);
+    } catch (error) {
+      return result(sha, VERDICT.fail, "record-v2-invalid", `record for \`${taskId}\` fails the ${DISPATCH_RECORD_SCHEMA} contract: ${error.message}`, { taskId });
+    }
+  }
+  if (Object.hasOwn(record, "modelOverride")) {
+    return result(
+      sha,
+      VERDICT.unverifiable,
+      "model-override-untrusted",
+      `record for \`${taskId}\` declares its own model override without a trusted authorization receipt`,
+      { taskId },
+    );
+  }
   if (!isTerminalOutcome(record.outcome)) {
     return result(sha, VERDICT.fail, "record-not-terminal", `record outcome \`${record.outcome ?? "(absent)"}\` is not terminal`, { taskId });
   }
   const declaredShas = declaredCommits(record);
-  if (declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
+  if (isV2 && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
+    return result(sha, VERDICT.fail, "record-names-different-commit", `v2 record is bound to a different candidate commit`, { taskId, declaredShas });
+  }
+  if (!isV2 && declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
     return result(sha, VERDICT.fail, "record-names-different-commit", `record names commit(s) \`${declaredShas.join("`, `")}\``, { taskId, declaredShas });
   }
 

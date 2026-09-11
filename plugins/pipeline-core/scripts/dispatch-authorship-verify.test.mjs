@@ -213,7 +213,7 @@ test("(k) recorded model contradicts the dispatched agent's definition (2026-08-
   assert.equal(verdict.modelCheck.classification, "model-mismatch");
 });
 
-test("(l) an explicit, rationale-carrying modelOverride is honoured -- stays PASS/bound, reported as an override", () => {
+test("(l) a legacy record's self-declared modelOverride is never accepted as authorization", () => {
   writeRecord("DOD-L", {
     taskId: "DOD-L",
     agentType: "goldfish-deep",
@@ -225,9 +225,41 @@ test("(l) an explicit, rationale-carrying modelOverride is honoured -- stays PAS
     report: { changedFiles: ["src/thing.mjs - x"] },
   });
   const verdict = verifyCommit("l00l333", commit({ message: "feat(x): a thing\n\nDispatch: DOD-L (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
-  assert.equal(verdict.verdict, VERDICT.pass);
-  assert.equal(verdict.classification, "bound");
-  assert.equal(verdict.modelCheck.classification, "model-override-declared");
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "model-override-untrusted");
+});
+
+test("a directly written v2 modelOverride and malformed v2 record cannot mint PASS", () => {
+  const sha = "d".repeat(40);
+  const base = {
+    schema: "pipeline.dispatch-record.v2", taskId: "DOD-V2", agentType: "goldfish-deep",
+    model: "claude-opus-5", effort: "xhigh", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, outcome: "completed", commits: [sha], log: [],
+    report: { text: "Done.", changedFiles: ["src/thing.mjs"] },
+  };
+  const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  writeRecord("DOD-V2", { ...base, modelOverride: { model: "claude-opus-5", effort: "xhigh", rationale: "self declared" } });
+  assert.equal(verifyCommit(sha, deps).classification, "model-override-untrusted");
+  writeRecord("DOD-V2", { ...base, commits: [] });
+  const malformed = verifyCommit(sha, deps);
+  assert.equal(malformed.verdict, VERDICT.fail);
+  assert.equal(malformed.classification, "record-v2-invalid");
+});
+
+test("v2 records bind the verified full commit through candidateCommit and commits", () => {
+  const sha = "e".repeat(40);
+  const record = {
+    schema: "pipeline.dispatch-record.v2", taskId: "DOD-V2-BIND", agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, outcome: "completed", commits: [sha], log: [],
+    report: { text: "Done.", changedFiles: ["src/thing.mjs"] },
+  };
+  writeRecord("DOD-V2-BIND", record);
+  const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V2-BIND (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  assert.equal(verifyCommit(sha, deps).verdict, VERDICT.pass);
+  const other = verifyCommit("f".repeat(40), deps);
+  assert.equal(other.verdict, VERDICT.fail);
+  assert.equal(other.classification, "record-names-different-commit");
 });
 
 test("(m) a record without agentType (pre-NVA-BL-78 corpus) is unaffected -- classification stays bound, no regression", () => {
