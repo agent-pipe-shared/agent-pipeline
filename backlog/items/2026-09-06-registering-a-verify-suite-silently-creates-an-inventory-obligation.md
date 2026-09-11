@@ -1,13 +1,17 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation
-type: workflow-improvement
-owner: pipeline
-status: open
-created: 2026-09-06
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "closed"
+created: "2026-09-06"
 source: "manual observation -- two occurrences on 2026-09-06: defe7013 (NVA-B-BLOCKE-FOLLOWUP-1, two suites) and ec0b158c (stage-0, guard-slicing-tests), each a full gate run red on product-capability-inventory-tests after a suite was registered in harness/scripts/verify.mjs"
-sprint: nova-b
-done_when: manual
+sprint: "nova-b"
+done_when: "manual"
+closed_at: "2026-09-11"
+closure_repository: "self"
+closure_commit: "f0be69b0533edcec43fd56f73e78b26f3802f92e"
+closure_evidence: "harness/scripts/check-verify-suite-registration.test.mjs"
 ---
 
 # Registering a verify suite silently creates an inventory obligation
@@ -74,7 +78,25 @@ registration is not complete until the inventory line exists.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted and implemented with the proposed early checker.
+- **Rationale:** the same hidden inventory obligation recurred during the 0.6.2
+  candidate work. A local registration check can name it before the expensive
+  Verify run without imposing the self-repository inventory on consumers.
+- **Assignment (if accepted):** Pipeline, completed in the Nova B continuation.
+- **Date:** 2026-09-11
+
+## Closure — 2026-09-11
+
+`check-verify-suite-registration.mjs` now derives the inventory surface for
+every ordinary `TEST_SUITES` registration whenever the self-repository product
+inventory exists. It rejects zero assignments, assignments to several
+capabilities, and repeated entries inside one capability, with the exact
+surface and repair location. Scoped and Windows-assurance suites retain their
+separate registries, and consumers without the product inventory retain the
+registration-only contract.
+
+The focused suite passes 42 cases, including deliberate red fixtures for all
+three invalid assignment shapes. Full Critic-mode Verify passed 520/520 with
+exact candidate binding at `f0be69b0` (run
+`verify-1789104017832-2ef6b24defc56500`). The independent correction-only
+Critic returned PASS with no remaining findings.

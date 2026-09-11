@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fd1c723024eb4db81d64365d0442949107b7ea14bf1baab7c6a5b13200df7e24"
+    "transitionHead": "caa962479da4c5029bf578c94a51b62a94d4a40ac90c0302a661ce810659bfd8"
   },
   "counts": {
-    "open": 108,
+    "open": 107,
     "in_progress": 0,
-    "closed": 532,
+    "closed": 533,
     "rejected": 3,
     "deferred": 11
   },
@@ -6140,12 +6140,16 @@
     },
     {
       "id": "pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "manual observation -- two occurrences on 2026-09-06: defe7013 (NVA-B-BLOCKE-FOLLOWUP-1, two suites) and ec0b158c (stage-0, guard-slicing-tests), each a full gate run red on product-capability-inventory-tests after a suite was registered in harness/scripts/verify.mjs",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "f0be69b0533edcec43fd56f73e78b26f3802f92e",
+      "closureEvidence": "harness/scripts/check-verify-suite-registration.test.mjs"
     },
     {
       "id": "pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory",
