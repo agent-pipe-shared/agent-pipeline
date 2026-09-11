@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ccf38fd295871ba27ff86f1db772c66489642fdf19856f93f754318b97d9df76"
+    "transitionHead": "ed316f05d5724d996586f64baa7a507b96181bbed7d91b0e691006e0f9084667"
   },
   "counts": {
-    "open": 101,
+    "open": 100,
     "in_progress": 0,
-    "closed": 539,
+    "closed": 540,
     "rejected": 3,
     "deferred": 11
   },
@@ -1236,13 +1236,17 @@
     },
     {
       "id": "pipeline.capture-evidence-refuses-fixture-literal-as-host-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "NVA-B-LANEEVICT-2 dispatch, 2026-09-06: both concurrent capture-evidence.mjs invocations of guard-maintenance-window.test.mjs refused before writing; a direct node --test run of the same suite is green. Trigger confirmed by the orchestrator at plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:1668,1679,1682.",
       "deferred": false,
-      "tracking": "Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\\Users\\Foo\\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time."
+      "tracking": "Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\\Users\\Foo\\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "5ebeae27a43636a1c1047399ad5d8731e8b37911",
+      "closureEvidence": "backlog/items/2026-09-06-the-evidence-capture-tool-refuses-a-fixture-literal-as-if-it-were-a-host-path.md"
     },
     {
       "id": "pipeline.chat-gate-non-ascii-name-windows",

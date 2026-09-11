@@ -106,7 +106,7 @@
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it | open | workflow-improvement | pipeline | 2026-09-06 | — |
-| pipeline.capture-evidence-refuses-fixture-literal-as-host-path | open | defect | pipeline | 2026-09-06 | Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\Users\Foo\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time. |
+| pipeline.capture-evidence-refuses-fixture-literal-as-host-path | closed | defect | pipeline | 2026-09-06 | Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\Users\Foo\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time. |
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.ci-failure-reporter-has-no-recorded-requirement | open | defect | pipeline | 2026-09-01 | Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec. |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 101
+- open: 100
 - in_progress: 0
-- closed: 539
+- closed: 540
 - rejected: 3
 - deferred: 11

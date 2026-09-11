@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.capture-evidence-refuses-fixture-literal-as-host-path
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 5ebeae27a43636a1c1047399ad5d8731e8b37911
+closure_evidence: backlog/items/2026-09-06-the-evidence-capture-tool-refuses-a-fixture-literal-as-if-it-were-a-host-path.md
 created: 2026-09-06
 sprint: nova-b
 done_when: manual
@@ -65,3 +69,13 @@ letter. The set of affected suites is not known; it was found by accident.
 Whichever direction, the refusal message should name the matched substring's
 *source line* so the next reader can tell fixture from leak without a
 second dispatch.
+
+## Closure — 2026-09-11
+
+Commit `5ebeae27` replaces every covered residual host-path spelling with a
+stable placeholder before publication, then reruns the detector as a
+fail-closed backstop. It covers literal and encoded POSIX, macOS, Windows
+drive-letter, WSL mount, WSL UNC and generic UNC paths, including UNC share
+roots. The actual Greenfield fixture shape now produces a complete capture
+instead of refusing it. The focused suite passed 38/38, and the final
+independent correction review returned PASS with no findings.
