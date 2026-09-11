@@ -17,7 +17,7 @@
     { "path": "docs/usage.md", "sha256": "d66a17fe382db5e082a1311effd26c0c735723153311f0144d1d50a88b7194ae" }
   ],
   "inputs": {
-    "capabilityInventorySha256": "2c067a5c530955425c9cb16f8ac49a023cf882eb7d8462c062d49686978b4e080",
+    "capabilityInventorySha256": "2c067a5c5309554250eace0ecd5f039b9e023720e3e21a3dd0e430d519ca7842",
     "governanceSha256": "3e9f350f088d917139651f8523d294fd6521b930e0c576af7c7b01d11669375c",
     "readerProtocolSha256": "9347e59408878daedf01f62b2ae1381d182d0bbdcaee47328dc10a8e9d8fad17"
   },
