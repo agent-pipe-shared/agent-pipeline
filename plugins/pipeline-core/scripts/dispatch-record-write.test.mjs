@@ -7,6 +7,7 @@ import { validateDispatchRecord } from "../lib/dispatch-record.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { VERDICT, verifyCommit } from "./dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "./dispatch-record-write.mjs";
+import { CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 
 const SHA = "a".repeat(40);
 const RESULT_SHA = "d".repeat(64);
@@ -14,7 +15,8 @@ const cases = [];
 function check(name, run) {
   cases.push({ id: `DRW${String(cases.length + 1).padStart(2, "0")}`, name, run });
 }
-function record(overrides = {}) { return { schema: "pipeline.dispatch-record.v3", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: RESULT_SHA, outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report: { text: "Done.", changedFiles: ["src/x.mjs"] }, criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: "T5" }, ...overrides }; }
+const skip = { schema: CRITIC_SKIP_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T5", reason: "fast path" };
+function record(overrides = {}) { return { schema: "pipeline.dispatch-record.v3", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: RESULT_SHA, outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report: { text: "Done.", changedFiles: ["src/x.mjs"] }, criticSkip: skip, ...overrides }; }
 function fixture(value = record(), target = `evidence/dispatch-record-${value.taskId}.json`) {
   const root = mkdtempSync(join(tmpdir(), "dispatch-record-write-"));
   mkdirSync(join(root, "evidence")); mkdirSync(join(root, "requests"));

@@ -139,7 +139,18 @@ check("final native return writes canonical v3 evidence and passes authorship ve
       rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit, resultSha256: A,
       outcome: "completed", commits: [candidateCommit], log: [{ phase: "done", toolUseCount: 4 }],
       report: { text: "Workflow dispatch completed.", changedFiles: ["src/x.mjs"] },
-      criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: "fixture exercises the no-Critic disposition" },
+      criticSkip: {
+        schema: "pipeline.critic-skip-decision.v1",
+        trigger: {
+          schema: "pipeline.critic-trigger-input.v1",
+          rigorLevel: 0,
+          riskClass: "low",
+          riskFlag: false,
+          diff: { mechanical: false, architecture: false, guardrails: false, security: false },
+        },
+        appliedRow: "T5",
+        reason: "fixture exercises the no-Critic disposition",
+      },
     };
     writeFileSync(join(root, requestPath), `${JSON.stringify({
       schema: "pipeline.dispatch-record-write-request.v1",

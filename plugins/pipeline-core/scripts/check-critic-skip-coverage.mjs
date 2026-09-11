@@ -59,6 +59,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
   let applicableRecordCount = 0;
   let legacyRecordCount = 0;
   let skipRecordCount = 0;
+  let requiredRecordCount = 0;
   let criticEvidenceRecordCount = 0;
   for (const entry of scan.records) {
     const { path, record } = entry;
@@ -78,6 +79,11 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     catch (error) { findings.push(`${path}: invalid v3 dispatch record (${error.message})`); continue; }
     const disposition = criticDisposition(record);
     if (disposition === "skipped") { skipRecordCount += 1; continue; }
+    if (disposition === "required") {
+      requiredRecordCount += 1;
+      findings.push(`${path}: Critic is required by ${record.criticRequired.appliedRow}; task/candidate/digest-bound criticEvidence is missing`);
+      continue;
+    }
     if (disposition === "evidenced") {
       const evidenceFinding = verifyCriticEvidence(root, path, record.criticEvidence);
       if (evidenceFinding) findings.push(evidenceFinding);
@@ -101,6 +107,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     legacyRecordCount,
     criticArtifactCount: criticEvidenceRecordCount,
     criticEvidenceRecordCount,
+    requiredRecordCount,
     skipRecordCount,
     readFindings: findings,
   };
@@ -115,7 +122,7 @@ function runCli() {
   }
   const result = evaluateRepositoryCriticSkipCoverage({ root: rootIndex === 0 ? args[1] : DEFAULT_ROOT });
   for (const finding of result.readFindings) process.stderr.write(`CRITIC-SKIP-COVERAGE ${finding}\n`);
-  process.stdout.write(`Critic-skip coverage: ${result.applicableRecordCount} applicable v3, ${result.skipRecordCount} skipped, ${result.criticEvidenceRecordCount} evidenced, ${result.legacyRecordCount} legacy (schema ${CRITIC_SKIP_SCHEMA}) -- ${result.reason}\n`);
+  process.stdout.write(`Critic-skip coverage: ${result.applicableRecordCount} applicable v3, ${result.skipRecordCount} skipped, ${result.requiredRecordCount} required-pending, ${result.criticEvidenceRecordCount} evidenced, ${result.legacyRecordCount} legacy (schema ${CRITIC_SKIP_SCHEMA}) -- ${result.reason}\n`);
   if (!result.ok) process.exitCode = result.readFindings.some((finding) => /unreadable|invalid JSON/u.test(finding)) ? 2 : 1;
 }
 

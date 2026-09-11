@@ -3,9 +3,12 @@ import assert from "node:assert/strict";
 import { openSync } from "node:fs";
 import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, validateDispatchRecord, validateLegacyDispatchRecord } from "./dispatch-record.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "./critic-skip-decision.mjs";
 
 const SHA = "a".repeat(40);
-const opening = () => ({ schema: "pipeline.dispatch-record.v3", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null, outcome: "in-progress", commits: [], log: [], report: null, criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: "T5: no mandatory review trigger" } });
+const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
+const skip = () => ({ schema: CRITIC_SKIP_SCHEMA, trigger: trigger(), appliedRow: "T5", reason: "no mandatory review trigger" });
+const opening = () => ({ schema: "pipeline.dispatch-record.v3", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null, outcome: "in-progress", commits: [], log: [], report: null, criticSkip: skip() });
 const terminal = () => ({ ...opening(), candidateCommit: "b".repeat(40), resultSha256: "d".repeat(64), outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "verify", toolUseCount: 12, note: "focused checks passed" }], report: { text: "Done.", changedFiles: ["plugins/pipeline-core/lib/x.mjs - implementation", { path: "plugins/pipeline-core/lib/x.test.mjs" }] } });
 
 const cases = [];
@@ -26,6 +29,24 @@ check("v2 is explicit read-only legacy evidence while v3 requires exactly one Cr
   const missing = opening(); delete missing.criticSkip;
   assert.throws(() => validateDispatchRecord(missing), (error) => error?.code === "record-critic-disposition");
   assert.throws(() => validateDispatchRecord({ ...opening(), criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "NVA-B-1", candidateCommit: SHA, path: "evidence/critic-NVA-B-1.json", sha256: "e".repeat(64) } }), (error) => error?.code === "record-critic-disposition");
+});
+check("required Critic disposition is valid while pending and must be replaced by evidence", () => {
+  const pending = opening(); delete pending.criticSkip;
+  pending.criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" };
+  assert.deepEqual(validateDispatchRecord(pending), pending);
+  const complete = terminal(); delete complete.criticSkip;
+  complete.criticEvidence = { schema: "pipeline.critic-evidence-reference.v1", taskId: complete.taskId, candidateCommit: complete.candidateCommit, path: "evidence/critic-NVA-B-1.json", sha256: "e".repeat(64) };
+  assert.deepEqual(validateDispatchRecord(complete), complete);
+});
+check("skip cannot falsely claim T5 when A/G/S, high-risk or rigor triggers require review", () => {
+  for (const triggerInput of [
+    trigger({ diff: { mechanical: false, architecture: true, guardrails: false, security: false } }),
+    trigger({ diff: { mechanical: false, architecture: false, guardrails: true, security: false } }),
+    trigger({ diff: { mechanical: false, architecture: false, guardrails: false, security: true } }),
+    trigger({ riskClass: "high" }),
+    trigger({ rigorLevel: 2 }),
+    trigger({ rigorLevel: 1 }),
+  ]) assert.throws(() => validateDispatchRecord({ ...opening(), criticSkip: { ...skip(), trigger: triggerInput } }), (error) => error?.code === "record-critic-trigger");
 });
 check("Critic evidence is bound to this task, candidate and repository-local artifact digest", () => {
   const evidenced = opening();
@@ -111,8 +132,8 @@ check("every persisted string lane rejects Unix, Windows, WSL and UNC private pa
     ["modelOverride.model", (value, path) => ({ ...value, modelOverride: { model: path, effort: "high", rationale: "reviewed" } })],
     ["modelOverride.effort", (value, path) => ({ ...value, modelOverride: { model: "claude-opus-5", effort: path, rationale: "reviewed" } })],
     ["modelOverride.rationale", (value, path) => ({ ...value, modelOverride: { model: "claude-opus-5", effort: "high", rationale: path } })],
-    ["criticSkip.schema", (value, path) => ({ ...value, criticSkip: { schema: path, reason: "not needed" } })],
-    ["criticSkip.reason", (value, path) => ({ ...value, criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: path } })],
+    ["criticSkip.schema", (value, path) => ({ ...value, criticSkip: { ...skip(), schema: path } })],
+    ["criticSkip.reason", (value, path) => ({ ...value, criticSkip: { ...skip(), reason: path } })],
   ];
   for (const [lane, inject] of lanes) {
     for (const path of paths) {
@@ -125,7 +146,7 @@ check("every persisted string lane rejects Unix, Windows, WSL and UNC private pa
   }
 });
 
-assert.equal(cases.length, 8, "the complete dispatch-record corpus must be registered before execution begins");
+assert.equal(cases.length, 10, "the complete dispatch-record corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

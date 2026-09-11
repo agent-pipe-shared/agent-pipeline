@@ -33,9 +33,8 @@
  *      file rather than trusted as hand-typed text. A disagreement downgrades a would-be PASS
  *      to FAIL. A record's own `modelOverride` is never authorization: without a separate
  *      trusted receipt it is UNVERIFIABLE, for both historical and v2 records.
- *   5. V2 contract and exact commit binding. A record declaring `pipeline.dispatch-record.v2`
- *      must pass the complete closed validator, and its full `candidateCommit` plus terminal
- *      `commits` list must bind exactly to the commit being checked.
+ *   5. V3 contract and exact commit binding. V2 remains readable historical evidence, but
+ *      it is explicitly nonbinding for a newly verified delivery and cannot mint PASS.
  *
  * A FIFTH, STRONGER FORM (Direction 3 Option B of the same item): `Dispatch:
  * <generator-script-path> (elephant-generated)`, e.g. `Dispatch:
@@ -114,6 +113,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+import { criticDisposition } from "../lib/critic-skip-decision.mjs";
 import {
   DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
   declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
@@ -478,6 +478,24 @@ export function verifyCommit(sha, deps) {
       return result(sha, VERDICT.fail, `record-${version}-invalid`, `record for \`${taskId}\` fails the ${record.schema} contract: ${error.message}`, { taskId });
     }
   }
+  if (isV2) {
+    return result(
+      sha,
+      VERDICT.unverifiable,
+      "record-v2-nonbinding",
+      `record for \`${taskId}\` is readable legacy v2 evidence but cannot bind a newly verified delivery; a v3 disposition is required`,
+      { taskId },
+    );
+  }
+  if (isV3 && criticDisposition(record) === "required") {
+    return result(
+      sha,
+      VERDICT.unverifiable,
+      "critic-evidence-pending",
+      `record for \`${taskId}\` requires a Critic under ${record.criticRequired.appliedRow}; task/candidate/digest-bound criticEvidence has not replaced the pending disposition`,
+      { taskId },
+    );
+  }
   if (Object.hasOwn(record, "modelOverride")) {
     return result(
       sha,
@@ -491,8 +509,8 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.fail, "record-not-terminal", `record outcome \`${record.outcome ?? "(absent)"}\` is not terminal`, { taskId });
   }
   const declaredShas = declaredCommits(record);
-  if ((isV2 || isV3) && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
-    return result(sha, VERDICT.fail, "record-names-different-commit", `${isV3 ? "v3" : "v2"} record is bound to a different candidate commit`, { taskId, declaredShas });
+  if (isV3 && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
+    return result(sha, VERDICT.fail, "record-names-different-commit", "v3 record is bound to a different candidate commit", { taskId, declaredShas });
   }
   if (!isV2 && !isV3 && declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
     return result(sha, VERDICT.fail, "record-names-different-commit", `record names commit(s) \`${declaredShas.join("`, `")}\``, { taskId, declaredShas });

@@ -39,6 +39,7 @@ import {
   runGeneratorInIsolatedParentTree,
   verifyCommit,
 } from "./dispatch-authorship-verify.mjs";
+import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -62,6 +63,8 @@ function commit({ message, paths = [], readBlobAtCommit, runAllowlistedGenerator
 }
 
 const TRAILERS = "\n\nDispatch: DOD-A (goldfish)\nAI-Assisted: true\n";
+const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
+const skip = () => ({ schema: CRITIC_SKIP_SCHEMA, trigger: trigger(), appliedRow: "T5" });
 
 test("(a) correct trailer, terminal record, paths covered -> PASS", () => {
   writeRecord("DOD-A", {
@@ -239,14 +242,14 @@ test("a directly written v2 modelOverride and malformed v2 record cannot mint PA
   };
   const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
   writeRecord("DOD-V2", { ...base, modelOverride: { model: "claude-opus-5", effort: "xhigh", rationale: "self declared" } });
-  assert.equal(verifyCommit(sha, deps).classification, "model-override-untrusted");
+  assert.equal(verifyCommit(sha, deps).classification, "record-v2-nonbinding");
   writeRecord("DOD-V2", { ...base, commits: [] });
   const malformed = verifyCommit(sha, deps);
   assert.equal(malformed.verdict, VERDICT.fail);
   assert.equal(malformed.classification, "record-v2-invalid");
 });
 
-test("v2 records bind the verified full commit through candidateCommit and commits", () => {
+test("v2 records remain readable but are explicitly nonbinding for a new delivery", () => {
   const sha = "e".repeat(40);
   const record = {
     schema: "pipeline.dispatch-record.v2", taskId: "DOD-V2-BIND", agentType: "goldfish-implementor",
@@ -256,10 +259,12 @@ test("v2 records bind the verified full commit through candidateCommit and commi
   };
   writeRecord("DOD-V2-BIND", record);
   const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V2-BIND (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
-  assert.equal(verifyCommit(sha, deps).verdict, VERDICT.pass);
+  const matching = verifyCommit(sha, deps);
+  assert.equal(matching.verdict, VERDICT.unverifiable);
+  assert.equal(matching.classification, "record-v2-nonbinding");
   const other = verifyCommit("f".repeat(40), deps);
-  assert.equal(other.verdict, VERDICT.fail);
-  assert.equal(other.classification, "record-names-different-commit");
+  assert.equal(other.verdict, VERDICT.unverifiable);
+  assert.equal(other.classification, "record-v2-nonbinding");
 });
 
 test("v3 records bind authorship and carry exactly one Critic disposition", () => {
@@ -269,7 +274,7 @@ test("v3 records bind authorship and carry exactly one Critic disposition", () =
     model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
     candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed", commits: [sha], log: [],
     report: { text: "Done.", changedFiles: ["src/thing.mjs"] },
-    criticSkip: { schema: "pipeline.critic-skip-decision.v1", reason: "T5" },
+    criticSkip: skip(),
   };
   const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V3-BIND (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
   writeRecord("DOD-V3-BIND", base);
@@ -278,6 +283,22 @@ test("v3 records bind authorship and carry exactly one Critic disposition", () =
   const missing = verifyCommit(sha, deps);
   assert.equal(missing.verdict, VERDICT.fail);
   assert.equal(missing.classification, "record-v3-invalid");
+});
+
+test("v3 criticRequired is a valid pending lifecycle state but cannot mint authorship PASS", () => {
+  const sha = "8".repeat(40);
+  const record = {
+    schema: "pipeline.dispatch-record.v3", taskId: "DOD-V3-REQUIRED", agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed", commits: [sha], log: [],
+    report: { text: "Done.", changedFiles: ["src/thing.mjs"] },
+    criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" },
+  };
+  writeRecord("DOD-V3-REQUIRED", record);
+  const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V3-REQUIRED (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  const pending = verifyCommit(sha, deps);
+  assert.equal(pending.verdict, VERDICT.unverifiable);
+  assert.equal(pending.classification, "critic-evidence-pending");
 });
 
 test("(m) a record without agentType (pre-NVA-BL-78 corpus) is unaffected -- classification stays bound, no regression", () => {

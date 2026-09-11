@@ -130,3 +130,21 @@ items by hand-editing the ledger.
    reminder, but it also most changes the meaning `deferred` currently has
    (a stable, review-exempt parking state) and should not be adopted without
    the PO weighing that tradeoff explicitly.
+
+## Implementation decision (2026-09-11)
+
+Nova B implements option 1 as a runner-neutral, read-only report. The standard
+Verify inventory runs `check-deferred-backlog.mjs`, which lists every deferred
+defect with age, due state, sprint and revisit condition. Overdue or incomplete
+revisit metadata remains visible but deliberately nonblocking; malformed or
+unreadable backlog data still fails closed. This does not add a ledger
+transition or silently reinterpret the terminal `deferred` status.
+
+- **Residual-risk owner:** the Pipeline Elephant performing backlog triage.
+- **Review expiry:** 2026-09-25. By that date, re-run the report and either
+  re-triage every overdue deferred defect or record a new dated disposition.
+- **Rollback:** remove the two `deferred-backlog-*` Verify entries and the
+  read-only report script, then regenerate `backlog/index.json` and
+  `backlog/STATUS.md` with the sanctioned reconciler. The ledger and item
+  statuses require no rollback because this implementation never changes
+  either one.

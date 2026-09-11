@@ -4,32 +4,85 @@ import test from "node:test";
 
 import {
   CRITIC_EVIDENCE_SCHEMA,
+  CRITIC_DISPOSITION_WIRING_MARKER,
+  CRITIC_REQUIRED_SCHEMA,
   CRITIC_SKIP_SCHEMA,
+  CRITIC_TRIGGER_INPUT_SCHEMA,
   countCriticSkipDecisions,
   criticDisposition,
+  evaluateCriticTriggerRow,
   evaluateCriticSkipCoverage,
   evaluateCriticSkipCoverageFromRecords,
   hasCriticEvidenceReference,
+  hasCriticRequiredDecision,
   hasCriticSkipDecision,
+  validateCriticDecision,
+  validateCriticTriggerInput,
 } from "./critic-skip-decision.mjs";
 
-const skip = { schema: CRITIC_SKIP_SCHEMA, reason: "T5" };
+const trigger = (overrides = {}) => ({
+  schema: CRITIC_TRIGGER_INPUT_SCHEMA,
+  rigorLevel: 0,
+  riskClass: "low",
+  riskFlag: false,
+  diff: { mechanical: false, architecture: false, guardrails: false, security: false },
+  ...overrides,
+});
+const skip = { schema: CRITIC_SKIP_SCHEMA, trigger: trigger(), appliedRow: "T5", reason: "fast path" };
+const required = { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" };
 const evidence = { schema: CRITIC_EVIDENCE_SCHEMA, taskId: "A", candidateCommit: "a".repeat(40), path: "evidence/critic-A.json", sha256: "b".repeat(64) };
+
+test("the real-dispatch wiring marker remains machine discoverable", () => {
+  assert.equal(CRITIC_DISPOSITION_WIRING_MARKER, "pipeline.critic-skip-wired-into-real-dispatch");
+});
 
 test("presence helpers accept objects and reject malformed lanes", () => {
   assert.equal(hasCriticSkipDecision({ criticSkip: skip }), true);
+  assert.equal(hasCriticRequiredDecision({ criticRequired: required }), true);
   assert.equal(hasCriticEvidenceReference({ criticEvidence: evidence }), true);
   for (const value of [null, undefined, "yes", true, []]) {
     assert.equal(hasCriticSkipDecision({ criticSkip: value }), false);
+    assert.equal(hasCriticRequiredDecision({ criticRequired: value }), false);
     assert.equal(hasCriticEvidenceReference({ criticEvidence: value }), false);
   }
 });
 
-test("criticDisposition distinguishes the four structural outcomes", () => {
+test("criticDisposition distinguishes the five structural outcomes", () => {
   assert.equal(criticDisposition({ criticSkip: skip }), "skipped");
+  assert.equal(criticDisposition({ criticRequired: required }), "required");
   assert.equal(criticDisposition({ criticEvidence: evidence }), "evidenced");
   assert.equal(criticDisposition({}), "missing");
   assert.equal(criticDisposition({ criticSkip: skip, criticEvidence: evidence }), "conflicting");
+});
+
+test("closed trigger inputs deterministically select the strictest matching row", () => {
+  assert.deepEqual(validateCriticTriggerInput(trigger()), trigger());
+  assert.equal(evaluateCriticTriggerRow(trigger({ diff: { mechanical: true, architecture: false, guardrails: false, security: false } })), "T0");
+  assert.equal(evaluateCriticTriggerRow(trigger()), "T5");
+  assert.equal(evaluateCriticTriggerRow(trigger({ diff: { mechanical: true, architecture: true, guardrails: false, security: false } })), "T1");
+  assert.equal(evaluateCriticTriggerRow(trigger({ diff: { mechanical: true, architecture: false, guardrails: true, security: false } })), "T1");
+  assert.equal(evaluateCriticTriggerRow(trigger({ diff: { mechanical: true, architecture: false, guardrails: false, security: true } })), "T1");
+  assert.equal(evaluateCriticTriggerRow(trigger({ riskClass: "high" })), "T2");
+  assert.equal(evaluateCriticTriggerRow(trigger({ rigorLevel: 2 })), "T3");
+  assert.equal(evaluateCriticTriggerRow(trigger({ rigorLevel: 1 })), "T4");
+  assert.equal(evaluateCriticTriggerRow(trigger({ riskFlag: true })), "T4");
+});
+
+test("skip and required decisions are closed and restricted to their evaluated rows", () => {
+  assert.deepEqual(validateCriticDecision(skip, { required: false }), skip);
+  assert.deepEqual(validateCriticDecision(required, { required: true }), required);
+  for (const triggerInput of [
+    trigger({ diff: { mechanical: false, architecture: true, guardrails: false, security: false } }),
+    trigger({ diff: { mechanical: false, architecture: false, guardrails: true, security: false } }),
+    trigger({ diff: { mechanical: false, architecture: false, guardrails: false, security: true } }),
+    trigger({ riskClass: "high" }),
+    trigger({ rigorLevel: 2 }),
+    trigger({ rigorLevel: 1 }),
+  ]) {
+    assert.throws(() => validateCriticDecision({ ...skip, trigger: triggerInput, appliedRow: evaluateCriticTriggerRow(triggerInput) }, { required: false }));
+  }
+  assert.throws(() => validateCriticDecision({ ...skip, unknown: true }, { required: false }));
+  assert.throws(() => validateCriticTriggerInput({ ...trigger(), unknown: true }));
 });
 
 test("countCriticSkipDecisions counts only structured skip decisions", () => {
@@ -54,6 +107,16 @@ test("records-based coverage uses only v3 as the forward cutover and preserves v
   assert.equal(evaluateCriticSkipCoverageFromRecords({ records }).finding, false);
   const uncovered = [...records, { schema: "pipeline.dispatch-record.v3", taskId: "C" }];
   assert.equal(evaluateCriticSkipCoverageFromRecords({ records: uncovered }).finding, true);
+});
+
+test("a required disposition remains uncovered until candidate-bound evidence replaces it", () => {
+  const pending = [{ schema: "pipeline.dispatch-record.v3", taskId: "A", criticRequired: required }];
+  const result = evaluateCriticSkipCoverageFromRecords({ records: pending });
+  assert.equal(result.finding, true);
+  assert.match(result.reason, /explicitly require Critic evidence/u);
+  assert.equal(evaluateCriticSkipCoverageFromRecords({
+    records: [{ schema: "pipeline.dispatch-record.v3", taskId: "A", criticEvidence: evidence }],
+  }).finding, false);
 });
 
 test("a global Critic-like object cannot cover an unrelated applicable record", () => {

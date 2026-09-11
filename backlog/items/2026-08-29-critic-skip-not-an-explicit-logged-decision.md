@@ -96,3 +96,27 @@ templates/prompts/goldfish-task.md) plus a new check-critic-skip-coverage.mjs
 script (tested standalone against fixtures, 9/9 passing). Registering this
 checker into harness/scripts/verify.mjs as a real, running gate needs a TP-3
 ceremony -- not yet done.
+
+## Nova B completion contract (2026-09-12)
+
+The first v3 enforcement candidate was rejected by an independent Critic
+because free-text skip reasons could mislabel mandatory T1-T4 work and newly
+written v2 records could still bind authorship. The corrected rollout is:
+
+- New writers emit only `pipeline.dispatch-record.v3`. Before the opening
+  record, they persist the closed trigger inputs and deterministic T0-T5 row
+  as `criticSkip` (T0/T5) or `criticRequired` (T1-T4).
+- A required decision remains a Verify finding until the coordinator replaces
+  it with `criticEvidence` bound to the same task, candidate commit,
+  repository-relative evidence path and SHA-256.
+- Pre-v3 records remain readable and are counted as historical legacy by the
+  coverage report. They no longer produce a binding PASS from the authorship
+  verifier, so writing a new v2 record cannot bypass the cutover.
+- The standard Verify registry runs both the scanner tests and the live
+  coverage check. This contract applies equally in consuming repositories;
+  it does not depend on a native runner sandbox.
+
+**Rollback:** revert the v3 writer/validator, coverage, authorship-verifier,
+runner instructions and Verify/inventory entries as one unit to the last
+attested v2 baseline. Do not rewrite existing evidence records. A partial
+rollback that restores v2 PASS while leaving the v3 gate active is invalid.
