@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: a8bd954dd61ebedd206f94f1d53fe6da1d2d2f5b
+closure_evidence: backlog/evidence/2026-09-11-claude-resume-hint-hook-closure.md
 sprint: nova-b
 tracking: "Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate."
 source: "Found while root-causing 2026-08-29-codex-restart-context-loss-needs-a-different-approach-not-harder-enforcement.md (point 5 of its root-cause note)."
-done_when: contains plugins/pipeline-core/hooks/hooks.json resume-hint
+done_when: contains plugins/pipeline-core/hooks/hooks.json codex-session-start-hint.mjs
 ---
 
 # Claude Code has no mechanical SessionStart hook delivering the resume-hint card into context -- only Codex does
@@ -72,3 +76,12 @@ than the Codex-side `codex-session-start-hint.mjs` content fix.
 
 - `2026-08-29-codex-restart-context-loss-needs-a-different-approach-not-harder-enforcement.md`
   (open, Nova A) -- the item this was found while root-causing.
+
+## Closure correction — 2026-09-11
+
+The premise was already stale when this item was created. Commit `a8bd954d`
+had registered the shared SessionStart hook in Claude's `hooks.json` on
+2026-07-26. Current tests prove both the actual hook output and the manifest
+wiring. The item is closed against that historical implementation commit;
+the exact evidence and the boundary to installation attestation are recorded
+in `backlog/evidence/2026-09-11-claude-resume-hint-hook-closure.md`.
