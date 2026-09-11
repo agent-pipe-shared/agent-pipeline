@@ -97,7 +97,7 @@ export function preflightRoleDispatch({ root, packet } = {}) {
   const tree = git(realRoot, ["rev-parse", `${commit}^{tree}`]);
   if (tree !== packet.candidate.tree) return rejected("RDP-CANDIDATE-TREE", "candidate.tree");
   for (const path of packet.requiredPaths) {
-    const row = git(realRoot, ["ls-tree", "-z", commit, "--", path]);
+    const row = git(realRoot, ["--literal-pathspecs", "ls-tree", "-z", commit, "--", path]);
     if (row === null || !/^(?:100644|100755) blob (?:[a-f0-9]{40}|[a-f0-9]{64})\t/u.test(row)) {
       return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
     }

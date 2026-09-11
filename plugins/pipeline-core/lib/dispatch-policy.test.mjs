@@ -213,7 +213,8 @@ try {
   execFileSync("git", ["config", "user.name", "Dispatch fixture"], { cwd: dispatchFixture });
   mkdirSync(join(dispatchFixture, "scratch"));
   writeFileSync(join(dispatchFixture, "input.txt"), "input\n");
-  execFileSync("git", ["add", "input.txt"], { cwd: dispatchFixture });
+  writeFileSync(join(dispatchFixture, "README.md"), "fixture\n");
+  execFileSync("git", ["add", "input.txt", "README.md"], { cwd: dispatchFixture });
   execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: dispatchFixture });
   const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dispatchFixture, encoding: "utf8" }).trim();
   const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dispatchFixture, encoding: "utf8" }).trim();
@@ -246,6 +247,14 @@ try {
     const packet = packetFor("consult-advisor", 18);
     packet.resultPath = "missing-parent/result.json";
     assert.equal(preflightRoleDispatch({ root: dispatchFixture, packet }).code, "RDP-RESULT-DESTINATION");
+  });
+
+  check("DP18a required source names are literal paths, never Git pathspecs", () => {
+    const packet = packetFor("consult-advisor", 181, [":README.md"]);
+    const result = preflightRoleDispatch({ root: dispatchFixture, packet });
+    assert.equal(result.code, "RDP-REQUIRED-PATH");
+    assert.equal(result.modelCalls, 0);
+    assert.equal(result.launcherCalls, 0);
   });
 
   const invalidPackets = roles.map((role, index) => packetFor(role, 100 + index, ["missing.txt"]));
