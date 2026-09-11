@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: "2026-08-31"
 sprint: nova-b
 done_when: manual
 source: "Measured 2026-08-31 during 0.6.0 release preparation, while verifying that only Nova B / Alfred / Batman / Nightwing items remained open."
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: 22944b8250bc4523e2c8760019c1819a72fe9176
+closure_evidence: backlog/evidence/2026-09-12-deferred-backlog-visibility-closure.md
 ---
 
 # A `deferred` backlog item is terminal in the ledger, so a live defect can be parked invisibly
@@ -148,3 +152,11 @@ transition or silently reinterpret the terminal `deferred` status.
   `backlog/STATUS.md` with the sanctioned reconciler. The ledger and item
   statuses require no rollback because this implementation never changes
   either one.
+
+## Closure — 2026-09-12
+
+The accepted nonblocking visibility option is present in the source and in the
+standard Verify inventory. A fresh focused test passes 4/4, and the live report
+enumerates all five deferred defects with age, due state, sprint and revisit
+condition while returning success. Closing this item closes the invisibility
+mechanism only; it does not claim that any reported deferred defect is fixed.
