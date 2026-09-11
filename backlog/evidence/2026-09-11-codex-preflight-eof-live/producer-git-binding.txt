@@ -1,0 +1,7 @@
+command: git ls-tree HEAD -- plugins/pipeline-core/scripts/codex-sandbox-preflight.mjs
+label: eof-producer-git-binding
+exitCode: 0
+--- stdout ---
+100644 blob 193773351ec1ee758b8ccc4a96fb02710ed6a0b5	plugins/pipeline-core/scripts/codex-sandbox-preflight.mjs
+
+--- stderr ---

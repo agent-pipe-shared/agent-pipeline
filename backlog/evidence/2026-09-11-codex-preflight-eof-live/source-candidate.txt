@@ -1,0 +1,8 @@
+command: git show -s --format=%H%n%T HEAD
+label: eof-source-candidate
+exitCode: 0
+--- stdout ---
+d55cdb11bd35ac8e44f8c77158c8e730989b1303
+e96520f9836561b237d9f32ba5ec5654207a91c5
+
+--- stderr ---

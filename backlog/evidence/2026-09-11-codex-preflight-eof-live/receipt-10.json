@@ -1,0 +1,59 @@
+{
+  "appServer": {
+    "control": {
+      "appServerBoundedStop": true,
+      "appServerErrorClass": null,
+      "appServerInitialized": true
+    },
+    "sandbox": {
+      "appServerBoundedStop": true,
+      "appServerErrorClass": null,
+      "appServerInitialized": true
+    }
+  },
+  "canaries": {
+    "count": 8,
+    "manifestSha256": "3b6b6c7e4694201f8924995864857753b7eb3382fdf20b4a11dbf9221c6042fc",
+    "unchanged": true
+  },
+  "cli": {
+    "artifactSha256": "3188814c35471432d4123203e0eb38e5bddc60226e3d7ddf0e59e649ea140022",
+    "version": "0.154.0"
+  },
+  "durationMs": 4652,
+  "eligibility": "intermediate",
+  "eventChainSha256": "61452808ee4390f5fc19e1d94fdf0fbb8a194b19d4aebd9d18ab6e1c36d3eea6",
+  "networkEnabled": true,
+  "observedHelper": {
+    "artifactSha256": null,
+    "role": "diagnostic-only"
+  },
+  "platform": {
+    "filesystemClass": "wsl-native",
+    "kernelClass": "wsl2",
+    "os": "linux"
+  },
+  "profile": {
+    "compiledStateSha256": "595f55aa321d3ac2d9821ee524cbba213f09e73bc02023e57ce1f2dc69882a76",
+    "id": "codex-critic-intermediate.v1",
+    "rawSha256": "e2f47f7e8da67f093b747ee3966e910063521ed2843de0d763acffd40e52868f"
+  },
+  "sandboxTransport": {
+    "selection": "codex-cli-owned"
+  },
+  "schema": "pipeline.codex-sandbox-preflight.v1",
+  "terminalCode": "ok",
+  "vectors": {
+    "allowedRead": true,
+    "appServerInitEquivalent": true,
+    "childExitEquivalent": true,
+    "childStdioEquivalent": true,
+    "externalReadDenied": false,
+    "lifecycleComplete": true,
+    "networkDenied": false,
+    "scratchWriteAllowed": true,
+    "sensitiveReadDenied": false,
+    "stdinEofEquivalent": true,
+    "writeDenied": true
+  }
+}

@@ -1,0 +1,7 @@
+command: node plugins/pipeline-core/scripts/codex-sandbox-preflight.mjs --run --kind intermediate --codex <home>/.codex/packages/standalone/releases/0.154.0-x86_64-unknown-linux-musl/bin/codex --receipt <repo-root>/backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-05.json
+label: eof-live-05
+exitCode: 0
+--- stdout ---
+{"schema":"pipeline.codex-sandbox-preflight.v1","eligibility":"intermediate","terminalCode":"ok"}
+
+--- stderr ---

@@ -1,0 +1,17 @@
+command: sha256sum plugins/pipeline-core/scripts/codex-sandbox-preflight.mjs backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-01.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-02.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-03.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-04.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-05.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-06.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-07.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-08.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-09.json backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-10.json
+label: eof-content-sha256
+exitCode: 0
+--- stdout ---
+3b5fead6f188bd546d712d9a3254aa4c53ba82d79d0562dd3ff40ddf255ed8bb  plugins/pipeline-core/scripts/codex-sandbox-preflight.mjs
+d41dea15375e26bed79de0c93363bd5d2ddf0567f9a24db4f901ab491a6e1fda  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-01.json
+6dc070977893d6abe0b9d322e75a40444c816be369bfc78558b888931aeba461  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-02.json
+12fb0f981b77ab40d321acd9a97b045a0d7200f3fd6693092d40618ef82f8ee7  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-03.json
+9dc56ba67928528ea5bdefea3fcd167bfbe670e190f3dd7364d72938a2e81984  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-04.json
+e85ced33ac94411f3d2ac88b7a20957a423380d47229c2ffde34a1633f6e254a  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-05.json
+cdb961c365ad7f25bcbad69d0a6260c25e798d91a1ed0139aaac1856a1ab4ff2  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-06.json
+56e355dc666ae750a866582826d2e7237c750e99d3648a7c67086c03195b83f4  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-07.json
+a17cfb6dac737905cc8c856eff6ff2d03b4641adccd13907ccaa44f1d4bfb10a  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-08.json
+6ea19cf9c49c820c9d2c2e59f7082bc3d12161489117987339f115f66e09a471  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-09.json
+43411ae0994497bbd43f7308c040fb632392df853c2d0ebddb767ca7ebb6d7a4  backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-10.json
+
+--- stderr ---

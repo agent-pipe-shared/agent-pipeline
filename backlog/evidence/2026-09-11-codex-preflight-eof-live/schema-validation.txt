@@ -1,0 +1,7 @@
+command: node --input-type=module --eval "import {readFileSync} from 'node:fs'; import {validatePreflightReceipt} from './plugins/pipeline-core/scripts/codex-sandbox-preflight.mjs'; for(let i=1;i<=10;i++){const n=String(i).padStart(2,'0'); validatePreflightReceipt(JSON.parse(readFileSync(`backlog/evidence/2026-09-11-codex-preflight-eof-live/receipt-${n}.json`,'utf8')));} console.log('validated=10');"
+label: eof-receipt-schema-validation
+exitCode: 0
+--- stdout ---
+validated=10
+
+--- stderr ---
