@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-worker-subagent-dispatch-capability-is-broken
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 75426da5ac1a926700922ddc71dc025383c9331d
+closure_evidence: backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md
 sprint: nova-b
 tracking: "Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix."
 source: "Codex 060-77 greenfield retrospective (scratch/greenfield-reports/pipeline-retrospective-codex-060-77.md), section 'Root und Worker hatten unterschiedliche Funktionsfähigkeit'."
@@ -51,3 +55,24 @@ limitation outside this repo's own code. Scope that determination first.
 - **Rationale:** severity is high (breaks the core delegation model on one runner) but scope
   is undetermined -- premature to dispatch a fix without first reproducing/root-causing.
 - **Date:** 2026-08-29
+
+## Closure, 2026-09-11
+
+The later, more specific item
+`pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not`
+reproduced the same two status codes against a real Codex worker and isolated
+the cause: that worker context denied the repository probe's Git subprocess
+with `EPERM`. It was closed with the live diagnosis in `b2bd05ed`; the real
+Codex worker launch then moved to the already accepted host-boundary sandbox
+in `75426da5`, with both launch sites covered by supervisor tests.
+
+The current Codex 0.6.2 Greenfield report supplies the missing end-to-end
+outcome evidence: implementation ran through Goldfish, an under-delivering
+worker was replaced by a fresh Goldfish, and the replacement completed the
+game logic and tests. That directly refutes this older item's broad claim that
+the Goldfish dispatch model remains unusable on Codex.
+
+This closure does not close or weaken
+`pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn`.
+That separate Nova B item still tracks the preferred narrower custom sandbox
+profile in place of the accepted `danger-full-access` compatibility route.

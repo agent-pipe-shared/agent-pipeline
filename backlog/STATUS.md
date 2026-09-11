@@ -133,7 +133,7 @@
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it. |
-| pipeline.codex-worker-subagent-dispatch-capability-is-broken | open | defect | pipeline | 2026-08-29 | Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix. |
+| pipeline.codex-worker-subagent-dispatch-capability-is-broken | closed | defect | pipeline | 2026-08-29 | Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix. |
 | pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn | open | defect | pipeline | 2026-08-30 | Nova B -- Nova A's danger-full-access quick fix is landed and re-verified; the remaining scope is the PO-recalled custom, safer sandbox profile with bootstrap-time selection. |
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | rejected | requirement | pipeline | 2026-08-17 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 95
+- open: 94
 - in_progress: 0
-- closed: 545
+- closed: 546
 - rejected: 3
 - deferred: 11

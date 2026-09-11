@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "80d1aab30342308658555cefba9162ab4bd2da110bea459e3080a95fbd4718a8"
+    "transitionHead": "3e4a475b0f7e2a5ea07593bebe3174a90c2f06fa65033bd77486cdf5e54161f6"
   },
   "counts": {
-    "open": 95,
+    "open": 94,
     "in_progress": 0,
-    "closed": 545,
+    "closed": 546,
     "rejected": 3,
     "deferred": 11
   },
@@ -1589,13 +1589,17 @@
     },
     {
       "id": "pipeline.codex-worker-subagent-dispatch-capability-is-broken",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Codex 060-77 greenfield retrospective (scratch/greenfield-reports/pipeline-retrospective-codex-060-77.md), section 'Root und Worker hatten unterschiedliche Funktionsfähigkeit'.",
       "deferred": false,
-      "tracking": "Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix."
+      "tracking": "Nova B -- needs deeper Codex-runner-side investigation, likely outside pure Pipeline-repo code; not a same-session fix.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "75426da5ac1a926700922ddc71dc025383c9331d",
+      "closureEvidence": "backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md"
     },
     {
       "id": "pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn",

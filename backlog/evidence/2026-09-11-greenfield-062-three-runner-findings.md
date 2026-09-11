@@ -25,10 +25,14 @@ measured, estimated or inferred rather than promoted to product guarantees.
   missing restart-test assertion, while the signed push and hash-chained audit
   path completed and attempted hardening bypasses failed.
 - The Codex run exercised recovery and verification binding but reported high
-  ceremony and a read-scope denial during transcript-oriented diagnosis. The
-  0.6.2 candidate subsequently corrected the over-broad read denial. The
-  report's final statement that the project was not pushed is stale relative
-  to the later completed run, so it is not retained as outcome evidence.
+  ceremony and a read-scope denial during transcript-oriented diagnosis. Its
+  product implementation ran through Goldfish; after one worker repeatedly
+  under-delivered, a fresh Goldfish completed the game logic and tests. This is
+  current end-to-end evidence that Codex worker dispatch is functional, while
+  also motivating the separate bounded-retry work. The 0.6.2 candidate
+  subsequently corrected the over-broad read denial. The report's final
+  statement that the project was not pushed is stale relative to the later
+  completed run, so it is not retained as outcome evidence.
 
 These observations support hard enforcement across Claude Code, Codex and
 Antigravity within each runner's tested adapter and host boundary. They do not
