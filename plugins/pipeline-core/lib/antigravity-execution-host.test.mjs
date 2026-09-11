@@ -3,18 +3,18 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { AGY_ERROR_TAXONOMY, discoverAgyPath, invokeAgy, parseAgyOutput } from "./antigravity-execution-host.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
-let passed = 0;
-let failed = 0;
-async function check(name, run) {
-  try { await run(); console.log(`PASS ${name}`); passed += 1; }
-  catch (error) { console.error(`FAIL ${name}`); console.error(error); failed += 1; }
+const cases = [];
+function check(label, run) {
+  const separator = label.indexOf(" ");
+  cases.push({ id: label.slice(0, separator), name: label.slice(separator + 1), run });
 }
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
@@ -70,6 +70,12 @@ function createFixture() {
   return { root, mockAgy, spawnLog, commit, tree };
 }
 
+async function withFixture(run) {
+  const fixture = createFixture();
+  try { return await run(fixture); }
+  finally { rmSync(fixture.root, { recursive: true, force: true }); }
+}
+
 function packetFor(fixture, role = "consult-advisor", suffix = "", requiredPaths = ["input.txt"]) {
   return {
     schema: ROLE_DISPATCH_REQUEST_SCHEMA,
@@ -93,112 +99,116 @@ function spawnRows(fixture) {
     : [];
 }
 
-await check("EPH01 discovery accepts an existing configured binary", () => {
+check("EPH01 discovery accepts an existing configured binary", () => {
   assert.equal(discoverAgyPath({ AGY_PATH: process.execPath, PATH: "" }), process.execPath);
 });
-await check("EPH02 parses the last valid JSON line", () => {
+check("EPH02 parses the last valid JSON line", () => {
   const parsed = parseAgyOutput('log\n{"status":"running"}\n{"result":"success","usage":{"input_tokens":10}}\n');
   assert.equal(parsed.result, "success");
   assert.equal(parsed.usage.input_tokens, 10);
 });
-await check("EPH03 rejects malformed output", () => {
+check("EPH03 rejects malformed output", () => {
   assert.throws(() => parseAgyOutput("no json"), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED);
 });
 
-const fixture = createFixture();
-try {
-  await check("EPH04 valid packet launches exactly once with its prompt byte-for-byte", async () => {
+check("EPH04 valid packet launches exactly once with its prompt byte-for-byte", () => withFixture(async (fixture) => {
+  const packet = packetFor(fixture);
+  const result = await invokeAgy(launchArgs(fixture, packet));
+  assert.equal(result.ok, true);
+  assert.equal(result.launcherCalls, 1);
+  assert.equal(result.modelCalls, 1);
+  const rows = spawnRows(fixture);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0][rows[0].indexOf("--prompt") + 1], packet.prompt);
+}));
+
+const zeroSpawnCases = [
+  ["EPH05 invalid packet shape", (packet) => { delete packet.candidate; }, "RDP-PACKET-SHAPE"],
+  ["EPH06 stale candidate tree", (packet) => { packet.candidate.tree = "0".repeat(40); }, "RDP-CANDIDATE-TREE"],
+  ["EPH07 wrong transport", (packet) => { packet.transport = "direct"; }, "AGY-DISPATCH-TRANSPORT"],
+  ["EPH08 unusable result destination", (packet) => { packet.resultDestination = { kind: "file", path: "missing/result.json" }; }, "RDP-RESULT-DESTINATION"],
+];
+for (const [name, mutate, code] of zeroSpawnCases) {
+  check(`${name} fails under five seconds with zero spawn`, () => withFixture(async (fixture) => {
     const packet = packetFor(fixture);
-    const result = await invokeAgy(launchArgs(fixture, packet));
-    assert.equal(result.ok, true);
-    assert.equal(result.launcherCalls, 1);
-    assert.equal(result.modelCalls, 1);
-    const rows = spawnRows(fixture);
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0][rows[0].indexOf("--prompt") + 1], packet.prompt);
-  });
-
-  const zeroSpawnCases = [
-    ["EPH05 invalid packet shape", (packet) => { delete packet.candidate; }, "RDP-PACKET-SHAPE"],
-    ["EPH06 stale candidate tree", (packet) => { packet.candidate.tree = "0".repeat(40); }, "RDP-CANDIDATE-TREE"],
-    ["EPH07 wrong transport", (packet) => { packet.transport = "direct"; }, "AGY-DISPATCH-TRANSPORT"],
-    ["EPH08 unusable result destination", (packet) => { packet.resultDestination = { kind: "file", path: "missing/result.json" }; }, "RDP-RESULT-DESTINATION"],
-  ];
-  for (const [name, mutate, code] of zeroSpawnCases) {
-    await check(`${name} fails under five seconds with zero spawn`, async () => {
-      const packet = packetFor(fixture);
-      mutate(packet);
-      const before = spawnRows(fixture).length;
-      const started = Date.now();
-      const result = await invokeAgy(launchArgs(fixture, packet));
-      assert.ok(Date.now() - started < 5000);
-      assert.equal(result.code, code);
-      assert.equal(result.launcherCalls, 0);
-      assert.equal(result.modelCalls, 0);
-      assert.equal(spawnRows(fixture).length, before);
-    });
-  }
-
-  await check("EPH09 dirty required input fails under five seconds with zero spawn", async () => {
-    const packet = packetFor(fixture);
-    const before = spawnRows(fixture).length;
-    writeFileSync(join(fixture.root, "input.txt"), "dirty\n");
-    try {
-      const started = Date.now();
-      const result = await invokeAgy(launchArgs(fixture, packet));
-      assert.ok(Date.now() - started < 5000);
-      assert.equal(result.code, "RDP-REQUIRED-PATH-DRIFT");
-      assert.equal(result.launcherCalls, 0);
-      assert.equal(spawnRows(fixture).length, before);
-    } finally { writeFileSync(join(fixture.root, "input.txt"), "input\n"); }
-  });
-
-  await check("EPH10 all eight roles reject an invalid required path under five seconds with zero spawn", async () => {
+    mutate(packet);
     const before = spawnRows(fixture).length;
     const started = Date.now();
-    for (const role of roles) {
-      const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, role, "", ["missing.txt"])));
-      assert.equal(result.code, "RDP-REQUIRED-PATH", role);
-      assert.equal(result.launcherCalls, 0, role);
-      assert.equal(result.modelCalls, 0, role);
-    }
+    const result = await invokeAgy(launchArgs(fixture, packet));
     assert.ok(Date.now() - started < 5000);
-    assert.equal(spawnRows(fixture).length, before);
-  });
-
-  const executionCases = [
-    ["EPH11 detects auth requirement", "--auth-test", undefined, AGY_ERROR_TAXONOMY.AUTH_REQUIRED],
-    ["EPH12 detects non-zero exit", "--fail-test", undefined, AGY_ERROR_TAXONOMY.NONZERO_EXIT],
-    ["EPH13 detects malformed output", "--malformed-test", undefined, AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED],
-    ["EPH14 detects model mismatch", "", "gemini-requested", AGY_ERROR_TAXONOMY.MODEL_MISMATCH],
-  ];
-  for (const [name, suffix, model, code] of executionCases) {
-    await check(name, async () => {
-      const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", suffix), { model }));
-      assert.equal(result.ok, false);
-      assert.equal(result.code, code);
-      assert.equal(result.launcherCalls, 1);
-    });
-  }
-  await check("EPH15 detects timeout", async () => {
-    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--timeout-test"), { timeoutMs: 200 }));
-    assert.equal(result.code, AGY_ERROR_TAXONOMY.TIMEOUT);
-    assert.equal(result.launcherCalls, 1);
-  });
-  await check("EPH16 detects missing binary only after packet preparation", async () => {
-    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture), { agyPath: "/does/not/exist/agy" }));
-    assert.equal(result.code, AGY_ERROR_TAXONOMY.NOT_INSTALLED);
+    assert.equal(result.code, code);
     assert.equal(result.launcherCalls, 0);
     assert.equal(result.modelCalls, 0);
-  });
-  await check("EPH17 accepts the observed model", async () => {
-    assert.equal((await invokeAgy(launchArgs(fixture, packetFor(fixture), { model: "gemini-observed" }))).ok, true);
-  });
-  await check("EPH18 slow execution remains bound to the fixture", async () => {
-    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--slow-test"), { model: "gemini-observed", timeoutMs: 2500 }));
-    assert.equal(result.ok, true);
-  });
-} finally { rmSync(fixture.root, { recursive: true, force: true }); }
+    assert.equal(spawnRows(fixture).length, before);
+  }));
+}
 
-console.log(`\n${passed}/${passed + failed} checks passed.`);
-process.exitCode = failed === 0 ? 0 : 1;
+check("EPH09 dirty required input fails under five seconds with zero spawn", () => withFixture(async (fixture) => {
+  const packet = packetFor(fixture);
+  const before = spawnRows(fixture).length;
+  writeFileSync(join(fixture.root, "input.txt"), "dirty\n");
+  try {
+    const started = Date.now();
+    const result = await invokeAgy(launchArgs(fixture, packet));
+    assert.ok(Date.now() - started < 5000);
+    assert.equal(result.code, "RDP-REQUIRED-PATH-DRIFT");
+    assert.equal(result.launcherCalls, 0);
+    assert.equal(spawnRows(fixture).length, before);
+  } finally { writeFileSync(join(fixture.root, "input.txt"), "input\n"); }
+}));
+
+check("EPH10 all eight roles reject an invalid required path under five seconds with zero spawn", () => withFixture(async (fixture) => {
+  const before = spawnRows(fixture).length;
+  const started = Date.now();
+  for (const role of roles) {
+    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, role, "", ["missing.txt"])));
+    assert.equal(result.code, "RDP-REQUIRED-PATH", role);
+    assert.equal(result.launcherCalls, 0, role);
+    assert.equal(result.modelCalls, 0, role);
+  }
+  assert.ok(Date.now() - started < 5000);
+  assert.equal(spawnRows(fixture).length, before);
+}));
+
+const executionCases = [
+  ["EPH11 detects auth requirement", "--auth-test", undefined, AGY_ERROR_TAXONOMY.AUTH_REQUIRED],
+  ["EPH12 detects non-zero exit", "--fail-test", undefined, AGY_ERROR_TAXONOMY.NONZERO_EXIT],
+  ["EPH13 detects malformed output", "--malformed-test", undefined, AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED],
+  ["EPH14 detects model mismatch", "", "gemini-requested", AGY_ERROR_TAXONOMY.MODEL_MISMATCH],
+];
+for (const [name, suffix, model, code] of executionCases) {
+  check(name, () => withFixture(async (fixture) => {
+    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", suffix), { model }));
+    assert.equal(result.ok, false);
+    assert.equal(result.code, code);
+    assert.equal(result.launcherCalls, 1);
+  }));
+}
+check("EPH15 detects timeout", () => withFixture(async (fixture) => {
+  const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--timeout-test"), { timeoutMs: 200 }));
+  assert.equal(result.code, AGY_ERROR_TAXONOMY.TIMEOUT);
+  assert.equal(result.launcherCalls, 1);
+}));
+check("EPH16 detects missing binary only after packet preparation", () => withFixture(async (fixture) => {
+  const result = await invokeAgy(launchArgs(fixture, packetFor(fixture), { agyPath: "/does/not/exist/agy" }));
+  assert.equal(result.code, AGY_ERROR_TAXONOMY.NOT_INSTALLED);
+  assert.equal(result.launcherCalls, 0);
+  assert.equal(result.modelCalls, 0);
+}));
+check("EPH17 accepts the observed model", () => withFixture(async (fixture) => {
+  assert.equal((await invokeAgy(launchArgs(fixture, packetFor(fixture), { model: "gemini-observed" }))).ok, true);
+}));
+check("EPH18 slow execution remains bound to the fixture", () => withFixture(async (fixture) => {
+  const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--slow-test"), { model: "gemini-observed", timeoutMs: 2500 }));
+  assert.equal(result.ok, true);
+}));
+
+assert.equal(cases.length, 18, "the complete Antigravity execution host corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

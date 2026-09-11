@@ -32,6 +32,7 @@ import {
   repairLocalSupervisorState,
   resolveLocalSupervisorRoot,
 } from "../lib/local-supervisor-state.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 const CLI = realpathSync(fileURLToPath(new URL("./local-worker-supervisor.mjs", import.meta.url)));
 const NODE = realpathSync(process.execPath);
@@ -356,14 +357,12 @@ function cleanup(context, recordSha256) {
   ], context);
 }
 
-let passed = 0;
-async function check(name, fn) {
-  await fn();
-  passed += 1;
-  console.log(`PASS LWSC${String(passed).padStart(2, "0")} ${name}`);
+const cases = [];
+function check(name, run) {
+  cases.push({ id: `LWSC${String(cases.length + 1).padStart(2, "0")}`, name, run });
 }
 
-await check("plans and runs two overlapping real child processes in separate no-hardlink Git clones", () => {
+check("plans and runs two overlapping real child processes in separate no-hardlink Git clones", () => {
   const context = fixture();
   try {
     const { run } = runWave(context, createRequest(context.sourceRoot, context.stateRoot, context.commit));
@@ -415,7 +414,7 @@ await check("plans and runs two overlapping real child processes in separate no-
   }
 });
 
-await check("returns serial-fallback-required before creating a workspace when recovery reserve is exhausted", () => {
+check("returns serial-fallback-required before creating a workspace when recovery reserve is exhausted", () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { recoveryReserve: 4 });
@@ -436,7 +435,7 @@ await check("returns serial-fallback-required before creating a workspace when r
   }
 });
 
-await check("times out and signals only the exact observed child, then permits exact cleanup", () => {
+check("times out and signals only the exact observed child, then permits exact cleanup", () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 2_000, timeoutMs: 200, write: false });
@@ -453,7 +452,7 @@ await check("times out and signals only the exact observed child, then permits e
   }
 });
 
-await check("accepts an exact cancellation intent, drains the owned child, and permits cleanup", async () => {
+check("accepts an exact cancellation intent, drains the owned child, and permits cleanup", async () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
@@ -491,7 +490,7 @@ await check("accepts an exact cancellation intent, drains the owned child, and p
   }
 });
 
-await check("does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest", async () => {
+check("does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest", async () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
@@ -527,7 +526,7 @@ await check("does not deny cancellation of a healthy worker purely because a hea
   }
 });
 
-await check("keeps a failed real child attributable and does not convert nonzero exit into success", () => {
+check("keeps a failed real child attributable and does not convert nonzero exit into success", () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 200, exitCode: 7, write: false });
@@ -550,7 +549,7 @@ await check("keeps a failed real child attributable and does not convert nonzero
   }
 });
 
-await check("classifies an ignored unauthorized write and source-checkout drift as recovery-required", async () => {
+check("classifies an ignored unauthorized write and source-checkout drift as recovery-required", async () => {
   const unauthorized = fixture();
   try {
     const request = createRequest(unauthorized.sourceRoot, unauthorized.stateRoot, unauthorized.commit, {
@@ -588,7 +587,7 @@ await check("classifies an ignored unauthorized write and source-checkout drift 
   }
 });
 
-await check("reports a killed supervisor with a still-attributable worker as recovery-required", async () => {
+check("reports a killed supervisor with a still-attributable worker as recovery-required", async () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
@@ -616,7 +615,7 @@ await check("reports a killed supervisor with a still-attributable worker as rec
   }
 });
 
-await check("admits only one of two concurrent starts for the same exact plan", async () => {
+check("admits only one of two concurrent starts for the same exact plan", async () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
@@ -646,7 +645,7 @@ await check("admits only one of two concurrent starts for the same exact plan", 
   }
 });
 
-await check("denies replayed cleanup and foreign workspace marker without broad deletion", () => {
+check("denies replayed cleanup and foreign workspace marker without broad deletion", () => {
   const context = fixture();
   try {
     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 200 });
@@ -668,4 +667,12 @@ await check("denies replayed cleanup and foreign workspace marker without broad 
   }
 });
 
-console.log(`${passed}/10 checks passed.`);
+assert.equal(cases.length, 10, "the complete local-worker supervisor CLI corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

@@ -8,6 +8,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "antigravity-execution-host-tests",
+      "path": "plugins/pipeline-core/lib/antigravity-execution-host.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "artifact-topology-tests",
       "path": "plugins/pipeline-core/scripts/check-artifact-topology.test.mjs",
       "disposition": "legacy-process-only",
@@ -438,8 +443,7 @@
     {
       "name": "local-worker-supervisor-cli-tests",
       "path": "plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "local-worker-supervisor-core-tests",
