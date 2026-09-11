@@ -1,13 +1,13 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "399d0a2c560074fe45cf33d386e84fd521d08618",
-    "tree": "0ffe043df5eb84b235d85c0f63bed53c541c4928"
+    "commit": "eb13cc3ccca7ebdf3123f190193d3a9f5ac08247",
+    "tree": "745e722a6e783bfd0a5c41b26e8ed6b7319f6847"
   },
   "criticReview": {
-    "status": "attested",
-    "receiptSha256": "1840971fff67ea57280d9432e214a52eff533468045fe9b518a80a55d86c0363",
-    "reason": null
+    "status": "required-before-publication",
+    "receiptSha256": null,
+    "reason": "The Codex dispatch-preflight surface and refreshed baseline require an independent inventory review before publication."
   },
   "capabilities": [
     {
@@ -100,7 +100,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-claude-hook-safety",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "plugins/pipeline-core/hooks/hooks.json",
@@ -117,6 +117,7 @@
         "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent:node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent|update_plan:node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
@@ -160,17 +161,19 @@
         "plugins/pipeline-core/.codex-plugin/plugin.json",
         "plugins/pipeline-core/hooks/codex-hooks.json",
         "plugins/pipeline-core/hooks/codex-slicing-hint.mjs",
+        "plugins/pipeline-core/hooks/guard-dispatch.mjs",
         "plugins/pipeline-core/hooks/native-slicing.mjs"
       ],
       "testEvidence": [
         "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+        "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
         "plugins/pipeline-core/hooks/guard-slicing.test.mjs"
       ],
       "targets": [
         {
           "document": "FLOW",
           "anchorId": "capability-codex-host-hook-bridge",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "plugins/pipeline-core/.codex-plugin/plugin.json",
@@ -663,7 +666,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-deterministic-verification",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": ".claude/pipeline.json",
@@ -719,7 +722,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-governance-example-extensions",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": ".claude/pipeline.yaml",
@@ -777,7 +780,7 @@
         {
           "document": "README",
           "anchorId": "capability-human-accountability-roles",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -834,7 +837,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-parallel-sprint-promotion-gates",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -890,7 +893,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-pipeline-update-channels",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "project/pipeline.json",
@@ -955,7 +958,7 @@
         {
           "document": "SETUP",
           "anchorId": "capability-plugin-distribution-and-publication",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": ".claude/settings.json",
@@ -1011,7 +1014,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-release-planning-controls",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1082,7 +1085,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-session-and-delivery-skills",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1147,7 +1150,7 @@
         {
           "document": "SETUP",
           "anchorId": "capability-setup-and-runtime-projection",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "pipeline.user.yaml",
@@ -1216,7 +1219,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-specialist-agent-roles",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1314,7 +1317,7 @@
         {
           "document": "SETUP",
           "anchorId": "capability-starter-templates",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1371,7 +1374,7 @@
         {
           "document": "SETUP",
           "anchorId": "capability-generated-agent-obligations",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1434,7 +1437,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-v3-routed-duties",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "pipeline.user.yaml",
@@ -1492,7 +1495,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-v3-work-profiles",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "pipeline.user.yaml",
@@ -1549,7 +1552,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-handover-hard-size-gate",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "plugins/pipeline-core/hooks/hooks.json",
@@ -1607,7 +1610,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-governance-event-ledger",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1661,7 +1664,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-agent-decision-journal",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1737,7 +1740,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-audit-and-evidence-cli",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1795,7 +1798,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-change-control-cli",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1860,7 +1863,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-security-control-catalog",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1931,7 +1934,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-supply-chain-provenance",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -1989,7 +1992,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-ai-assisted-hardening",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2049,7 +2052,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-critical-human-authorization",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2104,7 +2107,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-repair-guidance-cli",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2177,7 +2180,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-continuity-and-handover",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2240,7 +2243,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-afk-capability-workers",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2299,7 +2302,7 @@
         {
           "document": "FLOW",
           "anchorId": "capability-local-worker-supervision",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2360,7 +2363,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-cost-and-benchmark-cli",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2417,7 +2420,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-error-register-quality-gate",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2476,7 +2479,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-organization-policy-packs",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2541,7 +2544,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-external-traceability-adapters",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2603,7 +2606,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-human-override-and-maintenance-window",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
@@ -2670,7 +2673,7 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-documentation-quality-gates",
-          "status": "active"
+          "status": "pending"
         }
       ],
       "configurationPath": "none",
