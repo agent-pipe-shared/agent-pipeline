@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ae3b621ec2cb842816a2d81e9df7eeba8192901134348e8265940fe30f3d915d"
+    "transitionHead": "0cc8177d2005a728762e76f339257a02f9901fcadfe3b7451cf347a9d99ef760"
   },
   "counts": {
-    "open": 82,
+    "open": 81,
     "in_progress": 0,
-    "closed": 558,
+    "closed": 559,
     "rejected": 3,
     "deferred": 11
   },
@@ -2450,12 +2450,16 @@
     },
     {
       "id": "pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "PO, 2026-08-16 push-flow analysis: 'der push ist durch zu viele sachen viel zu schwierig und umständlich geworden. Man kann nicht zeitnah einfach mal pushen selbst nach freigabe nicht.' Named Block F in that session and agreed for filing; the measurements below were taken in the same session.",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "5c826023a728070b12a3af356e2733f1e382a29e",
+      "closureEvidence": "backlog/evidence/2026-09-11-boundary-aware-verify-closure.md"
     },
     {
       "id": "pipeline.every-small-correction-costs-a-new-human-interaction",

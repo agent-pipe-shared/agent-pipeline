@@ -201,7 +201,7 @@
 | pipeline.enforce-kickoff-po-questions | open | workflow-improvement | pipeline | 2026-08-21 | — |
 | pipeline.entry-point-reachability-check-substring-matches-whole-source-files | closed | defect | pipeline | 2026-09-03 | Nova B — the reachability check decides whether a guard admits a script by testing whether the guard's source text contains the script's stem anywhere, comments included. A comment citing an evidence file whose name happens to contain a script stem is read as an admission. |
 | pipeline.epic-file-contract-has-no-drift-check | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
+| pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.every-small-correction-costs-a-new-human-interaction | open | idea | pipeline | 2026-08-28 | — |
 | pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.evidence-bound-review-retry-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 82
+- open: 81
 - in_progress: 0
-- closed: 558
+- closed: 559
 - rejected: 3
 - deferred: 11
