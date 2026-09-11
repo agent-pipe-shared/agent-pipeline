@@ -6749,7 +6749,9 @@ test("a leading-tilde read is admitted in the cat-pipeline lane", () => {
     for (const marker of TILDE_MARKER_FORMS) {
       const command = `cat ${marker} | head -n 5`;
       assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
+      const admitted = readScopeRun(command, projectDir);
+      assert.equal(admitted.exitCode, 0, command);
+      assert.doesNotMatch(admitted.stderr, /GUARD-/u, command);
     }
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
@@ -6763,11 +6765,48 @@ test("a leading-tilde read is admitted in the git-pipeline lane", () => {
     for (const marker of TILDE_MARKER_FORMS) {
       const command = `git log ${marker} | head -n 5`;
       assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
+      const admitted = readScopeRun(command, projectDir);
+      assert.equal(admitted.exitCode, 0, command);
+      assert.doesNotMatch(admitted.stderr, /GUARD-/u, command);
     }
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("a leading-tilde mutation is classified as a cross-repository target in every commandPath call-site class", () => {
+  const projectDir = root();
+  try {
+    // Make this fixture a Pipeline source root so the cachebuster classifier reaches its
+    // target-containment decision instead of refusing merely because the source markers are
+    // absent. These are marker files only; no command below is executed.
+    writeFileSync(join(projectDir, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+    mkdirSync(join(projectDir, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+    mkdirSync(join(projectDir, "harness", "scripts"), { recursive: true });
+    writeFileSync(join(projectDir, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), "{}\n");
+    writeFileSync(join(projectDir, "harness", "scripts", "verify.mjs"), "// marker\n");
+
+    const commands = [
+      "printf x > ~/nva-commandpath-output.txt",
+      "python3 /tools/update_plugin_cachebuster.py ~/nva-commandpath-plugin",
+      "git -C ~/nva-commandpath-sibling commit -m mutation",
+      "cp in-root.txt ~/nva-commandpath-copy.txt",
+      "sed -i s/old/new/ ~/nva-commandpath-edit.txt",
+    ];
+    for (const command of commands) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, projectDir), true, command);
+      const refused = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir,
+        ...hgoReadyDeps(),
+        consumeHumanGuardOverrideFn() { return { status: "absent" }; },
+        recordHumanGuardDenialFn() { return { status: "unavailable" }; },
+      });
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, /GUARD-CROSS-REPO-MUTATION/u, command);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
   }
 });
 

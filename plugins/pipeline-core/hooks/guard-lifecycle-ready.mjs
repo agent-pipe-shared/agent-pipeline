@@ -2769,7 +2769,18 @@ function pipelineSourceRoot(root, exists = existsSync) {
 
 function commandPath(value, root) {
   if (typeof value !== "string" || value === "" || value.startsWith("-")) return null;
+  // Bash expands a leading `~` before executing the command. Treating the unexpanded token
+  // as a relative path would therefore classify a real home-directory target as if it were
+  // the literal (usually nonexistent) `<root>/~...` path. As in rawReadCandidatePath(), this
+  // is a fail-closed sentinel rather than an attempt to reproduce shell/user lookup rules:
+  // every leading-tilde form is outside `root`, while all other commandPath callers retain
+  // their existing resolve() behaviour.
+  if (value.startsWith("~")) return `${sep}${value}`;
   return resolve(root, value);
+}
+
+function isShellExternalPathToken(value) {
+  return typeof value === "string" && (isAbsolute(value) || value.startsWith("~"));
 }
 
 /**
@@ -3147,13 +3158,13 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   if (mutatingTargets.has(executable)) {
     return args.some((arg) => {
       const target = commandPath(arg, root);
-      return target !== null && isAbsolute(arg) && !pathInside(root, target);
+      return target !== null && isShellExternalPathToken(arg) && !pathInside(root, target);
     });
   }
   if (executable === "sed" && args.some((arg) => /^-[^-]*i/u.test(arg) || /^--in-place(?:=|$)/u.test(arg))) {
     return args.some((arg) => {
       const target = commandPath(arg, root);
-      return target !== null && isAbsolute(arg) && !pathInside(root, target);
+      return target !== null && isShellExternalPathToken(arg) && !pathInside(root, target);
     });
   }
   return false;
