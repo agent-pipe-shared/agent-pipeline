@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4782c2049c3bd02ac7b0551483da457de7d3e2df9e55eca3c870dde7efe14603"
+    "transitionHead": "12f2c6457d9ea4a6e48c07beeeea2fd18996c8084a8ea681857deb698ca049fe"
   },
   "counts": {
-    "open": 78,
+    "open": 77,
     "in_progress": 0,
-    "closed": 563,
+    "closed": 564,
     "rejected": 3,
     "deferred": 11
   },
@@ -91,13 +91,17 @@
     },
     {
       "id": "pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-31",
       "source": "Measured 2026-08-31 during 0.6.0 release preparation, while verifying that only Nova B / Alfred / Batman / Nightwing items remained open.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-12",
+      "closureRepository": "self",
+      "closureCommit": "22944b8250bc4523e2c8760019c1819a72fe9176",
+      "closureEvidence": "backlog/evidence/2026-09-12-deferred-backlog-visibility-closure.md"
     },
     {
       "id": "pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval",

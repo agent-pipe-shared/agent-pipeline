@@ -11,7 +11,7 @@
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.a-critic-has-no-writable-location-for-its-own-report | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs | open | requirement | pipeline | nova-b | 2026-09-06 | — | — |
-| pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | open | defect | pipeline | nova-b | 2026-08-31 | — | — |
+| pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher | open | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it. |
 | pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the dispatch record is the only artifact that binds a commit to its work package, so a Critic needs it; it also carries the implementor's narrative, which the Critic contract forbids as input. There is no way to hand over one without the other. |
@@ -663,8 +663,8 @@
 
 ## Counts
 
-- open: 78
+- open: 77
 - in_progress: 0
-- closed: 563
+- closed: 564
 - rejected: 3
 - deferred: 11
