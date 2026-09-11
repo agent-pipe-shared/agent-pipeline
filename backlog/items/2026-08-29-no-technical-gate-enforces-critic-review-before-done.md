@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-technical-gate-enforces-critic-review-before-done
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: 0b34dbc111f98dd4b3b6d1408ef012a924cd9d63
+closure_evidence: backlog/evidence/2026-09-12-critic-review-gate-closure.md
 created: 2026-08-29
 sprint: nova-b
 tracking: "Nova B -- PO decision 2026-08-29: real design work needed (detecting when a Critic review was DUE and never ran is not trivial), too large for this candidate."
@@ -56,3 +60,14 @@ authorship is already checked mechanically.
   large for the current candidate; addressed via AskUserQuestion during the greenfield-report
   review.
 - **Date:** 2026-08-29
+
+## Closure, 2026-09-12
+
+The accepted design and mechanical gate now exist. The closed T0--T5 matrix
+derives exactly one disposition; v3 dispatch records carry that disposition;
+the registered coverage check refuses a required review without matching
+task-, candidate-, digest- and commit-path-bound Critic evidence. Commit
+`0b34dbc1` closed the remaining path-binding gap. Focused suites pass. The live
+checker currently rejects three honestly pending high-risk dispatches, which is
+evidence that the gate blocks missing review evidence rather than silently
+accepting it. See the closure evidence for exact commands and limits.
