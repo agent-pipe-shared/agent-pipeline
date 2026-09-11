@@ -408,7 +408,8 @@ export function checkVerifySuiteRegistration({
         for (const capability of inventory.capabilities) {
           if (!Array.isArray(capability?.surfaceIds)) continue;
           for (const surfaceId of capability.surfaceIds) {
-            assignments.set(surfaceId, (assignments.get(surfaceId) ?? 0) + 1);
+            if (!assignments.has(surfaceId)) assignments.set(surfaceId, []);
+            assignments.get(surfaceId).push(capability.id);
           }
         }
         // check-product-capability-inventory.mjs's verifyMembers() discovers
@@ -417,7 +418,8 @@ export function checkVerifySuiteRegistration({
         // product-inventory surface obligation here.
         for (const entry of entries.filter((candidate) => candidate.arrayName === "TEST_SUITES")) {
           const surfaceId = `verify-phase:harness/scripts/verify.mjs:${entry.name}`;
-          const assignmentCount = assignments.get(surfaceId) ?? 0;
+          const assignedCapabilityIds = assignments.get(surfaceId) ?? [];
+          const assignmentCount = assignedCapabilityIds.length;
           if (assignmentCount === 1) continue;
           if (assignmentCount === 0) {
             uncategorizedVerifySurfaces.push(surfaceId);
@@ -426,8 +428,12 @@ export function checkVerifySuiteRegistration({
             );
           } else {
             duplicateVerifySurfaces.push(surfaceId);
+            const uniqueCapabilityIds = [...new Set(assignedCapabilityIds)].sort();
+            const cause = uniqueCapabilityIds.length === 1
+              ? `is listed ${assignmentCount} times in capability ${JSON.stringify(uniqueCapabilityIds[0])}`
+              : `belongs to ${uniqueCapabilityIds.length} capabilities (${uniqueCapabilityIds.map((id) => JSON.stringify(id)).join(", ")})`;
             findings.push(
-              `DUPLICATE-VERIFY-SURFACE "${entry.name}": "${surfaceId}" belongs to ${assignmentCount} capabilities in ${toPosix(relative(repoRoot, resolvedInventoryPath))}; keep exactly one assignment`,
+              `DUPLICATE-VERIFY-SURFACE "${entry.name}": "${surfaceId}" ${cause} in ${toPosix(relative(repoRoot, resolvedInventoryPath))}; keep exactly one assignment`,
             );
           }
         }

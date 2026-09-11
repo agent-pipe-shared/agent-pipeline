@@ -232,7 +232,27 @@ check("a registered suite is rejected immediately when two capabilities assign i
   assert.deepEqual(result.duplicateVerifySurfaces, [surfaceId]);
   assert.match(
     result.findings.join("\n"),
-    /DUPLICATE-VERIFY-SURFACE "alpha-tests".*belongs to 2 capabilities.*keep exactly one assignment/,
+    /DUPLICATE-VERIFY-SURFACE "alpha-tests".*belongs to 2 capabilities \("first", "second"\).*keep exactly one assignment/,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("a duplicate surface entry inside one capability reports that capability accurately", () => {
+  const root = buildRoot();
+  writeFile(root, "harness/scripts/alpha.test.mjs");
+  writeVerifyFixture(root, {
+    testSuites: [{ name: "alpha-tests", ident: "scriptDir", segments: ["alpha.test.mjs"] }],
+  });
+  const surfaceId = "verify-phase:harness/scripts/verify.mjs:alpha-tests";
+  writeFile(root, "docs/product-capability-inventory.json", JSON.stringify({
+    capabilities: [{ id: "fixture", surfaceIds: [surfaceId, surfaceId] }],
+  }));
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.duplicateVerifySurfaces, [surfaceId]);
+  assert.match(
+    result.findings.join("\n"),
+    /DUPLICATE-VERIFY-SURFACE "alpha-tests".*listed 2 times in capability "fixture".*keep exactly one assignment/,
   );
   rmSync(root, { recursive: true, force: true });
 });
