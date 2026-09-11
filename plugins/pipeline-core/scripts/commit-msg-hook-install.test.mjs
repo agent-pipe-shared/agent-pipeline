@@ -60,6 +60,29 @@ test("installed hook allows a valid contiguous Pipeline provenance block", () =>
   assert.equal(result.status, 0, result.stderr);
 });
 
+test("installed shim treats shell syntax, apostrophes, whitespace and newlines in its path as literal bytes", () => {
+  const dir = mkdtempSync(join(
+    tmpdir(),
+    "commit-msg path ' $(touch${IFS}SHIM_SENTINEL) `touch${IFS}BACKTICK_SENTINEL` $SHIM_EXPANSION line\nnext-",
+  ));
+  const git = (...args) => spawnSync("git", args, {
+    cwd: dir,
+    encoding: "utf8",
+    timeout: 20_000,
+    env: { ...process.env, SHIM_EXPANSION: "EXPANDED" },
+  });
+  assert.equal(git("init", "-q", "-b", "main").status, 0);
+  assert.equal(git("config", "user.email", "fixture@example.invalid").status, 0);
+  assert.equal(git("config", "user.name", "Fixture Human").status, 0);
+  install(dir);
+
+  const result = commitWithMessage(dir, git, "feat: literal shim path\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)\n");
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(existsSync(join(dir, "SHIM_SENTINEL")), false, "dollar-paren substitution must not execute");
+  assert.equal(existsSync(join(dir, "BACKTICK_SENTINEL")), false, "backtick substitution must not execute");
+  assert.equal(existsSync(join(dir, "EXPANDED")), false, "shell variables in the path must not expand");
+});
+
 test("installed hook blocks provenance split by a blank line", () => {
   const { dir, git } = freshRepo("split");
   install(dir);
