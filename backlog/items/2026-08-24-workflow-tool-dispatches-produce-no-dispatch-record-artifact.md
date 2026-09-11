@@ -150,3 +150,18 @@ stated: the Workflow tool itself still does not automatically write the
 dispatch-record artifact for every dispatch, and this checker is not yet wired
 into harness/scripts/verify.mjs as a hard registered gate (TP-3 protected, not
 attempted).
+
+## Implementation progress — 2026-09-11
+
+Commit `3801105d` adds the missing trustworthy producer core: a strict closed
+v2 record contract, an atomic exclusive writer at the exact canonical path,
+full commit/path/model binding, recursive private-path rejection, and direct
+compatibility with `dispatch-authorship-verify.mjs`. Request and publication
+directories are descriptor-pinned against path swaps, and a record-carried
+model override cannot authorize itself. Focused tests passed 65/65 and the
+final independent correction review returned PASS.
+
+The item remains open because the Workflow/native dispatch return paths do not
+yet invoke this writer automatically. That consumer wiring and one genuine
+end-to-end dispatch are the remaining acceptance work; no manual reconstruction
+is claimed by the writer core alone.

@@ -112,3 +112,19 @@ either file was not obtained this update — the containment guard admits
 only a single bounded `diff`/`stat` per call, not a scripted bisection loop
 against the marketplace path — so this item's acceptance criteria (below)
 stay the actionable measure, not a specific commit count.
+
+## Implementation progress — 2026-09-11
+
+Commit `d8933602` implements the provider-neutral verification core for an
+installer-owned receipt. It snapshots the complete installed tree, binds the
+protected graph and physical identity, requires a clean equivalent source copy
+for local development, and re-observes both source and installed state after
+the external receipt read to close their mutation window. Signed releases use
+a separately supplied trusted host policy; a receipt cannot choose its own key
+or builder. The focused tests passed 24/24 and the independent correction
+review returned PASS.
+
+This item remains open until the Codex, Claude and Antigravity installation or
+update coordinators produce the external receipt and bootstrap consumes it for
+the actually loaded plugin. The core deliberately cannot self-attest from
+inside the package it is checking.
