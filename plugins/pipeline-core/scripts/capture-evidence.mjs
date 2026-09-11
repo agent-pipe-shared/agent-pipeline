@@ -50,6 +50,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const REPO_ROOT_PLACEHOLDER = "<repo-root>";
 export const HOME_PLACEHOLDER = "<home>";
+export const HOST_PATH_PLACEHOLDER = "<host-path>";
 
 /** Resolve the Git repository root for `cwd` via `git rev-parse --show-toplevel`. Throws --
  * never guesses -- when `cwd` is not inside a Git working tree. */
@@ -92,10 +93,15 @@ export function redactText(text, repoRoot, homeDir) {
  * Covered shapes (AC-2), each as a literal spelling and a percent-encoded-separator spelling
  * (AC-3 -- catches the case where a path was run through a generic URI-component encoder that
  * percent-encodes `/` and `\` themselves, rather than `pathToFileURL`'s narrower per-character
- * encoding that leaves ordinary separators alone):
+ * encoding that leaves ordinary separators alone). These shapes are first
+ * replaced with `<host-path>` before artifact publication; this detector is
+ * then rerun as the fail-closed backstop:
  *
  *   - POSIX user-home path:      /home/<name>/...
  *   - macOS user-home path:      /Users/<name>/...
+ *   - WSL Windows-home path:     /mnt/<drive>/Users/<name>/...
+ *   - WSL UNC path:              \\\\wsl.localhost\\<distro>\\home\\<name>\\...
+ *   - Windows network UNC path:  \\\\<server>\\<share>\\...
  *   - Windows drive-letter path: C:\...  and the C:/... forward-slash spelling
  *
  * The word-boundary lookbehind on both drive-letter patterns exists to avoid a false positive on
@@ -110,6 +116,14 @@ export function redactText(text, repoRoot, homeDir) {
  * false-negative repro this replaces and the false-positive guard it must not reopen.
  */
 const RESIDUAL_HOST_PATH_PATTERNS = Object.freeze([
+  // These must precede the shorter `/Users/` and drive-like suffix patterns. Redacting a suffix
+  // first would leave a host-specific `/mnt/<drive>` or WSL distribution prefix behind.
+  { name: "wsl-windows-home", regex: /\/mnt\/[A-Za-z]\/Users\/[^\s"'<>]+/gu },
+  { name: "wsl-windows-home-percent-encoded", regex: /%2[fF]mnt%2[fF][A-Za-z]%2[fF]Users%2[fF][^\s"'<>]*/gu },
+  { name: "wsl-unc", regex: /\\\\wsl(?:\.localhost|\$)\\[^\s\\"'<>]+(?:\\[^\s"'<>]+)?/giu },
+  { name: "wsl-unc-percent-encoded", regex: /(?:%5[cC]){2}wsl(?:%2[eE]localhost|%24)%5[cC][^\s%"'<>]+(?:%5[cC][^\s"'<>]*)?/giu },
+  { name: "windows-unc", regex: /\\\\[A-Za-z0-9._-]+\\[^\s\\"'<>]+(?:\\[^\s"'<>]+)?/gu },
+  { name: "windows-unc-percent-encoded", regex: /(?:%5[cC]){2}[A-Za-z0-9._-]+%5[cC][^\s%"'<>]+(?:%5[cC][^\s"'<>]*)?/gu },
   { name: "posix-home", regex: /\/home\/[^\s"'<>]+/gu },
   { name: "posix-home-percent-encoded", regex: /%2[fF]home%2[fF][^\s"'<>]*/gu },
   { name: "macos-home", regex: /\/Users\/[^\s"'<>]+/gu },
@@ -127,8 +141,8 @@ const RESIDUAL_HOST_PATH_PATTERNS = Object.freeze([
  * Scan `text` for the earliest (lowest character-offset) surviving absolute host path among the
  * covered shapes. Returns `{ name, offset }` for the first match found, or `null` when none
  * survive. Deliberately returns only the pattern's NAME and OFFSET, never the matched substring
- * itself (AC-4) -- callers use this to build a refusal message, and a message carrying the
- * matched path would reproduce the exact defect this tool exists to prevent, one layer up.
+ * itself: callers use this for a final refusal check, and a diagnostic carrying the matched path
+ * would reproduce the exact defect this tool exists to prevent, one layer up.
  */
 export function findResidualHostPath(text) {
   let earliest = null;
@@ -140,6 +154,24 @@ export function findResidualHostPath(text) {
     }
   }
   return earliest;
+}
+
+/**
+ * Replace every residual host-path shape with one stable placeholder. This is
+ * the safe recovery path for captured command output: a test reporter can
+ * legitimately echo a synthetic Windows/POSIX fixture, while a real stack
+ * trace can expose an unrelated checkout. Both are untrusted text and both are
+ * made non-sensitive before any artifact write. The detector still runs after
+ * this pass as a fail-closed proof that no covered shape survived.
+ */
+export function redactResidualHostPaths(text) {
+  if (typeof text !== "string" || text === "") return text;
+  let redacted = text;
+  for (const { regex } of RESIDUAL_HOST_PATH_PATTERNS) {
+    regex.lastIndex = 0;
+    redacted = redacted.replace(regex, HOST_PATH_PLACEHOLDER);
+  }
+  return redacted;
 }
 
 function quoteIfNeeded(token) {
@@ -186,11 +218,12 @@ export function captureEvidence({
   const stdout = redactText(result.stdout ?? "", root, homeDir);
   const stderr = redactText(result.stderr ?? "", root, homeDir);
   const commandLine = redactText(command.map(quoteIfNeeded).join(" "), root, homeDir);
-  const artifactText = formatArtifact({ command: commandLine, label, exitCode, stdout, stderr });
+  const assembledArtifact = formatArtifact({ command: commandLine, label, exitCode, stdout, stderr });
+  const artifactText = redactResidualHostPaths(assembledArtifact);
 
-  // Fail-closed backstop (sibling of the spawn-failure throw above): redaction is a best-effort
-  // string replace, not a proof. Refuse to write anything -- no partial file, no empty file, no
-  // directory created that did not already exist -- if a known host-path shape survived it.
+  // Fail-closed backstop (sibling of the spawn-failure throw above): both exact-root redaction
+  // and shape redaction are best-effort string transforms, not a proof. Refuse if a covered
+  // shape somehow survives the sanitising pass.
   const residual = findResidualHostPath(artifactText);
   if (residual) {
     throw new Error(

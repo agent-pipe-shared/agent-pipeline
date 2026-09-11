@@ -14,7 +14,9 @@ import {
   findResidualHostPath,
   formatArtifact,
   HOME_PLACEHOLDER,
+  HOST_PATH_PLACEHOLDER,
   parseArgs,
+  redactResidualHostPaths,
   redactText,
   REPO_ROOT_PLACEHOLDER,
 } from "./capture-evidence.mjs";
@@ -224,76 +226,98 @@ test("findResidualHostPath: catches a percent-encoded POSIX user-home path (AC-3
   assert.equal(hit.name, "posix-home-percent-encoded");
 });
 
-test("captureEvidence: refuses to write when a surviving /home/ path is present -- no partial file, no empty file, no directory created (AC-1)", () => {
+test("captureEvidence: redacts a residual /home/ path and writes complete evidence", () => {
   const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-test-"));
   try {
     const nestedDir = join(workDir, "nested");
     const outPath = join(nestedDir, "evidence.txt");
     const stray = syntheticHostPath("/home/");
     const script = `console.log("leaked path: ${stray}");process.exit(0);`;
-    assert.throws(
-      () =>
-        captureEvidence({
-          command: ["node", "-e", script],
-          label: "residual",
-          out: outPath,
-          repoRoot: syntheticRoot("repo"),
-          homeDir: syntheticRoot("home"),
-        }),
-      /refused to write/,
-    );
-    assert.equal(existsSync(nestedDir), false, "no directory may be created for a refused write");
-    assert.equal(existsSync(outPath), false, "no file, partial or empty, may be written for a refused write");
+    const result = captureEvidence({
+      command: ["node", "-e", script],
+      label: "residual",
+      out: outPath,
+      repoRoot: syntheticRoot("repo"),
+      homeDir: syntheticRoot("home"),
+    });
+    assert.equal(result.exitCode, 0);
+    const written = readFileSync(outPath, "utf8");
+    assert.ok(!written.includes(stray));
+    assert.ok(written.includes(HOST_PATH_PLACEHOLDER));
+    assert.equal(findResidualHostPath(written), null);
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
 });
 
-test("captureEvidence: refuses to write when a surviving Windows drive-letter path is present (AC-1, AC-2)", () => {
+test("captureEvidence: redacts a residual Windows drive-letter path without losing the command result", () => {
   const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-test-"));
   try {
     const outPath = join(workDir, "evidence.txt");
     const stray = `C:\\Users\\synthetic-user-${process.pid}-${Date.now()}\\project\\file.mjs`;
     const script = `console.error("leaked path: ${stray}");process.exit(1);`;
-    assert.throws(
-      () =>
-        captureEvidence({
-          command: ["node", "-e", script],
-          label: "residual-windows",
-          out: outPath,
-          repoRoot: syntheticRoot("repo"),
-          homeDir: syntheticRoot("home"),
-        }),
-      /refused to write/,
-    );
-    assert.equal(existsSync(outPath), false);
+    const result = captureEvidence({
+      command: ["node", "-e", script],
+      label: "residual-windows",
+      out: outPath,
+      repoRoot: syntheticRoot("repo"),
+      homeDir: syntheticRoot("home"),
+    });
+    assert.equal(result.exitCode, 1);
+    const written = readFileSync(outPath, "utf8");
+    assert.ok(!written.includes(stray));
+    assert.ok(written.includes(HOST_PATH_PLACEHOLDER));
+    assert.match(written, /^exitCode: 1$/m);
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
 });
 
-test("captureEvidence: the refusal error names the pattern and offset but never the offending path itself (AC-4)", () => {
+test("redactResidualHostPaths removes multiple literal and encoded shapes in one pass", () => {
+  const posix = syntheticHostPath("/Users/");
+  const windows = `C:\\Users\\Foo\\repo`;
+  const encoded = `file://%2Fhome%2Ffixture-user%2Frepo%2Fx.mjs`;
+  const result = redactResidualHostPaths(`a ${posix}\nb ${windows}\nc ${encoded}`);
+  assert.ok(!result.includes(posix));
+  assert.ok(!result.includes(windows));
+  assert.ok(!result.includes(encoded));
+  assert.equal(findResidualHostPath(result), null);
+  assert.equal(result.match(/<host-path>/gu)?.length, 3);
+});
+
+test("redactResidualHostPaths removes complete WSL mount and UNC paths without leaving host prefixes", () => {
+  const cases = [
+    "/mnt/c/Users/Foo/repo/file.txt",
+    "%2Fmnt%2Fc%2FUsers%2FFoo%2Frepo%2Ffile.txt",
+    String.raw`\\wsl.localhost\Ubuntu\home\Foo\repo\file.txt`,
+    String.raw`\\wsl$\Ubuntu\home\Foo\repo\file.txt`,
+    String.raw`\\wsl.localhost\Ubuntu`,
+    "%5C%5Cwsl%2Elocalhost%5CUbuntu%5Chome%5CFoo%5Crepo%5Cfile.txt",
+    "%5C%5Cwsl%24%5CUbuntu",
+    String.raw`\\fileserver\team-share\Foo\repo\file.txt`,
+    String.raw`\\fileserver\team-share`,
+    "%5C%5Cfileserver%5Cteam-share%5CFoo%5Crepo%5Cfile.txt",
+    "%5C%5Cfileserver%5Cteam-share",
+  ];
+  for (const value of cases) {
+    const result = redactResidualHostPaths(`before ${value} after`);
+    assert.equal(result, `before ${HOST_PATH_PLACEHOLDER} after`, value);
+    assert.equal(findResidualHostPath(result), null, value);
+  }
+});
+
+test("captureEvidence accepts a reporter line containing the Greenfield Windows fixture literal", () => {
   const workDir = mkdtempSync(join(tmpdir(), "capture-evidence-test-"));
   try {
     const outPath = join(workDir, "evidence.txt");
-    const stray = syntheticHostPath("/Users/");
-    const script = `console.log("leaked path: ${stray}");process.exit(0);`;
-    let caught;
-    try {
-      captureEvidence({
-        command: ["node", "-e", script],
-        label: "residual-message",
-        out: outPath,
-        repoRoot: syntheticRoot("repo"),
-        homeDir: syntheticRoot("home"),
-      });
-    } catch (error) {
-      caught = error;
-    }
-    assert.ok(caught, "captureEvidence must have thrown");
-    assert.match(caught.message, /macos-home/, "message must name the matched pattern");
-    assert.match(caught.message, /offset \d+/, "message must name the character offset");
-    assert.ok(!caught.message.includes(stray), "message must never contain the offending path itself");
+    const script = String.raw`console.log("ok 1 - normalizes C:\\Users\\Foo\\repo and /mnt/c/Users/Foo/repo");`;
+    const result = captureEvidence({ command: ["node", "-e", script], label: "fixture", out: outPath, repoRoot: syntheticRoot("repo"), homeDir: syntheticRoot("home") });
+    assert.equal(result.exitCode, 0);
+    const written = readFileSync(outPath, "utf8");
+    assert.ok(written.includes("ok 1 - normalizes"));
+    assert.ok(!written.includes(String.raw`C:\Users\Foo\repo`));
+    assert.ok(!written.includes("/mnt/c"));
+    assert.ok(written.includes(HOST_PATH_PLACEHOLDER));
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
@@ -426,6 +450,14 @@ test("runCli (CLI process): an ordinary unrecognized-flag error with no embedded
   const result = spawnSync(process.execPath, [CLI_PATH, "--weird", "z", "--label", "probe", "--", "node", "-v"], { encoding: "utf8" });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /unrecognized flag --weird/, "an ordinary (non-leaking) parse error must still be shown, not swallowed by the new redaction path");
+});
+
+test("runCli (CLI process): a generic UNC share root in an argument error is refused on stderr", () => {
+  const stray = String.raw`\\fileserver\team-share`;
+  const result = spawnSync(process.execPath, [CLI_PATH, `--out=${stray}`, "--label", "probe", "--", "node", "-v"], { encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.ok(!result.stderr.includes(stray), "stderr must not leak the generic UNC path from argv");
+  assert.match(result.stderr, /refused to print the argument error/);
 });
 
 // --- NVA-B-REDFIX-2 F-B: the fail-closed backstop (findResidualHostPath) used to cover only the
