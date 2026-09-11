@@ -328,7 +328,7 @@ const TEST_SUITES = [
   { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
   { name: "sandboxed-readonly-host-bridge-tests", file: join(pluginScriptsDir, "sandboxed-readonly-host-bridge.test.mjs") },
   { name: "spec-readiness-host-tests", file: join(pluginScriptsDir, "spec-readiness-host.test.mjs") },
-  { name: "pipeline-start-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "pipeline-start", "pipeline-start-v3.test.mjs") },
+  { name: "pipeline-start-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "pipeline-start", "pipeline-start-v3.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 7 }, (_, index) => `PSV${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "pipeline-start-preflight-tests", file: join(pluginScriptsDir, "pipeline-start-preflight.test.mjs") },
   { name: "runner-usage-v1-tests", file: join(libDir, "runner-usage-v1.test.mjs") },
   { name: "p3b-runner-conformance-tests", file: join(libDir, "p3b-runner-conformance.test.mjs") },

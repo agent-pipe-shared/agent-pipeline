@@ -1,24 +1,49 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { measureBootstrapBytes } from "../../lib/bootstrap-payload-budget.mjs";
 import { DEFAULT_ENVELOPE } from "../../scripts/bootstrap-payload-measure.mjs";
+import { registerTestCaseCompletion } from "../../lib/test-case-completion.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const core = readFileSync(join(here, "SKILL.md"), "utf8");
-const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "utf8");
+const cases = [
+  { id: "PSV01", name: "every named lazy reference exists and is readable", run: checkNamedReferences },
+  { id: "PSV02", name: "core payload and bootstrap authority contract remain bounded", run: checkBootstrapAuthority },
+  { id: "PSV03", name: "resume card shape and restart capture are executable", run: checkResumeContract },
+  { id: "PSV04", name: "kickoff design and normal restart contracts stay explicit", run: checkKickoffContract },
+  { id: "PSV05", name: "push approval reference keeps the signed and chat contracts", run: checkPushApprovalContract },
+  { id: "PSV06", name: "kickoff reference pointer carries every trigger state", run: checkKickoffPointer },
+  { id: "PSV07", name: "session bootstrap obligations remain embedded or typed", run: checkSessionBootstrap },
+];
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});
+
+function loadInputs() {
+  const core = readFileSync(join(here, "SKILL.md"), "utf8");
+  const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "utf8");
+  const kickoffDesign = readFileSync(join(here, "references", "kickoff-design.md"), "utf8");
+  const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md", "push-approval.md", "kickoff-design.md"]
+    .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
+  return { all: `${core}\n${refs}`, closeBlock, core, kickoffDesign };
+}
+
+function checkNamedReferences() {
+  const { core } = loadInputs();
 // BOOTMOD-1 moved the kickoff-intake block out of the core verbatim, because the
 // core is read at the start of every session and pays for every byte, including in
 // the sessions that never reach a kickoff. Every phrase this suite pinned against
 // the core for that block is pinned below against this file instead -- the same
 // patterns, including the ones that span a line break, because the move preserved
 // the wrapping. Retargeted, never dropped.
-const kickoffDesign = readFileSync(join(here, "references", "kickoff-design.md"), "utf8");
-const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md", "push-approval.md", "kickoff-design.md"]
-  .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
 // Every reference the core's lazy-loading list names must exist and be readable.
 // SETUP-3 shipped a bullet for a file SETUP-4 had not written yet; the dangling
 // pointer survived a green suite because nothing checked the two agree. It does
@@ -29,7 +54,10 @@ assert.ok(namedReferences.length > 0, "the core must name at least one reference
 for (const name of new Set(namedReferences)) {
   assert.ok(readFileSync(join(here, "references", name), "utf8").length > 0, `SKILL.md names references/${name}, which is missing or empty`);
 }
-const all = `${core}\n${refs}`;
+}
+
+function checkBootstrapAuthority() {
+const { all, core } = loadInputs();
 // The budget is the emitted bootstrap payload, not the file alone: it is
 // BOOTSTRAP_PAYLOAD_MAX_BYTES over the SUMMED segments (core skill + machine-
 // readback envelope; lib/bootstrap-payload-budget.mjs, scripts/bootstrap-
@@ -86,6 +114,7 @@ assert.match(core, /collect the specific missing confirmation together rather th
 assert.match(core, /Follow the current returned\n   `nextAction` from onboarding inspection/u);
 assert.match(core, /do not add `pipeline-state inspect`\n   or an Operating Model hash as an unavailable pre-binding prerequisite/u);
 assert.match(core, /State\/authority orientation follows ready binding/u);
+}
 
 // RHSHAPE-1. The skill's description of the card must be a shape the validator
 // actually accepts. It was not: it called all four keys "a short distilled
@@ -95,6 +124,8 @@ assert.match(core, /State\/authority orientation follows ready binding/u);
 // run. Asserting the prose is not enough on its own; the card built to match the
 // prose is driven through the real validator below, which is the assertion that
 // would have failed before the fix.
+async function checkResumeContract() {
+const { core } = loadInputs();
 assert.match(core, /`intent` is one string; the other three are \*\*arrays\*\* of\n   short strings, at most 4, 4 and 3 entries/u);
 
 // RHRESTART-1. The capture command the skill prints for the pre-restart state must
@@ -137,10 +168,14 @@ assert.match(core, /`intent` is one string; the other three are \*\*arrays\*\* o
   };
   assert.equal(validateResumeHint(buildResumeHint({ context: documented })).ok, true,
     "the card shape this skill describes must be one the validator accepts");
-  assert.throws(() => buildResumeHint({ context: { ...documented, scope: "a single string" } }),
+assert.throws(() => buildResumeHint({ context: { ...documented, scope: "a single string" } }),
     /RH-SCHEMA: scope must be an ARRAY/u,
     "and the shape it no longer describes must be refused with a message naming the field");
 }
+}
+
+function checkKickoffContract() {
+const { closeBlock, core, kickoffDesign } = loadInputs();
 assert.match(kickoffDesign, /obtain both a single-line project goal and an\nexplicit PO profile: `epic`, `feature`, or `mini`/u);
 assert.match(kickoffDesign, /Never infer, silently select, or retrospectively claim a profile/u);
 assert.match(kickoffDesign, /`specs\/kickoff-\*` files are provisional bootstrap\nanchors, not the standard long-term design location/u);
@@ -170,6 +205,10 @@ assert.match(kickoffDesign, /Bind the answer into `<!-- po-language: \(de\|en\) 
 assert.match(kickoffDesign, /Recommendation: `feature` unless the work is visibly cross-package or\ntrivially small\./u);
 assert.ok(!core.includes("Set gates.push_approval?"), "a question must not be posed as a bare setting name");
 assert.ok(!kickoffDesign.includes("Set gates.push_approval?"), "a question must not be posed as a bare setting name");
+}
+
+function checkPushApprovalContract() {
+const { kickoffDesign } = loadInputs();
 // SETUP-4: the push-approval reference. These pin the claims an operator acts
 // on, not the prose around them -- each one is either a fact about the gate or a
 // warning derived from the live 2026-08-08 ceremony that took three attempts.
@@ -209,6 +248,7 @@ assert.match(pushApproval, /machine-scoped configuration plane/u);
 // pinned by requiring the same cross-reference here, not a `--help` deferral).
 assert.match(pushApproval, /authorize-critical/u);
 assert.match(pushApproval, /docs\/push-release-flow\.md/u);
+}
 
 // BOOTMOD-1: the failure class modularization creates, pinned.
 //
@@ -223,6 +263,8 @@ assert.match(pushApproval, /docs\/push-release-flow\.md/u);
 // stays green through this failure. What is pinned here is that the directive
 // naming the reference also names the states that send a reader to it, in the same
 // paragraph, so a session cannot meet the pointer without meeting its trigger.
+function checkKickoffPointer() {
+const { core } = loadInputs();
 const KICKOFF_REFERENCE = "`references/kickoff-design.md`";
 const kickoffTriggerStates = [
   { state: "a pristine project", pattern: /pristine/u },
@@ -255,11 +297,14 @@ assert.throws(
 assert.match(core, /No artifact of a pristine project is written before\nits bootstrap questions are answered/u);
 assert.match(core, /never inferred, defaulted, or claimed after the fact/u);
 assert.match(core, /`specs\/kickoff-\*` files a bootstrap transaction creates are provisional anchors\nonly/u);
+}
 
 // PHX-SKILL — obligations of harness/session-bootstrap.md that the skill must
 // carry. Steps 1d and 6 are pinned against `core`: the spec requires them
 // embedded, without a runtime file read. Steps 3, 4 and 5b are pinned against
 // `all`, because lazy relocation into a typed reference is legitimate there.
+function checkSessionBootstrap() {
+const { all, core } = loadInputs();
 assert.match(core, /Bootstrap check passed: ruleset \{\{VERSION_OR_SHA\}\} loaded/u);
 assert.match(core, /Never print it without Steps 1–5/u);
 assert.match(core, /Role prohibitions loaded: EL-01\/EL-02\/EL-03\/EL-04\/EL-16\/EL-18\/EL-19/u);
@@ -277,4 +322,4 @@ assert.match(all, /Staleness unchecked \(offline, cache state\)/u);
 assert.match(all, /MISSING \(F4\)/u);
 assert.match(all, /State briefing \{\{TASK_ID_OR_DATE\}\}/u);
 assert.match(all, /State n\/a \(Critic sees no history\)/u);
-process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");
+}
