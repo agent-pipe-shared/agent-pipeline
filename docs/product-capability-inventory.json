@@ -1,13 +1,13 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "7c34f6159445777f59c7c4146a478dcee185917f",
-    "tree": "d6deca4ad9c951c81fc142100587fff8dd0aab7d"
+    "commit": "0b34dbc111f98dd4b3b6d1408ef012a924cd9d63",
+    "tree": "ec7e4e0e4ff3a24a9c9bd7e86054c2223089c20f"
   },
   "criticReview": {
     "status": "required-before-publication",
     "receiptSha256": null,
-    "reason": "Awaiting bounded re-review of the 7c34f615 correction delta."
+    "reason": "Two bounded Critic rounds found and drove four corrections. The final commit-path binding correction is self-verified under QG-13 and awaits a later bundled candidate review before publication."
   },
   "capabilities": [
     {
