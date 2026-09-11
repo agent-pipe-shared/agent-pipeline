@@ -97,6 +97,19 @@ regression. Exact Verify passed 520/520 and the focused correction Critic
 returned PASS with no findings; see
 `backlog/evidence/2026-09-11-role-dispatch-preflight-critic-pass.md`.
 
+The fourth slice fixes the handoff from Critic preflight to the ordinary
+session Critic. A live correction review showed that `packet-ready` expanded
+every governance file but omitted the two manifest-declared governance
+directories and the fixed ruleset SHA from `dispatch.reviewerInput`. The
+strict Critic therefore rejected the otherwise valid dispatch after launch.
+
+`reviewerInput` now supplies those preflight-owned fields directly and covers
+both governed and no-governance manifests. The protected Critic skill names
+the same ownership boundary. Exact Verify passed 520/520 and an independent
+Critic returned PASS with no findings. The item remains open for its stated
+final condition: every shipped model-launching coordinator must consume the
+common batch preflight before its first launch.
+
 **Owner and due date:** Pipeline team, due 2026-09-30. The reusable envelope
 and all-packets barrier now exist, but the item remains open until the shipped
 model-launching coordinators call them and adapter-level tests prove that each

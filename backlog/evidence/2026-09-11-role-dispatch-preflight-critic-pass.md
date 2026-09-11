@@ -21,3 +21,28 @@ The Critic found no scope, test-integrity, dependency, security, governance,
 architecture or language issue, and no briefing violation.
 
 Assurance: `functional-equivalent-read-only; OS isolation not asserted`.
+
+## Complete reviewer-input correction
+
+Reviewed range:
+`07b9935a6b697e1eea5d883dbf35a28db87a6186..06b95a567adfd8b53445b88ae8d11e352828a175`
+
+Verdict: **PASS**, no findings.
+
+The preflight's `reviewerInput` now carries its frozen candidate commit as
+`rulesetSha`, both resolved governance directory paths, the expanded
+candidate-file guardrails and candidate-bound evidence paths. The session
+route adds only `project`, `verdict` and `assurance` metadata. A no-governance
+manifest produces an explicit empty directory list.
+
+Verify run `verify-1789115373209-c40902661ee505b8` first reported 519/520 and
+identified only the expected protected-preimage mismatch for the changed
+Critic skill. After restamping that exact SHA, candidate-exact run
+`verify-1789115656401-e39eac8fe41490a7` passed all 520 checks for commit
+`06b95a567adfd8b53445b88ae8d11e352828a175`, tree
+`eafbc7151cd1144c2897d93626a711aa56bac24f`.
+
+The independent Critic cleared scope, reachability, test integrity, the
+no-governance edge case, protected-contract integrity, governance, security,
+dependencies and language. Assurance:
+`functional-equivalent-read-only; OS isolation not asserted`.
