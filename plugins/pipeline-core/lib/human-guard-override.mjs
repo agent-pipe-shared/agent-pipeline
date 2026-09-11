@@ -69,6 +69,9 @@ const PLAN_SCHEMA = "pipeline.human-guard-override-plan.v2";
 const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v2";
 const AUDIT_SCHEMA = "pipeline.human-guard-override-audit.v1";
 const AUDIT_HEAD_SCHEMA = "pipeline.human-guard-override-audit-head.v1";
+const AUDIT_STATE_SCHEMA = "pipeline.human-guard-override-audit-state.v1";
+const AUDIT_REPAIR_SCHEMA = "pipeline.human-guard-override-audit-repair.v1";
+const AUDIT_REPAIR_PREIMAGE_SCHEMA = "pipeline.human-guard-override-audit-repair-preimage.v1";
 const MAX_REASON_BYTES = 500;
 const LIFECYCLE_NOT_READY_CODE = "GUARD-LIFECYCLE-NOT-READY";
 // 30 minutes, not 5 (PO, 2026-08-08). The window is sized for a HUMAN, and the
@@ -2082,13 +2085,22 @@ function key(paths, { create = false } = {}) {
   return bytes;
 }
 
-function auditEntries(paths, secret) {
-  if (!existsSync(paths.audit)) return [];
+function authenticatedAuditLedger(paths, secret) {
   safePrivateFile(paths.audit);
+  const ledgerBytes = readFileSync(paths.audit);
+  const text = ledgerBytes.toString("utf8");
+  if (!Buffer.from(text, "utf8").equals(ledgerBytes)
+    || (text.length > 0 && !text.endsWith("\n"))) {
+    fail("HGO-AUDIT", "audit ledger structure is invalid");
+  }
   const entries = [];
+  const endOffsets = [];
   let prior = "0".repeat(64);
-  const lines = readFileSync(paths.audit, "utf8").split("\n").filter(Boolean);
+  let byteOffset = 0;
+  const lines = text.split("\n");
+  lines.pop();
   for (const line of lines) {
+    if (line === "") fail("HGO-AUDIT", "audit ledger structure is invalid");
     let entry;
     try { entry = JSON.parse(line); } catch { fail("HGO-AUDIT", "audit ledger is malformed"); }
     if (!exactKeys(entry, ["schema", "sequence", "previousMac", "event", "mac"])
@@ -2104,9 +2116,11 @@ function auditEntries(paths, secret) {
     })).digest("hex");
     if (entry.mac !== expected) fail("HGO-AUDIT", "audit ledger authentication failed");
     entries.push(entry);
+    byteOffset += Buffer.byteLength(line, "utf8") + 1;
+    endOffsets.push(byteOffset);
     prior = entry.mac;
   }
-  return entries;
+  return { entries, ledgerBytes, endOffsets };
 }
 
 function auditHead(secret, entries, ledgerBytes) {
@@ -2122,20 +2136,122 @@ function auditHead(secret, entries, ledgerBytes) {
   };
 }
 
-function verifiedAuditEntries(paths, secret) {
+function auditRepairPreimage(head, ledgerBytes, entries) {
+  return {
+    schema: AUDIT_REPAIR_PREIMAGE_SCHEMA,
+    head,
+    ledgerSha256: sha(ledgerBytes),
+    ledgerEntries: entries.length,
+  };
+}
+
+function validAuditHeadShape(head) {
+  return exactKeys(head, ["schema", "entries", "lastMac", "ledgerSha256", "mac"])
+    && head.schema === AUDIT_HEAD_SCHEMA
+    && Number.isSafeInteger(head.entries) && head.entries >= 0
+    && (head.lastMac === null || SHA256.test(head.lastMac))
+    && SHA256.test(head.ledgerSha256)
+    && SHA256.test(head.mac);
+}
+
+function auditState(paths, secret) {
   const hasAudit = existsSync(paths.audit);
   const hasHead = existsSync(paths.auditHead);
-  if (hasAudit !== hasHead) fail("HGO-AUDIT", "audit ledger/head presence is inconsistent");
-  if (!hasAudit) fail("HGO-AUDIT", "audit ledger/head are missing");
-  const entries = auditEntries(paths, secret);
-  const ledgerBytes = readFileSync(paths.audit);
-  const head = readJson(paths.auditHead);
-  const expected = auditHead(secret, entries, ledgerBytes);
-  if (!exactKeys(head, ["schema", "entries", "lastMac", "ledgerSha256", "mac"])
-    || canonical(head) !== canonical(expected)) {
-    fail("HGO-AUDIT", "audit ledger head authentication failed");
+  const terminal = (reason) => ({ schema: AUDIT_STATE_SCHEMA, status: "terminal-invalid", reason });
+  if (hasAudit !== hasHead) return terminal("audit ledger/head presence is inconsistent");
+  if (!hasAudit) return terminal("audit ledger/head are missing");
+
+  let ledger;
+  let head;
+  try {
+    ledger = authenticatedAuditLedger(paths, secret);
+    head = readJson(paths.auditHead);
+  } catch (error) {
+    if (error instanceof HumanGuardOverrideError) return terminal(error.message);
+    throw error;
   }
-  return entries;
+  if (!validAuditHeadShape(head)) return terminal("audit ledger head structure is invalid");
+  const headCore = {
+    schema: head.schema,
+    entries: head.entries,
+    lastMac: head.lastMac,
+    ledgerSha256: head.ledgerSha256,
+  };
+  const authenticatedHeadMac = createHmac("sha256", secret).update(canonical(headCore)).digest("hex");
+  if (head.mac !== authenticatedHeadMac) return terminal("audit ledger head authentication failed");
+
+  const expectedCurrent = auditHead(secret, ledger.entries, ledger.ledgerBytes);
+  if (canonical(head) === canonical(expectedCurrent)) {
+    return {
+      schema: AUDIT_STATE_SCHEMA,
+      status: "valid",
+      entries: ledger.entries.length,
+      lastMac: ledger.entries.at(-1)?.mac ?? null,
+      head,
+      ledger,
+    };
+  }
+  if (head.entries >= ledger.entries.length) return terminal("audit ledger head does not bind a strict ledger prefix");
+  const prefixEnd = head.entries === 0 ? 0 : ledger.endOffsets[head.entries - 1];
+  const prefixBytes = ledger.ledgerBytes.subarray(0, prefixEnd);
+  const expectedPrefixHead = auditHead(secret, ledger.entries.slice(0, head.entries), prefixBytes);
+  if (canonical(head) !== canonical(expectedPrefixHead)) {
+    return terminal("audit ledger head does not authenticate the ledger prefix");
+  }
+
+  const currentPreimageSha256 = sha(auditRepairPreimage(head, ledger.ledgerBytes, ledger.entries));
+  const last = ledger.entries.at(-1);
+  let repairPreimageSha256 = currentPreimageSha256;
+  let completionPending = false;
+  if (last && exactKeys(last.event, [
+    "type", "at", "repairPreimageSha256", "priorHeadEntries", "recoveredTailEntries",
+  ]) && last.event.type === "audit-repaired"
+    && SHA256.test(last.event.repairPreimageSha256)
+    && last.event.priorHeadEntries === head.entries
+    && last.event.recoveredTailEntries === ledger.entries.length - head.entries - 1
+    && last.event.recoveredTailEntries > 0) {
+    const beforeRepairBytes = ledger.ledgerBytes.subarray(0, ledger.endOffsets.at(-2) ?? 0);
+    const beforeRepairEntries = ledger.entries.slice(0, -1);
+    const reconstructed = sha(auditRepairPreimage(head, beforeRepairBytes, beforeRepairEntries));
+    if (reconstructed === last.event.repairPreimageSha256) {
+      repairPreimageSha256 = reconstructed;
+      completionPending = true;
+    }
+  }
+  return {
+    schema: AUDIT_STATE_SCHEMA,
+    status: "recoverable-torn-append",
+    entries: ledger.entries.length,
+    headEntries: head.entries,
+    tailEntries: ledger.entries.length - head.entries,
+    repairPreimageSha256,
+    completionPending,
+    head,
+    ledger,
+  };
+}
+
+function publicAuditState(state) {
+  const { head: _head, ledger: _ledger, ...result } = state;
+  return result;
+}
+
+function requireValidAuditState(paths, secret) {
+  const state = auditState(paths, secret);
+  if (state.status === "valid") return state;
+  if (state.status === "recoverable-torn-append") {
+    fail(
+      "HGO-AUDIT",
+      `audit ledger has a recoverable torn append (repairPreimageSha256=${state.repairPreimageSha256}); `
+        + "run guard-human-override.mjs repair-audit --repo <absolute-root> "
+        + `--preimage-sha256 ${state.repairPreimageSha256} --activate in an attended terminal`,
+    );
+  }
+  fail("HGO-AUDIT", state.reason);
+}
+
+function verifiedAuditEntries(paths, secret) {
+  return requireValidAuditState(paths, secret).ledger.entries;
 }
 
 function appendAudit(paths, event) {
@@ -2146,9 +2262,8 @@ function appendAudit(paths, event) {
       && !existsSync(paths.audit)
       && !existsSync(paths.auditHead);
     const secret = key(paths, { create: initialize });
-    const entries = initialize
-      ? []
-      : verifiedAuditEntries(paths, secret);
+    const prior = initialize ? null : requireValidAuditState(paths, secret).ledger;
+    const entries = prior?.entries ?? [];
     const core = {
       schema: AUDIT_SCHEMA,
       sequence: entries.length + 1,
@@ -2156,8 +2271,12 @@ function appendAudit(paths, event) {
       event,
     };
     const entry = { ...core, mac: createHmac("sha256", secret).update(canonical(core)).digest("hex") };
-    const content = `${entries.map((item) => JSON.stringify(item)).join("\n")}${entries.length ? "\n" : ""}${JSON.stringify(entry)}\n`;
-    const ledgerBytes = Buffer.from(content, "utf8");
+    // Preserve the old head's exact byte prefix so interruption after this
+    // append remains recoverable even for authenticated noncanonical JSON.
+    const ledgerBytes = Buffer.concat([
+      prior?.ledgerBytes ?? Buffer.alloc(0),
+      Buffer.from(`${JSON.stringify(entry)}\n`, "utf8"),
+    ]);
     writeAtomic(paths.audit, ledgerBytes);
     writeAtomic(
       paths.auditHead,
@@ -2168,8 +2287,10 @@ function appendAudit(paths, event) {
     if (error?.code === "EEXIST") fail("HGO-AUDIT-LOCKED", "audit ledger is busy");
     throw error;
   } finally {
-    if (fd !== undefined) closeSync(fd);
-    try { unlinkSync(paths.auditLock); } catch {}
+    if (fd !== undefined) {
+      closeSync(fd);
+      try { unlinkSync(paths.auditLock); } catch {}
+    }
   }
 }
 
@@ -2897,6 +3018,21 @@ export function prepareHumanGuardOverrideForSignature({
   humanApprovalScriptPath,
   authorSourceRoot = null,
 } = {}) {
+  // A signature is a scarce human credential. Authenticate the audit sink before
+  // producing any signable material, so a standing ledger fault cannot consume a
+  // signature for a ceremony that authorization is guaranteed to reject later.
+  const auditRepo = topology(rootDir, spawn);
+  const auditPaths = storage(auditRepo.common);
+  const signatureAuditState = auditState(auditPaths, key(auditPaths));
+  if (signatureAuditState.status === "recoverable-torn-append") {
+    fail(
+      "HGO-AUDIT",
+      `audit ledger has a recoverable torn append (repairPreimageSha256=${signatureAuditState.repairPreimageSha256}); `
+        + `run ${process.execPath} ${scriptPath} repair-audit --repo ${auditRepo.root} `
+        + `--preimage-sha256 ${signatureAuditState.repairPreimageSha256} --activate in an attended terminal`,
+    );
+  }
+  if (signatureAuditState.status === "terminal-invalid") fail("HGO-AUDIT", signatureAuditState.reason);
   const planned = planHumanGuardOverride({
     rootDir,
     pluginRoot,
@@ -3603,6 +3739,143 @@ export function verifyHumanGuardOverrideAudit({ rootDir, spawn = spawnSync } = {
     entries: entries.length,
     lastMac: entries.at(-1)?.mac ?? null,
   };
+}
+
+export function inspectHumanGuardOverrideAudit({ rootDir, spawn = spawnSync } = {}) {
+  try {
+    const repo = topology(rootDir, spawn);
+    const paths = storage(repo.common);
+    return publicAuditState(auditState(paths, key(paths)));
+  } catch (error) {
+    if (error instanceof HumanGuardOverrideError) {
+      return {
+        schema: AUDIT_STATE_SCHEMA,
+        status: "terminal-invalid",
+        reason: error.message,
+        code: error.code,
+      };
+    }
+    throw error;
+  }
+}
+
+export function repairHumanGuardOverrideAudit({
+  rootDir,
+  expectedPreimageSha256,
+  activate = false,
+  nowMs = Date.now(),
+  spawn = spawnSync,
+  dependencies = {},
+} = {}) {
+  if (!activate || !SHA256.test(expectedPreimageSha256 ?? "")) {
+    fail("HGO-AUDIT-REPAIR-CONFIRMATION", "audit repair requires its inspected preimage and explicit activation");
+  }
+  const repo = topology(rootDir, spawn);
+  const paths = storage(repo.common);
+  const initial = auditState(paths, key(paths));
+  if (initial.status === "terminal-invalid") fail("HGO-AUDIT", initial.reason);
+  const initialRepairEvent = initial.status === "valid"
+    ? initial.ledger.entries.at(-1)?.event
+    : null;
+  const idempotentRetry = initial.status === "valid"
+    && initialRepairEvent?.type === "audit-repaired"
+    && initialRepairEvent.repairPreimageSha256 === expectedPreimageSha256;
+  if (initial.status === "valid" && !idempotentRetry) {
+    fail("HGO-AUDIT-REPAIR-NOT-REQUIRED", "audit ledger is already valid");
+  }
+  if (initial.status !== "valid" && initial.repairPreimageSha256 !== expectedPreimageSha256) {
+    fail("HGO-AUDIT-REPAIR-DRIFT", "audit repair preimage no longer matches");
+  }
+  const challenge = `HGO-AUDIT-${expectedPreimageSha256.slice(0, 12).toUpperCase()}`;
+  const confirmation = requireAttendedChatGateConfirmation({
+    summaryLines: [
+      "Human Guard Override audit repair",
+      `Repository: ${repo.root}`,
+      `Authenticated head entries: ${initial.status === "valid" ? initial.entries : initial.headEntries}`,
+      `Authenticated contiguous tail entries: ${initial.status === "valid" ? 0 : initial.tailEntries}`,
+      `Repair preimage: ${expectedPreimageSha256}`,
+      `Confirmation: ${challenge}`,
+    ],
+    expected: challenge,
+    dependencies,
+  });
+  if (!confirmation.ok) {
+    const code = confirmation.code === CHAT_GATE_NOT_ATTENDED
+      ? "HGO-AUDIT-REPAIR-NOT-ATTENDED"
+      : "HGO-AUDIT-REPAIR-CONFIRMATION-MISMATCH";
+    fail(code, "audit repair requires an attended terminal and exact typed readback");
+  }
+
+  let fd;
+  try {
+    fd = openSync(paths.auditLock, "wx", 0o600);
+    const secret = key(paths);
+    const state = auditState(paths, secret);
+    if (state.status === "terminal-invalid") fail("HGO-AUDIT", state.reason);
+    if (state.status === "valid") {
+      const repaired = state.ledger.entries.at(-1)?.event;
+      if (repaired?.type === "audit-repaired"
+        && repaired.repairPreimageSha256 === expectedPreimageSha256) {
+        return {
+          schema: AUDIT_REPAIR_SCHEMA,
+          status: "already-repaired",
+          entries: state.entries,
+          repairPreimageSha256: expectedPreimageSha256,
+        };
+      }
+      fail("HGO-AUDIT-REPAIR-DRIFT", "audit ledger changed before repair");
+    }
+    if (state.repairPreimageSha256 !== expectedPreimageSha256) {
+      fail("HGO-AUDIT-REPAIR-DRIFT", "audit repair preimage no longer matches");
+    }
+
+    let entries = state.ledger.entries;
+    let ledgerBytes = state.ledger.ledgerBytes;
+    if (!state.completionPending) {
+      const event = {
+        type: "audit-repaired",
+        at: new Date(nowMs).toISOString(),
+        repairPreimageSha256: expectedPreimageSha256,
+        priorHeadEntries: state.headEntries,
+        recoveredTailEntries: state.tailEntries,
+      };
+      const core = {
+        schema: AUDIT_SCHEMA,
+        sequence: entries.length + 1,
+        previousMac: entries.at(-1)?.mac ?? "0".repeat(64),
+        event,
+      };
+      const entry = { ...core, mac: createHmac("sha256", secret).update(canonical(core)).digest("hex") };
+      entries = [...entries, entry];
+      ledgerBytes = Buffer.concat([ledgerBytes, Buffer.from(`${JSON.stringify(entry)}\n`, "utf8")]);
+      // Ledger first is deliberate. If interrupted here, the authenticated old
+      // head still binds its exact prefix and the authenticated repair event lets
+      // a retry finish the head without appending a second repair event.
+      writeAtomic(paths.audit, ledgerBytes);
+      dependencies.afterLedgerWriteFn?.();
+    }
+    writeAtomic(paths.auditHead, Buffer.from(`${JSON.stringify(auditHead(secret, entries, ledgerBytes))}\n`, "utf8"));
+    const verified = requireValidAuditState(paths, secret);
+    const repaired = verified.ledger.entries.at(-1)?.event;
+    if (repaired?.type !== "audit-repaired"
+      || repaired.repairPreimageSha256 !== expectedPreimageSha256) {
+      fail("HGO-AUDIT", "audit repair readback is invalid");
+    }
+    return {
+      schema: AUDIT_REPAIR_SCHEMA,
+      status: state.completionPending ? "completed" : "repaired",
+      entries: verified.entries,
+      repairPreimageSha256: expectedPreimageSha256,
+    };
+  } catch (error) {
+    if (error?.code === "EEXIST") fail("HGO-AUDIT-LOCKED", "audit ledger is busy");
+    throw error;
+  } finally {
+    if (fd !== undefined) {
+      closeSync(fd);
+      try { unlinkSync(paths.auditLock); } catch {}
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------------

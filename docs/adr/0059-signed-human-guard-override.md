@@ -290,6 +290,33 @@ wrong key, expired/replayed intent) — a regression there would be a full HGO
 bypass, not a partial one, so it gets the same test rigor as GMW's fail-closed
 expiry parsing (ADR-0058 Decision 4).
 
+### Audit append recovery amendment (2026-09-12)
+
+The separate ledger/head write remains fail-closed, but a narrowly defined torn
+append is now recoverable. The authenticated old head must bind the ledger's exact
+byte prefix, and the remaining entries must form one contiguous authenticated
+chain. Any malformed entry, broken sequence or previous-MAC link, invalid head
+MAC, or head that does not bind that prefix is terminal-invalid and offers no
+repair route.
+
+Recovery is the attended `guard-human-override.mjs repair-audit` operation. Its
+typed readback binds the observed repair-preimage digest; mutation rechecks that
+digest while holding the audit lock. It records exactly one `audit-repaired` event
+before advancing the head, so an interruption between those writes is itself
+detectable and a retry completes without duplicating the event. The same completed
+operation is idempotently readable by its original preimage digest.
+
+This completion guarantee requires an available audit lock. Handled write
+failures release the owning writer's lock; contending writers cannot remove it.
+Abrupt process death may leave a stale `audit.lock`, which remains fail-closed as
+`HGO-AUDIT-LOCKED`. Safe stale-lock reclamation and power-loss durability are not
+provided by this amendment. Missing genesis material without an authenticated
+old head remains terminal-invalid.
+
+`prepare-for-signature` authenticates the audit ledger before creating or returning
+a plan or signable intent. Only the recoverable torn-append classification names
+`repair-audit`; terminal-invalid states retain the ordinary `HGO-AUDIT` refusal.
+
 ## Alternatives considered
 
 - **Build a bespoke signed override for each denial class separately

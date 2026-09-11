@@ -85,7 +85,7 @@ Three boundaries remain separate and non-substitutable:
 | Replay or parallel double use | Per-plan exclusive consume lock; capability is atomically rewritten to `consumed` before the tool call is admitted. |
 | Repository, State, plugin, denial, or input drift | Fresh physical observations must equal every bound preimage before consumption. Plugin identity includes the manifest, central adapter, override policy library, and override CLI. |
 | Capability tampering | Capability records carry an HMAC authenticated by the owner-private audit key. |
-| Audit deletion, replacement, reordering, or editing | Strict sequence plus previous-MAC linkage, HMAC verification, and a separately authenticated ledger-head anchor; deleting either or both ledger/head files while retaining the key fails closed. An armed capability is unusable unless its exact authorization event is present. Missing material is never silently regenerated. |
+| Audit deletion, replacement, reordering, editing, or a torn head update | Strict sequence plus previous-MAC linkage, HMAC verification, and a separately authenticated ledger-head anchor. A state is valid only when the head binds the complete ledger. It is recoverable only when the authenticated old head binds the exact ledger prefix and every remaining entry is contiguous and HMAC-authenticated; every other mismatch is terminal-invalid and names no repair. Deleting either or both ledger/head files while retaining the key fails closed. An armed capability is unusable unless its exact authorization event is present. Missing material is never silently regenerated. |
 | Symlink, hardlink, weak POSIX mode, or weak native-Windows DACL | Every existing target ancestor is physically inspected; symlink traversal, single-link, mode, and DACL assurance failures fail closed. |
 | Secret disclosure through audit | Audit events contain digests and bounded identifiers, never raw tool input, Human reason, owner nonce, repository-private path, or secret. |
 | Override reaches a protected operation | Nova R2H distinguishes project policy from external capability. Exact in-root project actions, including Git commit and closed operator input, may receive one digest/preimage/reason-bound PO capability. Writer-owned policy files keep their sanctioned writer as the preferred narrower route, but an informed PO can authorize the exact in-root emergency action when the denying guard returned no usable narrower action. `.git`, `.codex`, private authority/secret material, outside-root targets, wildcard targets, raw publication/push (including aliases), and Security exceptions never inherit that capability; they return an exact narrower publication/recovery action or external-operator action. |
@@ -110,6 +110,27 @@ event exist. Consumption happens before allow. Therefore an adapter crash:
   outcome is unknown.
 
 No success is inferred from an absent response.
+
+An audit append preserves the ledger's existing bytes and writes the new ledger
+before its new head. After an authenticated head exists, interruption in that
+window therefore leaves that head over an exact prefix. Ledger parsing rejects
+malformed UTF-8 as well as malformed JSON, sequence or MAC failures.
+`prepare-for-signature` authenticates this
+state before it emits any signable material. The attended `repair-audit` command
+binds typed readback to the observed repair preimage, rechecks that preimage while
+holding the audit lock, appends one `audit-repaired` event, and then advances the
+head. If interruption occurs after that event but before the head update, the
+authenticated repair event identifies the pending completion; retry advances the
+head without appending a second event. A completed retry returns idempotently only
+for the same repair-preimage digest.
+
+Recovery requires the exclusive audit lock to be available. A handled write
+failure releases only the current writer's lock; a competing writer never removes
+it. Abrupt process death can leave `audit.lock` behind, and this implementation
+does not reclaim such locks: `HGO-AUDIT-LOCKED` remains fail-closed. The retry
+guarantee covers interruptions that release the lock, not stale-lock recovery or
+power-loss durability. Missing genesis material, before a first authenticated
+head exists, is also terminal-invalid.
 
 ### Phoenix case-migration recovery
 

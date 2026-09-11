@@ -22,7 +22,7 @@
  */
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,7 @@ import test from "node:test";
 import { main } from "./guard-human-override.mjs";
 import {
   HGO_SIGNATURE_REASON,
+  inspectHumanGuardOverrideAudit,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   recordHumanGuardDenial,
@@ -699,6 +700,101 @@ test("prepare-for-signature validates its flag set like the sibling plan/prepare
   const status = main(["prepare-for-signature", "--repo", "/tmp/does-not-matter"], captured);
   assert.equal(status, 2);
   assert.match(captured.stderr, /HGO-USAGE/u);
+});
+
+test("prepare-for-signature emits no ceremony material for a recoverable torn audit and repair-audit requires typed attended readback", () => {
+  const root = fixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "old head\n" }, denials,
+    });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const base = join(common, "agent-pipeline", "human-guard-overrides");
+    const oldHead = readFileSync(join(base, "audit.head.json"));
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "torn tail\n" }, denials,
+    });
+    writeFileSync(join(base, "audit.head.json"), oldHead, { mode: 0o600 });
+
+    const preparedIo = io();
+    assert.equal(main([
+      "prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256,
+    ], preparedIo), 2);
+    assert.equal(preparedIo.stdout, "");
+    assert.match(preparedIo.stderr, /^HGO-AUDIT: .*recoverable torn append/u);
+    assert.match(preparedIo.stderr, /repair-audit --repo .* --preimage-sha256 [a-f0-9]{64} --activate/u);
+    assert.doesNotMatch(preparedIo.stderr, /sign-intent|authorize-by-signature/u);
+
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    const unattended = io();
+    assert.equal(main([
+      "repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate",
+    ], unattended, { dependencies: { isattyFn: () => false } }), 2);
+    assert.match(unattended.stderr, /HGO-AUDIT-REPAIR-NOT-ATTENDED/u);
+
+    const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
+    const mismatchedIo = io();
+    assert.equal(main([
+      "repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate",
+    ], mismatchedIo, {
+      dependencies: { isattyFn: () => true, readLineFn: () => "approve" },
+    }), 2);
+    assert.equal(mismatchedIo.stdout, "");
+    assert.match(mismatchedIo.stderr, /HGO-AUDIT-REPAIR-CONFIRMATION-MISMATCH/u);
+    assert.equal(inspectHumanGuardOverrideAudit({ rootDir: root }).repairPreimageSha256, state.repairPreimageSha256);
+
+    const repairedIo = io();
+    assert.equal(main([
+      "repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate",
+    ], repairedIo, {
+      dependencies: { isattyFn: () => true, readLineFn: (prompt) => {
+        assert.match(prompt, new RegExp(`Repair preimage: ${state.repairPreimageSha256}`, "u"));
+        assert.match(prompt, new RegExp(`Confirmation: ${challenge}`, "u"));
+        return challenge;
+      } },
+    }), 0, repairedIo.stderr);
+    assert.equal(JSON.parse(repairedIo.stdout).status, "repaired");
+
+    const headPath = join(base, "audit.head.json");
+    const head = JSON.parse(readFileSync(headPath, "utf8"));
+    head.mac = "0".repeat(64);
+    writeFileSync(headPath, `${JSON.stringify(head)}\n`, { mode: 0o600 });
+    const terminalIo = io();
+    assert.equal(main([
+      "prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256,
+    ], terminalIo), 2);
+    assert.equal(terminalIo.stdout, "");
+    assert.match(terminalIo.stderr, /^HGO-AUDIT:/u);
+    assert.doesNotMatch(terminalIo.stderr, /repair-audit|sign-intent|authorize-by-signature/u);
+    const terminalRepairIo = io();
+    assert.equal(main([
+      "repair-audit", "--repo", root, "--preimage-sha256", state.repairPreimageSha256, "--activate",
+    ], terminalRepairIo, {
+      dependencies: { isattyFn: () => assert.fail("terminal-invalid repair must not prompt") },
+    }), 2);
+    assert.equal(terminalRepairIo.stdout, "");
+    assert.match(terminalRepairIo.stderr, /^HGO-AUDIT:/u);
+    assert.doesNotMatch(terminalRepairIo.stderr, /repair-audit/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("repair-audit requires the exact flag set and explicit activation", () => {
+  for (const args of [
+    ["--repo", "/unused", "--preimage-sha256", "0".repeat(64)],
+    ["--repo", "/unused", "--activate"],
+    ["--repo", "/unused", "--preimage-sha256", "invalid", "--activate"],
+    ["--repo", "/unused", "--preimage-sha256", "0".repeat(64), "--unknown", "value", "--activate"],
+  ]) {
+    const captured = io();
+    assert.equal(main(["repair-audit", ...args], captured), 2);
+    assert.equal(captured.stdout, "");
+    assert.match(captured.stderr, /^HGO-USAGE:/u);
+  }
 });
 
 /**

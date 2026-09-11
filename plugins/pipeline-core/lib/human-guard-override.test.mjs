@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto";
 import {
   chmodSync,
   copyFileSync,
@@ -36,10 +36,12 @@ import {
   HumanGuardOverrideError,
   humanGuardOverrideInternals,
   humanGuardRouteUnavailableReason,
+  inspectHumanGuardOverrideAudit,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   prepareHumanGuardOverrideForSignature,
   recordHumanGuardDenial,
+  repairHumanGuardOverrideAudit,
   refreezeHumanGuardOverridePlan,
   verifyHumanGuardOverrideAudit,
 } from "./human-guard-override.mjs";
@@ -1788,10 +1790,329 @@ test("tampered audit fails verification", () => {
     const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
     const audit = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
     writeFileSync(audit, readFileSync(audit, "utf8").replace('"type":"denied"', '"type":"allowed"'), { mode: 0o600 });
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    assert.equal(state.status, "terminal-invalid");
+    assert.doesNotMatch(state.reason, /repair-audit/u);
     assert.throws(
       () => verifyHumanGuardOverrideAudit({ rootDir: root }),
       (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT",
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function tornAuditFixture(root) {
+  const first = recordHumanGuardDenial({
+    rootDir: root,
+    pluginRoot: PLUGIN_ROOT,
+    toolName: "Write",
+    toolInput: { file_path: "notes.md", content: "first audit entry\n" },
+    denials: denial,
+  });
+  const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+  const base = join(common, "agent-pipeline", "human-guard-overrides");
+  const oldHead = readFileSync(join(base, "audit.head.json"));
+  const second = recordHumanGuardDenial({
+    rootDir: root,
+    pluginRoot: PLUGIN_ROOT,
+    toolName: "Write",
+    toolInput: { file_path: "notes.md", content: "authenticated tail entry\n" },
+    denials: denial,
+  });
+  const currentHead = readFileSync(join(base, "audit.head.json"));
+  writeFileSync(join(base, "audit.head.json"), oldHead, { mode: 0o600 });
+  return { base, first, second, currentHead };
+}
+
+function writeAuthenticatedAuditHead(base, entries, bytes) {
+  const core = {
+    schema: "pipeline.human-guard-override-audit-head.v1",
+    entries: entries.length,
+    lastMac: entries.at(-1)?.mac ?? null,
+    ledgerSha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+  const mac = createHmac("sha256", readFileSync(join(base, "audit.key")))
+    .update(humanGuardOverrideInternals.canonical(core)).digest("hex");
+  writeFileSync(join(base, "audit.head.json"), `${JSON.stringify({ ...core, mac })}\n`, { mode: 0o600 });
+}
+
+test("an authenticated empty head and a multi-entry tail recover without dropping prefix bytes", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    const ledger = readFileSync(join(base, "audit.jsonl"));
+    writeAuthenticatedAuditHead(base, [], Buffer.alloc(0));
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    assert.equal(state.status, "recoverable-torn-append");
+    assert.equal(state.headEntries, 0);
+    assert.equal(state.tailEntries, 2);
+    repairHumanGuardOverrideAudit({
+      rootDir: root, expectedPreimageSha256: state.repairPreimageSha256, activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}` },
+    });
+    assert.equal(readFileSync(join(base, "audit.jsonl")).subarray(0, ledger.length).equals(ledger), true);
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 3);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a valid authenticated empty ledger remains valid and ordinary appends preserve authenticated JSON bytes", () => {
+  const root = fixture();
+  try {
+    const { base, currentHead } = tornAuditFixture(root);
+    const original = readFileSync(join(base, "audit.jsonl"), "utf8");
+    writeFileSync(join(base, "audit.jsonl"), Buffer.alloc(0), { mode: 0o600 });
+    writeAuthenticatedAuditHead(base, [], Buffer.alloc(0));
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 0);
+
+    const ledger = Buffer.from(original.replaceAll('{"schema":', '{ "schema":'), "utf8");
+    const entries = original.trim().split("\n").map((line) => JSON.parse(line));
+    writeFileSync(join(base, "audit.jsonl"), ledger, { mode: 0o600 });
+    writeAuthenticatedAuditHead(base, entries, ledger);
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, JSON.parse(currentHead).entries);
+    recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "third audit entry\n" }, denials: denial,
+    });
+    assert.equal(readFileSync(join(base, "audit.jsonl")).subarray(0, ledger.length).equals(ledger), true);
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 3);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const corruption of [
+  "head-mac", "head-prefix-digest", "prefix-bytes", "head-ahead", "tail-sequence",
+  "tail-link", "tail-mac", "missing-newline", "blank-line", "invalid-utf8",
+]) {
+  test(`audit ${corruption} is terminal-invalid and never repairable`, () => {
+    const root = fixture();
+    try {
+      const { base, currentHead } = tornAuditFixture(root);
+      const ledgerPath = join(base, "audit.jsonl");
+      const headPath = join(base, "audit.head.json");
+      const original = readFileSync(ledgerPath, "utf8");
+      const entries = original.trim().split("\n").map((line) => JSON.parse(line));
+      if (corruption === "head-mac") {
+        const head = JSON.parse(readFileSync(headPath, "utf8"));
+        head.mac = "0".repeat(64);
+        writeFileSync(headPath, JSON.stringify(head), { mode: 0o600 });
+      } else if (corruption === "head-prefix-digest") {
+        writeAuthenticatedAuditHead(base, entries.slice(0, 1), Buffer.from("wrong prefix\n"));
+      } else if (corruption === "prefix-bytes") {
+        writeFileSync(ledgerPath, original.replace('{"schema":', '{ "schema":'), { mode: 0o600 });
+      } else if (corruption === "head-ahead") {
+        writeFileSync(headPath, currentHead, { mode: 0o600 });
+        writeFileSync(ledgerPath, `${JSON.stringify(entries[0])}\n`, { mode: 0o600 });
+      } else if (corruption === "missing-newline") {
+        writeFileSync(ledgerPath, original.slice(0, -1), { mode: 0o600 });
+      } else if (corruption === "blank-line") {
+        writeFileSync(ledgerPath, `${original}\n`, { mode: 0o600 });
+      } else {
+        if (corruption === "tail-sequence") entries[1].sequence += 1;
+        if (corruption === "tail-link") entries[1].previousMac = "0".repeat(64);
+        if (corruption === "tail-mac") entries[1].mac = "0".repeat(64);
+        if (corruption === "invalid-utf8") {
+          entries[1].event.at = "\uFFFD";
+          const { mac: _mac, ...core } = entries[1];
+          entries[1].mac = createHmac("sha256", readFileSync(join(base, "audit.key")))
+            .update(humanGuardOverrideInternals.canonical(core)).digest("hex");
+          // Replacement decoding produces the authenticated event; the raw byte
+          // is nevertheless invalid UTF-8 and must never become a repaired head.
+          const [before, after] = `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`.split("\uFFFD");
+          writeFileSync(ledgerPath, Buffer.concat([Buffer.from(before), Buffer.from([0xFF]), Buffer.from(after)]), { mode: 0o600 });
+        } else {
+          writeFileSync(ledgerPath, `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`, { mode: 0o600 });
+        }
+      }
+      const beforeLedger = readFileSync(ledgerPath);
+      const beforeHead = readFileSync(headPath);
+      const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+      assert.equal(state.status, "terminal-invalid");
+      assert.equal(Object.hasOwn(state, "repairPreimageSha256"), false);
+      const refusesTerminalAudit = (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-AUDIT" && !/repair-audit/u.test(error.message);
+      assert.throws(() => verifyHumanGuardOverrideAudit({ rootDir: root }), refusesTerminalAudit);
+      assert.throws(() => repairHumanGuardOverrideAudit({
+        rootDir: root, expectedPreimageSha256: "0".repeat(64), activate: true,
+        dependencies: { isattyFn: () => assert.fail("terminal audit must refuse before prompting") },
+      }), refusesTerminalAudit);
+      assert.deepEqual(readFileSync(ledgerPath), beforeLedger);
+      assert.deepEqual(readFileSync(headPath), beforeHead);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
+
+test("a valid authenticated head prefix plus contiguous authenticated tail is classified and repaired once", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    assert.deepEqual({
+      status: state.status,
+      entries: state.entries,
+      headEntries: state.headEntries,
+      tailEntries: state.tailEntries,
+      completionPending: state.completionPending,
+    }, {
+      status: "recoverable-torn-append",
+      entries: 2,
+      headEntries: 1,
+      tailEntries: 1,
+      completionPending: false,
+    });
+    const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
+    const repaired = repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: state.repairPreimageSha256,
+      activate: true,
+      nowMs: 5000,
+      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
+    });
+    assert.equal(repaired.status, "repaired");
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 3);
+    const events = readFileSync(join(base, "audit.jsonl"), "utf8").trim().split("\n")
+      .map((line) => JSON.parse(line).event);
+    assert.equal(events.filter(({ type }) => type === "audit-repaired").length, 1);
+    assert.equal(events.at(-1).repairPreimageSha256, state.repairPreimageSha256);
+    assert.equal(repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: state.repairPreimageSha256,
+      activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
+    }).status, "already-repaired");
+    assert.equal(readFileSync(join(base, "audit.jsonl"), "utf8").trim().split("\n")
+      .map((line) => JSON.parse(line).event)
+      .filter(({ type }) => type === "audit-repaired").length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("repair rechecks the attended preimage under lock before it mutates", () => {
+  const root = fixture();
+  try {
+    const { base, currentHead } = tornAuditFixture(root);
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
+    assert.throws(() => repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: state.repairPreimageSha256,
+      activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => {
+        writeFileSync(join(base, "audit.head.json"), currentHead, { mode: 0o600 });
+        return challenge;
+      } },
+    }), (error) => error instanceof HumanGuardOverrideError
+      && error.code === "HGO-AUDIT-REPAIR-DRIFT");
+    assert.equal(inspectHumanGuardOverrideAudit({ rootDir: root }).status, "valid");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a failed repair or ordinary append never removes the active repair writer's lock", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
+    const repairOptions = {
+      rootDir: root, expectedPreimageSha256: state.repairPreimageSha256, activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
+    };
+    repairHumanGuardOverrideAudit({
+      ...repairOptions,
+      dependencies: {
+        ...repairOptions.dependencies,
+        afterLedgerWriteFn: () => {
+          assert.throws(() => repairHumanGuardOverrideAudit(repairOptions),
+            (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT-LOCKED");
+          assert.equal(existsSync(join(base, "audit.lock")), true);
+          assert.throws(() => recordHumanGuardDenial({
+            rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+            toolInput: { file_path: "notes.md", content: "competing append\n" }, denials: denial,
+          }), (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT-LOCKED");
+          assert.equal(existsSync(join(base, "audit.lock")), true);
+        },
+      },
+    });
+    assert.equal(existsSync(join(base, "audit.lock")), false);
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 3);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("repair completes idempotently after interruption between ledger and head without a second audit-repaired event", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
+    assert.throws(() => repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: state.repairPreimageSha256,
+      activate: true,
+      dependencies: {
+        isattyFn: () => true,
+        readLineFn: () => challenge,
+        afterLedgerWriteFn: () => { throw new Error("simulated interruption"); },
+      },
+    }), /simulated interruption/u);
+    const pending = inspectHumanGuardOverrideAudit({ rootDir: root });
+    assert.equal(pending.status, "recoverable-torn-append");
+    assert.equal(pending.completionPending, true);
+    assert.equal(pending.repairPreimageSha256, state.repairPreimageSha256);
+    const completed = repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: state.repairPreimageSha256,
+      activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
+    });
+    assert.equal(completed.status, "completed");
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).status, "valid");
+    const events = readFileSync(join(base, "audit.jsonl"), "utf8").trim().split("\n")
+      .map((line) => JSON.parse(line).event);
+    assert.equal(events.filter(({ type }) => type === "audit-repaired").length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("prepare-for-signature authenticates audit first and only recoverable state names repair-audit", () => {
+  const root = fixture();
+  try {
+    const { base, second } = tornAuditFixture(root);
+    assert.throws(() => prepareHumanGuardOverrideForSignature({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: second.requestSha256,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+      humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+    }), (error) => error instanceof HumanGuardOverrideError
+      && error.code === "HGO-AUDIT"
+      && /repair-audit/u.test(error.message));
+    assert.deepEqual(readdirSync(join(base, "plans")), [], "no signable plan may be emitted before audit authentication");
+
+    const headPath = join(base, "audit.head.json");
+    const head = JSON.parse(readFileSync(headPath, "utf8"));
+    head.mac = "0".repeat(64);
+    writeFileSync(headPath, `${JSON.stringify(head)}\n`, { mode: 0o600 });
+    assert.equal(inspectHumanGuardOverrideAudit({ rootDir: root }).status, "terminal-invalid");
+    assert.throws(() => prepareHumanGuardOverrideForSignature({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: second.requestSha256,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+      humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+    }), (error) => error instanceof HumanGuardOverrideError
+      && error.code === "HGO-AUDIT"
+      && !/repair-audit/u.test(error.message));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
