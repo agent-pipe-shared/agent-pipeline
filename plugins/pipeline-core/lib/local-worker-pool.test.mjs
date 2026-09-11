@@ -1,43 +1,19 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import test from "node:test";
+import { openSync } from "node:fs";
 import { computeEffectiveCapacity, createLocalWorkerPool, localWorkerPoolDigest, reduceLocalWorkerPool, selectLocalWorkerPoolReferenceAdapter, validateLocalWorkerPool } from "./local-worker-pool.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), O = "1".repeat(40);
 const bounds = (certified = 3, pressure = 5) => ({ configured:{concurrentTasks:8,required:true}, operator:{concurrentTasks:6,required:true}, certified:{concurrentTasks:certified,required:true}, observed:{concurrentTasks:4,required:true}, pressure:{concurrentTasks:pressure,required:false}, reserved:{elephant:1,verify:1,critic:0}, effective:{status:"available",concurrentTasks:Math.max(0,Math.min(8,6,certified,4,pressure)-2),reasonCodes:[]} });
 const worker = (subject = A, leaseId = "lease-1") => ({ subjectSha256:subject, workspaceLease:{leaseId,subjectSha256:subject,repository:A,baseCommit:O,candidateCommit:O,worktreePathSha256:B,writePaths:["lib/pool.mjs"],ownerNonce:"owner-1",issuedMonotonicMs:0,expiresMonotonicMs:60000,cleanupState:"active",evidenceSha256:C}, process:{identitySha256:B,separation:"observed",assuranceEvidenceSha256:C}, heartbeat:{intervalMs:1000,orphanAfterMs:3000,lastObservedMonotonicMs:0,evidenceSha256:C}, state:"running",lastTransitionMonotonicMs:0,stateEvidenceSha256:C });
 const pool = () => createLocalWorkerPool({ poolId:"pool-1",candidate:{repositorySha256:A,baseCommit:O,candidateCommit:O},queueRevision:0,capacity:bounds(),workers:[worker()],admissionSet:[{taskId:"task-1",subjectSha256:A,requestSha256:B,baseCommit:O,candidateCommit:O,writePaths:["lib/pool.mjs"],state:"admitted"}],cleanupOwner:{subjectSha256:A,ownerNonce:"owner-1",evidenceSha256:C},serialFallback:true });
 
-const injectedFailure = process.env.PIPELINE_LWP_TEST_INJECT_FAILURE ?? "";
-if (injectedFailure === "") {
-  const probe = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
-    encoding: "utf8",
-    env: { ...process.env, PIPELINE_LWP_TEST_INJECT_FAILURE: "LWP03", PIPELINE_LWP_TEST_PROBE_FD: "3" },
-    shell: false,
-    stdio: ["ignore", "pipe", "pipe", "pipe"],
-    timeout: 10_000,
-  });
-  assert.notEqual(probe.status, 0, "the early-failure probe must remain red");
-  assert.deepEqual(
-    String(probe.output[3]).trim().split("\n"),
-    Array.from({ length: 6 }, (_, index) => `LWP${String(index + 1).padStart(2, "0")}`),
-    "every case, including LWP06, must execute after LWP03 fails",
-  );
-}
-
-let registered = 0;
+const cases = [];
 function check(name, fn) {
-  registered += 1;
-  const id = `LWP${String(registered).padStart(2, "0")}`;
-  test(`${id} ${name}`, () => {
-    if (process.env.PIPELINE_LWP_TEST_PROBE_FD === "3") appendFileSync(3, `${id}\n`);
-    if (injectedFailure === id) throw new Error("intentional early-failure probe");
-    return fn();
-  });
+  const id = `LWP${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({ id, name, run: fn });
 }
 
 const event = (kind, extra = {}) => ({ kind,subjectSha256:A,candidateCommit:O,monotonicMs:1000,evidenceSha256:B,...extra });
@@ -48,4 +24,12 @@ check("rejects path escape, relational heartbeat/lease drift, stale owner, forei
 check("models heartbeat, cancellation, timeout, orphan recovery and completion only as synthetic state", () => { let value = pool(); value = reduceLocalWorkerPool(value,event("heartbeat")).pool; assert.equal(value.workers[0].heartbeat.lastObservedMonotonicMs,1000); value = reduceLocalWorkerPool(value,event("cancel")).pool; assert.equal(value.workers[0].state,"cancel-requested"); assert.equal(reduceLocalWorkerPool(value,event("cancelled",{monotonicMs:1001})).pool.workers[0].state,"cancelled"); assert.equal(reduceLocalWorkerPool(pool(),event("completed")).pool.workers[0].state,"completed"); assert.equal(reduceLocalWorkerPool(pool(),event("timeout")).pool.workers[0].state,"timed-out"); assert.equal(reduceLocalWorkerPool(pool(),event("orphan-suspected")).code,"BOUND:orphan-deadline"); let orphan = reduceLocalWorkerPool(pool(),event("orphan-suspected",{monotonicMs:3000})).pool; orphan = reduceLocalWorkerPool(orphan,event("recovered",{monotonicMs:3001})).pool; assert.equal(orphan.workers[0].state,"recovered"); });
 check("invalidates stale candidates and leaves result import unavailable until B1-I authority exists", () => { const value=pool(); assert.equal(reduceLocalWorkerPool(value,event("heartbeat",{candidateCommit:"2".repeat(40)})).code,"STALE:candidate"); const stale=reduceLocalWorkerPool(value,event("stale-candidate",{candidateCommit:"2".repeat(40)})); assert.equal(stale.pool.workers[0].state,"rejected"); assert.equal(stale.pool.admissionSet[0].state,"invalidated"); assert.equal(reduceLocalWorkerPool(value,event("result-import")).code,"UNAVAILABLE:result-import-authority"); });
 
-assert.equal(registered, 6, "the complete LWP corpus must be registered before execution begins");
+assert.equal(cases.length, 6, "the complete LWP corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

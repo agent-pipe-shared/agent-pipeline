@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, readFileSync, realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import test from "node:test";
+import { openSync, readFileSync, realpathSync } from "node:fs";
 
 import { createLocalWorkerPool } from "./local-worker-pool.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import {
   LOCAL_WORKER_SUPERVISOR_RECORD_SCHEMA,
   LOCAL_WORKER_SUPERVISOR_REQUEST_SCHEMA,
@@ -230,32 +228,10 @@ function schemaAccepts(schema, value, root, documents) {
   return true;
 }
 
-const injectedFailure = process.env.PIPELINE_LWS_TEST_INJECT_FAILURE ?? "";
-if (injectedFailure === "") {
-  const probe = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
-    encoding: "utf8",
-    env: { ...process.env, PIPELINE_LWS_TEST_INJECT_FAILURE: "LWS07", PIPELINE_LWS_TEST_PROBE_FD: "3" },
-    shell: false,
-    stdio: ["ignore", "pipe", "pipe", "pipe"],
-    timeout: 10_000,
-  });
-  assert.notEqual(probe.status, 0, "the early-failure probe must remain red");
-  assert.deepEqual(
-    String(probe.output[3]).trim().split("\n"),
-    Array.from({ length: 15 }, (_, index) => `LWS${String(index + 1).padStart(2, "0")}`),
-    "every case, including LWS15, must execute after LWS07 fails",
-  );
-}
-
-let registered = 0;
+const cases = [];
 function check(name, fn) {
-  registered += 1;
-  const id = `LWS${String(registered).padStart(2, "0")}`;
-  test(`${id} ${name}`, () => {
-    if (process.env.PIPELINE_LWS_TEST_PROBE_FD === "3") appendFileSync(3, `${id}\n`);
-    if (injectedFailure === id) throw new Error("intentional early-failure probe");
-    return fn();
-  });
+  const id = `LWS${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({ id, name, run: fn });
 }
 
 check("accepts one closed request bound to pool, runner, instructions, Git, and recovery reserve", () => {
@@ -531,9 +507,11 @@ check("pins observeRunner's Codex --version and --help probe argument vectors to
   assert.equal(start > -1, true);
   assert.equal(end > start, true);
   const observeRunnerSource = source.slice(start, end);
+  const execVectorPattern = new RegExp(String.raw`execFileSync\(request\.runner\.executable, \[([\s\S]*?)\], \x7b`, "gu");
+  const quotedArgumentPattern = new RegExp(String.raw`"((?:[^"\\]|\\.)*)"`, "gu");
   assert.deepEqual(
-    [...observeRunnerSource.matchAll(/execFileSync\(request\.runner\.executable, \[([\s\S]*?)\], \{/gu)].map(
-      (match) => [...match[1].matchAll(/"((?:[^"\\]|\\.)*)"/gu)].map((entry) => entry[1]),
+    [...observeRunnerSource.matchAll(execVectorPattern)].map(
+      (match) => [...match[1].matchAll(quotedArgumentPattern)].map((entry) => entry[1]),
     ),
     [
       ["--version"],
@@ -554,4 +532,12 @@ check("pins observeRunner's Codex --version and --help probe argument vectors to
   assert.equal(observeRunnerSource.includes("sandbox_workspace_write.network_access"), false);
 });
 
-assert.equal(registered, 15, "the complete LWS corpus must be registered before execution begins");
+assert.equal(cases.length, 15, "the complete LWS corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

@@ -86,10 +86,10 @@ function git(root, args) {
   return result.stdout.trim();
 }
 
-test("the repository registry covers all arrays and corrects the old static-only 166 count", () => {
+test("the repository registry covers all arrays and excludes the two required descriptor suites from the vulnerable count", () => {
   const result = checkVerifyCaseCompletion({ root: REPO_ROOT });
   assert.equal(result.ok, true, result.findings.join("\n"));
-  assert.equal(result.vulnerableCount, 170);
+  assert.equal(result.vulnerableCount, 168);
   assert.equal(result.registryCount, 172);
 });
 

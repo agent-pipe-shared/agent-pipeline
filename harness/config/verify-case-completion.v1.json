@@ -400,8 +400,7 @@
     {
       "name": "local-worker-pool-tests",
       "path": "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "local-worker-supervisor-cli-tests",
@@ -412,8 +411,7 @@
     {
       "name": "local-worker-supervisor-core-tests",
       "path": "plugins/pipeline-core/lib/local-worker-supervisor.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "main-session-route-tests",

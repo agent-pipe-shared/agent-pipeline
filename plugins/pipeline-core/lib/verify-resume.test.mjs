@@ -47,6 +47,28 @@ test("same complete bindings reuse terminal PASS receipts", () => {
   assert.equal(result.planSha256, digestJson(Object.fromEntries(Object.entries(result).filter(([key]) => key !== "planSha256"))));
 });
 
+test("required case completion rejects legacy or missing attestations and reuses one policy-bound v2 receipt", () => {
+  const policy = { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["C01"], maxBytes: 4096 };
+  const required = suite("required", { caseCompletion: policy });
+  const attestation = { schema: "pipeline.verify-case-completion-attestation.v1", status: "complete", policySha256: digestJson(policy), caseSetSha256: A, dispositionsSha256: B, declaredCount: 1, disposedCount: 1, counts: { pass: 1, fail: 0, skip: 0, todo: 0 } };
+  const current = receipt(required, { caseCompletion: attestation });
+  const currentPlan = planVerifyResume({ runId: "verify-next", candidate, suites: [required], receipts: { required: current }, logs: { required: log("required") }, policySha256: C });
+  assert.deepEqual(currentPlan.reusable, ["required"]);
+
+  const missing = receipt(required, { caseCompletion: null });
+  assert.equal(planVerifyResume({ runId: "verify-next", candidate, suites: [required], receipts: { required: missing }, logs: { required: log("required") }, policySha256: C }).reasons[0].code, "case-completion-missing");
+
+  const legacyBody = Object.fromEntries(Object.entries(current).filter(([key]) => !["caseCompletion", "receiptSha256"].includes(key)));
+  const legacy = { ...legacyBody, schema: "pipeline.verify-suite-receipt.v1", receiptSha256: null };
+  legacy.receiptSha256 = verifySuiteReceiptSha256(legacy);
+  assert.deepEqual(validateVerifySuiteReceipt(legacy), { ok: true, code: null });
+  assert.equal(planVerifyResume({ runId: "verify-next", candidate, suites: [required], receipts: { required: legacy }, logs: { required: log("required") }, policySha256: C }).reasons[0].code, "case-completion-missing");
+
+  const driftedPolicy = { ...policy, maxBytes: 8192 };
+  const drifted = receipt(required, { caseCompletion: { ...attestation, policySha256: digestJson(driftedPolicy) } });
+  assert.equal(planVerifyResume({ runId: "verify-next", candidate, suites: [required], receipts: { required: drifted }, logs: { required: log("required") }, policySha256: C }).reasons[0].code, "case-completion-policy-drift");
+});
+
 test("interrupted, failed, missing and corrupt artifacts rerun without prose inference", () => {
   const alpha = receipt(suites[0]);
   const partial = { ...alpha, status: "running", receiptSha256: alpha.receiptSha256 };
@@ -230,6 +252,7 @@ test("closed Verify schemas expose the exact Spec root keys and public run cover
   const expected = new Map([
     ["verify-progress.schema.json", ["schema", "runId", "candidate", "suite", "index", "total", "state", "startedAt", "completedAt", "receiptSha256", "diagnosticDigest"]],
     ["verify-suite-receipt.schema.json", ["schema", "runId", "candidate", "suite", "implementationSha256", "inputs", "environmentContractSha256", "policySha256", "status", "exitCode", "log", "startedAt", "completedAt", "receiptSha256"]],
+    ["verify-suite-receipt.v2.schema.json", ["schema", "runId", "candidate", "suite", "implementationSha256", "inputs", "environmentContractSha256", "policySha256", "status", "exitCode", "log", "caseCompletion", "startedAt", "completedAt", "receiptSha256"]],
     ["verify-resume-plan.schema.json", ["schema", "runId", "candidate", "policySha256", "reusable", "rerun", "invalidated", "reasons", "planSha256"]],
   ]);
   for (const [name, keys] of expected) {

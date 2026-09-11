@@ -26,6 +26,15 @@ const candidate = { commit: "1".repeat(40), tree: "2".repeat(40) };
 const spawnPass = () => ({ status: 0, stdout: Buffer.from("complete private log\n"), stderr: Buffer.alloc(0), error: undefined });
 const registerRun = (request) => sealVerifyCleanupRegistration({ status: "registered", runId: request.runId, runPath: request.runPath, sessionId: "test-session", descriptorSha256: "d".repeat(64), resourceId: `verify-${request.runId}`, registeredAt: "2026-08-01T00:00:00.000Z" });
 const artifact = verifySuiteArtifactName("fixture-suite");
+const completionPolicy = { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["C01", "C02"], maxBytes: 4096 };
+function completionStream() {
+  const ordered = [{ id: "C01", disposition: "pass" }, { id: "C02", disposition: "skip" }];
+  return Buffer.from(`${[
+    { schema: "pipeline.test-case-completion.v1", event: "DECLARED", caseIds: completionPolicy.caseIds, caseCount: 2, caseSetSha256: digestJson(completionPolicy.caseIds) },
+    ...ordered.map((entry, ordinal) => ({ schema: "pipeline.test-case-completion.v1", event: "DISPOSED", id: entry.id, ordinal, disposition: entry.disposition })),
+    { schema: "pipeline.test-case-completion.v1", event: "TERMINAL", declaredCount: 2, disposedCount: 2, caseIds: completionPolicy.caseIds, caseSetSha256: digestJson(completionPolicy.caseIds), dispositionsSha256: digestJson(ordered), counts: { pass: 1, fail: 0, skip: 1, todo: 0 } },
+  ].map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+}
 
 function makeClock(startMs = 1_700_000_000_000, stepMs = 25) {
   let ticks = 0;
@@ -73,6 +82,79 @@ test("a terminal matching receipt is reused and still produces complete current 
     assert.ok(resumed.steps[0].durationMs >= 0);
     const reusedReceipt = JSON.parse(readFileSync(join(resumed.runDir, "receipts", `${artifact}.json`), "utf8"));
     assert.equal(resumed.steps[0].durationMs, Date.parse(reusedReceipt.completedAt) - Date.parse(reusedReceipt.startedAt));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("a required case-completion descriptor is captured into receipt v2 and reused only with its attestation", async () => {
+  const f = fixture();
+  const suites = [{ ...f.suites[0], caseCompletion: completionPolicy }];
+  let calls = 0;
+  const spawn = (_command, _argv, options) => {
+    calls += 1;
+    assert.deepEqual(options.caseCompletion, completionPolicy);
+    assert.equal(options.env.PIPELINE_VERIFY_CASE_COMPLETION_FD, "3");
+    return { ...spawnPass(), caseCompletion: completionStream() };
+  };
+  try {
+    const clock = makeClock();
+    const first = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "completion" }, runId: "verify-completion-one", spawn, registerRun, clock });
+    const firstReceipt = JSON.parse(readFileSync(join(first.runDir, "receipts", `${artifact}.json`), "utf8"));
+    assert.equal(firstReceipt.schema, "pipeline.verify-suite-receipt.v2");
+    assert.equal(firstReceipt.caseCompletion.status, "complete");
+    assert.deepEqual(firstReceipt.caseCompletion.counts, { pass: 1, fail: 0, skip: 1, todo: 0 });
+    const resumed = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "completion" }, runId: "verify-completion-two", spawn, registerRun, clock });
+    assert.equal(calls, 1);
+    assert.deepEqual(resumed.plan.reusable, ["fixture-suite"]);
+    const reused = JSON.parse(readFileSync(join(resumed.runDir, "receipts", `${artifact}.json`), "utf8"));
+    assert.deepEqual(reused.caseCompletion, firstReceipt.caseCompletion);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("a required suite with a missing completion terminal fails closed even when its process exits zero", async () => {
+  const f = fixture();
+  try {
+    const result = await runVerifyJournal({
+      gitCommonDir: f.common,
+      repoRoot: f.root,
+      candidate,
+      suites: [{ ...f.suites[0], caseCompletion: completionPolicy }],
+      policyInputs: { harness: "completion-missing" },
+      runId: "verify-completion-missing",
+      spawn: () => ({ ...spawnPass(), caseCompletion: completionStream().subarray(0, completionStream().lastIndexOf(0x0a, completionStream().length - 2) + 1) }),
+      registerRun,
+    });
+    assert.equal(result.steps[0].exitCode, 1);
+    assert.equal(result.terminal.status, "failed");
+    const receipt = JSON.parse(readFileSync(join(result.runDir, "receipts", `${artifact}.json`), "utf8"));
+    assert.equal(receipt.caseCompletion, null);
+    assert.match(readFileSync(join(result.runDir, "logs", `${artifact}.log`), "utf8"), /VERIFY-CASE-COMPLETION-TERMINAL/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("the default async child transport inherits and captures the bounded completion descriptor", async () => {
+  const f = fixture();
+  try {
+    const helper = readFileSync(new URL("../lib/test-case-completion.mjs", import.meta.url), "utf8");
+    writeFileSync(join(f.root, "test-case-completion.mjs"), helper, { mode: 0o600 });
+    writeFileSync(f.suiteFile, `import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+registerTestCaseCompletion({
+  cases: [{ id: "C01", name: "first", run: () => {} }, { id: "C02", name: "second", mode: "skip", run: () => {} }],
+  fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD),
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES),
+});
+`, { mode: 0o600 });
+    const result = await runVerifyJournal({
+      gitCommonDir: f.common,
+      repoRoot: f.root,
+      candidate,
+      suites: [{ ...f.suites[0], caseCompletion: completionPolicy }],
+      policyInputs: { harness: "completion-real-child" },
+      runId: "verify-completion-real-child",
+      registerRun,
+    });
+    assert.equal(result.steps[0].exitCode, 0);
+    const receipt = JSON.parse(readFileSync(join(result.runDir, "receipts", `${artifact}.json`), "utf8"));
+    assert.deepEqual(receipt.caseCompletion.counts, { pass: 1, fail: 0, skip: 1, todo: 0 });
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

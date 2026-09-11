@@ -12,6 +12,7 @@ import {
   sealVerifySuiteReceipt,
   validateVerifySuiteReceipt,
 } from "../lib/verify-resume.mjs";
+import { parseVerifyCaseCompletion, validateVerifyCaseCompletionPolicy } from "../lib/verify-case-completion-receipt.mjs";
 import { bindEphemeralPrivateCleanup, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
 import { finalizeTemporaryResource, listActiveSessionDescriptors, loadSessionDescriptor, registerTemporaryIntent, retireSessionDescriptor, startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
@@ -250,7 +251,7 @@ export function createVerifyRun({ gitCommonDir, runId, candidate, policySha256, 
     runId,
     candidate,
     policySha256,
-    suites: suites.map((suite) => ({ id: suite.id, implementationSha256: suite.implementationSha256, inputs: suite.inputs, environmentContractSha256: suite.environmentContractSha256, dependsOn: suite.dependsOn })),
+    suites: suites.map((suite) => ({ id: suite.id, implementationSha256: suite.implementationSha256, inputs: suite.inputs, environmentContractSha256: suite.environmentContractSha256, dependsOn: suite.dependsOn, caseCompletion: suite.caseCompletion ?? null })),
     cleanupRegistration,
     durability,
     startedAt: now(clock),
@@ -461,6 +462,8 @@ export function compileVerifySuites({ repoRoot, suites, candidateTree, environme
     if (rel === "" || rel === ".." || rel.startsWith("../") || !regularPhysicalFile(absolute)) throw new Error(`VERIFY-SUITE-INPUT-UNSAFE:${suite.name}`);
     const implementationSha256 = sha(readFileSync(absolute));
     const dependsOn = [...(suite.dependsOn ?? [])].sort();
+    const caseCompletion = suite.caseCompletion ?? null;
+    if (!validateVerifyCaseCompletionPolicy(caseCompletion) && caseCompletion !== null) throw new Error(`VERIFY-SUITE-CASE-COMPLETION-INVALID:${suite.name}`);
     const declaration = tierBDeclarations[suite.name] ?? null;
     // "suite-dependencies" applies to every suite regardless of tier: it restores the one check
     // that dropping `suites: registrations` from policySha256 (below) would otherwise silently
@@ -468,6 +471,7 @@ export function compileVerifySuites({ repoRoot, suites, candidateTree, environme
     // declared-input-drift instead of via the removed whole-policy digest.
     const sharedNonFiles = [
       { kind: "suite-arguments", path: null, sha256: digestJson(suite.args ?? []) },
+      ...(caseCompletion === null ? [] : [{ kind: "suite-case-completion", path: null, sha256: digestJson(caseCompletion) }]),
       { kind: "suite-dependencies", path: null, sha256: digestJson(dependsOn) },
     ];
     // Tier A (ADR-0065 Decision 2, the default -- every suite not named in tierBDeclarations):
@@ -484,7 +488,7 @@ export function compileVerifySuites({ repoRoot, suites, candidateTree, environme
     const inputs = declaration
       ? { files: tierBDeclaredFiles({ suite, rel, implementationSha256, repoRoot, declaration }), nonFiles: [...sharedNonFiles].sort((a, b) => a.kind.localeCompare(b.kind)) }
       : { files: [{ path: rel, fileSha256: implementationSha256 }], nonFiles: [{ kind: "declared-tree:root", path: null, sha256: sha(candidateTree) }, ...sharedNonFiles].sort((a, b) => a.kind.localeCompare(b.kind)) };
-    return { id: suite.name, implementationSha256, inputs, environmentContractSha256, dependsOn };
+    return { id: suite.name, implementationSha256, inputs, environmentContractSha256, dependsOn, caseCompletion };
   });
 }
 
@@ -523,18 +527,25 @@ function spawnAsync(command, argv, options = {}) {
     const maxBuffer = typeof options.maxBuffer === "number" ? options.maxBuffer : Infinity;
     let child;
     try {
-      child = spawnChildProcess(command, argv, { cwd: options.cwd, stdio: ["ignore", "pipe", "pipe"] });
+      const completion = options.caseCompletion ?? null;
+      child = spawnChildProcess(command, argv, {
+        cwd: options.cwd,
+        env: options.env,
+        stdio: completion === null ? ["ignore", "pipe", "pipe"] : ["ignore", "pipe", "pipe", "pipe"],
+      });
     } catch (error) {
       resolvePromise({ status: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error });
       return;
     }
     const stdoutChunks = [];
     const stderrChunks = [];
+    const completionChunks = [];
     // Per-stream totals, not a combined one: spawnSync's own `maxBuffer` bounds stdout and
     // stderr INDEPENDENTLY (Node's documented behavior), so a shared counter here would kill a
     // suite that spawnSync would have let pass -- confirmed live regression, delta-4 Critic F3.
     let stdoutTotal = 0;
     let stderrTotal = 0;
+    let completionTotal = 0;
     let overflowed = false;
     let spawnError;
     let settled = false;
@@ -553,12 +564,24 @@ function spawnAsync(command, argv, options = {}) {
     };
     child.stdout.on("data", collect(stdoutChunks, (length) => (stdoutTotal += length)));
     child.stderr.on("data", collect(stderrChunks, (length) => (stderrTotal += length)));
+    if (options.caseCompletion !== null && options.caseCompletion !== undefined) {
+      child.stdio[3].on("data", (chunk) => {
+        completionTotal += chunk.length;
+        if (completionTotal > options.caseCompletion.maxBytes) {
+          overflowed = true;
+          spawnError = Object.assign(new Error("case completion maxBytes exceeded"), { code: "ECASECOMPLETION" });
+          try { child.kill(); } catch { /* best-effort */ }
+          return;
+        }
+        completionChunks.push(chunk);
+      });
+    }
     child.once("error", (error) => {
       spawnError = spawnError ?? error;
-      settle({ status: null, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), error: spawnError });
+      settle({ status: null, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), caseCompletion: Buffer.concat(completionChunks), error: spawnError });
     });
     child.once("close", (code) => {
-      settle({ status: code, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), error: spawnError });
+      settle({ status: code, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), caseCompletion: Buffer.concat(completionChunks), error: spawnError });
     });
   });
 }
@@ -777,17 +800,37 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
   const startedAt = now(clock);
   appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "started", startedAt, completedAt: null, receiptSha256: null, diagnosticDigest: null }, console.log);
   const permissionFlags = isTierBRegistration(registration) ? tierBSpawnFlags(registration, suite.cwd) : [];
-  const result = await spawn(process.execPath, [...permissionFlags, suite.file, ...(suite.args ?? [])], { encoding: "buffer", cwd: suite.cwd, maxBuffer: MAX_LOG_BYTES });
+  const completionPolicy = registration.caseCompletion ?? null;
+  const result = await spawn(process.execPath, [...permissionFlags, suite.file, ...(suite.args ?? [])], {
+    encoding: "buffer",
+    cwd: suite.cwd,
+    maxBuffer: MAX_LOG_BYTES,
+    env: completionPolicy === null ? undefined : {
+      ...process.env,
+      PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
+      PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: String(completionPolicy.maxBytes),
+    },
+    caseCompletion: completionPolicy,
+  });
   const stdout = Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout ?? "");
   const stderr = Buffer.isBuffer(result.stderr) ? result.stderr : Buffer.from(result.stderr ?? "");
-  const diagnostic = result.error ? Buffer.from(`\n[verify-runner-error] ${result.error.code ?? "ERROR"}\n`) : Buffer.alloc(0);
+  let caseCompletion = null;
+  let completionError = null;
+  if (completionPolicy !== null) {
+    try { caseCompletion = parseVerifyCaseCompletion(Buffer.isBuffer(result.caseCompletion) ? result.caseCompletion : Buffer.from(result.caseCompletion ?? ""), completionPolicy); }
+    catch (error) { completionError = error; }
+  }
+  const diagnostics = [];
+  if (result.error) diagnostics.push(`[verify-runner-error] ${result.error.code ?? "ERROR"}`);
+  if (completionError) diagnostics.push(`[verify-case-completion-error] ${completionError.message}`);
+  const diagnostic = diagnostics.length > 0 ? Buffer.from(`\n${diagnostics.join("\n")}\n`) : Buffer.alloc(0);
   const combined = Buffer.concat([stdout, stderr, diagnostic]);
   const truncated = result.error?.code === "ENOBUFS" || combined.length > MAX_LOG_BYTES;
   const logBytes = combined.subarray(0, MAX_LOG_BYTES);
   const artifact = verifySuiteArtifactName(suite.name);
   const logPath = join(run.logsDir, `${artifact}.log`);
   writeDurable(logPath, logBytes, "wx");
-  const exitCode = truncated ? 1 : (result.status ?? 1);
+  const exitCode = truncated || completionError !== null ? 1 : (result.status ?? 1);
   const completedAt = now(clock);
   const receipt = sealVerifySuiteReceipt({
     runId: run.manifest.runId,
@@ -800,11 +843,12 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
     status: "completed",
     exitCode,
     log: { path: `logs/${artifact}.log`, fileSha256: sha(logBytes), byteLength: logBytes.length, truncated },
+    caseCompletion,
     startedAt,
     completedAt,
   });
   atomicJson(join(run.receiptsDir, `${artifact}.json`), receipt);
-  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "completed", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ exitCode, error: result.error?.code ?? null }) }, console.log);
+  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "completed", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ exitCode, error: result.error?.code ?? null, caseCompletionError: completionError?.message ?? null }) }, console.log);
   return receipt;
 }
 
@@ -819,7 +863,7 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
   const logPath = join(run.logsDir, `${artifact}.log`);
   writeDurable(logPath, bytes, "wx");
   const completedAt = now(clock);
-  const receipt = sealVerifySuiteReceipt({ runId: run.manifest.runId, candidate, suite: suite.name, implementationSha256: registration.implementationSha256, inputs: registration.inputs, environmentContractSha256: registration.environmentContractSha256, policySha256, status: "completed", exitCode: 0, log: { path: `logs/${artifact}.log`, fileSha256: sha(bytes), byteLength: bytes.length, truncated: false }, startedAt, completedAt });
+  const receipt = sealVerifySuiteReceipt({ runId: run.manifest.runId, candidate, suite: suite.name, implementationSha256: registration.implementationSha256, inputs: registration.inputs, environmentContractSha256: registration.environmentContractSha256, policySha256, status: "completed", exitCode: 0, log: { path: `logs/${artifact}.log`, fileSha256: sha(bytes), byteLength: bytes.length, truncated: false }, caseCompletion: sourceReceipt.caseCompletion ?? null, startedAt, completedAt });
   atomicJson(join(run.receiptsDir, `${artifact}.json`), receipt);
   appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "reused", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ sourceRunId: sourceReceipt.runId, sourceReceiptSha256: sourceReceipt.receiptSha256 }) }, console.log);
   return receipt;

@@ -4,14 +4,16 @@
 import { createHash } from "node:crypto";
 
 export const VERIFY_PROGRESS_SCHEMA = "pipeline.verify-progress.v1";
-export const VERIFY_SUITE_RECEIPT_SCHEMA = "pipeline.verify-suite-receipt.v1";
+export const VERIFY_SUITE_RECEIPT_SCHEMA = "pipeline.verify-suite-receipt.v2";
+export const VERIFY_SUITE_RECEIPT_LEGACY_SCHEMA = "pipeline.verify-suite-receipt.v1";
 export const VERIFY_RESUME_PLAN_SCHEMA = "pipeline.verify-resume-plan.v1";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const REASONS = new Set(["missing-receipt", "reuse-disabled", "corrupt-receipt", "not-successful", "suite-identity-drift", "candidate-drift", "suite-implementation-drift", "declared-input-drift", "environment-contract-drift", "verify-policy-drift", "missing-log", "corrupt-log", "truncated-log", "dependency-invalidated"]);
-const ROOT_RECEIPT_KEYS = ["schema", "runId", "candidate", "suite", "implementationSha256", "inputs", "environmentContractSha256", "policySha256", "status", "exitCode", "log", "startedAt", "completedAt", "receiptSha256"];
+const REASONS = new Set(["missing-receipt", "reuse-disabled", "corrupt-receipt", "not-successful", "suite-identity-drift", "candidate-drift", "suite-implementation-drift", "declared-input-drift", "environment-contract-drift", "verify-policy-drift", "case-completion-missing", "case-completion-policy-drift", "missing-log", "corrupt-log", "truncated-log", "dependency-invalidated"]);
+const ROOT_RECEIPT_KEYS_V1 = ["schema", "runId", "candidate", "suite", "implementationSha256", "inputs", "environmentContractSha256", "policySha256", "status", "exitCode", "log", "startedAt", "completedAt", "receiptSha256"];
+const ROOT_RECEIPT_KEYS_V2 = [...ROOT_RECEIPT_KEYS_V1, "caseCompletion"];
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key)); }
@@ -35,7 +37,30 @@ function inputSet(value) {
 function logRef(value) { return exact(value, ["path", "fileSha256", "byteLength", "truncated"]) && safePath(value.path) && SHA256.test(value.fileSha256) && Number.isSafeInteger(value.byteLength) && value.byteLength >= 0 && typeof value.truncated === "boolean"; }
 function iso(value) { if (typeof value !== "string") return false; const time = Date.parse(value); return Number.isFinite(time) && new Date(time).toISOString() === value; }
 function sortedUnique(values) { return Array.isArray(values) && values.length <= 256 && values.every((value, index) => ID.test(value) && (index === 0 || values[index - 1] < value)); }
-function validSuite(suite) { return exact(suite, ["id", "implementationSha256", "inputs", "environmentContractSha256", "dependsOn"]) && ID.test(suite.id) && SHA256.test(suite.implementationSha256) && inputSet(suite.inputs) && SHA256.test(suite.environmentContractSha256) && sortedUnique(suite.dependsOn); }
+function completionPolicy(value) {
+  return value === null || (exact(value, ["schema", "caseIds", "maxBytes"])
+    && value.schema === "pipeline.verify-case-completion-policy.v1"
+    && Array.isArray(value.caseIds) && value.caseIds.length > 0 && value.caseIds.length <= 2_048
+    && value.caseIds.every((id, index) => /^[A-Za-z][A-Za-z0-9._:-]{0,63}$/u.test(id) && (index === 0 || value.caseIds[index - 1] < id))
+    && Number.isSafeInteger(value.maxBytes) && value.maxBytes >= 512 && value.maxBytes <= 1_048_576);
+}
+function completionAttestation(value) {
+  return value === null || (exact(value, ["schema", "status", "policySha256", "caseSetSha256", "dispositionsSha256", "declaredCount", "disposedCount", "counts"])
+    && value.schema === "pipeline.verify-case-completion-attestation.v1" && value.status === "complete"
+    && [value.policySha256, value.caseSetSha256, value.dispositionsSha256].every((entry) => SHA256.test(entry))
+    && Number.isSafeInteger(value.declaredCount) && value.declaredCount > 0 && value.disposedCount === value.declaredCount
+    && exact(value.counts, ["pass", "fail", "skip", "todo"])
+    && Object.values(value.counts).every((count) => Number.isSafeInteger(count) && count >= 0)
+    && Object.values(value.counts).reduce((sum, count) => sum + count, 0) === value.declaredCount);
+}
+function validSuite(suite) {
+  const keys = Object.keys(suite ?? {});
+  const supportedShape = exact(suite, ["id", "implementationSha256", "inputs", "environmentContractSha256", "dependsOn"])
+    || exact(suite, ["id", "implementationSha256", "inputs", "environmentContractSha256", "dependsOn", "caseCompletion"]);
+  return supportedShape && ID.test(suite.id) && SHA256.test(suite.implementationSha256) && inputSet(suite.inputs)
+    && SHA256.test(suite.environmentContractSha256) && sortedUnique(suite.dependsOn)
+    && (!keys.includes("caseCompletion") || completionPolicy(suite.caseCompletion));
+}
 
 // Registration diagnostics. A rejected registration reaches the operator only
 // as verify.mjs's `VERIFY-JOURNAL-FAILED: ${message}`, cut at 256 characters,
@@ -45,7 +70,7 @@ function validSuite(suite) { return exact(suite, ["id", "implementationSha256", 
 // elided at 64, so even a maximal pair still fits.
 const ID_QUOTE_MAX = 128;
 const TEXT_QUOTE_MAX = 64;
-const SUITE_FIELDS = ["id", "implementationSha256", "inputs", "environmentContractSha256", "dependsOn"];
+const SUITE_FIELDS = ["id", "implementationSha256", "inputs", "environmentContractSha256", "dependsOn", "caseCompletion"];
 function asText(value) {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") return String(value);
@@ -59,7 +84,7 @@ function quoted(value, budget) { const printable = asText(value).replace(/[^ -~]
 function suiteDefect(suite) {
   if (!object(suite)) return "is not a registration object";
   const keys = Object.keys(suite);
-  const missing = SUITE_FIELDS.find((field) => !keys.includes(field));
+  const missing = SUITE_FIELDS.slice(0, 5).find((field) => !keys.includes(field));
   if (missing !== undefined) return `is missing the ${missing} field`;
   const unexpected = keys.find((field) => !SUITE_FIELDS.includes(field));
   if (unexpected !== undefined) return `carries the unregistered field ${quoted(unexpected, TEXT_QUOTE_MAX)}`;
@@ -68,6 +93,7 @@ function suiteDefect(suite) {
   if (!inputSet(suite.inputs)) return "has an invalid inputs field";
   if (!SHA256.test(suite.environmentContractSha256)) return "has an invalid environmentContractSha256 field";
   if (!sortedUnique(suite.dependsOn)) return "has an invalid dependsOn field";
+  if (Object.hasOwn(suite, "caseCompletion") && !completionPolicy(suite.caseCompletion)) return "has an invalid caseCompletion field";
   return "has an invalid shape";
 }
 function suiteLocation(suite, index) { return object(suite) && typeof suite.id === "string" && ID.test(suite.id) ? `suite ${quoted(suite.id, TEXT_QUOTE_MAX)} at index ${index}` : `suite at index ${index}`; }
@@ -75,18 +101,21 @@ function suiteLocation(suite, index) { return object(suite) && typeof suite.id =
 export function verifySuiteReceiptSha256(receipt) { const { receiptSha256: omitted, ...body } = receipt ?? {}; return digestJson(body); }
 
 export function validateVerifySuiteReceipt(receipt) {
-  if (!exact(receipt, ROOT_RECEIPT_KEYS) || receipt.schema !== VERIFY_SUITE_RECEIPT_SCHEMA) return { ok: false, code: "VERIFY-RECEIPT-SHAPE" };
+  const legacy = receipt?.schema === VERIFY_SUITE_RECEIPT_LEGACY_SCHEMA;
+  if (!(legacy ? exact(receipt, ROOT_RECEIPT_KEYS_V1) : exact(receipt, ROOT_RECEIPT_KEYS_V2))
+    || (!legacy && receipt?.schema !== VERIFY_SUITE_RECEIPT_SCHEMA)) return { ok: false, code: "VERIFY-RECEIPT-SHAPE" };
   if (!ID.test(receipt.runId) || !candidate(receipt.candidate) || !ID.test(receipt.suite)) return { ok: false, code: "VERIFY-RECEIPT-IDENTITY" };
   if (!SHA256.test(receipt.implementationSha256) || !inputSet(receipt.inputs)) return { ok: false, code: "VERIFY-RECEIPT-INPUTS" };
   if (!SHA256.test(receipt.environmentContractSha256) || !SHA256.test(receipt.policySha256)) return { ok: false, code: "VERIFY-RECEIPT-POLICY" };
   if (receipt.status !== "completed" || !Number.isSafeInteger(receipt.exitCode) || receipt.exitCode < 0 || !logRef(receipt.log)) return { ok: false, code: "VERIFY-RECEIPT-TERMINAL" };
+  if (!legacy && !completionAttestation(receipt.caseCompletion)) return { ok: false, code: "VERIFY-RECEIPT-CASE-COMPLETION" };
   if (!iso(receipt.startedAt) || !iso(receipt.completedAt) || Date.parse(receipt.completedAt) < Date.parse(receipt.startedAt)) return { ok: false, code: "VERIFY-RECEIPT-TIME" };
   if (!SHA256.test(receipt.receiptSha256) || verifySuiteReceiptSha256(receipt) !== receipt.receiptSha256) return { ok: false, code: "VERIFY-RECEIPT-DIGEST" };
   return { ok: true, code: null };
 }
 
 export function sealVerifySuiteReceipt(fields) {
-  const receipt = { schema: VERIFY_SUITE_RECEIPT_SCHEMA, ...structuredClone(fields), receiptSha256: "0".repeat(64) };
+  const receipt = { schema: VERIFY_SUITE_RECEIPT_SCHEMA, ...structuredClone(fields), caseCompletion: fields.caseCompletion ?? null, receiptSha256: "0".repeat(64) };
   receipt.receiptSha256 = verifySuiteReceiptSha256(receipt);
   const checked = validateVerifySuiteReceipt(receipt);
   if (!checked.ok) throw new TypeError(checked.code);
@@ -141,6 +170,11 @@ function firstDrift(suite, receipt, context) {
   if (receipt.environmentContractSha256 !== suite.environmentContractSha256) return "environment-contract-drift";
   if ((isTierARegistration(suite) || !context.allowCrossCandidateReuse) && (receipt.candidate.commit !== context.candidate.commit || receipt.candidate.tree !== context.candidate.tree)) return "candidate-drift";
   if (receipt.policySha256 !== context.policySha256) return "verify-policy-drift";
+  const requiredCompletion = suite.caseCompletion ?? null;
+  if (requiredCompletion !== null) {
+    if (receipt.schema !== VERIFY_SUITE_RECEIPT_SCHEMA || receipt.caseCompletion === null) return "case-completion-missing";
+    if (receipt.caseCompletion.policySha256 !== digestJson(requiredCompletion)) return "case-completion-policy-drift";
+  }
   const log = context.logs?.[suite.id];
   if (!logRef(log)) return "missing-log";
   if (receipt.log.truncated || log.truncated) return "truncated-log";

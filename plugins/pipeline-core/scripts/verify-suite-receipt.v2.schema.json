@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.verify-suite-receipt.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "runId",
+    "candidate",
+    "suite",
+    "implementationSha256",
+    "inputs",
+    "environmentContractSha256",
+    "policySha256",
+    "status",
+    "exitCode",
+    "log",
+    "caseCompletion",
+    "startedAt",
+    "completedAt",
+    "receiptSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.verify-suite-receipt.v2"
+    },
+    "runId": {
+      "$ref": "#/$defs/id"
+    },
+    "candidate": {
+      "$ref": "#/$defs/candidate"
+    },
+    "suite": {
+      "$ref": "#/$defs/id"
+    },
+    "implementationSha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "nonFiles"
+      ],
+      "properties": {
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "fileSha256"
+            ],
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/path"
+              },
+              "fileSha256": {
+                "$ref": "#/$defs/sha"
+              }
+            }
+          }
+        },
+        "nonFiles": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/digestRef"
+          }
+        }
+      }
+    },
+    "environmentContractSha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "policySha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "status": {
+      "const": "completed"
+    },
+    "exitCode": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "fileSha256",
+        "byteLength",
+        "truncated"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "fileSha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777216
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "caseCompletion": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "status",
+            "policySha256",
+            "caseSetSha256",
+            "dispositionsSha256",
+            "declaredCount",
+            "disposedCount",
+            "counts"
+          ],
+          "properties": {
+            "schema": {
+              "const": "pipeline.verify-case-completion-attestation.v1"
+            },
+            "status": {
+              "const": "complete"
+            },
+            "policySha256": {
+              "$ref": "#/$defs/sha"
+            },
+            "caseSetSha256": {
+              "$ref": "#/$defs/sha"
+            },
+            "dispositionsSha256": {
+              "$ref": "#/$defs/sha"
+            },
+            "declaredCount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "disposedCount": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "counts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pass",
+                "fail",
+                "skip",
+                "todo"
+              ],
+              "properties": {
+                "pass": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "fail": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "skip": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "todo": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "receiptSha256": {
+      "$ref": "#/$defs/sha"
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)[A-Za-z0-9._/@:-]+$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "tree": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        }
+      }
+    },
+    "digestRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/id"
+        },
+        "path": {
+          "type": "null"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    }
+  }
+}
