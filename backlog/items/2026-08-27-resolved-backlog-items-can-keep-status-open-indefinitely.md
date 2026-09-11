@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.resolved-backlog-items-can-keep-status-open-indefinitely
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
 sprint: nova-b
 source: "NVA-BLRECONCILE-1, 2026-08-27 — process-defect finding from the briefing that reported two same-day dispatches briefed against already-finished work"
 done_when: contains plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs pipeline.undeclared-is-fatal
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 361358dbbb81c730277935653e31ea482a3277b8
+closure_evidence: backlog/evidence/2026-09-11-done-when-enforcement-evidence.md
 ---
 
 # A resolved backlog item can keep `status: open` indefinitely, so a dispatcher only avoids re-briefing finished work by remembering to check
@@ -122,3 +126,16 @@ is already resolved (close it) or genuinely open (assign a real, falsifiable
 `done_when`) — then land the marker once every item carries one. This is a
 large parallel campaign; scope it as its own dedicated Workflow wave, not
 folded into the current 0.6.0 fix wave.
+
+## Resolution, 2026-09-11
+
+The declaration campaign is complete: the live checker enumerates zero open or
+in-progress items without `done_when`. Commit
+`361358dbbb81c730277935653e31ea482a3277b8` therefore graduates `UNDECLARED`
+from advisory output to a fatal finding for those two active statuses and adds
+the predicate's required `pipeline.undeclared-is-fatal` marker. Undeclared
+closed, rejected, or deferred historical records remain counted and non-fatal.
+
+Focused fixtures cover the fatal open case and preserve the non-open behavior.
+Candidate-exact Verify and independent Critic results are recorded in
+`backlog/evidence/2026-09-11-done-when-enforcement-evidence.md`.

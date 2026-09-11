@@ -506,7 +506,7 @@
 | pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy | open | defect | pipeline | 2026-08-27 | — |
-| pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | open | defect | pipeline | 2026-08-27 | — |
+| pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts | open | defect | pipeline | 2026-08-31 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 105
+- open: 104
 - in_progress: 0
-- closed: 535
+- closed: 536
 - rejected: 3
 - deferred: 11

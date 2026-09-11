@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a38a8ce68a30e56ff3f9cf403c3d96df3ed8b7d5d1e5ed2dfa526cca63f52bbc"
+    "transitionHead": "196bb4405798a8cc159126e58bf834223a7096cc5854e2754702b218d04eb936"
   },
   "counts": {
-    "open": 105,
+    "open": 104,
     "in_progress": 0,
-    "closed": 535,
+    "closed": 536,
     "rejected": 3,
     "deferred": 11
   },
@@ -6277,12 +6277,16 @@
     },
     {
       "id": "pipeline.resolved-backlog-items-can-keep-status-open-indefinitely",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "NVA-BLRECONCILE-1, 2026-08-27 — process-defect finding from the briefing that reported two same-day dispatches briefed against already-finished work",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "361358dbbb81c730277935653e31ea482a3277b8",
+      "closureEvidence": "backlog/evidence/2026-09-11-done-when-enforcement-evidence.md"
     },
     {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
