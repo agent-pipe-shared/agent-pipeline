@@ -18,11 +18,10 @@
  *      Enforced unconditionally, blocking.
  *
  *   2. **`AI-Assisted: true` and one grounded `Dispatch:` binding must be present in the
- *      final Git trailer block.** These are conventions. Switching them on
- *      unconditionally would refuse every ordinary commit in every consumer project that
- *      has not adopted the trailer, which is a large silent behaviour change shipped to
- *      people who did not ask for it. Config-gated together (`commitTrailerPolicy` in the project
- *      guard-config), default off.
+ *      final Git trailer block.** The guard executes only for agent tool calls, so the
+ *      mandatory all-project GIT-03 contract is the safe default. A project may select
+ *      `warn` for a dated migration or explicitly select `off`; absence and unknown values
+ *      fail closed to `blocking`.
  *
  * WHAT IT CANNOT SEE, stated rather than discovered later. A commit whose message comes
  * from the editor (`git commit` with no `-m`/`-F`) has no message at the moment the hook
@@ -327,11 +326,12 @@ export function commitTypeFindingsForRange(commits) {
 export const COMMIT_MESSAGE_POLICY_MODES = Object.freeze(["off", "warn", "blocking"]);
 
 /**
- * The project's chosen strength for the marker half. Unknown or absent reads as `off`,
- * because this half is a convention a project opts into — unlike the correlation half,
- * which is not configurable at all and does not pass through here.
+ * The project's chosen strength for the marker half. Unknown or absent reads as
+ * `blocking`, matching GIT-03's mandatory all-project scope. `warn` is a dated
+ * migration mode and `off` is an explicit project opt-out. The correlation half
+ * is not configurable and does not pass through here.
  */
 export function markerPolicyMode(config) {
   const configured = config?.commitTrailerPolicy;
-  return COMMIT_MESSAGE_POLICY_MODES.includes(configured) ? configured : "off";
+  return COMMIT_MESSAGE_POLICY_MODES.includes(configured) ? configured : "blocking";
 }

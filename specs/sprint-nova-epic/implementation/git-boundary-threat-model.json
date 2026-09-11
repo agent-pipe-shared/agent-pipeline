@@ -4,7 +4,7 @@
     "commit": "1fa85422f66646857296fb605e094f8774af00ce",
     "tree": "55e5b1fc5d2e58ac8352453f92590a10335f64a8"
   },
-  "policyRevision": "nova-b-git-boundary-v1",
+  "policyRevision": "nova-b-git-boundary-v2",
   "classification": "public",
   "entities": [
     {

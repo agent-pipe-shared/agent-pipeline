@@ -156,10 +156,11 @@ check("CMP13 a non-commit git command is untouched", () => {
   assert.equal(result.inspected, false);
 });
 
-// CMP14 -- unknown or absent config reads as off; the convention half is opt-in.
-check("CMP14 the marker policy defaults to off on anything unrecognised", () => {
-  assert.equal(markerPolicyMode(undefined), "off");
-  assert.equal(markerPolicyMode({ commitTrailerPolicy: "nonsense" }), "off");
+// CMP14 -- unknown or absent config fails closed to the mandatory all-project rule.
+check("CMP14 the marker policy defaults to blocking unless explicitly weakened", () => {
+  assert.equal(markerPolicyMode(undefined), "blocking");
+  assert.equal(markerPolicyMode({ commitTrailerPolicy: "nonsense" }), "blocking");
+  assert.equal(markerPolicyMode({ commitTrailerPolicy: "off" }), "off");
   assert.equal(markerPolicyMode({ commitTrailerPolicy: "blocking" }), "blocking");
   assert.equal(markerPolicyMode({ commitTrailerPolicy: "warn" }), "warn");
 });

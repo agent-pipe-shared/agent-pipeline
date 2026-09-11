@@ -1,4 +1,5 @@
 {
+  "commitTrailerPolicy": "blocking",
   "protectedTestPaths": [
     {
       "id": "TP-1",

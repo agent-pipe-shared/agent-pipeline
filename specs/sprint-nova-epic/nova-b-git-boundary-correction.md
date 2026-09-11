@@ -11,7 +11,7 @@ ADR-0079 and the canonical backlog. It does not redefine the approved epic.
   route.
 - Commit-message policy parses the final contiguous Git trailer block rather
   than searching arbitrary body text.
-- When `commitTrailerPolicy` is `warn` or `blocking`, an agent-authored commit
+- By default, and when `commitTrailerPolicy` is `blocking`, an agent-authored commit
   message must contain exactly one `AI-Assisted: true` trailer and exactly one
   grounded `Dispatch:` trailer in that final block.
 - `warn` reports provenance convention findings without blocking; `blocking`
@@ -47,9 +47,9 @@ reopens the ADR-0079 risk.
 
 ## Deliberate residual scope
 
-This slice provides and recommends the blocking commit-trailer policy. It does
-not migrate existing project-local guard configurations automatically. The
-backlog item about missing stage-0 provenance remains open until activation and
-migration behavior is separately completed and verified. The Pipeline team
-owns that residual work and must complete or explicitly re-evaluate it by
-2026-09-30; the date is not an automatic exception or extension.
+This slice makes the blocking commit-trailer policy the runner-neutral default
+for agent tool calls, including consuming repositories without a project-local
+guard configuration. Existing projects may explicitly select `warn` for a
+dated migration or `off` as an opt-out. The repository's two authority-tier
+guard configurations also state `blocking` explicitly so their intended policy
+is visible without relying on the default.

@@ -62,8 +62,13 @@ function runGuard(command, projectDir, envOverride = {}) {
   return { code: res.status, stderr: res.stderr ?? "" };
 }
 
-// Hermetic default project dir (no guard-config → pure union).
+// Hermetic default project dir for tests unrelated to provenance. Those cases
+// opt out explicitly so the mandatory GIT-03 default cannot mask the rule each
+// case is intended to exercise.
 const EMPTY_DIR = mkdtempSync(join(tmpdir(), "guard-test-empty-"));
+mkdirSync(join(EMPTY_DIR, ".claude"), { recursive: true });
+writeFileSync(join(EMPTY_DIR, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off" }));
+const NO_CONFIG_DIR = mkdtempSync(join(tmpdir(), "guard-test-no-config-"));
 
 let pass = 0;
 const failures = [];
@@ -278,10 +283,10 @@ check("CFG block  union still active despite broken config", "git push --force o
 
 // ---- Config case 3: missing file → silent, union only ------------------------------------------
 check("CFG allow  missing config is silent (no warning)", "git status", ALLOW, {
-  projectDir: EMPTY_DIR,
+  projectDir: NO_CONFIG_DIR,
   stderrEmpty: true,
 });
-check("CFG block  union active without any config", "git add secrets.yaml", BLOCK, { projectDir: EMPTY_DIR });
+check("CFG block  union active without any config", "git add secrets.yaml", BLOCK, { projectDir: NO_CONFIG_DIR });
 
 // ---- P4-01: guard override mechanism (double-confirmation, one-time) --------------------------
 // Ledger-bearing dir: .claude/ pre-created so appendFileSync into guard-override.log.jsonl succeeds.
@@ -759,7 +764,10 @@ for (const [rule, command] of [
 const GIT03_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-"));
 writeFileSync(join(GIT03_DIR, "dirty.txt"),
   "feat(x): a thing\n\nAI-Assisted: true\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01Fx\n");
-writeFileSync(join(GIT03_DIR, "clean.txt"), "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\n");
+writeFileSync(join(GIT03_DIR, "clean.txt"),
+  "feat(x): a thing\n\nWhy it matters.\n\nDispatch: NVA-GIT03 (goldfish)\nAI-Assisted: true\n");
+writeFileSync(join(GIT03_DIR, "human.txt"),
+  "feat: pair work\n\nDispatch: NVA-GIT03 (goldfish)\nAI-Assisted: true\nCo-Authored-By: Jane Roe <jane@example.org>\n");
 // GIT03_OUTSIDE_DIR is a sibling of the project root, the shape of an agent's own scratch
 // directory -- the ordinary place a commit message gets composed, and the exact path class
 // that made this rule's "no override" claim untrue before F3.
@@ -777,7 +785,7 @@ check("GIT03-3 block  an inline session trailer", 'git commit -m "fix: y" -m "Se
 });
 // A human co-author is legitimate; a rule that refused all co-authorship would be turned
 // off by the people it is meant to protect.
-check("GIT03-4 allow  a human co-author", 'git commit -m "feat: pair work" -m "Co-Authored-By: Jane Roe <jane@example.org>"', ALLOW, {
+check("GIT03-4 allow  a human co-author", "git commit -F human.txt", ALLOW, {
   projectDir: GIT03_DIR,
 });
 // The correlation half is not overridable. The override mechanism exists for rules whose
@@ -787,10 +795,11 @@ check("GIT03-5 block  an armed override does not open the correlation rule",
     projectDir: GIT03_DIR,
     stderrIncludes: ["GIT-03-PROVIDER-COAUTHOR"],
   });
-// The marker half is a convention, so it stays off unless the project asks for it --
-// otherwise every ordinary commit in every consumer project would start failing.
-check("GIT03-6 allow  a missing marker is not enforced by default", 'git commit -m "chore: bump"', ALLOW, {
-  projectDir: GIT03_DIR,
+// Agent-issued commits use the mandatory all-project provenance rule even when
+// the consuming repository has no guard-config yet.
+check("GIT03-6 block  a missing marker is enforced by default", 'git commit -m "chore: bump"', BLOCK, {
+  projectDir: NO_CONFIG_DIR,
+  stderrIncludes: ["GIT-03-DISPATCH-MISSING", "GIT-03-MARKER-MISSING"],
 });
 // GIT03-7 -- F3, 2026-08-06 Critic round. Before this fix, a -F path outside projectDir made
 // commitMessageFindings' readFile throw, the throw was swallowed, and the commit went
@@ -1311,6 +1320,10 @@ function gg22CommitLedgerTouch(root, message = "chore: reconcile backlog ledger"
   gitIn(root)("commit", "--quiet", "-m", message);
 }
 function gg22StageFile(root, relPath, body) {
+  // These fixtures isolate GG-22. Keep the independent GIT-03 default from
+  // masking the rule and remediation text each case is designed to exercise.
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({ commitTrailerPolicy: "off" }));
   const segments = relPath.split("/").slice(0, -1);
   if (segments.length > 0) mkdirSync(join(root, ...segments), { recursive: true });
   writeFileSync(join(root, relPath), body);
@@ -1513,7 +1526,7 @@ check(
 );
 
 // ---- Summary -------------------------------------------------------------------------------------
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, GIT03_DIR, GIT03_OUTSIDE_DIR, GIT03_BLOCKING_DIR, GIT03_WARN_DIR, ...SIGNED_ROOTS]) {
+for (const dir of [EMPTY_DIR, NO_CONFIG_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, GIT03_DIR, GIT03_OUTSIDE_DIR, GIT03_BLOCKING_DIR, GIT03_WARN_DIR, ...SIGNED_ROOTS]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
