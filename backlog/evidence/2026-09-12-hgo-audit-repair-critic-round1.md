@@ -40,7 +40,9 @@ The implementation therefore remains under correction review. No PASS or
 closure is claimed from this round.
 
 After the review, the coordinator performed the missing read-only live check.
-It passed with 6160 authenticated entries; the exact result is preserved in
+The first read passed with 6160 authenticated entries; a later capture on the
+same day passed with 6165 after five ordinary denial events had been appended.
+The final exact result is preserved in
 `backlog/evidence/2026-09-12-hgo-live-audit-readback.json`. The ledger had
 already been restored before `repair-audit` existed, so the correction does
 not intentionally tear it merely to manufacture a live invocation.

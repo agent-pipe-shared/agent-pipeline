@@ -72,10 +72,15 @@
       "phase": "canonical-validation",
       "toolUseCount": 3,
       "note": "This normalization follow-up used two read commands and one correction command. Imported validateDispatchRecord from plugins/pipeline-core/lib/dispatch-record.mjs accepted the normalized record and its disk readback. git diff --check -- evidence/dispatch-record-NVA-B-HGO-AUDIT-REPAIR-2.json exited 0."
+    },
+    {
+      "phase": "critic-round-two",
+      "toolUseCount": 0,
+      "note": "Current-artifact Critic at 54a20d83a0501de98d522f7d7da7a829ccf16cc1 returned FAIL: final-candidate threat approval and disposition of the historical live-operation wording remain pending; the 6160/6165 sequential-readback wording was clarified. Coordinator transcription: backlog/evidence/2026-09-12-hgo-audit-repair-critic-round2.md. QG-13 permits no third Critic loop."
     }
   ],
   "report": {
-    "text": "Implementation committed as ba2b745b91b6ca5a379dc90bd6c0c28eb324da56. Focused tests: 144/144 passed; syntax: 4/4; scoped diff checks passed. Evidence pointers and commands are retained in log. Fresh read-only live audit verification passed with 6165 entries; no live repair claimed. Rollback and candidate-bound approval wording corrected; Critic round-one FAIL retained as coordinator-authored transcription/disposition, not raw execution evidence. Implementation source and other agents files unchanged. No correction commit or test rerun. T1 correction review, final-candidate threat-model approval, acceptance of the live-state disposition and PO acceptance remain open. Record stays pending with resultSha256 null until a terminal result is bound.",
+    "text": "Implementation committed as ba2b745b91b6ca5a379dc90bd6c0c28eb324da56. Focused tests passed 144/144 on both implementation and correction candidates; syntax and scoped diff checks passed. Fresh read-only live audit verification passed with a final captured 6165 entries; no live repair claimed. Rollback and dated stale-lock ownership are documented. Two independent Critic rounds are exhausted and remain FAIL pending the final-candidate threat-model approval plus PO disposition of the historical live-operation wording. The sequential 6160 then 6165 readbacks are clarified; implementation source is unchanged. Record remains pending with resultSha256 null.",
     "changedFiles": [
       "backlog/evidence/2026-09-12-hgo-audit-repair-critic-round1.md",
       "backlog/evidence/2026-09-12-hgo-live-audit-readback.json",
