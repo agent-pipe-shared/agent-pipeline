@@ -144,3 +144,22 @@ expensive Lektor inside the documentation block, then make release verification
 check only the binding to the reviewed document state. It creates no new PO
 decision. See
 `backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.
+
+## Implementation progress — 2026-09-11
+
+The reader-review skill, two-stage protocol, committed binding checker and
+source release-preflight consumer are present and focused-green. The remaining
+operator-discovery gap is now closed: both release-flow copies name the shipped
+`pipeline-core:reader-review` workflow and state that preflight consumes only
+its committed binding. Their registered contract test pins the shipped runner
+inventory plus feature/candidate admission, two distinct fresh readers,
+restart after a covered-document change, and final `record.json` checker PASS.
+
+The focused document contract passed 10/10 and the independent correction
+Critic returned PASS with no findings. See
+`backlog/evidence/2026-09-11-reader-review-release-workflow-pass.md`.
+
+This item remains open until its separately accepted prerequisite,
+`pipeline.complete-adr-governs-coverage-before-reader-review-binding`, has its
+final source-candidate reconciliation and review rather than only complete
+accepted-ADR declarations.
