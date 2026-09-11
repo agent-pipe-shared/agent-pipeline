@@ -98,3 +98,20 @@ them to one `test(...)` per case is a third direction and possibly the simplest.
   that today records only an exit code
 - `guardrails/quality-gates.md` — QG-01, which the process half of the 2026-09-03
   instance engages
+
+## Implementation progress — 2026-09-11
+
+The measured `local-worker-supervisor.test.mjs` instance now registers LWS01
+through LWS15 as separate `node:test` cases. Its regression probe deliberately
+fails LWS07 in a child and records callback execution over a separate inherited
+file descriptor; it requires the exact ordered sequence LWS01 through LWS15.
+This avoids relying on the test reporter stream and proves later cases really
+ran rather than merely being registered.
+
+The normal registered invocation is green. An independent correction Critic
+also recreated the injected failure: exit status 1, with all 15 callback IDs
+present in order, and returned PASS with no findings. See
+`backlog/evidence/2026-09-11-local-worker-supervisor-complete-corpus.md`.
+
+The item remains open while the repository-wide population described above is
+quantified and any remaining single-test/many-check suites are dispositioned.
