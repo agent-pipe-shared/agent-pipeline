@@ -6,7 +6,7 @@
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced | open | defect | pipeline | 2026-09-01 | — |
-| pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | open | defect | pipeline | 2026-08-31 | — |
+| pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | closed | defect | pipeline | 2026-08-31 | — |
 | pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.a-critic-has-no-writable-location-for-its-own-report | closed | defect | pipeline | 2026-09-01 | — |
@@ -113,7 +113,7 @@
 | pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names | open | defect | pipeline | 2026-09-02 | — |
 | pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook | open | defect | pipeline | 2026-08-29 | Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate. |
+| pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook | closed | defect | pipeline | 2026-08-29 | Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate. |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-greenfield-run-happy-path-findings | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | closed | idea | pipeline | 2026-08-05 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 86
+- open: 84
 - in_progress: 0
-- closed: 554
+- closed: 556
 - rejected: 3
 - deferred: 11

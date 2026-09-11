@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "802d4b379c6c133821bc945c65e1bc8bd57c9593718d365a0b1a09c3db73223f"
+    "transitionHead": "3f5719ff7f72f5bc36cf339ea7b85bdd11b9a51143999bc1d8b82f4609dfff66"
   },
   "counts": {
-    "open": 86,
+    "open": 84,
     "in_progress": 0,
-    "closed": 554,
+    "closed": 556,
     "rejected": 3,
     "deferred": 11
   },
@@ -24,12 +24,16 @@
     },
     {
       "id": "pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-31",
       "source": "Observed live on 2026-08-31 during release preparation. The Elephant captured a Resume-Hint card for compact safety; the next full verify.mjs run went red on resume-consumption-check, and push-prepare.mjs requires green candidate-bound verify evidence.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "b757f6a6f8321ac607e4765c2480173242a4eca3",
+      "closureEvidence": "backlog/evidence/2026-09-11-resume-delivery-gate-closure.md"
     },
     {
       "id": "pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals",
@@ -1330,13 +1334,17 @@
     },
     {
       "id": "pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "Found while root-causing 2026-08-29-codex-restart-context-loss-needs-a-different-approach-not-harder-enforcement.md (point 5 of its root-cause note).",
       "deferred": false,
-      "tracking": "Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate."
+      "tracking": "Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "a8bd954dd61ebedd206f94f1d53fe6da1d2d2f5b",
+      "closureEvidence": "backlog/evidence/2026-09-11-claude-resume-hint-hook-closure.md"
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
