@@ -1080,7 +1080,9 @@
         "plugins/pipeline-core/skills/reader-review/SKILL.md"
       ],
       "testEvidence": [
+        "harness/scripts/check-doc-contracts.test.mjs",
         "plugins/pipeline-core/scripts/github-issue-operations.test.mjs",
+        "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
         "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs"
       ],
       "targets": [
