@@ -215,3 +215,20 @@ authorize expanding the CI allowlist. Its replacement needs the ordinary
 item-content/ledger rescope procedure, and is not silently changed here.
 Status stays open because this local probe does not satisfy actual CI evidence.
 No push, CI job, workflow mutation or item closure was performed.
+
+### Current-candidate recheck — 2026-09-11
+
+The last red `main` Verify was re-identified as GitHub Actions run
+`33595311782`, job `100137458431`, on commit `6262d408` (503/506). Its three
+failures were the editor shim in this item, the transient Git
+`maintenance.lock` snapshot race, and the local-worker heartbeat digest race.
+The current branch contains their respective corrections (`216ff054`,
+`ae8da7b8`, `91f9bc45` plus `fc04dbc8`).
+
+All three focused suites passed again under an exactly reconstructed five-tool
+CI PATH: 1/1 rebase case, 30/30 onboarding cases and 10/10 supervisor CLI
+cases. This confirms that the old run's failures are no longer reproducible in
+the current source. It still does not satisfy this item's actual-CI criterion
+or prove the much larger current candidate; the item remains open until a new
+push-bound run is observed. See
+`backlog/evidence/2026-09-11-main-verify-33595311782-recheck.md`.
