@@ -129,6 +129,7 @@ the PO is recalling can actually be found/reconstructed.
   exercised and evidenced on its intended host. WSL results must not be used
   to claim native-sandbox readiness.
 - **Assignment:** future native-Windows Codex sandbox hardening
+- **Review expiry:** 2026-12-15 — re-triage date, not a delivery promise
 - **Date:** 2026-09-11
 
 ## Critic review (delta `c1d0a447^..4955c0ca`), 2026-08-30

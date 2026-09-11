@@ -95,4 +95,5 @@ fresh-session Critic route does not depend on this installed Selected route.
   supported autonomous route. Revisit when the lane can be exercised on
   native Windows without treating WSL behavior as proof.
 - **Assignment:** future native-Windows Codex sandbox hardening
+- **Review expiry:** 2026-12-15 — re-triage date, not a delivery promise
 - **Date:** 2026-09-11

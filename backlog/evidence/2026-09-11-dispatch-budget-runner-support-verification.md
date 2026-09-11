@@ -15,16 +15,18 @@ canonical and vendored templates now state the measured support boundary:
 
 This package does not claim native Codex sandbox or App-Server acceptance.
 Those host-specific checks are deferred to the dedicated native-Windows work
-package.
+package. The deferred risk owner is `pipeline`; its expiry is a mandatory
+re-triage on 2026-12-15. This date is a review deadline, not a promised
+delivery date.
 
 ## Focused verification
 
-- `node --test plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs plugins/pipeline-core/lib/dispatch-budget-core.test.mjs` — 45 passed, 0 failed (host-bound because the WSL workspace sandbox blocks the suite's child processes).
-- `node plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs` — 4 passed, 0 failed.
-- `node plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` — 4 passed, 0 failed after re-pinning the changed Critic contract.
-- `node harness/scripts/check-doc-contracts.mjs` — valid.
-- `node harness/scripts/check-critic-contract-citations.mjs` — 8 classes green.
-- `git diff --check` — clean.
+- `node --test plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs plugins/pipeline-core/lib/dispatch-budget-core.test.mjs` — exit 0; 45 passed, 0 failed (host-bound because the WSL workspace sandbox blocks the suite's child processes).
+- `node plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs` — exit 0; 4 passed, 0 failed.
+- `node plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` — exit 0; 4 passed, 0 failed after re-pinning the changed Critic contract.
+- `node harness/scripts/check-doc-contracts.mjs` — exit 0; valid.
+- `node harness/scripts/check-critic-contract-citations.mjs` — exit 0; 8 classes green.
+- `git diff --check` — exit 0; clean.
 
 The two open Nova B budget items remain open because cross-runner live adapters
 and estimate calibration are separate implementation work.

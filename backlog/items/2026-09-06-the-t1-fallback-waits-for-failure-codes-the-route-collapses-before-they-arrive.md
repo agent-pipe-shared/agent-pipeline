@@ -106,4 +106,5 @@ should be wired on an agent's judgment.
   claim would be misleading. The ordinary fresh-session Critic remains the
   supported autonomous route meanwhile.
 - **Assignment (if accepted):** future native-Windows Codex sandbox hardening
+- **Review expiry:** 2026-12-15 — re-triage date, not a delivery promise
 - **Date:** 2026-09-11
