@@ -1,0 +1,28 @@
+{
+  "schema": "pipeline.focused-test-evidence.v1",
+  "candidate": {
+    "commit": "949eb2e8afcd2ed5890fae937a6e24e99fa83e4b",
+    "tree": "33500912efeb484e084f82f0ab7b32775a9628f1"
+  },
+  "command": [
+    "/home/skar667/.local/opt/node-v24.15.0-linux-x64/bin/node",
+    "--test",
+    "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+  ],
+  "startedAt": "2026-09-11T05:50:17.704Z",
+  "completedAt": "2026-09-11T05:51:13.477Z",
+  "durationMs": 55771,
+  "exitCode": 0,
+  "signal": null,
+  "statusBefore": "",
+  "statusAfter": "",
+  "stdoutSha256": "c0f527d64a6b978b796a91c2c83bc14f24d47befc7f46346c0758c8ce84ee3a9",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "relevantOutput": [
+    "project-onboarding-v3: 166 passed, 0 failed",
+    "ℹ tests 1",
+    "ℹ pass 1",
+    "ℹ fail 0",
+    "ℹ skipped 0"
+  ]
+}

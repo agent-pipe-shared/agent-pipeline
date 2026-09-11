@@ -92,6 +92,48 @@ that write under `.git/agent-pipeline/**`
 This item stays open: the regression it names is measured, not resolved, and
 the between-releases wall-clock measurement it asks for still does not exist.
 
+## Profile and first implementation — 2026-09-11
+
+The remaining internal cost of `project-onboarding-v3-tests` is now reduced at
+its source. A clean run of the unchanged 166-case suite at `949eb2e8` took
+55.771s. Commit `72617333` gives the direct entry point four deterministic Node
+child shards; every declared case is assigned by declaration index modulo four,
+imports remain inert, partial child execution is labelled explicitly, and the
+parent fails on any child error, signal, or non-zero exit. The same 166 cases
+then took 16.930s, with 166 passed and zero failed in both measurements. That is
+a 69.6% reduction for this suite on the same machine and command.
+
+The exact-candidate full Verify at `72617333` passed 520/520 fresh steps. Under
+that pool load the suite took 20.669s; the full gate took 190.374s. The suite
+result therefore reduces compute and pool pressure, but it is not a claim that
+the entire gate became 69.6% faster. The serial lane still determines the full
+gate's critical path.
+
+Durable method, bindings, raw-output hashes, and limitations are recorded in
+`backlog/evidence/2026-09-11-project-onboarding-v3-sharding.md` and its linked
+machine evidence.
+
+## Wall-clock boundary decision
+
+Release-mode full Verify is the regular measurement boundary. Each such run
+already records exact candidate binding, `startedAt`, `finishedAt`, and every
+suite duration; release evidence must use those fields to report total wall
+clock and the leading suites. Ordinary implementation and Critic verification
+remain impact-scoped, because forcing a full run at those boundaries would
+reintroduce the cost this work is reducing. No blocking duration threshold is
+set from a single newer sample; the release series supplies the stable baseline
+needed for a later threshold.
+
+The historical 419s → 571.4s change has two distinguishable components. The
+registered suite set grew from 385 to 505 (+120), while
+`project-onboarding-v3-tests` grew from 116.5s to 157.0s (+40.5s). The named
+suite accounts for about 27% of the 152.4s wall-clock regression because it was
+then serial. Added suites and other serial-lane growth account for the remaining
+change, but the existing artifacts do not justify a finer numeric attribution.
+
+This item remains open until the residual serial critical path is assessed and
+the release-boundary trend is exercised by subsequent release evidence.
+
 ## Why "sort out old test cases" is not the remedy
 
 Raised by the PO on 2026-09-01 as the intuitive fix. The distribution rules it

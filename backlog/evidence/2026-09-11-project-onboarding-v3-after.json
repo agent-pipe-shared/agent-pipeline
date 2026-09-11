@@ -1,0 +1,32 @@
+{
+  "schema": "pipeline.focused-test-evidence.v1",
+  "candidate": {
+    "commit": "72617333eb5fe0fa0740fe0e174c87759b3eca31",
+    "tree": "3a0c5d4b251307a19ee43873b6d79c876fce631d"
+  },
+  "command": [
+    "/home/skar667/.local/opt/node-v24.15.0-linux-x64/bin/node",
+    "--test",
+    "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+  ],
+  "startedAt": "2026-09-11T05:49:17.742Z",
+  "completedAt": "2026-09-11T05:49:34.673Z",
+  "durationMs": 16930,
+  "exitCode": 0,
+  "signal": null,
+  "statusBefore": "",
+  "statusAfter": "",
+  "stdoutSha256": "bf7d5b1d803a255737d49d0b9c29be6725812c259791f3680b014f5b20790051",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "relevantOutput": [
+    "project-onboarding-v3 shard 3/4: 41 passed, 0 failed",
+    "project-onboarding-v3 shard 1/4: 42 passed, 0 failed",
+    "project-onboarding-v3 shard 2/4: 42 passed, 0 failed",
+    "project-onboarding-v3 shard 4/4: 41 passed, 0 failed",
+    "project-onboarding-v3: 166 cases across 4 shards, 0 shards failed",
+    "ℹ tests 1",
+    "ℹ pass 1",
+    "ℹ fail 0",
+    "ℹ skipped 0"
+  ]
+}
