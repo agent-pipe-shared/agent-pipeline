@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
+closed_at: "2026-09-11"
+closure_repository: self
+closure_commit: "306f85603be8256397338a3588c2b29db8d46010"
+closure_evidence: "backlog/evidence/2026-09-11-commit-message-hook-correction-critic-pass.md"
 sprint: nova-b
 done_when: manual
 source: "Critic round J, finding F-1, 2026-09-01, reviewing commits ccc7df84 and 25c51c90. Verified independently by the Elephant against git's own trailer parser before filing."
@@ -217,3 +221,19 @@ enforcing has to answer "is this commit bound to evidence at all", not merely
 
 Amending is unavailable — the ten are stacked, and history rewriting is
 prohibited outright. They stay unbound.
+
+## Closure — 2026-09-11
+
+The commit boundary now validates the finished message with Git's own trailer
+parser before accepting it. Onboarding installs the repository-local
+`commit-msg` shim, malformed or missing `AI-Assisted: true` and `Dispatch:`
+trailers fail closed, and a path containing whitespace, apostrophes, a newline,
+shell substitutions or variable syntax remains one quoted executable word.
+
+Focused installer, Git-guard and message-policy suites passed. The first
+Critic found the generated-shell-path quoting defect; commit `306f8560`
+corrected it and the fresh correction Critic returned PASS with no findings.
+The added Verify surface is registered and its product-inventory delta is
+independently attested by `cb65d059`. Historical malformed commits remain
+unchanged under GIT-04; closure prevents recurrence rather than rewriting
+history.
