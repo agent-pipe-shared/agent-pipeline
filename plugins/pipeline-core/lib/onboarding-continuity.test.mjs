@@ -169,6 +169,51 @@ function digest(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function sharedCloseEvidenceDamage(root, { secondPath = null, missing = false } = {}) {
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "closed"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "closed handover\n");
+  const evidencePath = "specs/closed/shared-close-evidence.md";
+  const otherPath = secondPath ?? evidencePath;
+  const currentEvidence = Buffer.from("current close evidence\n", "utf8");
+  if (!missing) writeFileSync(join(root, evidencePath), currentEvidence);
+  if (otherPath !== evidencePath) writeFileSync(join(root, otherPath), "other current evidence\n");
+  const closedAt = "2026-09-06T12:00:00.000Z";
+  const entries = ["older-feature", "newer-feature"].map((id, index) => {
+    const resultPath = `specs/closed/${id}-result.md`;
+    const resultBytes = Buffer.from(`${id} result\n`, "utf8");
+    writeFileSync(join(root, resultPath), resultBytes);
+    const path = index === 0 ? evidencePath : otherPath;
+    return {
+      id,
+      planPath: `specs/${id}/prd.md`,
+      phaseAtClose: "implementation",
+      closedAt: index === 0 ? "2026-09-06T11:00:00.000Z" : closedAt,
+      closedBy: "PO",
+      forCommit: null,
+      continuityClose: {
+        schema: "pipeline.continuity-close.v0",
+        featureId: id,
+        expectedRevision: index + 1,
+        result: { path: resultPath, sha256: digest(resultBytes) },
+        closeEvidence: {
+          path,
+          sha256: index === 0 ? digest("superseded close evidence\n") : digest(path === evidencePath ? currentEvidence : "other current evidence\n"),
+        },
+      },
+    };
+  });
+  const state = {
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: closedAt,
+    closedFeatures: entries,
+  };
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  return { statePath, evidencePath, currentEvidence };
+}
+
 check("pristine requires all three continuity sources to be absent", () => {
   const root = fixture("pristine");
   assert.deepEqual(classifyOnboardingContinuity({ rootDir: root }), {
@@ -1067,6 +1112,285 @@ check("bounded repair normalizes only the invalid active-turn resume pair", () =
   assert.equal(applied.status, "applied");
   assert.equal(applied.continuity.status, "valid");
   assert.deepEqual(readFileSync(historyPath), historyBefore);
+});
+
+check("shared close-evidence damage is diagnosed and repaired without changing evidence bytes", () => {
+  const root = fixture("repair-shared-close-evidence");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const stateBefore = readFileSync(damaged.statePath);
+  const originalState = JSON.parse(stateBefore);
+  const evidenceBefore = readFileSync(join(root, damaged.evidencePath));
+  const classified = classifyOnboardingContinuity({ rootDir: root });
+  assert.equal(classified.status, "damaged");
+  assert.equal(classified.diagnosis.status, "repairable");
+  assert.equal(classified.diagnosis.path, damaged.evidencePath);
+  assert.equal(classified.diagnosis.claimants.length, 2);
+  assert.deepEqual(classified.diagnosis.claimants.map((claimant) => claimant.status), ["mismatching", "matching"]);
+  assert.equal(classified.diagnosis.claimants[0].jsonPointer,
+    "/closedFeatures/0/continuityClose/closeEvidence");
+
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.reason, "repair-shared-close-evidence-path");
+  assert.equal(plan.diagnosis.observedSha256, digest(evidenceBefore));
+  assert.deepEqual(planOnboardingContinuityRepair({ rootDir: root }), plan,
+    "read-only replanning must bind the identical repair postimage");
+  assert.equal(plan.target.afterSha256, digest(`${JSON.stringify(plan.target.value, null, 2)}\n`));
+  const applied = applyOnboardingContinuityRepair({
+    rootDir: root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.continuity.status, "valid");
+  assert.deepEqual(readFileSync(join(root, damaged.evidencePath)), evidenceBefore,
+    "repair must leave the shared evidence bytes unchanged");
+  const repaired = JSON.parse(readFileSync(damaged.statePath, "utf8"));
+  assert.equal(repaired.closedFeatures[0].continuityClose, undefined);
+  assert.equal(repaired.closedFeatures[1].continuityClose.closeEvidence.sha256, digest(evidenceBefore));
+  assert.equal(repaired.stateRepairs.length, 1);
+  assert.equal(repaired.stateRepairs[0].planSha256, plan.planSha256);
+  assert.equal(repaired.stateRepairs[0].stateBeforeSha256, digest(stateBefore));
+  assert.equal(repaired.stateRepairs[0].sourceUpdatedAt, originalState.updatedAt);
+  assert.deepEqual(repaired.stateRepairs[0].affectedFeatureIds, ["newer-feature", "older-feature"]);
+  assert.equal(repaired.stateRepairs[0].quarantinedAssertions[0].formerAssertion.closeEvidence.sha256,
+    digest("superseded close evidence\n"));
+  assert.deepEqual(repaired.stateRepairs[0].quarantinedAssertions[0].formerAssertion,
+    originalState.closedFeatures[0].continuityClose);
+  delete originalState.closedFeatures[0].continuityClose;
+  assert.deepEqual({ ...repaired, stateRepairs: undefined }, { ...originalState, stateRepairs: undefined },
+    "only mismatching assertions and the appended audit record may change");
+  assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
+});
+
+check("shared evidence repair keeps the sole matching claimant regardless of age and quarantines every mismatch", () => {
+  const root = fixture("repair-shared-multiple-losers");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const state = JSON.parse(readFileSync(damaged.statePath));
+  state.closedFeatures[0].continuityClose.closeEvidence.sha256 = digest(damaged.currentEvidence);
+  state.closedFeatures[1].continuityClose.closeEvidence.sha256 = digest("outdated second proof\n");
+  const third = structuredClone(state.closedFeatures[1]);
+  third.id = "third-feature";
+  third.continuityClose.featureId = third.id;
+  state.closedFeatures.push(third);
+  writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const repaired = JSON.parse(readFileSync(damaged.statePath));
+  assert.deepEqual(repaired.closedFeatures[0], state.closedFeatures[0]);
+  assert.equal(repaired.closedFeatures[1].continuityClose, undefined);
+  assert.equal(repaired.closedFeatures[2].continuityClose, undefined);
+  assert.deepEqual(repaired.stateRepairs[0].affectedFeatureIds, ["older-feature", "newer-feature", "third-feature"]);
+  assert.deepEqual(readFileSync(join(root, damaged.evidencePath)), damaged.currentEvidence);
+});
+
+check("shared close-evidence repair refuses missing, unrelated, and ambiguous evidence", () => {
+  const missingRoot = fixture("repair-shared-close-missing");
+  sharedCloseEvidenceDamage(missingRoot, { missing: true });
+  const missing = planOnboardingContinuityRepair({ rootDir: missingRoot });
+  assert.equal(missing.status, "unsupported");
+  assert.equal(missing.code, "CONTINUITY-REPAIR-EVIDENCE-MISSING");
+
+  const unrelatedRoot = fixture("repair-shared-close-unrelated");
+  const unrelated = sharedCloseEvidenceDamage(unrelatedRoot);
+  writeFileSync(join(unrelatedRoot, "specs", "closed", "newer-feature-result.md"), "drifted result\n");
+  const unrelatedPlan = planOnboardingContinuityRepair({ rootDir: unrelatedRoot });
+  assert.equal(unrelatedPlan.status, "unsupported");
+  assert.equal(unrelatedPlan.code, "CONTINUITY-REPAIR-UNRELATED-ARTIFACT-INVALID");
+
+  const ambiguousRoot = fixture("repair-shared-close-ambiguous");
+  const ambiguous = sharedCloseEvidenceDamage(ambiguousRoot);
+  const state = JSON.parse(readFileSync(ambiguous.statePath, "utf8"));
+  state.closedFeatures.push(structuredClone(state.closedFeatures[1]));
+  state.closedFeatures[2].id = "third-feature";
+  state.closedFeatures[2].continuityClose.featureId = "third-feature";
+  state.closedFeatures[2].continuityClose.closeEvidence.sha256 = digest(ambiguous.currentEvidence);
+  writeFileSync(ambiguous.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const ambiguousPlan = planOnboardingContinuityRepair({ rootDir: ambiguousRoot });
+  assert.equal(ambiguousPlan.status, "unsupported");
+  assert.equal(ambiguousPlan.code, "CONTINUITY-REPAIR-CLAIMANT-AMBIGUOUS");
+});
+
+check("shared evidence diagnosis refuses zero matching claims, multiple groups, and independent stale claims", () => {
+  for (const variant of ["zero-matches", "multiple-groups", "independent-stale"]) {
+    const root = fixture(`repair-${variant}`);
+    const damaged = sharedCloseEvidenceDamage(root);
+    const state = JSON.parse(readFileSync(damaged.statePath));
+    if (variant === "zero-matches") {
+      state.closedFeatures[1].continuityClose.closeEvidence.sha256 = digest("unmatched proof\n");
+    } else {
+      writeFileSync(join(root, "specs/closed/other-evidence.md"), "other proof\n");
+      for (let index = 0; index < (variant === "multiple-groups" ? 2 : 1); index += 1) {
+        const extra = structuredClone(state.closedFeatures[1]);
+        extra.id = `extra-${index}`;
+        extra.continuityClose.featureId = extra.id;
+        extra.continuityClose.closeEvidence = { path: "specs/closed/other-evidence.md", sha256: digest("stale other proof\n") };
+        state.closedFeatures.push(extra);
+      }
+    }
+    writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const before = readFileSync(damaged.statePath);
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    assert.equal(plan.status, "unsupported", variant);
+    assert.equal(plan.diagnosis.status, "refused", "claimant details must not overwrite refusal status");
+    assert.equal(plan.code, variant === "zero-matches" ? "CONTINUITY-REPAIR-CLAIMANT-AMBIGUOUS"
+      : variant === "multiple-groups" ? "CONTINUITY-REPAIR-SHARED-PATH-AMBIGUOUS"
+        : "CONTINUITY-REPAIR-UNRELATED-ARTIFACT-INVALID");
+    assert.deepEqual(readFileSync(damaged.statePath), before);
+  }
+});
+
+check("shared evidence repair refuses unsafe paths and malformed unrelated state without writing", () => {
+  for (const variant of ["traversal", "symlink", "directory", "discarded", "coordinator", "repair-record"]) {
+    const root = fixture(`repair-unsafe-${variant}`);
+    const damaged = sharedCloseEvidenceDamage(root);
+    const state = JSON.parse(readFileSync(damaged.statePath));
+    if (variant === "traversal") {
+      for (const entry of state.closedFeatures) entry.continuityClose.closeEvidence.path = "../outside.md";
+    } else if (variant === "symlink" || variant === "directory") {
+      rmSync(join(root, damaged.evidencePath));
+      if (variant === "symlink") symlinkSync("newer-feature-result.md", join(root, damaged.evidencePath));
+      else mkdirSync(join(root, damaged.evidencePath));
+    } else if (variant === "discarded") state.discardedFeatures = [{}];
+    else if (variant === "coordinator") state.closedFeatures[0].coordinatorClose = {};
+    else state.stateRepairs = [{}];
+    writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const before = readFileSync(damaged.statePath);
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    assert.equal(plan.status, "unsupported", variant);
+    assert.equal(plan.code, ["traversal", "symlink", "directory"].includes(variant)
+      ? "CONTINUITY-REPAIR-EVIDENCE-PATH-UNSAFE" : "CONTINUITY-REPAIR-UNRELATED-STATE-INVALID", variant);
+    assert.deepEqual(readFileSync(damaged.statePath), before);
+  }
+});
+
+check("shared evidence repair rejects forged audit relationships after a successful repair", () => {
+  const root = fixture("repair-audit-tampering");
+  const damaged = sharedCloseEvidenceDamage(root);
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const valid = JSON.parse(readFileSync(damaged.statePath));
+  for (const tamper of [
+    (record) => { record.quarantinedAssertions[0].formerAssertion.closeEvidence.sha256 = record.evidence.observedSha256; },
+    (record) => { record.quarantinedAssertions[0].jsonPointer = record.preservedClaimant.jsonPointer; },
+    (record) => { record.quarantinedAssertions[0].formerAssertion.featureId = "wrong-feature"; },
+    (record) => { record.preservedClaimant.expectedSha256 = digest("wrong proof"); },
+  ]) {
+    const state = structuredClone(valid);
+    tamper(state.stateRepairs[0]);
+    writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+    assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
+  }
+});
+
+check("shared evidence repair preserves earlier repair records byte-for-byte on another independent repair", () => {
+  const root = fixture("repair-append-only-audit");
+  const damaged = sharedCloseEvidenceDamage(root);
+  let plan = planOnboardingContinuityRepair({ rootDir: root });
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const state = JSON.parse(readFileSync(damaged.statePath));
+  const firstRecord = JSON.stringify(state.stateRepairs[0]);
+  writeFileSync(join(root, "specs/closed/next-evidence.md"), "next proof\n");
+  for (const [index, id] of ["third-feature", "fourth-feature"].entries()) {
+    const entry = structuredClone(state.closedFeatures[1]);
+    entry.id = id;
+    entry.continuityClose.featureId = id;
+    entry.continuityClose.closeEvidence = { path: "specs/closed/next-evidence.md", sha256: digest(index === 0 ? "old next proof\n" : "next proof\n") };
+    state.closedFeatures.push(entry);
+  }
+  writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const repaired = JSON.parse(readFileSync(damaged.statePath));
+  assert.equal(repaired.stateRepairs.length, 2);
+  assert.equal(JSON.stringify(repaired.stateRepairs[0]), firstRecord);
+  assert.deepEqual(repaired.closedFeatures.slice(0, 2), state.closedFeatures.slice(0, 2));
+});
+
+check("shared close-evidence repair reports typed lock and CAS drift refusals without touching evidence", () => {
+  const driftRoot = fixture("repair-shared-close-cas-drift");
+  const drifted = sharedCloseEvidenceDamage(driftRoot);
+  const driftPlan = planOnboardingContinuityRepair({ rootDir: driftRoot });
+  const evidenceBefore = readFileSync(join(driftRoot, drifted.evidencePath));
+  expectKickoffError("CONTINUITY-REPAIR-CAS-DRIFT", () => applyOnboardingContinuityRepair({
+    rootDir: driftRoot,
+    expectedPlanSha256: driftPlan.planSha256,
+    activate: true,
+    deps: {
+      beforeCasRecheck() {
+        const state = JSON.parse(readFileSync(drifted.statePath, "utf8"));
+        state.closedFeatures[0].closedBy = "changed-after-plan";
+        writeFileSync(drifted.statePath, `${JSON.stringify(state, null, 2)}\n`);
+      },
+    },
+  }));
+  assert.deepEqual(readFileSync(join(driftRoot, drifted.evidencePath)), evidenceBefore);
+
+  const lockedRoot = fixture("repair-shared-close-locked");
+  const locked = sharedCloseEvidenceDamage(lockedRoot);
+  const lockedPlan = planOnboardingContinuityRepair({ rootDir: lockedRoot });
+  writeFileSync(`${locked.statePath}.lock`, `${JSON.stringify({
+    schema: "pipeline.continuity-lock.v0",
+    token: "foreign-writer",
+    ownerNonce: "foreign-owner",
+    acquiredAtMs: Date.now(),
+  })}\n`);
+  expectKickoffError("KICKOFF-LOCKED", () => applyOnboardingContinuityRepair({
+    rootDir: lockedRoot,
+    expectedPlanSha256: lockedPlan.planSha256,
+    activate: true,
+  }));
+  assert.deepEqual(readFileSync(join(lockedRoot, locked.evidencePath)), locked.currentEvidence);
+});
+
+check("shared evidence drift before replacement refuses without changing State and cleans the owned temporary", () => {
+  for (const stage of ["beforeCasRecheck", "beforeStateReplace"]) {
+    const root = fixture(`repair-evidence-drift-${stage}`);
+    const damaged = sharedCloseEvidenceDamage(root);
+    const stateBefore = readFileSync(damaged.statePath);
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    expectKickoffError("CONTINUITY-REPAIR-CAS-DRIFT", () => applyOnboardingContinuityRepair({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { [stage]() { writeFileSync(join(root, damaged.evidencePath), "concurrent writer evidence\n"); } },
+    }));
+    assert.deepEqual(readFileSync(damaged.statePath), stateBefore);
+    assert.equal(readFileSync(join(root, damaged.evidencePath), "utf8"), "concurrent writer evidence\n");
+    assert.ok(!existsSync(`${damaged.statePath}.lock`));
+    assert.equal(readdirSync(dirname(damaged.statePath)).some((name) => name.endsWith(".tmp")), false);
+  }
+});
+
+check("shared evidence repair failed readback is typed and committed, even if continuity remains valid", () => {
+  for (const variant of ["state", "evidence"]) {
+    const root = fixture(`repair-readback-${variant}`);
+    const damaged = sharedCloseEvidenceDamage(root);
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    assert.throws(() => applyOnboardingContinuityRepair({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        beforeReadback() {
+          if (variant === "evidence") writeFileSync(join(root, damaged.evidencePath), "concurrent proof\n");
+          else {
+            const state = JSON.parse(readFileSync(damaged.statePath));
+            state.closedFeatures[0].closedBy = "concurrent owner";
+            writeFileSync(damaged.statePath, `${JSON.stringify(state, null, 2)}\n`);
+            assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+          }
+        },
+      },
+    }), (error) => error.code === "CONTINUITY-REPAIR-READBACK-INVALID" && error.committed === true);
+    assert.equal(JSON.parse(readFileSync(damaged.statePath)).stateRepairs.length, 1,
+      "never roll back a committed repair over a later writer");
+    if (variant === "state") assert.deepEqual(readFileSync(join(root, damaged.evidencePath)), damaged.currentEvidence);
+    assert.ok(!existsSync(`${damaged.statePath}.lock`));
+  }
 });
 
 check("legacy adoption is explicit, PO-bound, and does not invent kickoff history", () => {

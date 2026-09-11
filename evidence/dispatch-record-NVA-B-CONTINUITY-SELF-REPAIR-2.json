@@ -1,0 +1,49 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "NVA-B-CONTINUITY-SELF-REPAIR-2",
+  "agentType": "goldfish-deep",
+  "model": "gpt-6-astra",
+  "effort": "xhigh",
+  "rulesetSha": "0.6.2+codex.20260911033523.8593a8a",
+  "dispatcher": "elephant",
+  "candidateCommit": "6e0a558993cd79ac2b0cc99d87a5cc9db23189cc",
+  "resultSha256": null,
+  "outcome": "in-progress",
+  "commits": [],
+  "log": [],
+  "report": {
+    "text": "Implementation and focused validation complete; record awaits the actual commit binding and independent Critic. No commit authored. Corrected refusal status, RFC 6901 pointers, shared evidence observation, audit relationships, full pre-replacement CAS, committed readback failure projection, and agent repair-map actor/schema. Host-bound checks passed: node plugins/pipeline-core/lib/onboarding-continuity.test.mjs (277); node plugins/pipeline-core/lib/project-onboarding-v3.test.mjs (173); node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs plugins/pipeline-core/scripts/repair-map.test.mjs (261); node harness/scripts/check-observation-governance.mjs (197 documents); git diff --check. Initial sandbox attempts were not successful evidence and were superseded by host-bound runs. sourceUpdatedAt records source-State provenance, not repair execution time. Full Verify was not requested for this package.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "plugins/pipeline-core/scripts/repair-map.mjs",
+      "plugins/pipeline-core/scripts/repair-map.test.mjs",
+      "plugins/pipeline-core/scripts/repair-map.schema.json",
+      "docs/adr/0082-bounded-continuity-self-repair.md",
+      "docs/adr/README.md",
+      "governance/observation-doc-governance.json",
+      "evidence/dispatch-record-NVA-B-CONTINUITY-SELF-REPAIR-2.json"
+    ]
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "high",
+      "riskFlag": true,
+      "diff": {
+        "mechanical": false,
+        "architecture": true,
+        "guardrails": true,
+        "security": false
+      }
+    },
+    "appliedRow": "T1",
+    "reason": "State repair and lifecycle-guard authority require independent review of the final committed candidate."
+  }
+}

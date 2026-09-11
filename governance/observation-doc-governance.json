@@ -264,6 +264,7 @@
           "docs/adr/0079-hook-bypass-is-never-agent-overridable.md",
           "docs/adr/0080-parallel-dispatch-slicing-enforcement.md",
           "docs/adr/0081-boundary-aware-impacted-verify.md",
+          "docs/adr/0082-bounded-continuity-self-repair.md",
           "docs/adr/README.md"
         ]
       },

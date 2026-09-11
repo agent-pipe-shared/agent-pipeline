@@ -5580,15 +5580,20 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner, op
       };
     }
     if (plan.status !== "ready") {
+      const repairCode = plan.code ?? "CONTINUITY-REPAIR-UNSUPPORTED";
       return {
         ...observed,
         nextAction: null,
-        diagnostics: [lifecycleDiagnostic(
-          "$.continuity",
-          "continuity_repair_unavailable",
-          "the damaged continuity has no bounded automatic repair",
-          "preserve the artifacts and use the continuity-owning workflow; do not retry plan-repair",
-        )],
+        diagnostics: [{
+          ...lifecycleDiagnostic(
+            "$.continuity",
+            "continuity_repair_refused",
+            `the damaged continuity repair was refused (${repairCode})`,
+            "preserve the artifacts and use the continuity-owning workflow; do not retry plan-repair",
+          ),
+          repairCode,
+          ...(plan.diagnosis === undefined ? {} : { diagnosis: plan.diagnosis }),
+        }],
       };
     }
     return {
@@ -6291,7 +6296,17 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
       spawn: fs.spawnSync,
       operatorAuthority,
     });
-    if (plan.status !== "ready" || plan.planSha256 !== planSha256) return beforeApply;
+    if (plan.status !== "ready" || plan.planSha256 !== planSha256) {
+      return {
+        ...beforeApply,
+        nextAction: null,
+        repairRefusal: {
+          code: plan.code ?? "CONTINUITY-REPAIR-PLAN-DIGEST",
+          message: "continuity repair plan is unavailable or its digest changed; inspect and plan again",
+          committed: false,
+        },
+      };
+    }
     try {
       applyOnboardingContinuityRepair({
         rootDir,
@@ -6301,8 +6316,21 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
         operatorAuthority,
         deps: { spawn: fs.spawnSync },
       });
-    } catch {
-      return v4Inspection(rootDir, fs, intent, runner);
+    } catch (error) {
+      const observed = v4Inspection(rootDir, fs, intent, runner);
+      return {
+        ...observed,
+        // A committed write can still fail durability/readback. A later
+        // inspection being ready must never turn that failed apply into CLI
+        // success or offer an unrelated mutation as its next action.
+        status: "recovery-required",
+        nextAction: null,
+        repairRefusal: {
+          code: typeof error?.code === "string" ? error.code : "CONTINUITY-REPAIR-WRITE-FAILED",
+          message: String(error?.message ?? "continuity repair failed"),
+          committed: error?.committed === true,
+        },
+      };
     }
     return v4Inspection(rootDir, fs, intent, runner);
   }

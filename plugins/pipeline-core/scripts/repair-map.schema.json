@@ -26,7 +26,7 @@
           },
           "by": {
             "type": "string",
-            "enum": ["this-session-human", "attended-operator-outside-session", "attended-author-outside-session", "nobody", "unknown"]
+            "enum": ["this-session-agent", "this-session-human", "attended-operator-outside-session", "attended-author-outside-session", "nobody", "unknown"]
           },
           "command": {
             "type": ["array", "null"],

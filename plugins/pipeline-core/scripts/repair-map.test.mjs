@@ -95,8 +95,6 @@ test("AC-7 (contract): the two structural rows match a fresh drive of their real
   assert.equal(fresh, true, "the representative kernel path fixture must actually be a kernel path");
   assert.ok(kernelRow.reason.includes("true"), "the row's reason must reflect the live predicate result it observed");
   const readyRow = map.rows.find((row) => row.code === "GUARD-LIFECYCLE-NOT-READY");
-  assert.equal(readyRow.command, null);
-  assert.equal(readyRow.liftable, "never");
   const lifecycle = { guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" };
   for (const denials of [[lifecycle], [{ guard: "guard-devplan.mjs", reason: "GUARD-DEVPLAN-NOT-READY" }, lifecycle]]) {
     const routed = recordHumanGuardDenial({
@@ -106,13 +104,17 @@ test("AC-7 (contract): the two structural rows match a fresh drive of their real
     assert.equal(routed.code, "HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY");
   }
   assert.match(readyRow.reason, /non-liftable-recovery-required\/HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY/u);
+  assert.equal(readyRow.liftable, "narrower-recovery");
+  assert.equal(readyRow.by, "this-session-agent");
+  assert.equal(readyRow.command.length, 1);
+  assert.deepEqual(readyRow.command[0].argv.slice(1), ["plan-repair", "--root", ROOT]);
+  assert.match(readyRow.reason, /returned action/u);
 });
 
-test("AC-2/AC-3: the three never-selectable reasons are distinct, and none offers a command", () => {
+test("AC-2/AC-3: kernel and author boundaries remain distinct while lifecycle names its narrow repair", () => {
   const map = buildRepairMap({ rootDir: ROOT });
   const neverOrAuthor = map.rows.filter((row) => row.liftable === "never" || row.liftable === "author-repair-required");
   const codes = neverOrAuthor.map((row) => row.code);
-  assert.ok(codes.includes("GUARD-LIFECYCLE-NOT-READY"));
   assert.ok(codes.includes("GS-6-NEVER-LIFTABLE-KERNEL-PATH"));
   assert.ok(codes.includes("HGO-AUTHOR-ROOT-REQUIRED"));
   for (const row of neverOrAuthor) assert.equal(row.command, null, `${row.code} must not offer a command`);

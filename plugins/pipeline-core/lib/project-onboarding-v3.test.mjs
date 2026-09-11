@@ -6365,6 +6365,118 @@ test("operator-confirmed continuity repair is a real ask-step end to end through
   } finally { dispose(path); }
 });
 
+test("shared close-evidence continuity damage self-repairs end to end through the exact CLI action", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    mkdirSync(join(path, "docs"), { recursive: true });
+    mkdirSync(join(path, "specs", "closed"), { recursive: true });
+    writeFileSync(join(path, "docs", "state.md"), "closed handover\n");
+    const evidencePath = "specs/closed/shared-evidence.md";
+    const evidenceBytes = Buffer.from("new close evidence\n", "utf8");
+    writeFileSync(join(path, evidencePath), evidenceBytes);
+    const resultBindings = ["old", "new"].map((name) => {
+      const resultPath = `specs/closed/${name}-result.md`;
+      const bytes = Buffer.from(`${name} result\n`, "utf8");
+      writeFileSync(join(path, resultPath), bytes);
+      return { path: resultPath, sha256: sha256(bytes) };
+    });
+    const closedAt = "2026-09-12T09:00:00.000Z";
+    const statePath = join(path, "project", "pipeline-state.json");
+    writeFileSync(statePath, `${JSON.stringify({
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: closedAt,
+      closedFeatures: ["old-feature", "new-feature"].map((id, index) => ({
+        id,
+        planPath: `specs/${id}/prd.md`,
+        phaseAtClose: "implementation",
+        closedAt: index === 0 ? "2026-09-12T08:00:00.000Z" : closedAt,
+        closedBy: "PO",
+        forCommit: null,
+        continuityClose: {
+          schema: "pipeline.continuity-close.v0",
+          featureId: id,
+          expectedRevision: index + 1,
+          result: resultBindings[index],
+          closeEvidence: {
+            path: evidencePath,
+            sha256: index === 0 ? sha256(Buffer.from("old close evidence\n")) : sha256(evidenceBytes),
+          },
+        },
+      })),
+    }, null, 2)}\n`);
+
+    const inspected = inspectProjectOnboardingV3({ rootDir: path, runner: "codex", deps: fakeDeps });
+    assert.equal(inspected.status, "continuity-damaged");
+    assert.equal(inspected.continuity.diagnosis.code, "CONTINUITY-SHARED-CLOSE-EVIDENCE-PATH");
+
+    let planOutput = "";
+    assert.equal(onboardingCli(["plan-repair", "--root", path, "--runner", "codex"], {
+      deps: fakeDeps,
+      write: (chunk) => { planOutput += chunk; },
+    }), 1);
+    const planned = JSON.parse(planOutput);
+    assert.equal(planned.nextAction.kind, "command");
+    const applyArgv = planned.nextAction.argv.slice(1);
+    const evidenceBefore = readFileSync(join(path, evidencePath));
+    const stateBefore = readFileSync(statePath);
+    let refusalOutput = "";
+    const staleArgv = [...applyArgv];
+    staleArgv[staleArgv.indexOf("--plan-sha256") + 1] = "0".repeat(64);
+    assert.equal(onboardingCli(staleArgv, {
+      deps: fakeDeps,
+      write: (chunk) => { refusalOutput += chunk; },
+    }), 1);
+    assert.equal(JSON.parse(refusalOutput).repairRefusal.code, "CONTINUITY-REPAIR-PLAN-DIGEST");
+    assert.deepEqual(readFileSync(statePath), stateBefore);
+
+    writeFileSync(`${statePath}.lock`, `${JSON.stringify({
+      schema: "pipeline.continuity-lock.v0", token: "foreign-writer", ownerNonce: "foreign-owner", acquiredAtMs: Date.now(),
+    })}\n`);
+    refusalOutput = "";
+    assert.equal(onboardingCli(applyArgv, {
+      deps: fakeDeps,
+      write: (chunk) => { refusalOutput += chunk; },
+    }), 1);
+    const locked = JSON.parse(refusalOutput);
+    assert.equal(locked.status, "recovery-required");
+    assert.equal(locked.repairRefusal.code, "KICKOFF-LOCKED");
+    assert.equal(locked.repairRefusal.committed, false);
+    assert.equal(locked.nextAction, null);
+    assert.deepEqual(readFileSync(statePath), stateBefore);
+    rmSync(`${statePath}.lock`);
+
+    let applyOutput = "";
+    assert.equal(onboardingCli(applyArgv, {
+      deps: fakeDeps,
+      write: (chunk) => { applyOutput += chunk; },
+    }), 0);
+    const applied = JSON.parse(applyOutput);
+    assert.equal(applied.status, "ready");
+    assert.deepEqual(readFileSync(join(path, evidencePath)), evidenceBefore);
+    const repaired = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(repaired.closedFeatures[0].continuityClose, undefined);
+    assert.equal(repaired.closedFeatures[1].continuityClose.closeEvidence.sha256, sha256(evidenceBytes));
+    assert.equal(repaired.stateRepairs[0].reason, "shared-close-evidence-path");
+
+    // Missing proof stays a typed terminal planning refusal, with the exact
+    // claimant location, rather than an action that loops forever.
+    writeFileSync(statePath, stateBefore);
+    rmSync(join(path, evidencePath));
+    planOutput = "";
+    assert.equal(onboardingCli(["plan-repair", "--root", path, "--runner", "codex"], {
+      deps: fakeDeps,
+      write: (chunk) => { planOutput += chunk; },
+    }), 1);
+    const refused = JSON.parse(planOutput);
+    assert.equal(refused.nextAction, null);
+    assert.equal(refused.diagnostics[0].repairCode, "CONTINUITY-REPAIR-EVIDENCE-MISSING");
+    assert.equal(refused.diagnostics[0].diagnosis.jsonPointer, "/closedFeatures/0/continuityClose/closeEvidence");
+  } finally { dispose(path); }
+});
+
 test("closed feature re-entry stays ready through the sanctioned set-feature transition", () => {
   const path = root();
   try {

@@ -3331,6 +3331,30 @@ test("NVA-LCGUARD-3: plan-repair and apply-repair admit exactly the operator-aut
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("continuity self-repair admission is exactly root plus digest, activation, and optional intent", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "b".repeat(64);
+    for (const command of [
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --intent session`,
+    ]) assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const command of [
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha}`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${"b".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --reason shared-close-evidence-path`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --intent invalid`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --plan-sha256 ${sha} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}/other' --plan-sha256 ${sha} --activate`,
+      `node '${path}/project-onboarding-v3.mjs' apply-repair --root '${path}' --plan-sha256 ${sha} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate && git status`,
+    ]) assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 /**
  * GUARDFIX-1 (A). The apply half of the same defect the test above closed for the plan half.
  *

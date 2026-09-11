@@ -89,6 +89,8 @@ export const KICKOFF_PROMOTION_APPLY_SCHEMA = "pipeline.codex-onboarding-kickoff
 export const KICKOFF_GOAL_MAX_BYTES = 160;
 export const CONTINUITY_REPAIR_PLAN_SCHEMA = "pipeline.codex-onboarding-continuity-repair-plan.v1";
 export const CONTINUITY_REPAIR_APPLY_SCHEMA = "pipeline.codex-onboarding-continuity-repair-apply.v1";
+export const CONTINUITY_REPAIR_DIAGNOSIS_SCHEMA = "pipeline.continuity-repair-diagnosis.v1";
+export const STATE_REPAIR_RECORD_SCHEMA = "pipeline.state-repair-record.v1";
 export const SESSION_CLEANUP_BIND_SCHEMA = "pipeline.codex-onboarding-session-cleanup-bind.v1";
 export const SESSION_CLEANUP_RELEASE_PROOF_SCHEMA = "pipeline.session-cleanup-release-proof.v1";
 export const SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.session-cleanup-release-receipt.v1";
@@ -249,38 +251,69 @@ function canonicalIsoTimestamp(value) {
     && new Date(value).toISOString() === value;
 }
 
+const CLOSE_EVIDENCE_POINTER = /^\/closedFeatures\/(?:0|[1-9][0-9]*)\/continuityClose\/closeEvidence$/u;
+
+function validStateRepairRecord(record) {
+  if (!exactKeys(record, new Set([
+    "schema", "reason", "sourceUpdatedAt", "planSha256", "stateBeforeSha256",
+    "evidence", "preservedClaimant", "quarantinedAssertions", "affectedFeatureIds",
+  ]))
+    || record.schema !== STATE_REPAIR_RECORD_SCHEMA
+    || record.reason !== "shared-close-evidence-path"
+    || !canonicalIsoTimestamp(record.sourceUpdatedAt)
+    || !SHA256_RE.test(record.planSha256 ?? "")
+    || !SHA256_RE.test(record.stateBeforeSha256 ?? "")
+    || !exactKeys(record.evidence, new Set(["artifactKind", "path", "observedSha256"]))
+    || record.evidence.artifactKind !== "closeEvidence"
+    || !SHA256_RE.test(record.evidence.observedSha256 ?? "")
+    || !exactKeys(record.preservedClaimant, new Set(["featureId", "jsonPointer", "expectedSha256"]))
+    || typeof record.preservedClaimant.featureId !== "string" || record.preservedClaimant.featureId.length === 0
+    || !CLOSE_EVIDENCE_POINTER.test(record.preservedClaimant.jsonPointer ?? "")
+    || !SHA256_RE.test(record.preservedClaimant.expectedSha256 ?? "")
+    || !Array.isArray(record.quarantinedAssertions) || record.quarantinedAssertions.length < 1
+    || !record.quarantinedAssertions.every((entry) => exactKeys(entry, new Set([
+      "featureId", "jsonPointer", "formerAssertion",
+    ]))
+      && typeof entry.featureId === "string" && entry.featureId.length > 0
+      && CLOSE_EVIDENCE_POINTER.test(entry.jsonPointer ?? "")
+      && exactKeys(entry.formerAssertion, new Set(["schema", "featureId", "expectedRevision", "result", "closeEvidence"]))
+      && entry.formerAssertion.schema === "pipeline.continuity-close.v0"
+      && entry.formerAssertion.featureId === entry.featureId
+      && Number.isSafeInteger(entry.formerAssertion.expectedRevision)
+      && entry.formerAssertion.expectedRevision >= 0
+      && exactKeys(entry.formerAssertion.result, new Set(["path", "sha256"]))
+      && SHA256_RE.test(entry.formerAssertion.result.sha256 ?? "")
+      && exactKeys(entry.formerAssertion.closeEvidence, new Set(["path", "sha256"]))
+      && entry.formerAssertion.closeEvidence.path === record.evidence.path
+      && SHA256_RE.test(entry.formerAssertion.closeEvidence.sha256 ?? "")
+      && entry.formerAssertion.closeEvidence.sha256 !== record.evidence.observedSha256)
+    || !Array.isArray(record.affectedFeatureIds)
+    || record.affectedFeatureIds.length !== record.quarantinedAssertions.length + 1
+    || new Set(record.affectedFeatureIds).size !== record.affectedFeatureIds.length
+    || record.affectedFeatureIds[0] !== record.preservedClaimant.featureId
+    || record.quarantinedAssertions.some((entry, index) => entry.featureId !== record.affectedFeatureIds[index + 1])
+    || new Set([record.preservedClaimant.jsonPointer, ...record.quarantinedAssertions.map((entry) => entry.jsonPointer)]).size
+      !== record.affectedFeatureIds.length) return false;
+  try {
+    safeRelativePath(record.evidence.path, "State repair evidence");
+    for (const entry of record.quarantinedAssertions) {
+      safeRelativePath(entry.formerAssertion.result.path, "quarantined Result binding");
+    }
+  } catch { return false; }
+  return record.preservedClaimant.expectedSha256 === record.evidence.observedSha256;
+}
+
+function validStateRepairRecords(state) {
+  return state.stateRepairs === undefined
+    || (Array.isArray(state.stateRepairs) && state.stateRepairs.every(validStateRepairRecord));
+}
+
 function validClosedFeatureEntry(root, entry) {
-  const baseKeys = new Set(["id", "planPath", "phaseAtClose", "closedAt", "closedBy", "forCommit"]);
-  const expectedKeys = new Set(baseKeys);
-  if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
-  if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
-  if (!exactKeys(entry, expectedKeys)
-    || typeof entry.id !== "string" || entry.id.length === 0
-    || typeof entry.planPath !== "string" || entry.planPath.length === 0
-    || !(entry.phaseAtClose === null || typeof entry.phaseAtClose === "string")
-    || !canonicalIsoTimestamp(entry.closedAt)
-    || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
-    || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
-  try { safeRelativePath(entry.planPath, "closed feature plan"); } catch { return false; }
+  if (!closedEntryStaticShape(entry)) return false;
   if (entry.continuityClose !== undefined) {
     const close = entry.continuityClose;
-    if (!exactKeys(close, new Set(["schema", "featureId", "expectedRevision", "result", "closeEvidence"]))
-      || close.schema !== "pipeline.continuity-close.v0"
-      || close.featureId !== entry.id
-      || !Number.isSafeInteger(close.expectedRevision) || close.expectedRevision < 0
-      || !exactKeys(close.result, new Set(["path", "sha256"]))
-      || !exactKeys(close.closeEvidence, new Set(["path", "sha256"]))
-      || !validateClosedArtifact(root, close.result)
+    if (!validateClosedArtifact(root, close.result)
       || !validateClosedArtifact(root, close.closeEvidence)) return false;
-  }
-  if (entry.coordinatorClose !== undefined) {
-    const coordinator = entry.coordinatorClose;
-    if (!exactKeys(coordinator, new Set(["schema", "lifecycleId", "stateSha256", "revision", "phase"]))
-      || coordinator.schema !== "pipeline.close-coordinator-reference.v1"
-      || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinator.lifecycleId ?? "")
-      || !SHA256_RE.test(coordinator.stateSha256 ?? "")
-      || coordinator.revision !== 2
-      || coordinator.phase !== "feature-close-prepared") return false;
   }
   return true;
 }
@@ -297,6 +330,7 @@ function validClosedTransitionState(root, state) {
     && Array.isArray(state.closedFeatures)
     && state.closedFeatures.length > 0
     && state.closedFeatures.every((entry) => validClosedFeatureEntry(root, entry))
+    && validStateRepairRecords(state)
     && state.closedFeatures.at(-1).closedAt === state.updatedAt;
 }
 
@@ -334,11 +368,175 @@ function validDiscardedTransitionState(root, state) {
     || !Array.isArray(state.discardedFeatures)
     || state.discardedFeatures.length === 0
     || !state.discardedFeatures.every((entry) => validDiscardedFeatureEntry(root, entry))
-    || state.discardedFeatures.at(-1).discardedAt !== state.updatedAt) return false;
+    || state.discardedFeatures.at(-1).discardedAt !== state.updatedAt
+    || !validStateRepairRecords(state)) return false;
   if (state.closedFeatures !== undefined
     && (!Array.isArray(state.closedFeatures)
       || !state.closedFeatures.every((entry) => validClosedFeatureEntry(root, entry)))) return false;
   return true;
+}
+
+function closedEntryStaticShape(entry) {
+  const baseKeys = new Set(["id", "planPath", "phaseAtClose", "closedAt", "closedBy", "forCommit"]);
+  const expectedKeys = new Set(baseKeys);
+  if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
+  if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
+  if (!exactKeys(entry, expectedKeys)
+    || typeof entry.id !== "string" || entry.id.length === 0
+    || typeof entry.planPath !== "string" || entry.planPath.length === 0
+    || !(entry.phaseAtClose === null || typeof entry.phaseAtClose === "string")
+    || !canonicalIsoTimestamp(entry.closedAt)
+    || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
+    || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
+  try { safeRelativePath(entry.planPath, "closed feature plan"); } catch { return false; }
+  if (entry.continuityClose !== undefined) {
+    const close = entry.continuityClose;
+    if (!exactKeys(close, new Set(["schema", "featureId", "expectedRevision", "result", "closeEvidence"]))
+      || close.schema !== "pipeline.continuity-close.v0"
+      || close.featureId !== entry.id
+      || !Number.isSafeInteger(close.expectedRevision) || close.expectedRevision < 0
+      || !exactKeys(close.result, new Set(["path", "sha256"]))
+      || !exactKeys(close.closeEvidence, new Set(["path", "sha256"]))
+      || !SHA256_RE.test(close.result.sha256 ?? "")
+      || !SHA256_RE.test(close.closeEvidence.sha256 ?? "")) return false;
+    try {
+      safeRelativePath(close.result.path, "closed Result artifact");
+    } catch { return false; }
+  }
+  if (entry.coordinatorClose !== undefined) {
+    const coordinator = entry.coordinatorClose;
+    if (!exactKeys(coordinator, new Set(["schema", "lifecycleId", "stateSha256", "revision", "phase"]))
+      || coordinator.schema !== "pipeline.close-coordinator-reference.v1"
+      || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinator.lifecycleId ?? "")
+      || !SHA256_RE.test(coordinator.stateSha256 ?? "")
+      || coordinator.revision !== 2
+      || coordinator.phase !== "feature-close-prepared") return false;
+  }
+  return true;
+}
+
+/**
+ * Diagnose the one legacy corruption shape this module can repair without
+ * changing evidence: several closed features asserted one close-evidence path,
+ * while the current bytes match exactly one of them. Every unrelated state
+ * field and artifact must already be valid.
+ */
+function diagnoseSharedCloseEvidencePath(root, state) {
+  const refused = (code, details = {}) => ({
+    ...details,
+    schema: CONTINUITY_REPAIR_DIAGNOSIS_SCHEMA,
+    status: "refused",
+    code,
+  });
+  if (!isObject(state)
+    || state.schema !== "pipeline.state.v0"
+    || state.activeFeature !== undefined
+    || state.continuity !== undefined
+    || state.planApproval !== undefined
+    || state.planRevocation !== undefined
+    || state.planApproved !== false
+    || !canonicalIsoTimestamp(state.updatedAt)
+    || !Array.isArray(state.closedFeatures) || state.closedFeatures.length < 2
+    || new Set(state.closedFeatures.map((entry) => entry?.id)).size !== state.closedFeatures.length
+    || state.closedFeatures.at(-1)?.closedAt !== state.updatedAt
+    || !state.closedFeatures.every(closedEntryStaticShape)
+    || !validStateRepairRecords(state)
+    || (state.discardedFeatures !== undefined
+      && (!Array.isArray(state.discardedFeatures)
+        || !state.discardedFeatures.every((entry) => validDiscardedFeatureEntry(root, entry))))) {
+    return refused("CONTINUITY-REPAIR-UNRELATED-STATE-INVALID");
+  }
+
+  const claimants = [];
+  const evidenceObservations = new Map();
+  for (let index = 0; index < state.closedFeatures.length; index += 1) {
+    const entry = state.closedFeatures[index];
+    if (entry.continuityClose === undefined) continue;
+    if (!validateClosedArtifact(root, entry.continuityClose.result)) {
+      return refused("CONTINUITY-REPAIR-UNRELATED-ARTIFACT-INVALID", {
+        jsonPointer: `/closedFeatures/${index}/continuityClose/result`,
+        featureId: entry.id,
+        artifactKind: "result",
+        path: entry.continuityClose.result.path,
+        expectedSha256: entry.continuityClose.result.sha256,
+      });
+    }
+    let observed;
+    try {
+      const path = entry.continuityClose.closeEvidence.path;
+      observed = evidenceObservations.get(path);
+      if (observed === undefined) {
+        observed = observeOptionalProjectFile(root, path, "closed continuity evidence");
+        evidenceObservations.set(path, observed);
+      }
+    } catch (error) {
+      return refused("CONTINUITY-REPAIR-EVIDENCE-PATH-UNSAFE", {
+        jsonPointer: `/closedFeatures/${index}/continuityClose/closeEvidence`,
+        featureId: entry.id,
+        artifactKind: "closeEvidence",
+        path: entry.continuityClose.closeEvidence.path,
+        causeCode: error instanceof KickoffError ? error.code : "KICKOFF-PATH-UNSAFE",
+      });
+    }
+    if (observed.status !== "present") {
+      return refused("CONTINUITY-REPAIR-EVIDENCE-MISSING", {
+        jsonPointer: `/closedFeatures/${index}/continuityClose/closeEvidence`,
+        featureId: entry.id,
+        artifactKind: "closeEvidence",
+        path: entry.continuityClose.closeEvidence.path,
+        expectedSha256: entry.continuityClose.closeEvidence.sha256,
+        observedSha256: null,
+      });
+    }
+    claimants.push({
+      jsonPointer: `/closedFeatures/${index}/continuityClose/closeEvidence`,
+      entryIndex: index,
+      featureId: entry.id,
+      artifactKind: "closeEvidence",
+      path: entry.continuityClose.closeEvidence.path,
+      expectedSha256: entry.continuityClose.closeEvidence.sha256,
+      observedSha256: observed.sha256,
+      status: entry.continuityClose.closeEvidence.sha256 === observed.sha256 ? "matching" : "mismatching",
+    });
+  }
+  const groups = new Map();
+  for (const claimant of claimants) {
+    const group = groups.get(claimant.path) ?? [];
+    group.push(claimant);
+    groups.set(claimant.path, group);
+  }
+  const collisionGroups = [...groups.values()].filter((group) => group.length > 1);
+  if (collisionGroups.length !== 1) {
+    return refused("CONTINUITY-REPAIR-SHARED-PATH-AMBIGUOUS", {
+      sharedPathCount: collisionGroups.length,
+    });
+  }
+  const selected = collisionGroups[0];
+  const selectedPath = selected[0].path;
+  for (const claimant of claimants) {
+    if (claimant.path !== selectedPath && claimant.status !== "matching") {
+      return refused("CONTINUITY-REPAIR-UNRELATED-ARTIFACT-INVALID", claimant);
+    }
+  }
+  const matching = selected.filter((claimant) => claimant.status === "matching");
+  if (matching.length !== 1) {
+    return refused("CONTINUITY-REPAIR-CLAIMANT-AMBIGUOUS", {
+      artifactKind: "closeEvidence",
+      path: selectedPath,
+      observedSha256: selected[0].observedSha256,
+      claimants: selected.map(({ entryIndex: _entryIndex, ...claimant }) => claimant),
+    });
+  }
+  return {
+    schema: CONTINUITY_REPAIR_DIAGNOSIS_SCHEMA,
+    status: "repairable",
+    code: "CONTINUITY-SHARED-CLOSE-EVIDENCE-PATH",
+    artifactKind: "closeEvidence",
+    path: selectedPath,
+    observedSha256: selected[0].observedSha256,
+    affectedFeatureIds: selected.map((claimant) => claimant.featureId),
+    claimants: selected.map(({ entryIndex: _entryIndex, ...claimant }) => claimant),
+  };
 }
 
 function validDesignTransitionState(state) {
@@ -781,7 +979,9 @@ function observeDetailed({
     }
     const projected = projectReadContinuityStatus({ status: "ok", state });
     let status;
-    if (projected.code === "CS-STATUS-ACTIVE" && projected.continuity.status === "valid") {
+    if (!validStateRepairRecords(state)) {
+      status = "damaged";
+    } else if (projected.code === "CS-STATUS-ACTIVE" && projected.continuity.status === "valid") {
       status = "valid";
     } else if (projected.code === "CS-STATUS-INACTIVE"
       && (validClosedTransitionState(root, state) || validDiscardedTransitionState(root, state))) {
@@ -799,8 +999,11 @@ function observeDetailed({
     } else {
       status = "unavailable";
     }
+    const diagnosis = status === "damaged"
+      ? diagnoseSharedCloseEvidencePath(root, state)
+      : null;
     return {
-      continuity: { status, ...hashes },
+      continuity: { status, ...hashes, ...(diagnosis === null ? {} : { diagnosis }) },
       root,
       repositoryCapability,
       calibration,
@@ -1066,8 +1269,61 @@ function normalizedContinuity(state, observed) {
   };
 }
 
-function continuityRepairBinding(plan) {
+function repairedSharedCloseEvidenceState(state, observed, diagnosis) {
+  if (diagnosis?.status !== "repairable"
+    || diagnosis.code !== "CONTINUITY-SHARED-CLOSE-EVIDENCE-PATH") {
+    fail("CONTINUITY-REPAIR-DIAGNOSIS-INVALID", "shared close-evidence diagnosis is not repairable");
+  }
+  const matching = diagnosis.claimants.filter((claimant) => claimant.status === "matching");
+  const mismatching = diagnosis.claimants.filter((claimant) => claimant.status === "mismatching");
+  if (matching.length !== 1 || mismatching.length < 1) {
+    fail("CONTINUITY-REPAIR-CLAIMANT-AMBIGUOUS", "shared close-evidence claimant set is ambiguous");
+  }
+  const next = structuredClone(state);
+  const mismatchingPointers = new Set(mismatching.map((claimant) => claimant.jsonPointer));
+  for (let index = 0; index < next.closedFeatures.length; index += 1) {
+    if (mismatchingPointers.has(`/closedFeatures/${index}/continuityClose/closeEvidence`)) {
+      delete next.closedFeatures[index].continuityClose;
+    }
+  }
+  const record = {
+    schema: STATE_REPAIR_RECORD_SCHEMA,
+    reason: "shared-close-evidence-path",
+    // Planning and applying must recompute byte-identically without accepting
+    // an unbound clock value. The damaged State's own canonical timestamp is
+    // therefore the provenance timestamp carried into this immutable record;
+    // it is deliberately not represented as the repair's wall-clock time.
+    sourceUpdatedAt: state.updatedAt,
+    planSha256: "0".repeat(64),
+    stateBeforeSha256: observed.stateObservation.sha256,
+    evidence: {
+      artifactKind: "closeEvidence",
+      path: diagnosis.path,
+      observedSha256: diagnosis.observedSha256,
+    },
+    preservedClaimant: {
+      featureId: matching[0].featureId,
+      jsonPointer: matching[0].jsonPointer,
+      expectedSha256: matching[0].expectedSha256,
+    },
+    quarantinedAssertions: mismatching.map((claimant) => ({
+      featureId: claimant.featureId,
+      jsonPointer: claimant.jsonPointer,
+      formerAssertion: structuredClone(state.closedFeatures.find((entry) => entry.id === claimant.featureId)?.continuityClose),
+    })),
+    affectedFeatureIds: [matching[0].featureId, ...mismatching.map((claimant) => claimant.featureId)],
+  };
+  next.stateRepairs = [...(next.stateRepairs ?? []), record];
   return {
+    reason: "repair-shared-close-evidence-path",
+    state: next,
+    authority: null,
+    diagnosis,
+  };
+}
+
+function continuityRepairBinding(plan) {
+  const binding = {
     schema: plan.schema,
     root: plan.root,
     repositoryCapability: plan.repositoryCapability,
@@ -1077,11 +1333,20 @@ function continuityRepairBinding(plan) {
     history: plan.history,
     authority: plan.authority,
     target: plan.target,
+    ...(plan.diagnosis === undefined ? {} : { diagnosis: plan.diagnosis }),
   };
+  if (plan.reason === "repair-shared-close-evidence-path") {
+    binding.target = structuredClone(plan.target);
+    const records = binding.target.value.stateRepairs;
+    records.at(-1).planSha256 = "0".repeat(64);
+    binding.target.afterSha256 = sha256(expectedStateBytes(binding.target.value));
+  }
+  return binding;
 }
 
 /**
- * Plan three bounded repairs:
+ * Plan four bounded repairs:
+ * - quarantine mismatching assertions on one shared close-evidence path;
  * - normalize the invalid resume-on-next-turn/active-turn pair;
  * - add continuity to an established pre-continuity state carrying PO authority; or
  * - adopt operator-confirmed authority for a mature project whose
@@ -1104,7 +1369,11 @@ export function planOnboardingContinuityRepair({
   try {
     observed = observeDetailed({ rootDir, repositoryCapability, spawn });
     if (observed.continuity.status !== "damaged" || observed.handoverObservation?.status !== "present") {
-      return { schema: CONTINUITY_REPAIR_PLAN_SCHEMA, status: "unsupported" };
+      return {
+        schema: CONTINUITY_REPAIR_PLAN_SCHEMA,
+        status: "unsupported",
+        ...(observed.error?.code === undefined ? {} : { code: observed.error.code }),
+      };
     }
     let proposed;
     if (observed.stateObservation?.status === "absent") {
@@ -1114,13 +1383,29 @@ export function planOnboardingContinuityRepair({
       proposed = operatorConfirmedContinuity(observed, operatorAuthority);
     } else if (observed.stateObservation?.status !== "present") {
       return { schema: CONTINUITY_REPAIR_PLAN_SCHEMA, status: "unsupported" };
+    } else if (!validStateRepairRecords(observed.state)) {
+      return {
+        schema: CONTINUITY_REPAIR_PLAN_SCHEMA,
+        status: "unsupported",
+        code: "CONTINUITY-REPAIR-UNRELATED-STATE-INVALID",
+        diagnosis: observed.continuity.diagnosis,
+      };
+    } else if (observed.continuity.diagnosis?.status === "repairable") {
+      proposed = repairedSharedCloseEvidenceState(observed.state, observed, observed.continuity.diagnosis);
     } else if (observed.projected?.code === "CS-STATUS-CONTINUITY-INVALID") {
       proposed = normalizedContinuity(observed.state, observed);
     } else if (observed.projected?.code === "CS-STATUS-ACTIVE-NO-CONTINUITY"
       && observed.historyObservation.status === "absent") {
       proposed = establishedContinuity(observed.state, observed);
     } else {
-      return { schema: CONTINUITY_REPAIR_PLAN_SCHEMA, status: "unsupported" };
+      return {
+        schema: CONTINUITY_REPAIR_PLAN_SCHEMA,
+        status: "unsupported",
+        ...(observed.continuity.diagnosis?.code === undefined ? {} : {
+          code: observed.continuity.diagnosis.code,
+          diagnosis: observed.continuity.diagnosis,
+        }),
+      };
     }
     const stateBytes = expectedStateBytes(proposed.state);
     const binding = {
@@ -1147,11 +1432,17 @@ export function planOnboardingContinuityRepair({
         afterSha256: sha256(stateBytes),
         value: proposed.state,
       },
+      ...(proposed.diagnosis === undefined ? {} : { diagnosis: proposed.diagnosis }),
     };
+    const planSha256 = canonicalSha256(binding);
+    if (proposed.reason === "repair-shared-close-evidence-path") {
+      binding.target.value.stateRepairs.at(-1).planSha256 = planSha256;
+      binding.target.afterSha256 = sha256(expectedStateBytes(binding.target.value));
+    }
     return {
       ...binding,
       status: "ready",
-      planSha256: canonicalSha256(binding),
+      planSha256,
     };
   } catch (error) {
     if (error instanceof KickoffError) {
@@ -1202,6 +1493,7 @@ export function applyOnboardingContinuityRepair({
   let temporaryRecord;
   let committed = false;
   try {
+    if (typeof deps.beforeCasRecheck === "function") deps.beforeCasRecheck(plan);
     const current = planOnboardingContinuityRepair({ rootDir, repositoryCapability, spawn, operatorAuthority });
     if (current.status !== "ready" || current.planSha256 !== plan.planSha256) {
       fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair preimage changed");
@@ -1216,22 +1508,19 @@ export function applyOnboardingContinuityRepair({
     );
     const stateBytes = expectedStateBytes(plan.target.value);
     temporaryRecord = writeExclusiveSynced(temporary, stateBytes, 0o600);
-    // `beforeSha256 === null` means the plan itself was built over an ABSENT
-    // state file (the operator-confirmed-authority case): `readPhysicalFile`
-    // would throw ENOENT rather than fail with a typed CONTINUITY-REPAIR code,
-    // so absence is checked directly instead of read-and-hashed. Every other
-    // repair case still always carries a real preimage digest here, unchanged.
-    if (plan.target.beforeSha256 === null) {
-      if (existsSync(statePath)) {
-        fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair state preimage changed");
-      }
-    } else if (sha256(readPhysicalFile(statePath, "Pipeline machine state")) !== plan.target.beforeSha256) {
-      fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair state preimage changed");
+    if (typeof deps.beforeStateReplace === "function") deps.beforeStateReplace(plan);
+    // Recheck the complete binding after temporary-file preparation, including
+    // evidence and physical path safety. A State-only hash would miss evidence
+    // drift between the first CAS check and the replacement.
+    const beforeReplace = planOnboardingContinuityRepair({ rootDir, repositoryCapability, spawn, operatorAuthority });
+    if (beforeReplace.status !== "ready" || beforeReplace.planSha256 !== plan.planSha256) {
+      fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair preimage changed before replacement");
     }
     renameSync(temporary, statePath);
     temporaryRecord = null;
     committed = true;
     fsyncDirectory(dirname(statePath));
+    if (typeof deps.beforeReadback === "function") deps.beforeReadback(plan);
     const continuity = classifyOnboardingContinuity({
       rootDir: plan.root,
       repositoryCapability,
@@ -1257,7 +1546,9 @@ export function applyOnboardingContinuityRepair({
     if (!committed && temporaryRecord) {
       try { unlinkOwned(temporaryRecord); } catch {}
     }
-    if (error instanceof KickoffError) throw error;
+    if (error instanceof KickoffError) {
+      fail(error.code, error.message, { committed: committed || error.committed });
+    }
     fail("CONTINUITY-REPAIR-WRITE-FAILED", "continuity repair failed", { committed });
   } finally {
     releaseLock(lock);

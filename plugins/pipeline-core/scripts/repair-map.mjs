@@ -214,14 +214,19 @@ export function structuralRows({ rootDir, pluginRoot }) {
     toolInput: { file_path: "repair-map-lifecycle-probe.md" },
     denials: [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }],
   });
+  const continuityRepairPlanner = {
+    executable: process.execPath,
+    argv: [join(pluginRoot, "scripts", "project-onboarding-v3.mjs"), "plan-repair", "--root", rootDir],
+  };
   return [
     {
       code: "GUARD-LIFECYCLE-NOT-READY",
-      liftable: "never",
-      by: "nobody",
-      command: null,
-      reason: `never liftable by central enforcement: observed ${lifecycleRoute.status}/${lifecycleRoute.code}; `
-        + "no plan or capability is created for this exact lifecycle code.",
+      liftable: "narrower-recovery",
+      by: "this-session-agent",
+      command: [continuityRepairPlanner],
+      reason: `the general lifecycle override remains unavailable (${lifecycleRoute.status}/${lifecycleRoute.code}); `
+        + "the read-only continuity planner may diagnose one shared close-evidence path and return the only "
+        + "digest-bound apply-repair command the guard admits. An agent in this session can execute that returned action.",
     },
     {
       code: "GS-6-NEVER-LIFTABLE-KERNEL-PATH",

@@ -3429,7 +3429,17 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
   // the closed value set is the CLI's own (scripts/project-onboarding-v3.mjs:62). Nothing
   // else moves: no new subcommand, no new flags -- only matchFlagSpec()'s order-insensitivity
   // (NVA-BOOTADMIT-2), same as every sibling branch in this function.
-  if (["apply-portable-seed", "apply-reinstall", "initialize-runtime", "apply-repair", "apply-readback"].includes(args[0])
+  if (["apply-portable-seed", "apply-reinstall", "initialize-runtime", "apply-readback"].includes(args[0])
+    && matchFlagSpec(args.slice(1), {
+      requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
+      required: { "--activate": true },
+      optionalValue: { "--intent": isIntentValue },
+    })) return true;
+  // A damaged lifecycle gets exactly one state-writing escape: the repair
+  // planner's digest-bound apply. Keep it separate from the generic apply
+  // family so no future widening of that family can silently broaden this
+  // deadlock-recovery boundary.
+  if (args[0] === "apply-repair"
     && matchFlagSpec(args.slice(1), {
       requiredValue: { "--root": isRootValue, "--plan-sha256": isHexDigest },
       required: { "--activate": true },
