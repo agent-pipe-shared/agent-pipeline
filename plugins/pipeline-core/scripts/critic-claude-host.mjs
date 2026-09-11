@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Candidate-packet host adapter for Claude native-bare and one weak fallback. */
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
+import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import {
   canonicalJson,
@@ -37,9 +39,17 @@ export const CLAUDE_FALLBACK_CODES = Object.freeze(new Set([
 ]));
 
 export class ClaudeCriticHostError extends Error {
-  constructor(code, message) { super(message); this.name = "ClaudeCriticHostError"; this.code = code; }
+  constructor(code, message, details = undefined) {
+    super(message);
+    this.name = "ClaudeCriticHostError";
+    this.code = code;
+    if (details !== undefined) {
+      this.details = details;
+      if (details.preparation !== undefined) this.preparation = details.preparation;
+    }
+  }
 }
-function fail(code, message) { throw new ClaudeCriticHostError(code, message); }
+function fail(code, message, details) { throw new ClaudeCriticHostError(code, message, details); }
 function exactKeys(value, keys) {
   return value && typeof value === "object" && !Array.isArray(value)
     && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
@@ -57,7 +67,54 @@ function refs(packet) {
   return [...byPath.values()];
 }
 function promptFor(packet) {
-  return canonicalJson({ schema: "pipeline.claude-critic-prompt.v1", packetId: packet.packetId, candidate: { ...packet.candidate }, diff: { ...packet.diff }, references: refs(packet) });
+  return canonicalJson({
+    schema: "pipeline.claude-critic-prompt.v1",
+    packetId: packet.packetId,
+    rulesetSha: packet.ruleset.oid,
+    selectedModel: packet.route.modelTier,
+    dispatchMetadata: `Ruleset SHA: ${packet.ruleset.oid}; selected model: ${packet.route.modelTier}`,
+    candidate: { ...packet.candidate },
+    diff: { ...packet.diff },
+    references: refs(packet),
+  });
+}
+function referenceBlobSha256(packet, reference) {
+  const bytes = execFileSync("git", ["-C", packet.checkout.realPath, "cat-file", "blob", reference.candidateBlobOid], {
+    encoding: null,
+    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    shell: false,
+    timeout: 5_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  return sha256(bytes);
+}
+function dispatchPreparation(packet, options, deps, prompt) {
+  const references = refs(packet);
+  const requiredPaths = references.map(({ path }) => path).sort();
+  const requiredPathSha256 = Object.fromEntries(requiredPaths.map((path) => {
+    const reference = references.find((entry) => entry.path === path);
+    return [path, referenceBlobSha256(packet, reference)];
+  }));
+  const dispatchPacket = {
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId: packet.packetId,
+    transport: "direct",
+    role: "pipeline-core:critic",
+    prompt,
+    candidate: { commit: packet.candidate.commit, tree: packet.candidate.tree },
+    requiredPaths,
+    requiredPathSha256,
+    resultPath: `${packet.packetId}/result.json`,
+  };
+  const preparation = (deps.preflightRoleDispatch ?? preflightRoleDispatch)({
+    root: packet.checkout.realPath,
+    resultRoot: options.controlRoot,
+    packet: dispatchPacket,
+  });
+  if (preparation?.status !== "prepared") {
+    fail("CLH-DISPATCH-PREFLIGHT", `Claude Critic dispatch preflight rejected: ${preparation?.code ?? "unknown"}.`, { preparation });
+  }
+  return preparation;
 }
 function fallbackDispatch(packet, reasonCode, exportAuthorizationSha256) {
   return {
@@ -113,6 +170,8 @@ export function prepareClaudePacketReview(options, deps = {}) {
   const packet = inspected.packet;
   if (packet.route.runner !== "claude" || packet.route.provider !== "anthropic"
     || packet.route.adapter !== options.adapter) fail("CLH-ROUTE", "Packet does not select this Claude adapter.");
+  const prompt = promptFor(packet);
+  const dispatch = dispatchPreparation(packet, options, deps, prompt);
   const nativeAuthorization = authorizeExport(packet, CLAUDE_NATIVE_ASSURANCE, options, deps);
   const claim = claimCandidatePacket({ controlRoot: options.controlRoot, packetId: options.packetId, adapter: options.adapter, claimantNonce: options.claimantNonce }, deps);
   if (sha256(canonicalJson(claim.packet)) !== sha256(canonicalJson(packet))) fail("CLH-CANDIDATE", "Packet changed between export authorization and claim.");
@@ -141,7 +200,8 @@ export function prepareClaudePacketReview(options, deps = {}) {
       exportAuthorizationSha256: nativeAuthorizationSha256,
       cleanupCapability: packet.cleanupCapability,
       handle,
-      prompt: promptFor(packet),
+      prompt,
+      dispatch,
     };
   } catch (error) {
     if (!(error instanceof NativeBareError) || !error.preVerdict || !CLAUDE_FALLBACK_CODES.has(error.code)) throw error;
@@ -158,6 +218,7 @@ export function prepareClaudePacketReview(options, deps = {}) {
       exportAuthorization: fallbackAuthorization.receipt,
       exportAuthorizationSha256: fallbackAuthorizationSha256,
       cleanupCapability: packet.cleanupCapability,
+      dispatch,
       fallback: fallbackDispatch(packet, error.code, fallbackAuthorizationSha256),
     };
   }

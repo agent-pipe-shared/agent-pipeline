@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { prepareCandidatePacket } from "./critic-packet-preflight.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { buildNativeBareArgv, preflightNativeBare, runNativeBare, NativeBareError } from "./critic-native-bare.mjs";
 import {
   CLAUDE_FALLBACK_ASSURANCE,
   CLAUDE_NATIVE_ASSURANCE,
+  ClaudeCriticHostError,
   acceptClaudeFallback,
   executeClaudeNative,
   finalizeClaudePacketReview,
@@ -31,7 +34,7 @@ function files() {
   writeFileSync(schema, JSON.stringify({ type: "object", required: ["findings", "deliberately_not_flagged", "trajectory_verdict", "trajectory_evidence", "briefing_violations", "pass"], additionalProperties: false, properties: { findings: { type: "array", items: { type: "object" } }, deliberately_not_flagged: { type: "array", items: { type: "string" } }, trajectory_verdict: { type: "string", enum: ["consistent", "inconsistent", "not verifiable"] }, trajectory_evidence: { type: "string" }, briefing_violations: { type: "array", items: { type: "string" } }, pass: { type: "boolean" } } }));
   return { root, executable, contract, schema };
 }
-function repository() {
+function repository({ references = [{ kind: "spec", path: "specs/work.md" }] } = {}) {
   const root = mkdtempSync(join(tmpdir(), "claude-packet-"));
   git(root, ["init", "--quiet"]); git(root, ["config", "user.email", "test@example.invalid"]); git(root, ["config", "user.name", "Test"]);
   mkdirSync(join(root, "specs")); writeFileSync(join(root, "specs", "work.md"), "base\n"); git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "base"]); const base = git(root, ["rev-parse", "HEAD"]);
@@ -41,9 +44,20 @@ function repository() {
   // root contract requires; harden it the way a real caller's private root would be (no-op on POSIX).
   if (process.platform === "win32") hardenWindowsPrivateDirectory(control);
   const prepared = prepareCandidatePacket({ repoRoot: root, controlRoot: control, packetId: "7".repeat(32), taskId: "batman-claude", projectId: "pipeline", baseCommit: base, candidateCommit: candidate, rulesetOid: candidate,
-    route: { routeId: "claude-critic", runner: "claude", adapter: "claude-host", provider: "anthropic", modelTier: "sonnet", effortTier: "max", assurance: "native-preferred", projectionDigest: "8".repeat(64) }, references: [{ kind: "spec", path: "specs/work.md" }] },
+    route: { routeId: "claude-critic", runner: "claude", adapter: "claude-host", provider: "anthropic", modelTier: "sonnet", effortTier: "max", assurance: "native-preferred", projectionDigest: "8".repeat(64) }, references },
   { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 15) });
   return { root, control, prepared };
+}
+function packetFile(repo, name) { return join(repo.control, repo.prepared.packet.packetId, name); }
+function assertDispatchPreflightRejection(repo, fn, expectedCode) {
+  assert.throws(fn, (error) => error instanceof ClaudeCriticHostError
+    && error.code === "CLH-DISPATCH-PREFLIGHT"
+    && error.preparation?.code === expectedCode
+    && error.preparation.modelCalls === 0
+    && error.preparation.launcherCalls === 0);
+  assert.equal(JSON.parse(readFileSync(packetFile(repo, "state.json"), "utf8")).phase, "prepared");
+  assert.equal(existsSync(packetFile(repo, "export-native.json")), false);
+  assert.equal(existsSync(packetFile(repo, "export-fallback.json")), false);
 }
 
 check("builds exact native argv with bare, CLI schema, fixed read-only tools and shell-free execution", () => {
@@ -71,6 +85,66 @@ check("does not turn timeout or verdict bytes into a fallback", () => {
     const handle = preflightNativeBare({ executablePath: f.executable, checkoutRoot: f.root, contractPath: f.contract, schemaPath: f.schema, model: "sonnet", effort: "max", routeDigest: "a".repeat(64), neutralCwd: f.root }, { spawnFn: () => ({ status: 0, stdout: stream(), stderr: "" }), now: new Date("2026-07-18T12:00:00.000Z") });
     assert.throws(() => runNativeBare(handle, { checkoutRoot: f.root, prompt: "packet" }, { spawnFn: () => ({ status: null, stdout: "", stderr: "", error: { code: "ETIMEDOUT" } }) }), (error) => error instanceof NativeBareError && error.code === "CLH-TIMEOUT" && !error.preVerdict);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("rejects a packet without dispatch references before claim, export or native probe", () => {
+  const repo = repository({ references: [] }); const f = files();
+  try {
+    let calls = 0;
+    assertDispatchPreflightRejection(repo, () => prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId, adapter: "claude-host", claimantNonce: "0".repeat(64), executablePath: f.executable, contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, {
+      spawnFn: () => { calls += 1; return { status: 0, stdout: stream(), stderr: "" }; },
+      now: new Date("2026-07-18T12:01:00.000Z"),
+    }), "RDP-REQUIRED-PATHS");
+    assert.equal(calls, 0);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("rejects an occupied result destination before claim, export or native probe", () => {
+  const repo = repository(); const f = files();
+  try {
+    writeFileSync(packetFile(repo, "result.json"), "occupied\n", { mode: 0o600 });
+    let calls = 0;
+    assertDispatchPreflightRejection(repo, () => prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId, adapter: "claude-host", claimantNonce: "1".repeat(64), executablePath: f.executable, contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, {
+      spawnFn: () => { calls += 1; return { status: 0, stdout: stream(), stderr: "" }; },
+      now: new Date("2026-07-18T12:01:00.000Z"),
+    }), "RDP-RESULT-DESTINATION");
+    assert.equal(calls, 0);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("binds the real preflight packet and launched native prompt to the exact candidate inputs", () => {
+  const repo = repository(); const f = files();
+  try {
+    const preparations = [];
+    const calls = [];
+    const spawnFn = (command, args, options) => { calls.push({ command, args, options }); return { status: 0, stdout: stream(), stderr: "" }; };
+    const prepared = prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId, adapter: "claude-host", claimantNonce: "2".repeat(64), executablePath: f.executable, contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, {
+      spawnFn,
+      preflightRoleDispatch: (input) => { preparations.push(input); return preflightRoleDispatch(input); },
+      now: new Date("2026-07-18T12:01:00.000Z"),
+    });
+    assert.equal(preparations.length, 1);
+    assert.equal(preparations[0].root, prepared.packet.checkout.realPath);
+    assert.equal(preparations[0].resultRoot, repo.control);
+    assert.deepEqual(prepared.dispatch.packet, {
+      schema: "pipeline.role-dispatch-request.v1",
+      dispatchId: prepared.packet.packetId,
+      transport: "direct",
+      role: "pipeline-core:critic",
+      prompt: prepared.prompt,
+      candidate: { commit: prepared.packet.candidate.commit, tree: prepared.packet.candidate.tree },
+      requiredPaths: ["specs/work.md"],
+      requiredPathSha256: { "specs/work.md": createHash("sha256").update("candidate\n").digest("hex") },
+      resultPath: `${prepared.packet.packetId}/result.json`,
+    });
+    const prompt = JSON.parse(prepared.prompt);
+    assert.equal(prompt.rulesetSha, prepared.packet.ruleset.oid);
+    assert.equal(prompt.selectedModel, prepared.packet.route.modelTier);
+    assert.equal(calls.length, 1);
+    executeClaudeNative(prepared, { spawnFn, now: new Date("2026-07-18T12:01:30.000Z") });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].args[calls[1].args.indexOf("-p") + 1], prepared.dispatch.packet.prompt);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
 });
 
 check("uses exactly one explicitly weak fresh fallback for an allowlisted pre-verdict failure", () => {
@@ -183,4 +257,4 @@ check("closes the late fallback dispatch over runner, references and reason", ()
   } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
 });
 
-process.stdout.write(`${passed}/12 checks passed.\n`);
+process.stdout.write(`${passed}/15 checks passed.\n`);
