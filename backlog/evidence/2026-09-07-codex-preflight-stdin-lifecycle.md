@@ -25,15 +25,43 @@ overflow limit, spawn-error handling, and bounded-stop behavior are unchanged.
   `node --test plugins/pipeline-core/scripts/codex-sandbox-preflight.test.mjs`, exit 0 (26 pass, 0 fail, 1 environment skip).
 - Consumer-safe paths: `node harness/scripts/check-consumer-safe-paths.test.mjs`, exit 0.
 
+## Current durable verification (2026-09-11)
+
+The historical scratch captures above explain how the defect was isolated, but
+they are ignored workspace artifacts and are not the closure proof. From a
+clean committed source candidate, the versioned Codex sandbox-preflight
+producer executed ten fresh intermediate preflights against Codex 0.154.0. It
+wrote the ten sanitized, exclusive-create receipts under
+`backlog/evidence/2026-09-11-codex-preflight-eof-live/`; none was reconstructed
+or edited after the run. Machine-written provenance beside those receipts binds
+the exact source commit and tree, the producer path, Git blob, SHA-256 and mode,
+the invocation transcripts, and each resulting receipt digest.
+
+All ten receipts report `terminalCode: ok`, `eligibility: intermediate`, both
+control and sandbox app servers initialized and stopped within the bound, and
+both `appServerInitEquivalent` and `lifecycleComplete` true. The receipts bind
+the measured Codex artifact digest, permission-profile digests, event-chain
+digest, canary manifest and semantic result vectors. This repeats the original
+10/10 actual-source result with current tracked machine output.
+
+The focused suite was also run on the clean predecessor candidate: 26 passed,
+zero failed and one honestly skipped fixture transport case. Its EOF-sensitive
+case `payload keeps app-server stdin open until initialize can respond` passed.
+That console observation is supporting regression evidence; the ten producer-
+written live receipts above are the durable integration evidence.
+
 ## Limits
 
-The ten successful initialize handshakes show that the lifecycle race is
-repaired for the measured intermediate route. They do not independently prove
-sandbox isolation; isolation remains governed by the preflight's permission,
-canary, and receipt checks. The fixture-driven happy-path test remains skipped
-when its outer subprocess transport reports `child-stdio-error`; the new EOF
-regression and the ten actual-source receipts provide the relevant lifecycle
-evidence without relabeling that environment limitation as a pass.
+The ten successful current initialize handshakes show that the lifecycle race
+is repaired for the measured intermediate route on this WSL2 host and Codex
+0.154.0. They do not establish portability to every Codex or operating-system
+version. The fixture-driven happy-path test remains skipped when its outer
+subprocess transport reports `child-stdio-error`; the deterministic EOF
+regression and the ten current live receipts provide distinct unit and
+integration evidence without relabelling that environment limitation as a
+pass. Pipeline maintainers own this remaining fixture-transport gap and will
+reassess it by 2026-09-18; after that date the closure evidence must be renewed
+or the item reopened.
 
 The initial ten-attempt capture wrapper returned before it wrote its capture
 log, while its host child continued and persisted all ten uniquely named

@@ -120,7 +120,13 @@ stdin. It adds an EOF-sensitive regression that fails against the old ordering.
 Commit `fac5c14f` makes that regression portable without weakening its
 initialization or bounded-stop assertions.
 
-The versioned measurement records the RED/GREEN regression and 10/10 successful
-real intermediate preflights. A current focused run on 2026-09-11 passed 26
-tests with zero failures; one separate environment-dependent fixture path was
-reported as skipped rather than relabeled as success.
+The versioned measurement explains the original RED/GREEN regression and the
+historical 10/10 intermediate preflights. Ten fresh producer-written receipts
+under `backlog/evidence/2026-09-11-codex-preflight-eof-live/` supply the current
+integration proof: every actual intermediate route reports `terminalCode: ok`,
+initializes and stops both app servers, and retains the sanitized semantic and
+canary bindings. The deterministic EOF-sensitive regression remains the direct
+test of the changed stdin lifecycle. One separate environment-dependent fixture
+transport path remains honestly skipped; it is not used as the live-route
+evidence. The historical ignored scratch files are therefore contextual and
+are not required to reproduce the current closure check.
