@@ -1,5 +1,12 @@
 # Native current-artifact technical review
 
+> **Status after the scope decision, reaffirmed 2026-09-12:** The contract design below is
+> retained as the platform-neutral specification. Native Codex sandbox/App-
+> Server execution under WSL is superseded as an acceptance route and supplies
+> no Nova-B readiness evidence. Exercising this design on the native route is
+> deferred to the separate future native-Windows package; ordinary fresh-session
+> Critic review remains the supported default.
+
 The native Critic must support an explicit review of named current artifacts
 against their requirements. This is the self-application review described in
 the Critic role contract. It is distinct from a historical change-range review:

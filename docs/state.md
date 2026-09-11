@@ -28,6 +28,19 @@
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 
+**Current native-Codex scope decision (reaffirmed 2026-09-12):** The ordinary
+fresh-session Critic remains the supported default. Native Codex sandbox and
+App-Server execution under WSL is deactivated and deferred to a separate future
+native-Windows package; it is neither Nova-B acceptance evidence nor a Nova-B
+blocker, and no WSL result establishes native readiness. Earlier WSL startup,
+preflight, smoke, receipt and review passages below are immutable diagnostic
+history rather than current operating instructions. Platform-neutral and
+offline contracts remain in scope. The deferred work reuses the existing
+`sprint: none` items for
+[worker sandbox selection](../backlog/items/2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md),
+[Selected-Critic contract binding](../backlog/items/2026-09-06-the-selected-critic-lane-briefs-contract-files-it-neither-pins-nor-binds.md),
+and [fallback routing](../backlog/items/2026-09-06-the-t1-fallback-waits-for-failure-codes-the-route-collapses-before-they-arrive.md).
+
 Continue the accepted local 0.6.2 test-candidate goal, then approved Nova work;
 collect actual human decisions in
 `backlog/evidence/2026-09-06-po-decision-queue.md`. Ordinary implementation,
@@ -566,10 +579,10 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
 
 ### 2026-09-11 scope and Verify update
 
-- Native Codex sandbox and App Server evidence under WSL is deferred to a
-  future native-Windows effort. It is neither Nova-B acceptance evidence nor a
-  Nova-B blocker. Platform-neutral contracts and the ordinary fresh Session
-  Critic remain in scope.
+- Native Codex sandbox and App Server evidence under WSL is deferred to the
+  three existing `sprint: none` items linked in the current decision above. It
+  is neither Nova-B acceptance evidence nor a Nova-B blocker. Platform-neutral
+  contracts and the ordinary fresh-session Critic remain in scope.
 - Boundary-aware impacted Verify is closed by ADR-0081, implementation
   `2c890778`, correction `5c826023`, and a PASS delta Critic. Invalid impact
   bases force full execution and the push guard independently verifies strict

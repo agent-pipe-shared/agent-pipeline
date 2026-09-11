@@ -59,7 +59,11 @@ review rounds the transport package was allowed under the cap are spent.
 - Or narrower: digest the three files at brief time into the Critic receipt
   only, leaving the sandbox execution receipt's schema untouched.
 
-`due` is set so the item cannot age silently past the 0.6.2 candidate.
+The remaining installed-package/native-execution surface has no 0.6.2 delivery
+date. It is explicitly deferred to the future native-Windows package alongside
+the existing `sprint: none` items for
+[worker sandbox selection](2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md)
+and [fallback routing](2026-09-06-the-t1-fallback-waits-for-failure-codes-the-route-collapses-before-they-arrive.md).
 
 ## Nova B implementation — 2026-09-11
 

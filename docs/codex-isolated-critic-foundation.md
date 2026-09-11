@@ -1,5 +1,16 @@
 # Lokale Grundlage für den isolierten Codex-Critic
 
+> **Aktueller Status (2026-09-12):** Dieses Dokument bewahrt die
+> plattformneutralen Verträge und historischen WSL-Diagnosen. Es ist kein
+> Readiness- oder Abnahmenachweis. Die optionale native Codex-Sandbox/App-
+> Server-Route ist unter WSL deaktiviert und in das separate künftige
+> Native-Windows-Paket verschoben; der gewöhnliche Critic in einer frischen
+> Session bleibt der unterstützte Standard. Maßgeblich sind die drei
+> bestehenden `sprint: none`-Einträge für
+> [Worker-Sandbox-Auswahl](../backlog/items/2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md),
+> [Selected-Critic-Vertragsbindung](../backlog/items/2026-09-06-the-selected-critic-lane-briefs-contract-files-it-neither-pins-nor-binds.md)
+> und [Fallback-Routing](../backlog/items/2026-09-06-the-t1-fallback-waits-for-failure-codes-the-route-collapses-before-they-arrive.md).
+
 **Stand:** Batman BTM-F2–F5 · F2-Zwischenklasse real verifiziert · produktiv
 weiterhin standardmäßig inaktiv
 

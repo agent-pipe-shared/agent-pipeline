@@ -205,7 +205,9 @@ redundant and non-authoritative; the English above them is corrected.
 
 ## Runner and platform scope, clarified 2026-08-06
 
-**The support claim stands: Claude Code and Codex, on Windows, macOS and Unix/WSL.**
+**The portable support claim stands for the shared Claude Code and Codex
+integration surfaces on Windows, macOS and Unix/WSL.** Host-native capabilities
+retain their own platform and evidence boundaries.
 
 An earlier revision of this document read ADR-0051's "support" clause literally and
 concluded 0.5.2 was evidenced for one runner on one platform with three accepted gaps.
@@ -215,16 +217,21 @@ verifying one combination and fixing what it finds would leave every *other*
 combination unevidenced against the new candidate. A definition under which improving
 the product shrinks its claim is not usable.
 
-The obligation ADR-0051 actually carries is on the **implementation** — runner
-neutrality by construction with no silent single-runner default, shell portability for
-both PowerShell and POSIX, and path/filesystem neutrality. Manual cross-platform
-verification is optional, performed independently by the PO, and gates nothing.
+The obligation ADR-0051 actually carries is on the **portable implementation** —
+runner neutrality by construction with no silent single-runner default, shell
+portability for both PowerShell and POSIX, and path/filesystem neutrality.
+Manual cross-platform verification of those shared surfaces is optional,
+performed independently by the PO, and gates nothing. This historical 0.5.2
+statement does not claim native Codex sandbox/App-Server readiness under WSL;
+that separate surface is deactivated there and deferred to the future
+native-Windows package described in
+[`docs/runtime-boundary.md`](runtime-boundary.md).
 
 For 0.5.2 this means:
 
 | | 0.5.2 |
 | --- | --- |
-| Support claim | unchanged and unqualified |
+| Portable support claim | unchanged for shared surfaces; host-native capabilities retain their declared platform boundary |
 | Runner-neutrality defect found this sprint | `RUNNER-THREAD-17`, in flight — must land |
 | Manual Codex / macOS / Windows runs | optional, PO-scheduled, not release gates |
 | Native-Windows red-suite class | retained as a tracked defect class, unchanged |

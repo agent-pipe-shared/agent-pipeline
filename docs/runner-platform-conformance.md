@@ -6,14 +6,18 @@
 
 ## The claim
 
-Agent-Pipeline supports **Claude Code and Codex**, on **Windows, macOS and Unix/WSL**.
+Agent-Pipeline's portable methodology and declared Claude Code and Codex
+integration surfaces support **Windows, macOS and Unix/WSL**. The claim applies
+per surface: shared contracts rely on runner, shell and filesystem neutrality;
+host-native capabilities additionally require the platform and evidence named
+by their own contract.
 
-That claim is not qualified by which machine a release happened to be developed on. A
-release is always built on one machine; requiring a fresh manual run of every
-runner/platform combination before the claim may be made would be unmaintainable, and
-self-defeating besides — verify one combination, fix what it finds, and every other
-combination is suddenly "unevidenced" against the new candidate. ADR-0057 records why
-that reading was rejected.
+The development machine does not qualify the portable claim. A release is
+always built on one machine, and ADR-0057 rejects a mandatory manual matrix for
+the shared surfaces. This does not turn evidence from one host into proof of a
+different host-native capability. In particular, native Codex sandbox/App-
+Server execution is deactivated on WSL and deferred to a native-Windows package;
+WSL diagnostics establish no readiness claim for that route.
 
 ## What actually carries the claim
 
@@ -22,9 +26,9 @@ change on whatever machine is at hand.
 
 ### R1 — Runner neutrality by construction
 
-Anything built works under both runners: genuinely runner-neutral, or explicitly
-routed per runner. A runner-specific path is acceptable only with an explicit, tested
-path for the other runner.
+Every shared surface must work under both runners: genuinely runner-neutral, or
+explicitly routed per runner. A runner-specific capability states and tests its
+own supported surface; it does not silently widen the shared claim.
 
 **Never a silent single-runner default.** No literal fallback runner, no environment
 sniff standing in for a threaded identity. This is the strongest clause in ADR-0051
@@ -44,9 +48,10 @@ for R1 over per-cell evidence.
 
 ### R2 — Shell portability by construction
 
-Every script, invocation and human-copyable command works under PowerShell **and** an
-ordinary POSIX shell. A command rendered for one shell family only is a defect, not a
-platform gap.
+Every portable script, invocation and human-copyable command works under
+PowerShell **and** an ordinary POSIX shell. A host-native command may be scoped
+to its declared platform; a portable command rendered for one shell family
+only is a defect.
 
 Reference shape: `restartCopyCommands` in
 `plugins/pipeline-core/lib/project-onboarding-v3.mjs`, which renders a POSIX and a
@@ -55,9 +60,11 @@ either is emitted.
 
 ### R3 — Path and filesystem neutrality
 
-No assumption of a path separator, case-folding rule, or permission model that holds
-on only one platform. Windows private-state handling (`windows-private-state.mjs`,
-DACL assurance) is the reference shape for the permission side.
+Shared code makes no assumption of a path separator, case-folding rule, or
+permission model that holds on only one platform. Platform adapters own and
+test their explicit differences. Windows private-state handling
+(`windows-private-state.mjs`, DACL assurance) is the reference shape for the
+permission side.
 
 ## Enforcement status, stated honestly
 
@@ -83,6 +90,12 @@ allowlist; and DACL/durability gaps in `afk-ledger` / `advisory-host-bridge` /
 
 This is a **defect class, not a missing-evidence gap**. Reclassifying evidence duty
 does not make known-red suites green, and ADR-0057 explicitly retains it.
+
+Native Codex sandbox/App-Server acceptance is a separate host-native surface.
+It is deactivated on WSL and tracked for a future native-Windows package in the
+existing `sprint: none` items linked from
+[`runtime-boundary.md`](runtime-boundary.md). Historical WSL probes remain useful
+diagnostics, but cannot establish that surface's readiness.
 
 ## Optional evidence log
 

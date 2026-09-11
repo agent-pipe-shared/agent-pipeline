@@ -120,6 +120,13 @@ stdin. It adds an EOF-sensitive regression that fails against the old ordering.
 Commit `fac5c14f` makes that regression portable without weakening its
 initialization or bounded-stop assertions.
 
+That portable EOF-lifecycle defect is closed. The WSL receipts below preserve
+the historical diagnosis of the route on that host; they are not native
+sandbox/App-Server readiness evidence, Nova-B acceptance evidence, or a Nova-B
+blocker. Native route activation and acceptance belong to the separate future
+native-Windows package linked from
+[`docs/runtime-boundary.md`](../../docs/runtime-boundary.md).
+
 The versioned measurement explains the original RED/GREEN regression and the
 historical 10/10 intermediate preflights. Ten fresh producer-written receipts
 under `backlog/evidence/2026-09-11-codex-preflight-eof-live/` supply the current

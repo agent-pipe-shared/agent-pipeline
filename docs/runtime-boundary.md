@@ -42,13 +42,17 @@ hand-edit them. If the adapter is absent, stale, disabled, pointed at a
 different project root, or the host does not deliver its native hook event, the
 methodology still applies but that adapter cannot enforce the operation.
 
-The native Codex selected-sandbox route remains the preferred attested route.
-If that route returns one typed `no-child` or `unavailable` result, the
-PO-authorized exception is limited to one fresh internal hard-read-only consult
-for the same question. It permits no handover, memory, mutation, network
-export, raw-answer retention, auto-apply, second question, or retry. A
-functional-equivalent pass does not establish native sandbox execution, OS
-isolation, or model identity.
+The ordinary fresh-session Critic is the default supported autonomous review
+route. The optional native Codex selected-sandbox/App-Server route is
+deactivated on WSL: WSL runs may diagnose portable contracts, but they are
+neither readiness evidence nor a blocker for Nova B. Native execution and
+acceptance move to a separate future native-Windows package tracked by the
+existing `sprint: none` items for
+[worker sandbox selection](../backlog/items/2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md),
+[Selected-Critic contract binding](../backlog/items/2026-09-06-the-selected-critic-lane-briefs-contract-files-it-neither-pins-nor-binds.md),
+and [fallback routing](../backlog/items/2026-09-06-the-t1-fallback-waits-for-failure-codes-the-route-collapses-before-they-arrive.md).
+No WSL result establishes native sandbox execution, OS isolation, model
+identity, or native-Windows readiness.
 
 ## Private review export consent
 
@@ -127,13 +131,15 @@ anderes Projektverzeichnis gerichtet oder liefert der Host kein natives Hook-
 Ereignis, bleibt die Methodik anwendbar, aber dieser Adapter kann die Operation
 nicht durchsetzen.
 
-Die native Codex-Selected-Sandbox-Route bleibt der bevorzugte attestierte Weg.
-Wenn sie einmalig `no-child` oder `unavailable` meldet, ist die PO-autorisierte
-Ausnahme auf genau einen frischen internen hard-read-only-Consult zur selben
-Frage begrenzt. Handover, Memory, Mutation, Netzwerkexport,
-Rohantwort-Aufbewahrung, Auto-Apply, eine zweite Frage und Retry sind nicht
-zulässig. Ein Funktionsäquivalenz-Pass bestätigt weder native
-Sandbox-Ausführung noch OS-Isolation oder Modellidentität.
+Der gewöhnliche Critic in einer frischen Session ist der standardmäßig
+unterstützte autonome Review-Weg. Die optionale native Codex-Selected-Sandbox-
+und App-Server-Route ist unter WSL deaktiviert: WSL-Läufe dürfen portable
+Verträge diagnostizieren, sind aber weder Readiness-Nachweis noch Nova-B-
+Blocker. Native Ausführung und Abnahme werden in einem separaten künftigen
+Native-Windows-Paket bearbeitet; die drei bestehenden `sprint: none`-Einträge
+für Worker-Sandbox-Auswahl, Selected-Critic-Vertragsbindung und Fallback-
+Routing sind oben verlinkt. Kein WSL-Ergebnis bestätigt native Sandbox-
+Ausführung, OS-Isolation, Modellidentität oder Native-Windows-Readiness.
 
 ## Zustimmung zum Export privater Review-Inhalte
 
