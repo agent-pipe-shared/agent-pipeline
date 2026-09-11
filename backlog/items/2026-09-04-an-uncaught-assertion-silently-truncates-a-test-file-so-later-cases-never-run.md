@@ -190,3 +190,12 @@ case-level completion evidence.
 All 31 DPT cases are registered before fixture reads or Git setup, and Verify
 requires their exact terminal evidence. The candidate-bound migration check
 passes and an independent review found no completion-protocol issue.
+
+The Codex coordinator and review-input hardening in `85921a11` extends the
+normal-path protocol to `codex-native-critic-host-tests`,
+`codex-critic-host-tests`, `dispatch-record-strip-for-critic-tests` and the
+completion registry's own meta-suite. The registry now contains **13 required
+and 167 legacy-process-only** entries, 180 total. NCH01–NCH08, CCH001–CCH133,
+DRS01–DRS11 and VCR01–VCR14 all completed, and the exact candidate-bound
+registry check passed. The item remains open because 167 registered suites
+still have only process-level evidence.

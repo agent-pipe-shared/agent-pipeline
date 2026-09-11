@@ -172,6 +172,24 @@ routes come next. The disabled worker supervisor requires its own candidate and
 workspace binding, and Antigravity requires a real production caller before an
 adapter-level completion claim is possible.
 
+The eighth slice in `85921a11` wires both shipped Codex Critic coordinators.
+The native host passes candidate blobs through the shared role-dispatch
+preflight and separately binds its coordinator evidence to the same commit and
+tree. The selected host prepares its packet before either App Server or CLI
+execution, then re-resolves the V3 route and repeats the complete preflight at
+the immediate launch boundary. Oversized reference sets fail before hashing;
+stale sources, route drift, symlinked destinations and forged preflight error
+lookalikes cannot reach the launcher.
+
+The native host suite passes 8/8 and the selected host suite passes 133/133 at
+the real WSL host boundary. The generic read-only bridge suite passes 10/10.
+Separate independent correction reviews returned PASS with no findings for
+both coordinators. Their normal Verify registrations now require exact
+case-completion evidence. The item remains open for the disabled local worker
+supervisor, which still needs candidate/workspace binding, and for an
+Antigravity production caller that can consume the common contract without
+inventing a launch surface.
+
 ## Greenfield 0.6.2 evidence — 2026-09-11
 
 The Claude greenfield analysis records a malformed Critic packet that reached
