@@ -5,6 +5,8 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-09-01
+closed_at: 2026-09-11
+closure_repository: self
 sprint: nova-b
 done_when: manual
 closure_evidence: backlog/evidence/2026-09-11-git-boundary-critic-pass.md
