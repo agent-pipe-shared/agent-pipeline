@@ -261,6 +261,15 @@ in that pilot's own exact preview.
 
 **Issue:** `#15`
 
+**Status (reconciled 2026-09-11): complete and superseded by the shipped native
+runner.** This section records the original research gate. Direct Antigravity
+support subsequently landed under the dedicated `sprint-agy-runner` package:
+the execution host (`7be2ecb9`), native hook projection (`bfc4fd0f`), hard
+enforcement (`4932d19d`) and later hardening are present on the current branch.
+The current authority is
+[`specs/sprint-agy-runner/spec.md`](../../sprint-agy-runner/spec.md) together
+with [ADR-0067](../../../docs/adr/0067-tri-runner-antigravity-integration.md).
+
 **Outcome:** pin one Google runtime surface: the current official Antigravity
 contract. Gemini appears exclusively as the model selectors available inside
 Antigravity. The decision binds structured result/usage/cancellation
@@ -282,6 +291,13 @@ edit.
 
 **Issue:** `#15`; direct AGY follow-up: `#69` (`sprint:NONE`).
 
+**Status (reconciled 2026-09-11): complete historical Alpha boundary.** The
+negative `antigravity-alpha-adapter` remains a regression fixture for this
+once-valid pre-activation boundary; it is not the current product capability
+declaration. The shipped execution, onboarding, hooks, model routing, usage
+projection and guard behavior are governed by the later native runner package
+named above.
+
 **Outcome:** register Antigravity visibly as the third-runner Alpha boundary,
 backed only by the reviewed documentation decision. It returns a typed
 fail-closed non-selection and keeps Gemini as the model family inside that
@@ -296,13 +312,28 @@ Those belong solely to #69's later dedicated AGY sprint.
 
 ## External B3-I follow-up
 
-Direct Antigravity invocation, cancellation, result, usage and live
-conformance are not a Nova slice. They are owned exclusively by Issue `#69`
-with `sprint:NONE` and require their own future lifecycle and authority.
+**Completed outside the original Nova slice.** Issue `#69` was implemented by
+the later `sprint-agy-runner` package and merged into this branch. Direct
+invocation, typed result/error handling, model selection, usage projection,
+native hooks and hard-enforcement fixtures are therefore supported Pipeline
+surfaces. Historical Nova candidate-freeze records that list B3-I as deferred
+remain immutable evidence about those older candidates; they are not the
+current capability status.
 
 ## Slice B4 — GitHub/GitLab transport and forge adapter
 
 **Issue:** `#51`
+
+**Status (reconciled 2026-09-11): implementation complete.** The provider-neutral
+forge and Git transport contracts plus GitHub and GitLab adapters landed in
+`3f4cf8c0` and confirmation hardening in `3c9eb8df`. The focused current-branch
+contract suites pass 49/49 across those four surfaces. A successful GitLab
+Desktop/WSL read observation is retained in
+[`backlog/evidence/2026-09-07-gitlab-read-access-observation.md`](../../../backlog/evidence/2026-09-07-gitlab-read-access-observation.md).
+Credentials and each external mutation remain explicit operator actions; that
+normal runtime boundary does not make the adapter implementation incomplete.
+Historical candidate-freeze records that deferred a live forge operation
+describe those exact candidates only.
 
 **Outcome:** one dual-provider Git transport plus provider-neutral forge
 contract for GitHub and GitLab.com / Self-Managed. Git remains the VCS; the

@@ -34,6 +34,16 @@ collect actual human decisions in
 tests, local commits and reviews remain authorized. Do not repeat historical
 startup diagnosis, missing-record searches or completed review rounds.
 
+Nova-B status reconciliation is active. The pass began at 61 open and 54
+closed `nova-b` items; after the first evidence-backed closure the canonical
+ledger projection contains 60 open and 55 closed. Every open item's
+`done_when` is being checked against the current code before that count is
+treated as remaining work. B3 and B4 are implemented:
+the later native Antigravity runner supersedes Nova's historical Alpha-only
+boundary, and the provider-neutral GitHub/GitLab forge adapter package is
+present and tested. The Nova-B plan now records that distinction without
+rewriting immutable historical candidate-freeze evidence.
+
 The genuine migration correction review is retained in
 `backlog/evidence/2026-09-10-migration-correction-critic.json`. Final correction
 `712f2aa3` preserves required input after activation; the parent inspected the
@@ -537,9 +547,11 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
    seeded only when the PO can sign immediately.
 5. **GIT-01 does not admit `revert`.** Deliberate or oversight? Two reverts this
    week were committed as `fix` with the reason in the body.
-6. **Nova B is 68 open items, not the 19 the STATUS.md tracking column shows.**
-   The authoritative field is `sprint: nova-b` in frontmatter. Recorded because
-   "work the Nova B backlog" and "work 68 items" are different asks.
+6. **Superseded count:** the 2026-09-06 snapshot contained 68 open Nova-B
+   items. The current audit started at 61 open and 54 closed; its first
+   sanctioned reconciliation leaves 60 open and 55 closed. Frontmatter plus
+   the append-only ledger remains authoritative, and each further change needs
+   checked completion evidence.
 7. **Action needed now: run the marketplace/plugin update + `/reload-plugins`.**
    Both `guard-lifecycle-ready.mjs` and `guard-git.mjs`'s installed copies
    are confirmed stale (see the READCONTAIN-1/2 section above for detail) —
