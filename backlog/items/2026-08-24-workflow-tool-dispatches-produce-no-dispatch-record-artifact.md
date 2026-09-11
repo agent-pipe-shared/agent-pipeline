@@ -165,3 +165,19 @@ The item remains open because the Workflow/native dispatch return paths do not
 yet invoke this writer automatically. That consumer wiring and one genuine
 end-to-end dispatch are the remaining acceptance work; no manual reconstruction
 is claimed by the writer core alone.
+
+Commit `50a80e51` adds the repository-owned return coordinator. It accepts only
+a fresh final runner return and binds its task ID, candidate commit and result
+digest through the validated v2 record, canonical writer receipt and authorship
+verification. Running, duplicate, stale, mismatched and same-suffix
+noncanonical-path results perform no successful handoff; a post-write
+verification failure is never reported as success. Three independent Critic
+rounds found and closed an optional-field incompatibility, a missing
+return-to-record binding and a receipt-path alias.
+
+The remaining boundary is now explicit and smaller: the proprietary Workflow
+host has no repository-visible return callback that this code can patch. That
+host adapter must call the versioned coordinator with its prepared write
+request, followed by one genuine Workflow-tool dispatch proving the automatic
+artifact path. Until then the item remains open and no live-host automation is
+claimed.

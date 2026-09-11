@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.commandpath-sibling-tilde-gap-and-test-pins
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 94fe6cc6e38bd690ee87af68092ac75789af00a0
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nova-b
 tracking: "Nova B — T1 Critic review of NVA-B-TILDEFIX-1 (PASS, 4 minor findings). F3: commandPath() in guard-lifecycle-ready.mjs still builds resolve(root, value) with no tilde reject, so a leading-~ argument still resolves as inside root wherever a caller trusts that result directly (named call sites: lines 2783, 2956, 2979, 2987) -- not proven exploitable, disclosed as such. F1: the cat-pipeline and git-pipeline lane tests added by NVA-B-TILDEFIX-1 assert only exitCode 2, not the specific denial code, unlike their single-command/rg siblings, so a future refactor could silently change which code those two lanes report with the suite still green."
 done_when: manual
@@ -60,3 +64,21 @@ code with the full suite still green.
   closer inspection — do not assume the commit message is correct without
   checking).
 - Full existing regression suite for both touched files stays green.
+
+## Closure — 2026-09-11
+
+Commit `94fe6cc6` closes the still-relevant mutation gap. A leading tilde is
+now treated as an external shell target by `commandPath()` without attempting
+user-directory expansion. Redirects, the local cachebuster, mutating `git -C`,
+generic file mutators and `sed -i` all route to the exact
+`GUARD-CROSS-REPO-MUTATION` refusal. Normal relative targets remain unchanged.
+
+The older F1 expectation that the cat and Git read pipelines should report
+`GUARD-READ-SCOPE-OUTSIDE-ROOT` was superseded by the later runner-neutral
+policy that permits bounded read-only diagnostics outside the project root.
+Their tests now pin that intended result directly: exit 0 with no `GUARD-*`
+code. This keeps the newer read policy while closing the real write-target
+bypass identified by F3.
+
+Focused mutation/read regressions and syntax checks passed; the independent
+Critic returned PASS with no blocker or major finding.
