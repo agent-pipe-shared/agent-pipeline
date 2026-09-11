@@ -174,6 +174,57 @@ check("the checker exits 0 (well-formed, function level) on a well-formed fixtur
   rmSync(root, { recursive: true, force: true });
 });
 
+check("a registered suite is rejected immediately when its derived inventory surface is uncategorized", () => {
+  const root = buildRoot();
+  writeFile(root, "harness/scripts/alpha.test.mjs");
+  writeVerifyFixture(root, {
+    testSuites: [{ name: "alpha-tests", ident: "scriptDir", segments: ["alpha.test.mjs"] }],
+  });
+  writeFile(root, "docs/product-capability-inventory.json", JSON.stringify({
+    capabilities: [{ id: "fixture", surfaceIds: [] }],
+  }));
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.uncategorizedVerifySurfaces, [
+    "verify-phase:harness/scripts/verify.mjs:alpha-tests",
+  ]);
+  assert.match(
+    result.findings.join("\n"),
+    /UNCATEGORIZED-VERIFY-SURFACE "alpha-tests".*verify-phase:harness\/scripts\/verify\.mjs:alpha-tests.*docs\/product-capability-inventory\.json/,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("a registered suite passes the early inventory check after exactly one capability assigns its surface", () => {
+  const root = buildRoot();
+  writeFile(root, "harness/scripts/alpha.test.mjs");
+  writeVerifyFixture(root, {
+    testSuites: [{ name: "alpha-tests", ident: "scriptDir", segments: ["alpha.test.mjs"] }],
+  });
+  writeFile(root, "docs/product-capability-inventory.json", JSON.stringify({
+    capabilities: [{
+      id: "fixture",
+      surfaceIds: ["verify-phase:harness/scripts/verify.mjs:alpha-tests"],
+    }],
+  }));
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, true, result.findings.join(" | "));
+  assert.deepEqual(result.uncategorizedVerifySurfaces, []);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("consumer projects without a product-capability inventory keep the registration-only contract", () => {
+  const root = buildRoot();
+  writeFile(root, "harness/scripts/alpha.test.mjs");
+  writeVerifyFixture(root, {
+    testSuites: [{ name: "alpha-tests", ident: "scriptDir", segments: ["alpha.test.mjs"] }],
+  });
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, true, result.findings.join(" | "));
+  assert.deepEqual(result.uncategorizedVerifySurfaces, []);
+  rmSync(root, { recursive: true, force: true });
+});
+
 // -- Process-level proof: the checker's own CLI exits 0 / non-zero for real. --
 // AC-P2/AC-P3 ("demonstrated by deliberate break ... not asserted"): this
 // spawns the real check-verify-suite-registration.mjs file as a child process
@@ -192,7 +243,11 @@ check("CLI: exits non-zero (deliberate break) against an unregistered-file fixtu
   writeFile(root, "plugins/pipeline-core/lib/unregistered-break.test.mjs");
   const result = spawnSync(process.execPath, [checkerPath, "--root", root], { encoding: "utf8" });
   assert.notEqual(result.status, 0, `expected a non-zero exit, got ${result.status}`);
-  assert.match(result.stderr, /UNREGISTERED .*unregistered-break\.test\.mjs/);
+  assert.match(
+    result.stderr,
+    /UNREGISTERED .*unregistered-break\.test\.mjs/,
+    `status=${String(result.status)} signal=${String(result.signal)} error=${String(result.error?.code ?? result.error ?? "none")} stdout=${JSON.stringify(result.stdout)}`,
+  );
   rmSync(root, { recursive: true, force: true });
 });
 

@@ -49,6 +49,11 @@
  *      clause that makes the list self-clearing rather than a permanent
  *      parking lot; it is checked for every declared exclusion, including one
  *      whose file has meanwhile been deleted -- a stale entry is debt too.
+ *   6. UNCATEGORIZED-VERIFY-SURFACE -- this checkout carries the optional
+ *      product-capability inventory, but a registered suite's derived
+ *      `verify-phase:` surface belongs to no capability. This is checked here,
+ *      before Full Verify, because registration is the edit that creates the
+ *      obligation. Consumer projects without that inventory are unaffected.
  *
  * STATIC PARSING, NOT IMPORT. This module never imports or executes
  * verify.mjs: importing it spawns git, requires a clean candidate, and runs
@@ -118,6 +123,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
 const VERIFY_REL = join("harness", "scripts", "verify.mjs");
+const INVENTORY_REL = join("docs", "product-capability-inventory.json");
 
 /** Roots scanned for *.test.mjs suites (mirrors the classification report's
  *  headline: "tracked *.test.mjs under plugins/pipeline-core/ + harness/"). */
@@ -301,6 +307,7 @@ export function checkVerifySuiteRegistration({
   registeredRoots = REGISTERED_ROOTS,
   exclusions = EXCLUSIONS,
   now = new Date(),
+  inventoryPath = undefined,
 } = {}) {
   const findings = [];
   // Classes 4 and 5 first: they are properties of the exclusion table alone and
@@ -316,6 +323,7 @@ export function checkVerifySuiteRegistration({
       ok: false,
       findings,
       registeredCount: 0, unregisteredCount: 0, excludedCount: 0, entries: [], unregisteredFiles: [],
+      uncategorizedVerifySurfaces: [],
       malformedExclusions: exclusionState.malformed, expiredExclusions: exclusionState.expired,
     };
   }
@@ -374,6 +382,49 @@ export function checkVerifySuiteRegistration({
     if (arrayNames.length > 1) findings.push(`DUPLICATE-NAME "${name}" is registered ${arrayNames.length} times (${arrayNames.join(", ")})`);
   }
 
+  // Class 6 -- UNCATEGORIZED-VERIFY-SURFACE. The inventory's surface SET is
+  // derived by check-product-capability-inventory.mjs, but assigning each
+  // surface to one capability remains a deliberate product judgement. A new
+  // registration therefore still creates one hand-maintained obligation.
+  // Detect it in this cheap registration check instead of ten minutes later in
+  // Full Verify. The inventory is a self-repository artifact, so its absence in
+  // a consumer project is a supported no-op rather than a new requirement.
+  const resolvedInventoryPath = inventoryPath === undefined ? join(repoRoot, INVENTORY_REL) : inventoryPath;
+  const uncategorizedVerifySurfaces = [];
+  if (resolvedInventoryPath !== null && existsSync(resolvedInventoryPath)) {
+    let inventory;
+    try {
+      inventory = JSON.parse(readFileSync(resolvedInventoryPath, "utf8"));
+    } catch (error) {
+      findings.push(`INVENTORY-READ-ERROR: could not parse ${resolvedInventoryPath} (${error.message})`);
+    }
+    if (inventory !== undefined) {
+      if (!Array.isArray(inventory.capabilities)) {
+        findings.push(`INVENTORY-SHAPE: ${resolvedInventoryPath} must contain a capabilities array`);
+      } else {
+        const assignments = new Map();
+        for (const capability of inventory.capabilities) {
+          if (!Array.isArray(capability?.surfaceIds)) continue;
+          for (const surfaceId of capability.surfaceIds) {
+            assignments.set(surfaceId, (assignments.get(surfaceId) ?? 0) + 1);
+          }
+        }
+        // check-product-capability-inventory.mjs's verifyMembers() discovers
+        // TEST_SUITES plus the two manifest phases. Scoped and Windows
+        // assurance suites have separate registries and therefore create no
+        // product-inventory surface obligation here.
+        for (const entry of entries.filter((candidate) => candidate.arrayName === "TEST_SUITES")) {
+          const surfaceId = `verify-phase:harness/scripts/verify.mjs:${entry.name}`;
+          if ((assignments.get(surfaceId) ?? 0) !== 0) continue;
+          uncategorizedVerifySurfaces.push(surfaceId);
+          findings.push(
+            `UNCATEGORIZED-VERIFY-SURFACE "${entry.name}": add "${surfaceId}" to exactly one capability in ${toPosix(relative(repoRoot, resolvedInventoryPath))}`,
+          );
+        }
+      }
+    }
+  }
+
   // Class 1 -- UNREGISTERED.
   const registeredPaths = new Set(entries.map((entry) => resolve(entry.resolvedPath)));
   const discovered = [];
@@ -400,6 +451,7 @@ export function checkVerifySuiteRegistration({
     excludedCount,
     entries,
     unregisteredFiles,
+    uncategorizedVerifySurfaces,
     malformedExclusions: exclusionState.malformed,
     expiredExclusions: exclusionState.expired,
   };
@@ -420,6 +472,7 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
   console.error(
     `Verify suite registration check failed: ${result.findings.length} finding(s) ` +
     `(${result.unregisteredCount} unregistered, ${result.excludedCount} honoured exclusion(s), ` +
+    `${result.uncategorizedVerifySurfaces.length} uncategorized inventory surface(s), ` +
     `${result.malformedExclusions.length} malformed, ${result.expiredExclusions.length} expired).`,
   );
   process.exit(2);
