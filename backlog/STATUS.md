@@ -43,7 +43,7 @@
 | pipeline.adr-0056-conflict-scope-text-narrower-than-code | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.advisor-consent-is-requested-before-the-readiness-preflight | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.afk-assumption-mode | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.agent-binding-guards-are-not-os-level-sandboxing | open | defect | pipeline | 2026-08-25 | Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature. |
+| pipeline.agent-binding-guards-are-not-os-level-sandboxing | closed | defect | pipeline | 2026-08-25 | Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature. |
 | pipeline.agent-can-self-arm-the-git-override | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.agent-decision-journal-code-pattern-array-coercion | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.agent-decision-journal-no-production-producer | closed | requirement | pipeline | 2026-08-11 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 83
+- open: 82
 - in_progress: 0
-- closed: 557
+- closed: 558
 - rejected: 3
 - deferred: 11

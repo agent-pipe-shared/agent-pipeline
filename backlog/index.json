@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6f72f5168e41147f0a93bfac8b970c89f6feb88568350459d66b56549f5edcd0"
+    "transitionHead": "ae3b621ec2cb842816a2d81e9df7eeba8192901134348e8265940fe30f3d915d"
   },
   "counts": {
-    "open": 83,
+    "open": 82,
     "in_progress": 0,
-    "closed": 557,
+    "closed": 558,
     "rejected": 3,
     "deferred": 11
   },
@@ -469,13 +469,17 @@
     },
     {
       "id": "pipeline.agent-binding-guards-are-not-os-level-sandboxing",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-25",
       "source": "PO relay (chat), 2026-08-25, from a separate Agy greenfield-test session's own threat-model self-analysis (Q&A transcript pasted verbatim by the PO); PO's own framing: 'eher was fürs backlog was aber nicht zeitnah angegangen wird (Thema eher für nova B)'",
       "deferred": true,
-      "tracking": "Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature."
+      "tracking": "Escalated idea -> defect on 2026-08-28: vector 1 is no longer theoretical. Two independent greenfield runs executed it, one of them reaching the GitHub remote with no PO signature.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "b4908639ac14e53832a3ec6f3b2a68bf06a2fed7",
+      "closureEvidence": "backlog/evidence/2026-09-11-agent-binding-os-boundary-disposition.md"
     },
     {
       "id": "pipeline.agent-can-self-arm-the-git-override",
