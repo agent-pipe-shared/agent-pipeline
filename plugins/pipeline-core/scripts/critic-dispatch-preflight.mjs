@@ -297,7 +297,11 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
         ...(scope === null ? { baseCommit } : { reviewScope: scope }),
         candidateCommit,
         candidateTree,
+        rulesetSha: candidateCommit,
         specPath: specReadback.path,
+        governanceConstraintPaths: governance.governance === null
+          ? []
+          : [governance.governance.guidelinesPath, governance.governance.policiesPath],
         guardrailPaths: guardrailReadback.map(({ path }) => path),
         evidencePaths: evidenceReadback.map(({ path }) => path),
       },

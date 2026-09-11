@@ -28,8 +28,11 @@ to the preflight only.
 Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
 `packet-ready`. `packet-ready` has `spawnAuthorized: false`: the session
 orchestrator's ordinary agent dispatch remains the execution authority. Its
-returned `dispatch.reviewerInput` is the complete path/ref input passed to this
-skill. The `coordinatorOnly.priorCriticEvidence` binding is retained for range
+returned `dispatch.reviewerInput` carries the frozen refs, ruleset SHA,
+resolved governance directories, candidate-file guardrails and evidence paths
+passed to this skill. The caller adds only its route metadata (`project:`,
+`verdict:` and `assurance:`); it must not reconstruct or omit any preflight
+field. The `coordinatorOnly.priorCriticEvidence` binding is retained for range
 and lineage checks and must never be copied into the reviewer input. This
 preflight is read-only.
 A rejected packet is a coordinator defect, not Critic work: do not spawn a child, create a packet or substitute prose/evidence.

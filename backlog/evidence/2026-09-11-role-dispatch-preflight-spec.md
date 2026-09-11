@@ -116,5 +116,18 @@ role/runner fixture with an invalid required field must terminate during
 `PREPARE`, within the local five-second bound, and prove zero launcher calls.
 See `backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`.
 
-<!-- SPEC-REFERENCE-STRIPPED-TRIAGE: this section of the original backlog item has been removed for dispatch citation. It recorded a prior human or Critic verdict about this item -- never spec/reference content -- and would otherwise contaminate an independent downstream review or implementation. See the item's own file for the full history. Convention: backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md. -->
+### Critic reviewer-input correction, 2026-09-11
 
+A live correction review exposed a remaining pre-launch mismatch:
+`critic-dispatch-preflight.mjs` returned `packet-ready` with every expanded
+governance file, but its `reviewerInput` omitted the manifest's two resolved
+governance directory paths and the fixed ruleset SHA required by the strict
+Critic bootstrap. The Critic therefore rejected the packet only after launch.
+
+The preflight result must carry both resolved governance directories and bind
+`rulesetSha` to its already frozen candidate commit. Tests must assert these
+fields alongside the expanded candidate-file guardrails. The route caller may
+still add `project`, `verdict` and `assurance` metadata, but it must not
+reconstruct the preflight-owned refs or paths.
+
+<!-- SPEC-REFERENCE-STRIPPED-TRIAGE: this section of the original backlog item has been removed for dispatch citation. It recorded a prior human or Critic verdict about this item -- never spec/reference content -- and would otherwise contaminate an independent downstream review or implementation. See the item's own file for the full history. Convention: backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md. -->

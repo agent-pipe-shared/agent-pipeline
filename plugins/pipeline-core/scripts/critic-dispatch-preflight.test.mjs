@@ -65,7 +65,9 @@ test("read-only dispatch preflight binds candidate, candidate-tree governance, a
     baseCommit: fx.base,
     candidateCommit: fx.candidate,
     candidateTree: fx.tree,
+    rulesetSha: fx.candidate,
     specPath: "specs/spec.md",
+    governanceConstraintPaths: ["governance/guidelines", "governance/policies"],
     guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"],
     evidencePaths: ["evidence/verify.json"],
   });
@@ -73,6 +75,17 @@ test("read-only dispatch preflight binds candidate, candidate-tree governance, a
   assert.equal(result.dispatch.childCreated, false);
   assert.equal(result.dispatch.spawnAuthorized, false);
   assert.equal(result.dispatch.requiredNextGate, "selected-runner-transport");
+});
+
+test("reviewer input uses an empty governance-directory list when the manifest declares no governance block", () => {
+  const fx = fixture();
+  writeFileSync(join(fx.root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const candidate = commit(fx.root, "remove optional governance block");
+  const tree = git(fx.root, ["rev-parse", "HEAD^{tree}"]);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  const result = preflightCriticDispatch(input(fx, { base: fx.candidate, candidate }));
+  assert.equal(result.dispatch.reviewerInput.rulesetSha, candidate);
+  assert.deepEqual(result.dispatch.reviewerInput.governanceConstraintPaths, []);
 });
 
 test("current-artifact preflight binds an unchanged artifact to the later candidate without inventing a range", () => {
