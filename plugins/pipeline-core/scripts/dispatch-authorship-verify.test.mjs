@@ -66,7 +66,7 @@ const TRAILERS = "\n\nDispatch: DOD-A (goldfish)\nAI-Assisted: true\n";
 const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
 const skip = () => ({ schema: CRITIC_SKIP_SCHEMA, trigger: trigger(), appliedRow: "T5" });
 
-test("(a) correct trailer, terminal record, paths covered -> PASS", () => {
+test("(a) correct pre-v3 trailer record remains nonbinding", () => {
   writeRecord("DOD-A", {
     taskId: "DOD-A",
     outcome: "completed",
@@ -79,8 +79,8 @@ test("(a) correct trailer, terminal record, paths covered -> PASS", () => {
     "abc1234def",
     commit({ message: `feat(x): a thing\n\nWhy it matters.${TRAILERS}`, paths: ["src/thing.mjs", "src/thing.test.mjs"] }),
   );
-  assert.equal(verdict.verdict, VERDICT.pass);
-  assert.equal(verdict.classification, "bound");
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "record-pre-v3-nonbinding");
   assert.equal(verdict.taskId, "DOD-A");
 });
 
@@ -134,7 +134,7 @@ test("(f) record naming a different commit -> FAIL (item failure shape 3)", () =
   assert.equal(verdict.classification, "record-names-different-commit");
 });
 
-test("(f2) a multi-commit dispatch binds every sha it declares in `commits`", () => {
+test("(f2) a pre-v3 multi-commit dispatch remains nonbinding for every declared sha", () => {
   writeRecord("DOD-F2", {
     taskId: "DOD-F2",
     outcome: "done",
@@ -145,7 +145,7 @@ test("(f2) a multi-commit dispatch binds every sha it declares in `commits`", ()
   });
   const fixture = { message: "feat(x): a thing\n\nDispatch: DOD-F2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] };
   for (const sha of ["6ad81155f000aa", "8161c31af6c5bb"]) {
-    assert.equal(verifyCommit(sha, commit(fixture)).verdict, VERDICT.pass, sha);
+    assert.equal(verifyCommit(sha, commit(fixture)).classification, "record-pre-v3-nonbinding", sha);
   }
   const stranger = verifyCommit("deadbeef0000", commit(fixture));
   assert.equal(stranger.verdict, VERDICT.fail);
@@ -185,7 +185,7 @@ test("(i) record whose own taskId denies the trailer -> FAIL (item failure shape
   assert.equal(verdict.classification, "record-taskid-mismatch");
 });
 
-test("(j) a record with a matching agentType/model/effort stays PASS/bound and carries modelCheck.model-matches", () => {
+test("(j) a matching model cannot make a pre-v3 record binding", () => {
   writeRecord("DOD-J", {
     taskId: "DOD-J",
     agentType: "goldfish-implementor",
@@ -196,9 +196,8 @@ test("(j) a record with a matching agentType/model/effort stays PASS/bound and c
     report: { changedFiles: ["src/thing.mjs - x"] },
   });
   const verdict = verifyCommit("j00j111", commit({ message: "feat(x): a thing\n\nDispatch: DOD-J (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
-  assert.equal(verdict.verdict, VERDICT.pass);
-  assert.equal(verdict.classification, "bound");
-  assert.equal(verdict.modelCheck.classification, "model-matches");
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "record-pre-v3-nonbinding");
 });
 
 test("(k) recorded model contradicts the dispatched agent's definition (2026-08-08 incident shape) -> downgraded to FAIL model-mismatch", () => {
@@ -267,6 +266,19 @@ test("v2 records remain readable but are explicitly nonbinding for a new deliver
   assert.equal(other.classification, "record-v2-nonbinding");
 });
 
+test("unversioned, v1, evidence-v1 and v2 shapes are all nonbinding for new delivery", () => {
+  const sha = "5".repeat(40);
+  const depsFor = (taskId) => commit({ message: `feat(x): done\n\nDispatch: ${taskId} (goldfish)\nAI-Assisted: true\n`, paths: ["src/thing.mjs"] });
+  for (const [taskId, schema] of [["PRE-NONE", undefined], ["PRE-V1", "pipeline.dispatch-record.v1"], ["PRE-EV1", "pipeline.dispatch-evidence.v1"]]) {
+    const record = { taskId, outcome: "completed", model: "claude-sonnet-5", rulesetSha: "old", report: { changedFiles: ["src/thing.mjs"] } };
+    if (schema !== undefined) record.schema = schema;
+    writeRecord(taskId, record);
+    const verdict = verifyCommit(sha, depsFor(taskId));
+    assert.equal(verdict.verdict, VERDICT.unverifiable, taskId);
+    assert.equal(verdict.classification, "record-pre-v3-nonbinding", taskId);
+  }
+});
+
 test("v3 records bind authorship and carry exactly one Critic disposition", () => {
   const sha = "9".repeat(40);
   const base = {
@@ -301,7 +313,47 @@ test("v3 criticRequired is a valid pending lifecycle state but cannot mint autho
   assert.equal(pending.classification, "critic-evidence-pending");
 });
 
-test("(m) a record without agentType (pre-NVA-BL-78 corpus) is unaffected -- classification stays bound, no regression", () => {
+test("actual paths reject false T5 and T0 while honest T1 required/evidence is accepted", () => {
+  const sha = "7".repeat(40);
+  const base = {
+    schema: "pipeline.dispatch-record.v3", taskId: "DOD-V3-PATHS", agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed", commits: [sha], log: [],
+    report: { text: "Done.", changedFiles: ["plugins/pipeline-core/hooks/guard-push.mjs"] },
+  };
+  const deps = commit({ message: "fix(guard): done\n\nDispatch: DOD-V3-PATHS (goldfish)\nAI-Assisted: true\n", paths: ["plugins/pipeline-core/hooks/guard-push.mjs"] });
+
+  writeRecord("DOD-V3-PATHS", { ...base, criticSkip: skip() });
+  assert.equal(verifyCommit(sha, deps).classification, "critic-trigger-underdeclared");
+
+  const t0 = { schema: CRITIC_SKIP_SCHEMA, trigger: trigger({ diff: { mechanical: true, architecture: false, guardrails: false, security: false } }), appliedRow: "T0" };
+  writeRecord("DOD-V3-PATHS", { ...base, report: { text: "Done.", changedFiles: ["src/runtime.mjs"] }, criticSkip: t0 });
+  const sourceDeps = commit({ message: "fix(core): done\n\nDispatch: DOD-V3-PATHS (goldfish)\nAI-Assisted: true\n", paths: ["src/runtime.mjs"] });
+  assert.equal(verifyCommit(sha, sourceDeps).classification, "critic-mechanical-path-mismatch");
+
+  const honestT1 = { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ diff: { mechanical: false, architecture: false, guardrails: true, security: false } }), appliedRow: "T1" };
+  writeRecord("DOD-V3-PATHS", { ...base, criticRequired: honestT1 });
+  assert.equal(verifyCommit(sha, deps).classification, "critic-evidence-pending");
+
+  writeRecord("DOD-V3-PATHS", { ...base, criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "DOD-V3-PATHS", candidateCommit: sha, path: "evidence/critic-DOD-V3-PATHS.json", sha256: "b".repeat(64) } });
+  assert.equal(verifyCommit(sha, deps).verdict, VERDICT.pass);
+});
+
+test("an honest T0 accepts only generated and lockfile paths", () => {
+  const sha = "6".repeat(40);
+  const mechanicalTrigger = trigger({ diff: { mechanical: true, architecture: false, guardrails: false, security: false } });
+  writeRecord("DOD-V3-MECHANICAL", {
+    schema: "pipeline.dispatch-record.v3", taskId: "DOD-V3-MECHANICAL", agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed", commits: [sha], log: [],
+    report: { text: "Done.", changedFiles: ["generated/client.mjs", "package-lock.json"] },
+    criticSkip: { schema: CRITIC_SKIP_SCHEMA, trigger: mechanicalTrigger, appliedRow: "T0" },
+  });
+  const deps = commit({ message: "chore(gen): done\n\nDispatch: DOD-V3-MECHANICAL (goldfish)\nAI-Assisted: true\n", paths: ["generated/client.mjs", "package-lock.json"] });
+  assert.equal(verifyCommit(sha, deps).verdict, VERDICT.pass);
+});
+
+test("(m) a record without agentType is explicitly pre-v3 and nonbinding", () => {
   writeRecord("DOD-M", {
     taskId: "DOD-M",
     model: "claude-sonnet-5",
@@ -311,9 +363,8 @@ test("(m) a record without agentType (pre-NVA-BL-78 corpus) is unaffected -- cla
     report: { changedFiles: ["src/thing.mjs - x"] },
   });
   const verdict = verifyCommit("m00m444", commit({ message: "feat(x): a thing\n\nDispatch: DOD-M (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
-  assert.equal(verdict.verdict, VERDICT.pass);
-  assert.equal(verdict.classification, "bound");
-  assert.equal(verdict.modelCheck.classification, "agent-type-absent");
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "record-pre-v3-nonbinding");
 });
 
 test("a Dispatch: mentioned in the body prose is not authorship evidence", () => {
@@ -384,7 +435,7 @@ test("orchestratorAddedFiles: declaredOrchestratorPaths extracts paths, and decl
   );
 });
 
-test("orchestratorAddedFiles: a commit with orchestrator-added files passes when declared in the record", () => {
+test("orchestratorAddedFiles stay readable but cannot make pre-v3 evidence binding", () => {
   writeRecord("DOD-ORCH", {
     taskId: "DOD-ORCH",
     outcome: "completed",
@@ -403,8 +454,8 @@ test("orchestratorAddedFiles: a commit with orchestrator-added files passes when
       paths: ["src/feature.mjs", "docs/state.md"],
     }),
   );
-  assert.equal(verdict.verdict, VERDICT.pass);
-  assert.equal(verdict.classification, "bound");
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "record-pre-v3-nonbinding");
   assert.equal(verdict.taskId, "DOD-ORCH");
   assert.deepEqual(verdict.orchestratorAddedFiles, ["docs/state.md"]);
 });
@@ -491,7 +542,7 @@ test("(l2) readRecordFile itself refuses an unsafe id rather than joining it int
 // bind. These two tests are the evidence that the pattern needs ZERO changes to this checker
 // (terminality is already a denylist, not an allowlist) and that skipping the outcome half of
 // the checkpoint is not enough on its own.
-test("(n) Direction 2 checkpoint pattern: an interim outcome off the denylist already PASSes with no checker change", () => {
+test("(n) Direction 2 legacy checkpoint stays terminal but pre-v3 nonbinding", () => {
   writeRecord("DOD-N", {
     taskId: "DOD-N",
     outcome: "committed-pending-report",
@@ -504,8 +555,8 @@ test("(n) Direction 2 checkpoint pattern: an interim outcome off the denylist al
     "n00n555aaa",
     commit({ message: "feat(x): a thing\n\nDispatch: DOD-N (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }),
   );
-  assert.equal(verdict.verdict, VERDICT.pass);
-  assert.equal(verdict.classification, "bound");
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "record-pre-v3-nonbinding");
   assert.equal(isTerminalOutcome("committed-pending-report"), true, "the denylist never listed this value, so it is terminal by construction");
 });
 

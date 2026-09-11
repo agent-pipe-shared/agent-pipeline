@@ -10,6 +10,69 @@ export const CRITIC_DISPOSITION_WIRING_MARKER = "pipeline.critic-skip-wired-into
 const RISK_CLASSES = Object.freeze(["low", "medium", "high"]);
 const TRIGGER_ROWS = Object.freeze(["T0", "T1", "T2", "T3", "T4", "T5"]);
 
+const LOCKFILE_NAMES = new Set([
+  "bun.lock", "bun.lockb", "cargo.lock", "composer.lock", "gemfile.lock", "go.sum",
+  "package-lock.json", "packages.lock.json", "pipfile.lock", "pnpm-lock.yaml",
+  "poetry.lock", "uv.lock", "yarn.lock",
+]);
+
+function pathSegments(path) {
+  return String(path ?? "").replaceAll("\\", "/").replace(/^\.\//u, "").toLowerCase().split("/").filter(Boolean);
+}
+
+function hasSegment(segments, names) {
+  return segments.some((segment) => names.has(segment));
+}
+
+/**
+ * Infer only the path-level facts that a dispatch cannot safely self-declare away.
+ * This deliberately prefers false positives over allowing a T0/T5 fast path over
+ * architecture, guardrail, or security authority surfaces.
+ */
+export function classifyCriticChangedPaths(paths) {
+  if (!Array.isArray(paths)) throw new TypeError("changed paths must be an array");
+  const normalized = paths.map((path) => String(path ?? "").replaceAll("\\", "/").replace(/^\.\//u, "")).filter(Boolean);
+  let architecture = false;
+  let guardrails = false;
+  let security = false;
+  let mechanical = normalized.length > 0;
+
+  for (const path of normalized) {
+    const segments = pathSegments(path);
+    const basename = segments.at(-1) ?? "";
+    const joined = segments.join("/");
+    if (hasSegment(segments, new Set(["agents", "agent", "architecture", "architectures", "adr", "adrs"]))
+      || /(?:^|[-_.])(architecture|architectural|adr|design-authority)(?:[-_.]|$)/u.test(basename)
+      || joined.includes("design-authority")) architecture = true;
+    if (hasSegment(segments, new Set(["hooks", "hook", "guardrails", "guardrail", "policies", "policy"]))
+      || /^\.claude\/settings(?:\.|$)/u.test(joined)) guardrails = true;
+    if (segments.some((segment) => /(?:^|[-_.])(security|secure|auth|authentication|authorization|credential|credentials|secret|secrets)(?:[-_.]|$)/u.test(segment))
+      || /(?:^|[-_.])(security|auth|authentication|authorization|credential|credentials|secret|secrets)(?:[-_.]|$)/u.test(basename)) security = true;
+
+    const isLockfile = LOCKFILE_NAMES.has(basename) || basename.endsWith(".lock");
+    const isGenerated = hasSegment(segments, new Set(["generated", "codegen"]))
+      || /(?:^|[-_.])(generated|codegen)(?:[-_.]|$)/u.test(basename);
+    mechanical &&= isLockfile || isGenerated;
+  }
+  return { mechanical, architecture, guardrails, security };
+}
+
+/** Validate a declared trigger against paths independently observed from git. */
+export function criticDecisionPathFinding(decision, paths) {
+  const actual = classifyCriticChangedPaths(paths);
+  if (!decision || typeof decision !== "object") return { code: "critic-trigger-missing", actual, reason: "critic decision is missing" };
+  const declared = decision.trigger?.diff;
+  if (!declared || typeof declared !== "object") return { code: "critic-trigger-missing", actual, reason: "critic decision has no diff trigger" };
+  const missing = ["architecture", "guardrails", "security"].filter((flag) => actual[flag] && declared[flag] !== true);
+  if (missing.length > 0) {
+    return { code: "critic-trigger-underdeclared", actual, missing, reason: `actual changed paths imply undeclared ${missing.join(", ")} trigger(s)` };
+  }
+  if (declared.mechanical === true && !actual.mechanical) {
+    return { code: "critic-mechanical-path-mismatch", actual, reason: "T0 mechanical disposition includes a path outside conservative generated/lockfile surfaces" };
+  }
+  return null;
+}
+
 function closedObject(value, keys) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value)
     && Object.keys(value).length === keys.length

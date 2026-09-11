@@ -109,9 +109,12 @@ written v2 records could still bind authorship. The corrected rollout is:
 - A required decision remains a Verify finding until the coordinator replaces
   it with `criticEvidence` bound to the same task, candidate commit,
   repository-relative evidence path and SHA-256.
-- Pre-v3 records remain readable and are counted as historical legacy by the
-  coverage report. They no longer produce a binding PASS from the authorship
-  verifier, so writing a new v2 record cannot bypass the cutover.
+- Coverage and authorship derive conservative A/G/S signals from the actual
+  changed paths of the record's bound commits. Under-declared A/G/S flags fail,
+  and T0 is valid only when every path is in the bounded mechanical set.
+- Every pre-v3 form remains readable and is counted as historical legacy by
+  the coverage report. None produces a binding PASS from the authorship
+  verifier, so a newly written legacy record cannot bypass the cutover.
 - The standard Verify registry runs both the scanner tests and the live
   coverage check. This contract applies equally in consuming repositories;
   it does not depend on a native runner sandbox.

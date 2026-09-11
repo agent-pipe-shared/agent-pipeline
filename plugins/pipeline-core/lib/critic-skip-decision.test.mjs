@@ -9,6 +9,8 @@ import {
   CRITIC_SKIP_SCHEMA,
   CRITIC_TRIGGER_INPUT_SCHEMA,
   countCriticSkipDecisions,
+  classifyCriticChangedPaths,
+  criticDecisionPathFinding,
   criticDisposition,
   evaluateCriticTriggerRow,
   evaluateCriticSkipCoverage,
@@ -66,6 +68,31 @@ test("closed trigger inputs deterministically select the strictest matching row"
   assert.equal(evaluateCriticTriggerRow(trigger({ rigorLevel: 2 })), "T3");
   assert.equal(evaluateCriticTriggerRow(trigger({ rigorLevel: 1 })), "T4");
   assert.equal(evaluateCriticTriggerRow(trigger({ riskFlag: true })), "T4");
+});
+
+test("changed paths conservatively expose A/G/S authority and mechanical-only surfaces", () => {
+  assert.deepEqual(classifyCriticChangedPaths(["plugins/pipeline-core/hooks/guard-push.mjs"]), {
+    mechanical: false, architecture: false, guardrails: true, security: false,
+  });
+  assert.deepEqual(classifyCriticChangedPaths(["agents/critic.md", "docs/adr/0042-review.md", "src/auth/token.mjs"]), {
+    mechanical: false, architecture: true, guardrails: false, security: true,
+  });
+  assert.deepEqual(classifyCriticChangedPaths(["generated/client.mjs", "pnpm-lock.yaml"]), {
+    mechanical: true, architecture: false, guardrails: false, security: false,
+  });
+  assert.equal(classifyCriticChangedPaths(["generated/client.mjs", "src/client.mjs"]).mechanical, false);
+  assert.equal(classifyCriticChangedPaths([".claude/settings.local.json"]).guardrails, true);
+});
+
+test("path evidence rejects underdeclared T5 and false T0 while accepting honest declarations", () => {
+  const falseT5 = criticDecisionPathFinding(skip, ["plugins/pipeline-core/hooks/guard-push.mjs"]);
+  assert.equal(falseT5.code, "critic-trigger-underdeclared");
+  assert.deepEqual(falseT5.missing, ["guardrails"]);
+  const falseT0 = { ...skip, trigger: trigger({ diff: { mechanical: true, architecture: false, guardrails: false, security: false } }), appliedRow: "T0" };
+  assert.equal(criticDecisionPathFinding(falseT0, ["src/runtime.mjs"]).code, "critic-mechanical-path-mismatch");
+  assert.equal(criticDecisionPathFinding(falseT0, ["generated/client.mjs", "package-lock.json"]), null);
+  const honestT1 = { ...required, trigger: trigger({ diff: { mechanical: false, architecture: false, guardrails: true, security: false } }), appliedRow: "T1" };
+  assert.equal(criticDecisionPathFinding(honestT1, ["guardrails/quality-gates.md"]), null);
 });
 
 test("skip and required decisions are closed and restricted to their evaluated rows", () => {

@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Per-dispatch Critic disposition enforcement for dispatch-record v3. */
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { CRITIC_SKIP_SCHEMA, criticDisposition } from "../lib/critic-skip-decision.mjs";
+import { CRITIC_SKIP_SCHEMA, criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import { DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, validateDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -52,8 +53,22 @@ function verifyCriticEvidence(root, sourcePath, reference) {
   return actual === reference.sha256 ? null : `${sourcePath}: criticEvidence digest mismatch for ${reference.path}`;
 }
 
+export function readCommitChangedPaths(root, commits, { execFile = execFileSync } = {}) {
+  if (!Array.isArray(commits) || commits.length === 0) throw new Error("criticSkip requires at least one commit for path verification");
+  const paths = new Set();
+  for (const sha of commits) {
+    const output = execFile("git", ["diff-tree", "--root", "--no-commit-id", "--no-renames", "--name-only", "-r", "-z", sha], {
+      cwd: root, encoding: "buffer", maxBuffer: 32 * 1024 * 1024,
+    });
+    for (const path of Buffer.from(output).toString("utf8").split("\0").filter(Boolean)) paths.add(path);
+  }
+  if (paths.size === 0) throw new Error("criticSkip commit set has no observable changed paths");
+  return [...paths].sort();
+}
+
 export function evaluateRepositoryCriticSkipCoverage(options = {}) {
   const root = options.root ?? DEFAULT_ROOT;
+  const readChangedPaths = options.readChangedPaths ?? ((record) => readCommitChangedPaths(root, record.commits));
   const scan = walkDispatchRecords(root);
   const findings = [...scan.findings];
   let applicableRecordCount = 0;
@@ -78,7 +93,16 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     try { validateDispatchRecord(record); }
     catch (error) { findings.push(`${path}: invalid v3 dispatch record (${error.message})`); continue; }
     const disposition = criticDisposition(record);
-    if (disposition === "skipped") { skipRecordCount += 1; continue; }
+    if (disposition === "skipped") {
+      try {
+        const pathFinding = criticDecisionPathFinding(record.criticSkip, readChangedPaths(record));
+        if (pathFinding) findings.push(`${path}: ${pathFinding.reason}`);
+        else skipRecordCount += 1;
+      } catch (error) {
+        findings.push(`${path}: actual changed paths could not be derived (${error.message})`);
+      }
+      continue;
+    }
     if (disposition === "required") {
       requiredRecordCount += 1;
       findings.push(`${path}: Critic is required by ${record.criticRequired.appliedRow}; task/candidate/digest-bound criticEvidence is missing`);

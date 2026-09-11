@@ -113,7 +113,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
-import { criticDisposition } from "../lib/critic-skip-decision.mjs";
+import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import {
   DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
   declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
@@ -467,7 +467,8 @@ export function verifyCommit(sha, deps) {
   }
   const isV3 = record.schema === DISPATCH_RECORD_SCHEMA;
   const isV2 = record.schema === LEGACY_DISPATCH_RECORD_SCHEMA;
-  if (Object.hasOwn(record, "schema") && !isV2 && !isV3) {
+  const isEarlierLegacy = record.schema === undefined || record.schema === "pipeline.dispatch-record.v1" || record.schema === "pipeline.dispatch-evidence.v1";
+  if (Object.hasOwn(record, "schema") && !isV2 && !isV3 && !isEarlierLegacy) {
     return result(sha, VERDICT.fail, "record-schema-unsupported", `record for \`${taskId}\` declares an unsupported schema`, { taskId });
   }
   if (isV2 || isV3) {
@@ -523,6 +524,17 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId });
   }
 
+  if (isV3 && criticDisposition(record) === "skipped") {
+    const pathFinding = criticDecisionPathFinding(record.criticSkip, changed);
+    if (pathFinding) {
+      return result(sha, VERDICT.fail, pathFinding.code, pathFinding.reason, {
+        taskId,
+        actualDiff: pathFinding.actual,
+        ...(pathFinding.missing ? { missingTriggerFlags: pathFinding.missing } : {}),
+      });
+    }
+  }
+
   const declared = declaredPaths(record);
   if (declared === null) {
     return result(sha, VERDICT.unverifiable, "record-has-no-machine-readable-paths", `record for \`${taskId}\` is terminal but declares no changedFiles`, {
@@ -563,6 +575,17 @@ export function verifyCommit(sha, deps) {
       "record-missing-briefing-fields",
       `record for \`${taskId}\` is missing the minimum dispatch-record shape (\`${missingFields.join("`, `")}\`); it does not evidence that a real six-field briefing existed`,
       { taskId, missingFields },
+    );
+  }
+
+  if (isEarlierLegacy) {
+    const legacyOrchestratorPaths = declaredOrchestratorPaths(record);
+    return result(
+      sha,
+      VERDICT.unverifiable,
+      "record-pre-v3-nonbinding",
+      `record for \`${taskId}\` predates pipeline.dispatch-record.v3 and cannot bind a newly verified delivery`,
+      { taskId, ...(legacyOrchestratorPaths.length > 0 ? { orchestratorAddedFiles: legacyOrchestratorPaths } : {}) },
     );
   }
 
