@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3405acf50af3d3f35c6b2ea786f0d1906908c9e10adb00d036e7e1c9dfe6900b"
+    "transitionHead": "a38a8ce68a30e56ff3f9cf403c3d96df3ed8b7d5d1e5ed2dfa526cca63f52bbc"
   },
   "counts": {
-    "open": 106,
+    "open": 105,
     "in_progress": 0,
-    "closed": 534,
+    "closed": 535,
     "rejected": 3,
     "deferred": 11
   },
@@ -142,12 +142,16 @@
     },
     {
       "id": "pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Measured 2026-09-01 while running check-backlog-state.mjs before a ledger commit: two of its 22 DRIFT lines are one surviving violation of a rule backlog/README.md already documents as a class.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "610c9220f26a423ad0412da06611e1c95461a06c",
+      "closureEvidence": "backlog/evidence/2026-09-11-ledger-oid-403-critic-pass.md"
     },
     {
       "id": "pipeline.a-node-script-defeats-every-file-protection-guard",

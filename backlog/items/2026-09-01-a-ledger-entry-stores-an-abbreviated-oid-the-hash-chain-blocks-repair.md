@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
 source: "Measured 2026-09-01 while running check-backlog-state.mjs before a ledger commit: two of its 22 DRIFT lines are one surviving violation of a rule backlog/README.md already documents as a class."
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 610c9220f26a423ad0412da06611e1c95461a06c
+closure_evidence: backlog/evidence/2026-09-11-ledger-oid-403-critic-pass.md
 ---
 
 # One ledger entry stores an abbreviated OID, and the hash chain blocks repairing it in place
