@@ -35,8 +35,8 @@ tests, local commits and reviews remain authorized. Do not repeat historical
 startup diagnosis, missing-record searches or completed review rounds.
 
 Nova-B status reconciliation is active. The pass began at 61 open and 54
-closed `nova-b` items; after the first evidence-backed closure the canonical
-ledger projection contains 60 open and 55 closed. Every open item's
+closed `nova-b` items; after five evidence-backed closures the canonical
+ledger projection contains 56 open and 59 closed. Every open item's
 `done_when` is being checked against the current code before that count is
 treated as remaining work. B3 and B4 are implemented:
 the later native Antigravity runner supersedes Nova's historical Alpha-only
@@ -548,8 +548,8 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
 5. **GIT-01 does not admit `revert`.** Deliberate or oversight? Two reverts this
    week were committed as `fix` with the reason in the body.
 6. **Superseded count:** the 2026-09-06 snapshot contained 68 open Nova-B
-   items. The current audit started at 61 open and 54 closed; its first
-   sanctioned reconciliation leaves 60 open and 55 closed. Frontmatter plus
+   items. The current audit started at 61 open and 54 closed; its first two
+   sanctioned reconciliation batches leave 56 open and 59 closed. Frontmatter plus
    the append-only ledger remains authoritative, and each further change needs
    checked completion evidence.
 7. **Action needed now: run the marketplace/plugin update + `/reload-plugins`.**
