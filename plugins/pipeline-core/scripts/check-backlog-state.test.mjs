@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { canonicalJson, itemPreTriageContent, transitionHash, validateBacklogItem } from "../lib/backlog-state.mjs";
-import { applyBacklogItemHashRescopeAmendment, checkBacklogState, writeBacklogProjections } from "./check-backlog-state.mjs";
+import { applyBacklogItemHashRescopeAmendment, checkBacklogState, knownAcceptedBacklogDrift, writeBacklogProjections } from "./check-backlog-state.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
 
@@ -406,6 +406,44 @@ try {
       },
     });
     assert.deepEqual(errors, ["backlog/items/2026-08-29-done-when-tau.md: unsupported field not_a_real_field"]);
+  });
+
+  check("CBS16 the real event 403 format and closure drift are explicitly accepted while all current drift is dispositioned", () => {
+    const result = checkBacklogState(REPO_ROOT);
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const accepted403 = result.drift.filter((entry) => entry.acceptedReason === "accepted-ledger-event-403-abbreviated-oid");
+    assert.deepEqual(
+      accepted403.map((entry) => entry.finding),
+      [
+        "ledger event 403: evidence.commit must be a full lowercase Git commit OID",
+        "items: pipeline.codex-read-only-steps-escalate-individually-instead-of-once closure_commit must equal its final ledger evidence.commit",
+      ],
+    );
+    assert.ok(result.drift.every((entry) => typeof entry.acceptedReason === "string"), result.drift.map((entry) => entry.finding).join("; "));
+  });
+
+  check("CBS17 event 403 acceptance is bound to the exact immutable ledger entry and does not admit lookalikes", () => {
+    const result = checkBacklogState(REPO_ROOT);
+    const event403 = result.events[402];
+    const formatFinding = "ledger event 403: evidence.commit must be a full lowercase Git commit OID";
+    const closureFinding = "items: pipeline.codex-read-only-steps-escalate-individually-instead-of-once closure_commit must equal its final ledger evidence.commit";
+    assert.equal(knownAcceptedBacklogDrift(formatFinding, result.events), "accepted-ledger-event-403-abbreviated-oid");
+    assert.equal(knownAcceptedBacklogDrift(closureFinding, result.events), "accepted-ledger-event-403-abbreviated-oid");
+
+    for (const mutant of [
+      { ...event403, actor: "someone-else" },
+      { ...event403, entryHash: "f".repeat(64) },
+      { ...event403, evidence: { ...event403.evidence, commit: "181b7731" } },
+    ]) {
+      const events = [...result.events];
+      events[402] = mutant;
+      assert.equal(knownAcceptedBacklogDrift(formatFinding, events), null);
+      assert.equal(knownAcceptedBacklogDrift(closureFinding, events), null);
+    }
+    const shifted = [...result.events];
+    shifted[401] = event403;
+    shifted[402] = { ...event403, sequence: 404 };
+    assert.equal(knownAcceptedBacklogDrift(formatFinding, shifted), null);
   });
 } finally {
   console.log(`${passed} passed, ${failed} failed`);

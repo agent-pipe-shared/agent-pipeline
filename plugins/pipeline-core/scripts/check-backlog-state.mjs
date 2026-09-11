@@ -365,6 +365,22 @@ const KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS = Object.freeze([
   { commit: "d48f1686697cf76cfebe3a4138497c7af2730ddb", actor: "backlog-reconciliation", kind: "item-file-reconciliation" },
 ]);
 const UNREACHABLE_COMMIT_FINDING = /^ledger event (\d+): evidence\.commit is not a reachable local Git commit$/u;
+const INVALID_COMMIT_FORMAT_FINDING = /^ledger event (\d+): evidence\.commit must be a full lowercase Git commit OID$/u;
+const CLOSURE_COMMIT_DRIFT_FINDING = /^items: (.+) closure_commit must equal its final ledger evidence\.commit$/u;
+const ACCEPTED_LEDGER_EVENT_403_REASON = "accepted-ledger-event-403-abbreviated-oid";
+const ACCEPTED_LEDGER_EVENT_403 = Object.freeze({
+  sequence: 403,
+  id: "pipeline.codex-read-only-steps-escalate-individually-instead-of-once",
+  from: "in_progress",
+  to: "closed",
+  at: "2026-08-11",
+  actor: "backlog-reconciliation",
+  entryHash: "cebb80de1690b19e03b5a5fb196e1ba6cab8328cb07c859e67b6a3851a7a8861",
+  previousHash: "2cf371ccf4aca78f1a9257c4259c3943fdc04f4c1b46bcc170e2db2eaf25cc3f",
+  evidenceCommit: "181b7730",
+  evidenceKind: "item-file-reconciliation",
+  evidenceReference: "backlog/items/2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md",
+});
 
 /**
  * Label (never filter) exactly the "unreachable evidence.commit" DRIFT
@@ -384,6 +400,47 @@ function isKnownHistoricalUnreachableFinding(finding, events) {
   return KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS.some((known) => event?.actor === known.actor
     && event?.evidence?.kind === known.kind
     && event?.evidence?.commit === known.commit);
+}
+
+function isAcceptedLedgerEvent403(event, physicalIndex) {
+  const accepted = ACCEPTED_LEDGER_EVENT_403;
+  return physicalIndex === accepted.sequence - 1
+    && event?.sequence === accepted.sequence
+    && event?.id === accepted.id
+    && event?.from === accepted.from
+    && event?.to === accepted.to
+    && event?.at === accepted.at
+    && event?.actor === accepted.actor
+    && event?.entryHash === accepted.entryHash
+    && event?.previousHash === accepted.previousHash
+    && event?.evidence?.commit === accepted.evidenceCommit
+    && event?.evidence?.kind === accepted.evidenceKind
+    && event?.evidence?.reference === accepted.evidenceReference;
+}
+
+/**
+ * Return the recorded acceptance reason for the two DRIFT findings caused by
+ * the immutable abbreviated OID at ledger event 403. The match binds the
+ * physical position, sequence, transition identity, chain hashes, and
+ * evidence tuple. A similar future short OID therefore remains unaccepted.
+ */
+export function knownAcceptedBacklogDrift(finding, events) {
+  const ledgerMatch = INVALID_COMMIT_FORMAT_FINDING.exec(finding);
+  if (ledgerMatch) {
+    const physicalIndex = Number(ledgerMatch[1]) - 1;
+    return isAcceptedLedgerEvent403(events[physicalIndex], physicalIndex)
+      ? ACCEPTED_LEDGER_EVENT_403_REASON
+      : null;
+  }
+
+  const closureMatch = CLOSURE_COMMIT_DRIFT_FINDING.exec(finding);
+  if (closureMatch?.[1] !== ACCEPTED_LEDGER_EVENT_403.id) return null;
+  const finalPhysicalIndex = events.findLastIndex((event) => event?.id === closureMatch[1]
+    && event?.evidence?.kind !== "reachability-amendment"
+    && event?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND);
+  return isAcceptedLedgerEvent403(events[finalPhysicalIndex], finalPhysicalIndex)
+    ? ACCEPTED_LEDGER_EVENT_403_REASON
+    : null;
 }
 
 export function reachabilityAmendmentFindings(root, event) {
@@ -668,7 +725,16 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
     .map((entry) => entry.finding);
   const driftFindings = classified
     .filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.DRIFT)
-    .map((entry) => ({ finding: entry.finding, knownHistoricalBatch: isKnownHistoricalUnreachableFinding(entry.finding, ledger.events) }));
+    .map((entry) => {
+      const knownHistoricalBatch = isKnownHistoricalUnreachableFinding(entry.finding, ledger.events);
+      return {
+        finding: entry.finding,
+        knownHistoricalBatch,
+        acceptedReason: knownHistoricalBatch
+          ? "accepted-2026-07-19-through-2026-07-22-unreachable-commit-batch"
+          : knownAcceptedBacklogDrift(entry.finding, ledger.events),
+      };
+    });
   const projection = blockingFindings.length === 0 ? projectBacklog(items, ledger.events) : null;
   return { ok: blockingFindings.length === 0, findings: blockingFindings, drift: driftFindings, items, events: ledger.events, projection };
 }
@@ -1203,7 +1269,12 @@ function cli() {
   // Drift is reported unconditionally — whether the run is otherwise green or
   // not — so it is never silently swallowed just because it does not block.
   for (const entry of result.drift ?? []) {
-    console.error(`DRIFT backlog state: ${entry.finding}${entry.knownHistoricalBatch ? " (known 2026-07-19..2026-07-22 historical batch)" : ""}`);
+    const disposition = entry.knownHistoricalBatch
+      ? "known accepted 2026-07-19..2026-07-22 historical batch"
+      : entry.acceptedReason === ACCEPTED_LEDGER_EVENT_403_REASON
+        ? "known accepted ledger event 403 abbreviated OID"
+        : null;
+    console.error(`DRIFT backlog state: ${entry.finding}${disposition ? ` (${disposition})` : ""}`);
   }
   if (!result.ok) {
     for (const finding of result.findings) console.error(`FAIL backlog state: ${finding}`);
