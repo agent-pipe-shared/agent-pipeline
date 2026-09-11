@@ -14,7 +14,7 @@ In accordance with Issue #69 and #15, Antigravity CLI (`agy`) is elevated to a f
 
 Crucially, in accordance with the Pipeline's core principle of technical enforcement (no prompt-only illusions) and Issue #92 (honest representation of native traits):
 1. **Interactive Session Enforcement (Dimension A):** Antigravity sessions operate under hard client-side pre-tool guards and lifecycle hooks (`.agents/hooks.json` mapping to `antigravity-pretool-guard.mjs`), which block unapproved shell commands, chained commands, workspace escapes, and lifecycle violations with exit code 2 before execution.
-2. **Headless Execution Plane (Dimension B):** Automated dispatches invoke `agy` via `antigravity-execution-host.mjs`, normalizing Gemini usage into canonical `pipeline.runner-usage.v1` schemas with exact provider (`google`) and model bindings.
+2. **Headless Execution Plane (Dimension B):** The exported launch boundary in `antigravity-execution-host.mjs` accepts only a complete runner-neutral dispatch packet. It checks the exact candidate commit/tree, required candidate files and their SHA-256 digests, result destination, Antigravity transport and role contract through `role-dispatch-preflight.mjs` immediately before it can spawn `agy`. The raw process helper is module-private.
 3. **Runner Autarky (ADR-0057 Decision 2a):** Antigravity is completely independent. No runner may be a prerequisite for any other runner.
 
 ## Decision
@@ -29,9 +29,11 @@ Agent-Pipeline formally supports three runners: **Claude Code**, **Codex**, and 
 - **Hard Enforcement Layer:** Client-side `.agents/hooks.json` is generated during setup to enforce pipeline guardrails before tool execution.
 - **Honest Profiles & Routing (v3):** Antigravity profiles map cleanly to Gemini models (`gemini-3.1-pro-high`, `gemini-3.7-flash-high`, `gemini-3.7-flash-low`). Uncertified duties default to `state: "unavailable"`.
 - **Fail-Closed Security:** Tool execution outside authorized workspace containment or during unapproved lifecycle states is denied deterministically by the pre-tool guard.
+- **Fail-Before-Launch Headless Boundary:** Invalid, stale or dirty dispatch packets and unusable result destinations return a structured zero-launch rejection. The admitted packet prompt is passed to `agy` unchanged.
 
 ## Consequences
 
 - Antigravity can be selected as `runners.default: "antigravity"` or enabled alongside Claude and Codex in `runners.enabled`.
 - All 385+ test suites in `harness/scripts/verify.mjs` pass across all supported runners.
 - The alpha descriptor `antigravity-alpha-adapter.mjs` is retired in favor of full native execution.
+- This headless host boundary is ready for a coordinator to consume, but no in-repository Antigravity coordinator currently calls it. The packet-bound host therefore does not by itself establish an activated production dispatch path.

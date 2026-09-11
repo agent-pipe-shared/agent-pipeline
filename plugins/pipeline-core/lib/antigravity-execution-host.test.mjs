@@ -1,147 +1,204 @@
 // SPDX-License-Identifier: SUL-1.0
 
-import { discoverAgyPath, invokeAgy, AGY_ERROR_TAXONOMY, parseAgyOutput } from "./antigravity-execution-host.mjs";
-import { writeFileSync, chmodSync, existsSync, rmSync, mkdtempSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { AGY_ERROR_TAXONOMY, discoverAgyPath, invokeAgy, parseAgyOutput } from "./antigravity-execution-host.mjs";
+import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
 
 let passed = 0;
 let failed = 0;
-function check(name, condition) {
-  if (condition) {
-    console.log(`PASS ${name}`);
-    passed++;
-  } else {
-    console.error(`FAIL ${name}`);
-    failed++;
-  }
+async function check(name, run) {
+  try { await run(); console.log(`PASS ${name}`); passed += 1; }
+  catch (error) { console.error(`FAIL ${name}`); console.error(error); failed += 1; }
 }
 
-// 2. Test output parsing (streaming NDJSON or extra text)
-const mockStdout = `
-Some log line
-{"status": "running"}
-{"result": "success", "usage": {"input_tokens": 10}}
-`;
-const parsed = parseAgyOutput(mockStdout);
-check("EPH02 Parses last valid JSON line", parsed.result === "success" && parsed.usage.input_tokens === 10);
-
-try {
-  parseAgyOutput("just some text\nno json here");
-  check("EPH03 Rejects malformed output", false);
-} catch(e) {
-  check("EPH03 Rejects malformed output", e.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED);
-}
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const roles = [
+  "afk-claude-worker", "consult-advisor", "critic", "goldfish-deep",
+  "goldfish-implementor", "goldfish-mechanic", "plan-verifier", "readiness-reviewer",
+];
+const criticPrompt = `Independent review from frozen references.
+Ruleset-SHA: local-test; Model: gemini-observed; effort high.`;
+const goldfishPrompt = `## Briefing
+### 1. Goal
+Inspect the required path.
+### 2. Context files
+- input.txt
+### 3. DoD checks
+- Return a bounded result.
+### 4. Forbidden
+- Do not edit files.
+### 5. Stop conditions
+- Required input unavailable.
+### 6. Dispatch-Metadata
+Model: gemini-observed; effort medium; Ruleset-SHA: local-test.`;
+const promptFor = (role, suffix = "") => `${role.includes("goldfish") ? goldfishPrompt : role === "critic" ? criticPrompt : "Inspect input.txt. Model: gemini-observed; Ruleset-SHA: local-test."}${suffix}`;
 
 const mockProgram = `#!/usr/bin/env node
+const { appendFileSync } = require("node:fs");
 const args = process.argv.slice(2);
-if (args.includes("--timeout-test")) {
-  setTimeout(() => {}, 5000);
-} else if (args.includes("--slow-test")) {
-  setTimeout(() => console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }})), 1200);
-} else if (args.includes("--auth-test")) {
-  console.error("Please login to Vertex");
-  process.exit(1);
-} else if (args.includes("--fail-test")) {
-  process.exit(2);
-} else if (args.includes("--malformed-test")) {
-  console.log("no json for you");
-} else {
-  console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}));
-}
+appendFileSync(process.env.AGY_SPAWN_LOG, JSON.stringify(args) + "\\n");
+const prompt = args[args.indexOf("--prompt") + 1];
+if (prompt.includes("--timeout-test")) setTimeout(() => {}, 5000);
+else if (prompt.includes("--slow-test")) setTimeout(() => console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }})), 1200);
+else if (prompt.includes("--auth-test")) { console.error("Please login to Vertex"); process.exit(1); }
+else if (prompt.includes("--fail-test")) process.exit(2);
+else if (prompt.includes("--malformed-test")) console.log("no json for you");
+else console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}));
 `;
 
-function createMockFixture(prefix = "test-agy-exec-") {
-  const root = mkdtempSync(join(tmpdir(), prefix));
+function createFixture() {
+  const root = mkdtempSync(join(tmpdir(), "test-agy-exec-"));
   const mockAgy = join(root, "agy-mock");
+  const spawnLog = join(root, "spawn.log");
   writeFileSync(mockAgy, mockProgram);
   chmodSync(mockAgy, 0o755);
-  return { root, mockAgy };
+  writeFileSync(join(root, "input.txt"), "input\n");
+  mkdirSync(join(root, "results"));
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  execFileSync("git", ["config", "user.email", "agy@example.invalid"], { cwd: root });
+  execFileSync("git", ["config", "user.name", "Agy fixture"], { cwd: root });
+  execFileSync("git", ["add", "input.txt"], { cwd: root });
+  execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: root });
+  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
+  return { root, mockAgy, spawnLog, commit, tree };
 }
 
-async function exerciseFixture(work) {
-  const fixture = createMockFixture("test-agy-exec-cleanup-");
-  try {
-    await work(fixture);
-    return { outcome: "success", root: fixture.root };
-  } catch {
-    return { outcome: "failure", root: fixture.root };
-  } finally {
-    rmSync(fixture.root, { recursive: true, force: true });
-  }
+function packetFor(fixture, role = "consult-advisor", suffix = "", requiredPaths = ["input.txt"]) {
+  return {
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId: `agy-${role}-${Math.random().toString(16).slice(2)}`,
+    transport: "antigravity",
+    role: `pipeline-core:${role}`,
+    prompt: promptFor(role, suffix),
+    candidate: { commit: fixture.commit, tree: fixture.tree },
+    requiredPaths,
+    requiredPathSha256: Object.fromEntries(requiredPaths.map((path) => [path, path === "input.txt" ? sha256("input\n") : "0".repeat(64)])),
+    resultDestination: { kind: "return" },
+  };
+}
+function launchArgs(fixture, packet, overrides = {}) {
+  return { root: fixture.root, packet, agyPath: fixture.mockAgy, timeoutMs: 1000,
+    env: { ...process.env, AGY_SPAWN_LOG: fixture.spawnLog }, ...overrides };
+}
+function spawnRows(fixture) {
+  return existsSync(fixture.spawnLog)
+    ? readFileSync(fixture.spawnLog, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse)
+    : [];
 }
 
-// 3. Test execution simulation
-const { root, mockAgy } = createMockFixture();
+await check("EPH01 discovery accepts an existing configured binary", () => {
+  assert.equal(discoverAgyPath({ AGY_PATH: process.execPath, PATH: "" }), process.execPath);
+});
+await check("EPH02 parses the last valid JSON line", () => {
+  const parsed = parseAgyOutput('log\n{"status":"running"}\n{"result":"success","usage":{"input_tokens":10}}\n');
+  assert.equal(parsed.result, "success");
+  assert.equal(parsed.usage.input_tokens, 10);
+});
+await check("EPH03 rejects malformed output", () => {
+  assert.throws(() => parseAgyOutput("no json"), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED);
+});
+
+const fixture = createFixture();
 try {
-  // EPH04: Success
-  const res1 = await invokeAgy({ agyPath: mockAgy, prompt: "test", cwd: root, timeoutMs: 1000 });
-  check("EPH04 Invokes successfully", res1.ok && res1.payload.result === "done" && res1.payload.usage.input_tokens === 5);
-
-  // EPH05: Auth required
-  const res2 = await invokeAgy({ agyPath: mockAgy, prompt: "--auth-test", cwd: root, timeoutMs: 1000 });
-  check("EPH05 Detects auth requirement", !res2.ok && res2.code === AGY_ERROR_TAXONOMY.AUTH_REQUIRED);
-
-  // EPH06: Non-zero exit
-  const res3 = await invokeAgy({ agyPath: mockAgy, prompt: "--fail-test", cwd: root, timeoutMs: 1000 });
-  check("EPH06 Detects non-zero exit", !res3.ok && res3.code === AGY_ERROR_TAXONOMY.NONZERO_EXIT);
-
-  // EPH07: Malformed output
-  const res4 = await invokeAgy({ agyPath: mockAgy, prompt: "--malformed-test", cwd: root, timeoutMs: 1000 });
-  check("EPH07 Detects malformed output", !res4.ok && res4.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED);
-
-  // EPH08: Timeout
-  const res5 = await invokeAgy({ agyPath: mockAgy, prompt: "--timeout-test", cwd: root, timeoutMs: 200 });
-  check("EPH08 Detects timeout", !res5.ok && res5.code === AGY_ERROR_TAXONOMY.TIMEOUT);
-
-  // EPH09: Not installed
-  const res6 = await invokeAgy({ agyPath: "/does/not/exist/agy", prompt: "test", cwd: root, timeoutMs: 1000 });
-  check("EPH09 Detects missing binary", !res6.ok && res6.code === AGY_ERROR_TAXONOMY.NOT_INSTALLED);
-  // EPH10: Model mismatch
-  const res7 = await invokeAgy({ agyPath: mockAgy, prompt: "test", model: "gemini-requested", cwd: root, timeoutMs: 1000 });
-  check("EPH10 Detects model mismatch", !res7.ok && res7.code === AGY_ERROR_TAXONOMY.MODEL_MISMATCH);
-
-  // EPH11: Model match
-  const res8 = await invokeAgy({ agyPath: mockAgy, prompt: "test", model: "gemini-observed", cwd: root, timeoutMs: 1000 });
-  check("EPH11 Accepts matching model", res8.ok && res8.payload.model === "gemini-observed");
-
-  // EPH12/EPH13: Slow cases cross the old 1 second teardown boundary.
-  const res9 = await invokeAgy({ agyPath: mockAgy, prompt: "--slow-test", model: "gemini-requested", cwd: root, timeoutMs: 2500 });
-  check("EPH12 Slow model mismatch survives fixture lifetime", !res9.ok && res9.code === AGY_ERROR_TAXONOMY.MODEL_MISMATCH);
-  const res10 = await invokeAgy({ agyPath: mockAgy, prompt: "--slow-test", model: "gemini-observed", cwd: root, timeoutMs: 2500 });
-  check("EPH13 Slow model match survives fixture lifetime", res10.ok && res10.payload.model === "gemini-observed");
-
-  const cleanupAfterSuccess = await exerciseFixture(async ({ mockAgy: fixtureAgy, root: fixtureRoot }) => {
-    const result = await invokeAgy({ agyPath: fixtureAgy, prompt: "test", cwd: fixtureRoot, timeoutMs: 1000 });
-    if (!result.ok) throw new Error("fixture success case failed");
+  await check("EPH04 valid packet launches exactly once with its prompt byte-for-byte", async () => {
+    const packet = packetFor(fixture);
+    const result = await invokeAgy(launchArgs(fixture, packet));
+    assert.equal(result.ok, true);
+    assert.equal(result.launcherCalls, 1);
+    assert.equal(result.modelCalls, 1);
+    const rows = spawnRows(fixture);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0][rows[0].indexOf("--prompt") + 1], packet.prompt);
   });
-  check("EPH14 Cleans fixture after success", cleanupAfterSuccess.outcome === "success" && !existsSync(cleanupAfterSuccess.root));
 
-  const cleanupAfterFailure = await exerciseFixture(async () => {
-    throw new Error("expected fixture failure");
-  });
-  check("EPH15 Cleans fixture after failure", cleanupAfterFailure.outcome === "failure" && !existsSync(cleanupAfterFailure.root));
-
-  const firstFixture = createMockFixture("test-agy-exec-concurrent-");
-  const secondFixture = createMockFixture("test-agy-exec-concurrent-");
-  try {
-    const [firstResult, secondResult] = await Promise.all([
-      invokeAgy({ agyPath: firstFixture.mockAgy, prompt: "test", model: "gemini-requested", cwd: firstFixture.root, timeoutMs: 1000 }),
-      invokeAgy({ agyPath: secondFixture.mockAgy, prompt: "test", model: "gemini-observed", cwd: secondFixture.root, timeoutMs: 1000 }),
-    ]);
-    rmSync(firstFixture.root, { recursive: true, force: true });
-    const secondAfterFirstCleanup = await invokeAgy({ agyPath: secondFixture.mockAgy, prompt: "test", model: "gemini-observed", cwd: secondFixture.root, timeoutMs: 1000 });
-    check("EPH16 Concurrent fixture cleanup is isolated", !existsSync(firstFixture.root) && existsSync(secondFixture.root) && firstResult.code === AGY_ERROR_TAXONOMY.MODEL_MISMATCH && secondResult.ok && secondAfterFirstCleanup.ok);
-  } finally {
-    rmSync(firstFixture.root, { recursive: true, force: true });
-    rmSync(secondFixture.root, { recursive: true, force: true });
+  const zeroSpawnCases = [
+    ["EPH05 invalid packet shape", (packet) => { delete packet.candidate; }, "RDP-PACKET-SHAPE"],
+    ["EPH06 stale candidate tree", (packet) => { packet.candidate.tree = "0".repeat(40); }, "RDP-CANDIDATE-TREE"],
+    ["EPH07 wrong transport", (packet) => { packet.transport = "direct"; }, "AGY-DISPATCH-TRANSPORT"],
+    ["EPH08 unusable result destination", (packet) => { packet.resultDestination = { kind: "file", path: "missing/result.json" }; }, "RDP-RESULT-DESTINATION"],
+  ];
+  for (const [name, mutate, code] of zeroSpawnCases) {
+    await check(`${name} fails under five seconds with zero spawn`, async () => {
+      const packet = packetFor(fixture);
+      mutate(packet);
+      const before = spawnRows(fixture).length;
+      const started = Date.now();
+      const result = await invokeAgy(launchArgs(fixture, packet));
+      assert.ok(Date.now() - started < 5000);
+      assert.equal(result.code, code);
+      assert.equal(result.launcherCalls, 0);
+      assert.equal(result.modelCalls, 0);
+      assert.equal(spawnRows(fixture).length, before);
+    });
   }
-} catch(e) {
-  console.error(e);
-  failed++;
-} finally {
-  rmSync(root, { recursive: true, force: true });
-}
+
+  await check("EPH09 dirty required input fails under five seconds with zero spawn", async () => {
+    const packet = packetFor(fixture);
+    const before = spawnRows(fixture).length;
+    writeFileSync(join(fixture.root, "input.txt"), "dirty\n");
+    try {
+      const started = Date.now();
+      const result = await invokeAgy(launchArgs(fixture, packet));
+      assert.ok(Date.now() - started < 5000);
+      assert.equal(result.code, "RDP-REQUIRED-PATH-DRIFT");
+      assert.equal(result.launcherCalls, 0);
+      assert.equal(spawnRows(fixture).length, before);
+    } finally { writeFileSync(join(fixture.root, "input.txt"), "input\n"); }
+  });
+
+  await check("EPH10 all eight roles reject an invalid required path under five seconds with zero spawn", async () => {
+    const before = spawnRows(fixture).length;
+    const started = Date.now();
+    for (const role of roles) {
+      const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, role, "", ["missing.txt"])));
+      assert.equal(result.code, "RDP-REQUIRED-PATH", role);
+      assert.equal(result.launcherCalls, 0, role);
+      assert.equal(result.modelCalls, 0, role);
+    }
+    assert.ok(Date.now() - started < 5000);
+    assert.equal(spawnRows(fixture).length, before);
+  });
+
+  const executionCases = [
+    ["EPH11 detects auth requirement", "--auth-test", undefined, AGY_ERROR_TAXONOMY.AUTH_REQUIRED],
+    ["EPH12 detects non-zero exit", "--fail-test", undefined, AGY_ERROR_TAXONOMY.NONZERO_EXIT],
+    ["EPH13 detects malformed output", "--malformed-test", undefined, AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED],
+    ["EPH14 detects model mismatch", "", "gemini-requested", AGY_ERROR_TAXONOMY.MODEL_MISMATCH],
+  ];
+  for (const [name, suffix, model, code] of executionCases) {
+    await check(name, async () => {
+      const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", suffix), { model }));
+      assert.equal(result.ok, false);
+      assert.equal(result.code, code);
+      assert.equal(result.launcherCalls, 1);
+    });
+  }
+  await check("EPH15 detects timeout", async () => {
+    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--timeout-test"), { timeoutMs: 200 }));
+    assert.equal(result.code, AGY_ERROR_TAXONOMY.TIMEOUT);
+    assert.equal(result.launcherCalls, 1);
+  });
+  await check("EPH16 detects missing binary only after packet preparation", async () => {
+    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture), { agyPath: "/does/not/exist/agy" }));
+    assert.equal(result.code, AGY_ERROR_TAXONOMY.NOT_INSTALLED);
+    assert.equal(result.launcherCalls, 0);
+    assert.equal(result.modelCalls, 0);
+  });
+  await check("EPH17 accepts the observed model", async () => {
+    assert.equal((await invokeAgy(launchArgs(fixture, packetFor(fixture), { model: "gemini-observed" }))).ok, true);
+  });
+  await check("EPH18 slow execution remains bound to the fixture", async () => {
+    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--slow-test"), { model: "gemini-observed", timeoutMs: 2500 }));
+    assert.equal(result.ok, true);
+  });
+} finally { rmSync(fixture.root, { recursive: true, force: true }); }
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exitCode = failed === 0 ? 0 : 1;

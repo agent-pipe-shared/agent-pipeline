@@ -5,6 +5,11 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
+import {
+  ROLE_DISPATCH_PREFLIGHT_SCHEMA,
+  preflightRoleDispatch,
+} from "./role-dispatch-preflight.mjs";
+
 export const AGY_ERROR_TAXONOMY = {
   NOT_INSTALLED: "AGY-NOT-INSTALLED",
   AUTH_REQUIRED: "AGY-AUTH-REQUIRED",
@@ -49,7 +54,7 @@ export function parseAgyOutput(stdout) {
   throw error;
 }
 
-export async function invokeAgy({ agyPath, prompt, model, effort, cwd, timeoutMs = 300000, env = process.env }) {
+async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs = 300000, env = process.env }) {
   if (!agyPath || !existsSync(agyPath)) {
     return { ok: false, code: AGY_ERROR_TAXONOMY.NOT_INSTALLED, message: "agy binary not found" };
   }
@@ -105,4 +110,51 @@ export async function invokeAgy({ agyPath, prompt, model, effort, cwd, timeoutMs
       }
     });
   });
+}
+
+/**
+ * The only exported Antigravity model-launch boundary.
+ *
+ * The raw process helper deliberately remains module-private: callers must
+ * supply the complete runner-neutral dispatch packet, and the immutable
+ * candidate/input/result bindings are checked immediately before `agy` is
+ * spawned. `root` is also the child working directory, so a caller cannot
+ * validate one checkout and execute in another.
+ */
+export async function invokeAgy({
+  root,
+  resultRoot = root,
+  packet,
+  agyPath,
+  model,
+  effort,
+  timeoutMs = 300000,
+  env = process.env,
+} = {}) {
+  const current = preflightRoleDispatch({ root, resultRoot, packet });
+  if (current.status !== "prepared") return current;
+  if (current.packet.transport !== "antigravity") {
+    return {
+      schema: ROLE_DISPATCH_PREFLIGHT_SCHEMA,
+      status: "rejected",
+      code: "AGY-DISPATCH-TRANSPORT",
+      field: "transport",
+      modelCalls: 0,
+      launcherCalls: 0,
+    };
+  }
+
+  const result = await invokeAgyProcess({
+    agyPath,
+    prompt: current.packet.prompt,
+    model,
+    effort,
+    cwd: root,
+    timeoutMs,
+    env,
+  });
+  if (result.code === AGY_ERROR_TAXONOMY.NOT_INSTALLED) {
+    return { ...result, launcherCalls: 0, modelCalls: 0 };
+  }
+  return { ...result, launcherCalls: 1, modelCalls: 1 };
 }
