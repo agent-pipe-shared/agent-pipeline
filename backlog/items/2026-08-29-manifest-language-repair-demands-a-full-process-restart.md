@@ -3,10 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.manifest-language-repair-demands-a-full-process-restart
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
 sprint: nova-b
 done_when: manual
+closure_commit: a2b952e4bef09375326e084cbc45d3b75cd37d06
+closure_evidence: backlog/evidence/2026-09-11-manifest-language-live-recovery-closure.md
 tracking: "Nova B (PO decision 2026-08-29) — low-severity UX friction, current restart-on-repair behavior is safe; investigate later, not a 0.6.0 blocker"
 source: "Codex/WSL report, delivered inline in chat by the PO (priority 6 in that report), during the 2026-08-29 three-runner greenfield test."
 ---
@@ -101,3 +103,12 @@ rather than leaving it implying a 0.6.0 blocker — the triage's own
 "blocks the 0.6.0 candidate" line above is now superseded by this decision
 and should not be trusted by a future dispatch without re-reading this
 section.
+
+## Resolution (2026-09-11)
+
+Later Nova implementation made the earlier no-action decision obsolete.
+Language correction now regenerates owned runtime projection drift inside the
+same kickoff transaction and returns `ready`; the common unchanged-language
+case follows the same recovery. A separate runtime-initialization test still
+pins a genuine Codex runtime-target change to `restart-required`. The focused
+closure run and implementation lineage are recorded in the closure evidence.
