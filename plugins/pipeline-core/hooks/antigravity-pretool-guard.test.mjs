@@ -46,10 +46,10 @@ function followLifecycleAction(root, result, name) {
   return lifecycleCommand(root, ...result.nextAction.argv.slice(1));
 }
 
-function readyLifecycleFixture() {
+function readyLifecycleFixture(mode = "chat") {
   const root = mkdtempSync(join(tmpdir(), "agy-ready-hgo-"));
   followLifecycleAction(root, lifecycleCommand(root, "plan", "--root", root, "--runner", "antigravity"), "apply-portable-seed");
-  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", "chat"], { cwd: root, encoding: "utf8", shell: false });
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", mode], { cwd: root, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
   for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy"]]) {
     const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
@@ -469,6 +469,28 @@ check("Antigravity GS-1 is liftable through its ordinary HGO path only after rea
     assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
     assert.match(res.reason, /Human override available for this exact action/u);
     assert.doesNotMatch(res.reason, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(res.reason, /sign-intent|human-held Ed25519 key|authorize-by-signature/u,
+      "chat mode must not advertise a signature ceremony");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity signature guidance assigns only sign-intent to the external PO/operator", () => {
+  const root = readyLifecycleFixture("signature");
+  try {
+    const res = decision(run({
+      toolCall: {
+        name: "replace_file_content",
+        args: { TargetFile: join(root, "pipeline.user.yaml"), TargetContent: "signature", ReplacementContent: "chat" },
+      },
+    }, root));
+    assert.equal(res.decision, "deny");
+    assert.match(
+      res.reason,
+      /emit-signature-digest --repo[^\n]*\n[^\n]*PO\/operator[^\n]*intentSha256[^\n]*\n[^\n]*sign-intent --repo-root[^\n]*--intent-sha256 <intent-sha256-from-emit-signature-digest>[^\n]*\n[^\n]*back in this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+    );
+    assert.match(res.reason, /PO\/operator[^\n]*human-held Ed25519 key/u);
+    assert.match(res.reason, /back in this session[^\n]*proof path, not the private key/u);
+    assert.match(res.reason, /--proof <proof-path-from-sign-intent>/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -1029,7 +1051,10 @@ check("lifecycle-not-ready denial does not advertise a human override ceremony",
       assert.match(denied.reason, /GUARD-LIFECYCLE-NOT-READY/u);
       assert.match(denied.reason, /Technical repair is required before retrying/u);
       assert.doesNotMatch(denied.reason, /Re-run the typed project-onboarding-v3 inspection/u);
-      assert.doesNotMatch(denied.reason, /Human override available|authorize-by-signature|verify-audit/u);
+      assert.doesNotMatch(
+        denied.reason,
+        /Human override available|sign-intent|human-held Ed25519 key|authorize-by-signature|verify-audit/u,
+      );
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

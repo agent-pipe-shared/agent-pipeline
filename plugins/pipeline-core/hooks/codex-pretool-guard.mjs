@@ -39,6 +39,7 @@ const { commandDisclosureFields } = humanGuardOverrideInternals;
 
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
 const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
 const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
 const HOOK_STARTED_AT = Date.now();
@@ -537,10 +538,19 @@ if (denials.length > 0) {
               "emit-signature-digest", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
               "--plan-sha256", placeholder("<plan-sha256>"),
             ]),
-            `Then, outside this session (gates.human_approval is "${approvalMode}"; only the signature itself needs the external Ed25519 key; presence of a valid, correctly-bound signature IS the authorization -- there is no in-session activate step for this mode):`,
+            // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand: the
+            // intent digest is the exact emitted value, and only this command crosses
+            // into the attended terminal that holds the PO/operator's private key.
+            `Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above (gates.human_approval is "${approvalMode}"). This writes proof-manual.json and signer-manual.json under the selected external material directory:`,
+            renderOverrideCommand(PO_HUMAN_APPROVAL_SCRIPT, [
+              "sign-intent", "--repo-root", forcedQuote(overrideRepo),
+              "--directory", placeholder("<external-po-material-directory>"),
+              "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
+            ]),
+            "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",
             renderOverrideCommand(script, [
               "authorize-by-signature", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
-              "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+              "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<proof-path-from-sign-intent>"),
             ]),
           ].join("\n");
         overrideGuidance = [

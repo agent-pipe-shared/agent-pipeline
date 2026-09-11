@@ -91,6 +91,7 @@ import { buildAppendIntent, buildOverrideDecisions, requestDecisionId } from "..
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
 
 export const GATE_STRENGTH_PATHS = Object.freeze([
   Object.freeze({
@@ -711,11 +712,21 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
                 "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
               ),
               ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>")),
-              `Then, outside this session (only the signature itself needs the external Ed25519 ` +
-                `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
-                `there is no in-session activate step for this mode):`,
+              // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand;
+              // only this command enters the attended private-key boundary.
+              "Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above. This writes proof-manual.json and signer-manual.json under the selected external material directory:",
+              boundedCopySafeCommand({
+                executable: process.execPath,
+                argv: [
+                  placeholder(JSON.stringify(PO_HUMAN_APPROVAL_SCRIPT)), "sign-intent",
+                  "--repo-root", placeholder(JSON.stringify(projectDir)),
+                  "--directory", placeholder("<external-po-material-directory>"),
+                  "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
+                ],
+              }).command,
+              "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",
               ceremonyCommand(
-                "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+                "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<proof-path-from-sign-intent>"),
               ),
             ].join("\n");
           overrideGuidance = [

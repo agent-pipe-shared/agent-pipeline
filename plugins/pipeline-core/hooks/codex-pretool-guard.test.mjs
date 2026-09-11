@@ -638,6 +638,8 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
         "chat mode must not offer the signature-only final step");
       assert.doesNotMatch(reason, /emit-signature-digest/u,
         "chat mode has no signing step; nothing to emit a digest for");
+      assert.doesNotMatch(reason, /sign-intent|human-held Ed25519 key/u,
+        "chat mode must not advertise the PO/operator's external signing step");
     } else {
       // NVA-SIGENTRY-2 F2: the digest-emission step must be reachable from the printed
       // guidance alone, at the point where the human/agent actually needs it -- before
@@ -647,15 +649,13 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
       // PO decision 2026-08-18 #12 (backlog/items/2026-08-18-hgo-signature-ceremony-
       // requires-more-human-steps-than-the-key-actually-needs.md): prepare-authorization
       // and emit-signature-digest are pure local digest computation (ADR-0059 Decision 1)
-      // and now run agentically, in-session; only authorize-by-signature still needs the
-      // external Ed25519 key and is labelled "outside this session". An inserted mode-
-      // change label line now sits between emit-signature-digest and authorize-by-signature,
-      // so the adjacency check allows one extra labelled line there while still pinning the
-      // overall order and the in-session/outside-this-session split.
+      // and now run agentically, in-session. Only sign-intent needs the external Ed25519
+      // key; authorize-by-signature is the local proof verifier/consumer and therefore
+      // returns to the agent session without access to that key.
       assert.match(
         reason,
-        /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n(?:[^\n]*\n)?[^\n]*authorize-by-signature --repo/u,
-        "emit-signature-digest must sit between prepare-authorization and authorize-by-signature",
+        /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n[^\n]*PO\/operator[^\n]*intentSha256[^\n]*\n[^\n]*sign-intent --repo-root[^\n]*--intent-sha256 <intent-sha256-from-emit-signature-digest>[^\n]*\n[^\n]*back in this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+        "the external signing action must sit between digest emission and local proof verification",
       );
       assert.match(
         reason,
@@ -664,10 +664,12 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
       );
       assert.match(
         reason,
-        /Then, outside this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
-        "authorize-by-signature must be labelled as running outside this session",
+        /PO\/operator[^\n]*human-held Ed25519 key[^\n]*\n[^\n]*sign-intent --repo-root/u,
+        "sign-intent must be assigned to the PO/operator's attended external terminal",
       );
-      assert.match(reason, /\bauthorize-by-signature --repo\b[^\n]*--proof <external-proof\.json>/u,
+      assert.match(reason, /back in this session[^\n]*proof path, not the private key/u,
+        "proof verification must be assigned back to the agent session without key access");
+      assert.match(reason, /\bauthorize-by-signature --repo\b[^\n]*--proof <proof-path-from-sign-intent>/u,
         "signature mode must offer its own decisive final step");
       assert.doesNotMatch(reason, /--activate/u,
         "signature mode must not offer the in-session activate step");
@@ -1202,7 +1204,10 @@ check("lifecycle-not-ready denial does not advertise a human override ceremony",
       assert.match(denied.permissionDecisionReason, /GUARD-LIFECYCLE-NOT-READY/u);
       assert.match(denied.permissionDecisionReason, /Technical repair is required before retrying/u);
       assert.doesNotMatch(denied.permissionDecisionReason, /Re-run the typed project-onboarding-v3 inspection/u);
-      assert.doesNotMatch(denied.permissionDecisionReason, /Human override available|authorize-by-signature|verify-audit/u);
+      assert.doesNotMatch(
+        denied.permissionDecisionReason,
+        /Human override available|sign-intent|human-held Ed25519 key|authorize-by-signature|verify-audit/u,
+      );
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

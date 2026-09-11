@@ -543,10 +543,17 @@ try {
     const sigStderr = ask(governedGit({ mode: "signature" }), rule.path).stderr;
     assert.match(sigStderr, /plan --repo/u);
     assert.match(sigStderr, /prepare-authorization --repo/u);
+    assert.match(sigStderr, /emit-signature-digest --repo/u);
+    assert.match(sigStderr, /PO\/operator[^\n]*human-held Ed25519 key/u);
+    assert.match(sigStderr, /sign-intent --repo-root[^\n]*--intent-sha256 <intent-sha256-from-emit-signature-digest>/u);
+    assert.match(sigStderr, /back in this session[^\n]*proof path, not the private key/u);
     assert.match(sigStderr, /authorize-by-signature --repo/u);
-    assert.match(sigStderr, /--proof/u);
+    assert.match(sigStderr, /--proof <proof-path-from-sign-intent>/u);
     assert.doesNotMatch(sigStderr, /--activate/u);
     assert.doesNotMatch(sigStderr, /--selection-sha256/u);
+
+    assert.doesNotMatch(chatStderr, /sign-intent|human-held Ed25519 key/u,
+      "chat mode must not advertise a signature ceremony");
   });
 
   check("GST24 an unusable override store leaves the refusal exactly as it was", () => {
@@ -689,6 +696,8 @@ try {
       assert.doesNotMatch(stderr, HAND_EDIT_PATTERN, `${target}: refusal named a hand-editing route`);
       assert.doesNotMatch(stderr, /guard-maintenance-window\.mjs" (?:prepare|install)/u,
         `${target}: kernel refusal must not print a GMW command -- none exists for this path`);
+      assert.doesNotMatch(stderr, /sign-intent|authorize-by-signature|human-held Ed25519 key/u,
+        `${target}: a never-liftable kernel refusal must not print an HGO signature ceremony`);
     }
   });
 

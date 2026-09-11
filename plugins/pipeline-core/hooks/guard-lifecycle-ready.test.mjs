@@ -4500,6 +4500,8 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
     assert.match(chatResult.stderr, /Step: authorize\n/u);
     assert.doesNotMatch(chatResult.stderr, /Step: authorize-by-signature/u);
     assert.doesNotMatch(chatResult.stderr, /Step: emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
+    assert.doesNotMatch(chatResult.stderr, /Step: sign-intent|human-held Ed25519 key/u,
+      "chat mode must not advertise the external PO/operator signing step");
     assert.doesNotMatch(chatResult.stderr, /capability consumed/u);
 
     const sigRoot = hgoGitFixture("signature");
@@ -4513,21 +4515,24 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
     // to sign anything out-of-band -- i.e. between prepare-authorization and
     // authorize-by-signature, not merely somewhere in the guidance text.
     assert.match(sigResult.stderr, /Step: emit-signature-digest/u);
-    // PO decision 2026-08-18 #12: prepare-authorization/emit-signature-digest are now
-    // labelled "in this session" and authorize-by-signature "outside this session" (ADR-0059
-    // Decision 1 -- neither of the first two touches the external key). The inserted mode-
-    // change label line between emit-signature-digest and authorize-by-signature is allowed
-    // for by the optional group below; order and the in-session/outside-this-session split
-    // are still pinned.
+    // PO decision 2026-08-18 #12: prepare-authorization/emit-signature-digest run in
+    // this session. Only sign-intent crosses into the PO/operator's attended external
+    // terminal; authorize-by-signature returns to the agent session to verify and
+    // consume the proof without private-key access.
     const prepareIndex = sigResult.stderr.indexOf("Step: prepare-authorization");
     const emitIndex = sigResult.stderr.indexOf("Step: emit-signature-digest");
+    const signIndex = sigResult.stderr.indexOf("Step: sign-intent");
     const authorizeIndex = sigResult.stderr.indexOf("Step: authorize-by-signature");
-    assert.ok(prepareIndex !== -1 && prepareIndex < emitIndex && emitIndex < authorizeIndex,
-      "emit-signature-digest must sit between prepare-authorization and authorize-by-signature");
+    assert.ok(prepareIndex !== -1 && prepareIndex < emitIndex && emitIndex < signIndex && signIndex < authorizeIndex,
+      "sign-intent must sit between digest emission and authorize-by-signature");
     assert.ok(sigResult.stderr.indexOf("Then, in this session") < prepareIndex,
       "prepare-authorization must be labelled as running in this session");
-    assert.ok(sigResult.stderr.indexOf("Then, outside this session") < authorizeIndex,
-      "authorize-by-signature must be labelled as running outside this session");
+    assert.match(sigResult.stderr, /PO\/operator[^\n]*human-held Ed25519 key/u);
+    assert.match(sigResult.stderr, /--intent-sha256/u);
+    assert.match(sigResult.stderr, /<intent-sha256-from-emit-signature-digest>/u);
+    assert.match(sigResult.stderr, /back in this session[^\n]*proof path, not the private key/u);
+    assert.match(sigResult.stderr, /--proof/u);
+    assert.match(sigResult.stderr, /<proof-path-from-sign-intent>/u);
     assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
@@ -4537,11 +4542,11 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
 // requirement -- scratch/strip-boilerplate.md measured it as pure duplication cost. The code
 // now distinguishes a determined shell (an in-session step, re-run through the SAME tool
 // that produced this denial -- here always Bash, via bash()) from a genuinely unknown one
-// (authorize-by-signature, which a human runs later on a machine this code never observes).
+// (sign-intent, which a human runs later on a machine this code never observes).
 // Chat mode has no out-of-session step at all (its `authorize` also runs in-session, per the
 // "the human confirms in-session" label), so chat mode's denial now carries POSIX only, with
 // no reconstruction: PowerShell was never computed away, it was never the determined answer
-// for this mode in the first place. Signature mode keeps both, for authorize-by-signature
+// for this mode in the first place. Signature mode keeps both, for sign-intent
 // alone -- that assertion is unchanged from before.
 test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determined command block without an unsafe primary command or rendering prerequisite", () => {
   const roots = [];
@@ -4555,10 +4560,14 @@ test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determin
       assert.match(result.stderr, /Step: plan\nPOSIX:/u);
       assert.match(result.stderr, /eval "\$CMD"/u);
       if (mode === "signature") {
-        // Only authorize-by-signature is out-of-session; it alone keeps both renderings.
+        // Only sign-intent is out-of-session; it alone keeps both renderings.
+        assert.match(result.stderr, /Step: sign-intent\nPOSIX:/u);
         assert.match(result.stderr, /Step: authorize-by-signature\nPOSIX:/u);
         assert.match(result.stderr, /PowerShell:/u);
         assert.match(result.stderr, /Invoke-Expression \$CMD/u);
+        const authorizeBlock = result.stderr.slice(result.stderr.indexOf("Step: authorize-by-signature"));
+        assert.doesNotMatch(authorizeBlock, /PowerShell:|Invoke-Expression \$CMD/u,
+          "local proof verification must use the current session's determined shell only");
       } else {
         // Chat mode: every step (plan/prepare-authorization/authorize) runs in-session
         // through the same Bash tool that produced this denial -- POSIX is determined, and
@@ -4664,6 +4673,8 @@ test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, an
     assert.match(sig.stderr, /Step: plan/u);
     assert.match(sig.stderr, /Step: prepare-authorization/u);
     assert.match(sig.stderr, /Step: emit-signature-digest/u);
+    assert.match(sig.stderr, /Step: sign-intent/u);
+    assert.match(sig.stderr, /PO\/operator[^\n]*human-held Ed25519 key/u);
     assert.match(sig.stderr, /Step: authorize-by-signature/u);
     assert.doesNotMatch(sig.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
 
@@ -4675,6 +4686,8 @@ test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, an
     assert.match(chat.stderr, /Step: authorize\n/u);
     assert.doesNotMatch(chat.stderr, /Step: authorize-by-signature/u);
     assert.doesNotMatch(chat.stderr, /Step: emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
+    assert.doesNotMatch(chat.stderr, /Step: sign-intent|human-held Ed25519 key/u,
+      "chat mode must not advertise the external signing step");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
@@ -4909,6 +4922,7 @@ function overrideReachability(command, projectDir) {
   if (reason === undefined) {
     // A code that never calls the planner at all (GUARD-LIFECYCLE-NOT-READY).
     assert.doesNotMatch(result.stderr, /Human override available/u, command);
+    assert.doesNotMatch(result.stderr, /Step: sign-intent|human-held Ed25519 key/u, command);
     return { code, reach: "never-liftable:not-routed" };
   }
   const recorded = recordHumanGuardDenial({
@@ -4922,11 +4936,13 @@ function overrideReachability(command, projectDir) {
     // The operator must be told exactly what the planner concluded -- a class that cannot be
     // armed and a refusal that implies one can be are two different failures.
     assert.doesNotMatch(result.stderr, /Human override available/u, command);
+    assert.doesNotMatch(result.stderr, /Step: sign-intent|human-held Ed25519 key/u, command);
     assert.match(result.stderr, /No human override route is offered/u, command);
     return { code, reach: `never-liftable:${recorded.status}:${recorded.code ?? "<none>"}` };
   }
   assert.match(result.stderr, /Human override available for this exact command/u, command);
   assert.match(result.stderr, /Step: emit-signature-digest/u, command);
+  assert.match(result.stderr, /Step: sign-intent/u, command);
   assert.match(result.stderr, /Step: authorize-by-signature/u, command);
   const planned = planHumanGuardOverride({
     rootDir: projectDir,
@@ -7194,7 +7210,10 @@ test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signatur
       if (mode === "chat") {
         assert.match(first.stderr, /Step: authorize\n/u, "chat denial must name its own activate step");
         assert.doesNotMatch(first.stderr, /Step: authorize-by-signature/u, "chat denial must not name signature's step");
+        assert.doesNotMatch(first.stderr, /Step: sign-intent|human-held Ed25519 key/u,
+          "chat denial must not advertise an external signing step");
       } else {
+        assert.match(first.stderr, /Step: sign-intent/u, "signature denial must name the PO/operator signing step");
         assert.match(first.stderr, /Step: authorize-by-signature/u, "signature denial must name the signed step");
         assert.doesNotMatch(first.stderr, /--activate/u, "signature denial must not offer in-session activation");
       }

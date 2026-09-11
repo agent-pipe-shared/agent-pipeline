@@ -677,7 +677,7 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
         // JSON.stringify() wrapping is harmless but no longer changes the
         // rendered shape -- kept only so a future path containing a shell-special
         // character still round-trips through shellWord() correctly.
-        // NVA-B-DENIALBOILER-1: every step below except authorize-by-signature is labelled
+        // NVA-B-DENIALBOILER-1: every step below except sign-intent is labelled
         // "in this session" (or, for chat mode, "the human confirms in-session") -- it runs
         // through the SAME tool that produced this very denial, so that tool's dialect is
         // determined, not guessed: the PowerShell tool renders PowerShell, anything else
@@ -685,7 +685,7 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
         // whose remediation still runs through this session's own Bash-equivalent tool)
         // renders POSIX -- mirroring CLAUDE_BASH_SHELL_DIALECT_PLATFORM above ("Claude's Bash
         // tool always executes through Git-Bash/POSIX, on every host including Windows").
-        // authorize-by-signature runs OUTSIDE this session, on a human's own machine this
+        // sign-intent runs OUTSIDE this session, on a human's own machine this
         // code never observes -- no signal here determines its shell, so it alone keeps the
         // full POSIX+PowerShell rendering (platform omitted below); this is deliberate and
         // load-bearing, not an oversight (see scratch/strip-boilerplate.md's own stop
@@ -713,8 +713,21 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
           "prepare-authorization", "prepare-authorization", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
         );
         const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256>"));
+        // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand;
+        // this is the only step that crosses into the attended private-key boundary.
+        const signIntent = renderHumanCopySafeCommand({
+          label: "sign-intent",
+          executable: process.execPath,
+          argv: [
+            placeholder(JSON.stringify(PO_HUMAN_APPROVAL_SCRIPT)), "sign-intent",
+            "--repo-root", placeholder(JSON.stringify(root)),
+            "--directory", placeholder("<external-po-material-directory>"),
+            "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
+          ],
+        });
         const authorizeBySignature = ceremonyCommand(
-          "authorize-by-signature", "authorize-by-signature", undefined, "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+          "authorize-by-signature", "authorize-by-signature", inSessionPlatform,
+          "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<proof-path-from-sign-intent>"),
         );
         // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
         // mode -- mirrors guard-testpath.mjs's own continuation exactly in shape.
@@ -729,9 +742,9 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
               `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
             prepareAuthorizationSignature.text,
             emitSignatureDigest.text,
-            `Then, outside this session (only the signature itself needs the external Ed25519 ` +
-              `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
-              `there is no in-session activate step for this mode):`,
+            "Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above. This writes proof-manual.json and signer-manual.json under the selected external material directory:",
+            signIntent.text,
+            "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",
             authorizeBySignature.text,
           ].join("\n");
         overrideGuidance = [
