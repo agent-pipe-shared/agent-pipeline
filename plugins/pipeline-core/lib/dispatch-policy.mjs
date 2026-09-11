@@ -30,6 +30,16 @@
 
 const CRITIC_ROLES = /critic|readiness-reviewer|plan-verifier/i;
 const GOLDFISH_ROLES = /goldfish/i;
+const PIPELINE_AGENT_TYPES = new Set([
+  "afk-claude-worker",
+  "consult-advisor",
+  "critic",
+  "goldfish-deep",
+  "goldfish-implementor",
+  "goldfish-mechanic",
+  "plan-verifier",
+  "readiness-reviewer",
+]);
 
 /**
  * Phrases the Critic template names as contamination. Each carries the reason, because a
@@ -90,15 +100,33 @@ const NAMES_MODEL = /\b(?:claude|gpt|o[0-9]|gemini|sonnet|opus|haiku|fable|codex
 const NAMES_RULESET = /\bruleset[- ]?sha\s*[:=]\s*\S/i;
 
 /**
- * @param {{subagentType: string, prompt: string}} dispatch
+ * @param {{subagentType: string, prompt: string, transport?: "direct"|"workflow"|"antigravity"|"codex"}} dispatch
  * @returns {{role: "critic"|"goldfish"|"other", findings: {code: string, why: string}[]}}
  */
-export function dispatchFindings({ subagentType, prompt } = {}) {
+export function dispatchFindings({ subagentType, prompt, transport = "direct" } = {}) {
   const text = typeof prompt === "string" ? prompt : "";
   const type = typeof subagentType === "string" ? subagentType : "";
   const findings = [];
+  const namespaced = type.startsWith("pipeline-core:");
+  const bareType = namespaced ? type.slice("pipeline-core:".length) : type;
+  const supported = PIPELINE_AGENT_TYPES.has(bareType);
 
-  if (CRITIC_ROLES.test(type)) {
+  if (["direct", "antigravity"].includes(transport) && type.trim() === "") {
+    findings.push({ code: "DISPATCH-ROLE-REQUIRED", why: "a dispatch packet needs a non-empty role before any runner or model starts" });
+    return { role: "other", findings };
+  }
+  if (namespaced && !supported) {
+    findings.push({ code: "DISPATCH-ROLE-UNKNOWN", why: `the pipeline role \`${type}\` has no shipped agent definition` });
+    return { role: "other", findings };
+  }
+  if (transport === "workflow" && supported && !namespaced) {
+    findings.push({ code: "DISPATCH-AGENT-TYPE-PREFIX", why: `Workflow resolves shipped roles through the plugin registry; use \`pipeline-core:${bareType}\`` });
+  }
+  if ((supported || namespaced || transport === "codex") && text.trim() === "") {
+    findings.push({ code: "DISPATCH-PROMPT-REQUIRED", why: "a shipped role needs a non-empty prompt before any runner or model starts" });
+  }
+
+  if (CRITIC_ROLES.test(bareType)) {
     for (const rule of CONTAMINATION) {
       if (rule.test.test(text)) findings.push({ code: `DISPATCH-CONTAMINATION-${rule.id}`, why: rule.why });
     }
@@ -114,7 +142,7 @@ export function dispatchFindings({ subagentType, prompt } = {}) {
     return { role: "critic", findings };
   }
 
-  if (GOLDFISH_ROLES.test(type)) {
+  if (GOLDFISH_ROLES.test(bareType)) {
     const missing = GOLDFISH_FIELDS.filter((field) => !field.test.test(text)).map((field) => field.id);
     if (missing.length > 0) {
       findings.push({
@@ -130,5 +158,5 @@ export function dispatchFindings({ subagentType, prompt } = {}) {
 
   // Roles with no template contract carry no requirement. Inventing one here would refuse
   // ordinary work in the name of a rule nobody wrote.
-  return { role: "other", findings: [] };
+  return { role: "other", findings };
 }

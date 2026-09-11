@@ -9,18 +9,19 @@
  * ../lib/dispatch-policy.mjs for the full account. The templates were correct; nothing
  * required using them. This is the reader they were missing.
  *
- * SCOPE. Roles that have a template contract are checked against it: Critic-family
- * dispatches for contamination and task frame, Goldfish-family for the six mandatory
- * briefing fields. Everything else passes untouched — inventing a requirement for roles
- * that have no template would refuse ordinary work in the name of a rule nobody wrote.
+ * SCOPE. Statically identified dispatch packets are checked before launch: shipped roles
+ * need a role name and prompt, Workflow uses the plugin-qualified shipped role name, and
+ * Critic/Goldfish families additionally satisfy their briefing contracts. Unrelated host
+ * roles pass untouched because this plugin has no contract for them.
  *
  * EXIT SEMANTICS, matching the sibling guards: 0 allow, 2 block, 1 allow with a warning.
  * Blocking rather than warning is deliberate. A warning on a dispatch is read after the
  * subagent has already spent its budget on a contaminated briefing, which is exactly too
  * late to be useful.
  *
- * FAIL-OPEN on anything it cannot parse. A guard that cannot read its input has no opinion,
- * and a broken hook must not become a work stoppage.
+ * FAIL-OPEN on unreadable hook input and dynamically constructed Workflow scripts. Once a
+ * native dispatch packet is statically identified, missing required packet fields fail
+ * closed before a runner or model starts.
  *
  * HONEST LIMIT, repeated here because it belongs where an operator will read it: this is a
  * structural check. It matches phrases and required fields, so it catches the accident —
@@ -47,8 +48,9 @@
  * regardless of contamination — backlog
  * 2026-08-25-guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape.md.
  * `extractAntigravityDispatches` reads `TypeName`/`Prompt` per array entry and checks each one
- * exactly like a direct Agent-tool dispatch; a malformed entry (missing `TypeName`, non-string
- * `Prompt`) is skipped rather than guessed at, same fail-open posture as the rest of this file.
+ * exactly like a direct Agent-tool dispatch. The pure extractor keeps ignoring malformed
+ * entries for its other consumers; this hook rejects an empty or malformed native envelope
+ * before invoking the extractor.
  */
 import { readFileSync } from "node:fs";
 
@@ -126,20 +128,28 @@ if (isDirectInvocation(import.meta.url)) {
   // The subagent tool is `Task` in Claude Code and `Agent` in some runners; both are accepted
   // rather than guessing one, because a matcher that names the wrong tool is a silent no-op —
   // the failure class this repository already paid for with NotebookEdit.
-  const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? "";
-  const prompt = toolInput.prompt ?? "";
+  const codexDispatch = input?.tool_name === "spawn_agent";
+  const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? toolInput.agent_type ?? (codexDispatch ? "default" : "");
+  const prompt = toolInput.prompt ?? toolInput.message ?? "";
 
   let dispatches;
   if (typeof subagentType === "string" && subagentType !== "" && typeof prompt === "string") {
-    dispatches = [{ subagentType, prompt }];
+    dispatches = [{ subagentType, prompt, transport: codexDispatch ? "codex" : "direct" }];
+  } else if (["Task", "Agent"].includes(input?.tool_name)) {
+    dispatches = [{ subagentType, prompt, transport: "direct" }];
   } else if (typeof toolInput.script === "string" && toolInput.script !== "") {
     // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
     // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
-    dispatches = extractWorkflowDispatches(toolInput.script);
+    dispatches = extractWorkflowDispatches(toolInput.script).map((dispatch) => ({ ...dispatch, transport: "workflow" }));
     if (dispatches.length === 0) process.exit(0);
   } else if (Array.isArray(toolInput.Subagents)) {
     // Antigravity runner's native invoke_subagent shape: capitalized, array-wrapped.
-    dispatches = extractAntigravityDispatches(toolInput.Subagents);
+    const malformed = toolInput.Subagents.length === 0 || toolInput.Subagents.some((entry) => !entry || typeof entry !== "object"
+      || typeof entry.TypeName !== "string" || entry.TypeName.trim() === ""
+      || typeof entry.Prompt !== "string" || entry.Prompt.trim() === "");
+    dispatches = malformed
+      ? [{ subagentType: "", prompt: "", transport: "antigravity" }]
+      : extractAntigravityDispatches(toolInput.Subagents).map((dispatch) => ({ ...dispatch, transport: "antigravity" }));
     if (dispatches.length === 0) process.exit(0);
   } else {
     process.exit(0);
@@ -151,17 +161,34 @@ if (isDirectInvocation(import.meta.url)) {
   if (blocked.length === 0) process.exit(0);
 
   const { role, findings } = blocked[0];
-  const template = role === "critic" ? "templates/prompts/critic-review.md" : "templates/prompts/goldfish-task.md";
+  const template = role === "critic" ? "templates/prompts/critic-review.md"
+    : role === "goldfish" ? "templates/prompts/goldfish-task.md"
+      : "the shipped role registry";
+  const guidance = role === "critic" || role === "goldfish"
+    ? [
+        `Correct the packet using ${template} and dispatch that. The template already forbids`,
+        "every pattern listed above, in those words. A review steered by the dispatcher's own",
+        "hypotheses is not an independent review, and an incomplete briefing is not dispatchable.",
+        "",
+        "This check is structural. It cannot see a steer written in fresh prose — read the template.",
+      ]
+    : [
+        "Correct the role and prompt fields using the shipped role registry, then dispatch again.",
+      ];
+  const receipt = {
+    schema: "pipeline.role-dispatch-preflight.v1",
+    status: "rejected",
+    phase: "packet",
+    findings: findings.map(({ code }) => code),
+    modelCalls: 0,
+  };
   process.stderr.write([
-    `BLOCKED (guard-dispatch, plugin pipeline-core): this ${role} dispatch was not built from ${template}.`,
+    `BLOCKED (guard-dispatch, plugin pipeline-core): this ${role} dispatch failed before launch against ${template}.`,
+    JSON.stringify(receipt),
     "",
     ...findings.map((f, i) => `  ${i + 1}. ${f.code}\n     ${f.why}`),
     "",
-    `Fill ${template} and dispatch that. The template is not a suggestion: it already forbids`,
-    "every pattern listed above, in those words. A review steered by the dispatcher's own",
-    "hypotheses is not an independent review, and an incomplete briefing is not dispatchable.",
-    "",
-    "This check is structural. It cannot see a steer written in fresh prose — read the template.",
+    ...guidance,
     "",
   ].join("\n"));
   process.exit(2);

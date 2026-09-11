@@ -242,14 +242,19 @@ check("descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing f
   assert.equal(sessionStart[0].hooks[0].commandWindows, sessionStart[0].hooks[0].command);
   assert.equal(sessionStart[0].hooks[0].timeout, 3);
   const entries = descriptor.hooks.PreToolUse;
-  assert.deepEqual(entries.map((entry) => entry.matcher), ["spawn_agent|update_plan", "Bash", "apply_patch|Edit|Write"]);
-  const [slicing, ...guardEntries] = entries;
+  assert.deepEqual(entries.map((entry) => entry.matcher), ["spawn_agent|update_plan", "spawn_agent", "Bash", "apply_patch|Edit|Write"]);
+  const [slicing, dispatch, ...guardEntries] = entries;
   assert.equal(slicing.hooks.length, 1);
   const slicingHook = slicing.hooks[0];
   assert.equal(slicingHook.command, "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse");
   assert.equal(slicingHook.commandWindows, slicingHook.command);
   assert.equal(slicingHook.timeout, 3);
   assert.equal(slicingHook.statusMessage, "Evaluating optional task slicing");
+  assert.equal(dispatch.hooks.length, 1);
+  assert.equal(dispatch.hooks[0].command, "node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"");
+  assert.equal(dispatch.hooks[0].commandWindows, dispatch.hooks[0].command);
+  assert.equal(dispatch.hooks[0].timeout, 3);
+  assert.equal(dispatch.hooks[0].statusMessage, "Checking dispatch packet");
   for (const entry of guardEntries) {
     assert.equal(entry.hooks.length, 1);
     const hook = entry.hooks[0];

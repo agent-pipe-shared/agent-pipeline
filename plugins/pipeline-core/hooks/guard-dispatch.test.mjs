@@ -178,6 +178,56 @@ check("GD15 allow  an Antigravity dispatch of an unrelated subagent type", {
   tool_input: { Subagents: [{ TypeName: "general-purpose", Prompt: "find where X is defined" }] },
 }, ALLOW);
 
+check("GD15a block a direct Agent packet with no role before launch", {
+  tool_name: "Agent",
+  tool_input: { prompt: "do work" },
+}, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-REQUIRED", '"modelCalls":0'] });
+
+check("GD15b block a shipped direct role with no prompt before launch", {
+  tool_name: "Agent",
+  tool_input: { subagent_type: "pipeline-core:consult-advisor", prompt: "" },
+}, BLOCK, { stderrIncludes: ["DISPATCH-PROMPT-REQUIRED", '"phase":"packet"'] });
+
+check("GD15c block an unknown namespaced role before launch", {
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic-typo", prompt: CLEAN_CRITIC },
+}, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-UNKNOWN", '"status":"rejected"'] });
+
+check("GD15d block a statically visible Workflow role without the plugin prefix", {
+  tool_name: "Workflow",
+  tool_input: { script: "agent({ agentType: 'consult-advisor', prompt: 'inspect the supplied paths' })" },
+}, BLOCK, { stderrIncludes: ["DISPATCH-AGENT-TYPE-PREFIX", "pipeline-core:consult-advisor"] });
+
+check("GD15e block malformed Antigravity entries before launch", {
+  tool_name: "invoke_subagent",
+  tool_input: { Subagents: [{ TypeName: "critic" }] },
+}, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-REQUIRED", '"modelCalls":0'] });
+
+check("GD15f block an empty Antigravity batch before launch", {
+  tool_name: "invoke_subagent",
+  tool_input: { Subagents: [] },
+}, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-REQUIRED", '"modelCalls":0'] });
+
+check("GD15g block a Codex critic packet carrying a claims list", {
+  tool_name: "spawn_agent",
+  tool_input: { agent_type: "critic", message: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x`, task_name: "review" },
+}, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", '"modelCalls":0'] });
+
+check("GD15h allow an ordinary Codex worker packet", {
+  tool_name: "spawn_agent",
+  tool_input: { agent_type: "worker", message: "Implement the bounded task.", task_name: "implementation" },
+}, ALLOW);
+
+check("GD15i allow Codex to use its valid default role when agent_type is omitted", {
+  tool_name: "spawn_agent",
+  tool_input: { message: "Inspect the bounded question.", task_name: "inspection" },
+}, ALLOW);
+
+check("GD15j block a Codex packet with no message before launch", {
+  tool_name: "spawn_agent",
+  tool_input: { agent_type: "worker", task_name: "missing-message" },
+}, BLOCK, { stderrIncludes: ["DISPATCH-PROMPT-REQUIRED", '"phase":"packet"'] });
+
 // GD16-GD19 -- NVA-B-DISPATCHEXPORT-1: extractWorkflowDispatches is now exported and the hook
 // body only runs when this module is the process entrypoint (isDirectInvocation, matching
 // guard-dispatch-budget.mjs), so it can be imported without disarming it. GD16 proves the

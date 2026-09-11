@@ -37,12 +37,31 @@ the delay and obscures the actual coordinator defect.
   printing the first `START`, so one bad packet cannot waste a long-running
   review slot.
 
-## Scope note
+## Implementation progress — 2026-09-11
 
-This item records the follow-up without changing the current candidate's role
-or launcher architecture. The 0.6.2 hardening fix only adds bounded filters and
-timeouts to affected test harnesses so a local infrastructure stall becomes
-visible promptly.
+The first shared preflight slice is implemented for the native tool envelopes
+that can otherwise fail after launch:
+
+- `dispatch-policy.mjs` owns the shipped role registry and common packet
+  findings instead of duplicating them in runner adapters;
+- Claude Code direct `Task`/`Agent`, static Workflow calls, Antigravity
+  `Subagents` envelopes and Codex `spawn_agent` consume that verdict;
+- missing role/prompt fields, unknown namespaced pipeline roles and missing
+  Workflow plugin prefixes return a structured
+  `pipeline.role-dispatch-preflight.v1` rejection with `modelCalls: 0`;
+- Codex keeps its optional native `agent_type` contract: omission selects its
+  valid `default` role, while a missing message is rejected;
+- unrelated host-defined roles remain admissible because the pipeline has no
+  registry authority over them.
+
+Focused process tests cover all shipped roles and all three runner adapters.
+This closes the malformed native-envelope path without changing the launcher
+architecture.
+
+The item remains open. A later slice still has to define and enforce the common
+coordinator envelope for required paths, candidate commit/tree binding and
+result destination, and batch coordinators still need an all-packets `PREPARE`
+barrier before their first `START`.
 
 ## Greenfield 0.6.2 evidence — 2026-09-11
 

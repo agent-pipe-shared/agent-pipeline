@@ -166,4 +166,37 @@ check("DP12 the real goldfish-task.md template, filled, passes", () => {
   assert.deepEqual(codes(result), []);
 });
 
+check("DP13 every shipped role refuses an empty prompt before launch", () => {
+  const roles = [
+    "afk-claude-worker", "consult-advisor", "critic", "goldfish-deep",
+    "goldfish-implementor", "goldfish-mechanic", "plan-verifier", "readiness-reviewer",
+  ];
+  for (const role of roles) {
+    const result = dispatchFindings({ subagentType: `pipeline-core:${role}`, prompt: "" });
+    assert.ok(codes(result).includes("DISPATCH-PROMPT-REQUIRED"), role);
+  }
+});
+
+check("DP14 an unknown pipeline role is refused before launch", () => {
+  const result = dispatchFindings({ subagentType: "pipeline-core:goldfish-typo", prompt: CLEAN_GOLDFISH });
+  assert.deepEqual(codes(result), ["DISPATCH-ROLE-UNKNOWN"]);
+});
+
+check("DP15 Workflow requires the plugin prefix for every shipped role", () => {
+  const roles = [
+    "afk-claude-worker", "consult-advisor", "critic", "goldfish-deep",
+    "goldfish-implementor", "goldfish-mechanic", "plan-verifier", "readiness-reviewer",
+  ];
+  for (const role of roles) {
+    const prompt = role.includes("goldfish") ? CLEAN_GOLDFISH : role === "critic" ? CLEAN_CRITIC : "Inspect the supplied paths.";
+    const result = dispatchFindings({ subagentType: role, prompt, transport: "workflow" });
+    assert.ok(codes(result).includes("DISPATCH-AGENT-TYPE-PREFIX"), role);
+  }
+});
+
+check("DP16 an unrelated host role remains outside the pipeline registry", () => {
+  const result = dispatchFindings({ subagentType: "general-purpose", prompt: "find where X is defined", transport: "workflow" });
+  assert.deepEqual(codes(result), []);
+});
+
 process.stdout.write(`\n${checks}/${checks} dispatch policy checks passed\n`);

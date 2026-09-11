@@ -770,7 +770,12 @@ test("GS32: Codex native lifecycle overlap resets a serial run without widening 
     assert.equal(reset.status, 0);
     assert.equal(reset.stdout, "");
     const safety = JSON.parse(readFileSync(fileURLToPath(new URL("./codex-hooks.json", import.meta.url)), "utf8"));
-    assert.equal(safety.hooks.PreToolUse.some((entry) => entry.matcher.includes("spawn_agent") && entry.hooks[0].command.includes("codex-pretool-guard")), false);
+    const dispatchGuards = safety.hooks.PreToolUse.filter((entry) => entry.matcher === "spawn_agent"
+      && entry.hooks[0].command.includes("guard-dispatch.mjs"));
+    assert.equal(dispatchGuards.length, 1, "spawn_agent has one separate fail-fast packet guard");
+    assert.equal(safety.hooks.PreToolUse.some((entry) => entry.matcher.includes("spawn_agent")
+      && entry.hooks[0].command.includes("codex-pretool-guard")), false,
+    "the broad safety bridge remains separate from the dispatch packet guard");
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 

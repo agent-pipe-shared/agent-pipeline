@@ -1,5 +1,5 @@
 {
-  "description": "Codex safety bridge for shell commands and write-path policy.",
+  "description": "Codex safety bridge for dispatch packets, shell commands, and write-path policy.",
   "hooks": {
     "SessionStart": [
       {
@@ -25,6 +25,18 @@
             "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
             "timeout": 3,
             "statusMessage": "Evaluating optional task slicing"
+          }
+        ]
+      },
+      {
+        "matcher": "spawn_agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+            "timeout": 3,
+            "statusMessage": "Checking dispatch packet"
           }
         ]
       },

@@ -52,6 +52,7 @@ no hand-maintained guard count or command list.
 | Claude Code | Stop | (all) | node "${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs" |
 | Codex | PreToolUse | Bash | node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs" |
 | Codex | PreToolUse | apply_patch&#124;Edit&#124;Write | node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs" |
+| Codex | PreToolUse | spawn_agent | node "${PLUGIN_ROOT}/hooks/guard-dispatch.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/guard-dispatch.mjs" |
 | Codex | PreToolUse | spawn_agent&#124;update_plan | node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" PreToolUse; Windows: node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" PreToolUse |
 | Codex | SessionStart | startup&#124;resume&#124;clear&#124;compact | node "${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs" |
 | Codex | SubagentStart | (all) | node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStart; Windows: node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStart |
@@ -74,5 +75,5 @@ The hashes bind this generated page to the exact manifest bytes it read.
 | Runner | Manifest | SHA-256 |
 | --- | --- | --- |
 | Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `e708edd8e0e1bc82ed2936830f134e0938629f1b3b755b7a16d4e93ca5998572` |
-| Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `ec7e3d0f9f5df1ab73e8d5af431ab1f271cbe2a615f9c4135b65178a51a24c68` |
+| Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `a2b112cf560ca898a8e0799f0c98930d0a2ed76e551611c2aecc1a515738fa99` |
 | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96` |
