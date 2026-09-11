@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { checkResumeConsumption, checkResumeConsumptionAnySession, SCHEMA } from "./check-resume-consumption.mjs";
 import {
   buildResumeHint, captureResumeHint, recordResumeHintCardDigest, recordResumeHintConsumption,
+  recordResumeHintDelivery,
 } from "../lib/resume-hint.mjs";
 
 const script = fileURLToPath(new URL("./check-resume-consumption.mjs", import.meta.url));
@@ -218,6 +219,7 @@ test("checkResumeConsumptionAnySession FATAL message also names both disposition
   const root = gitInitRoot("check-resume-consumption-any-msg-");
   try {
     captureWithDigest(root);
+    recordResumeHintDelivery({ rootDir: root, sessionId: "later-bootstrap" });
     const result = checkResumeConsumptionAnySession({ rootDir: root });
     assert.equal(result.ok, false);
     assert.equal(result.code, "RH-CHECK-RH-RECEIPT-ABSENT-ANY");
@@ -234,6 +236,7 @@ test("CLI: FATAL stderr text also carries both dispositions (any-session mode)",
   const root = gitInitRoot("check-resume-consumption-cli-any-msg-");
   try {
     captureWithDigest(root);
+    recordResumeHintDelivery({ rootDir: root, sessionId: "later-bootstrap" });
     const result = spawnSync(process.execPath, [script, "--root", root, "--any-session"], { encoding: "utf8" });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /^FATAL \(RH-CHECK-RH-RECEIPT-ABSENT-ANY\):/u);
@@ -314,13 +317,13 @@ test("checkResumeConsumptionAnySession PASS: an available card with a matching r
   }
 });
 
-test("checkResumeConsumptionAnySession FATAL: an available card with no consumption receipt at all", () => {
+test("checkResumeConsumptionAnySession PASS: a freshly captured card has not yet missed a later bootstrap", () => {
   const root = gitInitRoot("check-resume-consumption-any-noreceipt-");
   try {
     captureWithDigest(root);
     const result = checkResumeConsumptionAnySession({ rootDir: root });
-    assert.equal(result.ok, false);
-    assert.equal(result.code, "RH-CHECK-RH-RECEIPT-ABSENT-ANY");
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "RH-CHECK-PENDING-DELIVERY");
     assert.equal(result.cardStatus, "available");
     assert.equal(result.receiptCount, 0);
   } finally {
@@ -332,6 +335,7 @@ test("checkResumeConsumptionAnySession FATAL: consumption-receipts directory doe
   const root = gitInitRoot("check-resume-consumption-any-nodir-");
   try {
     captureWithDigest(root);
+    recordResumeHintDelivery({ rootDir: root, sessionId: "later-bootstrap" });
     // No receipt of any kind was ever recorded -- the directory itself is never created.
     const result = checkResumeConsumptionAnySession({ rootDir: root });
     assert.equal(result.ok, false);
@@ -348,6 +352,7 @@ test("checkResumeConsumptionAnySession FATAL: receipts exist but none match the 
     captureWithDigest(root);
     recordResumeHintConsumption({ rootDir: root, sessionId: "session-a" });
     captureWithDigest(root, { ...BASE_CONTEXT, intent: "A different, later intent entirely." });
+    recordResumeHintDelivery({ rootDir: root, sessionId: "replacement-card-bootstrap" });
 
     const result = checkResumeConsumptionAnySession({ rootDir: root });
     assert.equal(result.ok, false);
@@ -386,6 +391,7 @@ test("CLI: exit 1 for --any-session when an available card has no receipt from a
   const root = gitInitRoot("check-resume-consumption-cli-any-fatal-");
   try {
     captureWithDigest(root);
+    recordResumeHintDelivery({ rootDir: root, sessionId: "later-bootstrap" });
     const result = spawnSync(process.execPath, [script, "--root", root, "--any-session"], { encoding: "utf8" });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /^FATAL \(RH-CHECK-RH-RECEIPT-ABSENT-ANY\):/u);

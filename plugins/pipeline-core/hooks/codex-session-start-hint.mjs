@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { inspectResumeHint, recordResumeHintConsumption } from "../lib/resume-hint.mjs";
+import { inspectResumeHint, recordResumeHintConsumption, recordResumeHintDelivery } from "../lib/resume-hint.mjs";
 import { readOnboardingIntakeCheckpoint, readOnboardingIntakeMaterialInput } from "../lib/onboarding-continuity.mjs";
 import { decideOutput, loadStateSafe, shouldActivate } from "./post-compact-reground.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
@@ -152,7 +152,10 @@ function resumeHintContextLines(root, sessionId) {
   // failure must never prevent the card's content from still reaching the session below --
   // observation-only, mirroring inspectResumeHint's own "Passive observation only" contract.
   if (typeof sessionId === "string" && sessionId.trim().length > 0) {
-    try { recordResumeHintConsumption({ rootDir: root, sessionId }); } catch { /* best-effort, never blocking */ }
+    try {
+      recordResumeHintDelivery({ rootDir: root, sessionId });
+      recordResumeHintConsumption({ rootDir: root, sessionId });
+    } catch { /* best-effort, never blocking */ }
   }
   const { intent, scope, constraints, questions, progress } = observed.hint.context;
   const lines = [

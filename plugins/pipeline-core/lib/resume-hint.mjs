@@ -335,6 +335,7 @@ export function discardResumeHint({ rootDir, fs = { existsSync, lstatSync, unlin
  */
 export const CARD_DIGEST_RECORD_SCHEMA = "pipeline.resume-hint-card-digest.v1";
 export const CONSUMPTION_RECEIPT_SCHEMA = "pipeline.consumption-receipt.v1";
+export const DELIVERY_RECORD_SCHEMA = "pipeline.resume-hint-delivery.v1";
 
 /**
  * Deterministic content digest of a full capture card -- the exact object `capture` parsed
@@ -425,6 +426,61 @@ export function readResumeHintCardDigest({
   const record = readJsonRecord(join(dir, "card-digest.json"), fs);
   if (!record || record.schema !== CARD_DIGEST_RECORD_SCHEMA || typeof record.cardDigest !== "string") return null;
   return record;
+}
+
+/**
+ * Records that a bootstrap began surfacing the currently captured card. This is
+ * deliberately separate from a consumption receipt: Verify needs to distinguish
+ * a freshly captured card that no later bootstrap could have seen yet from a card
+ * whose delivery path ran without producing the matching read receipt.
+ */
+export function recordResumeHintDelivery({
+  rootDir, sessionId, now = new Date().toISOString(),
+  fs = { existsSync, lstatSync, mkdirSync, openSync, writeFileSync, closeSync, renameSync, readFileSync },
+  spawnSyncFn = spawnSync,
+} = {}) {
+  if (typeof sessionId !== "string" || sessionId.trim().length === 0) throw new Error("RH-DELIVERY-SESSION-ID");
+  const dir = resolvePrivateStateDir(rootDir, { spawnSyncFn });
+  if (dir === null) return { status: "unavailable" };
+  const recorded = readResumeHintCardDigest({ rootDir, fs, spawnSyncFn });
+  if (recorded === null) return { status: "no-card" };
+  const delivery = {
+    schema: DELIVERY_RECORD_SCHEMA,
+    sessionId,
+    cardDigest: recorded.cardDigest,
+    recordedAt: now,
+  };
+  try {
+    writeJsonRecord(dir, "delivery-record.json", delivery, fs);
+    return { status: "recorded", cardDigest: recorded.cardDigest };
+  } catch { return { status: "unavailable" }; }
+}
+
+/**
+ * Reads the one current delivery marker against the current capture digest.
+ * A stale marker from an older card is `not-delivered`, never evidence that the
+ * replacement card was offered to a later bootstrap.
+ */
+export function queryResumeHintDelivery({
+  rootDir, fs = { existsSync, lstatSync, readFileSync }, spawnSyncFn = spawnSync,
+} = {}) {
+  const cardRecord = readResumeHintCardDigest({ rootDir, fs, spawnSyncFn });
+  if (cardRecord === null) return { outcome: "no-card" };
+  const dir = resolvePrivateStateDir(rootDir, { spawnSyncFn });
+  const delivery = dir === null ? null : readJsonRecord(join(dir, "delivery-record.json"), fs);
+  if (!delivery || !exact(delivery, ["schema", "sessionId", "cardDigest", "recordedAt"])
+    || delivery.schema !== DELIVERY_RECORD_SCHEMA
+    || typeof delivery.sessionId !== "string" || delivery.sessionId.trim().length === 0
+    || !SHA256.test(delivery.cardDigest) || delivery.cardDigest !== cardRecord.cardDigest
+    || !validTimestamp(delivery.recordedAt)) {
+    return { outcome: "not-delivered", cardDigest: cardRecord.cardDigest };
+  }
+  return {
+    outcome: "delivered",
+    cardDigest: cardRecord.cardDigest,
+    sessionId: delivery.sessionId,
+    recordedAt: delivery.recordedAt ?? null,
+  };
 }
 
 /**

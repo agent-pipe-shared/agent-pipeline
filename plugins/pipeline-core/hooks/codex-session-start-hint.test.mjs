@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 
 import { main, sessionStartDecision, sessionStartMessage } from "./codex-session-start-hint.mjs";
 import {
-  buildResumeHint, captureResumeHint, queryResumeHintConsumption, recordResumeHintCardDigest,
+  buildResumeHint, captureResumeHint, queryResumeHintConsumption, queryResumeHintDelivery,
+  recordResumeHintCardDigest,
 } from "../lib/resume-hint.mjs";
 import {
   applyOnboardingIntakeCapture, applyOnboardingIntakeConsent, resolveIntakeCheckpointPaths,
@@ -237,6 +238,7 @@ try {
       "not-consumed",
       "no receipt should exist yet for any session",
     );
+    assert.equal(queryResumeHintDelivery({ rootDir: consumptionRoot }).outcome, "not-delivered");
 
     // A real sessionId: the SAME call that surfaces the card's content into context must
     // also record a matching consumption receipt for that exact session.
@@ -245,6 +247,10 @@ try {
     const queried = queryResumeHintConsumption({ rootDir: consumptionRoot, sessionId: "session-real" });
     assert.equal(queried.outcome, "consumed");
     assert.equal(queried.cardDigest, cardDigest);
+    const delivered = queryResumeHintDelivery({ rootDir: consumptionRoot });
+    assert.equal(delivered.outcome, "delivered");
+    assert.equal(delivered.sessionId, "session-real");
+    assert.equal(delivered.cardDigest, cardDigest);
 
     // A DIFFERENT session never having been surfaced this card must still show not-consumed --
     // consumption is per-session, never a blanket "someone read it" flag.

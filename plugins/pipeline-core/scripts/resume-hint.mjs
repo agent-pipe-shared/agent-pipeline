@@ -168,8 +168,9 @@ function main() {
   result = {
     ...result, cardDigest,
     verifyGateNote:
-      "a live Resume-Hint card fails resume-consumption-check until a later session runs " +
-      "`resume-hint.mjs consume` or `resume-hint.mjs discard`",
+      "a freshly captured Resume-Hint card remains pending without failing resume-consumption-check; after a later " +
+      "bootstrap begins delivery, it must run `resume-hint.mjs consume` or the card must be " +
+      "honestly disposed with `resume-hint.mjs discard`",
   };
   if (consumeCard) {
     try { unlinkSync(resolve(cardFile)); }

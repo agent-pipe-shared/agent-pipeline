@@ -42,8 +42,10 @@
  * verify run has no live session identity to supply, so this mode stays exactly what this
  * comment always said: standalone, after-the-fact, run on demand or by a Critic/verification
  * pass. The SEPARATE `--any-session` mode (added by NVA-CF-RESUMECHECKANYSESSION, commit
- * `2437d338`) answers a session-independent question instead ("does ANY recorded receipt match
- * the current card's digest") and IS now registered in `harness/scripts/verify.mjs` as suite
+ * `2437d338`) answers a session-independent question instead. A later Nova B correction
+ * distinguishes a freshly captured card from one a bootstrap has attempted to deliver: the
+ * former is pending and passes, while the latter requires a matching receipt. This mode IS
+ * registered in `harness/scripts/verify.mjs` as suite
  * `resume-consumption-check` (commit `03c1edcd`, TP-3 signed-override ceremony) -- it is a live
  * verify-gate check, not merely observed. `check-suite-registration.mjs`'s own
  * `DELIBERATELY_UNREGISTERED` opt-out list carries no entry for either mode: the single-session
@@ -69,7 +71,12 @@
 import { resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { anyResumeHintConsumptionReceipt, inspectResumeHint, queryResumeHintConsumption } from "../lib/resume-hint.mjs";
+import {
+  anyResumeHintConsumptionReceipt,
+  inspectResumeHint,
+  queryResumeHintConsumption,
+  queryResumeHintDelivery,
+} from "../lib/resume-hint.mjs";
 
 export const SCHEMA = "pipeline.check-resume-consumption.v1";
 
@@ -142,15 +149,16 @@ export function checkResumeConsumption({
 /**
  * Any-session composition, mirroring `checkResumeConsumption()`'s exact PASS/FATAL shape
  * (see that function's own doc comment above for the rationale). Answers a different
- * question than the single-session mode: does ANY recorded consumption receipt -- from ANY
- * session, not one caller-supplied id -- match the currently-available card's digest? This
- * is the mode `verify.mjs` (a batch check with no live session identity) will eventually be
- * able to call. `inspect`/`query` are injectable for the same filesystem-free-test reason as
- * `checkResumeConsumption()` above.
+ * question than the single-session mode: after a later bootstrap actually began delivery,
+ * does ANY recorded consumption receipt match the current digest? Before that first delivery
+ * attempt, a fresh card is pending rather than failed. `inspect`/`query`/`queryDelivery` are
+ * injectable for filesystem-free tests.
  */
 export function checkResumeConsumptionAnySession({
   rootDir,
-  inspect = inspectResumeHint, query = anyResumeHintConsumptionReceipt,
+  inspect = inspectResumeHint,
+  query = anyResumeHintConsumptionReceipt,
+  queryDelivery = queryResumeHintDelivery,
 } = {}) {
   const inspected = inspect({ rootDir });
   if (inspected.status !== "available") {
@@ -176,6 +184,26 @@ export function checkResumeConsumptionAnySession({
         "read the card, with no mechanical way to confirm it" + DISPOSITION_GUIDANCE,
     };
   }
+  const delivery = queryDelivery({ rootDir });
+  if (delivery.outcome === "not-delivered") {
+    return {
+      ok: true,
+      schema: SCHEMA,
+      code: "RH-CHECK-PENDING-DELIVERY",
+      cardStatus: inspected.status,
+      cardDigest: queried.cardDigest,
+      receiptCount: queried.receiptCount,
+      message:
+        "a Resume-Hint card is freshly captured and no later bootstrap delivery is recorded yet; " +
+        "the card remains pending for the next session and does not fail Verify",
+    };
+  }
+  if (delivery.outcome === "no-card") {
+    return {
+      ok: false, schema: SCHEMA, code: "RH-CHECK-NO-DIGEST-RECORD", cardStatus: inspected.status,
+      message: "a Resume-Hint card was available but its delivery state could not be bound to a card digest" + DISPOSITION_GUIDANCE,
+    };
+  }
   // queried.outcome === "not-found": a digest is recorded but no receipt anywhere matches it.
   return {
     ok: false, schema: SCHEMA, code: "RH-CHECK-RH-RECEIPT-ABSENT-ANY", cardStatus: inspected.status,
@@ -183,7 +211,8 @@ export function checkResumeConsumptionAnySession({
     message:
       "an available Resume-Hint card at bootstrap has no matching consumption receipt from ANY " +
       `session (${queried.receiptCount} receipt(s) inspected) -- this is the F12/F13 regression ` +
-      "shape, now checked repo-wide: no session anywhere consumed the currently-live card" + DISPOSITION_GUIDANCE,
+      `shape, now checked repo-wide: bootstrap session ${JSON.stringify(delivery.sessionId)} began ` +
+      "delivering the currently-live card, but no session recorded its consumption" + DISPOSITION_GUIDANCE,
   };
 }
 

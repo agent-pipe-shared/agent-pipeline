@@ -10,6 +10,7 @@ import test from "node:test";
 import {
   RESUME_HINT_SCHEMA, buildResumeHint, resumeHintContextDetail, validateResumeHint, verbatimMaterialRejection,
   anyResumeHintConsumptionReceipt, captureResumeHint, recordResumeHintCardDigest, recordResumeHintConsumption,
+  queryResumeHintDelivery, recordResumeHintDelivery,
 } from "./resume-hint.mjs";
 
 const BASE = {
@@ -590,6 +591,48 @@ test("NVA-RESUMEVERBATIM-1 a legacy four-key card (no materialInput/values) is u
 });
 
 // --- NVA-CF-RESUMECHECKANYSESSION: anyResumeHintConsumptionReceipt() -----------------------
+
+test("resume-hint delivery: a fresh card is pending until a bootstrap records its exact digest", () => {
+  const root = gitInitRoot("resume-hint-delivery-");
+  try {
+    captureResumeHint({ rootDir: root, context: BASE });
+    const { cardDigest } = recordResumeHintCardDigest({ rootDir: root, card: BASE });
+    assert.deepEqual(queryResumeHintDelivery({ rootDir: root }), { outcome: "not-delivered", cardDigest });
+
+    const recorded = recordResumeHintDelivery({ rootDir: root, sessionId: "bootstrap-a" });
+    assert.deepEqual(recorded, { status: "recorded", cardDigest });
+    const delivered = queryResumeHintDelivery({ rootDir: root });
+    assert.equal(delivered.outcome, "delivered");
+    assert.equal(delivered.cardDigest, cardDigest);
+    assert.equal(delivered.sessionId, "bootstrap-a");
+    assert.match(delivered.recordedAt, /^\d{4}-\d{2}-\d{2}T/u);
+
+    const deliveryPath = join(root, ".git", "agent-pipeline", "resume-hint", "delivery-record.json");
+    writeFileSync(deliveryPath, `${JSON.stringify({
+      schema: "pipeline.resume-hint-delivery.v1",
+      sessionId: "bootstrap-a",
+      cardDigest,
+      recordedAt: "not-a-timestamp",
+      forged: true,
+    })}\n`);
+    assert.deepEqual(queryResumeHintDelivery({ rootDir: root }), {
+      outcome: "not-delivered",
+      cardDigest,
+    }, "a malformed or extended private marker must not activate the Verify failure state");
+
+    recordResumeHintDelivery({ rootDir: root, sessionId: "bootstrap-a" });
+
+    const replacement = { ...BASE, intent: "A replacement card." };
+    captureResumeHint({ rootDir: root, context: replacement });
+    const { cardDigest: replacementDigest } = recordResumeHintCardDigest({ rootDir: root, card: replacement });
+    assert.deepEqual(queryResumeHintDelivery({ rootDir: root }), {
+      outcome: "not-delivered",
+      cardDigest: replacementDigest,
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("anyResumeHintConsumptionReceipt: no-card when no card-digest record exists", () => {
   const root = gitInitRoot("resume-hint-any-no-card-");
