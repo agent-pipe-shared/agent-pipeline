@@ -3,10 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
+closure_evidence: backlog/evidence/2026-09-11-git-boundary-critic-pass.md
+closure_commit: b94b83c06504a45374c90570c04801e7a6811f58
 source: "ADR-0079 (docs/adr/0079-hook-bypass-is-never-agent-overridable.md), recording the PO decision (2026-09-01, in session) that hook-bypass has no agent-side override route."
 ---
 
@@ -64,3 +66,13 @@ with a maintenance window already scoped for TP-5/TP-3-protected work. Landing a
 change to `guard-git.mjs` outside that window risks destabilizing the exact release-adjacent gate
 this change touches, for a fix whose urgency is a documentation/policy correctness gap rather than
 an active exploit. This item is scheduled for that maintenance window rather than done immediately.
+
+## Closure — 2026-09-11
+
+The four bypass rules now exit through the non-overridable path before any
+agent-side override can be consumed. Valid override arming is ignored for each
+rule, the guard offers no override instructions, and focused coverage passes
+247/247 cases. The correction also aligns the root and vendored guardrail text
+with ADR-0079. An independent T1 correction Critic returned PASS with no
+findings; the exact candidate and assurance boundary are recorded in the
+closure evidence.
