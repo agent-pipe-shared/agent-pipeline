@@ -35,8 +35,8 @@ tests, local commits and reviews remain authorized. Do not repeat historical
 startup diagnosis, missing-record searches or completed review rounds.
 
 Nova-B status reconciliation is active. The pass began at 61 open and 54
-closed `nova-b` items; after five evidence-backed closures the canonical
-ledger projection contains 56 open and 59 closed. Every open item's
+closed `nova-b` items; after six evidence-backed closures the canonical
+ledger projection contains 55 open and 60 closed. Every open item's
 `done_when` is being checked against the current code before that count is
 treated as remaining work. B3 and B4 are implemented:
 the later native Antigravity runner supersedes Nova's historical Alpha-only
@@ -549,14 +549,14 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
    week were committed as `fix` with the reason in the body.
 6. **Superseded count:** the 2026-09-06 snapshot contained 68 open Nova-B
    items. The current audit started at 61 open and 54 closed; its first two
-   sanctioned reconciliation batches leave 56 open and 59 closed. Frontmatter plus
+   sanctioned reconciliation batches and the Codex-dispatch duplicate closure
+   leave 55 open and 60 closed. Frontmatter plus
    the append-only ledger remains authoritative, and each further change needs
    checked completion evidence.
-7. **Action needed now: run the marketplace/plugin update + `/reload-plugins`.**
-   Both `guard-lifecycle-ready.mjs` and `guard-git.mjs`'s installed copies
-   are confirmed stale (see the READCONTAIN-1/2 section above for detail) —
-   neither today's read-scope fixes nor the GG-22 pathspec fixes are yet
-   actually enforced for this checkout's own sessions.
+7. **Installed-copy action completed:** the local Codex plugin is running the
+   0.6.2 development build that contains the read-scope and GG-22 corrections.
+   Later Nova-B commits still require a fresh local candidate sync before they
+   can be claimed as installed behavior.
 8. **Open from the 2026-09-06 design work:** whether the slicing nudge stays
    non-blocking if the channel probe fails.
 

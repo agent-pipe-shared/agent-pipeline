@@ -166,3 +166,17 @@ syntactically migrated supervisor/pool registrations whose current self-probe
 mode is not the normal standardized descriptor path. All entries therefore
 remain honestly `legacy-process-only`; no suite earns `required` until its
 normal Verify invocation imports the shipped helper and emits the bound stream.
+
+The first normal-path migration landed in `b0512d7d`. Verify now supplies the
+descriptor to `local-worker-pool-tests` and
+`local-worker-supervisor-core-tests`, captures their declared, disposed and
+terminal records over a separate bounded descriptor, and writes a v2 receipt
+that binds the exact case policy and completion attestation. A missing,
+malformed, oversized, late or policy-drifting stream fails closed; a legacy v1
+receipt cannot satisfy either required suite. Direct developer runs remain
+usable without minting a receipt. Focused tests and an independent Critic
+passed.
+
+The registry is now explicit: **2 required and 170 legacy-process-only**. The
+item stays open for the remaining staged migration; this commit does not claim
+that all registered suites have case-level completion evidence.
