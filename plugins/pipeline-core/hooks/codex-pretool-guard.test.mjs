@@ -16,7 +16,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn, spawnSync } from "node:child_process";
+import { fork, spawnSync } from "node:child_process";
 import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
 
@@ -33,6 +33,9 @@ const shardResults = [];
 if (Number.isInteger(shardIndex) && (shardIndex < 0 || shardIndex >= shardCount)) {
   throw new Error(`PIPELINE_CODEX_PRETOOL_TEST_SHARD must be between 0 and ${shardCount - 1}`);
 }
+if (Number.isInteger(shardIndex) && typeof process.send !== "function") {
+  throw new Error("PIPELINE_CODEX_PRETOOL_TEST_SHARD is internal and requires the controller IPC channel");
+}
 
 // This integration suite intentionally starts the production adapter and its nested
 // guards as real processes. Its cases use isolated temporary repositories, so the
@@ -40,11 +43,20 @@ if (Number.isInteger(shardIndex) && (shardIndex < 0 || shardIndex >= shardCount)
 // named filter keeps the old single-process path for focused debugging.
 if (!Number.isInteger(shardIndex) && checkFilter === "") {
   const testPath = fileURLToPath(import.meta.url);
+  const forged = spawnSync(process.execPath, [testPath], {
+    cwd: process.cwd(),
+    env: { ...process.env, PIPELINE_CODEX_PRETOOL_TEST_SHARD: "0" },
+    encoding: "utf8",
+    timeout: 5_000,
+  });
+  if (forged.status === 0 || !String(forged.stderr).includes("requires the controller IPC channel")) {
+    throw new Error("internal shard mode is reachable without its controller");
+  }
   const workers = Array.from({ length: shardCount }, (_, index) => new Promise((resolveWorker) => {
-    const child = spawn(process.execPath, [testPath], {
+    const child = fork(testPath, [], {
       cwd: process.cwd(),
       env: { ...process.env, PIPELINE_CODEX_PRETOOL_TEST_SHARD: String(index) },
-      stdio: ["ignore", "pipe", "pipe"],
+      silent: true,
     });
     let stdout = "";
     let stderr = "";
@@ -70,6 +82,12 @@ if (!Number.isInteger(shardIndex) && checkFilter === "") {
     if (outcome.code !== 0 || outcome.signal !== null) failed = true;
   }
   results.sort((left, right) => left.ordinal - right.ordinal);
+  if (results.length !== 36
+    || results.some((result, index) => result.ordinal !== index)
+    || new Set(results.map(({ ordinal }) => ordinal)).size !== results.length) {
+    failed = true;
+    process.stderr.write(`not ok - shards returned incomplete or duplicate coverage (${results.length}/36)\n`);
+  }
   for (const [index, result] of results.entries()) {
     process.stdout.write(`${result.ok ? "ok" : "not ok"} ${index + 1} - ${result.name}\n`);
     if (!result.ok) failed = true;
@@ -1177,6 +1195,7 @@ check("lifecycle-not-ready denial does not advertise a human override ceremony",
 
 if (Number.isInteger(shardIndex)) {
   process.stdout.write(`${JSON.stringify({ results: shardResults })}\n`);
+  process.disconnect?.();
 } else {
   if (process.exitCode) process.exit(process.exitCode);
   process.stdout.write(`1..${passed}\n`);
