@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, realpathSync } from "node:fs";
+import { appendFileSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -234,22 +234,28 @@ const injectedFailure = process.env.PIPELINE_LWS_TEST_INJECT_FAILURE ?? "";
 if (injectedFailure === "") {
   const probe = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
     encoding: "utf8",
-    env: { ...process.env, PIPELINE_LWS_TEST_INJECT_FAILURE: "LWS07" },
+    env: { ...process.env, PIPELINE_LWS_TEST_INJECT_FAILURE: "LWS07", PIPELINE_LWS_TEST_PROBE_FD: "3" },
     shell: false,
+    stdio: ["ignore", "pipe", "pipe", "pipe"],
     timeout: 10_000,
   });
   assert.notEqual(probe.status, 0, "the early-failure probe must remain red");
-  assert.match(probe.stdout, /LWS15 /u, "the last case must still be reported after LWS07 fails");
-  assert.match(probe.stdout, /tests 15/u, "the failure probe must execute the complete corpus");
-  assert.match(probe.stdout, /pass 14/u);
-  assert.match(probe.stdout, /fail 1/u);
+  assert.deepEqual(
+    String(probe.output[3]).trim().split("\n"),
+    Array.from({ length: 15 }, (_, index) => `LWS${String(index + 1).padStart(2, "0")}`),
+    "every case, including LWS15, must execute after LWS07 fails",
+  );
 }
 
 let registered = 0;
 function check(name, fn) {
   registered += 1;
   const id = `LWS${String(registered).padStart(2, "0")}`;
-  test(`${id} ${name}`, injectedFailure === id ? () => { throw new Error("intentional early-failure probe"); } : fn);
+  test(`${id} ${name}`, () => {
+    if (process.env.PIPELINE_LWS_TEST_PROBE_FD === "3") appendFileSync(3, `${id}\n`);
+    if (injectedFailure === id) throw new Error("intentional early-failure probe");
+    return fn();
+  });
 }
 
 check("accepts one closed request bound to pool, runner, instructions, Git, and recovery reserve", () => {
