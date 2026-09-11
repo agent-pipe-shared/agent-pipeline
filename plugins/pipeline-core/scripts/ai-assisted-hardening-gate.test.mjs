@@ -6,7 +6,13 @@ import { tmpdir } from "node:os";
 import test from "node:test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { evaluateAiHardeningGate, INDEPENDENT_CHECK_COMMANDS, runIndependentChecks } from "./ai-assisted-hardening-gate.mjs";
+import {
+  evaluateAiHardeningGate,
+  INDEPENDENT_CHECK_COMMANDS,
+  INDEPENDENT_CHECK_TIMEOUT_MS,
+  runIndependentChecks,
+  WORKTREE_GIT_TIMEOUT_MS,
+} from "./ai-assisted-hardening-gate.mjs";
 
 const GATE_SCRIPT_PATH = fileURLToPath(new URL("./ai-assisted-hardening-gate.mjs", import.meta.url));
 
@@ -90,10 +96,16 @@ test("runIndependentChecks: the same self-excluded guard check stays missing whe
   const file = INDEPENDENT_CHECK_COMMANDS.guard;
   const repoRoot = selfExcludedFixtureRoot(file, 0);
   try {
+    const spawnedFiles = [];
     const result = runIndependentChecks(repoRoot, [file], null, {
       reviewerId: "reviewer-b", authorId: "author-a", reviewerSource: "cli-argument",
+      spawnChild(_command, args) {
+        spawnedFiles.push(args[0]);
+        return { status: 0 };
+      },
     });
-    assert.deepEqual(result, []);
+    assert.deepEqual(result, ["test"]);
+    assert.equal(spawnedFiles.includes(file), false, "an ineligible reviewer must short-circuit before the candidate child spawn");
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
   }
@@ -121,6 +133,47 @@ test("runIndependentChecks: a self-excluded guard check stays missing when the c
   }
 });
 
+test("runIndependentChecks: a timed-out ordinary independent child remains missing and receives the fixed bound", () => {
+  const calls = [];
+  const result = runIndependentChecks("/fixture", [".github/workflows/verify.yml"], null, {
+    spawnChild(command, args, options) {
+      calls.push({ command, args, options });
+      return { status: null, error: Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }) };
+    },
+  });
+  assert.deepEqual(result, []);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.timeout, INDEPENDENT_CHECK_TIMEOUT_MS);
+});
+
+test("runIndependentChecks: base worktree add, check and cleanup are bounded; timeout never counts as PASS", () => {
+  const calls = [];
+  const changedPaths = [INDEPENDENT_CHECK_COMMANDS.scope, "docs/changed.md"];
+  const result = runIndependentChecks("/fixture", changedPaths, "a".repeat(40), {
+    reviewerId: null,
+    authorId: "author-a",
+    reviewerSource: null,
+    spawnChild(command, args, options) {
+      calls.push({ command, args, options });
+      if (command === "git" && args[0] === "worktree" && args[1] === "add") return { status: 0 };
+      return { status: null, error: Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }) };
+    },
+  });
+  assert.deepEqual(result, []);
+  assert.equal(calls.length, 4);
+  assert.deepEqual(calls.map(({ command }) => command), ["git", process.execPath, "git", process.execPath]);
+  assert.deepEqual(calls.map(({ options }) => options.timeout), [
+    WORKTREE_GIT_TIMEOUT_MS,
+    INDEPENDENT_CHECK_TIMEOUT_MS,
+    WORKTREE_GIT_TIMEOUT_MS,
+    INDEPENDENT_CHECK_TIMEOUT_MS,
+  ]);
+  assert.deepEqual(calls[0].args.slice(0, 2), ["worktree", "add"]);
+  assert.equal(calls[1].args[0].endsWith(INDEPENDENT_CHECK_COMMANDS.scope), true);
+  assert.deepEqual(calls[2].args.slice(0, 2), ["worktree", "remove"]);
+  assert.deepEqual(calls[3].args, [INDEPENDENT_CHECK_COMMANDS.test]);
+});
+
 // --- BUGFIX repro (Re-Critic vtpgate2-368458af F1, `ai-assisted-hardening-
 // gate.mjs:169`): `main()` gave `--reviewer-id` precedence over
 // `PIPELINE_SECURITY_REVIEWER_ID`, so the author of a candidate could name
@@ -135,6 +188,8 @@ test("runIndependentChecks: a self-excluded guard check stays missing when the c
 test("BUGFIX repro: the CLI's emitted reviewerIdentity is the repository variable, never the --reviewer-id flag, even when the flag names a distinct identity", () => {
   const repoRoot = twoCommitGitFixture();
   try {
+    const env = { ...process.env, PIPELINE_SECURITY_REVIEWER_ID: "admin-reviewer" };
+    delete env.NODE_TEST_CONTEXT;
     const result = spawnSync(process.execPath, [
       GATE_SCRIPT_PATH,
       "--repo-root", repoRoot,
@@ -143,8 +198,10 @@ test("BUGFIX repro: the CLI's emitted reviewerIdentity is the repository variabl
     ], {
       cwd: repoRoot,
       encoding: "utf8",
-      env: { ...process.env, PIPELINE_SECURITY_REVIEWER_ID: "admin-reviewer" },
+      env,
     });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.status, 0, result.stderr || "gate CLI produced no result");
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.reviewerIdentity.source, "repository-variable");
     assert.equal(parsed.reviewerIdentity.id, "admin-reviewer");
@@ -157,12 +214,15 @@ test("the CLI falls back to the cli-argument source when no repository variable 
   try {
     const env = { ...process.env };
     delete env.PIPELINE_SECURITY_REVIEWER_ID;
+    delete env.NODE_TEST_CONTEXT;
     const result = spawnSync(process.execPath, [
       GATE_SCRIPT_PATH,
       "--repo-root", repoRoot,
       "--author-id", "author-a",
       "--reviewer-id", "reviewer-b",
     ], { cwd: repoRoot, encoding: "utf8", env });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.status, 0, result.stderr || "gate CLI produced no result");
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.reviewerIdentity.source, "cli-argument");
     assert.equal(parsed.reviewerIdentity.id, "reviewer-b");

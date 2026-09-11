@@ -19,6 +19,7 @@ const OID = /^[0-9a-f]{40}$/u;
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..", "..", "..");
 const DEFAULT_INVENTORY = "docs/product-capability-inventory.json";
+export const TOPOLOGY_GIT_TIMEOUT_MS = 30_000;
 
 function failure(code, subject = null) {
   return Object.freeze({
@@ -38,6 +39,7 @@ function defaultGit(root, args) {
     encoding: "utf8",
     shell: false,
     stdio: ["ignore", "pipe", "ignore"],
+    timeout: TOPOLOGY_GIT_TIMEOUT_MS,
   });
   return Object.freeze({
     status: result.status,

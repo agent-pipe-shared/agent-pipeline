@@ -24,6 +24,8 @@ import {
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const AI_HARDENING_GATE_SCHEMA = "pipeline.ai-assisted-hardening-gate.v1";
+export const INDEPENDENT_CHECK_TIMEOUT_MS = 120_000;
+export const WORKTREE_GIT_TIMEOUT_MS = 30_000;
 export const INDEPENDENT_CHECK_COMMANDS = Object.freeze({
   scope: "harness/scripts/check-doc-contracts.mjs",
   test: "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
@@ -66,7 +68,11 @@ export function evaluateAiHardeningGate({
 }
 
 function git(repoRoot, args) {
-  const result = spawnSync("git", args, { cwd: repoRoot, encoding: "utf8" });
+  const result = spawnSync("git", args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: WORKTREE_GIT_TIMEOUT_MS,
+  });
   if (result.status !== 0) throw new Error((result.stderr || "git command failed").trim());
   return result.stdout.trim();
 }
@@ -78,6 +84,15 @@ function argument(name, fallback = null) {
 
 function bool(value) {
   return value === true || value === "true";
+}
+
+function spawnStatus(spawnChild, command, args, options) {
+  try {
+    const result = spawnChild(command, args, options);
+    return Number.isInteger(result?.status) ? result.status : null;
+  } catch {
+    return null;
+  }
 }
 
 export function changedPathsForCandidate(repoRoot, base, head) {
@@ -94,7 +109,7 @@ export function changedPathsForCandidate(repoRoot, base, head) {
  * to "not counted" -- fail-closed, never a thrown exception that could be
  * mistaken for something else.
  */
-function verifySelfExcludedAtBase(repoRoot, base, kind, file) {
+function verifySelfExcludedAtBase(repoRoot, base, kind, file, spawnChild) {
   const decision = evaluateSelfExcludedCheck({ kind, baseRevisionExitCode: null });
   if (!decision.rootPointable || typeof base !== "string" || base.length === 0) return false;
   let worktreeDir;
@@ -104,20 +119,26 @@ function verifySelfExcludedAtBase(repoRoot, base, kind, file) {
     return false;
   }
   try {
-    const add = spawnSync("git", ["worktree", "add", "--detach", "--force", worktreeDir, base], {
+    const addStatus = spawnStatus(spawnChild, "git", ["worktree", "add", "--detach", "--force", worktreeDir, base], {
       cwd: repoRoot,
       stdio: "ignore",
+      timeout: WORKTREE_GIT_TIMEOUT_MS,
     });
-    if (add.status !== 0) return false;
-    const run = spawnSync(process.execPath, [path.join(worktreeDir, file), "--root", repoRoot], {
+    if (addStatus !== 0) return false;
+    const runStatus = spawnStatus(spawnChild, process.execPath, [path.join(worktreeDir, file), "--root", repoRoot], {
       cwd: worktreeDir,
       stdio: "ignore",
+      timeout: INDEPENDENT_CHECK_TIMEOUT_MS,
     });
-    return evaluateSelfExcludedCheck({ kind, baseRevisionExitCode: run.status }).counted;
+    return evaluateSelfExcludedCheck({ kind, baseRevisionExitCode: runStatus }).counted;
   } catch {
     return false;
   } finally {
-    spawnSync("git", ["worktree", "remove", "--force", worktreeDir], { cwd: repoRoot, stdio: "ignore" });
+    spawnStatus(spawnChild, "git", ["worktree", "remove", "--force", worktreeDir], {
+      cwd: repoRoot,
+      stdio: "ignore",
+      timeout: WORKTREE_GIT_TIMEOUT_MS,
+    });
     try { rmSync(worktreeDir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
   }
 }
@@ -132,11 +153,27 @@ function verifySelfExcludedAtBase(repoRoot, base, kind, file) {
  * author cannot themselves supply (`reviewerSource === "repository-variable"`,
  * round 2 NVA-VTPGATE-3), and all three are required by that function.
  */
-function verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId, reviewerSource) {
-  const run = spawnSync(process.execPath, [file], { cwd: repoRoot, stdio: "ignore" });
+function verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId, reviewerSource, spawnChild) {
+  // If a passing candidate suite could not count with these identities, do
+  // not launch it. This keeps an absent/untrusted/self reviewer from paying
+  // for a child whose strongest possible result is already known to fail.
+  const eligibility = evaluateSelfExcludedCheck({
+    kind,
+    candidateRevisionExitCode: 0,
+    reviewerId,
+    authorId,
+    reviewerSource,
+  });
+  if (!eligibility.counted) return false;
+
+  const runStatus = spawnStatus(spawnChild, process.execPath, [file], {
+    cwd: repoRoot,
+    stdio: "ignore",
+    timeout: INDEPENDENT_CHECK_TIMEOUT_MS,
+  });
   return evaluateSelfExcludedCheck({
     kind,
-    candidateRevisionExitCode: run.status,
+    candidateRevisionExitCode: runStatus,
     reviewerId,
     authorId,
     reviewerSource,
@@ -153,16 +190,25 @@ function verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorI
  * base-only behaviour (and `reviewerSource` defaults to `null`, which
  * `evaluateSelfExcludedCheck` treats as untrusted -- fail closed).
  */
-export function runIndependentChecks(repoRoot, changedPaths, base = null, { reviewerId = null, authorId = null, reviewerSource = null } = {}) {
+export function runIndependentChecks(repoRoot, changedPaths, base = null, {
+  reviewerId = null,
+  authorId = null,
+  reviewerSource = null,
+  spawnChild = spawnSync,
+} = {}) {
   const required = evaluateChangeIntegrity({ paths: changedPaths, independentChecks: [] }).changed;
   return required.filter((kind) => {
     const file = INDEPENDENT_CHECK_COMMANDS[kind];
     if (!file) return false;
     if (changedPaths.includes(file)) {
-      return verifySelfExcludedAtBase(repoRoot, base, kind, file)
-        || verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId, reviewerSource);
+      return verifySelfExcludedAtBase(repoRoot, base, kind, file, spawnChild)
+        || verifySelfExcludedAtCandidate(repoRoot, kind, file, reviewerId, authorId, reviewerSource, spawnChild);
     }
-    return spawnSync(process.execPath, [file], { cwd: repoRoot, stdio: "ignore" }).status === 0;
+    return spawnStatus(spawnChild, process.execPath, [file], {
+      cwd: repoRoot,
+      stdio: "ignore",
+      timeout: INDEPENDENT_CHECK_TIMEOUT_MS,
+    }) === 0;
   });
 }
 
