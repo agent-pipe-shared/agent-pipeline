@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "34bfdff7073367a969c01d7fe89fb1fed0aa349cd1eb14c8b50b5f685df09c4e"
+    "transitionHead": "3d59773e7a61a6e1b7fbd67bb0d241016a9c7e1f2e786e383287629468ad6120"
   },
   "counts": {
-    "open": 93,
+    "open": 92,
     "in_progress": 0,
-    "closed": 547,
+    "closed": 548,
     "rejected": 3,
     "deferred": 11
   },
@@ -8205,13 +8205,17 @@
     },
     {
       "id": "pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "T1 Critic re-Critic round 2 on NVA-B-READCONTAIN-1 (2026-09-06), 'Not reached' section: 'Untested candidate, delta-introduced asymmetry... Not verified, not a finding.' Traced further by the Elephant while triaging that report.",
       "deferred": false,
-      "tracking": "Nova B — a T1 Critic reviewing NVA-B-READCONTAIN-1's symlink-containment fix found that the read-scope lane's new realpath check still admits a `<symlink-inside-root>/../<outside>/<file>` argument, because `path.resolve()` collapses the `..` lexically before any symlink is examined. The write lane's own `isPathWithinRealpathedRoot` — the pattern the read-lane fix was modeled on — opens with the identical `resolve(root, filePath)` call, before its own existence/realpath walk. Whether this is actually exploitable for a WRITE depends on a fact this session could not verify from inside the repository: how the host tool that performs the actual Edit/Write file mutation resolves the same path string."
+      "tracking": "Nova B — a T1 Critic reviewing NVA-B-READCONTAIN-1's symlink-containment fix found that the read-scope lane's new realpath check still admits a `<symlink-inside-root>/../<outside>/<file>` argument, because `path.resolve()` collapses the `..` lexically before any symlink is examined. The write lane's own `isPathWithinRealpathedRoot` — the pattern the read-lane fix was modeled on — opens with the identical `resolve(root, filePath)` call, before its own existence/realpath walk. Whether this is actually exploitable for a WRITE depends on a fact this session could not verify from inside the repository: how the host tool that performs the actual Edit/Write file mutation resolves the same path string.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "0a0b3ad9b56c9eff97d5d8323aa102e1e9b1578c",
+      "closureEvidence": "backlog/evidence/2026-09-11-write-lane-dotdot-disposition.md"
     }
   ]
 }

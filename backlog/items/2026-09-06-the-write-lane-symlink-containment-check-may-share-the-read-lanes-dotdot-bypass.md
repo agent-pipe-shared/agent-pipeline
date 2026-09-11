@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
 sprint: nova-b
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 0a0b3ad9b56c9eff97d5d8323aa102e1e9b1578c
+closure_evidence: backlog/evidence/2026-09-11-write-lane-dotdot-disposition.md
 tracking: "Nova B — a T1 Critic reviewing NVA-B-READCONTAIN-1's symlink-containment fix found that the read-scope lane's new realpath check still admits a `<symlink-inside-root>/../<outside>/<file>` argument, because `path.resolve()` collapses the `..` lexically before any symlink is examined. The write lane's own `isPathWithinRealpathedRoot` — the pattern the read-lane fix was modeled on — opens with the identical `resolve(root, filePath)` call, before its own existence/realpath walk. Whether this is actually exploitable for a WRITE depends on a fact this session could not verify from inside the repository: how the host tool that performs the actual Edit/Write file mutation resolves the same path string."
 done_when: manual
 source: "T1 Critic re-Critic round 2 on NVA-B-READCONTAIN-1 (2026-09-06), 'Not reached' section: 'Untested candidate, delta-introduced asymmetry... Not verified, not a finding.' Traced further by the Elephant while triaging that report."
@@ -161,3 +165,9 @@ behavior that closes the gap: Claude Code's `Write` tool resolves its
 semantics) before opening the file, without dereferencing intermediate
 symlinks — a future host-tool change to kernel-order resolution would
 reopen exactly this gap and is the regression risk to watch for.
+
+## Closure — 2026-09-11
+
+Closed with the acceptance criteria's explicit non-exploitable disposition.
+The tracked closure evidence preserves the discriminating host observation and
+its scope boundary. No guard change is warranted by the measured behavior.
