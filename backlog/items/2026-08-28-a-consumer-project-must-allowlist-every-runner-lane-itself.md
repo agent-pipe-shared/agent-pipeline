@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.consumer-must-allowlist-every-runner-lane
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: d0857abbedb6f86d3e57436cd443f5878ff1eded
+closure_evidence: backlog/evidence/2026-09-11-consumer-runner-permission-onboarding.md
 created: 2026-08-28
 sprint: nova-b
 tracking: "Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented"
@@ -61,3 +65,12 @@ applying unchanged.
 
 - `2026-08-28-the-readiness-guard-blocks-the-recovery-command-it-names.md` — the deadlock
   this gap makes unrecoverable.
+
+## Closure — 2026-09-11
+
+Commit `d0857abb` makes onboarding own the complete runner permission
+projection, including the Bash/PowerShell and separator variants it uses,
+while treating host-managed Codex permissions explicitly as not applicable.
+Ready validation, safe partial repair and fail-closed malformed-settings
+handling passed focused tests and an independent correction Critic. See the
+closure evidence.

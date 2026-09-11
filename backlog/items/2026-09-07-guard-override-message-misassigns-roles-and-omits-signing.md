@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-override-message-misassigns-roles-and-omits-signing
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: b10e9b4864898fe09504072361e35be07ae99500
+closure_evidence: backlog/evidence/2026-09-11-guard-signature-role-ceremony.md
 created: 2026-09-07
 source: "PO takeover report and source inspection of the signature-mode guard recovery messages on 2026-09-07."
 sprint: nova-b
@@ -55,3 +59,11 @@ the instructions for legitimate signature-mode overrides.
 - **Rationale:** confirmed message gap; independent of the current lifecycle repair.
 - **Assignment (if accepted):** bounded ceremony-message repair after candidate-critical work.
 - **Date:** 2026-09-07
+
+## Closure — 2026-09-11
+
+Commit `b10e9b48` gives every affected guard renderer the same role-correct
+sequence: the agent prepares and emits the digest, the PO/operator performs
+only the external `sign-intent`, and the agent verifies and consumes the proof.
+Chat and nonliftable paths advertise no signing route. Focused host tests and
+the final independent correction Critic passed; see the closure evidence.
