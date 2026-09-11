@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.runtime-projections-drift-after-v3-refresh
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 505a2e0fd5f470c7089dc217e64198b6349bacc5
+closure_evidence: backlog/items/2026-08-28-the-two-runtime-projections-drift-apart-after-a-v3-refresh.md
 created: 2026-08-28
 sprint: nova-b
 done_when: manual
@@ -65,3 +69,13 @@ detecting divergence between the neutral/legacy manifest pair the same way
 calibrationDriftDiagnostics() already does for the calibration pair. The
 item's other acceptance criterion -- a durable, stated intended relationship
 between the two files -- is still open.
+
+## Closure — 2026-09-11
+
+The formerly missing relationship is now explicit in the Operating Model and
+the project-authority ADRs: `pipeline.user.v3` is authoritative and the runtime
+files are derived projections, not peer authorities. `project-authority.mjs`
+and `check-routing-projections.mjs` fail on drift, and onboarding reports the
+same typed projection-drift condition. Commit `505a2e0f` contains the current
+governing-source comparison. The focused project-authority and routing suites
+passed 92/92 in the closure audit.

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: afb2e3c0f11f7bb0f6af31bec94a376616d31cb4
+closure_evidence: backlog/items/2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
@@ -238,3 +242,14 @@ inspected resolution without a new PO signature.
 
 This is guard code introducing a new authority that suspends a lifecycle
 gate. It carries a mandatory T1 Critic round.
+
+## Closure — 2026-09-11
+
+The rebase authority resolver and lifecycle/dev-plan wiring now preserve the
+approved `orig-head` authority across genuine conflict resolution while
+restricting writes to the active conflict surface. Exact continuation,
+read-only discovery, negative mutation and no-push cases are covered. The
+direct follow-up item that found the initially unwired resolver was closed at
+`afb2e3c0` after its documented full Verify and two Critic rounds. The current
+focused audit passed the resolver and end-to-end guard regressions, so this
+older originating item no longer remains open.

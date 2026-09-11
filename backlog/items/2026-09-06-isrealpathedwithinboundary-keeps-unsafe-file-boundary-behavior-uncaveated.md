@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.isrealpathedwithinboundary-file-boundary-uncaveated
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: 38ecc0a0f269a22a1285952c635f305e21957bf7
+closure_evidence: backlog/items/2026-09-06-isrealpathedwithinboundary-keeps-unsafe-file-boundary-behavior-uncaveated.md
 created: 2026-09-06
 sprint: nova-b
 done_when: manual
@@ -54,3 +58,12 @@ one guarded site) would silently reopen the exact admission gap
   level) proves a FILE-typed boundary refuses a nonexistent-child candidate.
 - Full existing `guard-lifecycle-ready.test.mjs` suite stays green,
   including the two shapes covered by `NVA-B-GLRMINORS-1`'s own new test.
+
+## Closure — 2026-09-11
+
+Commit `38ecc0a0` implements option (a) in the shared primitive. Every
+non-identical boundary is statted; descendants are accepted only when the
+boundary is a real directory, and inspection faults fail closed. Primitive
+regressions cover exact files, nonexistent file descendants, symlinked file
+descendants, real directory descendants and stat errors. The complete focused
+guard suite passed during the status audit.

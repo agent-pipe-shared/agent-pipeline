@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ed316f05d5724d996586f64baa7a507b96181bbed7d91b0e691006e0f9084667"
+    "transitionHead": "b6f61e753b24433b8f3db9621c779c981d23bfeb4fcdd58d28a7f5ca2c2e74e4"
   },
   "counts": {
-    "open": 100,
+    "open": 96,
     "in_progress": 0,
-    "closed": 540,
+    "closed": 544,
     "rejected": 3,
     "deferred": 11
   },
@@ -607,12 +607,16 @@
     },
     {
       "id": "pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "PO handover received in session on 2026-09-01, transcribed faithfully from the live reproduction on the agent-pipeline-shared_alfred checkout.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "afb2e3c0f11f7bb0f6af31bec94a376616d31cb4",
+      "closureEvidence": "backlog/items/2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md"
     },
     {
       "id": "pipeline.an-expired-override-is-armed-instead-of-refused",
@@ -3887,13 +3891,17 @@
     },
     {
       "id": "pipeline.isrealpathedwithinboundary-file-boundary-uncaveated",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "T1 Critic review (opus, max) of commit 571e67a820cdf6912b02e069c3c2d68c73a0f443, F2.",
       "deferred": false,
-      "tracking": "Nova B -- T1 Critic review of NVA-B-GLRMINORS-1 (PASS, 2 minor findings), F2: the hardening for the transcript-file exact-match invariant (commit 571e67a8) lives only at its sole call site, isApprovedSingleCommandReadArg(). The exported isRealpathedWithinBoundary() primitive itself still admits any <file>/<nonexistent-child> candidate when handed a FILE-typed boundary, and its own doc comment still reasons only in directory-boundary terms -- a future caller reusing this primitive with a FILE boundary would silently reopen the exact shape NVA-B-GLRMINORS-1 just closed, with no warning at the primitive itself."
+      "tracking": "Nova B -- T1 Critic review of NVA-B-GLRMINORS-1 (PASS, 2 minor findings), F2: the hardening for the transcript-file exact-match invariant (commit 571e67a8) lives only at its sole call site, isApprovedSingleCommandReadArg(). The exported isRealpathedWithinBoundary() primitive itself still admits any <file>/<nonexistent-child> candidate when handed a FILE-typed boundary, and its own doc comment still reasons only in directory-boundary terms -- a future caller reusing this primitive with a FILE boundary would silently reopen the exact shape NVA-B-GLRMINORS-1 just closed, with no warning at the primitive itself.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "38ecc0a0f269a22a1285952c635f305e21957bf7",
+      "closureEvidence": "backlog/items/2026-09-06-isrealpathedwithinboundary-keeps-unsafe-file-boundary-behavior-uncaveated.md"
     },
     {
       "id": "pipeline.kickoff-apply-action-drops-runner",
@@ -5021,13 +5029,17 @@
     },
     {
       "id": "pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO request, live in the same 2026-08-29 session that ran the 0.6.0 candidate's Critic 1+1. The PO explicitly named this a design problem ('wir müssen designen'), not a mechanical fix, and explicitly named that past attempts to secure this have already failed.",
       "deferred": false,
-      "tracking": "Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed."
+      "tracking": "Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed.",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "f91b33da13713849fbd6eb4fe06644af0cefc797",
+      "closureEvidence": "backlog/items/2026-08-29-the-pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing.md"
     },
     {
       "id": "pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions",
@@ -6474,13 +6486,17 @@
     },
     {
       "id": "pipeline.runtime-projections-drift-after-v3-refresh",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Consumer project HA, incident report S56 side finding (2026-08-28). Observed, not diagnosed: neither the consumer nor this item has established which value is correct.",
       "deferred": false,
-      "tracking": "Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report"
+      "tracking": "Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report",
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "505a2e0fd5f470c7089dc217e64198b6349bacc5",
+      "closureEvidence": "backlog/items/2026-08-28-the-two-runtime-projections-drift-apart-after-a-v3-refresh.md"
     },
     {
       "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",

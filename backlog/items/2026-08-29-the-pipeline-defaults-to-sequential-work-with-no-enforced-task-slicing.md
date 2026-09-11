@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-11
+closure_repository: self
+closure_commit: f91b33da13713849fbd6eb4fe06644af0cefc797
+closure_evidence: backlog/items/2026-08-29-the-pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing.md
 created: 2026-08-29
 sprint: nova-b
 tracking: "Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed."
@@ -108,3 +112,13 @@ actually sequential/dependent is at least as bad as the current gap):
 - `2026-08-28-the-push-path-has-no-driver-so-its-five-layers-are-walked-by-hand.md` — a
   different Nova B driver-automation item; related pattern (turn-by-turn work replaced by a
   machine-driven default), different subsystem.
+
+## Closure — 2026-09-11
+
+ADR-0080 defines the Parallel-Safety Predicate, including minimum batch size,
+disjoint write surfaces, dependency edges and commit isolation, with serial
+fallback on uncertainty. The mechanism is wired for Claude, Codex and
+Antigravity through `guard-slicing.mjs` and the native slicing adapters rather
+than relying on prose alone. Subsequent deduplication and pending-plan fixes
+end at `f91b33da`. The focused current-branch slicing suites passed in the
+closure audit.

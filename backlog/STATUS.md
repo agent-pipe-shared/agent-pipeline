@@ -55,7 +55,7 @@
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.agents-talk-the-po-out-of-the-signature | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | open | requirement | pipeline | 2026-08-27 | — |
-| pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | 2026-08-28 | — |
 | pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | 2026-08-28 | — |
@@ -318,7 +318,7 @@
 | pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | closed | defect | pipeline | 2026-08-24 | — |
 | pipeline.intake-values-restart-resilient-immediately | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.invalid-channel-value-blocks-unrelated-alpha-ref-write | closed | defect | pipeline | 2026-09-01 | Nova B — cross-field coupling in the calibration reader: a broken pipelineUpdateChannel value makes the unrelated pipelineUpdateAlphaRef field unwritable, with a reason code that names the wrong field. |
-| pipeline.isrealpathedwithinboundary-file-boundary-uncaveated | open | defect | pipeline | 2026-09-06 | Nova B -- T1 Critic review of NVA-B-GLRMINORS-1 (PASS, 2 minor findings), F2: the hardening for the transcript-file exact-match invariant (commit 571e67a8) lives only at its sole call site, isApprovedSingleCommandReadArg(). The exported isRealpathedWithinBoundary() primitive itself still admits any <file>/<nonexistent-child> candidate when handed a FILE-typed boundary, and its own doc comment still reasons only in directory-boundary terms -- a future caller reusing this primitive with a FILE boundary would silently reopen the exact shape NVA-B-GLRMINORS-1 just closed, with no warning at the primitive itself. |
+| pipeline.isrealpathedwithinboundary-file-boundary-uncaveated | closed | defect | pipeline | 2026-09-06 | Nova B -- T1 Critic review of NVA-B-GLRMINORS-1 (PASS, 2 minor findings), F2: the hardening for the transcript-file exact-match invariant (commit 571e67a8) lives only at its sole call site, isApprovedSingleCommandReadArg(). The exported isRealpathedWithinBoundary() primitive itself still admits any <file>/<nonexistent-child> candidate when handed a FILE-typed boundary, and its own doc comment still reasons only in directory-boundary terms -- a future caller reusing this primitive with a FILE boundary would silently reopen the exact shape NVA-B-GLRMINORS-1 just closed, with no warning at the primitive itself. |
 | pipeline.kickoff-apply-action-drops-runner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery | open | defect | pipeline | 2026-08-09 | — |
@@ -407,7 +407,7 @@
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.phoenix-merge-re-critic-minor-findings | closed | workflow-improvement | pipeline | 2026-08-27 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | 2026-08-18 | — |
-| pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing | open | workflow-improvement | pipeline | 2026-08-29 | Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed. |
+| pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing | closed | workflow-improvement | pipeline | 2026-08-29 | Nova B — PO request, 2026-08-29 (German verbatim): 'es stört mich das die Pipeline immer nur sequentiell von sich aus arbeitet. ich möchte ein durchgesetztes system per Maschine haben was für Standardmäßiges slicen von Aufgaben ohne Überschneidungen sorgt die dann mit workflow tool oder vergleichbaren subagenten arbeiten. wir müssen designen wie wir das in die Durchsetzungsschicht bekommen da die vergangenen Versuche dafür zu sorgen gescheitert sind'. Deliberately NOT Nova A: this needs a real design pass, not a same-session patch, and the candidate must not grow new enforcement surface before its current diff is reviewed. |
 | pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions | closed | defect | pipeline | 2026-08-29 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
@@ -521,7 +521,7 @@
 | pipeline.runner-fallback-defaults-to-codex-without-explicit-signal | closed | defect | pipeline | 2026-08-30 | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed. |
 | pipeline.runner-neutrality-before-third-runner | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | 2026-07-27 | — |
-| pipeline.runtime-projections-drift-after-v3-refresh | open | defect | pipeline | 2026-08-28 | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
+| pipeline.runtime-projections-drift-after-v3-refresh | closed | defect | pipeline | 2026-08-28 | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
 | pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | 2026-08-28 | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.scratch-write-exemption-does-not-cover-restart-required | closed | defect | pipeline | 2026-08-29 | — |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 100
+- open: 96
 - in_progress: 0
-- closed: 540
+- closed: 544
 - rejected: 3
 - deferred: 11
