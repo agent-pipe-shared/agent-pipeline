@@ -98,6 +98,7 @@ test(
       // fixtureCommit's tree happened to contain -- this also makes the fixture worktree
       // dirty (a modified tracked file), independent of the marker file below.
       writeFileSync(join(worktreeDir, "harness", "scripts", "verify.mjs"), readFileSync(currentVerifyScriptPath));
+      writeFileSync(join(worktreeDir, "harness", "scripts", "verify-evidence-writer.mjs"), readFileSync(join(scriptDir, "verify-evidence-writer.mjs")));
       writeFileSync(join(worktreeDir, "harness", "scripts", "self-verify-selection.mjs"), readFileSync(join(scriptDir, "self-verify-selection.mjs")));
       writeFileSync(join(worktreeDir, "plugins", "pipeline-core", "lib", "verify-selection.mjs"), readFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-selection.mjs")));
       // Belt-and-suspenders dirtiness signal, explicit and independent of the copy above.
