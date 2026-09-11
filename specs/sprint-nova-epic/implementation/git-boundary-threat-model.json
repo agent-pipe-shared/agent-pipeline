@@ -1,0 +1,57 @@
+{
+  "schema": "pipeline.threat-model.v1",
+  "candidate": {
+    "commit": "1fa85422f66646857296fb605e094f8774af00ce",
+    "tree": "55e5b1fc5d2e58ac8352453f92590a10335f64a8"
+  },
+  "policyRevision": "nova-b-git-boundary-v1",
+  "classification": "public",
+  "entities": [
+    {
+      "id": "asset-48ac47abc65ba487",
+      "kind": "asset",
+      "label": "git-change-authority",
+      "relationships": [
+        "boundary-2056494e61582dee"
+      ]
+    },
+    {
+      "id": "boundary-2056494e61582dee",
+      "kind": "boundary",
+      "label": "agent-to-git-command",
+      "relationships": [
+        "threat-1443f45aa713c2be",
+        "threat-6780fcce026a9446"
+      ]
+    },
+    {
+      "id": "threat-1443f45aa713c2be",
+      "kind": "threat",
+      "label": "agent-side-override-laundering",
+      "relationships": [
+        "mitigation-ec36d1262846d883"
+      ]
+    },
+    {
+      "id": "mitigation-ec36d1262846d883",
+      "kind": "mitigation",
+      "label": "closed-non-overridable-rules",
+      "relationships": []
+    },
+    {
+      "id": "threat-6780fcce026a9446",
+      "kind": "threat",
+      "label": "ungrounded-commit-provenance",
+      "relationships": [
+        "mitigation-a2e9f3d1107e6cdf"
+      ]
+    },
+    {
+      "id": "mitigation-a2e9f3d1107e6cdf",
+      "kind": "mitigation",
+      "label": "final-trailer-block-validation",
+      "relationships": []
+    }
+  ],
+  "lifecycle": "implementing"
+}

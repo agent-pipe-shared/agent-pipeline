@@ -28,9 +28,28 @@ ADR-0079 and the canonical backlog. It does not redefine the approved epic.
   provenance trailers, including repeated `git commit -m` paragraphs.
 - Documentation and consumer-safe-path contract checks pass.
 
+## Security model and rollback
+
+The checked-in reference model is
+`specs/sprint-nova-epic/implementation/git-boundary-threat-model.json`. For
+each delivery candidate, review preparation creates a detached model snapshot
+and approval request bound to that candidate's commit and tree. The request is
+only review input; it does not grant approval. A protected push or release
+still requires the matching external proof at that boundary.
+
+The provenance policy can be rolled back per consuming project by setting
+`commitTrailerPolicy` to `off` and then rerunning its focused guard tests. The
+`GG-17` through `GG-20` correction has no runtime feature flag because such a
+flag would recreate the bypass. Its production rollback is a forward revert
+of the delivery commit followed by the focused guard-git suite; deploying that
+revert requires the same trust-boundary review because it deliberately
+reopens the ADR-0079 risk.
+
 ## Deliberate residual scope
 
 This slice provides and recommends the blocking commit-trailer policy. It does
 not migrate existing project-local guard configurations automatically. The
 backlog item about missing stage-0 provenance remains open until activation and
-migration behavior is separately completed and verified.
+migration behavior is separately completed and verified. The Pipeline team
+owns that residual work and must complete or explicitly re-evaluate it by
+2026-09-30; the date is not an automatic exception or extension.
