@@ -5,9 +5,9 @@
     "tree": "26ebde564e0377c1b310f61e7d0503789505db8a"
   },
   "criticReview": {
-    "status": "required-before-publication",
-    "receiptSha256": null,
-    "reason": "Native and selected Codex preflight surfaces changed; final Critic review is pending."
+    "status": "attested",
+    "receiptSha256": "0ae2f1a7adc61ce3b403ee6f0a5f124bca9c5bba1862e5ca12996d0b9b617e6c",
+    "reason": null
   },
   "capabilities": [
     {
