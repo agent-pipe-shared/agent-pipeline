@@ -588,7 +588,7 @@
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | 2026-08-31 | — |
 | pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | open | defect | pipeline | 2026-09-01 | — |
 | pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable | closed | defect | pipeline | 2026-09-02 | — |
-| pipeline.the-sandbox-preflight-app-server-handshake-is-a-race | open | defect | pipeline | 2026-09-06 | — |
+| pipeline.the-sandbox-preflight-app-server-handshake-is-a-race | closed | defect | pipeline | 2026-09-06 | — |
 | pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses | open | defect | pipeline | 2026-09-06 | — |
 | pipeline.the-two-suite-registration-checkers-disagree | closed | defect | pipeline | 2026-08-27 | — |
 | pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim | closed | defect | pipeline | 2026-09-03 | Nova B — the sibling of the opaque-interpreter-code lane. Same blind-scan fallback, same fail-closed refusal of a mere mention, and the guard still tells the reader that only a detected write is refused. |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 107
+- open: 106
 - in_progress: 0
-- closed: 533
+- closed: 534
 - rejected: 3
 - deferred: 11

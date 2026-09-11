@@ -1,13 +1,17 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.the-sandbox-preflight-app-server-handshake-is-a-race
-type: defect
-owner: pipeline
-status: open
-created: 2026-09-06
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.the-sandbox-preflight-app-server-handshake-is-a-race"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-09-06"
 source: "three measurement dispatches on 2026-09-06 (NVA-B-CASPREFLIGHT-1/-2/-3) against the real Codex CLI 0.153.4; evidence under evidence/NVA-B-CASPREFLIGHT-*, forwarded from a Codex session that could not start an isolated Critic"
-sprint: nova-b
-done_when: manual
+sprint: "nova-b"
+done_when: "manual"
+closed_at: "2026-09-11"
+closure_repository: "self"
+closure_commit: "794817658047d852c44917e8ac60aa372ec31862"
+closure_evidence: "backlog/evidence/2026-09-07-codex-preflight-stdin-lifecycle.md"
 ---
 
 # The sandbox preflight's app-server handshake is a race, and the blocked-event-loop explanation does not survive its own measurement
@@ -100,7 +104,23 @@ about what happens when it does not.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted; the proposed EOF-lifecycle measurement was implemented
+  and confirmed the hypothesis.
+- **Rationale:** closing stdin only after the bounded initialize race preserves
+  the unchanged response checks and removes the measured clean-exit/no-response
+  race.
+- **Assignment (if accepted):** Pipeline, completed by the existing Nova B fix.
+- **Date:** 2026-09-11
+
+## Closure — 2026-09-11
+
+Commit `794817658047d852c44917e8ac60aa372ec31862` changes the payload to write the
+initialize messages, await the existing bounded handshake, and only then close
+stdin. It adds an EOF-sensitive regression that fails against the old ordering.
+Commit `fac5c14f` makes that regression portable without weakening its
+initialization or bounded-stop assertions.
+
+The versioned measurement records the RED/GREEN regression and 10/10 successful
+real intermediate preflights. A current focused run on 2026-09-11 passed 26
+tests with zero failures; one separate environment-dependent fixture path was
+reported as skipped rather than relabeled as success.

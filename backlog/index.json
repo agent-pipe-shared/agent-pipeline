@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "caa962479da4c5029bf578c94a51b62a94d4a40ac90c0302a661ce810659bfd8"
+    "transitionHead": "3405acf50af3d3f35c6b2ea786f0d1906908c9e10adb00d036e7e1c9dfe6900b"
   },
   "counts": {
-    "open": 107,
+    "open": 106,
     "in_progress": 0,
-    "closed": 533,
+    "closed": 534,
     "rejected": 3,
     "deferred": 11
   },
@@ -7281,12 +7281,16 @@
     },
     {
       "id": "pipeline.the-sandbox-preflight-app-server-handshake-is-a-race",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "three measurement dispatches on 2026-09-06 (NVA-B-CASPREFLIGHT-1/-2/-3) against the real Codex CLI 0.153.4; evidence under evidence/NVA-B-CASPREFLIGHT-*, forwarded from a Codex session that could not start an isolated Critic",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-09-11",
+      "closureRepository": "self",
+      "closureCommit": "794817658047d852c44917e8ac60aa372ec31862",
+      "closureEvidence": "backlog/evidence/2026-09-07-codex-preflight-stdin-lifecycle.md"
     },
     {
       "id": "pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses",
