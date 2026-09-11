@@ -21,3 +21,9 @@ criteria:
 
 The change must not widen an amendment authorization, append a repair event,
 accept abbreviated OIDs generally, or suppress drift output.
+
+If the accepted-drift behavior regresses, revert implementation commit
+`7a4a60725abb3acb5dec8a2e9e747ea42f9f501a`. That commit does not edit or
+append to the ledger, so its revert restores the prior labels and CLI wording
+without a ledger repair or migration. This later documentation correction can
+remain in place or be reverted independently.
