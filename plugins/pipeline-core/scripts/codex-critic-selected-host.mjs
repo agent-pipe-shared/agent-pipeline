@@ -68,13 +68,32 @@ function validateRequestedCriticRoute(value) {
   return value;
 }
 
-function receiptFor({ selection, requested, identity, verdict }) {
+function validateRulesetBindings(value) {
+  exactKeys(value, ["roleContractSha256", "promptContractSha256", "verdictSchemaSha256", "childExecutableSha256", "childModuleGraphSha256"], "selected Critic ruleset bindings");
+  for (const digest of Object.values(value)) if (!SHA256.test(digest)) fail("selected Critic ruleset binding is invalid");
+  return value;
+}
+function validRulesetBindings(value) {
+  try { validateRulesetBindings(value); return true; } catch { return false; }
+}
+function validateRulesetProvenance(value) {
+  exactKeys(value, ["kind", "identity"], "selected Critic ruleset provenance");
+  if (value.kind !== "git" || typeof value.identity !== "string" || value.identity.length === 0) fail("selected Critic ruleset provenance is invalid");
+  return value;
+}
+function validRulesetProvenance(value) {
+  try { validateRulesetProvenance(value); return true; } catch { return false; }
+}
+
+function receiptFor({ selection, requested, identity, verdict, rulesetBindings, rulesetProvenance }) {
   const receipt = {
     schema: "pipeline.critic-receipt.v1",
     selectionId: selection.selectionId,
     dispatch: structuredClone(selection.dispatch),
     requested: structuredClone(requested),
     observed: structuredClone(identity),
+    bindings: structuredClone(validateRulesetBindings(rulesetBindings)),
+    rulesetProvenance: structuredClone(validateRulesetProvenance(rulesetProvenance)),
     verdictSha256: sha256(canonicalJson(verdict)),
     status: "reviewed",
     emittedAtMs: Date.now(),
@@ -151,6 +170,8 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
       reviewBase: input.reviewBase,
     });
     if (result?.status !== "reviewed" || !result.verdict || typeof result.verdict !== "object" || Array.isArray(result.verdict)
+      || !validRulesetBindings(result.rulesetBindings)
+      || !validRulesetProvenance(result.rulesetProvenance)
       || !result.sandboxExecution || result.identity?.provider !== "openai" || result.identity?.modelId !== boundRoute.model
       || result.identity?.effort !== boundRoute.effort || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
       const diagnostic = validateFailureDiagnostic(result?.failureDiagnostic, input, sandboxTransport);
@@ -218,7 +239,7 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
       completed.set(selection.selectionId, { result, execution });
       return execution;
     }
-    const receipt = receiptFor({ selection, requested, identity: result.identity, verdict: result.verdict });
+    const receipt = receiptFor({ selection, requested, identity: result.identity, verdict: result.verdict, rulesetBindings: result.rulesetBindings, rulesetProvenance: result.rulesetProvenance });
     const execution = {
       ...header,
       dutyReceipt: { schema: "pipeline.critic-receipt.v1", sha256: sha256(canonicalJson(receipt)), status: "reviewed" },
@@ -238,8 +259,10 @@ export function selectedCriticInProcessBridge(input, { route, verifyRoute = null
 
 const APP_SERVER_FAILURE_CODES = new Set([
   "request-invalid", "prompt-invalid", "protocol-error", "write-attempt", "child-exit-error",
+  "input-invalid", "ruleset-unavailable",
   "outer-terminal", "outer-stdout-overflow", "child-output-invalid", "route-mismatch",
   "lifecycle-invalid", "answer-json-invalid", "verdict-schema-invalid",
+  "ruleset-drift",
 ]);
 const TERMINAL_SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGPIPE"]);
 

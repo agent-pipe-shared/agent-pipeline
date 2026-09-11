@@ -382,10 +382,24 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   const exportConsent = admitNativeCriticExport(input, physical.repoRoot);
   const executionFailure = (code, terminal = null, lifecycle = {}) => ({ ...boundedFailure(code, selection, terminal, lifecycle), exportConsent });
   if (!exportConsent.ok) return executionFailure("consent-unavailable");
+  let boundRuleset;
+  try {
+    const bind = (path) => {
+      const bytes = readFileSync(path);
+      return { base64: bytes.toString("base64"), sha256: createHash("sha256").update(bytes).digest("hex") };
+    };
+    const role = bind(physical.rolePath); const prompt = bind(physical.promptPath); const verdict = bind(physical.verdictPath);
+    boundRuleset = {
+      roleContractBase64: role.base64, roleContractSha256: role.sha256,
+      promptContractBase64: prompt.base64, promptContractSha256: prompt.sha256,
+      verdictSchemaBase64: verdict.base64, verdictSchemaSha256: verdict.sha256,
+      provenance: { kind: "native-host", identity: nativeCriticCanonicalDigest({ role: role.sha256, prompt: prompt.sha256, verdict: verdict.sha256 }) },
+    };
+  } catch { return executionFailure("physical-proof-unavailable"); }
   const request = {
     codexPath: physical.cliPath, cwd: physical.repoRoot, scratchPath: physical.scratch,
     model: selection.route.model, effort: selection.route.effort, referencePaths: physical.referencePaths,
-    roleContractPath: physical.rolePath, promptContractPath: physical.promptPath, verdictSchemaPath: physical.verdictPath,
+    ruleset: boundRuleset,
     candidateCommit: selection.dispatch.candidateCommit, candidateTree: selection.dispatch.candidateTree,
     ...(input.reviewScope === undefined ? { reviewBase: input.reviewBase } : { reviewScope: input.reviewScope }),
     reviewMode: input.reviewMode, sandboxMode: "native-tools-read-only",
@@ -401,7 +415,7 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
     return executionFailure(nativeCriticReportedChildFailure(child.result) ?? "child-terminal-invalid", terminal, lifecycle);
   }
   let verdictSchema;
-  try { verdictSchema = JSON.parse(readFileSync(physical.verdictPath, "utf8")); }
+  try { verdictSchema = JSON.parse(Buffer.from(boundRuleset.verdictSchemaBase64, "base64").toString("utf8")); }
   catch { return executionFailure("physical-proof-unavailable", terminal, lifecycle); }
   let checked;
   try { checked = validateChild(child.result, selection, input.expectedTuple, verdictSchema, { ...child, stdoutBytes: child.stdoutBytes, stderrBytes: child.stderrBytes }); }

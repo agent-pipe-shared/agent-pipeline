@@ -37,6 +37,10 @@
     {
       "path": "roles/critic.md",
       "rawSha256": "8acc1eb8adc6d86de63075e6f5f42aa06970866064e07a40297617e84e3efbb4"
+    },
+    {
+      "path": "templates/prompts/critic-review.md",
+      "rawSha256": "9d5e50144a65407c621ab1a74d04310cd3cefe206e846ef4612993e25e55748d"
     }
   ]
 }

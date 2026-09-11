@@ -20,6 +20,7 @@ const EXPECTED_PATHS = [
   "plugins/pipeline-core/scripts/critic-verdict.schema.json",
   "plugins/pipeline-core/skills/critic-review/SKILL.md",
   "roles/critic.md",
+  "templates/prompts/critic-review.md",
 ];
 
 let passed = 0;

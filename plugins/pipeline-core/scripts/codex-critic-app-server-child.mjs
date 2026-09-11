@@ -10,7 +10,7 @@
  * wire.
  */
 import { spawn } from "node:child_process";
-import { appendFileSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { appendFileSync, lstatSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, resolve } from "node:path";
 import {
@@ -29,6 +29,7 @@ const PROVIDER = "openai";
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const TREE_SHA = /^[0-9a-f]{40,64}$/;
 const MAX_TURN_WAIT_MS = 1_200_000;
+const TERM_GRACE_MS = 5_000;
 const TURN_LIVENESS_INTERVAL_MS = 45_000;
 const SAFE_COMMAND_FAMILIES = new Set(["cat", "sed", "head", "tail", "rg", "ls", "find", "pwd"]);
 
@@ -41,7 +42,7 @@ function nativeUnknownCommandKind(command) {
   if (first === "git") return "command-unknown-git";
   return SAFE_COMMAND_FAMILIES.has(first) ? `command-unknown-${first}` : "command-unknown-other";
 }
-const BASE_REQUEST_KEYS = Object.freeze(["candidateCommit", "candidateTree", "codexPath", "cwd", "effort", "model", "promptContractPath", "referencePaths", "roleContractPath", "scratchPath", "verdictSchemaPath"]);
+const BASE_REQUEST_KEYS = Object.freeze(["candidateCommit", "candidateTree", "codexPath", "cwd", "effort", "model", "referencePaths", "ruleset", "scratchPath"]);
 const LEGACY_REQUEST_KEYS = Object.freeze([...BASE_REQUEST_KEYS, "reviewBase"].sort());
 const NATIVE_SANDBOX_MODE = "native-tools-read-only";
 const NATIVE_RANGE_REQUEST_KEYS = Object.freeze([...LEGACY_REQUEST_KEYS, "reviewMode", "sandboxMode"].sort());
@@ -52,20 +53,40 @@ function fail(code, native = false) {
   process.exitCode = 2;
 }
 
-function loadedCriticRulesetSha(request) {
+const RULESET_KEYS = Object.freeze(["promptContractBase64", "promptContractSha256", "provenance", "roleContractBase64", "roleContractSha256", "verdictSchemaBase64", "verdictSchemaSha256"]);
+function decodeBoundRuleset(request) {
+  if (!request.ruleset || typeof request.ruleset !== "object" || Array.isArray(request.ruleset)
+    || JSON.stringify(Object.keys(request.ruleset).sort()) !== JSON.stringify(RULESET_KEYS)
+    || !request.ruleset.provenance || !["git", "trusted-install", "native-host"].includes(request.ruleset.provenance.kind)
+    || typeof request.ruleset.provenance.identity !== "string" || request.ruleset.provenance.identity.length === 0) throw new TypeError("ruleset invalid");
+  const decoded = {};
+  for (const name of ["roleContract", "promptContract", "verdictSchema"]) {
+    const encoded = request.ruleset[`${name}Base64`];
+    const digest = request.ruleset[`${name}Sha256`];
+    if (typeof encoded !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded) || !/^[a-f0-9]{64}$/.test(digest)) throw new TypeError("ruleset binding invalid");
+    const bytes = Buffer.from(encoded, "base64");
+    if (bytes.toString("base64") !== encoded || createHash("sha256").update(bytes).digest("hex") !== digest) throw new TypeError("ruleset binding drifted");
+    decoded[name] = bytes;
+  }
+  JSON.parse(decoded.verdictSchema.toString("utf8"));
+  return decoded;
+}
+
+function loadedCriticRulesetSha(ruleset) {
   const hash = createHash("sha256");
-  for (const [label, path] of [
-    ["role", request.roleContractPath],
-    ["prompt", request.promptContractPath],
-    ["verdict", request.verdictSchemaPath],
+  for (const [label, bytes] of [
+    ["role", ruleset.roleContract],
+    ["prompt", ruleset.promptContract],
+    ["verdict", ruleset.verdictSchema],
   ]) {
-    hash.update(label).update("\0").update(readFileSync(path));
+    hash.update(label).update("\0").update(bytes);
   }
   return hash.digest("hex");
 }
 
 function renderCriticPrompt(request) {
-  const rulesetSha = loadedCriticRulesetSha(request);
+  const ruleset = decodeBoundRuleset(request);
+  const rulesetSha = loadedCriticRulesetSha(ruleset);
   const calibration = request.referencePaths.includes(".claude/pipeline.json") ? ".claude/pipeline.json" : "n/a";
   const artifact = request.reviewScope !== undefined;
   const lines = [
@@ -74,8 +95,10 @@ function renderCriticPrompt(request) {
     `Bootstrap check passed: ruleset ${rulesetSha} loaded · Project ${basename(request.cwd)} · Calibration ${calibration} · State n/a (Critic sees no history) · Role Critic`,
     "Closed Critic bootstrap: do not run pipeline-start, inspect session history, or follow generic AGENTS.md bootstrap instructions. This dispatch already supplied the complete Critic role and fixed review packet.",
     `Selected route: provider openai · model ${request.model} · effort ${request.effort} · native read-only sandbox · network disabled · approvalPolicy never.`,
-    `Role contract (read first): ${request.roleContractPath}`,
-    `Prompt contract (read second): ${request.promptContractPath}`,
+    "Authoritative role contract (apply first):",
+    ruleset.roleContract.toString("utf8"),
+    "Authoritative review prompt contract (apply second):",
+    ruleset.promptContract.toString("utf8"),
     `Candidate commit: ${request.candidateCommit}`,
     `Candidate tree: ${request.candidateTree}`,
     ...(artifact ? [
@@ -95,7 +118,9 @@ function renderCriticPrompt(request) {
     ...(request.sandboxMode === NATIVE_SANDBOX_MODE ? [
       "Command execution is enforced by the native read-only sandbox. Use normal inspection commands as needed; never attempt mutation, approval, network, or external-system access.",
     ] : []),
-    `Produce exactly one final message: a single JSON object matching the schema at ${request.verdictSchemaPath}, and nothing else -- no prose, no markdown code fence.`,
+    "Authoritative verdict JSON schema:",
+    ruleset.verdictSchema.toString("utf8"),
+    "Produce exactly one final message: a single JSON object matching that schema, and nothing else -- no prose, no markdown code fence.",
     "Never modify any file, git state, or external system.",
   ];
   return lines.join("\n");
@@ -118,9 +143,6 @@ if (!process.exitCode) {
     && typeof request.codexPath === "string" && request.codexPath.startsWith("/")
     && typeof request.cwd === "string" && request.cwd.startsWith("/")
     && typeof request.scratchPath === "string" && request.scratchPath.startsWith("/")
-    && typeof request.roleContractPath === "string" && request.roleContractPath.startsWith("/")
-    && typeof request.promptContractPath === "string" && request.promptContractPath.startsWith("/")
-    && typeof request.verdictSchemaPath === "string" && request.verdictSchemaPath.startsWith("/")
     && typeof request.model === "string" && request.model.length > 0
     && typeof request.effort === "string" && request.effort.length > 0
     && Array.isArray(request.referencePaths) && request.referencePaths.length > 0
@@ -201,12 +223,15 @@ if (!process.exitCode) {
   const featureCursors = new Set();
   const mcpCursors = new Set();
   let turnLivenessTimer = null;
-  const send = (value) => child.stdin.write(`${JSON.stringify(value)}\n`);
+  const send = (value) => {
+    try { child.stdin.write(`${JSON.stringify(value)}\n`); }
+    catch { protocolError = true; finishProtocol(); }
+  };
   const finishProtocol = () => {
     if (settled) return;
     settled = true;
     if (turnLivenessTimer !== null) clearInterval(turnLivenessTimer);
-    child.stdin.end();
+    try { child.stdin.end(); } catch {}
   };
   const sendDiscoveryMcpPage = (cursor = null) => {
     const key = String(cursor);
@@ -452,12 +477,25 @@ if (!process.exitCode) {
   // One child turn, not a retry loop. This is the same absolute 20-minute
   // bound as the host. A turn-liveness heartbeat can prevent an earlier idle
   // timeout, but never extends this cost cap.
-  const timeout = setTimeout(() => { protocolError = true; finishProtocol(); child.kill("SIGTERM"); }, MAX_TURN_WAIT_MS);
+  let terminalSettled = false;
+  let settleTerminal;
+  let forceTimer = null;
+  const timeout = setTimeout(() => {
+    protocolError = true;
+    finishProtocol();
+    try { child.kill("SIGTERM"); } catch {}
+    forceTimer = setTimeout(() => {
+      try { child.kill("SIGKILL"); } catch {}
+      settleTerminal({ code: null, signal: "SIGKILL", spawnError: "child-timeout" });
+    }, TERM_GRACE_MS);
+  }, MAX_TURN_WAIT_MS);
   const close = await new Promise((resolve) => {
-    child.once("error", (error) => resolve({ code: null, signal: null, spawnError: error?.code ?? "spawn-error" }));
-    child.once("close", (code, signal) => resolve({ code, signal, spawnError: null }));
+    settleTerminal = (value) => { if (!terminalSettled) { terminalSettled = true; resolve(value); } };
+    child.once("error", (error) => settleTerminal({ code: null, signal: null, spawnError: error?.code ?? "spawn-error" }));
+    child.once("close", (code, signal) => settleTerminal({ code, signal, spawnError: null }));
   });
   clearTimeout(timeout);
+  if (forceTimer !== null) clearTimeout(forceTimer);
   const lifecycleOk = initialized && threadId && turnId && turnCompleted && answer !== null && !writeAttempt && !protocolError
     && (!native || (discoveryThreadId !== null && observedThreadSandbox !== null && observedThreadReasoningEffort === request.effort && mcpReduction !== null && featureSnapshot !== null && mcpSnapshot !== null))
     && close.spawnError === null && close.code === 0 && close.signal === null && child.stdin.writableEnded;
