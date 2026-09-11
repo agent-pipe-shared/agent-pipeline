@@ -137,3 +137,20 @@ That bounded conversion is now complete in `5366d7f4`. All six original
 assertion bodies are separately registered; an injected LWP03 failure records
 callback execution through LWP06 over the independent FD-3 channel. The normal
 suite passes 6/6 and an independent Critic returned PASS with no findings.
+
+### Scalable direction
+
+The inventory rules out the proposed last-stdout-line heuristic as a complete
+remedy: heterogeneous suites do not share a trustworthy completion line, and
+process completion does not prove declared cases were disposed. The bounded
+design is now a versioned opt-in case-completion protocol over a separate file
+descriptor, plus a complete registry that marks every affected suite either
+`required` or explicitly `legacy-process-only` during migration.
+
+`node:test` wrappers emit a declared ordered case set, one terminal disposition
+per callback and a final matching digest. Verify binds the policy and
+attestation into its receipt; missing, duplicate or partial completion is red
+even when the process exits. ADR-0081 selection applies this only to selected
+suites without claiming omitted work. User repositories can opt commands into
+the same protocol; opaque commands remain honestly process-only. See
+`backlog/evidence/2026-09-11-verify-case-completion-design.md`.
