@@ -11,7 +11,7 @@ done_when: manual
 closed_at: "2026-09-11"
 closure_repository: "self"
 closure_commit: "f3478069afc226791ccd43b10abb01c750795bf8"
-closure_evidence: "backlog/evidence/2026-09-11-nova-b-push-init-and-worktree-matcher-reverification.md"
+closure_evidence: "backlog/items/2026-08-31-push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy.md"
 ---
 
 # `push-init.mjs` hardcodes `--candidate HEAD`, which Layer 1b's own record contract can never satisfy
