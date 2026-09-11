@@ -40,21 +40,17 @@
  * PATH SAFETY, for every path argument in every verb: an absolute path, any `..` segment, or a
  * resolved real path that leaves the repository root is MALFORMED, never silently accepted.
  *
- * FOUR FINDING CLASSES, THREE FATAL TODAY. MALFORMED / STALE-OPEN / REGRESSION are exit-1
- * findings the moment a declared predicate contradicts the item's own status; UNDECLARED (an
- * `open`/`in_progress` item with no `done_when` at all) is counted and printed but NOT yet fatal
- * -- exactly the same "reported, not yet enforced" posture check-backlog-sprint-assignment.mjs
- * itself started from, before its own commit 6d81b33b declared a sprint for every item that was
- * `open` at the time and let that checker's mandatory-declaration rule graduate from reported to
- * enforced. UNDECLARED graduates to fatal the same way, in a later commit, once every open item
- * in this repository declares `done_when` -- until then this checker enforces only
- * CONTRADICTIONS between a declared predicate and the tree, never the absence of a declaration.
+ * FOUR FATAL FINDING CLASSES. MALFORMED / STALE-OPEN / REGRESSION are exit-1 findings the
+ * moment a declared predicate contradicts the item's own status. UNDECLARED is also fatal for
+ * an `open`/`in_progress` item with no `done_when`: the declaration campaign is complete, so the
+ * former advisory phase has graduated to enforcement (`pipeline.undeclared-is-fatal`).
  *
  * `status: rejected` and `status: deferred` items are counted and never a finding, mirroring how
  * the sprint checker treats non-open statuses for its own optional field.
  *
- * EXIT CODES: 0 = no fatal finding. 1 = at least one fatal finding (MALFORMED, STALE-OPEN, or
- * REGRESSION). 3 = usage/environment error (the items directory could not be enumerated/read).
+ * EXIT CODES: 0 = no fatal finding. 1 = at least one fatal finding (MALFORMED, STALE-OPEN,
+ * REGRESSION, or open/in-progress UNDECLARED). 3 = usage/environment error (the items directory
+ * could not be enumerated/read).
  *
  * SUITE REGISTRATION: this script's own `.test.mjs` sibling is registered in `harness/scripts/verify.mjs`
  * as the "backlog-done-predicate-tests" suite.
@@ -247,7 +243,7 @@ export function checkBacklogDonePredicate(root = DEFAULT_ROOT) {
       undeclaredItems.push(repoPath);
       if (isOpenLike) {
         openUndeclaredItems.push(repoPath);
-        findings.push(`UNDECLARED ${repoPath}: expected a done_when declaration (status is ${status}); observed none -- reported only, not yet fatal`);
+        findings.push(`UNDECLARED ${repoPath}: expected a done_when declaration (status is ${status}); observed none -- fatal`);
       }
       continue;
     }
@@ -276,7 +272,7 @@ export function checkBacklogDonePredicate(root = DEFAULT_ROOT) {
     // declared, nothing to report.
   }
 
-  const fatalCount = malformedItems.length + staleOpenItems.length + regressionItems.length;
+  const fatalCount = malformedItems.length + staleOpenItems.length + regressionItems.length + openUndeclaredItems.length;
   return {
     ok: fatalCount === 0,
     findings,
@@ -317,7 +313,7 @@ function main(argv) {
     `- stale-open (status open/in_progress, predicate already satisfied): ${result.staleOpen}`,
     `- regression (status closed, predicate not satisfied): ${result.regression}`,
     `- undeclared (no done_when at all, any status): ${result.undeclared}`,
-    `- undeclared and open/in_progress (reported, not yet fatal): ${result.openUndeclared}`,
+    `- undeclared and open/in_progress (fatal): ${result.openUndeclared}`,
   ];
   process.stdout.write(`${lines.join("\n")}\n`);
   if (result.findings.length > 0) {

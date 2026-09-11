@@ -4,8 +4,8 @@
  * check-backlog-done-predicate.test.mjs -- covers checkBacklogDonePredicate() and its pure
  * helpers against SYNTHETIC fixture directories only. Deliberately never run against this
  * repository's real backlog/items/ (unlike check-backlog-sprint-assignment.test.mjs's own real-
- * repository test) -- NVA-DONEWHEN-1's briefing scopes the real-backlog smoke run to a manual
- * CLI invocation outside this suite, precisely because no real item declares `done_when` yet.
+ * repository test): the CLI invocation is the registered integration check for the live backlog,
+ * while this suite keeps each classification boundary isolated and deterministic.
  */
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -281,13 +281,13 @@ test("checkBacklogDonePredicate: a closed item with an unsatisfied predicate is 
   assert.match(result.findings[0], /^REGRESSION backlog\/items\/2026-08-29-regressed\.md:/);
 });
 
-// The single most important assertion in this suite: the graduation boundary. An open item that
-// declares nothing at all is reported, never fatal, today.
-test("checkBacklogDonePredicate: an open item with no done_when at all is UNDECLARED and exit stays 0", () => {
+// The single most important assertion in this suite: after the declaration campaign, an open
+// item that declares nothing is a gate failure.
+test("checkBacklogDonePredicate: an open item with no done_when at all is fatal UNDECLARED", () => {
   const root = fixture([ITEM("undeclared-open")]);
   const result = checkBacklogDonePredicate(root);
-  assert.equal(result.ok, true, "UNDECLARED must never be fatal today -- graduation is a later, separate commit");
-  assert.equal(exitCodeFor(result), 0);
+  assert.equal(result.ok, false);
+  assert.equal(exitCodeFor(result), 1);
   assert.equal(result.undeclared, 1);
   assert.equal(result.openUndeclared, 1);
   assert.deepEqual(result.openUndeclaredItems, ["backlog/items/2026-08-29-undeclared-open.md"]);
@@ -425,7 +425,8 @@ test("checkBacklogDonePredicate: a done_when value containing a bare brace is MA
 test("checkBacklogDonePredicate: an item with no done_when line at all is still UNDECLARED (contrast with the two cases above)", () => {
   const root = fixture([ITEM("no-done-when-at-all")]);
   const result = checkBacklogDonePredicate(root);
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.equal(exitCodeFor(result), 1);
   assert.equal(result.malformed, 0);
   assert.equal(result.undeclared, 1);
   assert.equal(result.openUndeclared, 1);
