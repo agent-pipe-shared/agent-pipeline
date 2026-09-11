@@ -203,7 +203,7 @@
 | pipeline.epic-file-contract-has-no-drift-check | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.every-small-correction-costs-a-new-human-interaction | open | idea | pipeline | 2026-08-28 | — |
-| pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line | open | defect | pipeline | 2026-09-01 | — |
+| pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line | closed | defect | pipeline | 2026-09-01 | — |
 | pipeline.evidence-bound-review-retry-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.evslotfix-1-broke-verify-fixture-module-lists | closed | defect | pipeline | 2026-09-06 | Nova B — discovered running the first full verify.mjs gate of this session (last known-green was 7cc0b649, 2026-09-02; many commits landed since across the whole day). Blocks A-C of NVA-B-EVSLOTFIX-1 (commits 61dc7fc5/d30273d3) added a new import to harness/scripts/verify.mjs (harness/scripts/verify-evidence-writer.mjs). Two test fixtures that copy verify.mjs and a hardcoded list of its dependencies into an isolated sandbox to test its behavior were never updated to also copy the new file, so the copied verify.mjs now fails to even load in those sandboxes. |
@@ -662,8 +662,8 @@
 
 ## Counts
 
-- open: 79
+- open: 78
 - in_progress: 0
-- closed: 561
+- closed: 562
 - rejected: 3
 - deferred: 11
