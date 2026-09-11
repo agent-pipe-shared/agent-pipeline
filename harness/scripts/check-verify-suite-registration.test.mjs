@@ -213,6 +213,30 @@ check("a registered suite passes the early inventory check after exactly one cap
   rmSync(root, { recursive: true, force: true });
 });
 
+check("a registered suite is rejected immediately when two capabilities assign its surface", () => {
+  const root = buildRoot();
+  writeFile(root, "harness/scripts/alpha.test.mjs");
+  writeVerifyFixture(root, {
+    testSuites: [{ name: "alpha-tests", ident: "scriptDir", segments: ["alpha.test.mjs"] }],
+  });
+  const surfaceId = "verify-phase:harness/scripts/verify.mjs:alpha-tests";
+  writeFile(root, "docs/product-capability-inventory.json", JSON.stringify({
+    capabilities: [
+      { id: "first", surfaceIds: [surfaceId] },
+      { id: "second", surfaceIds: [surfaceId] },
+    ],
+  }));
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.uncategorizedVerifySurfaces, []);
+  assert.deepEqual(result.duplicateVerifySurfaces, [surfaceId]);
+  assert.match(
+    result.findings.join("\n"),
+    /DUPLICATE-VERIFY-SURFACE "alpha-tests".*belongs to 2 capabilities.*keep exactly one assignment/,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
 check("consumer projects without a product-capability inventory keep the registration-only contract", () => {
   const root = buildRoot();
   writeFile(root, "harness/scripts/alpha.test.mjs");
@@ -222,6 +246,7 @@ check("consumer projects without a product-capability inventory keep the registr
   const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
   assert.equal(result.ok, true, result.findings.join(" | "));
   assert.deepEqual(result.uncategorizedVerifySurfaces, []);
+  assert.deepEqual(result.duplicateVerifySurfaces, []);
   rmSync(root, { recursive: true, force: true });
 });
 

@@ -49,11 +49,12 @@
  *      clause that makes the list self-clearing rather than a permanent
  *      parking lot; it is checked for every declared exclusion, including one
  *      whose file has meanwhile been deleted -- a stale entry is debt too.
- *   6. UNCATEGORIZED-VERIFY-SURFACE -- this checkout carries the optional
+ *   6. VERIFY-SURFACE-ASSIGNMENT -- this checkout carries the optional
  *      product-capability inventory, but a registered suite's derived
- *      `verify-phase:` surface belongs to no capability. This is checked here,
- *      before Full Verify, because registration is the edit that creates the
- *      obligation. Consumer projects without that inventory are unaffected.
+ *      `verify-phase:` surface does not belong to exactly one capability. A
+ *      missing or duplicate assignment is checked here, before Full Verify,
+ *      because registration is the edit that creates the obligation. Consumer
+ *      projects without that inventory are unaffected.
  *
  * STATIC PARSING, NOT IMPORT. This module never imports or executes
  * verify.mjs: importing it spawns git, requires a clean candidate, and runs
@@ -323,7 +324,7 @@ export function checkVerifySuiteRegistration({
       ok: false,
       findings,
       registeredCount: 0, unregisteredCount: 0, excludedCount: 0, entries: [], unregisteredFiles: [],
-      uncategorizedVerifySurfaces: [],
+      uncategorizedVerifySurfaces: [], duplicateVerifySurfaces: [],
       malformedExclusions: exclusionState.malformed, expiredExclusions: exclusionState.expired,
     };
   }
@@ -391,6 +392,7 @@ export function checkVerifySuiteRegistration({
   // a consumer project is a supported no-op rather than a new requirement.
   const resolvedInventoryPath = inventoryPath === undefined ? join(repoRoot, INVENTORY_REL) : inventoryPath;
   const uncategorizedVerifySurfaces = [];
+  const duplicateVerifySurfaces = [];
   if (resolvedInventoryPath !== null && existsSync(resolvedInventoryPath)) {
     let inventory;
     try {
@@ -415,11 +417,19 @@ export function checkVerifySuiteRegistration({
         // product-inventory surface obligation here.
         for (const entry of entries.filter((candidate) => candidate.arrayName === "TEST_SUITES")) {
           const surfaceId = `verify-phase:harness/scripts/verify.mjs:${entry.name}`;
-          if ((assignments.get(surfaceId) ?? 0) !== 0) continue;
-          uncategorizedVerifySurfaces.push(surfaceId);
-          findings.push(
-            `UNCATEGORIZED-VERIFY-SURFACE "${entry.name}": add "${surfaceId}" to exactly one capability in ${toPosix(relative(repoRoot, resolvedInventoryPath))}`,
-          );
+          const assignmentCount = assignments.get(surfaceId) ?? 0;
+          if (assignmentCount === 1) continue;
+          if (assignmentCount === 0) {
+            uncategorizedVerifySurfaces.push(surfaceId);
+            findings.push(
+              `UNCATEGORIZED-VERIFY-SURFACE "${entry.name}": add "${surfaceId}" to exactly one capability in ${toPosix(relative(repoRoot, resolvedInventoryPath))}`,
+            );
+          } else {
+            duplicateVerifySurfaces.push(surfaceId);
+            findings.push(
+              `DUPLICATE-VERIFY-SURFACE "${entry.name}": "${surfaceId}" belongs to ${assignmentCount} capabilities in ${toPosix(relative(repoRoot, resolvedInventoryPath))}; keep exactly one assignment`,
+            );
+          }
         }
       }
     }
@@ -452,6 +462,7 @@ export function checkVerifySuiteRegistration({
     entries,
     unregisteredFiles,
     uncategorizedVerifySurfaces,
+    duplicateVerifySurfaces,
     malformedExclusions: exclusionState.malformed,
     expiredExclusions: exclusionState.expired,
   };
@@ -472,7 +483,8 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
   console.error(
     `Verify suite registration check failed: ${result.findings.length} finding(s) ` +
     `(${result.unregisteredCount} unregistered, ${result.excludedCount} honoured exclusion(s), ` +
-    `${result.uncategorizedVerifySurfaces.length} uncategorized inventory surface(s), ` +
+    `${result.uncategorizedVerifySurfaces.length} uncategorized and ` +
+    `${result.duplicateVerifySurfaces.length} duplicate inventory surface(s), ` +
     `${result.malformedExclusions.length} malformed, ${result.expiredExclusions.length} expired).`,
   );
   process.exit(2);
