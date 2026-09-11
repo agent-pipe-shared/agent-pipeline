@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -339,15 +339,19 @@ async function captureStdout(run) {
   }
 }
 
-function nativeClaudeAdvisoryInput(dispatch, question, evidence) {
+function advisoryInput(dispatch, question, evidence, runner = "claude") {
   const demand = createAdvisoryDemand({
-    runner: "claude", profile: "epic", reason: "risk-review", question,
+    runner, profile: "epic", reason: "risk-review", question,
     evidenceSha256: advisoryEvidenceBundleSha256(evidence), dispatch,
   }).demand;
   return {
-    runner: "claude", profile: "epic", question, dispatch, demand,
+    runner, profile: "epic", question, dispatch, demand,
     references: evidence.references.map(({ path }) => path), evidenceBundle: evidence,
   };
+}
+
+function nativeClaudeAdvisoryInput(dispatch, question, evidence) {
+  return advisoryInput(dispatch, question, evidence, "claude");
 }
 
 test("A-AC-05: an answered coordinateAdvisory receipt is durably recorded on the agent governance stream", async () => {
@@ -466,6 +470,102 @@ test("role-dispatch preflight rejects an untracked advisory input before the hos
     const completed = events.find((event) => event.type === "advisory.completed");
     assert.equal(completed?.code, "role_dispatch_preflight_rejected");
     await assert.rejects(readFile(receiptPath, "utf8"), { code: "ENOENT" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(inputRoot, { recursive: true, force: true });
+  }
+});
+
+test("advisory evidence binding failures reject before the host adapter starts", async () => {
+  for (const mismatch of ["bundle-content", "reference-list", "demand-digest"]) {
+    const { root, dispatchCandidate, evidence } = await governanceRepoRoot();
+    const inputRoot = await mkdtemp(join(tmpdir(), `advisory-evidence-${mismatch}-`));
+    try {
+      const dispatch = { dispatchId: `evidence-${mismatch}`, queueRevision: 1, ...dispatchCandidate };
+      const input = nativeClaudeAdvisoryInput(dispatch, "Is the evidence bound?", evidence);
+      if (mismatch === "bundle-content") await writeFile(join(root, "evidence-input.md"), "changed after bundle creation\n");
+      if (mismatch === "reference-list") input.references = ["different.md"];
+      if (mismatch === "demand-digest") {
+        input.demand = createAdvisoryDemand({
+          runner: "claude", profile: "epic", reason: "risk-review", question: input.question,
+          evidenceSha256: "f".repeat(64), dispatch,
+        }).demand;
+      }
+      const inputPath = join(inputRoot, "input.json");
+      const receiptPath = join(inputRoot, "receipt.json");
+      await writeFile(inputPath, JSON.stringify(input));
+      let adapterCalls = 0;
+      const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
+        ["--input", inputPath, "--receipt", receiptPath],
+        { repoRoot: root, makeHostAdapter: () => async () => { adapterCalls += 1; return { status: "answered", answer: "unsafe" }; } },
+      ));
+      assert.equal(code, 2, mismatch);
+      assert.equal(adapterCalls, 0, mismatch);
+      const preparation = events.find((event) => event.type === "dispatch.prepare")?.preparation;
+      assert.equal(preparation?.code, "RDP-EVIDENCE-BINDING", mismatch);
+      assert.equal(preparation?.modelCalls, 0, mismatch);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(inputRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test("a symlinked advisory receipt directory rejects before the host adapter starts", async () => {
+  const { root, dispatchCandidate, evidence } = await governanceRepoRoot();
+  const inputRoot = await mkdtemp(join(tmpdir(), "advisory-symlink-result-"));
+  try {
+    const actualResultRoot = join(inputRoot, "actual");
+    const linkedResultRoot = join(inputRoot, "linked");
+    await mkdir(actualResultRoot);
+    await symlink(actualResultRoot, linkedResultRoot, "dir");
+    const dispatch = { dispatchId: "symlink-result-01", queueRevision: 1, ...dispatchCandidate };
+    const inputPath = join(inputRoot, "input.json");
+    await writeFile(inputPath, JSON.stringify(nativeClaudeAdvisoryInput(dispatch, "Should this result path be used?", evidence)));
+    let adapterCalls = 0;
+    const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
+      ["--input", inputPath, "--receipt", join(linkedResultRoot, "receipt.json")],
+      { repoRoot: root, makeHostAdapter: () => async () => { adapterCalls += 1; return { status: "answered", answer: "unsafe" }; } },
+    ));
+    assert.equal(code, 2);
+    assert.equal(adapterCalls, 0);
+    assert.equal(events.find((event) => event.type === "dispatch.prepare")?.preparation?.code, "RDP-RESULT-ROOT");
+    await assert.rejects(readFile(join(actualResultRoot, "receipt.json"), "utf8"), { code: "ENOENT" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(inputRoot, { recursive: true, force: true });
+  }
+});
+
+test("Codex launch receives the exact physical repository root admitted by preflight", async () => {
+  const { root, dispatchCandidate, evidence } = await governanceRepoRoot();
+  const inputRoot = await mkdtemp(join(tmpdir(), "advisory-codex-root-"));
+  try {
+    const dispatch = { dispatchId: "codex-root-01", queueRevision: 1, ...dispatchCandidate };
+    const input = {
+      ...advisoryInput(dispatch, "Which repository is reviewed?", evidence, "codex"),
+      advisorExport: { consent: "approved" },
+    };
+    const inputPath = join(inputRoot, "input.json");
+    const receiptPath = join(inputRoot, "receipt.json");
+    await writeFile(inputPath, JSON.stringify(input));
+    let launchedRoot = null;
+    const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
+      ["--input", inputPath, "--receipt", receiptPath],
+      {
+        repoRoot: root,
+        runCodexAdvisoryWithHostFallback: async (_input, _adapter, transport) => {
+          launchedRoot = transport.repoRoot;
+          return {
+            advisoryResult: { ok: false, code: "fixture-unavailable", answer: null, receipt: null, consultationRecord: null, attempts: [] },
+            execution: null, sandboxBinding: null,
+          };
+        },
+      },
+    ));
+    assert.equal(code, 2);
+    assert.equal(launchedRoot, await realpath(root));
+    assert.equal(events.find((event) => event.type === "dispatch.prepare")?.preparation?.status, "prepared");
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(inputRoot, { recursive: true, force: true });

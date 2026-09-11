@@ -73,8 +73,11 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
   try { realRoot = realpathSync(root); } catch { return rejected("RDP-ROOT", "root"); }
   let realResultRoot;
   try {
-    realResultRoot = realpathSync(resultRoot);
-    if (!lstatSync(realResultRoot).isDirectory()) return rejected("RDP-RESULT-ROOT", "resultRoot");
+    const lexicalResultRoot = resolve(resultRoot);
+    const lexicalResultStat = lstatSync(lexicalResultRoot);
+    realResultRoot = realpathSync(lexicalResultRoot);
+    if (!lexicalResultStat.isDirectory() || lexicalResultStat.isSymbolicLink()
+      || lexicalResultRoot !== realResultRoot) return rejected("RDP-RESULT-ROOT", "resultRoot");
   } catch { return rejected("RDP-RESULT-ROOT", "resultRoot"); }
   if (!exactKeys(packet, PACKET_KEYS) || packet.schema !== ROLE_DISPATCH_REQUEST_SCHEMA) {
     return rejected("RDP-PACKET-SHAPE", "packet");

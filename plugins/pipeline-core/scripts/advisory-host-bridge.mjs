@@ -10,6 +10,7 @@
  * runtime transport; only the sanitized receipt is written to disk.
  */
 import { createHash, randomUUID } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -428,6 +429,22 @@ function advisoryDispatchPreparation(input, args, root, prepare = preflightRoleD
   if (!demand.ok || !disposition?.ok || disposition.disposition === "reuse-no-repeat"
     || input?.profile === "mini" || consentDeclined) return null;
   const requiredPaths = input?.evidenceBundle?.references?.map(({ path }) => path);
+  const evidence = validateAdvisoryEvidenceBundleForRepository(
+    root,
+    input?.evidenceBundle,
+    input?.demand?.evidenceSha256 ?? null,
+  );
+  if (!evidence.ok || !equal(input?.references, requiredPaths)
+    || advisoryEvidenceBundleSha256(input?.evidenceBundle) !== input?.demand?.evidenceSha256) {
+    return {
+      schema: "pipeline.role-dispatch-preflight.v1",
+      status: "rejected",
+      code: "RDP-EVIDENCE-BINDING",
+      field: "evidenceBundle",
+      modelCalls: 0,
+      launcherCalls: 0,
+    };
+  }
   const receipt = resolve(args.receipt);
   const packet = {
     schema: ROLE_DISPATCH_REQUEST_SCHEMA,
@@ -583,7 +600,9 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   const iterator = lines[Symbol.asyncIterator]();
   try {
-    const repositoryRoot = dependencies.repoRoot ?? process.cwd();
+    const configuredRepositoryRoot = dependencies.repoRoot ?? process.cwd();
+    let repositoryRoot = configuredRepositoryRoot;
+    try { repositoryRoot = realpathSync(configuredRepositoryRoot); } catch { /* shared preflight returns RDP-ROOT */ }
     const preparation = advisoryDispatchPreparation(
       input,
       args,
@@ -615,7 +634,8 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     let agentDecisionEvent = null;
     const advisorExport = input?.advisorExport;
     if (input.runner === "codex") {
-      const outcome = await runCodexAdvisoryWithHostFallback(input, null, { repoRoot: process.cwd() });
+      const invokeCodex = dependencies.runCodexAdvisoryWithHostFallback ?? runCodexAdvisoryWithHostFallback;
+      const outcome = await invokeCodex(input, null, { repoRoot: repositoryRoot });
       result = outcome.advisoryResult;
       execution = outcome.execution;
       var sandboxBinding = outcome.sandboxBinding;
