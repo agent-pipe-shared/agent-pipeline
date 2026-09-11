@@ -134,11 +134,18 @@ import { basename, dirname, isAbsolute, join, relative } from "node:path";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import {
+  CLOSING_ALLOWANCE,
+  DENIAL_CODE,
+  INVALID_INPUT_CODE,
+  SAFETY_MARGIN,
+  classifyDispatchBudgetCaller,
+  decideDispatchBudgetCall,
+  dispatchWorkingCap,
+} from "../lib/dispatch-budget-core.mjs";
 
 const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
-export const DENIAL_CODE = "DISPATCH-BUDGET-EXHAUSTED";
-export const CLOSING_ALLOWANCE = 5;
-export const SAFETY_MARGIN = 10;
+export { CLOSING_ALLOWANCE, DENIAL_CODE, INVALID_INPUT_CODE, SAFETY_MARGIN };
 const DISPATCH_RECORD_PATTERN = /^evidence\/dispatch-record-.*\.json$/u;
 const GIT_CLOSING_VERB_PATTERN = /^git\s+(add|commit)\b/u;
 
@@ -154,6 +161,15 @@ function blocked({ agentId, agentType, maxTurns, workingCap, count }) {
       + `(derived from its own maxTurns=${maxTurns} frontmatter minus a fixed ${CLOSING_ALLOWANCE}-closing + ${SAFETY_MARGIN}-safety reserve).\n`
       + "Only these acts remain permitted: (1) write/update evidence/dispatch-record-*.json, (2) `git add` your own paths, (3) `git commit` your own paths.\n"
       + "Stop working: restore live state, commit what is green, finalize the dispatch record, and emit the closing report.\n",
+  );
+}
+
+function invalidBudgetInputBlocked({ agentId, agentType, reason }) {
+  return verdict(
+    2,
+    "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
+      + `${INVALID_INPUT_CODE}: this dispatch (${agentType}, agent ${agentId}) has invalid budget state (${reason}).\n`
+      + "The persisted counter was left unchanged; repair or remove it through the trusted host path before continuing.\n",
   );
 }
 
@@ -311,7 +327,7 @@ export function resolveMaxTurns(agentType, rootDir, dependencies = {}) {
   const turnsMatch = scope.match(/^maxTurns:\s*(\d+)\s*$/mu);
   if (!turnsMatch) return null;
   const value = Number(turnsMatch[1]);
-  return Number.isFinite(value) && value > 0 ? value : null;
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
 /**
@@ -348,9 +364,12 @@ function loadCounter(path, seed, dependencies) {
   if (existsSyncFn(path)) {
     try {
       const parsed = JSON.parse(readFileSyncFn(path, "utf8"));
-      if (typeof parsed.count === "number") return parsed;
+      if (Number.isSafeInteger(parsed?.count) && parsed.count >= 0) return parsed;
+      return { schema: "pipeline.dispatch-budget-counter.v1", ...seed, count: parsed?.count };
     } catch {
-      // a corrupt counter file must never crash the guard -- fall through to a fresh one
+      // Preserve an invalid sentinel so policy denies instead of silently
+      // resetting a corrupt persisted count and granting a fresh budget.
+      return { schema: "pipeline.dispatch-budget-counter.v1", ...seed, count: undefined };
     }
   }
   return { schema: "pipeline.dispatch-budget-counter.v1", ...seed, count: 0 };
@@ -505,25 +524,15 @@ function recordOrchestratorObservation(commonDir, record, dependencies) {
  * as absent. The budget-local classifier does not consume transcript-path identity.
  */
 function dispatchBudgetCallerIdentity(input) {
-  const agentId = input?.agent_id;
-  if (typeof agentId === "string" && agentId.trim() !== "") {
-    const agentType = typeof input?.agent_type === "string" ? input.agent_type : undefined;
-    return { kind: "subagent", agentId, agentType };
-  }
   const isObjectInput = typeof input === "object" && input !== null;
   const hasAgentIdKey = isObjectInput && Object.prototype.hasOwnProperty.call(input, "agent_id");
   const hasAgentTypeKey = isObjectInput && Object.prototype.hasOwnProperty.call(input, "agent_type");
-  if (hasAgentIdKey || hasAgentTypeKey) {
-    const agentIdRaw = hasAgentIdKey ? input.agent_id : undefined;
-    const agentTypeRaw = hasAgentTypeKey ? input.agent_type : undefined;
-    const reason = !hasAgentIdKey
-      ? "agent-type-without-agent-id"
-      : (typeof agentIdRaw === "string" && agentIdRaw.trim() === "")
-        ? "agent-id-present-but-blank"
-        : "agent-id-present-but-not-a-string";
-    return { kind: "unresolved", reason, agentIdRaw, agentTypeRaw };
-  }
-  return { kind: "orchestrator" };
+  return classifyDispatchBudgetCaller({
+    agentIdPresent: hasAgentIdKey,
+    agentId: hasAgentIdKey ? input.agent_id : undefined,
+    agentTypePresent: hasAgentTypeKey,
+    agentType: hasAgentTypeKey ? input.agent_type : undefined,
+  });
 }
 
 export function evaluateDispatchBudgetGuard(input, options = {}) {
@@ -566,20 +575,34 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
     return verdict(0);
   }
 
-  const workingCap = Math.max(0, maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN));
+  const workingCap = dispatchWorkingCap(maxTurns);
   const path = counterPath(commonDir, identity.agentId);
   const counter = loadCounter(path, {
     agentId: identity.agentId, agentType: identity.agentType, maxTurns, workingCap,
   }, options);
-  counter.count += 1;
+  // First validate and advance as a normal work call. Only a valid exhausted
+  // state may ask the Claude adapter to parse the concrete closing-call shape.
+  // Invalid persisted values therefore cannot coerce comparisons or recover a
+  // fresh allowance, and valid under-cap calls keep the established call order.
+  const preliminaryBudget = decideDispatchBudgetCall({ maxTurns, currentCount: counter.count, isClosingAct: false });
+  if (preliminaryBudget.decision === "invalid-input") {
+    return invalidBudgetInputBlocked({
+      agentId: identity.agentId,
+      agentType: identity.agentType,
+      reason: preliminaryBudget.reason,
+    });
+  }
+  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir)
+    ? decideDispatchBudgetCall({ maxTurns, currentCount: counter.count, isClosingAct: true })
+    : preliminaryBudget;
+  counter.count = budget.nextCount;
   counter.updatedAt = nowFn();
   saveCounter(path, counter, options);
 
-  if (counter.count <= workingCap) return verdict(0);
-  if (isClosingAct(input, rootDir)) return verdict(0);
+  if (budget.allowed) return verdict(0);
 
   return blocked({
-    agentId: identity.agentId, agentType: identity.agentType, maxTurns, workingCap, count: counter.count,
+    agentId: identity.agentId, agentType: identity.agentType, maxTurns, workingCap: budget.workingCap, count: counter.count,
   });
 }
 
