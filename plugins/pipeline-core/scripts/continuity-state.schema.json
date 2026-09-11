@@ -101,6 +101,15 @@
         }
       }
     },
+    "retryBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["productRetryCount", "environmentRerouteCount"],
+      "properties": {
+        "productRetryCount": { "type": "integer", "enum": [0, 1] },
+        "environmentRerouteCount": { "type": "integer", "enum": [0, 1] }
+      }
+    },
     "nativeContinuation": {
       "anyOf": [
         { "type": "null" },

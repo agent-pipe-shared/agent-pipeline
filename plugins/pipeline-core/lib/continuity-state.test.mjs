@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   CONTINUITY_STATE_CODES,
   applyRunnerNativeContinuation,
+  applyContinuityFailureDisposition,
   applyCourseDecisionIntent,
   applyDecisionSelection,
   beginCloseTransition,
@@ -27,6 +28,7 @@ import {
   planLegacyContinuityAdoption,
   applyLegacyContinuityAdoption,
 } from "./continuity-state.mjs";
+import { sha256Canonical } from "./review-economy.mjs";
 import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
 import { computePoGoalDecisionReceiptDigest, computeRunnerNativeContinuationDigest } from "./runner-native-continuation.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
@@ -174,6 +176,156 @@ function integratedNext(current, observation, finalOutcome = "succeeded") {
   }
   return next;
 }
+
+function failureEvidence(current, overrides = {}) {
+  const evidence = {
+    schema: "pipeline.continuity-failure-evidence.v1",
+    identity: structuredClone(current.queueHead.dispatch),
+    failure: {
+      faultDomain: "product",
+      capabilityId: "critic",
+      stage: "verify",
+      runner: "codex",
+      stableErrorCode: "assertion-failed",
+      exitCode: 1,
+      signal: null,
+      boundedTailSha256: A,
+    },
+    classificationEvidence: { productVerdict: { schemaValid: true, outcome: "failed" }, host: null },
+    priorFailureSignatures: [],
+    failoverAdmission: null,
+    ...overrides,
+  };
+  return { expectedRevision: current.revision, evidence, evidenceSha256: sha256Canonical(evidence) };
+}
+
+check("failure disposition derives one runner-neutral product retry and generic CAS cannot forge counters", () => {
+  for (const runner of ["claude", "codex", "antigravity"]) {
+    const current = state();
+    const request = failureEvidence(current, { failure: { ...failureEvidence(current).evidence.failure, runner } });
+    const applied = applyContinuityFailureDisposition(current, request, FEATURE);
+    assert.equal(applied.ok, true);
+    assert.equal(applied.code, "CS-PRODUCT-RETRY-ADMITTED");
+    assert.equal(applied.state.queueHead.productRetryCount, 1);
+    assert.deepEqual(applied.state.retryBudget, { productRetryCount: 1, environmentRerouteCount: 0 });
+    assert.equal(applied.state.queueHead.dispatch, null);
+    assert.equal(applied.state.queueHead.nextAction, "dispatch");
+  }
+  const current = state();
+  const forged = structuredClone(current);
+  forged.revision += 1;
+  forged.queueHead.productRetryCount = 1;
+  forged.queueHead.dispatch.queueRevision = 1;
+  assert.equal(compareAndSwapContinuity(current, { expectedRevision: 0, next: forged }, FEATURE).code, "CS-PROTECTED-RETRY-COUNTERS");
+});
+
+check("caller-manufactured environment evidence cannot authorize a reroute", () => {
+  const current = state();
+  const hostEvidence = {
+    structured: true,
+    code: "host-sandbox-bootstrap-rejected",
+    beforeProductStart: true,
+    evidenceSha256: D,
+    diagnostic: { exitCode: 1, signal: null, stdoutBytes: 0, stderrBytes: 2, stdoutOverflow: false, stderrOverflow: false, tailSha256: A, capturedTailBytes: 2 },
+    calibration: null,
+  };
+  const request = failureEvidence(current, {
+    failure: { ...failureEvidence(current).evidence.failure, faultDomain: "execution-environment", runner: "antigravity", stableErrorCode: "sandbox-bootstrap" },
+    classificationEvidence: { productVerdict: null, host: hostEvidence },
+    failoverAdmission: {
+      recoverySlotAvailable: true,
+      narrowRouteAvailable: true,
+      frozenBindingsMatch: true,
+      permissionsNarrowed: true,
+      mayDelegate: false,
+      originLaneId: "origin-lane",
+      originDispatchId: current.queueHead.dispatch.dispatchId,
+      revision: current.revision,
+      environmentEvidenceSha256: D,
+      narrowingContractSha256: E,
+    },
+  });
+  const applied = applyContinuityFailureDisposition(current, request, FEATURE);
+  assert.equal(applied.ok, false);
+  assert.equal(applied.code, "CS-ENVIRONMENT-REROUTE-UNAVAILABLE");
+  assert.equal(applied.mutated, false);
+  assert.equal(applied.state, null);
+  assert.equal(current.queueHead.environmentRerouteCount, 0);
+  assert.equal(current.recovery, null);
+});
+
+check("failure disposition refuses stale, unbound, caller-directed and exhausted retries", () => {
+  const current = state();
+  const valid = failureEvidence(current);
+  assert.equal(applyContinuityFailureDisposition(current, { ...valid, expectedRevision: 1 }, FEATURE).code, "CS-STALE");
+  assert.equal(applyContinuityFailureDisposition(current, { ...valid, evidenceSha256: B }, FEATURE).code, "CS-FAILURE-EVIDENCE");
+  assert.equal(applyContinuityFailureDisposition(current, { ...valid, action: "product-retry" }, FEATURE).code, "CS-FAILURE-DISPOSITION-REQUEST");
+  const exhausted = state({ queueHead: queueHead({ productRetryCount: 1 }) });
+  const exhaustedRequest = failureEvidence(exhausted);
+  assert.equal(applyContinuityFailureDisposition(exhausted, exhaustedRequest, FEATURE).code, "CS-PRODUCT-RETRY-BUDGET");
+  const unrecognized = failureEvidence(current, {
+    classificationEvidence: { productVerdict: null, host: null },
+  });
+  assert.equal(applyContinuityFailureDisposition(current, unrecognized, FEATURE).code, "CS-FAILURE-EVIDENCE-UNRECOGNIZED");
+});
+
+check("generic CAS cannot reset or reintroduce a consumed budget through a null queue", () => {
+  const consumed = state({ queueHead: queueHead({ productRetryCount: 1 }) });
+  const blocked = structuredClone(consumed);
+  blocked.revision = 1;
+  blocked.queueHead = null;
+  blocked.blocker = { type: "product", signature: "retry-budget-blocked", resumeCondition: { kind: "manual", evidenceSha256: A }, decisionBrief: null };
+  blocked.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
+  assert.equal(compareAndSwapContinuity(consumed, { expectedRevision: 0, next: blocked }, FEATURE).code, "CS-PROTECTED-RETRY-COUNTERS");
+
+  const zeroBlocked = state({
+    queueHead: null,
+    blocker: { type: "product", signature: "product-blocked", resumeCondition: { kind: "manual", evidenceSha256: A }, decisionBrief: null },
+  });
+  const reintroduced = structuredClone(zeroBlocked);
+  reintroduced.revision = 1;
+  reintroduced.queueHead = queueHead({ productRetryCount: 1, dispatch: identity({ queueRevision: 1 }) });
+  reintroduced.blocker = null;
+  reintroduced.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
+  assert.equal(compareAndSwapContinuity(zeroBlocked, { expectedRevision: 0, next: reintroduced }, FEATURE).code, "CS-PROTECTED-RETRY-COUNTERS");
+});
+
+check("a consumed retry survives a course blocker and must be restored by the selected queue", () => {
+  const retried = applyContinuityFailureDisposition(state(), failureEvidence(state()), FEATURE).state;
+  const brief = recordCourseDecisionBrief(retried, {
+    expectedRevision: 1,
+    result: { path: "specs/result.md", sha256: D },
+    blocker: courseBlocker(),
+    resume: { mode: "resume-on-next-turn", sourceRevision: 2, reasonCode: "blocker" },
+  }, FEATURE);
+  assert.equal(brief.ok, true);
+  assert.equal(brief.state.queueHead, null);
+  assert.deepEqual(brief.state.retryBudget, { productRetryCount: 1, environmentRerouteCount: 0 });
+
+  const txn = { ...decisionTxn(), preSelectionRevision: 2, selectedRevision: 3, dispatchableRevision: 4 };
+  const reset = applyCourseDecisionIntent(brief.state, {
+    expectedRevision: 2,
+    result: { path: "specs/result.md", sha256: A },
+    decisionTxn: txn,
+    queueHead: queueHead({ productRetryCount: 0, dispatch: null }),
+    blocker: null,
+    resume: { mode: "resume-on-next-turn", sourceRevision: 3, reasonCode: "blocker" },
+  }, FEATURE);
+  assert.equal(reset.ok, false);
+  assert.equal(reset.code, "CS-INVALID");
+
+  const retained = applyCourseDecisionIntent(brief.state, {
+    expectedRevision: 2,
+    result: { path: "specs/result.md", sha256: A },
+    decisionTxn: txn,
+    queueHead: queueHead({ productRetryCount: 1, dispatch: null }),
+    blocker: null,
+    resume: { mode: "resume-on-next-turn", sourceRevision: 3, reasonCode: "blocker" },
+  }, FEATURE);
+  assert.equal(retained.ok, true);
+  assert.equal(retained.state.queueHead.productRetryCount, 1);
+  assert.equal(retained.state.retryBudget.productRetryCount, 1);
+});
 
 const CLOSE_COMMIT = "1".repeat(40);
 const CLOSE_TREE = "2".repeat(40);
@@ -546,6 +698,7 @@ check("formal schema carries authority-path and recovery/decision safe-ID patter
   assert.match(schema.properties.authority.properties.result.properties.path.pattern, /\(\?!\/\)/);
   assert.equal(schema.properties.recovery.properties.originLaneId.pattern, "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$");
   assert.equal(schema.properties.decisionTxn.properties.idempotencyKey.pattern, "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$");
+  assert.deepEqual(schema.properties.retryBudget.properties.productRetryCount.enum, [0, 1]);
 });
 
 for (const [name, mutate] of [
@@ -566,6 +719,8 @@ for (const [name, mutate] of [
   ["delegating dispatch", (value) => { value.queueHead.dispatch.mayDelegate = true; }],
   ["future dispatch revision", (value) => { value.queueHead.dispatch.queueRevision = 1; }],
   ["product retry above one", (value) => { value.queueHead.productRetryCount = 2; }],
+  ["retry budget above one", (value) => { value.retryBudget = { productRetryCount: 2, environmentRerouteCount: 0 }; }],
+  ["retry budget disagrees with queue", (value) => { value.retryBudget = { productRetryCount: 1, environmentRerouteCount: 0 }; }],
   ["missing critic reservation", (value) => { value.capacity.reservedCriticSlots = 0; }],
 ]) {
   check(`${name} fails closed`, () => {

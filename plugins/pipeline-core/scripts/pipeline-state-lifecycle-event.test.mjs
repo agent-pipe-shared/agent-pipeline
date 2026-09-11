@@ -22,6 +22,7 @@ import { join } from "node:path";
 import { run, readState, statePath } from "./pipeline-state.mjs";
 import { computeContinuityFinalDigest } from "../lib/continuity-host-adapter.mjs";
 import { validateLifecycleGovernanceEvent } from "../lib/lifecycle-governance-events.mjs";
+import { sha256Canonical } from "../lib/review-economy.mjs";
 
 const FEATURE = "feature-lifecycle";
 const NOW = () => "2026-08-17T00:00:00.000Z";
@@ -297,6 +298,49 @@ const statusFlags = (out = STATUS_OUT) => lifecycleFlags(out);
   assert.equal(readFileSync(join(dir, STATUS_OUT), "utf8"), "occupied");
   assert.equal(readFileSync(statePath(dir), "utf8"), before);
   assert.equal(readFileSync(join(dir, "specs", "result.md"), "utf8"), beforeResult);
+}
+
+// =============================================================================
+// Runner-neutral failure disposition: the CLI exposes evidence, never action.
+// =============================================================================
+
+function failureDispositionRequest(currentIdentity) {
+  const evidence = {
+    schema: "pipeline.continuity-failure-evidence.v1",
+    identity: structuredClone(currentIdentity),
+    failure: { faultDomain: "product", capabilityId: "critic", stage: "verify", runner: "codex", stableErrorCode: "assertion-failed", exitCode: 1, signal: null, boundedTailSha256: A },
+    classificationEvidence: { productVerdict: { schemaValid: true, outcome: "failed" }, host: null },
+    priorFailureSignatures: [],
+    failoverAdmission: null,
+  };
+  return { evidence, evidenceSha256: sha256Canonical(evidence) };
+}
+
+// --- the dedicated writer persists the policy-derived retry -------------------
+{
+  const dir = mkdtempSync(join(tmpdir(), "ps-failure-disposition-"));
+  assert.equal(run(["set-feature", "--id", FEATURE, "--plan-path", "specs/prd.md"], { dir, now: NOW }), 0);
+  const initial = continuityState({ queueHead: queue() });
+  assert.equal(run(args("continuity-init", "absent", request(dir, "failure-init", initial)), deps(dir)), 0);
+  const disposition = request(dir, "failure", failureDispositionRequest(identity()));
+  assert.equal(run(args("continuity-dispose-failure", 0, disposition), deps(dir)), 0);
+  const persisted = readState(dir).state.continuity;
+  assert.equal(persisted.revision, 1);
+  assert.equal(persisted.queueHead.productRetryCount, 1);
+  assert.equal(persisted.queueHead.nextAction, "dispatch");
+  assert.equal(persisted.queueHead.dispatch, null);
+}
+
+// --- caller-selected action is outside the closed request and changes nothing --
+{
+  const dir = mkdtempSync(join(tmpdir(), "ps-failure-directed-"));
+  assert.equal(run(["set-feature", "--id", FEATURE, "--plan-path", "specs/prd.md"], { dir, now: NOW }), 0);
+  const initial = continuityState({ queueHead: queue() });
+  assert.equal(run(args("continuity-init", "absent", request(dir, "failure-init", initial)), deps(dir)), 0);
+  const before = readFileSync(statePath(dir), "utf8");
+  const directed = { ...failureDispositionRequest(identity()), action: "product-retry" };
+  assert.equal(run(args("continuity-dispose-failure", 0, request(dir, "directed", directed)), deps(dir)), 2);
+  assert.equal(readFileSync(statePath(dir), "utf8"), before);
 }
 
 console.log("pipeline-state-lifecycle-event: ok");

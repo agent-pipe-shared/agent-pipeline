@@ -242,6 +242,7 @@
  *                                                 matches nothing. Refuses blank
  *                                                 --env/--by (--artifact stays optional).
  *   continuity-init|continuity-cas|continuity-integrate-final|
+ *   continuity-dispose-failure|
  *   continuity-record-course-brief|continuity-select-course|
  *   continuity-apply-decision|continuity-clear-decision
  *                  --expected-revision <absent|integer>
@@ -255,6 +256,14 @@
  *                                                 idempotent evidence transactions;
  *                                                 the request envelope is closed and
  *                                                 validated by continuity-state.mjs.
+ *                                                 `dispose-failure` consumes a
+ *                                                 digest-bound closed failure envelope
+ *                                                 and derives a product retry plus its
+ *                                                 counter through review-economy; environment
+ *                                                 reroute remains unavailable until a trusted
+ *                                                 host-attestation adapter and route consumer
+ *                                                 are bound. The request has no caller-selected
+ *                                                 action or next state.
  *                                                 Accepted passive/duplicate outcomes
  *                                                 exit 0 with zero mutation.
  *   continuity-result-close-plan                  Read-only approved-implementation
@@ -352,6 +361,7 @@ import { fileURLToPath } from "node:url";
 import {
   applyCourseDecisionIntent,
   applyDecisionSelection,
+  applyContinuityFailureDisposition,
   clearCourseDecisionReceipt,
   clearDecisionSelection,
   applyRunnerNativeContinuation,
@@ -640,6 +650,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "po-authority-acknowledge-plan", "po-authority-acknowledge-apply",
   "po-authority-decision-plan", "po-authority-decision-select", "po-authority-decision-apply",
   "continuity-init", "continuity-cas", "continuity-apply-native", "continuity-integrate-final",
+  "continuity-dispose-failure",
   "continuity-record-course-brief", "continuity-select-course", "continuity-apply-decision",
   "continuity-clear-decision", "continuity-result-bootstrap-plan", "continuity-result-bootstrap-apply",
   "continuity-result-rebind-plan", "continuity-result-rebind-apply",
@@ -676,6 +687,7 @@ const CONTINUITY_SUBCOMMANDS = new Set([
   "continuity-cas",
   "continuity-apply-native",
   "continuity-integrate-final",
+  "continuity-dispose-failure",
   "continuity-record-course-brief",
   "continuity-select-course",
   "continuity-apply-decision",
@@ -2455,6 +2467,10 @@ function continuityTransition(sub, base, expectedRevision, request) {
   if (sub === "continuity-integrate-final") {
     if (!exactObjectKeys(request, ["observation", "next"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };
     return integrateContinuityFinal(base.continuity, { expectedRevision, observation: request.observation, next: request.next }, featureId);
+  }
+  if (sub === "continuity-dispose-failure") {
+    if (!exactObjectKeys(request, ["evidence", "evidenceSha256"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };
+    return applyContinuityFailureDisposition(base.continuity, { expectedRevision, ...request }, featureId);
   }
   if (sub === "continuity-apply-decision") {
     if (!exactObjectKeys(request, ["decisionTxn", "queueHead", "blocker", "resume"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };

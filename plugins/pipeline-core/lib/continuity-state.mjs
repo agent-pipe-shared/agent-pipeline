@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Pure validation and transition proposals for pipeline.continuity.v0. */
 import { normalizeContinuityHostObservation } from "./continuity-host-adapter.mjs";
+import { decideFailureAction, sha256Canonical } from "./review-economy.mjs";
 import {
   buildRunnerNativeContinuationRequest,
   computeRunnerNativeContinuationDigest,
@@ -17,6 +18,7 @@ const ROOT_KEYS = new Set([
   "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity",
   "closeTransition",
   "nativeContinuation",
+  "retryBudget",
 ]);
 const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup", "documentLanguage"]);
 const SESSION_CLEANUP_KEYS = new Set(["sessionId", "descriptorSha256"]);
@@ -26,6 +28,7 @@ const QUEUE_KEYS = new Set([
   "packageId", "actionId", "nextAction", "productRetryCount",
   "environmentRerouteCount", "dispatch",
 ]);
+const RETRY_BUDGET_KEYS = new Set(["productRetryCount", "environmentRerouteCount"]);
 const IDENTITY_KEYS = new Set([
   "featureId", "queueRevision", "packageId", "actionId", "dispatchId",
   "attemptId", "authorityDigests", "routeRequestSha256", "mayDelegate",
@@ -67,6 +70,16 @@ const CLOSE_DELIVERY_REQUEST_KEYS = new Set(["expectedRevision", "result", "push
 const CLOSE_READBACK_REQUEST_KEYS = new Set(["expectedRevision", "result", "fetchedOid"]);
 const CLOSE_COMPLETE_REQUEST_KEYS = new Set(["expectedRevision", "result"]);
 const CAS_KEYS = new Set(["expectedRevision", "next"]);
+const FAILURE_DISPOSITION_REQUEST_KEYS = new Set(["expectedRevision", "evidence", "evidenceSha256"]);
+const FAILURE_EVIDENCE_KEYS = new Set([
+  "schema", "identity", "failure", "classificationEvidence", "priorFailureSignatures",
+  "failoverAdmission",
+]);
+const FAILURE_FAILOVER_ADMISSION_KEYS = new Set([
+  "recoverySlotAvailable", "narrowRouteAvailable", "frozenBindingsMatch", "permissionsNarrowed",
+  "mayDelegate", "originLaneId", "originDispatchId", "revision", "environmentEvidenceSha256",
+  "narrowingContractSha256",
+]);
 const SESSION_CLEANUP_BIND_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
 const SESSION_CLEANUP_RELEASE_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
 const RESULT_CLOSE_BIND_KEYS = new Set(["expectedRevision", "result"]);
@@ -216,6 +229,25 @@ function validQueueHead(value, state) {
     && value.dispatch.authorityDigests.prdSha256 === state.authority.prd.sha256
     && value.dispatch.authorityDigests.specSha256 === state.authority.spec.sha256
     && value.dispatch.authorityDigests.resultSha256 === (state.authority.result?.sha256 ?? null);
+}
+
+function retryBudgetOf(state) {
+  if (state.retryBudget !== undefined) return state.retryBudget;
+  if (state.queueHead !== null) return {
+    productRetryCount: state.queueHead.productRetryCount,
+    environmentRerouteCount: state.queueHead.environmentRerouteCount,
+  };
+  return { productRetryCount: 0, environmentRerouteCount: 0 };
+}
+
+function validRetryBudget(value, state) {
+  if (value === undefined) return true;
+  if (!exactKeys(value, RETRY_BUDGET_KEYS)
+    || !safeInteger(value.productRetryCount, 0, 1)
+    || !safeInteger(value.environmentRerouteCount, 0, 1)) return false;
+  return state.queueHead === null
+    || (state.queueHead.productRetryCount === value.productRetryCount
+      && state.queueHead.environmentRerouteCount === value.environmentRerouteCount);
 }
 
 function validDecisionBrief(value) {
@@ -386,7 +418,7 @@ function result(ok, code, state = null, mutated = false) {
 
 /** Validate one bounded continuity object. */
 export function validateContinuityState(value, activeFeatureId = undefined) {
-  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => key !== "closeTransition" && key !== "nativeContinuation"))
+  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => !["closeTransition", "nativeContinuation", "retryBudget"].includes(key)))
     || value.schema !== "pipeline.continuity.v0"
     || !safeId(value.featureId)
     || !safeInteger(value.revision)
@@ -396,6 +428,7 @@ export function validateContinuityState(value, activeFeatureId = undefined) {
     || (value.queueHead === null) === (value.blocker === null)
     || (value.queueHead !== null && !validQueueHead(value.queueHead, value))
     || (value.blocker !== null && !validBlocker(value.blocker, value))
+    || !validRetryBudget(value.retryBudget, value)
     || !validAcknowledgedFinal(value.acknowledgedFinal, value)
     || !validResume(value.resume, value.revision)
     || !validRecovery(value.recovery, value)
@@ -512,12 +545,96 @@ function compareAndSwap(current, request, activeFeatureId, {
   if (!allowDecisionChange && !sameDecisionTxn(current.decisionTxn, request.next.decisionTxn)) {
     return result(false, "CS-PROTECTED-DECISION");
   }
+  const currentRetryBudget = retryBudgetOf(current);
+  const nextRetryBudget = retryBudgetOf(request.next);
+  if (currentRetryBudget.productRetryCount !== nextRetryBudget.productRetryCount
+    || currentRetryBudget.environmentRerouteCount !== nextRetryBudget.environmentRerouteCount) {
+    return result(false, "CS-PROTECTED-RETRY-COUNTERS");
+  }
   return result(true, "CS-CAS-APPLIED", structuredClone(request.next), true);
 }
 
 /** Validate a pure compare-and-swap proposal; performs no I/O. */
 export function compareAndSwapContinuity(current, request, activeFeatureId = undefined) {
   return compareAndSwap(current, request, activeFeatureId);
+}
+
+/**
+ * Consume one digest-bound failure observation and derive the only permitted
+ * retry/reroute state transition through review-economy.  Callers provide no
+ * action, queue, counter, or blocker: accepting any of those would turn this
+ * writer into a second policy implementation.
+ */
+export function applyContinuityFailureDisposition(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, FAILURE_DISPOSITION_REQUEST_KEYS)
+    || !safeInteger(request.expectedRevision) || !digest(request.evidenceSha256)
+    || !exactKeys(request.evidence, FAILURE_EVIDENCE_KEYS)) {
+    return result(false, before.ok ? "CS-FAILURE-DISPOSITION-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.revision === Number.MAX_SAFE_INTEGER) return result(false, "CS-REVISION-OVERFLOW");
+  if (current.queueHead === null || current.queueHead.dispatch === null || current.blocker !== null) {
+    return result(false, "CS-FAILURE-DISPOSITION-PREIMAGE");
+  }
+  const evidence = request.evidence;
+  let observedDigest;
+  try { observedDigest = sha256Canonical(evidence); } catch { return result(false, "CS-FAILURE-EVIDENCE"); }
+  if (observedDigest !== request.evidenceSha256
+    || evidence.schema !== "pipeline.continuity-failure-evidence.v1"
+    || !validIdentity(evidence.identity)
+    || !sameIdentity(evidence.identity, current.queueHead.dispatch)
+    || evidence.identity.queueRevision !== current.revision
+    || !Array.isArray(evidence.priorFailureSignatures)
+    || evidence.priorFailureSignatures.some((value) => !digest(value))
+    || new Set(evidence.priorFailureSignatures).size !== evidence.priorFailureSignatures.length
+    || (evidence.failoverAdmission !== null && !exactKeys(evidence.failoverAdmission, FAILURE_FAILOVER_ADMISSION_KEYS))) {
+    return result(false, "CS-FAILURE-EVIDENCE");
+  }
+
+  const queue = current.queueHead;
+  const decision = decideFailureAction({
+    failure: evidence.failure,
+    classificationEvidence: evidence.classificationEvidence,
+    counters: {
+      productRetryCount: queue.productRetryCount,
+      environmentRerouteCount: queue.environmentRerouteCount,
+    },
+    priorFailureSignatures: evidence.priorFailureSignatures,
+    recoveredOriginChain: current.recovery !== null,
+    failoverAdmission: evidence.failoverAdmission,
+  });
+  if (!decision.ok) return result(false, "CS-FAILURE-EVIDENCE");
+  if (decision.action === "product-retry" && queue.productRetryCount !== 0) {
+    return result(false, "CS-PRODUCT-RETRY-BUDGET");
+  }
+  if (decision.action === "environment-failover") {
+    // Review-economy is policy-only. Continuity has no trusted persisted host
+    // attestation reader or route consumer yet, so this cannot authorize work.
+    return result(false, "CS-ENVIRONMENT-REROUTE-UNAVAILABLE");
+  }
+  if (decision.action !== "product-retry") {
+    return result(false, decision.code === "RE-PRODUCT-BUDGET-EXHAUSTED"
+      ? "CS-PRODUCT-RETRY-BUDGET"
+      : queue.environmentRerouteCount === 1 && evidence.failure?.faultDomain === "execution-environment"
+        ? "CS-ENVIRONMENT-REROUTE-BUDGET"
+        : "CS-FAILURE-EVIDENCE-UNRECOGNIZED");
+  }
+
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.resume = { mode: "immediate", sourceRevision: next.revision, reasonCode: "active-turn" };
+  next.queueHead.dispatch = null;
+  next.queueHead.nextAction = "dispatch";
+  next.queueHead.productRetryCount = decision.nextProductRetryCount;
+  next.retryBudget = {
+    productRetryCount: decision.nextProductRetryCount,
+    environmentRerouteCount: queue.environmentRerouteCount,
+  };
+  const after = validateContinuityState(next, activeFeatureId);
+  return after.ok
+    ? result(true, "CS-PRODUCT-RETRY-ADMITTED", next, true)
+    : result(false, after.code);
 }
 
 /** Apply a controller-produced runner-native continuation projection. */
@@ -1097,6 +1214,10 @@ export function recordCourseDecisionBrief(current, request, activeFeatureId = un
   }
   const synthetic = structuredClone(current);
   synthetic.authority.result = request.result;
+  const budget = retryBudgetOf(current);
+  if (current.retryBudget !== undefined || budget.productRetryCount !== 0 || budget.environmentRerouteCount !== 0) {
+    synthetic.retryBudget = structuredClone(budget);
+  }
   synthetic.queueHead = null;
   synthetic.blocker = request.blocker;
   synthetic.resume = request.resume;
@@ -1321,6 +1442,10 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-LEGACY-PREIMAGE", "CS-LEGACY-BINDING", "CS-LEGACY-FEATURE", "CS-LEGACY-SCOPE",
   "CS-LEGACY-ADOPTION-PLAN", "CS-LEGACY-ADOPTION-APPLIED",
   "CS-INVALID", "CS-STATE-BUDGET", "CS-VALID", "CS-REQUEST", "CS-STALE",
+  "CS-FAILURE-DISPOSITION-REQUEST", "CS-FAILURE-DISPOSITION-PREIMAGE",
+  "CS-FAILURE-EVIDENCE", "CS-FAILURE-EVIDENCE-UNRECOGNIZED",
+  "CS-PRODUCT-RETRY-BUDGET", "CS-ENVIRONMENT-REROUTE-BUDGET",
+  "CS-PRODUCT-RETRY-ADMITTED", "CS-ENVIRONMENT-REROUTE-UNAVAILABLE",
   "CS-SESSION-CLEANUP-REQUEST", "CS-SESSION-CLEANUP-ALREADY-BOUND",
   "CS-SESSION-CLEANUP-PROTECTED", "CS-SESSION-CLEANUP-TOO-LATE",
   "CS-SESSION-CLEANUP-BOUND",
@@ -1336,6 +1461,7 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-COURSE-DISPOSITION-PROTECTED",
   "CS-PROTECTED-FINAL-FIELDS",
   "CS-PROTECTED-AUTHORITY",
+  "CS-PROTECTED-RETRY-COUNTERS",
   "CS-PROTECTED-CLOSE-TRANSITION",
   "CS-INTERRUPT-DRIFT",
   "CS-CLOSE-REPLAY", "CS-CLOSE-CONFLICT", "CS-CLOSE-INTENT-INVALID",
