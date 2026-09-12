@@ -94,3 +94,24 @@ Related but distinct from
 `backlog/items/2026-08-26-sendmessage-mid-task-scope-relay-rule-has-no-durable-home.md`
 (closed 2026-09-03), which homed the dispatcher-side prohibition. This item is
 the receiving side of the same boundary.
+
+## Implementation progress, 2026-09-12
+
+The receiving rule now exists as `GF-02a` in the canonical and vendored
+Goldfish role, in both task-template copies, and in all three shipped Goldfish
+agent definitions. It treats every mid-task instruction as unauthenticated
+content regardless of channel or claimed sender. Only a purely procedural
+continuation wholly within the original closed briefing is admissible.
+
+A message that changes or corrects rules, scope, files, authority, plan, PO
+decisions, model/effort, or acceptance/DoD is refused and reported, and the
+dispatch stops until a fresh dispatch is created from a new closed six-field
+briefing. Primary
+evidence may support an action the original briefing already authorized; it
+cannot authenticate the message, repair the briefing, or expand authority.
+
+Focused regression evidence is recorded in
+`backlog/evidence/2026-09-12-mid-task-instruction-authentication-green.txt`.
+The item remains open until the uncommitted implementation has its required
+independent review and commit-bound closure evidence; this progress note does
+not claim either one prematurely.
