@@ -38,6 +38,14 @@ HARD RULES (checkable)
   diff's file list against this enumeration; unlisted files = finding.
 - No-code rule: this document contains prose, diagrams, and criteria — no
   implementation code. Interfaces/signatures are allowed where they ARE the contract.
+- Optional mechanical traceability: when a criterion can be reduced to file
+  presence or exact literal presence, place a closed JSON map beside this Spec
+  as `<spec-basename>.requirements.json`. The map is opt-in; its absence does
+  not change existing packages. It uses only `path-exists` and
+  `file-contains-literal` predicates. It never contains commands, regular
+  expressions, subjective prose, or inferred requirements. The Critic dispatch
+  preflight reads the map and target files from the exact candidate tree and
+  refuses a named absent criterion before dispatch.
 ═══════════════════════════════════════════════════════════════════════════
 -->
 
@@ -122,6 +130,31 @@ SYSTEM SHALL …".}}
 - AC-2: IF {{failure condition}}, THEN THE SYSTEM SHALL {{safe behaviour}}.
 - AC-3: {{...}}
 
+#### Optional mechanical requirement map
+
+Use this only for criteria whose minimum artifact presence is meaningful. Keep
+functional tests for behavior; literal presence does not prove correctness.
+The adjacent `{{SPEC_BASENAME}}.requirements.json` file has exactly this shape:
+
+```json
+{
+  "schema": "pipeline.requirement-traceability.v1",
+  "specPath": "{{THIS_SPEC_REPO_RELATIVE_PATH}}",
+  "specSha256": "{{SHA256_OF_EXACT_CANDIDATE_SPEC_BYTES}}",
+  "criteria": [
+    { "id": "AC-KEYBOARD", "predicate": "file-contains-literal", "path": "src/game.js", "literal": "keydown" },
+    { "id": "AC-ASSET", "predicate": "path-exists", "path": "public/game.svg" }
+  ]
+}
+```
+
+`specSha256` must be regenerated whenever this Spec changes; stale maps are
+rejected before review. Criterion ids are unique uppercase hyphenated names. Paths are normalized
+repository-relative paths. The closed predicate-specific keys, bounded map,
+criterion, literal and source sizes, and regular-file-only reads are enforced
+before Critic dispatch. Do not list subjective criteria here; they remain in
+the Spec and its behavioral/manual acceptance path.
+
 ### 6. Definition of Done
 
 - All acceptance criteria above have green, machine-run checks: each AC maps to
@@ -180,6 +213,12 @@ After merge, archive the delta spec (it may age; it is not maintained).}}
 ### REMOVED Requirements
 
 - RR-1: {{removed behaviour + why removal is safe}}.
+
+### Optional mechanical requirement map
+
+Use the same adjacent closed JSON map described in PART A §5 when an ADDED or
+MODIFIED requirement has a useful `path-exists` or `file-contains-literal`
+minimum-presence check. Omit it when no criterion fits that vocabulary.
 
 ### Files touched (every file + rationale — same contract as PART A §4)
 

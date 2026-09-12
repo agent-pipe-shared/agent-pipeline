@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -10,6 +11,7 @@ import test from "node:test";
 import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, enumerateEvidenceArtifacts, preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 
 function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
+function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function commit(root, message) {
   git(root, ["add", "."]);
   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
@@ -86,6 +88,89 @@ test("reviewer input uses an empty governance-directory list when the manifest d
   const result = preflightCriticDispatch(input(fx, { base: fx.candidate, candidate }));
   assert.equal(result.dispatch.reviewerInput.rulesetSha, candidate);
   assert.deepEqual(result.dispatch.reviewerInput.governanceConstraintPaths, []);
+});
+
+function traceabilityCandidate(fx, { soundToggle = true, mapOverride = null } = {}) {
+  mkdirSync(join(fx.root, "src"), { recursive: true });
+  writeFileSync(join(fx.root, "src", "game.js"), "window.addEventListener('keydown', onKey);\n");
+  writeFileSync(join(fx.root, "index.html"), soundToggle
+    ? "<button data-action=\"sound-toggle\">Sound</button>\n"
+    : "<button>Play</button>\n");
+  const map = mapOverride ?? {
+    schema: "pipeline.requirement-traceability.v1",
+    specPath: "specs/spec.md",
+    specSha256: sha256(readFileSync(join(fx.root, "specs", "spec.md"))),
+    criteria: [
+      { id: "AC-KEYBOARD", predicate: "file-contains-literal", path: "src/game.js", literal: "keydown" },
+      { id: "AC-SOUND-TOGGLE", predicate: "file-contains-literal", path: "index.html", literal: "data-action=\"sound-toggle\"" },
+    ],
+  };
+  writeFileSync(join(fx.root, "specs", "spec.requirements.json"), `${JSON.stringify(map)}\n`);
+  const candidate = commit(fx.root, "traceable candidate");
+  const tree = git(fx.root, ["rev-parse", `${candidate}^{tree}`]);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  return { candidate, tree };
+}
+
+test("opt-in requirement map is candidate-bound, evaluated, and passed to the Critic as a constraint", () => {
+  const fx = fixture();
+  const traced = traceabilityCandidate(fx);
+  const result = preflightCriticDispatch(input(fx, { base: fx.candidate, candidate: traced.candidate }));
+  assert.equal(result.status, "packet-ready");
+  assert.equal(result.requirementTraceability.mode, "declared");
+  assert.deepEqual(result.requirementTraceability.criteria.map(({ id, status }) => ({ id, status })), [
+    { id: "AC-KEYBOARD", status: "present" },
+    { id: "AC-SOUND-TOGGLE", status: "present" },
+  ]);
+  assert.deepEqual(result.requirementTraceability.candidate, { commit: traced.candidate, tree: traced.tree });
+  assert.ok(result.guardrails.some(({ path }) => path === "specs/spec.requirements.json"));
+  assert.ok(result.dispatch.reviewerInput.guardrailPaths.includes("specs/spec.requirements.json"));
+});
+
+test("preflight rejects a specifically named absent requirement before packet-ready", () => {
+  const fx = fixture();
+  const traced = traceabilityCandidate(fx, { soundToggle: false });
+  assert.throws(
+    () => preflightCriticDispatch(input(fx, { base: fx.candidate, candidate: traced.candidate })),
+    (error) => error instanceof CriticDispatchPreflightError
+      && error.code === "CDP-REQUIREMENT-ABSENT"
+      && error.message.includes("AC-SOUND-TOGGLE")
+      && !error.message.includes("AC-KEYBOARD"),
+  );
+});
+
+test("preflight rejects prose/command predicates instead of executing or inferring them", () => {
+  const fx = fixture();
+  const traced = traceabilityCandidate(fx, { mapOverride: {
+    schema: "pipeline.requirement-traceability.v1",
+    specPath: "specs/spec.md",
+    specSha256: sha256(readFileSync(join(fx.root, "specs", "spec.md"))),
+    criteria: [{ id: "AC-PLAYABILITY", predicate: "run-command", path: "src/game.js", command: "node game.js" }],
+  } });
+  assert.throws(
+    () => preflightCriticDispatch(input(fx, { base: fx.candidate, candidate: traced.candidate })),
+    (error) => error instanceof CriticDispatchPreflightError
+      && error.code === "CDP-REQUIREMENT-MAP"
+      && error.message.includes("RT-PREDICATE"),
+  );
+});
+
+test("preflight rejects a stale requirement map after the candidate Spec changes", () => {
+  const fx = fixture();
+  const staleDigest = sha256(readFileSync(join(fx.root, "specs", "spec.md")));
+  writeFileSync(join(fx.root, "specs", "spec.md"), "# Spec\n\nA newly named sound requirement.\n");
+  const traced = traceabilityCandidate(fx, { mapOverride: {
+    schema: "pipeline.requirement-traceability.v1",
+    specPath: "specs/spec.md",
+    specSha256: staleDigest,
+    criteria: [{ id: "AC-KEYBOARD", predicate: "file-contains-literal", path: "src/game.js", literal: "keydown" }],
+  } });
+  assert.throws(
+    () => preflightCriticDispatch(input(fx, { base: fx.candidate, candidate: traced.candidate })),
+    (error) => error instanceof CriticDispatchPreflightError
+      && error.code === "CDP-REQUIREMENT-MAP"
+      && error.message.includes("RT-MAP-SPEC-DIGEST"),
+  );
 });
 
 test("current-artifact preflight binds an unchanged artifact to the later candidate without inventing a range", () => {

@@ -22,6 +22,10 @@ import {
   deriveCriticPacketGovernance,
 } from "../lib/critic-packet-governance.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import {
+  RequirementTraceabilityError,
+  evaluateRequirementTraceability,
+} from "../lib/requirement-traceability.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
 export const EVIDENCE_SWEEP_SCHEMA = "pipeline.critic-dispatch-preflight-evidence-sweep.v1";
@@ -42,14 +46,15 @@ const EVIDENCE_MAX_BYTES = 1024 * 1024;
 const CANDIDATE_SOURCE_MAX_BYTES = 16 * 1024 * 1024;
 
 export class CriticDispatchPreflightError extends Error {
-  constructor(code, message) {
+  constructor(code, message, details = null) {
     super(message);
     this.name = "CriticDispatchPreflightError";
     this.code = code;
+    this.details = details;
   }
 }
 
-function fail(code, message) { throw new CriticDispatchPreflightError(code, message); }
+function fail(code, message, details = null) { throw new CriticDispatchPreflightError(code, message, details); }
 function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function compare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -269,7 +274,28 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     changedPaths,
   });
   const governancePaths = governance.required.map(({ path }) => path);
-  const allGuardrails = [...new Set([...guardrails, ...governancePaths])].sort(compare);
+  let requirementTraceability;
+  try {
+    requirementTraceability = evaluateRequirementTraceability({
+      specPath: spec,
+      candidate: { commit: candidateCommit, tree: candidateTree },
+      candidateFiles: byPath,
+      readCandidateFile: (path) => candidateBytes(realRoot, candidateCommit, path),
+    });
+  } catch (error) {
+    if (error instanceof RequirementTraceabilityError) {
+      fail("CDP-REQUIREMENT-MAP", `${error.code}: ${error.message}`);
+    }
+    throw error;
+  }
+  if (requirementTraceability.missingCriteria.length > 0) {
+    const names = requirementTraceability.missingCriteria.map(({ id }) => id).join(", ");
+    fail("CDP-REQUIREMENT-ABSENT", `Candidate is missing named requirements: ${names}`, {
+      missingCriteria: requirementTraceability.missingCriteria,
+    });
+  }
+  const requirementPaths = requirementTraceability.mode === "declared" ? [requirementTraceability.map.path] : [];
+  const allGuardrails = [...new Set([...guardrails, ...governancePaths, ...requirementPaths])].sort(compare);
   const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
   const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
   const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path));
@@ -287,6 +313,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     spec: specReadback,
     guardrails: guardrailReadback,
     governance,
+    requirementTraceability,
     evidence: evidenceReadback,
     coordinatorOnly: { priorCriticEvidence: priorReadback },
     dispatch: {
@@ -393,7 +420,8 @@ if (isDirectInvocation(import.meta.url)) {
       process.stdout.write(`${JSON.stringify(result)}\n`);
     } catch (error) {
       const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
-      process.stderr.write(`${JSON.stringify({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA, status: "rejected", code })}\n`);
+      const details = error instanceof CriticDispatchPreflightError ? error.details : null;
+      process.stderr.write(`${JSON.stringify({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA, status: "rejected", code, ...(details ?? {}) })}\n`);
       process.exitCode = 1;
     }
   }

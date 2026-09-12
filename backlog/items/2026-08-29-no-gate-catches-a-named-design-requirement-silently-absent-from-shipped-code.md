@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code
 type: workflow-improvement
 owner: pipeline
-status: open
+status: in_progress
 created: 2026-08-29
 sprint: nova-b
 done_when: manual
@@ -90,3 +90,26 @@ correctly.
   flow, DoD mechanism), no concrete 0.6.0-blocking incident behind it.
 - **Assignment:** `sprint: nova` — Nova B, not a 0.6.0 candidate blocker.
 - **Date:** 2026-08-29
+
+## Implementation slice (2026-09-12)
+
+The smallest bounded mechanism is now implemented at the Critic admission
+boundary. A feature may opt in with an adjacent
+`<spec-basename>.requirements.json` map. The map is read from the exact frozen
+candidate tree, binds itself to the exact Spec path and byte digest, uses a closed schema and
+only the `path-exists` and `file-contains-literal` predicates, and has explicit
+path, regular-file/symlink, byte, criterion-count, id, and literal bounds.
+
+Every declared criterion produces a typed `present` or `absent` evaluation.
+The Critic preflight refuses `CDP-REQUIREMENT-ABSENT` and names the absent ids
+before returning `packet-ready`. Unknown predicates, prose fields, and command
+shapes are schema errors and are never executed. Feature packages without the
+adjacent map retain their prior preflight behavior. Focused fixtures cover the
+original keyboard-handler and sound-toggle omissions, including independent
+present/absent results, candidate Spec digest drift, and a subjective sentence
+that is deliberately ignored.
+
+This slice proves minimum artifact presence only. Behavioral correctness still
+belongs to the mapped tests and independent Critic; a literal such as
+`keydown` can exist in dead or incorrect code. Final closure remains pending
+focused candidate review and integration evidence.

@@ -65,6 +65,16 @@ argv, request, or verdict exits 2 with a closed
 `pipeline.session-critic-finalization-error.v1` object.
 A rejected packet is a coordinator defect, not Critic work: do not spawn a child, create a packet or substitute prose/evidence.
 
+**Opt-in named-requirement admission:** a feature Spec may place
+`<spec-basename>.requirements.json` beside itself. When present, the preflight
+reads that closed map and all targets from the exact candidate tree, requires
+its `specSha256` to match the exact candidate Spec bytes, evaluates
+only its allowlisted `path-exists` and `file-contains-literal` predicates, and
+rejects `CDP-REQUIREMENT-ABSENT` with the missing criterion ids before this
+Critic is dispatched. The map is included in the returned candidate guardrail
+paths. Never execute or infer a requirement from its prose. An absent map keeps
+the existing review behavior.
+
 **Evidence artifact shape (confirmed from source, hard — not free-form text):**
 each `evidence:{{PATH}}` file must be JSON (plain text is rejected as
 `CDP-EVIDENCE-JSON`, `scripts/critic-dispatch-preflight.mjs` line 147) whose
