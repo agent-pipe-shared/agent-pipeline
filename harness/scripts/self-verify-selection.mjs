@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA } from "../../plugins/pipeline-core/lib/governance-verification-action.mjs";
 import { planVerifySelection } from "../../plugins/pipeline-core/lib/verify-selection.mjs";
 
 const MODES = new Set(["work", "critic", "push", "candidate", "release"]);
@@ -9,6 +11,7 @@ const MODES = new Set(["work", "critic", "push", "candidate", "release"]);
 export function parseVerifyInvocation(argv = [], environment = {}) {
   let mode = environment.PIPELINE_VERIFY_MODE ?? "work";
   let base = environment.PIPELINE_VERIFY_BASE || null;
+  let eventOutPath = environment.PIPELINE_VERIFY_EVENT_OUT || null;
   let reuseReceipts = true;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -16,15 +19,36 @@ export function parseVerifyInvocation(argv = [], environment = {}) {
     else if (argument?.startsWith("--mode=")) mode = argument.slice(7);
     else if (argument === "--base") base = argv[++index];
     else if (argument?.startsWith("--base=")) base = argument.slice(7);
+    else if (argument === "--event-out") eventOutPath = argv[++index];
+    else if (argument?.startsWith("--event-out=")) eventOutPath = argument.slice(12);
     else if (argument === "--no-reuse") reuseReceipts = false;
     else throw new Error(`VERIFY-ARGUMENT: unsupported argument ${JSON.stringify(argument)}`);
   }
-  if (!MODES.has(mode) || (base !== null && (typeof base !== "string" || base === ""))) throw new Error("VERIFY-ARGUMENT");
-  return Object.freeze({ mode, base, reuseReceipts });
+  if (!MODES.has(mode)
+    || (base !== null && (typeof base !== "string" || base === ""))
+    || (eventOutPath !== null && (typeof eventOutPath !== "string" || eventOutPath === ""))) throw new Error("VERIFY-ARGUMENT");
+  return Object.freeze({ mode, base, eventOutPath, reuseReceipts });
 }
 
 export function renderVerifyCommand(invocation) {
-  return `node harness/scripts/verify.mjs --mode ${invocation.mode}${invocation.base === null ? "" : ` --base ${invocation.base}`}${invocation.reuseReceipts === false ? " --no-reuse" : ""}`;
+  return `node harness/scripts/verify.mjs --mode ${invocation.mode}${invocation.base === null ? "" : ` --base ${invocation.base}`}${invocation.eventOutPath == null ? "" : ` --event-out ${invocation.eventOutPath}`}${invocation.reuseReceipts === false ? " --no-reuse" : ""}`;
+}
+
+export function buildSelfVerifyGovernanceSource({ evidence, startedCandidate, finishedCandidate, overallExitCode }) {
+  const stableExactCandidate = new Set(["clean", "approval-pending"]).has(startedCandidate?.status)
+    && finishedCandidate?.status === startedCandidate.status
+    && typeof startedCandidate.commit === "string" && typeof startedCandidate.tree === "string"
+    && finishedCandidate.commit === startedCandidate.commit && finishedCandidate.tree === startedCandidate.tree;
+  if (!stableExactCandidate || !Number.isSafeInteger(overallExitCode)) return null;
+  const terminalBytes = `${JSON.stringify(evidence, null, 2)}\n`;
+  return Object.freeze({
+    schema: GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
+    terminalEvidenceSha256: createHash("sha256").update(terminalBytes).digest("hex"),
+    outcome: overallExitCode === 0 ? "passed" : "failed",
+    candidate: Object.freeze({ commit: startedCandidate.commit, tree: startedCandidate.tree }),
+    featureId: Object.freeze({ state: "not-applicable" }),
+    sessionId: Object.freeze({ state: "not-applicable" }),
+  });
 }
 
 function gitText(repoRoot, args, spawn) {

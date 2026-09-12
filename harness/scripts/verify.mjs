@@ -49,7 +49,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { duplicateSuiteIds } from "./check-verify-suite-registration.mjs";
 import { UNREPLACED_MANUAL_CHECK_PLACEHOLDER, computeManualVerifyStep } from "./manual-check-logic.mjs";
@@ -64,8 +64,14 @@ import { resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/pr
 import { validateScopedVerifyRegistration } from "../../plugins/pipeline-core/lib/scoped-verify-registration.mjs";
 import { validateWindowsAssuranceVerifyRegistration } from "../../plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs";
 import { createPublicVerifyRunEvidence } from "../../plugins/pipeline-core/lib/verify-resume.mjs";
+import {
+  buildGovernanceVerificationAction,
+  buildGovernanceVerificationRetry,
+  preflightGovernanceVerificationActionOutput,
+  writeGovernanceVerificationAction,
+} from "../../plugins/pipeline-core/lib/governance-verification-action.mjs";
 import { runVerifyJournal } from "../../plugins/pipeline-core/scripts/verify-journal.mjs";
-import { parseVerifyInvocation, renderVerifyCommand, resolveSelfVerifySelection } from "./self-verify-selection.mjs";
+import { buildSelfVerifyGovernanceSource, parseVerifyInvocation, renderVerifyCommand, resolveSelfVerifySelection } from "./self-verify-selection.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
@@ -129,6 +135,24 @@ const evidencePath = join(evidenceDir, "verify-latest.json");
 const runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`;
 const runEvidencePath = join(evidenceDir, `${runId}.json`);
 const verifyStartedAt = new Date().toISOString();
+let verificationActionPlan = null;
+if (invocation.eventOutPath !== null) {
+  if (startedCandidate.status !== "clean" && startedCandidate.status !== NOVA_APPROVAL_PENDING_STATUS) {
+    console.error("VERIFY-ACTION-PREFLIGHT: an action event requires an exact stable candidate before source execution.");
+    process.exit(2);
+  }
+  try {
+    verificationActionPlan = preflightGovernanceVerificationActionOutput({ rootDir: primaryRoot, eventOutPath: invocation.eventOutPath });
+    for (const sourcePath of [evidencePath, runEvidencePath]) {
+      if (verificationActionPlan.target === sourcePath
+        || verificationActionPlan.target.startsWith(`${sourcePath}${sep}`)
+        || sourcePath.startsWith(`${verificationActionPlan.target}${sep}`)) throw new Error("VERIFY-ACTION-PATH-COLLISION");
+    }
+  } catch (error) {
+    console.error(`VERIFY-ACTION-PREFLIGHT: ${error?.code ?? error?.message ?? "unavailable"}`);
+    process.exit(2);
+  }
+}
 function writeEvidence(evidence, phase) {
   writeVerifyEvidencePair({
     runPath: runEvidencePath,
@@ -972,9 +996,41 @@ const evidence = {
   exitCode: overallExitCode,
 };
 
+const verificationActionSource = verificationActionPlan === null ? null : buildSelfVerifyGovernanceSource({
+  evidence, startedCandidate, finishedCandidate, overallExitCode,
+});
+const verificationActionEvent = verificationActionSource === null ? null : buildGovernanceVerificationAction(verificationActionSource);
+
 writeEvidence(evidence, "terminal");
+
+let verificationActionResult = null;
+if (verificationActionPlan !== null) {
+  if (verificationActionEvent === null) {
+    verificationActionResult = { status: "source-unavailable", sourceStatus: "unavailable", eventOutPath: verificationActionPlan.eventOutPath };
+  } else {
+    let sourceReadback = null;
+    try { sourceReadback = JSON.parse(readFileSync(runEvidencePath, "utf8")); } catch { sourceReadback = null; }
+    if (JSON.stringify(sourceReadback) !== JSON.stringify(evidence)) {
+      verificationActionResult = { status: "source-complete/event-unavailable", sourceStatus: verifyRun.terminal.status, code: "VERIFY-ACTION-SOURCE-READBACK", eventOutPath: verificationActionPlan.eventOutPath };
+    } else {
+      try {
+        const written = writeGovernanceVerificationAction({ rootDir: primaryRoot, eventOutPath: verificationActionPlan.eventOutPath, event: verificationActionEvent });
+        verificationActionResult = { status: "event-written", sourceStatus: verifyRun.terminal.status, eventOutPath: verificationActionPlan.eventOutPath, eventId: written.event.eventId };
+      } catch {
+        verificationActionResult = {
+          status: "source-complete/event-unavailable",
+          sourceStatus: verifyRun.terminal.status,
+          eventOutPath: verificationActionPlan.eventOutPath,
+          eventRetry: buildGovernanceVerificationRetry({ eventOutPath: verificationActionPlan.eventOutPath, event: verificationActionEvent }),
+        };
+      }
+    }
+  }
+  console.log(JSON.stringify({ schema: "pipeline.verify-governance-action-result.v1", ...verificationActionResult }));
+}
 
 console.log(`\nEvidence written: ${evidencePath} (run record: ${runEvidencePath})`);
 console.log(`Overall: ${steps.map((s) => `${s.name}=${s.exitCode}`).join(", ")} -> exit ${overallExitCode}`);
 
-process.exit(overallExitCode);
+const finalExitCode = overallExitCode === 0 && verificationActionResult?.status === "source-complete/event-unavailable" ? 2 : overallExitCode;
+process.exit(finalExitCode);

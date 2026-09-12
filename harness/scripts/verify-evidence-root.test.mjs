@@ -154,6 +154,27 @@ test(
       assert.equal(evidence.candidate.start.commit, fixtureCommit, "candidate identity must reflect the INVOKING worktree, not the primary");
       assert.notEqual(evidence.candidate.start.commit, primaryHeadCommit, "candidate identity must not silently fall back to the primary worktree's HEAD");
       assert.equal(evidence.commit, fixtureCommit);
+
+      // An explicitly requested governance action changes the dirty-candidate
+      // boundary: source and target preflight must reject before replacing the
+      // public evidence that the ordinary invocation just wrote.
+      const actionRelativePath = `evidence/verify-evidence-root-action-${process.pid}.json`;
+      const actionPath = join(primaryRoot, actionRelativePath);
+      rmSync(actionPath, { force: true });
+      const evidenceBeforeRejectedAction = readFileSync(realEvidencePath);
+      const rejectedActionRun = spawnSync(process.execPath, [
+        join(worktreeDir, "harness", "scripts", "verify.mjs"),
+        "--event-out", actionRelativePath,
+      ], {
+        cwd: worktreeDir,
+        encoding: "utf8",
+        shell: false,
+        timeout: 30000,
+      });
+      assert.equal(rejectedActionRun.status, 2);
+      assert.match(rejectedActionRun.stderr || "", /VERIFY-ACTION-PREFLIGHT/u);
+      assert.deepEqual(readFileSync(realEvidencePath), evidenceBeforeRejectedAction, "failed action preflight must not replace source evidence");
+      assert.equal(existsSync(actionPath), false, "failed action preflight must not create an action artifact");
     } finally {
       try { spawnSync("git", ["worktree", "remove", "--force", worktreeDir], { cwd: repoRoot, shell: false }); } catch { /* best-effort */ }
       try { rmSync(parent, { recursive: true, force: true }); } catch { /* best-effort */ }

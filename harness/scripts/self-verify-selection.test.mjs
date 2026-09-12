@@ -2,13 +2,23 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { parseVerifyInvocation, renderVerifyCommand, resolveSelfVerifySelection } from "./self-verify-selection.mjs";
+import { createHash } from "node:crypto";
+import { buildSelfVerifyGovernanceSource, parseVerifyInvocation, renderVerifyCommand, resolveSelfVerifySelection } from "./self-verify-selection.mjs";
 
-assert.deepEqual(parseVerifyInvocation([], {}), { mode: "work", base: null, reuseReceipts: true });
-assert.deepEqual(parseVerifyInvocation(["--mode", "critic", "--base=main", "--no-reuse"], {}), { mode: "critic", base: "main", reuseReceipts: false });
-assert.equal(renderVerifyCommand({ mode: "push", base: "abc", reuseReceipts: true }), "node harness/scripts/verify.mjs --mode push --base abc");
-assert.equal(renderVerifyCommand({ mode: "push", base: "abc", reuseReceipts: false }), "node harness/scripts/verify.mjs --mode push --base abc --no-reuse");
+assert.deepEqual(parseVerifyInvocation([], {}), { mode: "work", base: null, eventOutPath: null, reuseReceipts: true });
+assert.deepEqual(parseVerifyInvocation(["--mode", "critic", "--base=main", "--event-out", "evidence/actions/verify.json", "--no-reuse"], {}), { mode: "critic", base: "main", eventOutPath: "evidence/actions/verify.json", reuseReceipts: false });
+assert.deepEqual(parseVerifyInvocation([], { PIPELINE_VERIFY_EVENT_OUT: "evidence/actions/env.json" }), { mode: "work", base: null, eventOutPath: "evidence/actions/env.json", reuseReceipts: true });
+assert.equal(renderVerifyCommand({ mode: "push", base: "abc", eventOutPath: null, reuseReceipts: true }), "node harness/scripts/verify.mjs --mode push --base abc");
+assert.equal(renderVerifyCommand({ mode: "push", base: "abc", eventOutPath: "evidence/actions/verify.json", reuseReceipts: false }), "node harness/scripts/verify.mjs --mode push --base abc --event-out evidence/actions/verify.json --no-reuse");
 assert.throws(() => parseVerifyInvocation(["--unknown"], {}), /VERIFY-ARGUMENT/u);
+
+const exactCandidate = { status: "clean", commit: "a".repeat(40), tree: "b".repeat(40) };
+const terminalEvidence = { schema: "pipeline.verify-evidence.v0", exitCode: 0 };
+const passedSource = buildSelfVerifyGovernanceSource({ evidence: terminalEvidence, startedCandidate: exactCandidate, finishedCandidate: structuredClone(exactCandidate), overallExitCode: 0 });
+assert.equal(passedSource.outcome, "passed");
+assert.equal(passedSource.terminalEvidenceSha256, createHash("sha256").update(`${JSON.stringify(terminalEvidence, null, 2)}\n`).digest("hex"));
+assert.equal(buildSelfVerifyGovernanceSource({ evidence: { ...terminalEvidence, exitCode: 3 }, startedCandidate: exactCandidate, finishedCandidate: structuredClone(exactCandidate), overallExitCode: 3 }).outcome, "failed");
+assert.equal(buildSelfVerifyGovernanceSource({ evidence: terminalEvidence, startedCandidate: exactCandidate, finishedCandidate: { ...exactCandidate, tree: "c".repeat(40) }, overallExitCode: 0 }), null);
 
 const suites = [
   { name: "doc-contract-tests", file: "/repo/doc.test.mjs" },
@@ -50,4 +60,4 @@ const release = resolveSelfVerifySelection({ repoRoot: "/repo", candidateCommit:
 assert.equal(release.selection.execution, "full");
 assert.equal(release.suites.length, 2);
 
-console.log("self-verify-selection: 13 tests passed");
+console.log("self-verify-selection: 19 tests passed");

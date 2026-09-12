@@ -312,6 +312,13 @@ Evidence: `backlog/evidence/2026-09-12-lnd3-mixed-stream-replay-viewer.md`.
   retry binding. Running without the output argument is byte-compatible.
 - Both self-repository Verify and the consuming-project evidence producer use
   the same pure builder; no runner identity enters the event.
+- **Rollback and recovery:** omitting the optional event-output argument restores
+  the previous Verify behavior without changing the source evidence contract.
+  A target/source preflight rejection is zero mutation. Once terminal source
+  evidence is durable, an event publication failure never retracts or rewrites
+  that source; it returns the closed event-only retry binding, which may publish
+  only the identical create-only artifact. A conflicting artifact is preserved
+  and rejected rather than overwritten.
 
 ### LND-5 — review producer
 
