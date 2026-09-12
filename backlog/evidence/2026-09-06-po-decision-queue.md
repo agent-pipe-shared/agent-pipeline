@@ -581,3 +581,20 @@ so the two heavy suites the win was expected from cannot be evicted. Twelve
 lane members remain eligible on that criterion alone, gated by two further
 modules. That is ordinary work, not a PO decision, and it is not promised for
 this candidate.
+## CI failure reporter public-log boundary — ready for PO decision
+
+The current reporter is reachable and bounded, but an independent review on
+2026-09-12 confirmed that it publishes an otherwise-unclassified raw log tail
+after only four credential-pattern replacements. Its exception handler also
+publishes raw `error.message`. The draft requirement at
+`docs/adr/draft-ci-failure-reporter-redaction-requirement.md` is therefore a
+material public-log trust decision rather than editorial cleanup.
+
+Recommended decision: accept draft AC5's positive allow-list and AC10's
+disclosed, non-gating failure behavior. The repaired reporter would emit only
+typed suite/name, coarse status, safe structured attribution, and a
+repository-relative or digest reference to private evidence; any unclassified
+content would become an explicit redaction marker. Reporter failure would
+remain visible but would not create a second CI gate after Verify is already
+red. Alternative: authorize a broader sanitized-excerpt grammar and accept its
+higher residual disclosure risk. No implementation begins until the PO chooses.

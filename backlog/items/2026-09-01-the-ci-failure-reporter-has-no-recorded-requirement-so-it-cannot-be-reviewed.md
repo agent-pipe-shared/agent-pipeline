@@ -70,3 +70,21 @@ there something to review it against.
   findings dispositioned.
 - Until that happens, the component's review status is recorded as outstanding
   rather than skipped — it is neither reviewed nor exempt.
+
+## Review status, 2026-09-12
+
+The durable draft requirement now exists at
+`docs/adr/draft-ci-failure-reporter-redaction-requirement.md`. A fresh Critic
+review against the current implementation found two blockers and one major:
+the reporter emits unclassified raw log tails after a four-shape credential
+blocklist, its top-level exception path prints raw `error.message`, and its
+tests do not cover the draft's default-deny boundary. The full disposition is
+recorded in
+`backlog/evidence/2026-09-12-ci-failure-reporter-requirement-review.md`.
+
+Implementation remains blocked on PO acceptance of the draft's AC5 positive
+allow-list and AC10 disclosed-but-non-gating reporter-failure behavior. The
+recommended disposition is to accept both: emit only typed suite/status and
+private-evidence reference fields, visibly mark withheld content, and keep a
+reporter failure non-blocking because the substantive Verify failure has
+already made the job red.
