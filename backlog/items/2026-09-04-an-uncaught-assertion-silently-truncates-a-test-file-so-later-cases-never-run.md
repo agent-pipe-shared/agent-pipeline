@@ -215,4 +215,14 @@ Commit `a1446c56` migrates three further normal Verify paths:
 `runner-profile-migration-v3-tests` (51). All 367 callbacks completed in the
 focused run, and Verify now supplies their exact policies. The unchanged
 181-entry registry therefore contains **18 required and 163
-legacy-process-only** entries. The item remains open for staged migration.
+legacy-process-only** entries. The pipeline team owns that remaining staged
+migration and will re-triage its next bounded batch by 2026-10-31; this expiry
+prevents the legacy population from becoming an indefinite exception.
+
+Rollback for this batch is a forward revert of `a1446c56` and its bookkeeping
+commit. It restores the three suites to their prior `legacy-process-only`
+registry entries and removes only their descriptor registration/callback
+instrumentation. The underlying test assertions remain intact and directly
+runnable. Run the registration checker and the three focused suites on the
+revert candidate before accepting it; do not hand-edit receipts or reuse
+completion evidence across the changed candidate.
