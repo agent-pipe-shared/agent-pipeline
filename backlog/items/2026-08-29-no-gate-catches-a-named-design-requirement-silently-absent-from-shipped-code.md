@@ -113,3 +113,15 @@ This slice proves minimum artifact presence only. Behavioral correctness still
 belongs to the mapped tests and independent Critic; a literal such as
 `keydown` can exist in dead or incorrect code. Final closure remains pending
 focused candidate review and integration evidence.
+
+## Focused review — 2026-09-12
+
+The fresh path-only Critic passed the exact isolated candidate with no findings.
+Parent verification reran the evaluator at 5/5, the candidate-bound Critic
+preflight at 17/17 with real Git fixture access, documentation contracts, and
+the diff check. The exact report and candidate identity are retained in
+`backlog/evidence/2026-09-12-requirement-traceability-critic.md`.
+
+The suite is registered in the frozen Verify inventory. The item remains
+`in_progress` until that registered suite passes in the final Full Verify; this
+entry does not infer that later result.
