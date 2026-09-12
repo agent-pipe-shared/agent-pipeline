@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -46,6 +47,7 @@ const BUILDERS = Object.freeze({
   "authorize-critical-push": Object.freeze({
     build: authorizeCriticalPushCommand,
     boundary: REGISTERED_BOUNDARIES["authorize-critical-push"],
+    source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
   }),
 });
 
@@ -196,6 +198,20 @@ export function parseHumanTerminalActionCatalog(text) {
 
 export function loadHumanTerminalActionCatalog(path = HUMAN_TERMINAL_ACTION_CATALOG_PATH) {
   return parseHumanTerminalActionCatalog(readFileSync(path, "utf8"));
+}
+
+export function humanTerminalActionCatalogEntry(templateId, catalog = loadHumanTerminalActionCatalog()) {
+  const entry = catalog.entries.find((candidate) => candidate.templateId === templateId);
+  if (!entry || entry.disposition !== "registered") throw new Error(`HTA-TEMPLATE-UNKNOWN: ${templateId}`);
+  return entry;
+}
+
+export function registeredHumanTerminalActionBuilderIdentity(builderId) {
+  const registered = BUILDERS[builderId];
+  if (!registered) throw new Error(`HTA-BUILDER-UNKNOWN: ${builderId}`);
+  return Object.freeze({
+    sourceSha256: createHash("sha256").update(readFileSync(registered.source)).digest("hex"),
+  });
 }
 
 export function buildRegisteredHumanTerminalAction(builderId, input) {

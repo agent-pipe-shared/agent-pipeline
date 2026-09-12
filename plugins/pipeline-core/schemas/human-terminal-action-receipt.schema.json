@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.human-terminal-action-receipt.v1.json",
+  "title": "Pipeline human terminal action result receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "code", "instanceId", "templateId", "revision", "requestSha256", "valuesSha256", "candidateSha256", "exitCode", "resultCode", "resultSha256", "readbackStatus", "readbackSha256", "recordSha256"],
+  "properties": {
+    "schema": { "const": "pipeline.human-terminal-action-receipt.v1" },
+    "status": { "const": "completed" },
+    "code": { "const": "HTA-RUN-COMPLETED" },
+    "instanceId": { "type": "string", "pattern": "^[a-f0-9]{24}$" },
+    "templateId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "requestSha256": { "$ref": "#/$defs/sha256" },
+    "valuesSha256": { "$ref": "#/$defs/sha256" },
+    "candidateSha256": { "$ref": "#/$defs/sha256" },
+    "exitCode": { "const": 0 },
+    "resultCode": { "type": "string", "minLength": 1 },
+    "resultSha256": { "$ref": "#/$defs/sha256" },
+    "readbackStatus": { "const": "verified" },
+    "readbackSha256": { "$ref": "#/$defs/sha256" },
+    "recordSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": { "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
+}

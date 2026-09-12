@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.human-terminal-action-instance.v1.json",
+  "title": "Pipeline prepared human terminal action instance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "instanceId", "templateId", "revision", "builderId", "catalogSha256", "builderSourceSha256", "runner", "platform", "repositoryRoot", "candidate", "values", "builderOutput", "builderOutputSha256", "boundary", "expectedReadback", "createdAt", "recordSha256"],
+  "properties": {
+    "schema": { "const": "pipeline.human-terminal-action-instance.v1" },
+    "instanceId": { "type": "string", "pattern": "^[a-f0-9]{24}$" },
+    "templateId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "builderId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+    "catalogSha256": { "$ref": "#/$defs/sha256" },
+    "builderSourceSha256": { "$ref": "#/$defs/sha256" },
+    "runner": { "enum": ["claude", "codex", "antigravity"] },
+    "platform": { "const": "posix" },
+    "repositoryRoot": { "type": "string", "minLength": 1 },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "values": { "type": "object", "additionalProperties": { "type": "string" } },
+    "builderOutput": { "$ref": "#/$defs/builderOutput" },
+    "builderOutputSha256": { "$ref": "#/$defs/sha256" },
+    "boundary": { "$ref": "#/$defs/userCopyBoundary" },
+    "expectedReadback": { "$ref": "#/$defs/readback" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "recordSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "candidate": {
+      "type": "object", "additionalProperties": false, "required": ["commit", "tree"],
+      "properties": { "commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" }, "tree": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" } }
+    },
+    "userCopyBoundary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["executionBoundary", "invocation", "codexToolCallPermitted"],
+      "properties": {
+        "executionBoundary": { "enum": ["external-terminal", "attended-external-terminal"] },
+        "invocation": { "const": "user-copy-only" },
+        "codexToolCallPermitted": { "const": false }
+      }
+    },
+    "readback": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "code", "command"],
+      "properties": {
+        "schema": { "type": ["string", "null"] },
+        "code": { "type": "string", "minLength": 1 },
+        "command": { "type": "string", "minLength": 1 }
+      }
+    },
+    "builderOutput": {
+      "type": "object", "additionalProperties": false, "required": ["executable", "argv", "command", "copyCommand"],
+      "properties": {
+        "executable": { "type": "string", "minLength": 1 },
+        "argv": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "command": { "type": "string", "minLength": 1 },
+        "copyCommand": {
+          "type": "object", "additionalProperties": false,
+          "required": ["maxColumns", "posix", "powershell", "cmd"],
+          "properties": {
+            "maxColumns": { "type": "integer", "minimum": 1 },
+            "posix": { "type": ["string", "null"] },
+            "powershell": { "type": ["string", "null"] },
+            "cmd": { "type": ["string", "null"] }
+          }
+        }
+      }
+    }
+  }
+}

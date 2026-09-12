@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { chmodSync, existsSync, linkSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -15,6 +16,11 @@ import {
   registeredHumanTerminalActionBuilderIds,
   validateHumanTerminalActionCatalog,
 } from "../../plugins/pipeline-core/lib/human-terminal-action-catalog.mjs";
+import {
+  inspectHumanTerminalAction,
+  prepareHumanTerminalAction,
+  runHumanTerminalAction,
+} from "../../plugins/pipeline-core/lib/human-terminal-action-instance.mjs";
 
 import {
   checkAuthGateInventoryDrift,
@@ -387,4 +393,262 @@ test("published registered/inactive schema branches and runtime reject the same 
     changed.entries[0][field] = null;
     assert.equal(validateHumanTerminalActionCatalog(changed).valid, false, field);
   }
+});
+
+function preparedInstanceFixture() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "hta-instance-")));
+  const catalog = JSON.parse(readFileSync(SHIPPED_CATALOG_PATH, "utf8"));
+  const entry = catalog.entries[0];
+  entry.boundary = {
+    executionBoundary: "attended-external-terminal",
+    invocation: "user-copy-only",
+    codexToolCallPermitted: false,
+  };
+  entry.expectedReadback.schema = "fixture.action-result.v1";
+  const catalogBytes = Buffer.from(JSON.stringify(catalog));
+  const output = {
+    executable: "node",
+    argv: ["fixture-action.mjs"],
+    command: "node fixture-action.mjs",
+    copyCommand: { maxColumns: 72, posix: "node fixture-action.mjs", powershell: null, cmd: null },
+  };
+  const values = {
+    repoRoot: root,
+    directory: join(root, "private material"),
+    featureId: "feature-one",
+    plan: "specs/feature-one/prd.md",
+    spec: "specs/feature-one/spec.md",
+    subjectSha256: "a".repeat(64),
+    expiresAt: "2026-09-13T12:00:00.000Z",
+  };
+  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+  const deps = {
+    catalog,
+    catalogBytes,
+    build: () => ({ output: structuredClone(output), boundary: structuredClone(entry.boundary) }),
+    builderIdentity: () => ({ sourceSha256: "d".repeat(64) }),
+    observeCandidate: () => structuredClone(candidate),
+    randomBytes: () => Buffer.from("01".repeat(12), "hex"),
+    nowMs: Date.parse("2026-09-12T12:00:00.000Z"),
+    platform: "linux",
+    scriptPath: "/installed/plugin/scripts/human-terminal-action.mjs",
+  };
+  const prepared = prepareHumanTerminalAction({
+    rootDir: root,
+    templateId: entry.templateId,
+    runner: "codex",
+    platform: "posix",
+    values,
+  }, deps);
+  return { root, catalog, entry, output, values, candidate, deps, prepared };
+}
+
+test("Slice 2 prepares and inspects one closed private POSIX instance", () => {
+  const fixture = preparedInstanceFixture();
+  try {
+    assert.equal(fixture.prepared.status, "prepared", JSON.stringify(fixture.prepared));
+    assert.equal(lstatSync(fixture.prepared.requestPath).mode & 0o777, 0o600);
+    assert.equal(lstatSync(fixture.prepared.launcherPath).mode & 0o777, 0o700);
+    assert.equal(lstatSync(join(fixture.root, "scratch", "human-terminal-actions")).mode & 0o777, 0o700);
+    const inspected = inspectHumanTerminalAction({
+      requestPath: fixture.prepared.requestPath,
+      requestSha256: fixture.prepared.requestSha256,
+    }, fixture.deps);
+    assert.equal(inspected.status, "inspected");
+    assert.deepEqual(inspected.request.candidate, fixture.candidate);
+    assert.deepEqual(inspected.request.boundary, fixture.entry.boundary);
+    assert.equal(readFileSync(fixture.prepared.launcherPath, "utf8").includes("--request-sha256"), true);
+    assert.equal(fixture.prepared.launch.invocation, "user-copy-only");
+    assert.equal(fixture.prepared.launch.codexToolCallPermitted, false);
+    assert.equal(fixture.prepared.launch.text.split("\n").every((line) => line.length <= 72), true);
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("Slice 2 rejects unresolved and unknown slots without creating an instance", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "hta-slots-")));
+  const catalog = JSON.parse(readFileSync(SHIPPED_CATALOG_PATH, "utf8"));
+  const entry = catalog.entries[0];
+  entry.boundary = {
+    executionBoundary: "attended-external-terminal",
+    invocation: "user-copy-only",
+    codexToolCallPermitted: false,
+  };
+  const deps = { catalog, platform: "linux" };
+  try {
+    const missing = prepareHumanTerminalAction({
+      rootDir: root, templateId: entry.templateId, runner: "codex", platform: "posix", values: {},
+    }, deps);
+    assert.equal(missing.status, "needs-input");
+    assert.match(missing.code, /^HTA-VALUES-MISSING:/u);
+    const unknown = prepareHumanTerminalAction({
+      rootDir: root, templateId: entry.templateId, runner: "codex", platform: "posix",
+      values: { unexpected: "value" },
+    }, deps);
+    assert.equal(unknown.status, "needs-input");
+    assert.equal(unknown.code, "HTA-VALUES-UNKNOWN:unexpected");
+    assert.equal(existsSync(join(root, "scratch", "human-terminal-actions")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Slice 2 publishes closed instance and receipt schemas", () => {
+  for (const name of ["human-terminal-action-instance.schema.json", "human-terminal-action-receipt.schema.json"]) {
+    const schema = JSON.parse(readFileSync(new URL(`../../plugins/pipeline-core/schemas/${name}`, import.meta.url), "utf8"));
+    assert.equal(schema.additionalProperties, false, name);
+    assert.equal(Array.isArray(schema.required), true, name);
+  }
+});
+
+test("Slice 2 shipped entry and Windows fail closed before writing a launcher", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "hta-shipped-")));
+  try {
+    const values = Object.fromEntries(loadHumanTerminalActionCatalog().entries[0].slots
+      .filter((slot) => slot.required).map((slot) => [slot.name, "x"]));
+    const shipped = prepareHumanTerminalAction({ rootDir: root, templateId: "critical-push-authorize", runner: "codex", platform: "posix", values });
+    assert.deepEqual({ status: shipped.status, code: shipped.code }, { status: "refused", code: "HTA-PREPARE-BOUNDARY-UNATTESTED" });
+    const windows = prepareHumanTerminalAction({ rootDir: root, templateId: "critical-push-authorize", runner: "codex", platform: "posix", values }, { platform: "win32" });
+    assert.deepEqual({ status: windows.status, code: windows.code }, { status: "unsupported", code: "HTA-PREPARE-PLATFORM-UNSUPPORTED" });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Slice 2 run refuses unknown caller and absent readback before spawning", () => {
+  const fixture = preparedInstanceFixture();
+  let spawns = 0;
+  const spawn = () => { spawns += 1; return { status: 0, signal: null, stdout: "{}", stderr: "" }; };
+  const input = { requestPath: fixture.prepared.requestPath, requestSha256: fixture.prepared.requestSha256 };
+  const caller = { trusted: true, ...fixture.entry.boundary, attendedTty: true };
+  try {
+    assert.equal(runHumanTerminalAction(input, { ...fixture.deps, spawn }).code, "HTA-RUN-INVOCATION-FORBIDDEN");
+    assert.equal(runHumanTerminalAction(input, { ...fixture.deps, spawn, callerEvidence: caller }).code, "HTA-RUN-READBACK-UNAVAILABLE");
+    assert.equal(spawns, 0);
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("Slice 2 executes once only with trusted attended evidence and verified typed readback", () => {
+  const fixture = preparedInstanceFixture();
+  let spawns = 0;
+  const input = { requestPath: fixture.prepared.requestPath, requestSha256: fixture.prepared.requestSha256 };
+  const callerEvidence = { trusted: true, ...fixture.entry.boundary, attendedTty: true };
+  try {
+    const result = runHumanTerminalAction(input, {
+      ...fixture.deps,
+      callerEvidence,
+      spawn: () => {
+        spawns += 1;
+        return {
+          status: 0,
+          signal: null,
+          stdout: JSON.stringify({ schema: fixture.entry.expectedReadback.schema, code: fixture.entry.expectedReadback.code }),
+          stderr: "",
+        };
+      },
+      readback: () => ({ status: "verified", digest: "e".repeat(64) }),
+    });
+    assert.equal(result.status, "completed");
+    assert.equal(spawns, 1);
+    const resultPath = join(fixture.root, "scratch", "human-terminal-actions", "01".repeat(12), "result.json");
+    assert.equal(lstatSync(resultPath).mode & 0o777, 0o600);
+    const persisted = JSON.parse(readFileSync(resultPath, "utf8"));
+    assert.deepEqual(
+      { templateId: persisted.templateId, revision: persisted.revision, readbackStatus: persisted.readbackStatus },
+      { templateId: fixture.entry.templateId, revision: fixture.entry.revision, readbackStatus: "verified" },
+    );
+    for (const field of ["requestSha256", "valuesSha256", "candidateSha256", "resultSha256", "readbackSha256", "recordSha256"]) {
+      assert.match(persisted[field], /^[a-f0-9]{64}$/u, field);
+    }
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("Slice 2 rejects permission, link, launcher, catalog, builder and candidate drift", () => {
+  const cases = [
+    (fixture) => { chmodSync(fixture.prepared.requestPath, 0o644); },
+    (fixture) => { linkSync(fixture.prepared.requestPath, join(fixture.root, "request-hardlink.json")); },
+    (fixture) => { writeFileSync(fixture.prepared.launcherPath, "#!/bin/sh\nexit 0\n", { mode: 0o700 }); },
+  ];
+  for (const mutate of cases) {
+    const fixture = preparedInstanceFixture();
+    try {
+      mutate(fixture);
+      const result = inspectHumanTerminalAction({ requestPath: fixture.prepared.requestPath, requestSha256: fixture.prepared.requestSha256 }, fixture.deps);
+      assert.equal(result.status, "refused");
+    } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+  }
+
+  const symlinked = preparedInstanceFixture();
+  try {
+    unlinkSync(symlinked.prepared.launcherPath);
+    symlinkSync("/bin/true", symlinked.prepared.launcherPath);
+    assert.equal(inspectHumanTerminalAction({ requestPath: symlinked.prepared.requestPath, requestSha256: symlinked.prepared.requestSha256 }, symlinked.deps).status, "refused");
+  } finally { rmSync(symlinked.root, { recursive: true, force: true }); }
+
+  const drifted = preparedInstanceFixture();
+  const input = { requestPath: drifted.prepared.requestPath, requestSha256: drifted.prepared.requestSha256 };
+  try {
+    assert.equal(inspectHumanTerminalAction(input, { ...drifted.deps, catalogBytes: Buffer.from("{}") }).code, "HTA-CATALOG-DRIFT");
+    assert.equal(inspectHumanTerminalAction(input, { ...drifted.deps, builderIdentity: () => ({ sourceSha256: "f".repeat(64) }) }).code, "HTA-BUILDER-DRIFT");
+    const callerEvidence = { trusted: true, ...drifted.entry.boundary, attendedTty: true };
+    let spawns = 0;
+    const result = runHumanTerminalAction(input, {
+      ...drifted.deps,
+      callerEvidence,
+      readback: () => ({ status: "verified" }),
+      observeCandidate: () => ({ commit: "9".repeat(40), tree: "8".repeat(40) }),
+      spawn: () => { spawns += 1; return { status: 0, signal: null, stdout: "{}" }; },
+    });
+    assert.equal(result.code, "HTA-RUN-CANDIDATE-DRIFT");
+    assert.equal(spawns, 0);
+  } finally { rmSync(drifted.root, { recursive: true, force: true }); }
+
+  const requestDrift = preparedInstanceFixture();
+  try {
+    const request = JSON.parse(readFileSync(requestDrift.prepared.requestPath, "utf8"));
+    request.values.featureId = "tampered-feature";
+    writeFileSync(requestDrift.prepared.requestPath, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+    const result = inspectHumanTerminalAction({
+      requestPath: requestDrift.prepared.requestPath,
+      requestSha256: requestDrift.prepared.requestSha256,
+    }, requestDrift.deps);
+    assert.equal(result.status, "refused");
+    assert.equal(result.code, "HTA-INSTANCE-INTEGRITY");
+  } finally { rmSync(requestDrift.root, { recursive: true, force: true }); }
+});
+
+test("Slice 2 rejects cross-entry rebinding and wrong typed result schema", () => {
+  const variants = [
+    ["HTA-TEMPLATE-BUILDER-DRIFT", (entry) => { entry.builderId = "different-builder"; }],
+    ["HTA-TEMPLATE-BOUNDARY-DRIFT", (entry) => { entry.boundary.executionBoundary = "external-terminal"; }],
+    ["HTA-TEMPLATE-RUNNER-DRIFT", (entry) => { entry.runners = ["claude"]; }],
+    ["HTA-TEMPLATE-PLATFORM-DRIFT", (entry) => { entry.platforms = ["windows"]; }],
+  ];
+  for (const [expected, mutate] of variants) {
+    const fixture = preparedInstanceFixture();
+    try {
+      const catalog = structuredClone(fixture.catalog);
+      mutate(catalog.entries[0]);
+      const result = inspectHumanTerminalAction({
+        requestPath: fixture.prepared.requestPath,
+        requestSha256: fixture.prepared.requestSha256,
+      }, { ...fixture.deps, catalog });
+      assert.equal(result.code, expected);
+    } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+  }
+
+  const fixture = preparedInstanceFixture();
+  let readbacks = 0;
+  try {
+    const result = runHumanTerminalAction({
+      requestPath: fixture.prepared.requestPath,
+      requestSha256: fixture.prepared.requestSha256,
+    }, {
+      ...fixture.deps,
+      callerEvidence: { trusted: true, ...fixture.entry.boundary, attendedTty: true },
+      spawn: () => ({
+        status: 0, signal: null,
+        stdout: JSON.stringify({ schema: "wrong.result.v1", code: fixture.entry.expectedReadback.code }),
+        stderr: "",
+      }),
+      readback: () => { readbacks += 1; return { status: "verified" }; },
+    });
+    assert.equal(result.code, "HTA-RUN-RESULT-MISMATCH");
+    assert.equal(readbacks, 0);
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 });
