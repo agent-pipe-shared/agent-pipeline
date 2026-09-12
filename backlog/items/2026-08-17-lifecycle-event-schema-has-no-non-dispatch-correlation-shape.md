@@ -208,6 +208,28 @@ slices. The item remains `open` until the applicable slices below are green.
 - A focused parity test fails if either contract changes alone.
 - Existing lifecycle validator, control/execution mapper and pipeline-state
   producer suites remain green.
+- **Consumer rollout (governance checklist item 7):** this corrects the
+  published schema from four fields to the six fields the runtime validator,
+  control/execution mapper, pipeline-state producers, store and replay readers
+  already use. Before distributing the corrected schema, run the focused
+  schema/runtime parity suite and those producer/reader suites together.
+  Existing six-field lifecycle-v1 records remain valid. A four-field record
+  that only the stale published schema admitted was never runtime-valid; do not
+  fill in invented correlation. Reject it, or regenerate it from its
+  authoritative source when all six values are available. Schema-only external
+  consumers must adopt the six-field requirement with the corrected artifact;
+  this repository does not claim an automatic migration or runtime toggle for
+  them.
+- **Rollback and recovery (governance checklist item 4):** before release, one
+  forward revert of the LND-0 schema-and-parity-test commit restores the prior
+  candidate. After the corrected schema has been activated or consumed, do not
+  roll the public contract back to four fields: that would resurrect documents
+  every runtime reader rejects. Stop further distribution of the affected
+  candidate if necessary, retain six-field read validation for existing
+  records, and ship a forward corrective artifact after rerunning the parity,
+  lifecycle-validator, control/execution-mapper and pipeline-state-producer
+  suites. No stored lifecycle record is rewritten or supplemented during this
+  recovery.
 
 ### LND-1 — closed action payload
 

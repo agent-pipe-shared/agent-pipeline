@@ -83,6 +83,7 @@ test("LND-0 publishes the runtime's exact six-field correlation shape", () => {
 test("LND-0 schema and runtime accept the same positive correlation boundaries", () => {
   for (const valid of [
     correlation(),
+    { ...correlation(), workerId: "worker_1" },
     { ...correlation(), packageId: "A", correlationId: `z${"0".repeat(127)}` },
     { ...correlation(), queueRevision: Number.MAX_SAFE_INTEGER },
   ]) {
