@@ -174,6 +174,7 @@ export function readExternalInstalledPluginReceipt(request, { receiptDirectory =
 export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
   receiptDirectory = defaultReceiptDirectory(input?.provider),
   verify = verifyInstalledPluginAttestation,
+  observe = (value, deps) => observeRunnerPublicCoreIdentity(input?.provider, value, deps),
 } = {}) {
   try {
     const protectedPaths = input?.protectedPaths ?? INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[input?.provider];
@@ -192,14 +193,24 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
     if (!locatorValid(locator, binding)) throw new Error("IPA-HOST-LOCATOR");
     if (["antigravity", "claude"].includes(normalized.provider)) {
       if (realpathSync(normalized.registryInstalledPluginRoot) !== realpathSync(normalized.installedPluginRoot)) throw new Error("IPA-HOST-LOCATOR-INSTALLED");
-    } else if (realpathSync(normalized.registrySourcePluginRoot) !== locator.sourcePluginRoot) throw new Error("IPA-HOST-LOCATOR-SOURCE");
+    } else if (realpathSync(normalized.registrySourcePluginRoot) !== locator.sourcePluginRoot) {
+      const registryCopy = observe({
+        sourcePluginRoot: locator.sourcePluginRoot,
+        installedPluginRoot: normalized.registrySourcePluginRoot,
+      });
+      if (registryCopy?.status !== "ready"
+        || registryCopy.plugin.name !== normalized.plugin.name
+        || registryCopy.plugin.version !== normalized.plugin.version) {
+        throw new Error("IPA-HOST-LOCATOR-SOURCE");
+      }
+    }
     return verify({
       provider: normalized.provider, plugin: normalized.plugin,
       installedPluginRoot: normalized.installedPluginRoot,
       source: { class: "local-development", sourcePluginRoot: locator.sourcePluginRoot },
       protectedPaths,
     }, {
-      observeLocal: (value, deps) => observeRunnerPublicCoreIdentity(normalized.provider, value, deps),
+      observeLocal: observe,
       readExternalReceipt: (request) => readExternalInstalledPluginReceipt(request, { receiptDirectory }),
     });
   } catch {
@@ -273,11 +284,36 @@ export function resolveAntigravityRegistryInstalledRoot({ installedPluginRoot, r
 }
 
 export function writeCodexRegistryInstalledPluginReceipt(input, dependencies = {}) {
-  const sourcePluginRoot = resolveCodexRegistrySource({
+  const registrySourcePluginRoot = resolveCodexRegistrySource({
     plugin: input?.plugin,
     ...(typeof dependencies.readPluginList === "function" ? { readPluginList: dependencies.readPluginList } : {}),
   });
-  if (sourcePluginRoot === null) return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-REGISTRY-SOURCE" };
+  if (registrySourcePluginRoot === null) {
+    return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-REGISTRY-SOURCE" };
+  }
+
+  let sourcePluginRoot = registrySourcePluginRoot;
+  if (typeof input?.sourcePluginRoot === "string") {
+    try {
+      sourcePluginRoot = realpathSync(input.sourcePluginRoot);
+      if (sourcePluginRoot !== registrySourcePluginRoot) {
+        const observe = dependencies.observe
+          ?? ((value, deps) => observeRunnerPublicCoreIdentity("codex", value, deps));
+        const registryCopy = observe({
+          sourcePluginRoot,
+          installedPluginRoot: registrySourcePluginRoot,
+        });
+        if (registryCopy?.status !== "ready"
+          || registryCopy.plugin.name !== input.plugin.name
+          || registryCopy.plugin.version !== input.plugin.version) {
+          return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-READBACK" };
+        }
+      }
+    } catch {
+      return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-READBACK" };
+    }
+  }
+
   return writeLocalDevelopmentInstalledPluginReceipt({ ...input, sourcePluginRoot }, dependencies);
 }
 
@@ -295,8 +331,9 @@ export function installedPluginAttestationSetupCommand({
     || typeof launcher !== "string" || !isAbsolute(launcher)) throw new TypeError("installedPluginAttestationSetupCommand requires a supported provider, version, and absolute launcher/installed root");
   const operation = provider === "codex" ? "write-local-from-codex-registry"
     : provider === "claude" ? "write-local-from-registry" : "write-local";
-  if ((provider === "codex" && sourcePluginRoot !== null)
-    || (provider !== "codex" && (typeof sourcePluginRoot !== "string" || !isAbsolute(sourcePluginRoot)))) {
+  if ((sourcePluginRoot !== null
+      && (typeof sourcePluginRoot !== "string" || !isAbsolute(sourcePluginRoot)))
+    || (provider !== "codex" && sourcePluginRoot === null)) {
     throw new TypeError("installedPluginAttestationSetupCommand source root does not match provider contract");
   }
   const argv = [launcher, operation];
@@ -447,7 +484,6 @@ function parse(argv) {
   }
   if (!value.plugin.version || !value.installedPluginRoot) return null;
   if (operation === "write-local" && !value.sourcePluginRoot) return null;
-  if (operation === "write-local-from-codex-registry" && value.sourcePluginRoot) return null;
   if (operation === "write-local-from-codex-registry") value.provider = "codex";
   if (operation === "write-local-from-registry" && !["codex", "claude"].includes(value.provider)) return null;
   if (operation === "write-local-from-registry" && value.provider === "codex" && value.sourcePluginRoot) return null;
@@ -458,7 +494,7 @@ function parse(argv) {
 if (isDirectInvocation(import.meta.url)) {
   const input = parse(process.argv.slice(2));
   if (input === null) {
-    process.stderr.write("installed-plugin-attestation-host: write-local --provider <codex|claude|antigravity> --version <version> --source-plugin-root <path> --installed-plugin-root <path> | write-local-from-codex-registry --version <version> --installed-plugin-root <path> | write-local-from-registry --provider claude --version <version> --source-plugin-root <path> --installed-plugin-root <path>\n");
+    process.stderr.write("installed-plugin-attestation-host: write-local --provider <codex|claude|antigravity> --version <version> --source-plugin-root <path> --installed-plugin-root <path> | write-local-from-codex-registry --version <version> [--source-plugin-root <path>] --installed-plugin-root <path> | write-local-from-registry --provider claude --version <version> --source-plugin-root <path> --installed-plugin-root <path>\n");
     process.exit(2);
   }
   const result = input === null ? null : input.operation === "write-local"

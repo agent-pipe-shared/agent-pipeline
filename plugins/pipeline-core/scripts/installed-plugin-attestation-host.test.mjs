@@ -130,6 +130,55 @@ check("terminal-template attestation producer preserves Codex setupAction argv a
   assert.equal(readback.code, "IPA-HOST-RECEIPT-VERIFIED");
 });
 
+check("Codex accepts an exact real-directory marketplace copy bound to its clean Git source", (t) => {
+  const repo = fixture("codex"); t.after(repo.cleanup);
+  const marketplaceRoot = join(repo.base, "marketplace");
+  const marketplacePluginRoot = join(marketplaceRoot, "plugins", "pipeline-core");
+  cpSync(repo.sourcePluginRoot, marketplacePluginRoot, { recursive: true });
+
+  const pluginList = () => JSON.stringify({ installed: [{
+    pluginId: "pipeline-core@agent-pipeline-local",
+    name: "pipeline-core",
+    marketplaceName: "agent-pipeline-local",
+    version: repo.input.plugin.version,
+    installed: true,
+    enabled: true,
+    source: { source: "local", path: marketplacePluginRoot },
+    marketplaceSource: { sourceType: "local", source: marketplaceRoot },
+  }], available: [] });
+
+  const command = installedPluginAttestationSetupCommand({
+    provider: "codex",
+    version: repo.input.plugin.version,
+    sourcePluginRoot: repo.sourcePluginRoot,
+    installedPluginRoot: repo.installedPluginRoot,
+    launcher: join(repo.installedPluginRoot, "scripts", "installed-plugin-attestation-host.mjs"),
+  });
+  assert.equal(command.argv.includes("--source-plugin-root"), true);
+  assert.equal(command.argv.includes(repo.sourcePluginRoot), true);
+
+  const written = writeCodexRegistryInstalledPluginReceipt({
+    provider: "codex",
+    plugin: repo.input.plugin,
+    sourcePluginRoot: repo.sourcePluginRoot,
+    installedPluginRoot: repo.installedPluginRoot,
+    protectedPaths: repo.protectedPaths,
+  }, {
+    receiptDirectory: repo.receiptDirectory,
+    readPluginList: pluginList,
+  });
+  assert.equal(written.status, "written", JSON.stringify(written));
+
+  const verified = verifyLocalDevelopmentInstalledPluginReceipt({
+    provider: "codex",
+    plugin: repo.input.plugin,
+    installedPluginRoot: repo.installedPluginRoot,
+    registrySourcePluginRoot: marketplacePluginRoot,
+    protectedPaths: repo.protectedPaths,
+  }, { receiptDirectory: repo.receiptDirectory });
+  assert.equal(verified.status, "verified", JSON.stringify(verified));
+});
+
 check("readback is request-selected and a changed installed copy cannot reuse a receipt", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   assert.equal(writeLocalDevelopmentInstalledPluginReceipt(repo.input, { receiptDirectory: repo.receiptDirectory }).status, "written");
@@ -303,7 +352,7 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
   assert.match(shippedEntrypoint, /isDirectInvocation\(import\.meta\.url\).*runInteractiveInstaller/u);
 });
 
-assert.equal(cases.length, 8, "the complete installed-plugin-attestation host corpus must be registered before execution begins");
+assert.equal(cases.length, 9, "the complete installed-plugin-attestation host corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

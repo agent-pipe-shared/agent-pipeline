@@ -857,6 +857,11 @@ export function observePipelineStartPreflight({
       ? resolveCodexRegistrySource({ plugin: { name: "pipeline-core", version }, readPluginList: () => pluginListSnapshot })
       : null
     : null;
+  const codexCheckoutPluginRoot = resolve(cwd, "plugins", "pipeline-core");
+  const codexSourcePluginRoot = runner === "codex"
+    && pluginRootHasSelfApplicationGit(codexCheckoutPluginRoot)
+    ? codexCheckoutPluginRoot
+    : null;
   const registryInstalledPluginRoot = version && runner === "antigravity" && !pluginRootHasSelfApplicationGit(pluginRoot)
     ? resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: pluginRoot, registryPayloads: antigravityPluginRegistries() })
     : null;
@@ -925,7 +930,9 @@ export function observePipelineStartPreflight({
     : { schema: "pipeline.installed-plugin-attestation-bootstrap.v1", status: "not-required", reasonCodes: [] };
   const installedPluginAttestationCommand = rawInstalledPluginAttestation.status === "unavailable" && runner === "codex"
     ? installedPluginAttestationSetupCommand({
-        provider: "codex", version, installedPluginRoot: pluginRoot,
+        provider: "codex", version,
+        ...(codexSourcePluginRoot === null ? {} : { sourcePluginRoot: codexSourcePluginRoot }),
+        installedPluginRoot: pluginRoot,
         launcher: resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
       })
     : null;
