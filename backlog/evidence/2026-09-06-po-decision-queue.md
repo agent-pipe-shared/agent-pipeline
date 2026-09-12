@@ -632,17 +632,17 @@ The current reporter is reachable and bounded, but an independent review on
 2026-09-12 confirmed that it publishes an otherwise-unclassified raw log tail
 after only four credential-pattern replacements. Its exception handler also
 publishes raw `error.message`. The draft requirement at
-`docs/adr/draft-ci-failure-reporter-redaction-requirement.md` is therefore a
+`docs/adr/0084-ci-failure-reporter-public-log-boundary.md` is therefore a
 material public-log trust decision rather than editorial cleanup.
 
-Recommended decision: accept draft AC5's positive allow-list and AC10's
-disclosed, non-gating failure behavior. The repaired reporter would emit only
-typed suite/name, coarse status, safe structured attribution, and a
+**PO decision — 2026-09-12:** accept draft AC5's positive allow-list and AC10's
+disclosed, non-gating failure behavior. The repaired reporter emits only typed
+suite/name, coarse status, safe structured attribution, and a
 repository-relative or digest reference to private evidence; any unclassified
-content would become an explicit redaction marker. Reporter failure would
-remain visible but would not create a second CI gate after Verify is already
-red. Alternative: authorize a broader sanitized-excerpt grammar and accept its
-higher residual disclosure risk. No implementation begins until the PO chooses.
+content becomes an explicit redaction marker. Reporter failure remains visible
+but does not create a second CI gate after Verify is already red. The PO
+declined the broader sanitized-excerpt grammar and its higher residual
+disclosure risk. Implementation may proceed.
 
 ## Advisor calls from dispatched children — ready for PO decision
 
@@ -654,21 +654,22 @@ trace. The prohibition is conditional: it is present when the Elephant has
 already bound the relevant Advisor demand, rather than a blanket ban on useful
 consultation.
 
-Recommended decision: when the exact child dispatch is bound to that explicit
-prohibition, block the raw Advisor call before its model effect and record a
-minimal private audit event. Without that prohibition binding, this rule does
-not block the call, but the existing demand, consent, candidate, route and
-evidence checks remain mandatory and the attempt remains auditable. This makes
-the promise in the concrete briefing enforceable while preserving permitted
-Advisor use.
+**PO decision — 2026-09-12:** when the exact child dispatch is bound to that
+explicit prohibition, block the raw Advisor call before its model effect and
+record a minimal private audit event. Without that prohibition binding, this
+rule does not block the call, but the existing demand, consent, candidate,
+route and evidence checks remain mandatory and the attempt remains auditable.
+This makes the promise in the concrete briefing enforceable while preserving
+permitted Advisor use.
 
 Alternative one is allow-and-audit, which makes the current Forbidden section
 non-binding and requires removing that promise from policy and templates.
 Alternative two blocks every direct child Advisor call and routes all judgment
 through stop, Elephant consultation and re-dispatch; it is simpler but adds
 turns and latency and discards consultation that has measurably improved prior
-work. The implementation stays pending until the PO selects one semantic
-boundary. Native Codex sandbox execution under WSL is outside this decision.
+work. The PO declined both alternatives. The runner-neutral core and the
+currently interceptable runner surface may now proceed; native Codex sandbox
+execution under WSL remains outside this decision.
 
 ## Governance-action lifecycle ADR — proposed, review evidence pending
 

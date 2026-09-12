@@ -265,6 +265,7 @@
           "docs/adr/0080-parallel-dispatch-slicing-enforcement.md",
           "docs/adr/0081-boundary-aware-impacted-verify.md",
           "docs/adr/0082-bounded-continuity-self-repair.md",
+          "docs/adr/0084-ci-failure-reporter-public-log-boundary.md",
           "docs/adr/README.md"
         ]
       },
@@ -289,7 +290,6 @@
         "paths": [
           "docs/adr/0083-governance-action-events.md",
           "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md",
-          "docs/adr/draft-ci-failure-reporter-redaction-requirement.md",
           "docs/adr/draft-critic-report-durable-write-location.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-session-cut-recommended-by-readiness.md",

@@ -71,20 +71,22 @@ there something to review it against.
 - Until that happens, the component's review status is recorded as outstanding
   rather than skipped — it is neither reviewed nor exempt.
 
-## Review status, 2026-09-12
+## Review and implementation status, 2026-09-12
 
-The durable draft requirement now exists at
-`docs/adr/draft-ci-failure-reporter-redaction-requirement.md`. A fresh Critic
-review against the current implementation found two blockers and one major:
+The PO accepted the durable requirement as
+`docs/adr/0084-ci-failure-reporter-public-log-boundary.md`. The preceding
+Critic review against the old implementation found two blockers and one major:
 the reporter emits unclassified raw log tails after a four-shape credential
 blocklist, its top-level exception path prints raw `error.message`, and its
 tests do not cover the draft's default-deny boundary. The full disposition is
 recorded in
 `backlog/evidence/2026-09-12-ci-failure-reporter-requirement-review.md`.
 
-Implementation remains blocked on PO acceptance of the draft's AC5 positive
-allow-list and AC10 disclosed-but-non-gating reporter-failure behavior. The
-recommended disposition is to accept both: emit only typed suite/status and
-private-evidence reference fields, visibly mark withheld content, and keep a
-reporter failure non-blocking because the substantive Verify failure has
-already made the job red.
+The implementation candidate now uses the accepted positive allow-list: typed
+suite/status, safe structured attribution, and a digest reference to private
+evidence. It emits an explicit marker for unclassified content, never publishes
+free-text excerpts or exception messages, and discloses reporter failure while
+returning success because the substantive Verify failure has already made the
+job red. Focused adversarial tests cover the recorded leak classes and failure
+paths. This item remains open until a fresh exact-candidate Critic reviews the
+implementation and its findings are dispositioned.

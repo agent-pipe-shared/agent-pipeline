@@ -2,11 +2,11 @@
 
 Date: 2026-09-12
 Assurance: `functional-equivalent-read-only`; OS isolation was not asserted.
-Requirement: `docs/adr/draft-ci-failure-reporter-redaction-requirement.md`
+Requirement: `docs/adr/0084-ci-failure-reporter-public-log-boundary.md`
 
-## Verdict
+## Historical verdict before the accepted repair
 
-The current reporter does not satisfy the draft requirement.
+The reporter reviewed at that time did not satisfy the draft requirement.
 
 ### Blockers
 
@@ -31,8 +31,8 @@ The Critic confirmed CI reachability, per-suite/global bounds, visible
 truncation, tail-recovery edge cases, visible ordinary degradation, and the
 current non-gating exit behavior described by draft AC10.
 
-No candidate-bound implementation evidence was claimed for this review. The
-requirement's AC5 allow-list shape and AC10 non-gating behavior still need PO
-acceptance before implementation.
+No candidate-bound implementation evidence was claimed for this historical
+review. The PO subsequently accepted AC5 and AC10 in ADR-0084; the repaired
+candidate requires a fresh exact-candidate review.
 
 No native Codex sandbox or App-Server readiness under WSL was used or claimed.

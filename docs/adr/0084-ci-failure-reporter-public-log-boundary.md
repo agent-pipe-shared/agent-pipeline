@@ -1,19 +1,14 @@
-# ADR (draft, unnumbered) — the CI failure reporter's redaction requirement
-
-> Unnumbered and unindexed until PO acceptance, per
-> [ADR-0069](0069-adr-numbers-are-allocated-at-acceptance.md) Decision 2. Home
-> confirmed by [ADR-0063](0063-repository-directory-contract.md) (a
-> decision/requirement record of this kind lives under `docs/adr/`).
+# ADR-0084 — CI failure reporter public-log boundary
 
 ## Status
 
-Draft, 2026-09-04. Written in response to
+Accepted, 2026-09-12. Initially drafted on 2026-09-04 in response to
 `backlog/items/2026-09-01-*-ci-failure-reporter-has-no-recorded-requirement*.md`
-(preserved for this dispatch as `scratch/strip-ci-failure-reporter.md`): a
-component that performs redaction on a public log has never had a recorded
-requirement, so no Critic round can be dispatched against it — a Critic given a
-missing spec is contractually fail-closed on its own reference boundary
-(`templates/prompts/critic-review.md`).
+(preserved for the drafting dispatch as `scratch/strip-ci-failure-reporter.md`).
+The PO accepted the positive allow-list in AC5 and the disclosed, non-gating
+failure behavior in AC10. The accepted design permits no sanitized free-text
+excerpt: every raw or unclassified log value and every exception message is
+represented only by an explicit redaction marker.
 
 **This document is deliberately written from the problem, not from the
 component's current source.** The drafting Goldfish did not open
@@ -111,12 +106,11 @@ fields, and any environment state available to the step).
   to the repository or a content digest) that a reader with access to the
   private evidence can use to retrieve detail themselves — provided that
   pointer itself independently satisfies R1 (AC1–AC3).
-- **AC6 (excerpted content needs the same classification, not an exemption).**
-  IF the reporter emits any excerpt of suite output (for readability, e.g. a
-  bounded tail), THEN every value within that excerpt SHALL independently
-  satisfy AC1–AC4 before inclusion — an excerpt is not a separate, looser
-  channel; it is content subject to the same default-deny rule as everything
-  else in R1.
+- **AC6 (no free-text excerpts).** WHEN the reporter emits public attribution,
+  THE SYSTEM SHALL NOT emit raw or sanitized free-text excerpts from suite
+  output, evidence fields, or exception messages. Such values are outside the
+  closed allow-list in AC5 and are represented only by the marker required by
+  AC8.
 
 ### R3 — Behaviour on a value it cannot classify
 
@@ -163,16 +157,14 @@ trying to explain, and the two must not be allowed to blur into each other.
 
 **Summary answer to the item's fourth question, stated plainly:** a
 redaction failure is neither a full CI failure (AC10) nor a silent
-degradation (AC11) — it is a disclosed, non-blocking degradation. Whether a
-future decision wants to make it block instead is open (see Follow-up); this
-requirement's position is the conservative default that does not add a new
-way for the pipeline to go red while a Critic round is still outstanding
-against the component that would gate it.
+degradation (AC11) — it is a disclosed, non-blocking degradation. This avoids
+adding a second reason for the pipeline to go red after Verify has already
+failed.
 
 ## Consequences
 
 **Positive.** A Critic round now has something falsifiable to check the
-seven implementing commits against — each AC above maps to something a
+implementation candidate against — each AC above maps to something a
 reviewer can either find satisfied or find a counter-example for. The four
 questions the source item posed as "actually owed" are each answered
 explicitly (R1/AC1–AC4 for classes withheld, R2/AC5–AC6 for what may be
@@ -180,19 +172,16 @@ emitted, R3/AC7–AC8 for the unclassifiable case, R4/AC9–AC11 for the
 reporter's own failure), so no part of the item's stated minimum is left
 implicit.
 
-**Negative.** Some of R2 and R4 are genuine design positions taken by this
-document rather than restatements of an already-settled fact (there was no
-prior requirement to restate) — specifically AC10's "does not gate" stance
-and AC5's specific allow-list shape are choices, not derivations, and a
-Critic or the PO may reasonably contest them. They are stated as explicit,
-falsifiable claims precisely so that contesting them is possible.
+**Negative.** Public CI output no longer contains a readable suite-log tail.
+Operators need access to private evidence and use its digest reference for
+detailed diagnosis. The reporter also remains diagnostic: its own failure is
+visible but cannot add a second gate after Verify is already red.
 
-**Risk.** A requirement written before the Critic round exists is only as
-good as the review that follows it; this document does not itself confirm
-the seven commits satisfy any AC below — that confirmation is the separate,
-later Critic round the source item's own acceptance criteria call for.
+**Risk.** This decision does not itself prove the implementation satisfies the
+criteria. That confirmation requires the separate exact-candidate Critic round
+in the source item's acceptance criteria.
 
-## Confirmed satisfiable by reading the current implementation
+## Pre-acceptance implementation finding (historical)
 
 *(Added in a follow-up edit after the requirement above was drafted and
 committed at `32213a0a`. `harness/scripts/print-verify-failures.mjs` was read
@@ -201,57 +190,40 @@ opened, since the main script already answers the one question this section
 exists to answer — is R1–R4 achievable in principle, not "does the current
 code already pass it." No AC above was written or altered by this reading.)*
 
-**Achievable, yes — but the current implementation's architecture is the
-opposite shape from R1/AC4's default-deny model, which is exactly the kind of
-gap a requirement written from the problem is supposed to surface, not
-paper over.** The script redacts four specific credential *shapes*
+At the time of that review, the implementation's architecture was the
+opposite shape from R1/AC4's default-deny model. The script redacted four
+specific credential *shapes*
 (`ghp_`/`gho_`/etc. GitHub tokens, `github_pat_` tokens, AWS `AKIA` keys, and
 PEM private-key blocks) out of an otherwise-unfiltered suite-log tail, and
-emits everything else that survives its byte/line bounds — including, by
+emitted everything else that survived its byte/line bounds — including, by
 construction, absolute filesystem paths, email addresses, and any other
 value a suite happened to print. That is a **blocklist** (emit by default,
 strip four known-bad shapes) where AC1–AC4 specify an **allowlist** (withhold
 by default, emit only classified-safe fields). Nothing about that makes
 AC1–AC11 unachievable — a default-deny redesign is a real, buildable change,
-not a contradiction in terms — but it does mean the current implementation
-would not, as it stands, satisfy AC2 (machine-identifying paths), AC3
+not a contradiction in terms — but the then-current implementation did not
+satisfy AC2 (machine-identifying paths), AC3
 (personal identifiers), or AC4/AC7 (default-withhold on anything
-unclassified) if checked against them today. That gap is exactly what the
-forthcoming Critic round is for; this section names it as an observation for
-that round to weigh, not as a finding this dispatch is authorized to act on
-(briefing NVA-B-CIREPSPEC-1, field 4: no edits to the reporter or its test).
+unclassified). This historical finding supplied the concrete implementation
+gap addressed after PO acceptance.
 
-One further concrete point worth flagging for that Critic round specifically:
+That review also found that
 the top-level `catch` at the CLI entrypoint
 (`print-verify-failures.mjs:446-450`) prints `error.message` (truncated to
 200 characters) directly to `console.log`, with no pass through `redactText`
 first. An exception message is exactly the kind of unclassified value AC1/
 AC9 are about, and this path bypasses the script's own redaction function
-entirely — worth the Critic round's attention against AC1/AC9 specifically.
+entirely. The accepted implementation must close that AC1/AC9 path.
 
-AC5/AC6 (positive allow-list, same classification for excerpts), AC10 (does
-not gate — the script always exits 0, degrading every failure mode to one
-diagnostic line, matching AC10 exactly), and AC9/AC11's "never throws, always
-degrades to a bounded diagnostic line" framing are all already structurally
-present in the current code's design intent, even though AC9's specific
-"exception path must not skip redaction" requirement is not, per the point
-above.
+The old design intent already treated the reporter as non-gating and attempted
+bounded degradation, but the exception path showed why that intent was
+insufficient without the closed output schema adopted here.
 
 ## Follow-up
 
-- **A Critic round against the seven commits named in the source item**
-  (`4d5df21c`, `b904c01d`, `8fbb4ed7`, `a5d26a72`, `58fe2d4b`, `c84d2f44`,
-  `57fefcf2`) is the next step, dispatched separately by the Elephant — not
-  performed by this document or this dispatch (briefing NVA-B-CIREPSPEC-1,
-  field 4: "A Critic round against the seven listed commits is a SEPARATE,
-  later step the Elephant dispatches — not yours to fold in").
-- PO decision on whether AC10's "does not gate" stance is the wanted default,
-  or whether a reporting failure should instead block the job, is open — this
-  document takes the conservative non-blocking position and states it as
-  contestable rather than settled.
-- Numbering and `docs/adr/README.md` index-row assignment happen only at PO
-  acceptance, per ADR-0069 Decision 2; this file stays
-  `docs/adr/draft-ci-failure-reporter-redaction-requirement.md` until then.
-- Until the Critic round in the first bullet completes, the component's
-  review status should be recorded as outstanding, not skipped and not
-  reviewed — the source item's own acceptance criteria already say this.
+- Review the positive-allow-list implementation against this accepted ADR on
+  its exact candidate. Until that Critic round completes, the component's
+  review status remains outstanding rather than skipped or reviewed.
+- Keep detailed evidence private. Future public fields require a successor ADR
+  that adds a typed safe class; expanding a sanitizer or free-text grammar is
+  not an implementation-only change.

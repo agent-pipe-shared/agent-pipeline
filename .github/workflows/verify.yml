@@ -68,10 +68,9 @@ jobs:
       - name: Surface failing suite diagnostics
         if: failure()
         # A reporter, never a gate (NVA-B-CIDIAG): reads evidence/verify-latest.json
-        # plus the private journal run directory the prior step just wrote and prints
-        # each failing suite's name, exit code, log path, and a bounded, redacted log
-        # tail, so this step's own output is self-explaining without re-running
-        # anything or downloading an artifact. Always exits 0 -- deliberately no
+        # plus the private journal run directory the prior step just wrote. It prints
+        # only typed suite/status attribution and a digest reference to private evidence;
+        # raw log text and unclassified values are explicitly withheld. Always exits 0 -- deliberately no
         # `continue-on-error`, since there is nothing here that can fail the job.
         run: node harness/scripts/print-verify-failures.mjs
 

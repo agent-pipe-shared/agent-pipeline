@@ -1,452 +1,157 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+
 /**
- * print-verify-failures.mjs — reads the verify evidence artifact plus the
- * private journal run directory for that run and prints, for every suite
- * that exited non-zero, its name, exit code, log path, and a bounded,
- * redacted tail of its captured stdout/stderr.
+ * Public CI attribution for a Verify run that is already red.
  *
- * WHY THIS EXISTS (NVA-B-CIDIAG). verify.mjs deliberately keeps complete suite
- * stdout/stderr in owner-private bounded logs and gives the interactive
- * channel only bounded machine-readable progress records (verify.mjs ~44-47).
- * That is the right default for an interactive session, but it left a CI
- * step log self-explaining nothing on failure: run 33471808564 failed with
- * three suites red and the step log carried only `diagnosticDigest` values,
- * no assertion text — an operator had to re-run locally or pull a private
- * artifact to see WHY. This script is the explicitly-invoked exception to
- * that contract: it never runs as part of `verify.mjs` itself, only when a
- * caller names it, and a CI step now does exactly that on failure (see
- * .github/workflows/verify.yml, step "Surface failing suite diagnostics",
- * `if: failure()`).
- *
- * IT IS A REPORTER, NEVER A GATE. It always exits 0 — whether or not any
- * failing suite is found, whether or not its own inputs are available. A
- * missing evidence artifact, a missing run directory, a missing per-suite
- * log, or unparsable JSON are all degraded to one bounded diagnostic line
- * naming what was missing; none of them throws.
- *
- * INPUT SHAPE. `evidence/verify-latest.json` (schema `pipeline.verify-evidence.v0`,
- * verify.mjs ~893-912) carries `steps[]` (`{name, exitCode, durationMs, reused}`)
- * and `verifyRun.runId`. The private journal run directory lives at
- * `<git-common-dir>/agent-pipeline/verify/runs/<runId>` (verify-journal.mjs
- * createVerifyRun/runVerifyJournal); each suite's sealed receipt is
- * `receipts/<verifySuiteArtifactName(suite.id)>.json` (verify-resume.mjs
- * ROOT_RECEIPT_KEYS) and its `log.path` is receipt-relative
- * (`logs/<artifact>.log`). `verifySuiteArtifactName` is a SHA-256 hex digest
- * of the suite id, never a human-readable slug — it is imported from
- * verify-journal.mjs rather than re-derived, per that module's own contract.
- *
- * NOT EVERY FAILING `steps[]` ENTRY IS A SUITE WITH A RECEIPT. Some entries
- * are synthetic preflight/aggregation steps verify.mjs pushes itself
- * (`candidate-preflight`, `verify-journal`, `verify-suite-registration-duplicates`,
- * `verify-terminal-coverage`, `candidate-binding`, the manual-check
- * placeholder, ...) that never went through runVerifyJournal and therefore
- * have no receipt/log. Those degrade through the exact same
- * "no suite log available" branch as a genuinely missing receipt/log would —
- * there is no special-case list of synthetic step names to keep in sync.
+ * This is a declassification boundary. It never publishes suite output,
+ * receipt fields, run identifiers, exception messages, or filesystem paths.
+ * Public records use a closed allow-list; a private log is referenced only by
+ * the SHA-256 digest of its exact bytes.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { dirname, join, relative, resolve } from "node:path";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { verifySuiteArtifactName } from "../../plugins/pipeline-core/scripts/verify-journal.mjs";
 
 export { verifySuiteArtifactName };
 
-// AC-2: bounds are named constants, never magic numbers inline.
-export const MAX_LINES_PER_SUITE = 200;
-export const MAX_BYTES_PER_SUITE = 20000;
-export const MAX_TOTAL_BYTES = 200000;
+export const PUBLIC_FAILURE_SCHEMA = "pipeline.verify-public-failure.v1";
+export const PUBLIC_NOTICE_SCHEMA = "pipeline.verify-public-notice.v1";
+export const REDACTION_MARKER = "[REDACTED-UNCLASSIFIED]";
+export const MAX_EVIDENCE_BYTES = 4 * 1024 * 1024;
+export const MAX_PRIVATE_LOG_BYTES = 64 * 1024 * 1024;
+export const MAX_PUBLIC_FAILURES = 512;
 
-// AC-3: defence in depth for a log a CI step publishes — not a claim the logs
-// contain secrets. A redacted span is replaced with this fixed marker; the
-// surrounding line is preserved.
-export const REDACTION_MARKER = "[REDACTED-CREDENTIAL]";
+const SUITE_NAME = /^[a-z0-9][a-z0-9._-]{0,159}$/u;
+const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 
-const GITHUB_TOKEN_RE = /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b/g;
-const GITHUB_PAT_RE = /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g;
-const AKIA_RE = /\bAKIA[0-9A-Z]{16}\b/g;
-// Matches a PEM key-block marker line: dashes, the word BEGIN or END, an
-// optional key-type word (RSA / EC / OPENSSH / ED25519 / ...), then the words
-// PRIVATE and KEY, then closing dashes. Deliberately not spelled out here as
-// one literal example string: a complete literal marker in a comment reads to
-// a secret scanner as an embedded key header (measured: gitleaks rule
-// "private-key" fired on exactly that literal in an earlier revision of this
-// comment). No `g` flag on either pattern below: used with .test() per line,
-// and a global-flag regex reused across .test() calls would leak lastIndex
-// state.
-const PRIVATE_KEY_BEGIN_RE = /-{5}BEGIN[\w ]*PRIVATE KEY-{5}/;
-const PRIVATE_KEY_END_RE = /-{5}END[\w ]*PRIVATE KEY-{5}/;
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const line = (value) => JSON.stringify(value);
 
-/**
- * AC-3 redaction pass. Applied line by line (never across a line boundary):
- * a private-key block is tracked by BEGIN/END marker lines (the markers
- * themselves are structure, not secret material, and are left intact so the
- * redacted output still shows a key was present); every line strictly
- * between them is replaced whole. Outside such a block, each of the four
- * credential-shape patterns is redacted wherever it matches within the line,
- * the rest of the line is preserved.
- */
-export function redactText(text) {
-  const lines = text.split("\n");
-  let insideKeyBlock = false;
-  const redacted = lines.map((line) => {
-    if (PRIVATE_KEY_BEGIN_RE.test(line)) { insideKeyBlock = true; return line; }
-    if (PRIVATE_KEY_END_RE.test(line)) { insideKeyBlock = false; return line; }
-    if (insideKeyBlock) return REDACTION_MARKER;
-    return line
-      .replace(GITHUB_TOKEN_RE, REDACTION_MARKER)
-      .replace(GITHUB_PAT_RE, REDACTION_MARKER)
-      .replace(AKIA_RE, REDACTION_MARKER);
-  });
-  return redacted.join("\n");
+function notice(code, extra = {}) {
+  return line({ schema: PUBLIC_NOTICE_SCHEMA, kind: "reporter-notice", code, ...extra });
 }
 
-// NVA-B-CIGREEN-1. A pure TAIL bound is exactly the wrong bound for the one
-// line this reporter exists to surface. `node:test` emits `not ok N - <name>`
-// in test order, so a failure EARLY in a long suite is the first thing dropped,
-// and the tail that survives carries only the summary counts. Measured: CI run
-// 33551001455 reported codex-onboarding-capabilities-tests red with 22 of 23
-// tests passing, and which test failed was unrecoverable from the step log —
-// its line had fallen into the omitted head. Failure-marker lines are therefore
-// recovered out of the omitted portion and re-attached ahead of the tail,
-// bounded by their own count so this cannot become an unbounded second copy of
-// the log.
-export const MAX_RECOVERED_FAILURE_LINES = 20;
-export const RECOVERED_FAILURE_HEADER = "--- failing lines recovered from the omitted head ---";
-// Deliberately broad across reporters: TAP (`not ok`), this repo's own
-// hand-rolled suites (`FAIL  <name>`), the node:test spec reporter (`✖`), and
-// the assertion class name that carries the message itself.
-//
-// Every alternative is anchored to the start of the line (round-L finding F7).
-// The `AssertionError` alternative used to be unanchored, so it claimed any
-// line that merely MENTIONS the class -- a passing test whose name contains it,
-// a stack frame, a `# Subtest:` header -- and those lines then competed for the
-// bounded recovery budget with the actual failures. node:test prints the real
-// one as `  AssertionError [ERR_ASSERTION]: ...`, at the start of its own line,
-// so anchoring costs no genuine detection; the `[A-Za-z]*` prefix keeps the
-// subclasses (`RangeError`-style wrappers, `TypeAssertionError`) that reporters
-// emit in the same position.
-export const FAILURE_LINE_RE = /^\s*(?:not ok\b|FAIL\b|✖|✗|×|#\s*fail\b|[A-Za-z]*AssertionError\b)/u;
-
-// The share of MAX_BYTES_PER_SUITE the recovered-failure block may occupy. It
-// has to be a RESERVE rather than a remainder: the tail is bounded first, so
-// without a reserve the recovered lines would have nothing left to fit into on
-// exactly the suites that need them most.
-const RECOVERED_BLOCK_BYTE_SHARE = 0.5;
-
-// UTF-8 structure, not a bound: a continuation byte is `10xxxxxx`.
-const UTF8_CONTINUATION_MASK = 0xC0;
-const UTF8_CONTINUATION_BYTE = 0x80;
-
-/**
- * Round-N finding F-E. Keeps the last `byteCount` bytes of `buffer` and decodes
- * them, never cutting inside a UTF-8 sequence.
- *
- * `buffer.subarray(n).toString("utf8")` decodes each orphaned continuation byte
- * to U+FFFD, and U+FFFD re-encodes to THREE bytes -- so a slice of exactly N
- * bytes could decode to a string of N+4 to N+6 bytes, and the documented
- * `keptBytes <= MAX_BYTES_PER_SUITE` invariant simply did not hold (measured on
- * a 3-byte-character log: 20004 bytes against a 20000-byte cap). The start
- * offset is therefore advanced past any continuation bytes, dropping the
- * partial character rather than replacing it; the result is always at most
- * `byteCount` bytes and carries no manufactured replacement characters. The END
- * never needs this treatment: a tail slice runs to the end of a complete
- * encoding.
- */
-function tailSlice(buffer, byteCount) {
-  let start = Math.max(0, buffer.length - Math.max(0, byteCount));
-  while (start < buffer.length && (buffer[start] & UTF8_CONTINUATION_MASK) === UTF8_CONTINUATION_BYTE) {
-    start += 1;
-  }
-  return buffer.subarray(start).toString("utf8");
-}
-
-/**
- * AC-2 per-suite bounding: at most MAX_LINES_PER_SUITE lines, then at most
- * MAX_BYTES_PER_SUITE bytes — for the WHOLE returned text, recovered failure
- * lines included. Both bounds keep the TAIL (the end of the content — where an
- * assertion failure's own message lives), never the head: a byte-bound overflow
- * is resolved by slicing the last bytes of the already line-bounded text, not by
- * dropping whole lines, so one line longer than the byte cap still yields a
- * useful (if partial) tail instead of being dropped entirely.
- *
- * Whatever both bounds drop is then re-scanned for failure-marker lines, and up
- * to MAX_RECOVERED_FAILURE_LINES of them are re-attached ahead of the tail under
- * RECOVERED_FAILURE_HEADER: a truncation that hides the failing test's own line
- * defeats the whole reporter.
- *
- * Round-L finding F7: recovery used to run AFTER the byte bound and merely
- * recompute `keptBytes`, so the returned text could exceed MAX_BYTES_PER_SUITE
- * by the size of the recovered block. `keptBytes` is what the global gate
- * spends, so a single suite whose omitted head carried many long failure-marker
- * lines could exhaust MAX_TOTAL_BYTES and omit every LATER failing suite's tail
- * entirely. The bound is now ENFORCED across both parts: the recovered block is
- * admitted line by line within its own byte reserve, and the tail is then shrunk
- * to whatever the cap leaves, so `keptBytes <= MAX_BYTES_PER_SUITE` always holds
- * and is always the true byte length of `text`. Round-N finding F-E: that
- * invariant is exact only because both byte slices go through `tailSlice()`,
- * which snaps the cut forward to a UTF-8 character boundary -- a raw
- * `subarray().toString("utf8")` can decode to MORE bytes than it sliced.
- *
- * Round-N findings F-C and F-D concern which lines reach the block at all: a
- * line too long for the reserve is SKIPPED rather than ending the admission
- * loop, and the exclusion set is re-derived from the tail that actually
- * survives the re-shrink rather than from the tail as it stood before it.
- */
-export function boundSuiteTail(text) {
-  const originalBytes = Buffer.byteLength(text, "utf8");
-  const allLines = text.split("\n");
-  // A trailing newline produces one phantom empty trailing element; drop it
-  // so it is never counted or reported as its own line.
-  if (allLines.length > 0 && allLines[allLines.length - 1] === "") allLines.pop();
-  const totalLines = allLines.length;
-  const lineTruncated = totalLines > MAX_LINES_PER_SUITE;
-  const lineTail = lineTruncated ? allLines.slice(totalLines - MAX_LINES_PER_SUITE) : allLines;
-  let keptText = lineTail.join("\n");
-  let keptBytes = Buffer.byteLength(keptText, "utf8");
-  let byteTruncated = false;
-  if (keptBytes > MAX_BYTES_PER_SUITE) {
-    byteTruncated = true;
-    keptText = tailSlice(Buffer.from(keptText, "utf8"), MAX_BYTES_PER_SUITE);
-    keptBytes = Buffer.byteLength(keptText, "utf8");
-  }
-  if (lineTruncated || byteTruncated) {
-    const headerBytes = Buffer.byteLength(RECOVERED_FAILURE_HEADER, "utf8") + 1;
-    const reserve = Math.min(
-      Math.floor(MAX_BYTES_PER_SUITE * RECOVERED_BLOCK_BYTE_SHARE),
-      MAX_BYTES_PER_SUITE,
-    );
-    // Indices, not line texts: two identical failure lines are two separate
-    // candidates, exactly as the previous `filter()` over `allLines` treated them.
-    const failureIndices = [];
-    for (let index = 0; index < allLines.length; index += 1) {
-      if (FAILURE_LINE_RE.test(allLines[index])) failureIndices.push(index);
-    }
-    const boundedTail = Buffer.from(keptText, "utf8");
-    const admitted = new Set();
-    let blockBytes = headerBytes;
-    let tailText = keptText;
-    // A fixed point, not a single pass (round-N finding F-D). Admitting a line
-    // shrinks the tail, and shrinking the tail can cut away a failure line that
-    // was excluded from recovery precisely BECAUSE it was still in the tail --
-    // so it ended up in neither place. The exclusion set therefore has to be
-    // re-derived from the tail that actually survives. This terminates: every
-    // pass either admits a line (bounded by MAX_RECOVERED_FAILURE_LINES) or
-    // leaves the tail unchanged and stops, and the tail only ever shrinks.
-    for (let pass = 0; pass <= MAX_RECOVERED_FAILURE_LINES; pass += 1) {
-      // Line EQUALITY, not `includes`: a short failure line that happens to
-      // occur inside any kept line was previously treated as already present
-      // and dropped from recovery (round-L finding F7).
-      const tailLines = new Set(tailText.split("\n"));
-      let changed = false;
-      for (const index of failureIndices) {
-        if (admitted.size >= MAX_RECOVERED_FAILURE_LINES) break;
-        if (admitted.has(index) || tailLines.has(allLines[index])) continue;
-        const cost = Buffer.byteLength(allLines[index], "utf8") + 1;
-        // SKIP, never break (round-N finding F-C). `failureIndices` is in file
-        // order, so breaking on the first line too long for the reserve emptied
-        // the block and suppressed the header plus every shorter failure line
-        // behind it -- the suite whose earliest omitted failure line is a long
-        // assertion diff got no recovered block at all. Truncating the long line
-        // instead was the other option and is worse here: it would consume the
-        // whole reserve and starve those same shorter lines, and half a marker
-        // line can lose the very assertion text that motivated recovering it.
-        // (The tail's partial slice is defensible because it is contiguous
-        // end-of-log context; half a recovered line is not.)
-        if (blockBytes + cost > reserve) continue;
-        admitted.add(index);
-        blockBytes += cost;
-        changed = true;
-      }
-      // Enforce, don't recompute: the tail gives up exactly what the recovered
-      // block takes, so the joined text is bounded by MAX_BYTES_PER_SUITE.
-      const tailBudget = admitted.size > 0 ? Math.max(0, MAX_BYTES_PER_SUITE - blockBytes) : MAX_BYTES_PER_SUITE;
-      const nextTail = tailSlice(boundedTail, tailBudget);
-      if (nextTail !== tailText) { tailText = nextTail; changed = true; }
-      if (!changed) break;
-    }
-    if (admitted.size > 0) {
-      if (tailText !== keptText) byteTruncated = true;
-      keptText = [
-        RECOVERED_FAILURE_HEADER,
-        ...[...admitted].sort((a, b) => a - b).map((index) => allLines[index]),
-        tailText,
-      ].join("\n");
-      keptBytes = Buffer.byteLength(keptText, "utf8");
-    }
-  }
-  const keptLineCount = keptText.length === 0 ? 0 : keptText.split("\n").length;
-  return {
-    text: keptText,
-    totalLines,
-    keptLineCount,
-    keptBytes,
-    originalBytes,
-    omittedBytes: originalBytes - keptBytes,
-    truncated: lineTruncated || byteTruncated,
-  };
-}
-
-/**
- * Shrinks an already per-suite-bounded tail further to fit a remaining
- * global-budget byte count (AC-2's MAX_TOTAL_BYTES, applied across all
- * suites). Same tail-keeping rule as boundSuiteTail: the LAST `remaining`
- * bytes are kept, not the first -- and through the same character-boundary-safe
- * slice (round-N finding F-E), so this cannot hand the global gate a `keptBytes`
- * larger than the budget it was given.
- */
-function shrinkToRemainingBudget(bounded, remaining) {
-  const newText = tailSlice(Buffer.from(bounded.text, "utf8"), remaining);
-  const newBytes = Buffer.byteLength(newText, "utf8");
-  return { ...bounded, text: newText, keptBytes: newBytes, omittedBytes: bounded.originalBytes - newBytes, truncated: true };
-}
-
-/**
- * Pure report builder — AC-1/AC-2/AC-3/AC-4. Never throws: every failure
- * mode degrades to one bounded diagnostic line and an early return. Takes
- * plain paths (never does its own git-plumbing lookups) so it is directly
- * fixturable against a temporary directory in tests, independent of the CLI
- * entrypoint's git resolution below.
- *
- * `evidencePath`  — absolute path to the verify evidence artifact JSON.
- * `runsRoot`      — absolute path to `<git-common-dir>/agent-pipeline/verify/runs`.
- * `repoRoot`      — absolute path used only to render repo-relative paths in
- *                    the output; never read from.
- */
-export function buildFailureReport({ evidencePath, runsRoot, repoRoot }) {
-  const lines = [];
-
-  let evidenceRaw;
+function safeRegularFile(path, maxBytes = Number.MAX_SAFE_INTEGER) {
   try {
-    evidenceRaw = readFileSync(evidencePath, "utf8");
-  } catch {
-    lines.push(`PRINT-VERIFY-FAILURES-NO-EVIDENCE: no verify evidence artifact found at ${relative(repoRoot, evidencePath)}; nothing to report.`);
-    return { lines };
-  }
+    const stat = lstatSync(path);
+    return stat.isFile() && !stat.isSymbolicLink() && stat.size >= 0 && stat.size <= maxBytes
+      && realpathSync(path) === resolve(path);
+  } catch { return false; }
+}
 
+function safeDirectory(path) {
+  try {
+    const stat = lstatSync(path);
+    return stat.isDirectory() && !stat.isSymbolicLink() && realpathSync(path) === resolve(path);
+  } catch { return false; }
+}
+
+function safeFailingSteps(evidence) {
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)
+    || evidence.schema !== "pipeline.verify-evidence.v0" || !Array.isArray(evidence.steps)) return null;
+  const rows = [];
+  for (const [index, step] of evidence.steps.entries()) {
+    if (!step || typeof step !== "object" || Array.isArray(step)
+      || typeof step.name !== "string" || !SUITE_NAME.test(step.name)
+      || !Number.isSafeInteger(step.exitCode) || step.exitCode < 0 || step.exitCode > 255) return null;
+    if (step.exitCode !== 0) rows.push({ index, name: step.name, exitCode: step.exitCode });
+  }
+  return rows;
+}
+
+function privateLogReference({ runsRoot, runId, suiteName }) {
+  if (!RUN_ID.test(runId ?? "") || runId === "." || runId === ".." || !safeDirectory(runsRoot)) {
+    return { availability: "unavailable" };
+  }
+  const runDir = join(runsRoot, runId);
+  if (!safeDirectory(runDir)) return { availability: "unavailable" };
+  const artifact = verifySuiteArtifactName(suiteName);
+  if (!SHA256.test(artifact)) return { availability: "unavailable" };
+  const receiptPath = join(runDir, "receipts", `${artifact}.json`);
+  if (!safeRegularFile(receiptPath, 1024 * 1024)) return { availability: "unavailable" };
+
+  let receipt;
+  try { receipt = JSON.parse(readFileSync(receiptPath, "utf8")); }
+  catch { return { availability: "invalid" }; }
+  const expectedLogPath = `logs/${artifact}.log`;
+  if (receipt?.log?.path !== expectedLogPath) return { availability: "invalid" };
+  const logPath = join(runDir, "logs", `${artifact}.log`);
+  if (!safeRegularFile(logPath, MAX_PRIVATE_LOG_BYTES)) return { availability: "unavailable" };
+  try {
+    const bytes = readFileSync(logPath);
+    return { availability: "available", referenceKind: "sha256", sha256: sha256(bytes) };
+  } catch { return { availability: "unavailable" }; }
+}
+
+/** Build closed-schema public records. This function never emits private free text. */
+export function buildFailureReport({ evidencePath, runsRoot }) {
+  if (!safeRegularFile(evidencePath, MAX_EVIDENCE_BYTES)) {
+    return { lines: [notice("PVF-EVIDENCE-UNAVAILABLE")], complete: false };
+  }
   let evidence;
-  try {
-    evidence = JSON.parse(evidenceRaw);
-  } catch (error) {
-    lines.push(`PRINT-VERIFY-FAILURES-CORRUPT-EVIDENCE: ${relative(repoRoot, evidencePath)} is not valid JSON (${String(error.message ?? error).slice(0, 120)}); nothing to report.`);
-    return { lines };
+  try { evidence = JSON.parse(readFileSync(evidencePath, "utf8")); }
+  catch { return { lines: [notice("PVF-EVIDENCE-INVALID")], complete: false }; }
+
+  const failing = safeFailingSteps(evidence);
+  if (failing === null) return { lines: [notice("PVF-EVIDENCE-SHAPE")], complete: false };
+  if (failing.length === 0) {
+    return { lines: [notice("PVF-NO-FAILURES", { status: "complete", failingSuites: 0 })], complete: true };
   }
 
-  if (!evidence || typeof evidence !== "object" || !Array.isArray(evidence.steps)) {
-    lines.push(`PRINT-VERIFY-FAILURES-CORRUPT-EVIDENCE: ${relative(repoRoot, evidencePath)} does not have the expected shape (missing a "steps" array); nothing to report.`);
-    return { lines };
+  const runId = evidence.verifyRun && typeof evidence.verifyRun.runId === "string"
+    ? evidence.verifyRun.runId
+    : null;
+  const selected = failing.slice(0, MAX_PUBLIC_FAILURES);
+  const lines = selected.map((step) => line({
+    schema: PUBLIC_FAILURE_SCHEMA,
+    kind: "verify-suite",
+    suite: step.name,
+    status: "failed",
+    exitCode: step.exitCode,
+    attribution: { source: "verify-evidence", stepIndex: step.index },
+    privateEvidence: privateLogReference({ runsRoot, runId, suiteName: step.name }),
+    detail: REDACTION_MARKER,
+  }));
+  if (selected.length !== failing.length) {
+    lines.push(notice("PVF-FAILURE-LIMIT", { status: "incomplete", reported: selected.length, withheld: failing.length - selected.length }));
   }
-
-  const commit = typeof evidence.commit === "string" ? evidence.commit : "unknown";
-  const failingSteps = evidence.steps.filter((step) => step && typeof step.name === "string" && typeof step.exitCode === "number" && step.exitCode !== 0);
-
-  if (failingSteps.length === 0) {
-    lines.push(`PRINT-VERIFY-FAILURES-NONE: no failing suites (commit ${commit}, ${evidence.steps.length} step(s) all exited 0).`);
-    return { lines };
-  }
-
-  const runId = evidence.verifyRun && typeof evidence.verifyRun.runId === "string" ? evidence.verifyRun.runId : null;
-  let runDir = null;
-  if (runId === null) {
-    lines.push("PRINT-VERIFY-FAILURES-NO-RUN-ID: verify evidence carries no verifyRun.runId; per-suite logs are unavailable for this run.");
-  } else {
-    const candidateRunDir = join(runsRoot, runId);
-    if (existsSync(candidateRunDir)) {
-      runDir = candidateRunDir;
-    } else {
-      lines.push(`PRINT-VERIFY-FAILURES-NO-RUN-DIR: journal run directory for runId ${runId} was not found under ${relative(repoRoot, runsRoot)}; per-suite logs are unavailable.`);
-    }
-  }
-
-  let globalBytesUsed = 0;
-  for (const step of failingSteps) {
-    lines.push(`=== ${step.name} (exit ${step.exitCode}) ===`);
-    if (runDir === null) {
-      lines.push(`PRINT-VERIFY-FAILURES-NO-SUITE-LOG: no log available for suite "${step.name}" (no run directory).`);
-      continue;
-    }
-
-    const artifact = verifySuiteArtifactName(step.name);
-    const receiptPath = join(runDir, "receipts", `${artifact}.json`);
-    let receipt;
-    try {
-      receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
-    } catch {
-      lines.push(`PRINT-VERIFY-FAILURES-NO-SUITE-LOG: no suite receipt found for "${step.name}" at ${relative(repoRoot, receiptPath)}; log unavailable.`);
-      continue;
-    }
-
-    const logRelPath = receipt && receipt.log && typeof receipt.log.path === "string" ? receipt.log.path : null;
-    if (logRelPath === null) {
-      lines.push(`PRINT-VERIFY-FAILURES-NO-SUITE-LOG: suite receipt for "${step.name}" carries no log reference.`);
-      continue;
-    }
-
-    const logPath = join(runDir, logRelPath);
-    let logBytes;
-    try {
-      logBytes = readFileSync(logPath);
-    } catch {
-      lines.push(`PRINT-VERIFY-FAILURES-NO-SUITE-LOG: log file for "${step.name}" not found at ${relative(repoRoot, logPath)}.`);
-      continue;
-    }
-
-    lines.push(`log: ${relative(repoRoot, logPath)}`);
-    const redacted = redactText(logBytes.toString("utf8"));
-    let bounded = boundSuiteTail(redacted);
-    let globalTruncated = false;
-
-    if (globalBytesUsed + bounded.keptBytes > MAX_TOTAL_BYTES) {
-      const remaining = MAX_TOTAL_BYTES - globalBytesUsed;
-      if (remaining <= 0) {
-        lines.push(`PRINT-VERIFY-FAILURES-TRUNCATED: "${step.name}" log tail omitted entirely (${bounded.keptBytes} byte(s)) -- the ${MAX_TOTAL_BYTES}-byte total output cap was already reached.`);
-        continue;
-      }
-      bounded = shrinkToRemainingBudget(bounded, remaining);
-      globalTruncated = true;
-    }
-
-    if (bounded.truncated) {
-      const globalNote = globalTruncated ? ` (the ${MAX_TOTAL_BYTES}-byte total output cap also applied)` : "";
-      lines.push(`PRINT-VERIFY-FAILURES-TRUNCATED: "${step.name}" omitted ${bounded.omittedBytes} byte(s) of its log (kept ${bounded.keptBytes} of ${bounded.originalBytes} byte(s), originally ${bounded.totalLines} line(s))${globalNote}.`);
-    }
-    lines.push("--- log tail ---");
-    if (bounded.text.length > 0) lines.push(bounded.text);
-    globalBytesUsed += bounded.keptBytes;
-  }
-
-  return { lines };
+  return { lines, complete: selected.length === failing.length };
 }
 
-function resolveGitPaths() {
-  const commonDirResult = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" });
-  if (commonDirResult.status !== 0 || commonDirResult.stdout.trim() === "") return null;
-  const gitCommonDir = commonDirResult.stdout.trim();
-  // Mirrors verify.mjs's own primaryRoot (dirname(gitCommonDirectory())):
-  // evidence/verify-latest.json is always written at the PRIMARY worktree
-  // root (verify.mjs ~108-123), never at the invoking worktree's own root.
-  return { gitCommonDir, repoRoot: dirname(gitCommonDir) };
+export function resolveGitPaths() {
+  const result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"], {
+    encoding: "utf8", shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 5_000,
+  });
+  if (result.error || result.status !== 0 || result.stdout.trim() === "") return null;
+  const [repoRoot, gitCommonDir, ...extra] = result.stdout.trim().split(/\r?\n/u);
+  if (!repoRoot || !gitCommonDir || extra.length !== 0) return null;
+  return { gitCommonDir, repoRoot };
+}
+
+/** Reporter failures are disclosed by a fixed marker and never become a second gate. */
+export function runFailureReporter({ resolvePaths = resolveGitPaths, build = buildFailureReport } = {}) {
+  try {
+    const paths = resolvePaths();
+    if (paths === null) return { lines: [notice("PVF-GIT-UNAVAILABLE")], exitCode: 0, complete: false };
+    const result = build({
+      evidencePath: join(paths.repoRoot, "evidence", "verify-latest.json"),
+      runsRoot: join(paths.gitCommonDir, "agent-pipeline", "verify", "runs"),
+    });
+    return { ...result, exitCode: 0 };
+  } catch {
+    return { lines: [notice("PVF-REPORTER-FAILED", { status: "incomplete", detail: REDACTION_MARKER })], exitCode: 0, complete: false };
+  }
 }
 
 const isDirectInvocation = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 if (isDirectInvocation) {
-  try {
-    const gitPaths = resolveGitPaths();
-    if (gitPaths === null) {
-      console.log("PRINT-VERIFY-FAILURES-NO-GIT: could not determine the git common directory (not a git repository, or git is unavailable); nothing to report.");
-    } else {
-      const { gitCommonDir, repoRoot } = gitPaths;
-      const evidencePath = join(repoRoot, "evidence", "verify-latest.json");
-      const runsRoot = join(gitCommonDir, "agent-pipeline", "verify", "runs");
-      const { lines } = buildFailureReport({ evidencePath, runsRoot, repoRoot });
-      console.log(lines.join("\n"));
-    }
-  } catch (error) {
-    // Never throw: this is a reporter, not a gate (AC-1). An unanticipated
-    // failure still degrades to one bounded diagnostic line and exit 0.
-    console.log(`PRINT-VERIFY-FAILURES-UNEXPECTED-ERROR: ${String(error && error.message ? error.message : error).slice(0, 200)}`);
-  }
+  const result = runFailureReporter();
+  process.stdout.write(`${result.lines.join("\n")}\n`);
   process.exit(0);
 }
