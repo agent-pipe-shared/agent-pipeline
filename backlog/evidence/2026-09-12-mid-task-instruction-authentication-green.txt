@@ -2,17 +2,14 @@ command: node --test backlog/evidence/2026-09-12-mid-task-instruction-authentica
 label: goldfish-mid-task-instruction-authentication
 exitCode: 0
 --- stdout ---
-✔ canonical Goldfish role defines the mid-task authentication boundary (0.542148ms)
-✔ vendored Goldfish role and task template remain byte-identical to canon (0.114419ms)
-✔ the task template carries both admission and refusal instructions (0.10536ms)
-✔ all shipped Goldfish definitions carry the same receiver boundary (0.104339ms)
-ℹ tests 4
+✔ backlog/evidence/2026-09-12-mid-task-instruction-authentication.test.mjs (32.310444ms)
+ℹ tests 1
 ℹ suites 0
-ℹ pass 4
+ℹ pass 1
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 37.716338
+ℹ duration_ms 36.981782
 
 --- stderr ---

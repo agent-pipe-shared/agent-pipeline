@@ -115,3 +115,30 @@ Focused regression evidence is recorded in
 The item remains open until the uncommitted implementation has its required
 independent review and commit-bound closure evidence; this progress note does
 not claim either one prematurely.
+
+The current authority-bound threat model and its honest approval state are
+recorded in
+`backlog/evidence/2026-09-12-mid-task-instruction-authentication-threat-model.md`.
+It binds the reviewed implementation candidate and every policy-bearing blob
+that implements the receiver boundary. It does not claim that the later
+correction commit, final delivery candidate, or push has PO approval.
+
+## Rollback and recovery
+
+Rollback is triggered if the rule admits an authority-changing mid-task
+message, blocks a continuation that is wholly procedural and within the closed
+briefing, loses canonical/vendored parity, or causes the focused regression
+test to fail. Before publication, revert candidate
+`f413cc825f88d140d73a93a9f629a169748b5062` with a normal inverse commit (and
+revert a later evidence-only correction commit separately if it has landed).
+Do not rewrite shared history. Re-run the focused test and document-contract
+check to prove the repository returned to the pre-change behavior.
+
+Recovery starts from a fresh closed six-field briefing that names the repaired
+policy and test files. Correct the rule in a new candidate, restore
+canonical/vendored byte parity, regenerate candidate-bound threat-model and
+test evidence, and send that candidate through a fresh independent Critic
+review. Any dispatch that received the faulty contract is stopped and replaced
+with a fresh dispatch; a mid-task message must not be used to repair its
+authority. Before any push or release, obtain the configured detached PO proof
+against the exact final candidate and target.
