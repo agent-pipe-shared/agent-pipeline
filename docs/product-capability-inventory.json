@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "9ced16b44b03495cc62d34d0e0fbc7e56d61e78f",
-    "tree": "cde56ccb6dc8c567ddf3d4f3edcf65e619a4f5b0"
+    "commit": "bf2a09566e915fd10f48a491346f216bdc279d98",
+    "tree": "bcae1b7b7cff7c252b16b1595437d3b478ddd5e0"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -319,6 +319,7 @@
         "verify-phase:harness/scripts/verify.mjs:gitleaks-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-authority-resolver-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-verification-action-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
