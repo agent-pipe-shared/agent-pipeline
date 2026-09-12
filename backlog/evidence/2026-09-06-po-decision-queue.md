@@ -1,5 +1,46 @@
 # PO decision queue — collected 2026-09-06
 
+## Stable Nova-B candidate — threat-model signature at freeze
+
+ADR-0083 LND-2 changes the repository-public governance-event validation
+boundary. Its implementation and correction are complete, but policy checklist
+item 2 requires a detached threat-model approval request bound to the exact
+stable delivery candidate and effective policy before the final PO decision.
+
+- **Timing:** prepare the request only after the Nova-B candidate is stable;
+  earlier signatures would become stale after the next implementation commit.
+- **PO action later:** verify and sign that exact prepared request using the
+  configured external trust key.
+- **Blocking status:** blocks only push/release of the stable candidate. It does
+  not block LND-3 through LND-8 or other local Nova-B work.
+- **Evidence:**
+  `backlog/evidence/2026-09-12-lnd2-envelope-store-reader-admission.md`.
+
+## Torn HGO audit append — equivalent live evidence decision pending
+
+The implementation and adversarial repair fixture are complete. The fixture
+constructs the historical authenticated-prefix/contiguous-tail state, exercises
+the attended `repair-audit` command, proves interruption recovery and
+idempotency, and passed the two independent review rounds. The repository's
+actual ledger is currently valid at 6,165 authenticated entries.
+
+- **Question:** may the valid live readback plus the exact adversarial repair
+  fixture satisfy the acceptance sentence that says this repository's ledger
+  is reconciled "by that operation"?
+- **Recommendation:** yes. Deliberately damaging a valid production audit ledger
+  only to replay a historical repair would add risk and no stronger contract
+  evidence.
+- **Alternative/consequence:** keep the item open indefinitely until another
+  natural torn append occurs. Do not manufacture one in live state.
+- **Evidence:**
+  `backlog/evidence/2026-09-12-hgo-audit-repair-critic-round1.md`, the round-two
+  review at candidate `54a20d83a0501de98d522f7d7da7a829ccf16cc1`, and
+  `backlog/evidence/2026-09-12-hgo-live-audit-readback.json`.
+- **Blocking status:** blocks only closure of
+  `pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`;
+  it does not block other Nova-B implementation. Final release-bound threat
+  model approval remains a separate candidate-freeze obligation.
+
 ## Native Codex sandbox scope under WSL — superseded 2026-09-12
 
 The PO has deferred every native Codex sandbox/App-Server acceptance question
