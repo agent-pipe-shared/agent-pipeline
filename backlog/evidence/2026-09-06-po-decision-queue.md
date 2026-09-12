@@ -599,9 +599,9 @@ remain visible but would not create a second CI gate after Verify is already
 red. Alternative: authorize a broader sanitized-excerpt grammar and accept its
 higher residual disclosure risk. No implementation begins until the PO chooses.
 
-## Governance-action lifecycle ADR — ready for formal acceptance
+## Governance-action lifecycle ADR — proposed, review evidence pending
 
-The reviewed proposal at `docs/adr/draft-governance-action-events.md` keeps
+The proposal at `docs/adr/draft-governance-action-events.md` keeps
 queue dispatch/status events on the existing dispatch-correlated payload and
 adds a separate closed `pipeline.governance-action-event.v1` payload in the
 same lifecycle stream for verification, review, gate, recovery, and
@@ -615,4 +615,7 @@ either omit these governance actions or fabricate queue/worker identity for
 them. A separate, non-blocking follow-up remains on whether an exact-candidate
 HGO consumption may have a minimal public projection; until decided, HGO stays
 private-only. Native Codex sandbox/App-Server execution under WSL is outside
-this decision.
+this decision. The prior Critic-PASS note was not candidate- or
+trajectory-bound; a fresh review failed that evidence boundary. Formal
+acceptance therefore also requires exact-candidate deterministic evidence and
+a fresh refs-only review on the stable candidate.
