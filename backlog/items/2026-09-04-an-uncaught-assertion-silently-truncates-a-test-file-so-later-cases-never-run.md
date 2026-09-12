@@ -258,3 +258,11 @@ Correction commit `35b9dee2` received an independent PASS with no findings.
 The batch evidence, including the first review's detected Verify-policy gap, is
 recorded in
 `backlog/evidence/2026-09-12-case-completion-migration-batch-2.md`.
+
+The follow-up checker hardening through `c18e1f18` now rejects a missing,
+`null`, `undefined`, parenthesized/nullish, spread-derived, reordered, or
+otherwise non-canonical Verify-side policy for every `required` suite. VCR07
+pins those regression forms, the 181-entry registry check is green, and the
+final independent review returned PASS with no findings. Future migration
+batches therefore fail during the focused registry check instead of waiting
+for a full Verify run to expose an unbound completion channel.

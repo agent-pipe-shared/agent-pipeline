@@ -29,3 +29,13 @@ case-completion checker against `53fc71d3..35b9dee2` and confirmed the AEX01–0
 binding and rollback closure. Verify suite registration and `git diff --check`
 also pass. The aggregate backlog item remains open for the remaining 157 staged
 suites.
+
+The missing-policy incident also produced a permanent checker correction.
+Commits `284217a1`, `510fda91`, `96b04dae`, and `c18e1f18` make a `required`
+registry row fail unless its Verify registration contains the closed literal
+policy grammar used by the runtime. The review sequence found and closed exact
+`null`, parenthesized/nullish, and spread-derived bypasses; VCR07 now exercises
+all of them. The final candidate-bound registry check reports 181 entries and
+175 conservatively classified suites, and the final independent correction
+review returned PASS with no findings. This hardens future migrations; it does
+not change the current 24/157 disposition count.
