@@ -1,9 +1,9 @@
 {
   "schema": "pipeline.dispatch-record.v3",
   "taskId": "NVA-B-WORKFLOW-SCOPE-BATCH-2",
-  "agentType": "goldfish-deep",
-  "model": "gpt-6-astra",
-  "effort": "xhigh",
+  "agentType": "worker",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
   "rulesetSha": "0.6.2+codex.20260911033523.8593a8a",
   "dispatcher": "elephant",
   "candidateCommit": "a4c77364b8b1fcfc122d19be71e8d7800c3d19a5",
@@ -30,11 +30,6 @@
       "backlog/STATUS.md",
       "backlog/index.json"
     ]
-  },
-  "modelOverride": {
-    "model": "gpt-6-astra",
-    "effort": "xhigh",
-    "rationale": "The Coordinator reused the already-running deep implementation worker for this bounded high-risk workflow admission package; the record preserves the actual inherited model and effort rather than claiming the role default."
   },
   "criticEvidence": {
     "schema": "pipeline.critic-evidence-reference.v1",
