@@ -235,3 +235,21 @@ unchanged 181-entry registry is now **21 required and 160 legacy-process-only**.
 Focused normal and early-failure runs passed; details are in
 `backlog/evidence/2026-09-12-case-completion-migration-batch.md`. The item stays
 open for the remaining staged population.
+
+The next 2026-09-12 batch migrates `async-execution-tests` (5 cases),
+`bootstrap-payload-budget-tests` (10) and `control-catalog-schema-tests` (33),
+raising the registry to **24 required and 157 legacy-process-only**. The first
+independent review found that the async suite's Verify registration omitted its
+five-case policy even though the suite and registry were migrated. The
+correction adds that exact policy and is covered by the registration and
+case-completion checkers.
+
+**Rollback and recovery for this batch:** before release, revert the three test
+file migrations together with their three Verify policies and registry
+dispositions; a partial rollback is invalid because it would either advertise
+evidence Verify does not consume or make a protocol-emitting suite legacy
+again. Re-run all three direct suites, the case-completion registry checker and
+the Verify suite-registration checker on the revert candidate. Never reuse a
+completion receipt across the changed candidate. After release evidence has
+consumed these required policies, retain reader compatibility for those
+receipts and correct forward rather than silently downgrading the registry.

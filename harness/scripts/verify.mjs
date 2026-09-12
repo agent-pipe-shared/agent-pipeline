@@ -557,7 +557,7 @@ const TEST_SUITES = [
   { name: "network-lockdown-tests", file: join(scriptDir, "network-lockdown.test.mjs") },
   { name: "pipeline-state-external-push-ledger-tests", file: join(scriptDir, "pipeline-state-external-push-ledger.test.mjs") },
   { name: "agent-decision-journal-tests", file: join(libDir, "agent-decision-journal.test.mjs") },
-  { name: "async-execution-tests", file: join(libDir, "async-execution.test.mjs") },
+  { name: "async-execution-tests", file: join(libDir, "async-execution.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 5 }, (_, index) => `AEX${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "authority-revision-proof-tests", file: join(libDir, "authority-revision-proof.test.mjs") },
   { name: "credential-lease-tests", file: join(libDir, "credential-lease.test.mjs") },
   { name: "critical-action-approval-request-tests", file: join(libDir, "critical-action-approval-request.test.mjs") },
