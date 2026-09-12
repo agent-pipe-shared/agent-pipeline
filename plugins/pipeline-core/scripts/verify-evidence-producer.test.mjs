@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -14,6 +14,7 @@ import { prepareConsumerVerify, CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/cons
 import { verifySuiteArtifactName } from "./verify-journal.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { retryGovernanceVerificationAction } from "../lib/governance-verification-action.mjs";
 
 function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
 
@@ -68,6 +69,111 @@ test("a failing verify command produces no artifact at all", async () => {
       (error) => error instanceof VerifyEvidenceError && error.code === "VEP-VERIFY-FAILED",
     );
     assert.equal(existsSync(join(root, "evidence", "verify.json")), false, "a failing verify must leave no evidence file");
+  });
+});
+
+test("an explicit event output emits exactly one aggregate candidate-bound action after passing source readback", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const result = await produceVerifyEvidence({
+      rootDir: root,
+      outPath: "evidence/verify.json",
+      eventOutPath: "evidence/actions/verify.json",
+    });
+    assert.equal(result.status, "passed");
+    assert.equal(result.actionEvent.kind, "verification");
+    assert.equal(result.actionEvent.status, "completed");
+    assert.equal(result.actionEvent.reasonCode, "VERIFICATION_PASSED");
+    assert.equal(result.actionEvent.correlation.requestId, result.evidence.verifyRun.terminalSha256);
+    assert.deepEqual(result.actionEvent.candidate, result.evidence.candidate);
+    assert.deepEqual(result.actionEvent.correlation.featureId, { state: "not-applicable" });
+    assert.deepEqual(result.actionEvent.correlation.sessionId, { state: "not-applicable" });
+    assert.equal(Object.hasOwn(result.actionEvent, "runner"), false);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, "evidence/actions/verify.json"), "utf8")), result.actionEvent);
+    assert.equal(readdirSync(join(root, "evidence/actions")).length, 1, "one terminal run emits one action artifact");
+  });
+});
+
+test("an explicit event output maps terminal Verify failure without creating success evidence", async () => {
+  await withFixture('node -e "process.exit(3)"', async (root) => {
+    const result = await produceVerifyEvidence({
+      rootDir: root,
+      outPath: "evidence/verify.json",
+      eventOutPath: "evidence/actions/verify.json",
+    });
+    assert.equal(result.status, "failed");
+    assert.equal(result.evidence, null);
+    assert.equal(result.actionEvent.status, "failed");
+    assert.equal(result.actionEvent.reasonCode, "VERIFICATION_FAILED");
+    assert.equal(existsSync(join(root, "evidence/verify.json")), false);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, "evidence/actions/verify.json"), "utf8")), result.actionEvent);
+  });
+});
+
+test("event target preflight failure leaves prior source evidence untouched and never starts Verify", async () => {
+  const outside = mkdtempSync(join(tmpdir(), "verify-event-outside-"));
+  try {
+    await withFixture('node -e "require(\'fs\').writeFileSync(\'.git/verify-ran\', \'yes\')"', async (root) => {
+      mkdirSync(join(root, "evidence"));
+      writeFileSync(join(root, "evidence/verify.json"), "prior source bytes\n");
+      symlinkSync(outside, join(root, "event-alias"), "dir");
+      await assert.rejects(
+        () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", eventOutPath: "event-alias/action.json" }),
+        (error) => error.code === "GVA-OUTPUT-PATH",
+      );
+      assert.equal(readFileSync(join(root, "evidence/verify.json"), "utf8"), "prior source bytes\n");
+      assert.equal(existsSync(join(root, ".git/verify-ran")), false);
+      assert.equal(existsSync(join(outside, "action.json")), false);
+    });
+  } finally { rmSync(outside, { recursive: true, force: true }); }
+});
+
+test("event source preflight failure is also zero mutation", async () => {
+  await withFixture('node -e "require(\'fs\').writeFileSync(\'.git/verify-ran\', \'yes\')"', async (root) => {
+    mkdirSync(join(root, "evidence"));
+    writeFileSync(join(root, "evidence/verify.json"), "prior source bytes\n");
+    writeFileSync(join(root, "README.md"), "dirty candidate\n");
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", eventOutPath: "evidence/actions/verify.json" }),
+      (error) => error.code === "VEP-EVENT-SOURCE",
+    );
+    assert.equal(readFileSync(join(root, "evidence/verify.json"), "utf8"), "prior source bytes\n");
+    assert.equal(existsSync(join(root, ".git/verify-ran")), false);
+    assert.equal(existsSync(join(root, "evidence/actions/verify.json")), false);
+  });
+});
+
+test("a post-source event path race returns typed retry data and does not roll back Verify evidence", async () => {
+  const outside = mkdtempSync(join(tmpdir(), "verify-event-race-outside-"));
+  try {
+    const command = `node -e "require('fs').mkdirSync('evidence',{recursive:true});require('fs').symlinkSync('${outside}','evidence/actions','dir')"`;
+    await withFixture(command, async (root) => {
+      const result = await produceVerifyEvidence({
+        rootDir: root,
+        outPath: "evidence/verify.json",
+        eventOutPath: "evidence/actions/verify.json",
+      });
+      assert.equal(result.status, "source-complete/event-unavailable");
+      assert.equal(result.sourceStatus, "passed");
+      assert.equal(existsSync(join(root, "evidence/verify.json")), true);
+      assert.equal(existsSync(join(outside, "verify.json")), false);
+      assert.deepEqual(result.eventRetry.event, result.actionEvent);
+      unlinkSync(join(root, "evidence/actions"));
+      const retried = retryGovernanceVerificationAction({ rootDir: root, retry: result.eventRetry });
+      assert.equal(retried.status, "written");
+      assert.deepEqual(JSON.parse(readFileSync(retried.outPath, "utf8")), result.actionEvent);
+      assert.equal(retryGovernanceVerificationAction({ rootDir: root, retry: result.eventRetry }).status, "existing-identical");
+    });
+  } finally { rmSync(outside, { recursive: true, force: true }); }
+});
+
+test("candidate drift suppresses a requested action as well as success evidence", async () => {
+  await withFixture('node -e "require(\'fs\').writeFileSync(\'README.md\', \'drift\')"', async (root) => {
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, eventOutPath: "evidence/actions/verify.json" }),
+      (error) => error.code === "VEP-DRIFT",
+    );
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+    assert.equal(existsSync(join(root, "evidence/actions/verify.json")), false);
   });
 });
 
@@ -207,6 +313,18 @@ test("the CLI wrapper exits 0 and writes evidence for a passing run", async () =
     const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
     assert.equal(parsed.status, "passed");
     assert.equal(existsSync(join(root, "evidence", "verify.json")), true);
+  });
+});
+
+test("the CLI exposes the explicit event boundary without changing the evidence default", async () => {
+  await withFixture('node -e "process.exit(0)"', (root) => {
+    const scriptPath = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
+    const stdout = execFileSync("node", [scriptPath, "--root", root, "--event-out", "evidence/actions/verify.json"], { encoding: "utf8" });
+    const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
+    assert.equal(parsed.status, "passed");
+    assert.equal(parsed.actionEvent.reasonCode, "VERIFICATION_PASSED");
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), true);
+    assert.equal(existsSync(join(root, "evidence/actions/verify.json")), true);
   });
 });
 

@@ -477,6 +477,7 @@ const TEST_SUITES = [
   { name: "symlink-capability-tests", file: join(libDir, "symlink-capability.test.mjs") },
   { name: "runner-native-continuation-tests", file: join(libDir, "runner-native-continuation.test.mjs") },
   { name: "bootstrap-payload-budget-tests", file: join(libDir, "bootstrap-payload-budget.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 10 }, (_, index) => `BPB${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "governance-verification-action-tests", file: join(libDir, "governance-verification-action.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `GVA${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "bootstrap-payload-measure-cli-tests", file: join(pluginScriptsDir, "bootstrap-payload-measure.test.mjs") },
   { name: "local-supervisor-state-tests", file: join(libDir, "local-supervisor-state.test.mjs") },
   { name: "local-supervisor-setup-tests", file: join(pluginScriptsDir, "local-supervisor-setup.test.mjs") },

@@ -345,6 +345,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "governance-verification-action-tests",
+      "path": "plugins/pipeline-core/lib/governance-verification-action.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "guard-git-phoenix-authority-grant-tests",
       "path": "plugins/pipeline-core/hooks/guard-git-phoenix-authority-grant.test.mjs",
       "disposition": "legacy-process-only",

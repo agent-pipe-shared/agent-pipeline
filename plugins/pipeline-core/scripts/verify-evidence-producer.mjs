@@ -33,7 +33,7 @@
  *     alone, requires refusing evidence for a run whose tree moved under it.
  *
  * Usage:
- *   node verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]
+ *   node verify-evidence-producer.mjs [--out <repo-relative path>] [--event-out <repo-relative path>] [--root <repo>]
  *   node verify-evidence-producer.mjs --prepare [--root <repo>]
  *   node verify-evidence-producer.mjs --root <repo> --mode <boundary> [--base <ref>] [--no-reuse]
  *
@@ -47,6 +47,9 @@
  * -- the same path `guard-push.mjs` and `push-prepare.mjs` read -- so a bare
  * invocation with no `--out` flag produces exactly the file the push gate
  * consumes. An explicit `--out` still overrides it for a supplementary run.
+ * `--event-out` is optional. When present, one aggregate terminal verification
+ * action is written after source durability/readback. Without it, source output
+ * and exit behavior remain unchanged.
  *
  * Exit 0: evidence written for a passing run. Exit 1: the working tree was
  * dirty -- an artifact recording that explicitly IS written. Exit 2: the
@@ -56,7 +59,7 @@
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -66,6 +69,13 @@ import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResou
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify, readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
+import {
+  GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
+  buildGovernanceVerificationAction,
+  buildGovernanceVerificationRetry,
+  preflightGovernanceVerificationActionOutput,
+  writeGovernanceVerificationAction,
+} from "../lib/governance-verification-action.mjs";
 
 export const VERIFY_EVIDENCE_SCHEMA = "pipeline.verify-evidence.v0";
 
@@ -145,19 +155,43 @@ function writeEvidence(root, target, evidence) {
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
  */
-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, mode = "candidate", base = null, reuseReceipts = true }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true }) {
   const root = resolve(rootDir);
   const target = safeOutPath(root, outPath);
+  const canonicalTarget = safeOutPath(root, VERIFY_EVIDENCE_DEFAULT_PATH);
+  let eventPlan = null;
+  let configuration;
+  let started;
+  let startedAt;
+  let file;
+  let policyInputs;
+  if (eventOutPath !== null) {
+    eventPlan = preflightGovernanceVerificationActionOutput({ rootDir: root, eventOutPath });
+    const collides = [target, canonicalTarget].some((sourceTarget) => eventPlan.target === sourceTarget
+      || eventPlan.target.startsWith(`${sourceTarget}${sep}`) || sourceTarget.startsWith(`${eventPlan.target}${sep}`));
+    if (collides) fail("VEP-EVENT-PATH", "Action event output must be separate from Verify evidence outputs.");
+    // With an event request, both target and source are preflighted before the
+    // replacement run invalidates prior public evidence.
+    try { configuration = readConsumerVerifyConfiguration(root); }
+    catch (error) { fail("VEP-CALIBRATION", error.message); }
+    if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
+    started = candidateIdentity(root);
+    startedAt = new Date().toISOString();
+    if (started.status !== "clean") fail("VEP-EVENT-SOURCE", "Action event output requires a clean exact candidate before source execution.");
+    file = assertConsumerVerifyAdapter(root);
+    policyInputs = consumerVerifyPolicy(root);
+  }
   // Invalidate prior success before configuration, candidate checks or execution.
   // An interrupted replacement attempt must never leave consumable stale green.
-  for (const path of new Set([target, safeOutPath(root, VERIFY_EVIDENCE_DEFAULT_PATH)])) rmSync(path, { force: true });
-  let configuration;
-  try { configuration = readConsumerVerifyConfiguration(root); }
-  catch (error) { fail("VEP-CALIBRATION", error.message); }
+  for (const path of new Set([target, canonicalTarget])) rmSync(path, { force: true });
+  if (configuration === undefined) {
+    try { configuration = readConsumerVerifyConfiguration(root); }
+    catch (error) { fail("VEP-CALIBRATION", error.message); }
+  }
   const { fullCommand: command, project } = configuration;
   if (command === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
-  const started = candidateIdentity(root);
-  const startedAt = new Date().toISOString();
+  started ??= candidateIdentity(root);
+  startedAt ??= new Date().toISOString();
 
   if (started.status === "dirty") {
     // Same convention as this repository's own verify entry point: the dirty
@@ -178,8 +212,8 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     return { status: "dirty", evidence, outPath: target };
   }
 
-  const file = assertConsumerVerifyAdapter(root);
-  const policyInputs = consumerVerifyPolicy(root);
+  file ??= assertConsumerVerifyAdapter(root);
+  policyInputs ??= consumerVerifyPolicy(root);
   const attempt = randomBytes(16).toString("hex");
   const standardSuites = [
     { name: "baseline-calibration", file, args: [CONSUMER_VERIFY_DISPATCHER, "calibration"] },
@@ -227,12 +261,41 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   // Keep the real private descriptor and resource available for recovery/resume.
   // Interrupted runs retain their creating intent rather than inventing a seal.
   finalizeTemporaryResource(root, { ...registration, canaryRelative: "terminal.json" });
-  if (run.terminal.status !== "passed") fail("VEP-VERIFY-FAILED", "Required consumer Verify checks failed; no success evidence was written.");
+  if (run.terminal.status !== "passed" && eventPlan === null) fail("VEP-VERIFY-FAILED", "Required consumer Verify checks failed; no success evidence was written.");
+  let terminalSource = run.terminal;
+  if (eventPlan !== null) {
+    try { terminalSource = JSON.parse(readFileSync(join(run.runDir, "terminal.json"), "utf8")); }
+    catch { fail("VEP-SOURCE-READBACK", "Terminal Verify evidence could not be read back after persistence."); }
+    if (JSON.stringify(terminalSource) !== JSON.stringify(run.terminal)) {
+      fail("VEP-SOURCE-READBACK", "Terminal Verify evidence readback did not match the completed run.");
+    }
+  }
   if (JSON.stringify(consumerVerifyPolicy(root)) !== JSON.stringify(policyInputs)) fail("VEP-DRIFT", "Installed implementation or declared inputs changed during Verify.");
 
   const finished = candidateIdentity(root);
   if (finished.status !== "clean" || finished.commit !== started.commit || finished.tree !== started.tree) {
     fail("VEP-DRIFT", "The candidate commit or tree changed while the verify command ran -- no evidence was written.");
+  }
+
+  const actionEvent = eventPlan === null ? null : buildGovernanceVerificationAction({
+    schema: GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
+    terminalEvidenceSha256: terminalSource.terminalSha256,
+    outcome: terminalSource.status,
+    candidate: terminalSource.candidate,
+    featureId: { state: "not-applicable" },
+    sessionId: { state: "not-applicable" },
+  });
+
+  if (run.terminal.status !== "passed") {
+    try {
+      const eventWrite = writeGovernanceVerificationAction({ rootDir: root, eventOutPath: eventPlan.eventOutPath, event: actionEvent });
+      return { status: "failed", evidence: null, outPath: target, actionEvent, eventOutPath: eventWrite.outPath };
+    } catch {
+      return {
+        status: "source-complete/event-unavailable", sourceStatus: "failed", evidence: null, outPath: target,
+        actionEvent, eventRetry: buildGovernanceVerificationRetry({ eventOutPath: eventPlan.eventOutPath, event: actionEvent }),
+      };
+    }
   }
 
   const evidence = {
@@ -257,7 +320,20 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     exitCode: 0,
   };
   writeEvidence(root, target, evidence);
-  return { status: "passed", evidence, outPath: target };
+  if (eventPlan === null) return { status: "passed", evidence, outPath: target };
+  // The event follows source persistence and a physical source readback.
+  let observed;
+  try { observed = JSON.parse(readFileSync(target, "utf8")); } catch { fail("VEP-SOURCE-READBACK", "Verify evidence could not be read back after persistence."); }
+  if (JSON.stringify(observed) !== JSON.stringify(evidence)) fail("VEP-SOURCE-READBACK", "Verify evidence readback did not match the terminal source.");
+  try {
+    const eventWrite = writeGovernanceVerificationAction({ rootDir: root, eventOutPath: eventPlan.eventOutPath, event: actionEvent });
+    return { status: "passed", evidence, outPath: target, actionEvent, eventOutPath: eventWrite.outPath };
+  } catch {
+    return {
+      status: "source-complete/event-unavailable", sourceStatus: "passed", evidence, outPath: target,
+      actionEvent, eventRetry: buildGovernanceVerificationRetry({ eventOutPath: eventPlan.eventOutPath, event: actionEvent }),
+    };
+  }
 }
 
 function parseArgs(argv) {
@@ -266,7 +342,7 @@ function parseArgs(argv) {
     const flag = argv[index];
     if (flag === "--prepare") { value.prepare = true; continue; }
     if (flag === "--no-reuse") { value.reuseReceipts = false; continue; }
-    if (!["--root", "--out", "--mode", "--base"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
+    if (!["--root", "--out", "--event-out", "--mode", "--base"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
     const next = argv[++index];
     if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) {
       fail("VEP-USAGE", "Usage: verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]");
@@ -275,15 +351,19 @@ function parseArgs(argv) {
   }
   const mode = value["--mode"] ?? "candidate";
   if (!["work", "critic", "push", "candidate", "release"].includes(mode)) fail("VEP-USAGE", `Unknown Verify mode: ${mode}`);
-  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, mode, base: value["--base"] ?? null, reuseReceipts: value.reuseReceipts !== false };
+  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath: value["--event-out"] ?? null, mode, base: value["--base"] ?? null, reuseReceipts: value.reuseReceipts !== false };
 }
 
 if (isDirectInvocation(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
     const result = args.prepare ? prepareConsumerVerify(args) : await produceVerifyEvidence(args);
-    process.stdout.write(`${JSON.stringify({ status: result.status, outPath: result.outPath, ...result.evidence }, null, 2)}\n`);
+    const output = result.actionEvent === undefined
+      ? { status: result.status, outPath: result.outPath, ...result.evidence }
+      : { status: result.status, sourceStatus: result.sourceStatus, outPath: result.outPath, eventOutPath: result.eventOutPath, ...result.evidence, actionEvent: result.actionEvent, eventRetry: result.eventRetry };
+    process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
     if (result.status === "dirty") process.exitCode = 1;
+    if (["failed", "source-complete/event-unavailable"].includes(result.status)) process.exitCode = 2;
   } catch (error) {
     const code = error instanceof VerifyEvidenceError ? error.code : "VEP-ERROR";
     process.stderr.write(`verify-evidence-producer: ${code}: ${error.message}\n`);
