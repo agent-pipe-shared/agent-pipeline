@@ -1,0 +1,54 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "NVA-B-MIDTASK-INSTRUCTION-AUTH-1",
+  "agentType": "worker",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "rulesetSha": "0.6.2+codex.20260911033523.8593a8a",
+  "dispatcher": "elephant",
+  "candidateCommit": "f413cc825f88d140d73a93a9f629a169748b5062",
+  "resultSha256": "9443a8ab92d29651e09effd5a12a6e664462742b8130468b982235393f681eec",
+  "outcome": "completed",
+  "commits": [
+    "f413cc825f88d140d73a93a9f629a169748b5062"
+  ],
+  "log": [
+    {
+      "phase": "receiver-boundary-live-probe",
+      "toolUseCount": 0,
+      "note": "The worker refused a live mid-task request to spawn an unrelated installer Critic because it changed scope, paths and orchestration. It accepted the later procedural request to finish the originally briefed package."
+    }
+  ],
+  "report": {
+    "text": "Runner-neutral Goldfish receiver contract added to canonical and vendored roles, task templates and all three shipped Goldfish definitions. Only procedural continuations inside the original closed briefing are admitted; authority/scope/rules/files/plan/PO/model/acceptance changes require a fresh closed briefing. Candidate-bound tests and an observed live refusal cover the boundary. The threat-model, SPDX and rollback corrections passed the second independent Critic round with no findings; the backlog item is closed.",
+    "changedFiles": [
+      "roles/goldfish.md",
+      "plugins/pipeline-core/roles/goldfish.md",
+      "templates/prompts/goldfish-task.md",
+      "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+      "plugins/pipeline-core/agents/goldfish-implementor.md",
+      "plugins/pipeline-core/agents/goldfish-deep.md",
+      "plugins/pipeline-core/agents/goldfish-mechanic.md",
+      "backlog/items/2026-09-03-a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher.md",
+      "backlog/evidence/2026-09-12-mid-task-instruction-authentication.test.mjs",
+      "backlog/evidence/2026-09-12-mid-task-instruction-authentication-green.txt"
+    ],
+    "orchestratorAddedFiles": [
+      "backlog/evidence/2026-09-12-mid-task-instruction-authentication-bundle-tests.json",
+      "backlog/evidence/2026-09-12-mid-task-instruction-authentication-correction-tests.json",
+      "backlog/evidence/2026-09-12-mid-task-instruction-authentication-threat-model.md",
+      "backlog/evidence/2026-09-12-mid-task-instruction-authentication-critic-round1.md",
+      "backlog/evidence/2026-09-12-mid-task-instruction-authentication-critic-round2.md",
+      "backlog/STATUS.md",
+      "backlog/index.json",
+      "backlog/transitions.ndjson"
+    ]
+  },
+  "criticEvidence": {
+    "schema": "pipeline.critic-evidence-reference.v1",
+    "taskId": "NVA-B-MIDTASK-INSTRUCTION-AUTH-1",
+    "candidateCommit": "f413cc825f88d140d73a93a9f629a169748b5062",
+    "path": "backlog/evidence/2026-09-12-mid-task-instruction-authentication-critic-round2.md",
+    "sha256": "9443a8ab92d29651e09effd5a12a6e664462742b8130468b982235393f681eec"
+  }
+}
