@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: 40a2339e397b0fbaa0929425d8407539fc4ca2c2
+closure_evidence: backlog/items/2026-09-02-documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it.md
 created: 2026-09-02
 source: "Direct measurement, 2026-09-02 session: three Goldfish dispatches hit maxTurns in one block, one of them losing all of its work"
 sprint: nova-b
@@ -122,7 +126,19 @@ whoever triages this item next.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted with Direction 1 and Direction 2 implemented;
+  Direction 3 rejected.
+- **Rationale:** Direction 1 is implemented by the authenticated Claude
+  dispatch-budget hook and its runner-neutral policy core. Codex and
+  Antigravity do not yet expose an authenticated live-call adapter, so their
+  briefed cap remains advisory and no cross-runner enforcement is claimed.
+  Direction 2 landed as the one-briefing/one-independently-deliverable-package
+  rule. Direction 3's proposed `log.length`/commit-count heuristic is not a
+  sound durability gate: it cannot detect work lost before the first commit,
+  would flag ordinary newly opened records, and would add duplicate
+  administration without proving a checkpoint was timely or useful.
+- **Assignment (if accepted):** delivered by the pipeline team in
+  `84a7be95`, `96eb1208`, `40a2339e`, `623b2d09`, `9da13920`, and
+  `94c669de`; this reconciliation adds the durable decision marker and
+  predecessor backlink.
+- **Date:** 2026-09-12

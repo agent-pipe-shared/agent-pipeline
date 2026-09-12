@@ -192,7 +192,7 @@
 | pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path | closed | defect | pipeline | — | 2026-08-10 | 2026-08-24 | — |
 | pipeline.documentation-has-no-reader-facing-review-and-no-machine-binding-for-one | closed | requirement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.documentation-information-architecture | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
-| pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it | open | defect | pipeline | nova-b | 2026-09-02 | — | — |
+| pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.dual-channel-publication | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.el-01-has-no-in-session-tripwire | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
@@ -663,8 +663,8 @@
 
 ## Counts
 
-- open: 74
+- open: 73
 - in_progress: 0
-- closed: 567
+- closed: 568
 - rejected: 3
 - deferred: 11

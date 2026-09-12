@@ -173,3 +173,10 @@ caps themselves being too tight even for complex work.
 **Final disposition: `maxTurns` stays at 50/30, no change needed.** All
 three parts of this item are now resolved: parts 1+2 landed (`eccbdadd`),
 part 3 measured and confirmed (this entry). Item closed.
+
+## Follow-up
+
+The documentary fix alone did not prevent three later truncations. The
+enforcing-counter and package-splitting follow-up is tracked and resolved in
+`pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it`;
+this historical item remains closed.
