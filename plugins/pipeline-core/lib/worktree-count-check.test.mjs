@@ -21,13 +21,14 @@
  * WTC23-WTC24 exercise the human-readable message formatter.
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import {
   WORKTREE_COUNT_CHECK_SCHEMA,
+  WORKTREE_COUNT_VERDICT_SCHEMA,
   clearWorktreeCountBaseline,
   countLiveWorktrees,
   countWorktreeIsolatedDispatches,
@@ -35,10 +36,13 @@ import {
   evaluateWorktreeCountCheckEvent,
   evaluateWorktreeCountDelta,
   formatWorktreeIsolationMismatch,
+  readWorktreeCountVerdict,
   readWorktreeCountBaseline,
   recordWorktreeCountBaseline,
+  recordWorktreeCountVerdict,
   registerWorktreeIsolationLaunch,
   resolveWorktreeIsolationLaunch,
+  validateWorktreeCountVerdict,
 } from "./worktree-count-check.mjs";
 
 let pass = 0;
@@ -211,9 +215,18 @@ check("WTC18b register is a no-op for a non-isolated call",
 // Resolve against an unchanged count -> not-isolated, and consumes the baseline.
 const resolvedMismatch = resolveWorktreeIsolationLaunch({
   commonDir: hookCommonDir, dispatchKey: hookKey, countLiveWorktrees: fakeCounter([1]), startPath: hookFixture,
+  now: new Date("2026-08-29T01:01:00.000Z"),
 });
 checkTrue("WTC19 resolve reports not-isolated when the count did not move",
   resolvedMismatch && resolvedMismatch.verdict === "not-isolated" && resolvedMismatch.delta === 0, JSON.stringify(resolvedMismatch));
+checkTrue("WTC19b mismatch resolution atomically publishes a sanitized terminal receipt",
+  resolvedMismatch?.receipt?.schema === WORKTREE_COUNT_VERDICT_SCHEMA
+  && resolvedMismatch.receipt.status === "terminal"
+  && resolvedMismatch.receipt.verdict === "not-isolated"
+  && readWorktreeCountVerdict({ commonDir: hookCommonDir, dispatchKey: hookKey })?.receiptSha256 === resolvedMismatch.receipt.receiptSha256
+  && !JSON.stringify(resolvedMismatch.receipt).includes(hookFixture)
+  && !JSON.stringify(resolvedMismatch.receipt).includes("transcript.jsonl"),
+  JSON.stringify(resolvedMismatch));
 check("WTC20 resolve is single-shot -- nothing left to resolve after",
   resolveWorktreeIsolationLaunch({ commonDir: hookCommonDir, dispatchKey: hookKey, countLiveWorktrees: fakeCounter([1]), startPath: hookFixture }), null);
 
@@ -221,15 +234,22 @@ check("WTC20 resolve is single-shot -- nothing left to resolve after",
 registerWorktreeIsolationLaunch({
   toolInput: { subagentType: "pipeline-core:critic", isolation: "worktree", prompt: "x" },
   commonDir: hookCommonDir, dispatchKey: hookKey, countLiveWorktrees: fakeCounter([5]), startPath: hookFixture,
+  now: new Date("2026-08-29T01:01:30.000Z"),
 });
 const combinedEvent = evaluateWorktreeCountCheckEvent({
   toolInput: { file_path: "some/file.md" }, // an ordinary, non-dispatch tool call
   transcriptPath: "/tmp/hook/transcript.jsonl",
   commonDir: hookCommonDir, startPath: hookFixture, countLiveWorktrees: fakeCounter([6]),
+  now: new Date("2026-08-29T01:02:00.000Z"),
 });
 checkTrue("WTC21 combined event resolves a prior baseline as isolated on the next tool call",
   combinedEvent.resolved && combinedEvent.resolved.verdict === "isolated" && combinedEvent.resolved.delta === 1
-  && combinedEvent.registered === null, JSON.stringify(combinedEvent));
+  && combinedEvent.resolved.receipt?.verdict === "isolated"
+  && combinedEvent.registered === null
+  && readWorktreeCountBaseline({ commonDir: hookCommonDir, dispatchKey: hookKey }) === null,
+  JSON.stringify(combinedEvent));
+checkTrue("WTC21b a durable isolated receipt distinguishes success from a hook that never resolved",
+  readWorktreeCountVerdict({ commonDir: hookCommonDir, dispatchKey: hookKey })?.verdict === "isolated");
 
 // Two dispatch calls back-to-back: the second call's own PreToolUse event both
 // resolves the first (unchanged count -> not-isolated) AND registers its own
@@ -238,6 +258,11 @@ registerWorktreeIsolationLaunch({
   toolInput: { subagent_type: "pipeline-core:goldfish-deep", isolation: "worktree", prompt: "first" },
   commonDir: hookCommonDir, dispatchKey: hookKey, countLiveWorktrees: fakeCounter([9]), startPath: hookFixture,
 });
+const hookVerdictPath = join(hookCommonDir, "agent-pipeline", "worktree-count-checks", `${hookKey}.verdict.json`);
+checkTrue("WTC21c fresh registration durably creates its baseline before removing old success",
+  readWorktreeCountBaseline({ commonDir: hookCommonDir, dispatchKey: hookKey }) !== null
+  && readWorktreeCountVerdict({ commonDir: hookCommonDir, dispatchKey: hookKey }) === null
+  && !existsSync(hookVerdictPath));
 const backToBack = evaluateWorktreeCountCheckEvent({
   toolInput: { subagent_type: "pipeline-core:goldfish-deep", isolation: "worktree", prompt: "second" },
   transcriptPath: "/tmp/hook/transcript.jsonl",
@@ -247,6 +272,80 @@ checkTrue("WTC22 back-to-back dispatches resolve the first and register the seco
   backToBack.resolved && backToBack.resolved.verdict === "not-isolated"
   && backToBack.registered && backToBack.registered.baselineCount === 9 && backToBack.registered.expectedDispatchCount === 1,
   JSON.stringify(backToBack));
+
+// A two-dispatch launch that gains only one worktree is durably partial.
+const partialKey = dispatchKeyForTranscript("/tmp/hook/partial.jsonl");
+registerWorktreeIsolationLaunch({
+  toolInput: { script: WORKFLOW_TWO_ISOLATED },
+  commonDir: hookCommonDir, dispatchKey: partialKey, countLiveWorktrees: fakeCounter([4]), startPath: hookFixture,
+  now: new Date("2026-08-29T02:00:00.000Z"),
+});
+const partial = resolveWorktreeIsolationLaunch({
+  commonDir: hookCommonDir, dispatchKey: partialKey, countLiveWorktrees: fakeCounter([5]), startPath: hookFixture,
+  now: new Date("2026-08-29T02:01:00.000Z"),
+});
+checkTrue("WTC22b partial resolution is terminal, durable and relation-bound",
+  partial?.verdict === "partial" && partial.receipt?.verdict === "partial"
+  && validateWorktreeCountVerdict(partial.receipt, partialKey));
+
+// Persistence failure cannot manufacture success. Mismatch and partial remain
+// fail-closed warning verdicts even when their durable receipt cannot be stored.
+for (const [id, expectedDispatchCount, baselineCount, currentCount, expectedVerdict] of [
+  ["WTC22c", 1, 7, 8, "unobservable"],
+  ["WTC22d", 1, 7, 7, "not-isolated"],
+  ["WTC22e", 2, 7, 8, "partial"],
+]) {
+  const failureKey = dispatchKeyForTranscript(`/tmp/hook/${id}.jsonl`);
+  recordWorktreeCountBaseline({
+    commonDir: hookCommonDir, dispatchKey: failureKey, baselineCount, expectedDispatchCount,
+    now: new Date("2026-08-29T03:00:00.000Z"),
+  });
+  const result = resolveWorktreeIsolationLaunch({
+    commonDir: hookCommonDir, dispatchKey: failureKey, countLiveWorktrees: fakeCounter([currentCount]),
+    recordWorktreeCountVerdict: () => null, startPath: hookFixture,
+    now: new Date("2026-08-29T03:01:00.000Z"),
+  });
+  checkTrue(`${id} receipt persistence failure remains fail closed as ${expectedVerdict}`,
+    result?.verdict === expectedVerdict && result.receipt === null
+    && readWorktreeCountBaseline({ commonDir: hookCommonDir, dispatchKey: failureKey }) !== null
+    && readWorktreeCountVerdict({ commonDir: hookCommonDir, dispatchKey: failureKey }) === null,
+    JSON.stringify(result));
+}
+
+const corruptKey = dispatchKeyForTranscript("/tmp/hook/corrupt.jsonl");
+const corruptPath = join(hookCommonDir, "agent-pipeline", "worktree-count-checks", `${corruptKey}.verdict.json`);
+const validReceipt = recordWorktreeCountVerdict({
+  commonDir: hookCommonDir, dispatchKey: corruptKey, baselineCount: 1, expectedDispatchCount: 1,
+  currentCount: 2, delta: 1, verdict: "isolated",
+  recordedAt: "2026-08-29T04:00:00.000Z", resolvedAt: new Date("2026-08-29T04:01:00.000Z"),
+});
+checkTrue("WTC22f terminal receipt creation is digest-bound and read back byte-for-byte",
+  validReceipt !== null
+  && JSON.parse(readFileSync(corruptPath, "utf8")).receiptSha256 === validReceipt.receiptSha256);
+writeFileSync(corruptPath, `${JSON.stringify({ ...validReceipt, verdict: "partial" })}\n`, "utf8");
+check("WTC22g a tampered or relationally invalid receipt cannot be read as success",
+  readWorktreeCountVerdict({ commonDir: hookCommonDir, dispatchKey: corruptKey }), null);
+check("WTC22h malformed receipt inputs fail closed before selecting a host path",
+  recordWorktreeCountVerdict({
+    commonDir: hookCommonDir, dispatchKey: "../../escape", baselineCount: 1, expectedDispatchCount: 1,
+    currentCount: 2, delta: 1, verdict: "isolated",
+    recordedAt: "2026-08-29T04:00:00.000Z", resolvedAt: "not-a-date",
+  }), null);
+check("WTC22i a raw path cannot be used as a verdict lookup key",
+  readWorktreeCountVerdict({ commonDir: hookCommonDir, dispatchKey: "/tmp/private/transcript.jsonl" }), null);
+
+const malformedPendingKey = dispatchKeyForTranscript("/tmp/hook/malformed-pending.jsonl");
+const malformedPendingVerdict = recordWorktreeCountVerdict({
+  commonDir: hookCommonDir, dispatchKey: malformedPendingKey, baselineCount: 2, expectedDispatchCount: 1,
+  currentCount: 3, delta: 1, verdict: "isolated",
+  recordedAt: "2026-08-29T05:00:00.000Z", resolvedAt: new Date("2026-08-29T05:01:00.000Z"),
+});
+const malformedPendingPath = join(hookCommonDir, "agent-pipeline", "worktree-count-checks", `${malformedPendingKey}.json`);
+writeFileSync(malformedPendingPath, "{malformed pending baseline", "utf8");
+checkTrue("WTC22j malformed pending state masks an older isolated receipt",
+  malformedPendingVerdict?.verdict === "isolated"
+  && readWorktreeCountBaseline({ commonDir: hookCommonDir, dispatchKey: malformedPendingKey }) === null
+  && readWorktreeCountVerdict({ commonDir: hookCommonDir, dispatchKey: malformedPendingKey }) === null);
 
 // ---------------------------------------------------------------------------
 // WTC23-WTC24: message formatting.

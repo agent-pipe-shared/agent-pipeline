@@ -45,7 +45,7 @@
  *   3. On the NEXT PreToolUse event in that same transcript -- any tool,
  *      including the following dispatch call if the Elephant fires two in a
  *      row with no intervening tool use -- `resolveWorktreeIsolationLaunch`
- *      consumes (reads once, then deletes) any pending baseline and compares
+ *      reads the pending baseline and compares
  *      the worktree count observed AT THAT MOMENT against it. Because
  *      PreToolUse fires before the CURRENT tool executes, this moment's count
  *      is exactly the count as it stood right after the PRIOR tool (the
@@ -54,6 +54,11 @@
  *      hook (this repository has never wired one; see NVA-W7-WORKTREECOUNT's
  *      dispatch record for the confirmation that PostToolUse/SubagentStop
  *      appear nowhere in this codebase today).
+ *   4. Resolution atomically publishes and reads back a sanitized terminal
+ *      verdict in the same git-common worktree-count-check lane before it
+ *      removes the pending baseline. A raw pending file masks older success,
+ *      including when malformed; persistence failure retains that pending
+ *      marker and can never manufacture a current success receipt.
  *
  * HONEST LIMITS.
  *   - This is a COUNT delta, not a per-dispatch identity check. It cannot
@@ -99,6 +104,11 @@ import { spawnSync } from "node:child_process";
 import { parseWorktreePorcelain } from "./worktree-lifecycle.mjs";
 
 export const WORKTREE_COUNT_CHECK_SCHEMA = "pipeline.worktree-count-check.v1";
+export const WORKTREE_COUNT_VERDICT_SCHEMA = "pipeline.worktree-count-verdict.v1";
+
+const DISPATCH_KEY = /^[a-f0-9]{32}$/u;
+const RECEIPT_DIGEST = /^[a-f0-9]{64}$/u;
+const TERMINAL_VERDICTS = new Set(["isolated", "not-isolated", "partial", "unobservable"]);
 
 // ---------------------------------------------------------------------------
 // Step 1: how many isolation:"worktree" dispatches does this tool_input declare?
@@ -209,6 +219,10 @@ function baselinePath(commonDir, dispatchKey) {
   return join(commonDir, "agent-pipeline", "worktree-count-checks", `${dispatchKey}.json`);
 }
 
+function verdictPath(commonDir, dispatchKey) {
+  return join(commonDir, "agent-pipeline", "worktree-count-checks", `${dispatchKey}.verdict.json`);
+}
+
 /** Atomic, mode-0600 write -- write-temp-then-rename, matching this plugin's other local-state writers. */
 function writeBaselineAtomic(path, record) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
@@ -216,6 +230,131 @@ function writeBaselineAtomic(path, record) {
   const temporary = `${path}.${process.pid}.${Math.random().toString(16).slice(2, 8)}.tmp`;
   writeFileSync(temporary, bytes, { mode: 0o600 });
   renameSync(temporary, path);
+}
+
+function receiptDigest(record) {
+  const unsigned = { ...record };
+  delete unsigned.receiptSha256;
+  return createHash("sha256").update(JSON.stringify(unsigned)).digest("hex");
+}
+
+function validIsoInstant(value) {
+  if (typeof value !== "string" || value.length !== 24) return false;
+  try {
+    return new Date(value).toISOString() === value;
+  } catch {
+    return false;
+  }
+}
+
+function validCount(value, nullable = false) {
+  return (nullable && value === null) || (Number.isSafeInteger(value) && value >= 0);
+}
+
+function validVerdictRelation(record) {
+  if (record.verdict === "unobservable") return record.currentCount === null && record.delta === null;
+  if (!validCount(record.currentCount) || !Number.isSafeInteger(record.delta)) return false;
+  if (record.delta !== record.currentCount - record.baselineCount) return false;
+  if (record.verdict === "not-isolated") return record.delta <= 0;
+  if (record.verdict === "partial") return record.delta > 0 && record.delta < record.expectedDispatchCount;
+  return record.delta >= record.expectedDispatchCount && record.expectedDispatchCount > 0;
+}
+
+/**
+ * Validate one terminal observation. The receipt contains counts, timestamps and
+ * a transcript-derived digest only; repository, transcript and host paths are
+ * never persisted.
+ */
+export function validateWorktreeCountVerdict(record, expectedDispatchKey = null) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) return false;
+  if (Object.keys(record).sort().join("\0") !== [
+    "schema", "status", "dispatchKey", "baselineCount", "expectedDispatchCount",
+    "currentCount", "delta", "verdict", "recordedAt", "resolvedAt", "receiptSha256",
+  ].sort().join("\0")) return false;
+  if (record.schema !== WORKTREE_COUNT_VERDICT_SCHEMA || record.status !== "terminal") return false;
+  if (!DISPATCH_KEY.test(record.dispatchKey) || (expectedDispatchKey !== null && record.dispatchKey !== expectedDispatchKey)) return false;
+  if (!validCount(record.baselineCount) || !validCount(record.expectedDispatchCount) || record.expectedDispatchCount < 1) return false;
+  if (!TERMINAL_VERDICTS.has(record.verdict) || !validVerdictRelation(record)) return false;
+  if (!validIsoInstant(record.recordedAt) || !validIsoInstant(record.resolvedAt)) return false;
+  if (Date.parse(record.resolvedAt) < Date.parse(record.recordedAt)) return false;
+  return RECEIPT_DIGEST.test(record.receiptSha256) && receiptDigest(record) === record.receiptSha256;
+}
+
+/** Read the latest durable terminal verdict for one orchestrator transcript. */
+export function readWorktreeCountVerdict({ commonDir, dispatchKey }) {
+  if (typeof commonDir !== "string" || commonDir === "" || !DISPATCH_KEY.test(dispatchKey)) return null;
+  // A pending baseline is newer authority than the preceding terminal receipt.
+  // Check raw existence rather than successful parsing: a malformed pending
+  // file must also mask old success instead of making it authoritative again.
+  if (existsSync(baselinePath(commonDir, dispatchKey))) return null;
+  const path = verdictPath(commonDir, dispatchKey);
+  if (!existsSync(path)) return null;
+  try {
+    const record = JSON.parse(readFileSync(path, "utf8"));
+    return validateWorktreeCountVerdict(record, dispatchKey) ? record : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearWorktreeCountVerdict({ commonDir, dispatchKey }) {
+  if (typeof commonDir !== "string" || commonDir === "" || !DISPATCH_KEY.test(dispatchKey)) return;
+  try {
+    unlinkSync(verdictPath(commonDir, dispatchKey));
+  } catch {
+    // Missing or already consumed terminal evidence is not an error.
+  }
+}
+
+/**
+ * Atomically publish and read back one bounded terminal verdict. A write or
+ * readback failure returns null, so callers cannot turn absent evidence into a
+ * successful isolation claim.
+ */
+export function recordWorktreeCountVerdict({
+  commonDir,
+  dispatchKey,
+  baselineCount,
+  expectedDispatchCount,
+  currentCount,
+  delta,
+  verdict,
+  recordedAt,
+  resolvedAt = new Date(),
+}) {
+  let resolvedAtIso;
+  try {
+    resolvedAtIso = resolvedAt.toISOString();
+  } catch {
+    return null;
+  }
+  const unsigned = {
+    schema: WORKTREE_COUNT_VERDICT_SCHEMA,
+    status: "terminal",
+    dispatchKey,
+    baselineCount,
+    expectedDispatchCount,
+    currentCount,
+    delta,
+    verdict,
+    recordedAt,
+    resolvedAt: resolvedAtIso,
+  };
+  const record = { ...unsigned, receiptSha256: receiptDigest(unsigned) };
+  if (!validateWorktreeCountVerdict(record, dispatchKey)) return null;
+  try {
+    writeBaselineAtomic(verdictPath(commonDir, dispatchKey), record);
+  } catch {
+    return null;
+  }
+  let readback;
+  try {
+    const candidate = JSON.parse(readFileSync(verdictPath(commonDir, dispatchKey), "utf8"));
+    readback = validateWorktreeCountVerdict(candidate, dispatchKey) ? candidate : null;
+  } catch {
+    readback = null;
+  }
+  return readback && readback.receiptSha256 === record.receiptSha256 ? readback : null;
 }
 
 export function recordWorktreeCountBaseline({ commonDir, dispatchKey, baselineCount, expectedDispatchCount, now = new Date() }) {
@@ -298,31 +437,67 @@ export function registerWorktreeIsolationLaunch({ toolInput, commonDir, dispatch
   if (expectedDispatchCount === 0) return null;
   const live = countFn(startPath);
   if (!live.ok) return null;
-  return recordWorktreeCountBaseline({ commonDir, dispatchKey, baselineCount: live.count, expectedDispatchCount, now });
+  const baseline = recordWorktreeCountBaseline({ commonDir, dispatchKey, baselineCount: live.count, expectedDispatchCount, now });
+  // Baseline first, then old verdict: at every observable point the new pending
+  // launch either masks or has removed the preceding terminal success.
+  clearWorktreeCountVerdict({ commonDir, dispatchKey });
+  return baseline;
 }
 
 /**
  * Call on ANY PreToolUse event in the same orchestrator transcript (including
  * the next dispatch call, if the Elephant fires two dispatches back-to-back
  * with no intervening tool use -- see `evaluateWorktreeCountCheckEvent` for
- * the ordering that makes that safe). Consumes and resolves any pending
- * baseline for `dispatchKey`; returns null when there was nothing pending.
+ * the ordering that makes that safe). Resolves any pending baseline for
+ * `dispatchKey` and removes it only after terminal receipt readback succeeds;
+ * returns null when there was nothing pending.
  */
-export function resolveWorktreeIsolationLaunch({ commonDir, dispatchKey, countLiveWorktrees: countFn = countLiveWorktrees, startPath }) {
+export function resolveWorktreeIsolationLaunch({
+  commonDir,
+  dispatchKey,
+  countLiveWorktrees: countFn = countLiveWorktrees,
+  recordWorktreeCountVerdict: recordVerdict = recordWorktreeCountVerdict,
+  startPath,
+  now = new Date(),
+}) {
   if (!commonDir || !dispatchKey) return null;
   const baseline = readWorktreeCountBaseline({ commonDir, dispatchKey });
   if (!baseline) return null;
-  clearWorktreeCountBaseline({ commonDir, dispatchKey });
   const live = countFn(startPath);
   if (!live.ok) {
-    return { ...baseline, currentCount: null, verdict: "unobservable" };
+    const receipt = recordVerdict({
+      commonDir, dispatchKey,
+      baselineCount: baseline.baselineCount,
+      expectedDispatchCount: baseline.expectedDispatchCount,
+      currentCount: null,
+      delta: null,
+      verdict: "unobservable",
+      recordedAt: baseline.recordedAt,
+      resolvedAt: now,
+    });
+    if (receipt !== null) clearWorktreeCountBaseline({ commonDir, dispatchKey });
+    return { ...baseline, currentCount: null, delta: null, verdict: "unobservable", receipt };
   }
   const { verdict, delta } = evaluateWorktreeCountDelta({
     baselineCount: baseline.baselineCount,
     expectedDispatchCount: baseline.expectedDispatchCount,
     currentCount: live.count,
   });
-  return { ...baseline, currentCount: live.count, verdict, delta };
+  const receipt = recordVerdict({
+    commonDir, dispatchKey,
+    baselineCount: baseline.baselineCount,
+    expectedDispatchCount: baseline.expectedDispatchCount,
+    currentCount: live.count,
+    delta,
+    verdict,
+    recordedAt: baseline.recordedAt,
+    resolvedAt: now,
+  });
+  if (receipt !== null) clearWorktreeCountBaseline({ commonDir, dispatchKey });
+  if (receipt === null && verdict === "isolated") {
+    return { ...baseline, currentCount: live.count, delta, verdict: "unobservable", observedVerdict: verdict, receipt: null };
+  }
+  return { ...baseline, currentCount: live.count, verdict, delta, receipt };
 }
 
 /**
@@ -342,7 +517,7 @@ export function resolveWorktreeIsolationLaunch({ commonDir, dispatchKey, countLi
 export function evaluateWorktreeCountCheckEvent({ toolInput, transcriptPath, commonDir, startPath, countLiveWorktrees: countFn = countLiveWorktrees, now }) {
   const dispatchKey = dispatchKeyForTranscript(transcriptPath);
   if (!dispatchKey || !commonDir) return { resolved: null, registered: null };
-  const resolved = resolveWorktreeIsolationLaunch({ commonDir, dispatchKey, countLiveWorktrees: countFn, startPath });
+  const resolved = resolveWorktreeIsolationLaunch({ commonDir, dispatchKey, countLiveWorktrees: countFn, startPath, now });
   const registered = registerWorktreeIsolationLaunch({ toolInput, commonDir, dispatchKey, countLiveWorktrees: countFn, startPath, now });
   return { resolved, registered };
 }
