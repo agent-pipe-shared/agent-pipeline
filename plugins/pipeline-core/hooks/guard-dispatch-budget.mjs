@@ -64,14 +64,17 @@
  *   dispatched subagent; any other shape falls to the unresolved branch
  *   below rather than being force-fit.
  *
- * ## Budget arithmetic (derived from the dispatched agent's own
- * definition, never from briefing text -- CLOSING_ALLOWANCE and
- * SAFETY_MARGIN come from the shared policy core; `maxTurns` is
- * read live from the agent's frontmatter file on every call, so a future
- * change to that value is picked up automatically with no edit here):
+ * ## Budget arithmetic
+ * `guard-dispatch.mjs` validates the briefing's exact numeric base cap before
+ * launch and stores it under the parent Dispatch tool-use id. On the first
+ * authenticated child call this guard resolves that id from Claude's measured
+ * child meta file, binds the cap into the agent-id counter, and consumes the
+ * pending record. Later calls read only the bound counter. `maxTurns` is still
+ * read live from the selected agent definition and must match the preflighted
+ * tier; CLOSING_ALLOWANCE and SAFETY_MARGIN come from the shared policy core:
  *
- *   workingCap = max(0, maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN))
- *              = max(0, maxTurns - 15)
+ *   workingCap = min(baseCalls,
+ *                    max(0, maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN)))
  *
  * At maxTurns = 50, workingCap is 35; at maxTurns = 80, it is 65.
  * The shared core permits only closing acts during the next five counted
@@ -87,8 +90,16 @@
  * --path-format=absolute --git-common-dir`. Never a tracked path, never
  * `scratch/` (agent-writable -- a limited agent could erase its own
  * counter there, defeating the whole guard).
+ * Every budget-bearing counter read/modify/write, including first binding, is
+ * serialized by `<agentId>.json.binding.lock`. The owner record binds hostname,
+ * Linux boot id, PID and `/proc` process start time; live or ambiguous owners
+ * block, while a provably dead owner is reclaimed through a separate recovery
+ * lock and inode/content readback. A pending dispatch whose child never makes
+ * its first tool call remains an orphan in `pending/`; safe bounded cleanup
+ * needs a dispatch-lifecycle signal and is deliberately a follow-on rather
+ * than a TTL guess in this hook.
  *
- * ## Fail-open-but-visible
+ * ## Fail-open-but-visible for unattested legacy identity
  * Any point at which the identity chain or the budget cannot be resolved
  * (malformed/missing `transcript_path`, missing/unparseable meta.json,
  * `spawnDepth` not a number >=1, `agentType` not resolving to a known
@@ -98,8 +109,11 @@
  * claimed per session/reason below `unresolved-observations/`; the historical
  * readable `unresolved.jsonl` is retained and never truncated. Session and
  * reason path components are digest-derived, while the diagnostic JSON records
- * the branch, reason, root/common dir, transcript path and instant. This guard
- * never fails closed on its own confusion -- that would halt every dispatch.
+ * the branch, reason, root/common dir, transcript path and instant.
+ * Budget-bearing children with authenticated `agent_id`/`agent_type` fail
+ * closed on missing/conflicting binding or counter-lock state. These legacy
+ * unresolved-identity branches remain fail-open so an orchestrator or an
+ * unsupported runner shape is not silently classified as a Claude child.
  * The bound is per session/reason only, never a finite global-retention claim
  * across unlimited sessions; absent, null, blank, or malformed session IDs all
  * share the explicit fallback-session bucket for each reason.
@@ -122,13 +136,16 @@
  *   own stderr -- the one channel guaranteed to exist for a PreToolUse hook
  *   regardless of git state -- without changing the exit code.
  */
-import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, lstatSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import { hostname } from "node:os";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { consumePendingDispatchBudgetBinding, resolvePendingDispatchBudgetBinding } from "../lib/dispatch-budget-binding.mjs";
+import { dispatchBudgetContractForRole } from "../lib/dispatch-policy.mjs";
 import {
   CLOSING_ALLOWANCE,
   DENIAL_CODE,
@@ -148,7 +165,7 @@ function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
 }
 
-function blocked({ agentId, agentType, maxTurns, workingCap, count }) {
+function blocked({ agentId, agentType, maxTurns, baseCalls, workingCap, count }) {
   const remainingClosingCalls = Math.max(0, workingCap + CLOSING_ALLOWANCE - count);
   const continuation = remainingClosingCalls > 0
     ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
@@ -160,7 +177,7 @@ function blocked({ agentId, agentType, maxTurns, workingCap, count }) {
     2,
     "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
       + `${DENIAL_CODE}: this dispatch (${agentType}, agent ${agentId}) has counted ${count} tool-call attempts against a working cap of ${workingCap} `
-      + `(derived from its own maxTurns=${maxTurns} frontmatter minus a fixed ${CLOSING_ALLOWANCE}-closing + ${SAFETY_MARGIN}-safety reserve).\n`
+      + `(effective cap min(baseCalls=${baseCalls}, maxTurns=${maxTurns} minus the fixed ${CLOSING_ALLOWANCE}-closing + ${SAFETY_MARGIN}-safety reserve)).\n`
       + continuation,
   );
 }
@@ -383,6 +400,232 @@ function saveCounter(path, counter, dependencies) {
   writeFileSyncFn(path, `${JSON.stringify(counter, null, 2)}\n`, "utf8");
 }
 
+const COUNTER_LOCK_SCHEMA = "pipeline.dispatch-budget-counter-lock.v1";
+
+function processStart(pid, dependencies = {}) {
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+  const text = readFileSyncFn(`/proc/${pid}/stat`, "utf8");
+  const close = text.lastIndexOf(")");
+  if (close < 0) throw new Error("invalid proc stat");
+  const fields = text.slice(close + 2).trim().split(/\s+/u);
+  if (fields.length < 20 || !/^[0-9]+$/u.test(fields[19])) throw new Error("invalid proc start");
+  return fields[19];
+}
+
+function localCounterLockOwner(dependencies = {}) {
+  const platform = dependencies.platform ?? process.platform;
+  const hostnameFn = dependencies.hostnameFn ?? hostname;
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+  const pid = dependencies.pid ?? process.pid;
+  if (platform !== "linux") throw new Error("counter-lock-owner-ambiguous");
+  const hostId = hostnameFn().toLowerCase();
+  const bootId = readFileSyncFn("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase();
+  const processStartValue = processStart(pid, dependencies);
+  if (!/^[A-Za-z0-9._-]{1,120}$/u.test(hostId)
+    || !/^[A-Za-z0-9._-]{1,120}$/u.test(bootId)
+    || !/^[0-9]+$/u.test(processStartValue)) throw new Error("counter-lock-owner-ambiguous");
+  return { platform, hostId, bootId, pid, processStart: processStartValue, nonce: randomUUID().replaceAll("-", "") };
+}
+
+function counterLockBytes(owner) {
+  return Buffer.from(`${JSON.stringify({ schema: COUNTER_LOCK_SCHEMA, owner })}\n`, "utf8");
+}
+
+function counterLockIdentity(path, dependencies = {}, expectedBytes = null) {
+  const lstatSyncFn = dependencies.lstatSyncFn ?? lstatSync;
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+  const info = lstatSyncFn(path);
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) throw new Error("counter-lock-unsafe");
+  const bytes = Buffer.from(readFileSyncFn(path));
+  if (bytes.length === 0 || bytes.length > 4096 || (expectedBytes !== null && !bytes.equals(expectedBytes))) {
+    throw new Error("counter-lock-malformed");
+  }
+  return { dev: String(info.dev), ino: String(info.ino), bytes };
+}
+
+function sameCounterLockIdentity(path, identity, dependencies = {}) {
+  try {
+    const current = counterLockIdentity(path, dependencies, identity.bytes);
+    return current.dev === identity.dev && current.ino === identity.ino;
+  } catch { return false; }
+}
+
+function readCounterLock(path, dependencies = {}) {
+  const identity = counterLockIdentity(path, dependencies);
+  let value;
+  try { value = JSON.parse(identity.bytes.toString("utf8")); } catch { throw new Error("counter-lock-malformed"); }
+  const owner = value?.owner;
+  if (!identity.bytes.equals(counterLockBytes(owner))
+    || value?.schema !== COUNTER_LOCK_SCHEMA
+    || Object.keys(value).sort().join(",") !== "owner,schema"
+    || owner === null || typeof owner !== "object" || Array.isArray(owner)
+    || Object.keys(owner).sort().join(",") !== "bootId,hostId,nonce,pid,platform,processStart"
+    || owner.platform !== "linux"
+    || !/^[A-Za-z0-9._-]{1,120}$/u.test(owner.hostId ?? "")
+    || !/^[A-Za-z0-9._-]{1,120}$/u.test(owner.bootId ?? "")
+    || !Number.isSafeInteger(owner.pid) || owner.pid < 1
+    || !/^[0-9]+$/u.test(owner.processStart ?? "")
+    || !/^[a-f0-9]{32}$/u.test(owner.nonce ?? "")) throw new Error("counter-lock-malformed");
+  return { owner, identity };
+}
+
+function readStableCounterLock(path, dependencies = {}) {
+  let lastError;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try { return readCounterLock(path, dependencies); }
+    catch (error) {
+      lastError = error;
+      // Atomic hard-link publication has one bounded transitional instant with
+      // nlink=2 before the private temporary name is removed. Wait only for
+      // that publisher; persistent malformed state remains fail-closed.
+      if (attempt < 7) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1);
+    }
+  }
+  throw lastError;
+}
+
+function counterLockOwnerState(record, dependencies = {}) {
+  const platform = dependencies.platform ?? process.platform;
+  if (platform !== "linux" || record.owner.platform !== "linux") return "ambiguous";
+  let hostId;
+  let bootId;
+  try {
+    hostId = (dependencies.hostnameFn ?? hostname)().toLowerCase();
+    bootId = (dependencies.readFileSyncFn ?? readFileSync)("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase();
+  } catch { return "ambiguous"; }
+  if (record.owner.hostId !== hostId) return "ambiguous";
+  if (record.owner.bootId !== bootId) return "dead";
+  try { return processStart(record.owner.pid, dependencies) === record.owner.processStart ? "live" : "dead"; }
+  catch (error) { return error?.code === "ENOENT" ? "dead" : "ambiguous"; }
+}
+
+function publishCounterLock(path, dependencies = {}) {
+  const writeFileSyncFn = dependencies.writeFileSyncFn ?? writeFileSync;
+  const linkSyncFn = dependencies.linkSyncFn ?? linkSync;
+  const unlinkSyncFn = dependencies.unlinkSyncFn ?? unlinkSync;
+  let temporary = `${path}.${process.pid}-${randomUUID()}.tmp`;
+  const bytes = counterLockBytes(localCounterLockOwner(dependencies));
+  try {
+    writeFileSyncFn(temporary, bytes, { flag: "wx", mode: 0o600 });
+    linkSyncFn(temporary, path);
+    unlinkSyncFn(temporary);
+    temporary = null;
+    return { path, identity: counterLockIdentity(path, dependencies, bytes) };
+  } finally {
+    if (temporary !== null) try { unlinkSyncFn(temporary); } catch { /* best effort */ }
+  }
+}
+
+export function releaseDispatchBudgetCounterLock(lock, dependencies = {}) {
+  if (!lock || !sameCounterLockIdentity(lock.path, lock.identity, dependencies)) return false;
+  const renameSyncFn = dependencies.renameSyncFn ?? renameSync;
+  const unlinkSyncFn = dependencies.unlinkSyncFn ?? unlinkSync;
+  const quarantine = `${lock.path}.release.${process.pid}-${randomUUID()}`;
+  renameSyncFn(lock.path, quarantine);
+  if (!sameCounterLockIdentity(quarantine, lock.identity, dependencies)) return false;
+  unlinkSyncFn(quarantine);
+  return true;
+}
+
+export function acquireDispatchBudgetCounterLock(path, dependencies = {}) {
+  const mkdirSyncFn = dependencies.mkdirSyncFn ?? mkdirSync;
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+  const renameSyncFn = dependencies.renameSyncFn ?? renameSync;
+  const unlinkSyncFn = dependencies.unlinkSyncFn ?? unlinkSync;
+  mkdirSyncFn(dirname(path), { recursive: true, mode: 0o700 });
+  try { return { status: "acquired", lock: publishCounterLock(path, dependencies), recovered: false }; }
+  catch (error) { if (error?.code !== "EEXIST") return { status: "rejected", code: error?.message ?? "counter-lock-publish" }; }
+
+  let observed;
+  try { observed = readStableCounterLock(path, dependencies); }
+  catch { return { status: "rejected", code: "counter-lock-malformed" }; }
+  const state = counterLockOwnerState(observed, dependencies);
+  if (state === "live") return { status: "rejected", code: "counter-lock-busy" };
+  if (state !== "dead") return { status: "rejected", code: "counter-lock-owner-ambiguous" };
+
+  const recoveryPath = `${path}.recovery`;
+  let recovery;
+  try { recovery = publishCounterLock(recoveryPath, dependencies); }
+  catch (error) {
+    if (error?.code === "EEXIST") {
+      if (!existsSyncFn(recoveryPath)) return { status: "rejected", code: "counter-lock-recovery-raced" };
+      let recoveryObserved;
+      try { recoveryObserved = readStableCounterLock(recoveryPath, dependencies); }
+      catch { return { status: "rejected", code: "counter-lock-recovery-malformed" }; }
+      const recoveryState = counterLockOwnerState(recoveryObserved, dependencies);
+      if (recoveryState !== "dead") return { status: "rejected", code: recoveryState === "live" ? "counter-lock-recovery-busy" : "counter-lock-owner-ambiguous" };
+      const staleRecovery = `${recoveryPath}.dead.${process.pid}-${randomUUID()}`;
+      try {
+        renameSyncFn(recoveryPath, staleRecovery);
+        if (!sameCounterLockIdentity(staleRecovery, recoveryObserved.identity, dependencies)) return { status: "rejected", code: "counter-lock-recovery-changed" };
+        unlinkSyncFn(staleRecovery);
+        recovery = publishCounterLock(recoveryPath, dependencies);
+      } catch { return { status: "rejected", code: "counter-lock-recovery-raced" }; }
+    } else return { status: "rejected", code: error?.message ?? "counter-lock-recovery-publish" };
+  }
+  const quarantine = `${path}.dead.${process.pid}-${randomUUID()}`;
+  try {
+    const current = readStableCounterLock(path, dependencies);
+    if (!sameCounterLockIdentity(path, observed.identity, dependencies)
+      || !current.identity.bytes.equals(observed.identity.bytes)
+      || counterLockOwnerState(current, dependencies) !== "dead") return { status: "rejected", code: "counter-lock-changed" };
+    renameSyncFn(path, quarantine);
+    if (!sameCounterLockIdentity(quarantine, observed.identity, dependencies)) return { status: "rejected", code: "counter-lock-changed" };
+    const lock = publishCounterLock(path, dependencies);
+    unlinkSyncFn(quarantine);
+    return { status: "acquired", lock, recovered: true };
+  } catch { return { status: "rejected", code: "counter-lock-recovery-raced" }; }
+  finally { releaseDispatchBudgetCounterLock(recovery, dependencies); }
+}
+
+function initializeBoundCounter(path, seed, pendingContext, dependencies) {
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+  const unlinkSyncFn = dependencies.unlinkSyncFn ?? unlinkSync;
+  try {
+    if (existsSyncFn(path)) return { status: "prepared", counter: loadCounter(path, seed, dependencies) };
+    saveCounter(path, { schema: "pipeline.dispatch-budget-counter.v1", ...seed, count: 0 }, dependencies);
+    const expected = `${JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", ...seed, count: 0 }, null, 2)}\n`;
+    if (readFileSyncFn(path, "utf8") !== expected) throw new Error("counter readback mismatch");
+    const consumed = (dependencies.consumePendingDispatchBudgetBindingFn ?? consumePendingDispatchBudgetBinding)(pendingContext, dependencies);
+    if (consumed.status !== "consumed") {
+      unlinkSyncFn(path);
+      return { status: "rejected", code: consumed.code };
+    }
+    return { status: "prepared", counter: loadCounter(path, seed, dependencies) };
+  } catch {
+    try { unlinkSyncFn(path); } catch { /* no published counter */ }
+    return { status: "rejected", code: "counter-binding-initialize" };
+  }
+}
+
+function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir, input, nowFn, dependencies }) {
+  const workingCap = Math.min(baseCalls, dispatchWorkingCap(maxTurns));
+  const bindingMatches = counter.agentId === identity.agentId
+    && counter.agentType === identity.agentType
+    && counter.maxTurns === maxTurns
+    && counter.baseCalls === baseCalls
+    && counter.workingCap === workingCap;
+  if (!bindingMatches) {
+    return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: "counter-binding-mismatch" });
+  }
+  const preliminaryBudget = decideDispatchBudgetCall({ maxTurns, baseCalls, currentCount: counter.count, isClosingAct: false });
+  if (preliminaryBudget.decision === "invalid-input") {
+    return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: preliminaryBudget.reason });
+  }
+  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir)
+    ? decideDispatchBudgetCall({ maxTurns, baseCalls, currentCount: counter.count, isClosingAct: true })
+    : preliminaryBudget;
+  counter.count = budget.nextCount;
+  counter.updatedAt = nowFn();
+  saveCounter(path, counter, dependencies);
+  if (budget.allowed) return verdict(0);
+  return blocked({
+    agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls,
+    workingCap: budget.workingCap, count: counter.count,
+  });
+}
+
 function digest(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -536,6 +779,36 @@ function dispatchBudgetCallerIdentity(input) {
   });
 }
 
+function normalizedAgentType(value) {
+  if (typeof value !== "string") return null;
+  return value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
+}
+
+export function resolveParentDispatchToolUseId(input, identity, dependencies = {}) {
+  const transcriptPath = input?.transcript_path;
+  if (typeof transcriptPath !== "string" || !isAbsolute(transcriptPath) || !transcriptPath.endsWith(".jsonl")) {
+    return { status: "rejected", code: "parent-transcript-path-unusable" };
+  }
+  const agentId = identity?.agentId;
+  if (typeof agentId !== "string" || agentId.trim() === "" || agentId.includes("/") || agentId.includes("\\")) {
+    return { status: "rejected", code: "agent-id-unusable" };
+  }
+  const sessionDir = transcriptPath.slice(0, -".jsonl".length);
+  const metaPath = join(sessionDir, "subagents", `agent-${agentId}.meta.json`);
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+  if (!existsSyncFn(metaPath)) return { status: "rejected", code: "agent-meta-missing", metaPath };
+  let meta;
+  try { meta = JSON.parse(readFileSyncFn(metaPath, "utf8")); }
+  catch { return { status: "rejected", code: "agent-meta-unparseable", metaPath }; }
+  if (!Number.isFinite(meta?.spawnDepth) || meta.spawnDepth < 1
+    || normalizedAgentType(meta.agentType) !== normalizedAgentType(identity.agentType)
+    || typeof meta.toolUseId !== "string" || meta.toolUseId.trim() === "") {
+    return { status: "rejected", code: "agent-meta-binding-invalid", metaPath };
+  }
+  return { status: "prepared", toolUseId: meta.toolUseId, metaPath };
+}
+
 export function evaluateDispatchBudgetGuard(input, options = {}) {
   const rootDir = options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
   const nowFn = options.nowFn ?? (() => new Date().toISOString());
@@ -576,35 +849,58 @@ export function evaluateDispatchBudgetGuard(input, options = {}) {
     return verdict(0);
   }
 
-  const workingCap = dispatchWorkingCap(maxTurns);
+  const contract = (options.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType);
   const path = counterPath(commonDir, identity.agentId);
-  const counter = loadCounter(path, {
-    agentId: identity.agentId, agentType: identity.agentType, maxTurns, workingCap,
-  }, options);
-  // First validate and advance as a normal work call. Only a valid exhausted
-  // state may ask the Claude adapter to parse the concrete closing-call shape.
-  // Invalid persisted values therefore cannot coerce comparisons or recover a
-  // fresh allowance, and valid under-cap calls keep the established call order.
-  const preliminaryBudget = decideDispatchBudgetCall({ maxTurns, currentCount: counter.count, isClosingAct: false });
-  if (preliminaryBudget.decision === "invalid-input") {
-    return invalidBudgetInputBlocked({
-      agentId: identity.agentId,
-      agentType: identity.agentType,
-      reason: preliminaryBudget.reason,
-    });
+  const existsSyncFn = options.existsSyncFn ?? existsSync;
+  let baseCalls = dispatchWorkingCap(maxTurns);
+  let counter;
+  if (contract.applicable) {
+    if (contract.maxTurns !== maxTurns) {
+      return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: "budget-tier-max-turns-conflict" });
+    }
+    const lockPath = `${path}.binding.lock`;
+    const acquired = (options.acquireDispatchBudgetCounterLockFn ?? acquireDispatchBudgetCounterLock)(lockPath, options);
+    if (acquired.status !== "acquired") {
+      return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: acquired.code });
+    }
+    try {
+      options.afterCounterLockAcquiredFn?.();
+      if (existsSyncFn(path)) {
+        counter = loadCounter(path, {}, options);
+        baseCalls = counter.baseCalls;
+      } else {
+        const parent = (options.resolveParentDispatchToolUseIdFn ?? resolveParentDispatchToolUseId)(input, identity, options);
+        if (parent.status !== "prepared") {
+          return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: parent.code });
+        }
+        const pendingContext = { commonDir, toolUseId: parent.toolUseId, agentType: identity.agentType };
+        const pending = (options.resolvePendingDispatchBudgetBindingFn ?? resolvePendingDispatchBudgetBinding)(pendingContext, options);
+        if (pending.status !== "prepared") {
+          return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: pending.code });
+        }
+        if (pending.binding.maxTurns !== maxTurns) {
+          return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: "pending-binding-tier-conflict" });
+        }
+        baseCalls = pending.binding.baseCalls;
+        const workingCap = Math.min(baseCalls, dispatchWorkingCap(maxTurns));
+        const initialized = initializeBoundCounter(path, {
+          agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls, workingCap,
+        }, { ...pendingContext, binding: pending.binding }, options);
+        if (initialized.status !== "prepared") {
+          return invalidBudgetInputBlocked({ agentId: identity.agentId, agentType: identity.agentType, reason: initialized.code });
+        }
+        counter = initialized.counter;
+      }
+      return advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir, input, nowFn, dependencies: options });
+    } finally {
+      (options.releaseDispatchBudgetCounterLockFn ?? releaseDispatchBudgetCounterLock)(acquired.lock, options);
+    }
   }
-  const budget = preliminaryBudget.decision === "exhausted" && isClosingAct(input, rootDir)
-    ? decideDispatchBudgetCall({ maxTurns, currentCount: counter.count, isClosingAct: true })
-    : preliminaryBudget;
-  counter.count = budget.nextCount;
-  counter.updatedAt = nowFn();
-  saveCounter(path, counter, options);
-
-  if (budget.allowed) return verdict(0);
-
-  return blocked({
-    agentId: identity.agentId, agentType: identity.agentType, maxTurns, workingCap: budget.workingCap, count: counter.count,
-  });
+  const workingCap = Math.min(baseCalls, dispatchWorkingCap(maxTurns));
+  counter ??= loadCounter(path, {
+    agentId: identity.agentId, agentType: identity.agentType, maxTurns, baseCalls, workingCap,
+  }, options);
+  return advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir, input, nowFn, dependencies: options });
 }
 
 if (isDirectInvocation(import.meta.url)) {

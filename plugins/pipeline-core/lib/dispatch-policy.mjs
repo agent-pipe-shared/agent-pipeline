@@ -28,6 +28,8 @@
  * detect a determined one, and it is not a substitute for reading the template.
  */
 
+import { bindDispatchBudget } from "./dispatch-budget-binding.mjs";
+
 const CRITIC_ROLES = /critic|readiness-reviewer|plan-verifier/i;
 const GOLDFISH_ROLES = /goldfish/i;
 const PIPELINE_AGENT_TYPES = new Set([
@@ -40,6 +42,26 @@ const PIPELINE_AGENT_TYPES = new Set([
   "plan-verifier",
   "readiness-reviewer",
 ]);
+const BUDGETED_ROLE_MAX_TURNS = Object.freeze({
+  critic: 30,
+  "goldfish-deep": 80,
+  "goldfish-implementor": 50,
+  "goldfish-mechanic": 50,
+});
+
+export function dispatchBudgetContractForRole(subagentType) {
+  const type = typeof subagentType === "string" ? subagentType : "";
+  const bareType = type.startsWith("pipeline-core:") ? type.slice("pipeline-core:".length) : type;
+  if (!Object.hasOwn(BUDGETED_ROLE_MAX_TURNS, bareType)) {
+    return Object.freeze({ applicable: false, role: bareType });
+  }
+  return Object.freeze({ applicable: true, role: bareType, maxTurns: BUDGETED_ROLE_MAX_TURNS[bareType] });
+}
+
+export function dispatchBudgetBinding({ subagentType, prompt } = {}) {
+  const contract = dispatchBudgetContractForRole(subagentType);
+  return bindDispatchBudget({ prompt, maxTurns: contract.maxTurns, applicable: contract.applicable });
+}
 
 /**
  * Phrases the Critic template names as contamination. Each carries the reason, because a
@@ -124,6 +146,14 @@ export function dispatchFindings({ subagentType, prompt, transport = "direct" } 
   }
   if ((supported || namespaced || transport === "codex") && text.trim() === "") {
     findings.push({ code: "DISPATCH-PROMPT-REQUIRED", why: "a shipped role needs a non-empty prompt before any runner or model starts" });
+  }
+
+  const budget = dispatchBudgetBinding({ subagentType: bareType, prompt: text });
+  if (text.trim() !== "" && budget.status === "rejected") {
+    findings.push({
+      code: budget.code,
+      why: "the dispatch metadata must carry exactly one positive numeric base tool cap that can be bound to the selected role before launch",
+    });
   }
 
   if (CRITIC_ROLES.test(bareType)) {

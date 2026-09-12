@@ -12,7 +12,7 @@
  * adjacency bug ship green while every real template-built dispatch was refused.
  */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,6 +30,9 @@ import { fileURLToPath } from "node:url";
 // (missing success marker) rather than silently vanish the whole file's coverage.
 const GUARD = fileURLToPath(new URL("./guard-dispatch.mjs", import.meta.url));
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const bindingRepo = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-binding-"));
+execFileSync("git", ["init", "-q"], { cwd: bindingRepo });
+process.once("exit", () => rmSync(bindingRepo, { recursive: true, force: true }));
 
 function filledTemplateBody(relativePath) {
   const raw = readFileSync(join(repoRoot, relativePath), "utf8");
@@ -40,6 +43,7 @@ function filledTemplateBody(relativePath) {
   body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-opus-5");
   body = body.replace(/\{\{EFFORT\}\}/g, "max");
   body = body.replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium");
+  body = body.replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses");
   body = body.replace(/\{\{[^{}]*\}\}/g, "FILLED");
   return body;
 }
@@ -47,7 +51,9 @@ function filledTemplateBody(relativePath) {
 let pass = 0;
 const failures = [];
 function run(payload) {
-  const res = spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), encoding: "utf8" });
+  const res = spawnSync(process.execPath, [GUARD], {
+    input: JSON.stringify(payload), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: bindingRepo },
+  });
   return { code: res.status, stderr: res.stderr ?? "" };
 }
 function check(id, payload, expectExit, { stderrIncludes } = {}) {
@@ -70,6 +76,7 @@ const CLEAN_CRITIC = [
   "GUARDRAILS: guardrails/global.md",
   "EVIDENCE ARTIFACTS: evidence/verify-latest.json",
   "TASK FRAME: risk class high; Ruleset-SHA: 0f38b425; Model: claude-opus-5.",
+  "- **Tool budget (hard cap, first-class field):** ≤24 tool uses.",
 ].join("\n");
 
 // GD1 -- the failure this hook exists for, at the hook boundary.
@@ -79,6 +86,7 @@ check("GD1 block  a Critic dispatch carrying a claims list", {
 }, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", "templates/prompts/critic-review.md"] });
 
 check("GD2 allow  a references-only Critic dispatch", {
+  tool_use_id: "gd2",
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
 }, ALLOW);
@@ -107,11 +115,13 @@ check("GD7 allow  a dispatch with no subagent type", { tool_input: { prompt: "an
 
 // GD8/GD9 -- the real templates, filled, must be dispatchable at the hook boundary too.
 check("GD8 the real critic-review.md template, filled, is dispatchable", {
+  tool_use_id: "gd8",
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:critic", prompt: filledTemplateBody("templates/prompts/critic-review.md") },
 }, ALLOW);
 
 check("GD9 the real goldfish-task.md template, filled, is dispatchable", {
+  tool_use_id: "gd9",
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: filledTemplateBody("templates/prompts/goldfish-task.md") },
 }, ALLOW);
@@ -145,6 +155,7 @@ async function main() {
 }
 `;
 check("GD11 allow  a Workflow-embedded agent() call with a clean references-only prompt", {
+  tool_use_id: "gd11",
   tool_name: "Workflow",
   tool_input: { script: WORKFLOW_SCRIPT_CLEAN },
 }, ALLOW);
@@ -295,9 +306,15 @@ check("GD17 block  via the real path, a refusable dispatch still refuses after t
 }, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", "templates/prompts/critic-review.md"] });
 
 check("GD18 allow  via the real path, an admissible dispatch still admits after the entrypoint gate", {
+  tool_use_id: "gd18",
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
 }, ALLOW);
+
+check("GD18a block a budget-bearing Claude dispatch without its parent tool-use id before launch", {
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
+}, BLOCK, { stderrIncludes: ["DBB-PARENT-TOOL-USE-ID-MISSING"] });
 
 {
   const id = "GD19 block  invoked through a symlink to the module, the hook still refuses (the 2026-08-06 failure shape)";

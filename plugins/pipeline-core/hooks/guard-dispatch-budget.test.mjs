@@ -33,6 +33,7 @@
  * of the isDirectInvocation() gate itself remains a follow-up, not attempted here.
  */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -47,6 +48,13 @@ const META_PATH = "/fake/session/subagents/agent-abc123.meta.json";
 const ORCHESTRATOR_TRANSCRIPT = "/fake/session/top-level.jsonl";
 const COMMON_DIR = "/fake/.git";
 const COUNTER_PATH = `${COMMON_DIR}/agent-pipeline/dispatch-budget/abc123.json`;
+const PARENT_META_PATH = "/fake/session/parent/subagents/agent-abc123.meta.json";
+const pendingBindingPath = (toolUseId) => `${COMMON_DIR}/agent-pipeline/dispatch-budget/pending/${createHash("sha256").update(toolUseId).digest("hex")}.json`;
+const pendingBinding = ({ toolUseId = "parent-tool-1", baseCalls, maxTurns = 50, effectiveCap }) => `${JSON.stringify({
+  schema: "pipeline.pending-dispatch-budget-binding.v1",
+  toolUseIdSha256: createHash("sha256").update(toolUseId).digest("hex"),
+  bindings: [{ agentType: "goldfish-implementor", baseCalls, maxTurns, effectiveCap }],
+})}\n`;
 
 const agentDefPath = (name) => `${FAKE_ROOT}/plugins/pipeline-core/agents/${name}.md`;
 const AGENT_DEF_PATH = agentDefPath("goldfish-deep");
@@ -86,12 +94,17 @@ const RUNNER_SOURCE = [
   "const nowFn = () => scenario.nowIso || '2026-08-27T00:00:00.000Z';",
   "",
   "function baseOpts() {",
-  "  const o = { resolveGitCommonDirFn, nowFn, existsSyncFn, readFileSyncFn, writeFileSyncFn, mkdirSyncFn, appendFileSyncFn, linkSyncFn, unlinkSyncFn };",
+  "  const o = { resolveGitCommonDirFn, nowFn, existsSyncFn, readFileSyncFn, writeFileSyncFn, mkdirSyncFn, appendFileSyncFn, linkSyncFn, unlinkSyncFn,",
+  "    acquireDispatchBudgetCounterLockFn: (path) => ({ status: 'acquired', lock: { path } }),",
+  "    releaseDispatchBudgetCounterLockFn: () => true,",
+  "  };",
+  "  if (!scenario.realBudgetBinding) o.dispatchBudgetContractForRoleFn = (agentType) => ({ applicable: false, role: agentType });",
   "  if (!scenario.rootDirAbsent) o.rootDir = scenario.rootDir;",
   "  return o;",
   "}",
   "",
   "const results = [];",
+  "let realLock = null;",
   "for (const step of (scenario.steps || [])) {",
   "  if (step.op === 'guard') {",
   "    const r = mod.evaluateDispatchBudgetGuard(step.input, baseOpts());",
@@ -117,6 +130,13 @@ const RUNNER_SOURCE = [
   "    results.push(files.size);",
   "  } else if (step.op === 'constants') {",
   "    results.push({ DENIAL_CODE: mod.DENIAL_CODE, CLOSING_ALLOWANCE: mod.CLOSING_ALLOWANCE, SAFETY_MARGIN: mod.SAFETY_MARGIN });",
+  "  } else if (step.op === 'acquireRealLock') {",
+  "    const r = mod.acquireDispatchBudgetCounterLock(step.path);",
+  "    if (r.status === 'acquired') realLock = r.lock;",
+  "    results.push({ status: r.status, code: r.code || null, recovered: r.recovered || false });",
+  "  } else if (step.op === 'releaseRealLock') {",
+  "    results.push(mod.releaseDispatchBudgetCounterLock(realLock));",
+  "    realLock = null;",
   "  } else {",
   "    throw new Error('unknown op ' + step.op);",
   "  }",
@@ -131,6 +151,21 @@ mkdirSync(SCRATCH_ROOT, { recursive: true });
 const runnerDir = mkdtempSync(join(SCRATCH_ROOT, "guard-dispatch-budget-runner-"));
 const RUNNER_PATH = join(runnerDir, "runner.mjs");
 writeFileSync(RUNNER_PATH, RUNNER_SOURCE);
+const PARALLEL_COUNTER_RUNNER_PATH = join(runnerDir, "parallel-counter-runner.mjs");
+writeFileSync(PARALLEL_COUNTER_RUNNER_PATH, [
+  "const [, , guardPath, configB64] = process.argv;",
+  "const { commonDir, counterPath } = JSON.parse(Buffer.from(configB64, 'base64').toString('utf8'));",
+  "const { evaluateDispatchBudgetGuard } = await import(guardPath);",
+  "const input = { agent_id: 'parallel-agent', agent_type: 'pipeline-core:goldfish-implementor', transcript_path: '/unused.jsonl', tool_name: 'Read', tool_input: { file_path: '/x' } };",
+  "let result;",
+  "for (let attempt = 0; attempt < 1000; attempt += 1) {",
+  "  result = evaluateDispatchBudgetGuard(input, { rootDir: '/unused', resolveGitCommonDirFn: () => commonDir, resolveMaxTurnsFn: () => 50 });",
+  "  if (result.exitCode === 0) break;",
+  "  if (!result.stderr.includes('counter-lock-busy') && !result.stderr.includes('counter-lock-recovery-busy')) break;",
+  "  await new Promise((resolve) => setTimeout(resolve, 2));",
+  "}",
+  "console.log(JSON.stringify({ exitCode: result.exitCode, stderr: result.stderr, count: JSON.parse((await import('node:fs')).readFileSync(counterPath, 'utf8')).count }));",
+].join("\n"));
 process.on("exit", () => { try { rmSync(runnerDir, { recursive: true, force: true }); } catch { /* best effort */ } });
 
 /** Spawns the runner against the REAL guard module and returns its parsed RESULT payload. Fails loudly (never silently) if the child does not print the success marker -- see the file-top NOTE for why. */
@@ -493,6 +528,133 @@ function measuredOrchestratorPayload(overrides = {}) {
 function measuredSubagentPayload(overrides = {}) {
   return { ...measuredOrchestratorPayload(), agent_id: "abc123", agent_type: "pipeline-core:goldfish-deep", ...overrides };
 }
+
+function boundImplementorFiles(baseCalls, effectiveCap) {
+  const toolUseId = "parent-tool-1";
+  return {
+    [agentDefPath("goldfish-implementor")]: "---\nname: goldfish-implementor\nmaxTurns: 50\n---\n",
+    [PARENT_META_PATH]: JSON.stringify({ agentType: "pipeline-core:goldfish-implementor", description: "x", toolUseId, spawnDepth: 1 }),
+    [pendingBindingPath(toolUseId)]: pendingBinding({ toolUseId, baseCalls, effectiveCap }),
+  };
+}
+
+test("a preflight-bound base cap of 20 denies the twenty-first authenticated child work call", () => {
+  const input = measuredSubagentPayload({ agent_type: "pipeline-core:goldfish-implementor" });
+  const steps = [
+    { op: "guard", input },
+    { op: "getFile", path: pendingBindingPath("parent-tool-1") },
+    ...Array.from({ length: 20 }, () => ({ op: "guard", input })),
+  ];
+  const { results } = run({ rootDir: FAKE_ROOT, realBudgetBinding: true, files: boundImplementorFiles(20, 20), steps });
+  assert.equal(results[1], null, "the first authenticated child call consumes its pending binding");
+  assert.equal(results[0].exitCode, 0);
+  assert.ok(results.slice(2, 21).every(({ exitCode }) => exitCode === 0));
+  assert.equal(results[21].exitCode, 2);
+  assert.match(results[21].stderr, /working cap of 20/u);
+});
+
+test("an altered pending record cannot overwrite an already-bound child counter", () => {
+  const files = boundImplementorFiles(40, 35);
+  files[COUNTER_PATH] = `${JSON.stringify({
+    schema: "pipeline.dispatch-budget-counter.v1", agentId: "abc123",
+    agentType: "pipeline-core:goldfish-implementor", maxTurns: 50,
+    baseCalls: 20, workingCap: 20, count: 1,
+  }, null, 2)}\n`;
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    realBudgetBinding: true,
+    files,
+    steps: [
+      { op: "guard", input: measuredSubagentPayload({ agent_type: "pipeline-core:goldfish-implementor" }) },
+      { op: "getFile", path: COUNTER_PATH },
+    ],
+  });
+  assert.equal(results[0].exitCode, 0);
+  const counter = JSON.parse(results[1]);
+  assert.equal(counter.baseCalls, 20);
+  assert.equal(counter.workingCap, 20);
+  assert.equal(counter.count, 2);
+});
+
+test("an implementor base cap of 40 is limited to the tier-safe cap of 35", () => {
+  const input = measuredSubagentPayload({ agent_type: "pipeline-core:goldfish-implementor" });
+  const steps = Array.from({ length: 36 }, () => ({ op: "guard", input }));
+  const { results } = run({ rootDir: FAKE_ROOT, realBudgetBinding: true, files: boundImplementorFiles(40, 35), steps });
+  assert.ok(results.slice(0, 35).every(({ exitCode }) => exitCode === 0));
+  assert.equal(results[35].exitCode, 2);
+  assert.match(results[35].stderr, /working cap of 35/u);
+  assert.match(results[35].stderr, /min\(baseCalls=40, maxTurns=50/u);
+});
+
+test("a budget-bearing child with an attested parent tool id but no pending binding fails closed", () => {
+  const files = boundImplementorFiles(20, 20);
+  delete files[pendingBindingPath("parent-tool-1")];
+  const { results } = run({
+    rootDir: FAKE_ROOT,
+    realBudgetBinding: true,
+    files,
+    steps: [{ op: "guard", input: measuredSubagentPayload({ agent_type: "pipeline-core:goldfish-implementor" }) }],
+  });
+  assert.equal(results[0].exitCode, 2);
+  assert.match(results[0].stderr, /DBB-PENDING-BINDING-MISSING/u);
+});
+
+test("a live counter owner blocks a second acquisition and releases its exact inode", () => {
+  const lockDir = mkdtempSync(join(runnerDir, "live-lock-"));
+  const lockPath = join(lockDir, "agent.json.binding.lock");
+  const { results } = run({ steps: [
+    { op: "acquireRealLock", path: lockPath },
+    { op: "acquireRealLock", path: lockPath },
+    { op: "releaseRealLock" },
+  ] });
+  assert.deepEqual(results[0], { status: "acquired", code: null, recovered: false });
+  assert.deepEqual(results[1], { status: "rejected", code: "counter-lock-busy", recovered: false });
+  assert.equal(results[2], true);
+});
+
+test("a binding lock left by a dead process is identity-checked and recovered", () => {
+  const lockDir = mkdtempSync(join(runnerDir, "dead-lock-"));
+  const lockPath = join(lockDir, "agent.json.binding.lock");
+  const first = run({ steps: [{ op: "acquireRealLock", path: lockPath }] });
+  assert.deepEqual(first.results[0], { status: "acquired", code: null, recovered: false });
+  const second = run({ steps: [
+    { op: "acquireRealLock", path: lockPath },
+    { op: "releaseRealLock" },
+  ] });
+  assert.deepEqual(second.results[0], { status: "acquired", code: null, recovered: true });
+  assert.equal(second.results[1], true);
+});
+
+test("concurrent authenticated child calls serialize counter RMW without lost increments", async () => {
+  const commonDir = mkdtempSync(join(runnerDir, "parallel-counter-"));
+  const counterPath = join(commonDir, "agent-pipeline", "dispatch-budget", "parallel-agent.json");
+  mkdirSync(join(commonDir, "agent-pipeline", "dispatch-budget"), { recursive: true, mode: 0o700 });
+  writeFileSync(counterPath, `${JSON.stringify({
+    schema: "pipeline.dispatch-budget-counter.v1",
+    agentId: "parallel-agent",
+    agentType: "pipeline-core:goldfish-implementor",
+    maxTurns: 50,
+    baseCalls: 35,
+    workingCap: 35,
+    count: 0,
+  }, null, 2)}\n`);
+  const config = Buffer.from(JSON.stringify({ commonDir, counterPath }), "utf8").toString("base64");
+  const invoke = () => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [PARALLEL_COUNTER_RUNNER_PATH, GUARD, config], { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) reject(new Error(`parallel worker exited ${code}: ${stderr}`));
+      else resolve(JSON.parse(stdout.trim()));
+    });
+  });
+  const results = await Promise.all(Array.from({ length: 16 }, invoke));
+  assert.ok(results.every(({ exitCode }) => exitCode === 0), JSON.stringify(results));
+  assert.equal(JSON.parse(readFileSync(counterPath, "utf8")).count, 16);
+});
 
 test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): the two measured live PreToolUse payload key sets are pinned as fixtures", () => {
   assert.deepEqual(Object.keys(measuredOrchestratorPayload()).sort(), [...ORCHESTRATOR_PAYLOAD_KEYS].sort());

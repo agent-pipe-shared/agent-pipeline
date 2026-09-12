@@ -49,6 +49,14 @@ export function dispatchWorkingCap(maxTurns) {
   return Math.max(0, maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN));
 }
 
+/** Bind a declared work cap to the smaller capacity the selected tier can safely carry. */
+export function effectiveDispatchBaseCap(baseCalls, maxTurns) {
+  if (!Number.isSafeInteger(baseCalls) || baseCalls <= 0) return null;
+  const workingCap = dispatchWorkingCap(maxTurns);
+  if (workingCap === null) return null;
+  return Math.min(baseCalls, workingCap);
+}
+
 function invalidBudgetInput(reason) {
   return {
     allowed: false,
@@ -68,12 +76,13 @@ function invalidBudgetInput(reason) {
  */
 export function decideDispatchBudgetCall(input = {}) {
   if (input === null || typeof input !== "object" || Array.isArray(input)) return invalidBudgetInput("budget-call-input-must-be-an-object");
-  const { maxTurns, currentCount, isClosingAct } = input;
+  const { maxTurns, baseCalls, currentCount, isClosingAct } = input;
   if (!Number.isSafeInteger(maxTurns) || maxTurns <= 0) return invalidBudgetInput("max-turns-must-be-a-positive-safe-integer");
+  if (!Number.isSafeInteger(baseCalls) || baseCalls <= 0) return invalidBudgetInput("base-calls-must-be-a-positive-safe-integer");
   if (!Number.isSafeInteger(currentCount) || currentCount < 0) return invalidBudgetInput("current-count-must-be-a-nonnegative-safe-integer");
   if (currentCount === Number.MAX_SAFE_INTEGER) return invalidBudgetInput("current-count-cannot-be-incremented-safely");
   if (typeof isClosingAct !== "boolean") return invalidBudgetInput("is-closing-act-must-be-boolean");
-  const workingCap = dispatchWorkingCap(maxTurns);
+  const workingCap = effectiveDispatchBaseCap(baseCalls, maxTurns);
   const nextCount = currentCount + 1;
   if (nextCount <= workingCap) {
     return { allowed: true, decision: "working", nextCount, workingCap };

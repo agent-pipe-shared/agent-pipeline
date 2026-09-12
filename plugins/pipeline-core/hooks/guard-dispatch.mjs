@@ -54,8 +54,10 @@
  */
 import { readFileSync } from "node:fs";
 
-import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
+import { dispatchBudgetBinding, dispatchFindings } from "../lib/dispatch-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 
 // Recover `{ agentType: '...', prompt: `...` }`-shaped dispatches embedded in a Workflow
 // script body. Regex-based, not a JS parser: it only claims the statically-obvious case.
@@ -155,10 +157,40 @@ if (isDirectInvocation(import.meta.url)) {
     process.exit(0);
   }
 
-  const blocked = dispatches
-    .map((d) => dispatchFindings(d))
-    .filter((r) => r.findings.length > 0);
-  if (blocked.length === 0) process.exit(0);
+  const evaluated = dispatches.map((dispatch) => ({
+    dispatch,
+    policy: dispatchFindings(dispatch),
+    budget: dispatchBudgetBinding(dispatch),
+  }));
+  const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
+  if (blocked.length === 0) {
+    const budgetBindings = evaluated
+      .filter(({ budget }) => budget.status === "prepared")
+      .map(({ dispatch, budget }) => ({
+        agentType: dispatch.subagentType,
+        baseCalls: budget.baseCalls,
+        maxTurns: budget.maxTurns,
+        effectiveCap: budget.effectiveCap,
+      }));
+    const toolUseId = input?.tool_use_id ?? input?.toolUseId;
+    const bindingCapableTool = ["Task", "Agent", "Workflow"].includes(input?.tool_name);
+    if (bindingCapableTool && budgetBindings.length > 0) {
+      if (typeof toolUseId !== "string" || toolUseId.trim() === "") {
+        process.stderr.write("BLOCKED (guard-dispatch, plugin pipeline-core): DBB-PARENT-TOOL-USE-ID-MISSING: a budget-bearing dispatch requires the host tool-use id before launch.\n");
+        process.exit(2);
+      }
+      const rootDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+      const commonDir = resolveGitCommonDir(rootDir);
+      const persisted = commonDir === null
+        ? { status: "rejected", code: "DBB-PENDING-BINDING-WRITE" }
+        : persistPendingDispatchBudgetBindings({ commonDir, toolUseId, bindings: budgetBindings });
+      if (persisted.status !== "prepared") {
+        process.stderr.write(`BLOCKED (guard-dispatch, plugin pipeline-core): ${persisted.code}: the validated tool budget could not be bound to this dispatch before launch.\n`);
+        process.exit(2);
+      }
+    }
+    process.exit(0);
+  }
 
   const { role, findings } = blocked[0];
   const template = role === "critic" ? "templates/prompts/critic-review.md"

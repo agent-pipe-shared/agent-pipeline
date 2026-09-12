@@ -43,6 +43,7 @@ function filledTemplateBody(relativePath) {
   body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-opus-5");
   body = body.replace(/\{\{EFFORT\}\}/g, "max");
   body = body.replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium");
+  body = body.replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses");
   body = body.replace(/\{\{[^{}]*\}\}/g, "FILLED");
   return body;
 }
@@ -79,7 +80,8 @@ EVIDENCE ARTIFACTS: evidence/verify-latest.json evidence/security-latest.json
 DECISION AUTHORITY: docs/adr/0056-push-approval-mode.md
 
 TASK FRAME: project agent-pipeline; risk class high; rigor T2;
-Ruleset-SHA: 0f38b425; Model: claude-opus-5; effort high.`;
+Ruleset-SHA: 0f38b425; Model: claude-opus-5; effort high.
+- **Tool budget (hard cap, first-class field):** ≤24 tool uses.`;
 
 const CLEAN_GOLDFISH = `## Briefing NVA-1: close the thing
 
@@ -99,13 +101,15 @@ The endpoint streams without OOM; AC-1..AC-3 pass.
 - Tool budget reached.
 
 ### 6. Dispatch-Metadaten
-Model: claude-sonnet-5; effort medium; Ruleset-SHA: 0f38b425.`;
+Model: claude-sonnet-5; effort medium; Ruleset-SHA: 0f38b425.
+- **Tool budget (TB-09, hard cap, first-class field):** ≤40 tool uses.`;
 
 // DP1 -- the case this exists for.
 check("DP1 the real 2026-08-06 briefing is refused", () => {
   const result = dispatchFindings({ subagentType: "pipeline-core:critic", prompt: REAL_BRIEFING });
   assert.equal(result.role, "critic");
   assert.deepEqual(codes(result), [
+    "DBB-BASE-CAP-MISSING",
     "DISPATCH-CONTAMINATION-CLAIMS-LIST",
     "DISPATCH-CONTAMINATION-HUNT-LIST",
     "DISPATCH-CONTAMINATION-RERUN-COMMANDS",
@@ -146,6 +150,30 @@ check("DP7 an incomplete Goldfish briefing names what is missing", () => {
 check("DP8 a Goldfish dispatch that names no model is refused", () => {
   const prompt = CLEAN_GOLDFISH.replace(/Model: \S+;\s*/, "");
   assert.ok(codes(dispatchFindings({ subagentType: "pipeline-core:goldfish-mechanic", prompt })).includes("DISPATCH-NO-MODEL"));
+});
+
+check("DP8b every budget-bearing role binds its declared cap before launch", () => {
+  const fixtures = [
+    ["critic", CLEAN_CRITIC],
+    ["goldfish-implementor", CLEAN_GOLDFISH],
+    ["goldfish-mechanic", CLEAN_GOLDFISH],
+    ["goldfish-deep", CLEAN_GOLDFISH.replace("≤40 tool uses", "≤45 tool uses")],
+  ];
+  for (const [role, prompt] of fixtures) {
+    assert.equal(codes(dispatchFindings({ subagentType: `pipeline-core:${role}`, prompt })).some((code) => code.startsWith("DBB-")), false, role);
+  }
+});
+
+check("DP8c budget-bearing roles reject missing, ambiguous and nonnumeric caps", () => {
+  const noBudget = CLEAN_GOLDFISH.replace(/^- \*\*Tool budget.*\n?/mu, "");
+  assert.ok(codes(dispatchFindings({ subagentType: "pipeline-core:goldfish-implementor", prompt: noBudget })).includes("DBB-BASE-CAP-MISSING"));
+  assert.ok(codes(dispatchFindings({ subagentType: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n- Tool budget: 10 tool uses.` })).includes("DBB-BASE-CAP-AMBIGUOUS"));
+  assert.ok(codes(dispatchFindings({ subagentType: "pipeline-core:goldfish-deep", prompt: CLEAN_GOLDFISH.replace("≤40 tool uses", "forty tool uses") })).includes("DBB-BASE-CAP-NONNUMERIC"));
+});
+
+check("DP8d a role without an adopted budget field receives no fabricated budget finding", () => {
+  const result = dispatchFindings({ subagentType: "pipeline-core:consult-advisor", prompt: "Inspect the supplied paths." });
+  assert.equal(codes(result).some((code) => code.startsWith("DBB-")), false);
 });
 
 // DP9 -- roles with no template contract carry no requirement. Inventing one would refuse
@@ -526,7 +554,7 @@ const fixtureCheck = (label, run) => check(label, async () => {
     }
   });
 
-assert.equal(cases.length, 31, "the complete dispatch-policy corpus must be registered before execution begins");
+assert.equal(cases.length, 34, "the complete dispatch-policy corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
