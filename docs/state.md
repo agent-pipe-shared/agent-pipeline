@@ -590,6 +590,20 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
 - The current Main-Verify consumer-safe-path false positive was corrected in
   `23f178b2`; its repository check and 35 focused tests pass.
 
+### 2026-09-12 Nova-B design update
+
+- The non-dispatch governance-action gap now has a reviewed proposed design at
+  `docs/adr/draft-governance-action-events.md`. It keeps dispatch/status on the
+  existing dispatch-correlated lifecycle payload and introduces a separate,
+  closed `pipeline.governance-action-event.v1` payload in the same stream for
+  verification, review, gate, recovery, and reconciliation actions. A second
+  Critic round passed after exact candidate binding, envelope equalities, ID
+  derivation, and the complete kind/status/reason matrix were specified.
+- Implementation remains unstarted pending formal ADR acceptance. The first
+  slice also repairs the already measured four-versus-six lifecycle correlation
+  schema drift. Native Codex sandbox or App-Server behavior under WSL is not an
+  input, acceptance criterion, or readiness claim for this work.
+
 ## Operational head
 
 - Project calibration: [`project/pipeline.json`](../project/pipeline.json).

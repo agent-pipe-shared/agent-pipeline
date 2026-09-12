@@ -186,3 +186,140 @@ Not blocked on the PO: this is the Elephant's decision to make and record. It is
 held here rather than made in passing because a schema shape for a governance
 audit trail deserves its own pass, not a paragraph written between two
 dispatches.
+
+## Nova-B design decision and executable slices — 2026-09-12
+
+Option B is selected in
+`docs/adr/draft-governance-action-events.md`, based on the current-source audit
+in `backlog/evidence/NVA-B-LIFECYCLE-NONDISPATCH-DESIGN-1.md`.
+
+The five non-dispatch facts use a separate closed
+`pipeline.governance-action-event.v1` payload in the existing `lifecycle`
+stream. Lifecycle v1 stays dispatch-correlated. Candidate invalidation and a
+cancelled status stay queue-state-machine work and are not part of these action
+slices. The item remains `open` until the applicable slices below are green.
+
+### LND-0 — published lifecycle-v1 parity
+
+- **WHEN** the published lifecycle JSON schema and runtime validator are
+  compared, **THEN** both require exactly the six correlation fields
+  `packageId`, `dispatchId`, `attemptId`, `workerId`, `correlationId`, and
+  `queueRevision`, with the same ID and non-negative-integer constraints.
+- A focused parity test fails if either contract changes alone.
+- Existing lifecycle validator, control/execution mapper and pipeline-state
+  producer suites remain green.
+
+### LND-1 — closed action payload
+
+- A new JSON schema and runtime validator accept exactly the five kinds
+  `verification`, `review`, `gate`, `recovery`, `reconciliation` and terminal
+  statuses `completed`, `failed`, `unknown`, `unavailable`.
+- The validator admits only the kind/status/reason/candidate rows enumerated in
+  draft ADR D3. Every row requires an exact commit/tree candidate. The exact
+  payload fields and correlation rules match D3 through D5. Extra fields,
+  dispatch identity, arbitrary reason strings,
+  free-form text and invalid kind/status/candidate combinations are rejected
+  with typed codes.
+- JSON-schema/runtime parity, canonical freezing and digest-stable identifiers
+  have focused positive and negative tests. Those tests pin the exact
+  `requestId`, `actionId` and `eventId` source/derivation rules in draft ADR D3,
+  including rejection when either supplied digest is recomputed differently.
+
+### LND-2 — envelope/store reader-first admission
+
+- The common envelope admits both lifecycle payload schemas under the existing
+  `lifecycle` origin/stream and still rejects either schema under another
+  origin or authority class.
+- The portable store selects the validator by `payloadSchema` and binds
+  payload/envelope event ID, idempotency key/action ID, candidate, every
+  correlation field and `eventType = lifecycle.action.<kind>` by the exact D4a
+  equality table, without
+  weakening capture, privacy, append, idempotency, lock or readback checks.
+- Existing lifecycle-v1 records remain readable. New lifecycle-v1 writes for
+  the five action-kind spellings are refused with a typed code, while dispatch,
+  status and candidate-invalidation writes remain admissible.
+- No action producer is enabled in this slice.
+
+### LND-3 — mixed-stream replay and viewer
+
+- Replay v2 routes lifecycle-v1 records into unchanged dispatch timelines and
+  action-v1 records into separate action timelines; it never requires or
+  fabricates worker topology for an action.
+- Candidate drift, invalidation and package/worker/attempt topology retain
+  their existing dispatch-only behavior.
+- Replay v1 artifacts remain readable. Unknown payload schemas, malformed
+  action events, forks and incomplete checkpoints still fail closed.
+- The offline viewer renders a separately labelled non-authoritative
+  Governance actions section and exposes no payload field excluded by the
+  privacy contract.
+
+### LND-4 — verification producer
+
+- **WHEN** aggregate Verify reaches its terminal evidence boundary with a
+  stable candidate and an event output was requested, **THEN** exactly one
+  candidate-bound verification action is produced from the terminal evidence
+  digest.
+- Passed, failed, unknown and unavailable outcomes map exactly to the four
+  verification rows in draft ADR D3. Per-suite
+  receipts do not create action events.
+- Target/source preflight failure is zero mutation. Post-source event failure
+  returns `source-complete/event-unavailable` with an idempotent event-only
+  retry binding. Running without the output argument is byte-compatible.
+- Both self-repository Verify and the consuming-project evidence producer use
+  the same pure builder; no runner identity enters the event.
+
+### LND-5 — review producer
+
+- **WHEN** a Critic result has become an accepted durable receipt through the
+  common candidate-packet boundary, **THEN** a requested event is derived from
+  that receipt, candidate and verdict digest, never raw model output.
+- Only an accepted durable receipt emits: pass maps to
+  `completed/REVIEW_PASSED` and a verdict with findings maps to
+  `completed/REVIEW_FINDINGS`. A result rejected before receipt consumption,
+  including failed or unavailable execution without an accepted receipt, emits
+  no action event.
+- Claude, Codex and future runner adapters satisfy the same builder contract;
+  native Codex WSL sandbox execution is neither required nor valid evidence.
+- Replays and post-source event failures are idempotent and typed.
+
+### LND-6 — push/deploy gate producers
+
+- A requested push or deploy gate action is emitted only after the exact
+  approval State write and physical readback succeed, bound to the approved
+  candidate and approval subject digest.
+- The action is explicitly non-authoritative and cannot substitute for the
+  signed proof, State approval, or push/deploy guard checks.
+- Refused, expired, drifted or unreadable approvals never produce an approved
+  event. No signer, key, reason or destination secret enters the payload.
+- Event-only retry and no-output compatibility follow D6.
+
+### LND-7 — recovery and reconciliation producers
+
+- A requested recovery event is emitted only from a successful
+  `applySessionCleanupRecovery()` result after its existing readback checks.
+- A requested reconciliation event is emitted only from a successful
+  `applyBacklogReconciliation()` transaction after ledger/projection readback;
+  backlog-delivery apply/recovery joins only with an equally closed receipt.
+- Recovery and reconciliation event planning must observe and retain exact
+  pre-action HEAD/tree identity. An unavailable or invalid candidate refuses
+  the requested event before source mutation; no typed candidate is accepted.
+- Failed planning, failed apply, rollback, replay and event-write failure each
+  have focused non-emission/idempotency assertions.
+
+### LND-8 — documentation, export and compatibility close
+
+- Governance topology and user documentation describe both payload families,
+  reader-first deployment, permanent read compatibility and producer-disable
+  rollback.
+- Export tests prove the existing envelope projection does not begin exporting
+  action payload bodies or new identifiers without an explicit closed policy.
+- A migration fixture containing old lifecycle-v1 dispatch events, a legacy v1
+  action spelling and new action-v1 events replays deterministically after an
+  upgrade; no canonical event is rewritten.
+
+### Independent HGO decision
+
+Exact-candidate HGO consumption may join LND-6 only after the ADR register
+explicitly accepts the minimal public projection. Until then its authenticated
+private audit ledger remains the sole record and HGO does not block LND-0
+through LND-8 for the other producer families.

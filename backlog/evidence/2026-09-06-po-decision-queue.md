@@ -598,3 +598,21 @@ content would become an explicit redaction marker. Reporter failure would
 remain visible but would not create a second CI gate after Verify is already
 red. Alternative: authorize a broader sanitized-excerpt grammar and accept its
 higher residual disclosure risk. No implementation begins until the PO chooses.
+
+## Governance-action lifecycle ADR — ready for formal acceptance
+
+The reviewed proposal at `docs/adr/draft-governance-action-events.md` keeps
+queue dispatch/status events on the existing dispatch-correlated payload and
+adds a separate closed `pipeline.governance-action-event.v1` payload in the
+same lifecycle stream for verification, review, gate, recovery, and
+reconciliation actions. Every portable action binds an exact commit/tree; the
+payload and envelope identifiers are deterministically derived and checked for
+equality; the admitted kind/status/reason combinations are fully enumerated.
+
+Recommended decision: accept and number the ADR so the nine `LND-*` slices can
+proceed reader-first. The alternative is to keep the current false choice:
+either omit these governance actions or fabricate queue/worker identity for
+them. A separate, non-blocking follow-up remains on whether an exact-candidate
+HGO consumption may have a minimal public projection; until decided, HGO stays
+private-only. Native Codex sandbox/App-Server execution under WSL is outside
+this decision.
