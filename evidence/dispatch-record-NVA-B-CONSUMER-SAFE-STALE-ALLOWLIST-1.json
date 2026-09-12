@@ -1,0 +1,40 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "NVA-B-CONSUMER-SAFE-STALE-ALLOWLIST-1",
+  "agentType": "worker",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "rulesetSha": "0.6.2+codex.20260911033523.8593a8a",
+  "dispatcher": "elephant",
+  "candidateCommit": "7380621e36ea0c7cad789bb5f9938e14787324a4",
+  "resultSha256": "bfb9948090c6ae980591297e88ac51ad3662729710959b6b56ecdb29ba3c1059",
+  "outcome": "completed",
+  "commits": [
+    "7380621e36ea0c7cad789bb5f9938e14787324a4"
+  ],
+  "log": [],
+  "report": {
+    "text": "The one stale consumer-safe-path allowlist inventory entry was removed after Git confirmed that its literal was already absent before the current authority package. Checker logic and tests are unchanged. The production checker and its existing suite pass.",
+    "changedFiles": [
+      "harness/scripts/check-consumer-safe-paths.mjs",
+      "backlog/evidence/2026-09-12-consumer-safe-stale-allowlist-correction.md"
+    ]
+  },
+  "criticSkip": {
+    "schema": "pipeline.critic-skip-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 0,
+      "riskClass": "low",
+      "riskFlag": false,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": false
+      }
+    },
+    "appliedRow": "T5",
+    "reason": "Exact stale inventory deletion; no checker logic, test assertion, role contract, security surface or dependency changed."
+  }
+}
