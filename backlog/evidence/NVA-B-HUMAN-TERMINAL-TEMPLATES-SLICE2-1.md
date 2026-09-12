@@ -6,23 +6,22 @@ Design: `backlog/evidence/NVA-B-HUMAN-TERMINAL-TEMPLATES-DESIGN-1.md`
 
 ## Candidate binding
 
-Implementation candidate: `2b4ffa7d9920dfd33a516b6a0380fb3f752d5420`
-Implementation tree: `76e976d6a2aaf8f68c140b609cb7faf6e1203535`
+Correction candidate: `e4d7539d5684f59f3f817670e8a52f70e06e8b3a`
+Correction tree: `9808669a94b37b773c4c8d75e676723f62dccecd`
 
 The implementation commit contains the six implementation blobs below at the
 recorded SHA-256 values:
 
 | Path | SHA-256 |
 |---|---|
-| `harness/scripts/check-auth-gate-inventory-drift.test.mjs` | `abaae6d559f13f14d0ea06149ba658d2a2138be90c53308f2dfeee7c15892dab` |
+| `harness/scripts/check-auth-gate-inventory-drift.test.mjs` | `ce67bd1f85b4e88f7dce841f41111d751a119f21a576e9f00f23a018615910fc` |
 | `plugins/pipeline-core/lib/human-terminal-action-catalog.mjs` | `f09d2738d8ef53ffc25526ec398b846accf985e55ec4b27eb1d07b9deb7ea7da` |
-| `plugins/pipeline-core/lib/human-terminal-action-instance.mjs` | `8d6d545e6aec72127088bebe632b0be5ff455bc0c5dee818d2f3cf46f40ddc7d` |
+| `plugins/pipeline-core/lib/human-terminal-action-instance.mjs` | `7acf9ebc083dd86755573265aca035bc54526c6b1ef69b915ce5ab8f4963f04e` |
 | `plugins/pipeline-core/schemas/human-terminal-action-instance.schema.json` | `bf51b230a9cad1cef7ca78795b7f6aa45cde1a9df6f48a5990ff736f4e827ac2` |
-| `plugins/pipeline-core/schemas/human-terminal-action-receipt.schema.json` | `dee9837e6534da31c8f52b7e5ecb5893a8e8c271f17585f50d3f8cfcc03ce462` |
+| `plugins/pipeline-core/schemas/human-terminal-action-receipt.schema.json` | `3af64f6a32825d3b1c2737fc4efa8234e30a5371fe6d594c293004e53be2673e` |
 | `plugins/pipeline-core/scripts/human-terminal-action.mjs` | `f28fc920357343ca60b32619bfbc257ff8a25c2f0ba840e6f5419893cc5654b7` |
 
-This subsequent evidence update changes only this report and does not alter the
-six candidate blobs.
+The correction commit contains the six implementation blobs listed above.
 
 ## Implemented behavior
 
@@ -45,11 +44,19 @@ The displayed launcher uses the existing shared copy-safe renderer and retains
 its 72-column bound.
 
 `run` re-inspects the frozen instance before child creation, compares the
-current repository candidate, uses shell-free argv, requires typed child
-success plus independent verified readback, and writes a private self-digested
-receipt. The receipt contains action/revision, input and candidate digests,
-exit/result/readback fields and digests; it contains no raw output, private
-path, username, passphrase, or session identifier.
+current repository candidate, and uses shell-free argv with inherited stdin,
+stdout, and stderr. The existing driver's disclosure and result stay visible
+in the attended terminal. The runner never parses or stores that mixed output;
+it determines the outcome only through child exit and an independent typed
+readback adapter.
+
+After a successful child, absent, failed, or schema/code-mismatched readback is
+recorded as `outcome-unknown` / `HTA-RUN-MANUAL-RECONCILIATION`, with
+`retrySafe: false` and `mutationMayHaveOccurred: true`. It is never presented
+as a failed, safely repeatable action. The private self-digested receipt
+contains action/revision, input and candidate digests, exit and typed readback
+state. It contains no raw output, private path, username, passphrase, or
+session identifier.
 
 ## Honest reachability boundary
 
@@ -71,8 +78,8 @@ Sandbox, or Codex App Server claim under WSL. Windows remains typed
 ## Checks
 
 - `node harness/scripts/check-auth-gate-inventory-drift.test.mjs` — exit 0,
-  30/30 tests passed, including direct cross-entry binding and wrong-result-
-  schema refusals.
+  31/31 tests passed, including inherited terminal streams, direct cross-entry
+  binding, and absent/failed/mismatched readback reconciliation.
 - `node harness/scripts/check-auth-gate-inventory-drift.mjs` — exit 0; 11
   discovered surfaces and all 18 canonical inventory rows/dispositions clean.
 - `node harness/scripts/check-verify-suite-registration.mjs` — exit 0; 532
@@ -88,7 +95,11 @@ No full verify was run for this focused, uncommitted slice.
 
 ## Residual slices
 
-- Slice 3 must migrate selected producers, supply their exact structured
+- **Slice 3 — owner: pipeline; re-triage: 2026-09-30.** Reassess scope and
+  sequencing, then migrate selected producers, supply their exact structured
   boundary/readback adapters, and prove byte equality with their old output.
-- Slice 4 must implement and test native Windows owner/DACL/reparse protection
-  before enabling Windows launchers.
+  This is a re-triage date, not a readiness promise.
+- **Slice 4 native Windows — owner: pipeline; re-triage: 2026-10-31.** Reassess
+  the deferred native-Windows package. It must implement and test native
+  Windows owner/DACL/reparse protection before enabling Windows launchers.
+  This is a re-triage date, not a readiness promise.
