@@ -29,6 +29,13 @@ export const MAX_PUBLIC_FAILURES = 512;
 const SUITE_NAME = /^[a-z0-9][a-z0-9._-]{0,159}$/u;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
+const MAX_VERIFY_SOURCE_BYTES = 4 * 1024 * 1024;
+const SUITE_ARRAYS = Object.freeze([
+  ["const SCOPED_VERIFY_SUITES = Object.freeze([", "\n]);"],
+  ["const WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([", "\n]);"],
+  ["const TEST_SUITES = [", "\n];"],
+  ["const PHASE_STEPS =", ";\n\n// pipeline.verify-manual-check-placeholder-detection"],
+]);
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const line = (value) => JSON.stringify(value);
@@ -52,13 +59,38 @@ function safeDirectory(path) {
   } catch { return false; }
 }
 
-function safeFailingSteps(evidence) {
+function suiteNamesInBlock(block) {
+  const keyCount = [...block.matchAll(/\bname\s*:/gu)].length;
+  const names = [...block.matchAll(/\bname\s*:\s*"([^"]+)"/gu)].map((match) => match[1]);
+  return keyCount === names.length ? names : null;
+}
+
+/** Read the exact suite identifiers declared by this candidate's Verify source. */
+export function loadPublicSuiteInventory(verifySourcePath) {
+  if (!safeRegularFile(verifySourcePath, MAX_VERIFY_SOURCE_BYTES)) return null;
+  let source;
+  try { source = readFileSync(verifySourcePath, "utf8"); } catch { return null; }
+  const names = [];
+  for (const [startMarker, endMarker] of SUITE_ARRAYS) {
+    const start = source.indexOf(startMarker);
+    if (start === -1) return null;
+    const end = source.indexOf(endMarker, start + startMarker.length);
+    if (end === -1) return null;
+    const blockNames = suiteNamesInBlock(source.slice(start, end + endMarker.length));
+    if (blockNames === null) return null;
+    names.push(...blockNames);
+  }
+  if (names.length === 0 || new Set(names).size !== names.length) return null;
+  return new Set(names);
+}
+
+function safeFailingSteps(evidence, suiteInventory) {
   if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)
     || evidence.schema !== "pipeline.verify-evidence.v0" || !Array.isArray(evidence.steps)) return null;
   const rows = [];
   for (const [index, step] of evidence.steps.entries()) {
     if (!step || typeof step !== "object" || Array.isArray(step)
-      || typeof step.name !== "string" || !SUITE_NAME.test(step.name)
+      || typeof step.name !== "string" || !SUITE_NAME.test(step.name) || !suiteInventory.has(step.name)
       || !Number.isSafeInteger(step.exitCode) || step.exitCode < 0 || step.exitCode > 255) return null;
     if (step.exitCode !== 0) rows.push({ index, name: step.name, exitCode: step.exitCode });
   }
@@ -90,16 +122,20 @@ function privateLogReference({ runsRoot, runId, suiteName }) {
 }
 
 /** Build closed-schema public records. This function never emits private free text. */
-export function buildFailureReport({ evidencePath, runsRoot }) {
+export function buildFailureReport({ evidencePath, runsRoot, verifySourcePath }) {
   if (!safeRegularFile(evidencePath, MAX_EVIDENCE_BYTES)) {
     return { lines: [notice("PVF-EVIDENCE-UNAVAILABLE")], complete: false };
   }
   let evidence;
   try { evidence = JSON.parse(readFileSync(evidencePath, "utf8")); }
-  catch { return { lines: [notice("PVF-EVIDENCE-INVALID")], complete: false }; }
+  catch { return { lines: [notice("PVF-EVIDENCE-INVALID", { detail: REDACTION_MARKER })], complete: false }; }
 
-  const failing = safeFailingSteps(evidence);
-  if (failing === null) return { lines: [notice("PVF-EVIDENCE-SHAPE")], complete: false };
+  const suiteInventory = loadPublicSuiteInventory(verifySourcePath);
+  if (suiteInventory === null) {
+    return { lines: [notice("PVF-SUITE-INVENTORY-UNAVAILABLE", { detail: REDACTION_MARKER })], complete: false };
+  }
+  const failing = safeFailingSteps(evidence, suiteInventory);
+  if (failing === null) return { lines: [notice("PVF-EVIDENCE-SHAPE", { detail: REDACTION_MARKER })], complete: false };
   if (failing.length === 0) {
     return { lines: [notice("PVF-NO-FAILURES", { status: "complete", failingSuites: 0 })], complete: true };
   }
@@ -142,6 +178,7 @@ export function runFailureReporter({ resolvePaths = resolveGitPaths, build = bui
     const result = build({
       evidencePath: join(paths.repoRoot, "evidence", "verify-latest.json"),
       runsRoot: join(paths.gitCommonDir, "agent-pipeline", "verify", "runs"),
+      verifySourcePath: join(paths.repoRoot, "harness", "scripts", "verify.mjs"),
     });
     return { ...result, exitCode: 0 };
   } catch {

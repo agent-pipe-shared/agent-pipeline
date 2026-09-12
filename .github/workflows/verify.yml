@@ -69,9 +69,10 @@ jobs:
         if: failure()
         # A reporter, never a gate (NVA-B-CIDIAG): reads evidence/verify-latest.json
         # plus the private journal run directory the prior step just wrote. It prints
-        # only typed suite/status attribution and a digest reference to private evidence;
-        # raw log text and unclassified values are explicitly withheld. Always exits 0 -- deliberately no
-        # `continue-on-error`, since there is nothing here that can fail the job.
+        # only inventory-bound suite/status attribution and a digest reference to private
+        # evidence; raw log text and unclassified values are explicitly withheld. Always
+        # exits 0 -- deliberately no `continue-on-error`, since there is nothing here that
+        # can fail the job.
         run: node harness/scripts/print-verify-failures.mjs
 
   live-certification:

@@ -106,6 +106,10 @@ fields, and any environment state available to the step).
   to the repository or a content digest) that a reader with access to the
   private evidence can use to retrieve detail themselves — provided that
   pointer itself independently satisfies R1 (AC1–AC3).
+  A suite name is classified as safe only when it exactly matches an identifier
+  in the current candidate's repository-authoritative Verify suite inventory.
+  Character shape or a permissive identifier regex alone is not a safety
+  classification.
 - **AC6 (no free-text excerpts).** WHEN the reporter emits public attribution,
   THE SYSTEM SHALL NOT emit raw or sanitized free-text excerpts from suite
   output, evidence fields, or exception messages. Such values are outside the
@@ -181,6 +185,27 @@ visible but cannot add a second gate after Verify is already red.
 criteria. That confirmation requires the separate exact-candidate Critic round
 in the source item's acceptance criteria.
 
+## Public schema compatibility and rollback
+
+The reporter emits one JSON object per line. Failure records use
+`pipeline.verify-public-failure.v1`; diagnostic and degradation records use
+`pipeline.verify-public-notice.v1`. Consumers must branch on `schema` and
+`kind`, treat unknown schema versions as unsupported, and must not render
+unknown fields as free text. Notice `code` values are fixed identifiers; their
+presence does not authorize any additional evidence field for publication.
+
+This replaces the earlier human-readable log-tail output. Consumers that need
+details must resolve the SHA-256 reference against the separately protected
+private evidence. There is no compatibility promise for parsers of the former
+free-text format because preserving it would violate AC4–AC7.
+
+A safe rollback cannot restore the former raw-tail implementation while this
+ADR remains accepted. If the structured reporter must be withdrawn, the CI
+step degrades to a fixed `pipeline.verify-public-notice.v1` notice with an
+explicit redaction marker and exit code zero, or is disabled together with an
+equivalent fixed notice at the workflow boundary. Restoring public excerpts
+requires a successor ADR and a new privacy review.
+
 ## Pre-acceptance implementation finding (historical)
 
 *(Added in a follow-up edit after the requirement above was drafted and
@@ -224,6 +249,9 @@ insufficient without the closed output schema adopted here.
 - Review the positive-allow-list implementation against this accepted ADR on
   its exact candidate. Until that Critic round completes, the component's
   review status remains outstanding rather than skipped or reviewed.
+- Bind the final candidate to the required Privacy and Threat-Model signatures
+  through the normal PO ceremony. This ADR records no fabricated signature or
+  substitute attestation.
 - Keep detailed evidence private. Future public fields require a successor ADR
   that adds a typed safe class; expanding a sanitizer or free-text grammar is
   not an implementation-only change.

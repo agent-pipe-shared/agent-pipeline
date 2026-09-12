@@ -87,6 +87,12 @@ suite/status, safe structured attribution, and a digest reference to private
 evidence. It emits an explicit marker for unclassified content, never publishes
 free-text excerpts or exception messages, and discloses reporter failure while
 returning success because the substantive Verify failure has already made the
-job red. Focused adversarial tests cover the recorded leak classes and failure
-paths. This item remains open until a fresh exact-candidate Critic reviews the
-implementation and its findings are dispositioned.
+job red. Suite names require an exact match in the repository-authoritative
+Verify inventory; syntactically valid token-, user-, or session-shaped canaries
+therefore remain withheld with a visible marker. ADR-0084 records the JSONL v1
+compatibility boundary and a safe fixed-notice rollback that cannot restore the
+old public log tail. Focused adversarial tests cover the recorded leak classes
+and failure paths. This item remains open until a fresh exact-candidate Critic
+reviews the implementation, its findings are dispositioned, and the final
+candidate receives the required Privacy and Threat-Model signatures through
+the PO ceremony.

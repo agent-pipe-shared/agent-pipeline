@@ -13,6 +13,7 @@ import {
   PUBLIC_NOTICE_SCHEMA,
   REDACTION_MARKER,
   buildFailureReport,
+  loadPublicSuiteInventory,
   runFailureReporter,
   verifySuiteArtifactName,
 } from "./print-verify-failures.mjs";
@@ -25,9 +26,24 @@ function fixture() {
   const root = mkdtempSync(join(tmpdir(), "verify-public-report-"));
   const evidencePath = join(root, "evidence", "verify-latest.json");
   const runsRoot = join(root, "runs");
+  const verifySourcePath = join(root, "verify.mjs");
   mkdirSync(join(root, "evidence"), { recursive: true });
   mkdirSync(runsRoot, { recursive: true });
-  return { root, evidencePath, runsRoot };
+  writeFileSync(verifySourcePath, [
+    "const SCOPED_VERIFY_SUITES = Object.freeze([",
+    "]);",
+    "const WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([",
+    "]);",
+    "const TEST_SUITES = [",
+    '  { name: "unit-tests" },',
+    '  { name: "security-tests" },',
+    "];",
+    "const PHASE_STEPS =",
+    "  [];",
+    "",
+    "// pipeline.verify-manual-check-placeholder-detection",
+  ].join("\n"));
+  return { root, evidencePath, runsRoot, verifySourcePath };
 }
 
 function evidence(steps, runId = "run-1") {
@@ -87,14 +103,35 @@ check("raw log values never cross the public boundary", () => {
   } finally { rmSync(value.root, { recursive: true, force: true }); }
 });
 
-check("unclassified suite names make evidence invalid rather than being echoed", () => {
+check("syntactically valid token or PII shaped names are not public without inventory authority", () => {
   const value = fixture();
   try {
-    const unsafe = "suite\nsecret@example.invalid";
-    writeFileSync(value.evidencePath, JSON.stringify(evidence([{ name: unsafe, exitCode: 1 }])));
-    const output = buildFailureReport(value).lines.join("\n");
-    assert.equal(output.includes(unsafe), false);
-    assert.deepEqual(JSON.parse(output), { schema: PUBLIC_NOTICE_SCHEMA, kind: "reporter-notice", code: "PVF-EVIDENCE-SHAPE" });
+    for (const unsafe of ["passwordtokenabc123", "andre-private-suite", "sessioncorrelation987654"]) {
+      writeFileSync(value.evidencePath, JSON.stringify(evidence([{ name: unsafe, exitCode: 1 }])));
+      const output = buildFailureReport(value).lines.join("\n");
+      assert.equal(output.includes(unsafe), false);
+      assert.deepEqual(JSON.parse(output), {
+        schema: PUBLIC_NOTICE_SCHEMA,
+        kind: "reporter-notice",
+        code: "PVF-EVIDENCE-SHAPE",
+        detail: REDACTION_MARKER,
+      });
+    }
+  } finally { rmSync(value.root, { recursive: true, force: true }); }
+});
+
+check("missing or ambiguous repository suite inventory fails closed with visible redaction", () => {
+  const value = fixture();
+  try {
+    writeFileSync(value.verifySourcePath, 'const TEST_SUITES = [{ name: "unit-tests" }];\n');
+    writeFileSync(value.evidencePath, JSON.stringify(evidence([{ name: "unit-tests", exitCode: 1 }])));
+    assert.equal(loadPublicSuiteInventory(value.verifySourcePath), null);
+    assert.deepEqual(parsed(buildFailureReport(value))[0], {
+      schema: PUBLIC_NOTICE_SCHEMA,
+      kind: "reporter-notice",
+      code: "PVF-SUITE-INVENTORY-UNAVAILABLE",
+      detail: REDACTION_MARKER,
+    });
   } finally { rmSync(value.root, { recursive: true, force: true }); }
 });
 
@@ -105,6 +142,7 @@ check("missing and malformed evidence use fixed notices without paths or parser 
     writeFileSync(value.evidencePath, "{ private parser canary");
     const output = buildFailureReport(value).lines.join("\n");
     assert.equal(JSON.parse(output).code, "PVF-EVIDENCE-INVALID");
+    assert.match(output, /\[REDACTED-UNCLASSIFIED\]/u);
     assert.equal(output.includes("private parser canary"), false);
     assert.equal(output.includes(value.root), false);
   } finally { rmSync(value.root, { recursive: true, force: true }); }
