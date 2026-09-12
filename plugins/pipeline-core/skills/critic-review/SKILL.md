@@ -26,15 +26,43 @@ candidate. Pass the candidate Spec, every declared guardrail, each fresh
 candidate-evidence path and, for a re-review, the separate prior-Critic path
 to the preflight only.
 Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
-`packet-ready`. `packet-ready` has `spawnAuthorized: false`: the session
-orchestrator's ordinary agent dispatch remains the execution authority. Its
+`packet-ready`. `packet-ready` has `spawnAuthorized: false` and names
+`session-critic-dispatch` as its required next gate: the session orchestrator's
+ordinary fresh-agent dispatch remains the execution authority. Its
 returned `dispatch.reviewerInput` carries the frozen refs, ruleset SHA,
 resolved governance directories, candidate-file guardrails and evidence paths
 passed to this skill. The caller adds only its route metadata (`project:`,
 `verdict:` and `assurance:`); it must not reconstruct or omit any preflight
 field. The `coordinatorOnly.priorCriticEvidence` binding is retained for range
 and lineage checks and must never be copied into the reviewer input. This
-preflight is read-only.
+preflight is read-only. After the session returns a schema-shaped verdict, the
+coordinator uses `scripts/session-critic-finalizer.mjs`; that normal path
+creates and claims its private candidate packet automatically, records and
+consumes the result, and accepts the receipt only after an identical second
+consume readback. A caller must not invent Git blob references for ignored
+local evidence: the complete preflight digest binds that evidence to the
+session packet instead.
+
+The canonical finalization command is:
+
+```bash
+node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" finalize --root . --request scratch/session-critic-finalization-request.json
+```
+
+The request file is closed `pipeline.session-critic-finalization-request.v1`
+JSON with exactly `schema`, `taskId`, `projectId`, `sessionId`, `packetId`,
+`trigger`, `route`, `review`, `verdictPath`, and `event`. `review` contains
+exactly `base`, `candidate`, `specPath`, `guardrailPaths`, `evidencePaths`, and
+`priorCriticEvidencePath`; `route` contains exactly `routeId`, `runner`,
+`adapter`, `provider`, `modelTier`, and `effortTier`. `verdictPath` names the
+bounded repository-relative JSON verdict returned by this fresh session.
+`event` is either `null` or exactly `{ "eventOutPath": "...", "featureId":
+"..." }`; use a `null` feature ID when none applies. The CLI emits one
+`pipeline.session-critic-finalization.v1` JSON result and exits 0 only for
+`completed`; a durable review whose optional event write failed exits 2 with
+`source-complete/event-unavailable` and an identical-only retry. Any malformed
+argv, request, or verdict exits 2 with a closed
+`pipeline.session-critic-finalization-error.v1` object.
 A rejected packet is a coordinator defect, not Critic work: do not spawn a child, create a packet or substitute prose/evidence.
 
 **Evidence artifact shape (confirmed from source, hard — not free-form text):**

@@ -2230,6 +2230,46 @@ test("OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("LND-5 admits only the canonical session Critic finalizer request under the project scratch root", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "session-critic-finalizer-outside-"));
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(join(path, "scratch"), { recursive: true });
+    writeFileSync(join(path, "scratch", "session-critic-finalization-request.json"), "{}\n");
+    writeFileSync(join(outside, "request.json"), "{}\n");
+    symlinkSync(join(outside, "request.json"), join(path, "scratch", "linked-request.json"));
+    const nonReady = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    };
+    const script = join(SCRIPTS_DIR, "session-critic-finalizer.mjs");
+    const canonical = `node '${script}' finalize --root '${path}' --request scratch/session-critic-finalization-request.json`;
+    assert.equal(isSanctionedLifecycleCommand(canonical, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(canonical), nonReady), { exitCode: 0, stderr: "" });
+    const skillCommand = `node '${script}' finalize --root . --request scratch/session-critic-finalization-request.json`;
+    assert.equal(isSanctionedLifecycleCommand(skillCommand, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(skillCommand), nonReady), { exitCode: 0, stderr: "" });
+
+    for (const command of [
+      `node '${script}' inspect --root '${path}' --request scratch/session-critic-finalization-request.json`,
+      `node '${script}' finalize --root '${path}' --request scratch/session-critic-finalization-request.json --force`,
+      `node '${script}' finalize --root '${path}' --request '${join(outside, "request.json")}'`,
+      `node '${script}' finalize --root '${path}' --request ../request.json`,
+      `node '${script}' finalize --root '${path}' --request evidence/request.json`,
+      `node '${script}' finalize --root '${path}' --request scratch/request.txt`,
+      `node '${script}' finalize --root '${path}' --request scratch/linked-request.json`,
+      `node '${script}' finalize --root scratch --request scratch/session-critic-finalization-request.json`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 /**
  * NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
  * runnable.md). Measured before this dispatch: `onboarding-init.mjs` was refused

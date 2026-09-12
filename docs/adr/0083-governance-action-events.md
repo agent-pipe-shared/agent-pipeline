@@ -197,7 +197,7 @@ The payload correlation sources are also closed:
 | Kind | `requestId` source | `featureId` / `sessionId` |
 |---|---|---|
 | `verification` | terminal Verify run ID or its domain-separated receipt digest | copy a validated source ID, otherwise `not-applicable` |
-| `review` | accepted candidate packet ID | copy a validated source ID, otherwise `not-applicable` |
+| `review` | lowercase SHA-256 of canonical JSON with exactly `{domain: "pipeline.governance-review-action.v1:request-id", receiptSha256, verdictSha256}`, where both inputs come from the identically read-back accepted candidate receipt | copy a validated source ID, otherwise `not-applicable` |
 | `gate` | verified approval request/subject ID | copy a validated source ID, otherwise `not-applicable` |
 | `recovery` | verified recovery plan digest | copy a validated source ID, otherwise `not-applicable` |
 | `reconciliation` | verified reconciliation plan/baseline digest | copy a validated source ID, otherwise `not-applicable` |

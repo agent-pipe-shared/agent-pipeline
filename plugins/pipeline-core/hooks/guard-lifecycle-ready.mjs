@@ -221,6 +221,7 @@ const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-
 const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../scripts/repair-map.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const SESSION_CRITIC_FINALIZER_SCRIPT = fileURLToPath(new URL("../scripts/session-critic-finalizer.mjs", import.meta.url));
 const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
@@ -1827,6 +1828,22 @@ function simpleWords(command, root, options = {}) {
 
 function exactRoot(args, root, index) {
   return args[index] === "--root" && args[index + 1] === root;
+}
+
+function sanctionedSessionCriticFinalizerArgs(args, root) {
+  const exactProjectRoot = exactRoot(args, root, 1)
+    || (args[1] === "--root" && args[2] === "."
+      && resolve(root, args[2]) === resolve(root)
+      && isRealpathedWithinBoundary(resolve(root, args[2]), root));
+  if (args[0] !== "finalize" || !exactProjectRoot
+    || args[3] !== "--request" || args.length !== 5) return false;
+  const request = args[4];
+  if (typeof request !== "string" || request.length === 0 || request.length > 256
+    || request.includes("\\") || request.includes("\0") || isAbsolute(request)
+    || !request.endsWith(".json")) return false;
+  const components = request.split("/");
+  if (components[0] !== "scratch" || components.some((part) => part === "" || part === "." || part === "..")) return false;
+  return isRealpathedWithinBoundary(resolve(root, request), root);
 }
 
 // NVA-BOOTADMIT-2 (backlog: onboarding/runner-profile-migration allowlist admitted a flag
@@ -4091,6 +4108,7 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   if (script === REPAIR_MAP_SCRIPT) return args.length === 0;
   if (script === SESSION_CAPABILITY_DIAGNOSE_SCRIPT) return args[0] === "--repo" && args[1] === root && args.length === 2;
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
+  if (script === SESSION_CRITIC_FINALIZER_SCRIPT) return sanctionedSessionCriticFinalizerArgs(args, root);
   if (script === PIPELINE_STATE_SCRIPT) {
     return sanctionedPipelineStateArgs(args, root);
   }

@@ -43,6 +43,7 @@ import { validateCriticLineagePacketAdmission } from "../lib/critic-review-linea
 export const PACKET_SCHEMA = "pipeline.critic-candidate-packet.v1";
 export const STATE_SCHEMA = "pipeline.critic-candidate-state.v1";
 export const RECORD_SCHEMA = "pipeline.critic-candidate-record.v1";
+export const SESSION_PACKET_BINDING_SCHEMA = "pipeline.session-critic-packet-binding.v1";
 export const PACKET_TTL_SECONDS = 900;
 export const PACKET_DIFF_PATH = ".git/agent-pipeline-review.diff";
 export const PACKET_FILES = Object.freeze([
@@ -56,6 +57,7 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const REFERENCE_KINDS = new Set(["spec", "calibration", "guardrail", "evidence"]);
 const RUNNERS = new Set(["claude", "codex", "antigravity"]);
+const SESSION_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
 
 export class CriticPacketError extends Error {
   constructor(code, message) {
@@ -90,13 +92,14 @@ export function normalizePacketPath(value, label = "path") {
   return value;
 }
 
-function git(root, args, { allowNonzero = false, timeout = 5000 } = {}) {
+function git(root, args, { allowNonzero = false, timeout = 5000, input = undefined } = {}) {
   const result = spawnSync("git", ["-C", root, ...args], {
     encoding: "utf8",
     env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
     maxBuffer: 32 * 1024 * 1024,
     shell: false,
     timeout,
+    input,
   });
   if (result.error) fail("CPP-GIT", `Git failed to start: ${result.error.message}`);
   if (!allowNonzero && result.status !== 0) fail("CPP-GIT", `Git ${args[0]} failed.`);
@@ -203,6 +206,15 @@ function normalizeRoute(route) {
   }
   return Object.fromEntries(keys.map((key) => [key, route[key]]));
 }
+function normalizeSessionBinding(value) {
+  const keys = ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"];
+  if (!exactKeys(value, keys) || value.schema !== SESSION_PACKET_BINDING_SCHEMA
+    || typeof value.sessionId !== "string" || !SAFE_ID.test(value.sessionId)
+    || typeof value.preflightSha256 !== "string" || !SHA256.test(value.preflightSha256)
+    || value.assurance !== SESSION_ASSURANCE || value.freshContext !== true
+    || value.historyInherited !== false || value.mayDelegate !== false) fail("CPP-SESSION-BINDING", "Session Critic binding is invalid.");
+  return Object.freeze(Object.fromEntries(keys.map((key) => [key, value[key]])));
+}
 function normalizeReferences(references, candidateByPath) {
   if (!Array.isArray(references)) fail("CPP-REFERENCE", "references must be an array.");
   const normalized = references.map((reference) => {
@@ -282,6 +294,7 @@ function validatePacketShape(packet) {
     || !SHA256.test(packet.bindings?.governanceSha256)) fail("CPP-DIGEST", "Packet shape is invalid.");
   const expected = bindingsFor(packet);
   if (JSON.stringify(expected) !== JSON.stringify(packet.bindings)) fail("CPP-DIGEST", "Packet binding digest mismatch.");
+  if (packet.request?.sessionBinding !== undefined) normalizeSessionBinding(packet.request.sessionBinding);
 }
 function packetContext(controlRoot, packetId) {
   if (!PACKET_ID.test(packetId)) fail("CPP-ARGUMENT", "packetId must be 32 lowercase hex characters.");
@@ -397,12 +410,20 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const controlRoot = assertRealPrivateDir(resolve(options.controlRoot), "control root");
     if (controlRoot !== requiredControl) fail("CPP-CONTROL", "controlRoot is not the canonical Git common-dir packet root.");
     if (!PACKET_ID.test(options.packetId) || !SAFE_ID.test(options.taskId) || !SAFE_ID.test(options.projectId)) fail("CPP-ARGUMENT", "Unsafe packet/task/project ID.");
+    const sessionBinding = options.sessionBinding === undefined ? undefined : normalizeSessionBinding(options.sessionBinding);
     const objectFormat = gitText(repoRoot, ["rev-parse", "--show-object-format"]);
     const base = assertOid(options.baseCommit, objectFormat, "baseCommit");
     const candidate = assertOid(options.candidateCommit, objectFormat, "candidateCommit");
     const rulesetOid = assertOid(options.rulesetOid, objectFormat, "rulesetOid");
-    if (git(repoRoot, ["merge-base", "--is-ancestor", base, candidate], { allowNonzero: true }).status !== 0) fail("CPP-ANCESTRY", "baseCommit is not an ancestor of candidateCommit.");
-    if (gitText(repoRoot, ["cat-file", "-t", base]) !== "commit" || gitText(repoRoot, ["cat-file", "-t", candidate]) !== "commit") fail("CPP-REF", "Packet refs are not commits.");
+    const baseType = gitText(repoRoot, ["cat-file", "-t", base]);
+    if (gitText(repoRoot, ["cat-file", "-t", candidate]) !== "commit") fail("CPP-REF", "Candidate ref is not a commit.");
+    if (baseType === "commit") {
+      if (git(repoRoot, ["merge-base", "--is-ancestor", base, candidate], { allowNonzero: true }).status !== 0) fail("CPP-ANCESTRY", "baseCommit is not an ancestor of candidateCommit.");
+    } else {
+      const parents = gitText(repoRoot, ["rev-list", "--parents", "-n", "1", candidate]).split(/\s+/u);
+      const emptyTree = String(git(repoRoot, ["hash-object", "-t", "tree", "--stdin"], { input: "" }).stdout).trim();
+      if (baseType !== "tree" || parents.length !== 1 || base !== emptyTree) fail("CPP-REF", "Base ref is neither an ancestor commit nor the empty tree of a root candidate.");
+    }
     const candidateTree = assertOid(gitText(repoRoot, ["rev-parse", `${candidate}^{tree}`]), objectFormat, "candidate tree");
     const diffPaths = changedPaths(repoRoot, base, candidate);
     const packetDir = assertNoSymlinkPath(join(controlRoot, options.packetId), controlRoot, "packet directory");
@@ -432,7 +453,12 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
       packetId: options.packetId,
       createdAt,
       expiresAt,
-      request: { taskId: options.taskId, projectId: options.projectId, trigger: options.trigger ?? "T1" },
+      request: {
+        taskId: options.taskId,
+        projectId: options.projectId,
+        trigger: options.trigger ?? "T1",
+        ...(sessionBinding === undefined ? {} : { sessionBinding }),
+      },
       ruleset: { oid: rulesetOid, objectFormat },
       route: normalizeRoute(options.route),
       candidate: { base, commit: candidate, tree: candidateTree },

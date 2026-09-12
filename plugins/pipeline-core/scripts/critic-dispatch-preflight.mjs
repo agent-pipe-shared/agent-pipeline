@@ -278,10 +278,9 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
 
   return {
     schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
-    // The selected Codex transport is a separate, mandatory no-child
-    // preflight.  Calling this result "ready" caused coordinators to mistake
-    // packet integrity for a runnable Critic lane and to start an unbounded
-    // generic child when that lane was unavailable.
+    // This remains read-only. The ordinary session orchestrator is the next
+    // authority: it launches one fresh Critic and then hands the closed result
+    // to the runner-neutral durable finalizer. Native transports are optional.
     status: "packet-ready",
     ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
     candidate: { commit: candidateCommit, tree: candidateTree },
@@ -292,7 +291,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     coordinatorOnly: { priorCriticEvidence: priorReadback },
     dispatch: {
       mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
-      spawnAuthorized: false, requiredNextGate: "selected-runner-transport",
+      spawnAuthorized: false, requiredNextGate: "session-critic-dispatch",
       reviewerInput: {
         ...(scope === null ? { baseCommit } : { reviewScope: scope }),
         candidateCommit,

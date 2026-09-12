@@ -8,6 +8,7 @@ import { join } from "node:path";
 
 import {
   CriticPacketError,
+  SESSION_PACKET_BINDING_SCHEMA,
   claimCandidatePacket,
   cleanupCandidatePacket,
   consumeCandidatePacket,
@@ -135,6 +136,29 @@ await check("prepares a canonical no-remote packet with sorted diff and explicit
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
+await check("binds an ordinary session preflight explicitly without changing legacy packets", () => {
+  const f = fixture();
+  try {
+    const legacy = prepareCandidatePacket(options(f, "8".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 16) });
+    assert.equal(Object.hasOwn(legacy.packet.request, "sessionBinding"), false);
+    const boundOptions = options(f, "9".repeat(32));
+    boundOptions.sessionBinding = {
+      schema: SESSION_PACKET_BINDING_SCHEMA,
+      sessionId: "session-critic-1",
+      preflightSha256: "f".repeat(64),
+      assurance: "functional-equivalent-read-only; OS isolation not asserted",
+      freshContext: true,
+      historyInherited: false,
+      mayDelegate: false,
+    };
+    const bound = prepareCandidatePacket(boundOptions, { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 17) });
+    assert.deepEqual(bound.packet.request.sessionBinding, boundOptions.sessionBinding);
+    const invalid = options(f, "a".repeat(32));
+    invalid.sessionBinding = { ...boundOptions.sessionBinding, assurance: "runner-native" };
+    assert.throws(() => prepareCandidatePacket(invalid), expectCode("CPP-SESSION-BINDING"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
 await check("claims once, records once, consumes once and capability-cleans only its checkout", () => {
   const f = fixture();
   try {
@@ -196,4 +220,4 @@ await check("binds an admissible closed Nova A5 lineage at claim and rejects a f
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-process.stdout.write(`${passed}/6 checks passed.\n`);
+process.stdout.write(`${passed}/7 checks passed.\n`);

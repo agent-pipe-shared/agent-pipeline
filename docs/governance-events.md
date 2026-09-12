@@ -42,10 +42,14 @@ publish only from its durable candidate-bound evidence; push and deploy may
 publish only after the approval State postimage has been physically read back;
 session cleanup may publish only after a successful recovery result; and the
 backlog reconciler may publish only after every ledger/projection byte and the
-canonical backlog state have been read back. Review production remains
-disabled until the normal fresh-session Critic has a durable accepted receipt
-with the same closed binding. A model response by itself is never a source
-receipt.
+canonical backlog state have been read back. The normal fresh-session Critic
+may publish only after its runner-neutral finalizer has automatically prepared
+and claimed the private candidate packet, recorded the schema-valid verdict,
+consumed the candidate-bound receipt, and confirmed it through an identical
+second consume readback. The packet binds the complete read-only dispatch
+preflight digest, including ignored local candidate evidence; it does not
+fabricate tracked Git references for those files. A model response by itself
+is never a source receipt.
 
 Each producer validates the repository-relative output path and builds the
 complete event before changing its source. A failure before source completion
@@ -53,6 +57,14 @@ emits nothing. If event publication fails after the source has completed, the
 source stays committed and the result returns a closed event-only retry; that
 retry can create only the identical event. Calling the same source operation
 as a no-op or replay does not create another event.
+
+Review receipts and review action payloads omit runner, provider, and model
+identity. They retain the exact candidate commit/tree, reviewed base and diff
+digest, ruleset object ID, fixed functional-equivalent assurance, and the
+explicit fresh-session/no-history/no-delegation contract. A pre-receipt failure
+emits no event. If only the later event-artifact write fails, the durable review
+receipt remains accepted and the finalizer returns an identical-only event
+retry.
 
 Deployment is reader-first. Keep the action-v1 reader enabled permanently so
 old lifecycle-v1 records, the legacy lifecycle action spellings, and current

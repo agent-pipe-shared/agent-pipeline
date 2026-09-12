@@ -74,7 +74,7 @@ test("read-only dispatch preflight binds candidate, candidate-tree governance, a
   assert.equal(JSON.stringify(result.dispatch.reviewerInput).includes("prior-critic"), false);
   assert.equal(result.dispatch.childCreated, false);
   assert.equal(result.dispatch.spawnAuthorized, false);
-  assert.equal(result.dispatch.requiredNextGate, "selected-runner-transport");
+  assert.equal(result.dispatch.requiredNextGate, "session-critic-dispatch");
 });
 
 test("reviewer input uses an empty governance-directory list when the manifest declares no governance block", () => {
