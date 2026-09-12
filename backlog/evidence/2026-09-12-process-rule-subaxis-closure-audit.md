@@ -48,14 +48,11 @@ underspecified-stub failure class.
 
 The machine-written receipt
 `backlog/evidence/2026-09-12-process-rule-subaxis-test-receipt.json` binds the
-run to candidate commit `21cf930cacebf26b3d2ceb8c6ebe55ed787c017e`
-and tree `b5a54b04b2bada03c837620fc13c68132fd5f8a2`. It verifies before and
-after execution that the Pipeline code in the worktree matches that candidate,
-records exact argv, exit codes, signals, byte counts and stdout/stderr digests,
-and performs exact publication readback. Its canonical payload digest is
-`eb35740399d9340006e8953428db2d137f262569f3b1ba540b37728c710ca0be`;
-the final JSON file digest observed after readback is
-`92c9c2f0a87f174724f8ca8dd93857b1c52ccae82b2c7f880f266f04c21f8047`.
+fresh run to candidate commit `d335b876b658612bf7e7059f0af26eefd94f7d68`
+and tree `4d996f8b3008bc30006543ad539f70e0e5a412da`. The detached worktree was
+clean after execution. The receipt records exact argv, exit codes, signals,
+byte counts and stdout/stderr digests. Its JSON-payload digest is
+`2dd3bc9e273956b676be20d5ffde2e5916a8918e513005543b45fef7fe5903de`.
 
 The focused commands passed on 2026-09-12 with exit code 0:
 

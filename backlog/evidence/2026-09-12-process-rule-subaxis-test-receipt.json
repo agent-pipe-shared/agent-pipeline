@@ -1,12 +1,11 @@
 {
   "schema": "pipeline.focused-candidate-test-evidence.v1",
-  "generatedAt": "2026-09-12T01:44:56.255Z",
-  "candidateCommit": "21cf930cacebf26b3d2ceb8c6ebe55ed787c017e",
-  "candidateTree": "b5a54b04b2bada03c837620fc13c68132fd5f8a2",
+  "generatedAt": "2026-09-12T03:12:19.382Z",
+  "candidateCommit": "d335b876b658612bf7e7059f0af26eefd94f7d68",
+  "candidateTree": "4d996f8b3008bc30006543ad539f70e0e5a412da",
   "candidateBinding": {
     "headAndTreeMatchedExpected": true,
-    "pipelineCodeMatchedCandidateBefore": true,
-    "pipelineCodeMatchedCandidateAfter": true
+    "cleanBeforeAndAfter": true
   },
   "tests": [
     {
@@ -16,11 +15,11 @@
         "plugins/pipeline-core/lib/continuity-state.test.mjs",
         "plugins/pipeline-core/scripts/pipeline-state-lifecycle-event.test.mjs"
       ],
-      "startedAt": "2026-09-12T01:44:55.959Z",
-      "completedAt": "2026-09-12T01:44:56.146Z",
+      "startedAt": "2026-09-12T03:12:19.076Z",
+      "completedAt": "2026-09-12T03:12:19.278Z",
       "exitCode": 0,
       "signal": null,
-      "stdoutSha256": "6e749ac38465e23583940e32eadd5a26f623feda6bf021e7da36531ec4f6331f",
+      "stdoutSha256": "7480cfd8525b180422512b7b788baaecd320586540e0a94cec1dbe7b4be07ba1",
       "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdoutBytes": 12354,
       "stderrBytes": 0
@@ -33,23 +32,20 @@
         "plugins/pipeline-core/lib/dispatch-record.test.mjs",
         "plugins/pipeline-core/lib/workflow-runner-boundary.test.mjs"
       ],
-      "startedAt": "2026-09-12T01:44:56.147Z",
-      "completedAt": "2026-09-12T01:44:56.248Z",
+      "startedAt": "2026-09-12T03:12:19.279Z",
+      "completedAt": "2026-09-12T03:12:19.382Z",
       "exitCode": 0,
       "signal": null,
-      "stdoutSha256": "fdcbffaffc54fd34bb3d1eb4ce1bd894abba17970cb2ad8213a4d6c7a68ce0d6",
+      "stdoutSha256": "5401f8e845f27cf5d17cb3c0aefb6510461571f6a3fb2abebbaf3e3bdfffe415",
       "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdoutBytes": 5328,
+      "stdoutBytes": 5331,
       "stderrBytes": 0
     }
   ],
   "passed": true,
-  "recordSha256": "eb35740399d9340006e8953428db2d137f262569f3b1ba540b37728c710ca0be",
+  "recordSha256": "2dd3bc9e273956b676be20d5ffde2e5916a8918e513005543b45fef7fe5903de",
   "selfCheck": {
-    "algorithm": "sha256-canonical-payload",
+    "algorithm": "sha256-json-payload",
     "verified": true
-  },
-  "publication": {
-    "readbackExact": true
   }
 }
