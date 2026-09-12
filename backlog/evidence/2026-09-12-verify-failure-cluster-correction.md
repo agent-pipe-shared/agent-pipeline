@@ -53,7 +53,8 @@ contract evidence only.
 
 Native Codex sandbox and App-Server execution under WSL remains deferred to a
 future native-Windows package. No result above claims native WSL readiness, and
-that deferred runtime is not a Nova-B blocker. The normal fresh-session Critic
+that deferred runtime is not a Nova-B blocker. The pipeline team owns the
+future package and re-triages it on 2026-10-31. The normal fresh-session Critic
 remains the review default.
 
 The terminal-action package still needs its separately recorded,
