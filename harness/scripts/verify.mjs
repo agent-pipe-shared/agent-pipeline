@@ -1000,6 +1000,7 @@ const verificationActionSource = verificationActionPlan === null ? null : buildS
   evidence, startedCandidate, finishedCandidate, overallExitCode,
 });
 const verificationActionEvent = verificationActionSource === null ? null : buildGovernanceVerificationAction(verificationActionSource);
+const verificationActionSourceStatus = verificationActionSource?.outcome ?? "unavailable";
 
 writeEvidence(evidence, "terminal");
 
@@ -1011,15 +1012,15 @@ if (verificationActionPlan !== null) {
     let sourceReadback = null;
     try { sourceReadback = JSON.parse(readFileSync(runEvidencePath, "utf8")); } catch { sourceReadback = null; }
     if (JSON.stringify(sourceReadback) !== JSON.stringify(evidence)) {
-      verificationActionResult = { status: "source-complete/event-unavailable", sourceStatus: verifyRun.terminal.status, code: "VERIFY-ACTION-SOURCE-READBACK", eventOutPath: verificationActionPlan.eventOutPath };
+      verificationActionResult = { status: "source-complete/event-unavailable", sourceStatus: verificationActionSourceStatus, code: "VERIFY-ACTION-SOURCE-READBACK", eventOutPath: verificationActionPlan.eventOutPath };
     } else {
       try {
         const written = writeGovernanceVerificationAction({ rootDir: primaryRoot, eventOutPath: verificationActionPlan.eventOutPath, event: verificationActionEvent });
-        verificationActionResult = { status: "event-written", sourceStatus: verifyRun.terminal.status, eventOutPath: verificationActionPlan.eventOutPath, eventId: written.event.eventId };
+        verificationActionResult = { status: "event-written", sourceStatus: verificationActionSourceStatus, eventOutPath: verificationActionPlan.eventOutPath, eventId: written.event.eventId };
       } catch {
         verificationActionResult = {
           status: "source-complete/event-unavailable",
-          sourceStatus: verifyRun.terminal.status,
+          sourceStatus: verificationActionSourceStatus,
           eventOutPath: verificationActionPlan.eventOutPath,
           eventRetry: buildGovernanceVerificationRetry({ eventOutPath: verificationActionPlan.eventOutPath, event: verificationActionEvent }),
         };
