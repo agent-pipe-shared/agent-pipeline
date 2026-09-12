@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -19,6 +19,7 @@ import {
   projectAuthorityInternals,
 } from "./project-authority.mjs";
 import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const roots = [];
 function root() { const value = mkdtempSync(join(tmpdir(), "project-authority-")); roots.push(value); return value; }
@@ -75,9 +76,18 @@ function marketplace(base, { ignore = true } = {}) {
   if (ignore) write(base, ".gitignore", `/${VENDORED}/\n`);
   return base;
 }
-let passed = 0;
+const cases = [];
 let interruptedRoot;
-function ok(name, callback) { callback(); passed += 1; }
+function ok(name, callback) {
+  const id = `PAT${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({ id, name, run: async () => {
+    const firstOwnedRoot = roots.length;
+    try { await callback(); }
+    finally {
+      for (const entry of roots.splice(firstOwnedRoot)) rmSync(entry, { recursive: true, force: true });
+    }
+  } });
+}
 try {
   ok("legacy reader and preview are write-free", () => {
     const base = root(); legacy(base); const plan = planProjectAuthorityMigration({ rootDir: base });
@@ -635,5 +645,14 @@ try {
       hardenWindowsPrivateDirectoryFn() { return { status: "insecure", reason: "private path DACL grants a non-owner principal" }; },
     }), /^Error: project authority adoption archive is unsafe$/);
   });
-  console.log(`project-authority: ${passed} passed, 0 failed`);
 } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+
+assert.equal(cases.length, 36, "the complete project authority corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

@@ -549,8 +549,7 @@
     {
       "name": "onboarding-continuity-tests",
       "path": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "p3b-runner-conformance-tests",
@@ -674,8 +673,7 @@
     {
       "name": "project-authority-tests",
       "path": "plugins/pipeline-core/lib/project-authority.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "project-onboarding-v3-tests",
@@ -824,8 +822,7 @@
     {
       "name": "runner-profile-migration-v3-tests",
       "path": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "runner-profiles-v2-tests",

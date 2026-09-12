@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -31,6 +31,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { main as migrationCli } from "../scripts/runner-profile-migration-v3.mjs";
 import { main as v3BootstrapAuthorityCli, validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { buildDefaultAnswers, renderPipelineYaml, renderUserYaml } from "../../../setup.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const runtimePaths = loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path);
 
@@ -103,11 +104,10 @@ function fixture(source, { omitCodex = false, omitRuntime = [] } = {}) {
   return root;
 }
 
-let passed = 0;
-const failures = [];
+const cases = [];
 function record(name, run) {
-  try { run(); passed += 1; console.log(`PASS  ${name}`); }
-  catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); }
+  const id = `RPM${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({ id, name, run });
 }
 
 record("legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization", () => {
@@ -1703,5 +1703,12 @@ record("a customised existing manifest is never replaced by the fresh seed", () 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-console.log(`\nrunner-profile-migration-v3: ${passed} passed, ${failures.length} failed`);
-if (failures.length > 0) { for (const failure of failures) console.error(`  ${failure}`); process.exit(1); }
+assert.equal(cases.length, 51, "the complete runner profile migration corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

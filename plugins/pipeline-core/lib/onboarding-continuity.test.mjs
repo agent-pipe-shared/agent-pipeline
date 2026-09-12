@@ -5,6 +5,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -33,6 +34,7 @@ import { validateContinuityState } from "./continuity-state.mjs";
 import { mkdtempTestScratch as createTestScratch } from "./test-tmpdir.mjs";
 import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 import {
   KICKOFF_FAULT_STAGES,
@@ -76,7 +78,7 @@ import {
   validateKickoffGoal,
 } from "./onboarding-continuity.mjs";
 
-let passed = 0;
+const cases = [];
 let activeScratchRoots = null;
 
 function mkdtempTestScratch(prefix, base) {
@@ -88,22 +90,20 @@ function mkdtempTestScratch(prefix, base) {
 }
 
 function check(name, fn) {
-  const priorScratchRoots = activeScratchRoots;
-  const ownedScratchRoots = new Set();
-  activeScratchRoots = ownedScratchRoots;
-  try {
-    fn();
-    passed += 1;
-    console.log(`ok - ${name}`);
-  } catch (error) {
-    console.error(`not ok - ${name}`);
-    throw error;
-  } finally {
-    activeScratchRoots = priorScratchRoots;
-    for (const root of [...ownedScratchRoots].sort((a, b) => b.length - a.length)) {
-      rmSync(root, { recursive: true, force: true });
+  const id = `OBC${String(cases.length + 1).padStart(3, "0")}`;
+  cases.push({ id, name, run: async () => {
+    const priorScratchRoots = activeScratchRoots;
+    const ownedScratchRoots = new Set();
+    activeScratchRoots = ownedScratchRoots;
+    try {
+      await fn();
+    } finally {
+      activeScratchRoots = priorScratchRoots;
+      for (const root of [...ownedScratchRoots].sort((a, b) => b.length - a.length)) {
+        rmSync(root, { recursive: true, force: true });
+      }
     }
-  }
+  } });
 }
 
 function fixture(name, { handover, neutral = false } = {}) {
@@ -4638,4 +4638,12 @@ check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) st
   assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
 });
 
-console.log(`${passed} onboarding continuity/kickoff checks passed.`);
+assert.equal(cases.length, 280, "the complete onboarding continuity corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});
