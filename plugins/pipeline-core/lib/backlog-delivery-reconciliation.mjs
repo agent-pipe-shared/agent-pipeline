@@ -150,7 +150,7 @@ export function validateBacklogSpecBinding(value) {
 }
 
 /** Validate the durable success boundary used by delivery replay and recovery. */
-export function validateBacklogReconciliationReceipt(value, { intentSha256 = null, idempotencyKey = null } = {}) {
+export function validateBacklogReconciliationReceipt(value, { intentId = null, intentSha256 = null, idempotencyKey = null } = {}) {
   const errors = [];
   const keys = ["schema", "receiptId", "intentId", "idempotencyKey", "intentSha256", "status", "preSnapshot", "postSnapshot", "targets", "eventSequences", "appliedAt", "recordSha256"];
   if (!exact(value, keys, "reconciliation receipt", errors)) return { ok: false, findings: errors };
@@ -181,6 +181,7 @@ export function validateBacklogReconciliationReceipt(value, { intentSha256 = nul
     || Number.isNaN(appliedAt?.valueOf()) || appliedAt.toISOString() !== value.appliedAt) errors.push(finding("BOUND", "appliedAt must be a canonical UTC instant"));
   if (intentSha256 !== null && value.intentSha256 !== intentSha256) errors.push(finding("CONFLICT", "receipt intentSha256 does not match the delivery intent"));
   if (idempotencyKey !== null && value.idempotencyKey !== idempotencyKey) errors.push(finding("CONFLICT", "receipt idempotencyKey does not match the delivery intent"));
+  if (intentId !== null && value.intentId !== intentId) errors.push(finding("CONFLICT", "receipt intentId does not match the delivery intent"));
   const idRecord = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "receiptId" && key !== "recordSha256"));
   if (value.receiptId !== digest(`${BACKLOG_RECONCILIATION_RECEIPT_SCHEMA}:id`, idRecord)) errors.push(finding("BOUND", "receiptId does not bind canonical receipt content"));
   const record = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "recordSha256"));

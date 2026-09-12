@@ -236,9 +236,11 @@ test("receipt validation closes replay over exact canonical success evidence", (
     const applied = applyBacklogDelivery(root, { intentPath: "intent.json", bindingPath: "binding.json", preview, postimages: postimages(preview) }, { readState, readback: () => true });
     assert.equal(applied.ok, true);
     assert.equal(validateBacklogReconciliationReceipt(applied.receipt, {
+      intentId: intent.intentId,
       intentSha256: preview.intentSha256,
       idempotencyKey: intent.idempotencyKey,
     }).ok, true);
+    assert.equal(validateBacklogReconciliationReceipt(applied.receipt, { intentId: "different-intent" }).ok, false);
 
     const rebindRecord = (receipt) => ({
       ...receipt,
@@ -247,6 +249,7 @@ test("receipt validation closes replay over exact canonical success evidence", (
     const malformed = [
       rebindRecord({ ...applied.receipt, extra: true }),
       rebindRecord({ ...applied.receipt, receiptId: "1".repeat(64) }),
+      rebindRecord({ ...applied.receipt, intentId: "different-intent" }),
       rebindRecord({ ...applied.receipt, appliedAt: "2026-09-12T25:00:00.000Z" }),
       rebindRecord({ ...applied.receipt, eventSequences: [1, 1] }),
       rebindRecord({ ...applied.receipt, targets: [...applied.receipt.targets].reverse() }),

@@ -292,8 +292,8 @@ function receiptRecord(intent, preview, appliedAt) {
   core.recordSha256 = semanticDigest(RECEIPT_SCHEMA, Object.fromEntries(Object.entries(core).filter(([key]) => key !== "recordSha256")));
   return core;
 }
-function validReceipt(receipt, intentSha256, idempotencyKey) {
-  return validateBacklogReconciliationReceipt(receipt, { intentSha256, idempotencyKey }).ok;
+function validReceipt(receipt, intentSha256, idempotencyKey, intentId = null) {
+  return validateBacklogReconciliationReceipt(receipt, { intentId, intentSha256, idempotencyKey }).ok;
 }
 
 function committedPostimagesPresent(root, transaction, receipt, fs) {
@@ -435,7 +435,7 @@ export function applyBacklogDelivery(root = DEFAULT_ROOT, { intentPath, bindingP
   const intentSha256 = semanticDigest("pipeline.backlog-delivery-intent.v1", intent);
   const existing = readJsonFile(root, receiptPathFor(intent), fs);
   if (existing !== null) {
-    if (!validReceipt(existing, intentSha256, intent.idempotencyKey)) return rejectApply([finding("CONFLICT", "idempotency receipt conflicts with the delivery intent")]);
+    if (!validReceipt(existing, intentSha256, intent.idempotencyKey, intent.intentId)) return rejectApply([finding("CONFLICT", "idempotency receipt conflicts with the delivery intent")]);
     if (deps.readback && deps.readback(existing) !== true) return rejectApply([finding("READBACK", "idempotency receipt post-state readback failed")]);
     return { ok: true, applied: true, replayed: true, receipt: existing, findings: [] };
   }
