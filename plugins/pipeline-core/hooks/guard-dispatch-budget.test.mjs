@@ -33,10 +33,11 @@
  * of the isDirectInvocation() gate itself remains a follow-up, not attempted here.
  */
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -610,6 +611,27 @@ test("a live counter owner blocks a second acquisition and releases its exact in
   assert.deepEqual(results[0], { status: "acquired", code: null, recovered: false });
   assert.deepEqual(results[1], { status: "rejected", code: "counter-lock-busy", recovered: false });
   assert.equal(results[2], true);
+});
+
+test("a complete lock in its two-link publication interval is retryable contention", () => {
+  const lockDir = mkdtempSync(join(runnerDir, "publishing-lock-"));
+  const lockPath = join(lockDir, "agent.json.binding.lock");
+  const temporaryPath = `${lockPath}.publisher.tmp`;
+  const statText = readFileSync(`/proc/${process.pid}/stat`, "utf8");
+  const close = statText.lastIndexOf(")");
+  const processStart = statText.slice(close + 2).trim().split(/\s+/u)[19];
+  const owner = {
+    platform: "linux",
+    hostId: hostname().toLowerCase(),
+    bootId: readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase(),
+    pid: process.pid,
+    processStart,
+    nonce: randomUUID().replaceAll("-", ""),
+  };
+  writeFileSync(temporaryPath, `${JSON.stringify({ schema: "pipeline.dispatch-budget-counter-lock.v1", owner })}\n`, { flag: "wx", mode: 0o600 });
+  linkSync(temporaryPath, lockPath);
+  const { results } = run({ steps: [{ op: "acquireRealLock", path: lockPath }] });
+  assert.deepEqual(results[0], { status: "rejected", code: "counter-lock-busy", recovered: false });
 });
 
 test("a binding lock left by a dead process is identity-checked and recovered", () => {

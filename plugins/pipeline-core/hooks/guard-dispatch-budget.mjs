@@ -435,7 +435,14 @@ function counterLockIdentity(path, dependencies = {}, expectedBytes = null) {
   const lstatSyncFn = dependencies.lstatSyncFn ?? lstatSync;
   const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
   const info = lstatSyncFn(path);
-  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) throw new Error("counter-lock-unsafe");
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error("counter-lock-unsafe");
+  // publishCounterLock() first hard-links the complete private inode into the
+  // public name and then removes the private name. A competing process may be
+  // scheduled in that bounded interval and observe nlink=2. That is contention,
+  // not malformed persisted state. Keep every other link count fail-closed as
+  // unsafe: only the publisher's exact two-name transition is retryable.
+  if (info.nlink === 2) throw new Error("counter-lock-publishing");
+  if (info.nlink !== 1) throw new Error("counter-lock-unsafe");
   const bytes = Buffer.from(readFileSyncFn(path));
   if (bytes.length === 0 || bytes.length > 4096 || (expectedBytes !== null && !bytes.equals(expectedBytes))) {
     throw new Error("counter-lock-malformed");
@@ -538,7 +545,16 @@ export function acquireDispatchBudgetCounterLock(path, dependencies = {}) {
 
   let observed;
   try { observed = readStableCounterLock(path, dependencies); }
-  catch { return { status: "rejected", code: "counter-lock-malformed" }; }
+  catch (error) {
+    // An owner may release the public name, or a publisher may still hold its
+    // private hard link, throughout the bounded stable-read retries. Both are
+    // ordinary contention and must remain retryable by the caller. Persisted
+    // malformed/unsafe lock state still fails closed under its existing code.
+    if (error?.code === "ENOENT" || error?.message === "counter-lock-publishing") {
+      return { status: "rejected", code: "counter-lock-busy" };
+    }
+    return { status: "rejected", code: "counter-lock-malformed" };
+  }
   const state = counterLockOwnerState(observed, dependencies);
   if (state === "live") return { status: "rejected", code: "counter-lock-busy" };
   if (state !== "dead") return { status: "rejected", code: "counter-lock-owner-ambiguous" };
