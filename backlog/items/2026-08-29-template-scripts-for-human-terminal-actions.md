@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-29
 sprint: nova-b
-tracking: "Nova B -- runner-neutral design reviewed; catalog and POSIX prepare/inspect/run slices implemented, producer adoption remains open; native Windows launcher hardening is deferred."
+tracking: "Nova B -- runner-neutral design reviewed; catalog, POSIX runner, and first producer adoption implemented; native Windows launcher hardening is deferred."
 source: "PO inline observation (2026-08-29, 3-runner greenfield synthesis): Antigravity was the only runner to move quickly through the first 2 phases, in part because it built its OWN scripts to confirm the PRD faster. PO suggests: pre-built template scripts (that runners lightly rewrite, with clear placeholders) for fixed gates/installs/anything the human must run in a terminal, so what needs filling in is always clear."
 done_when: manual
 ---
@@ -86,3 +86,11 @@ runner-neutral work and re-triages it on 2026-09-30. Slice 4 native Windows
 owner/DACL/reparse hardening is deferred to the native-Windows package and is
 re-triaged on 2026-10-31. It is not a Nova-B acceptance blocker and no WSL
 result establishes native readiness.
+
+Slice 3 registers PO-key setup and installed-plugin attestation setup through
+their existing drivers, exact boundary tuples, and independent typed readback.
+Both remain `requiresPoApproval: false`. Compatibility is additive: existing
+CLI verbs and `setupAction` remain, the original v1 receipt schema is unchanged,
+and reconciliation receipts use v2. Rollback may remove the new catalog metadata
+and v2 consumer while the original commands continue to work; candidate/builder
+binding makes older prepared instances refuse after drift.

@@ -1,4 +1,4 @@
-# Human-terminal action templates — Slice 2 implementation evidence
+# Human-terminal action templates — Slices 2 and 3 implementation evidence
 
 Date: 2026-09-12
 Backlog item: `pipeline.template-scripts-for-human-terminal-actions`
@@ -6,22 +6,25 @@ Design: `backlog/evidence/NVA-B-HUMAN-TERMINAL-TEMPLATES-DESIGN-1.md`
 
 ## Candidate binding
 
-Correction candidate: `e4d7539d5684f59f3f817670e8a52f70e06e8b3a`
-Correction tree: `9808669a94b37b773c4c8d75e676723f62dccecd`
+Implementation candidate: `824e787c6fa9cdce1fa7ff6b9335bd21ec28160a`
+Implementation tree: `6efceccbe05748f10bf502163ff5b5bb2f6a59f3`
 
 The implementation commit contains the six implementation blobs below at the
 recorded SHA-256 values:
 
 | Path | SHA-256 |
 |---|---|
-| `harness/scripts/check-auth-gate-inventory-drift.test.mjs` | `ce67bd1f85b4e88f7dce841f41111d751a119f21a576e9f00f23a018615910fc` |
-| `plugins/pipeline-core/lib/human-terminal-action-catalog.mjs` | `f09d2738d8ef53ffc25526ec398b846accf985e55ec4b27eb1d07b9deb7ea7da` |
-| `plugins/pipeline-core/lib/human-terminal-action-instance.mjs` | `7acf9ebc083dd86755573265aca035bc54526c6b1ef69b915ce5ab8f4963f04e` |
+| `harness/scripts/check-auth-gate-inventory-drift.test.mjs` | `b243f7ea0bd97d92c8811076cd207710f98e6088f247cb335ef5a80acfe721f9` |
+| `plugins/pipeline-core/lib/human-terminal-action-catalog.mjs` | `16e1cae8772e71a38bb29fce14f535a75185586fbf50152e3d4ee1b53be5ffa1` |
+| `plugins/pipeline-core/lib/human-terminal-action-instance.mjs` | `e17f1b5c9502676dc80f91a9479076894731e8b84ba2e01abe6372744a30fb12` |
 | `plugins/pipeline-core/schemas/human-terminal-action-instance.schema.json` | `bf51b230a9cad1cef7ca78795b7f6aa45cde1a9df6f48a5990ff736f4e827ac2` |
-| `plugins/pipeline-core/schemas/human-terminal-action-receipt.schema.json` | `3af64f6a32825d3b1c2737fc4efa8234e30a5371fe6d594c293004e53be2673e` |
+| `plugins/pipeline-core/schemas/human-terminal-action-receipt.schema.json` | `dee9837e6534da31c8f52b7e5ecb5893a8e8c271f17585f50d3f8cfcc03ce462` |
+| `plugins/pipeline-core/schemas/human-terminal-action-receipt-v2.schema.json` | `e2274a70bc11d7bba890098d10ed057a590ba2a4708c9a9f1ad959654265869b` |
 | `plugins/pipeline-core/scripts/human-terminal-action.mjs` | `f28fc920357343ca60b32619bfbc257ff8a25c2f0ba840e6f5419893cc5654b7` |
 
-The correction commit contains the six implementation blobs listed above.
+The implementation commit contains the listed blobs. Slice 3 additionally
+binds the existing PO-key and installed-plugin-attestation producers and their
+focused tests.
 
 ## Implemented behavior
 
@@ -58,9 +61,14 @@ contains action/revision, input and candidate digests, exit and typed readback
 state. It contains no raw output, private path, username, passphrase, or
 session identifier.
 
+The reconciliation-capable receipt is v2; the published v1 schema remains
+unchanged for compatibility. A readback adapter must resolve before child
+spawn. If a resolved adapter throws after successful mutation, v2 records
+manual reconciliation and never claims a safe retry.
+
 ## Honest reachability boundary
 
-The only currently registered Slice-1 builder still has `boundary: null`
+The original critical-push Slice-1 builder still has `boundary: null`
 because its source producer does not expose a structured boundary tuple.
 Consequently the shipped catalog refuses preparation with
 `HTA-PREPARE-BOUNDARY-UNATTESTED`. Tests use a synthetic future entry with the
@@ -78,27 +86,29 @@ Sandbox, or Codex App Server claim under WSL. Windows remains typed
 ## Checks
 
 - `node harness/scripts/check-auth-gate-inventory-drift.test.mjs` — exit 0,
-  31/31 tests passed, including inherited terminal streams, direct cross-entry
-  binding, and absent/failed/mismatched readback reconciliation.
+  34/34 tests passed, including inherited terminal streams, producer argv
+  equality, and absent/failed/thrown/mismatched readback reconciliation.
 - `node harness/scripts/check-auth-gate-inventory-drift.mjs` — exit 0; 11
-  discovered surfaces and all 18 canonical inventory rows/dispositions clean.
+  discovered surfaces and all 20 canonical inventory rows/dispositions clean.
 - `node harness/scripts/check-verify-suite-registration.mjs` — exit 0; 532
   registered, 0 excluded, 0 unregistered.
-- `node harness/scripts/check-doc-contracts.mjs` — exit 0; 1,585 Markdown
+- `node harness/scripts/check-doc-contracts.mjs` — exit 0; 1,586 Markdown
   files, 1,370 links and 20 anchor checks valid.
 - Draft 2020-12 schema self-check through Python `jsonschema` — exit 0 for both
   new schemas.
 - `node --check` for the new runtime and CLI — exit 0.
 - `git diff --check` for all Slice-2 implementation paths — exit 0.
 
-No full verify was run for this focused, uncommitted slice.
+The complete PO helper suite passed 110/110 and the complete pipeline-start
+preflight suite passed 55/55 when their local Git fixtures were run outside
+the WSL process sandbox. The installed-attestation host suite passed 8/8. No
+full Verify was run for this focused candidate.
 
 ## Residual slices
 
-- **Slice 3 — owner: pipeline; re-triage: 2026-09-30.** Reassess scope and
-  sequencing, then migrate selected producers, supply their exact structured
-  boundary/readback adapters, and prove byte equality with their old output.
-  This is a re-triage date, not a readiness promise.
+- **Further producer adoption — owner: pipeline; re-triage: 2026-09-30.** The
+  first two producers are registered. Additional producers require their own
+  exact structured boundary/readback adapters and byte-equality evidence.
 - **Slice 4 native Windows — owner: pipeline; re-triage: 2026-10-31.** Reassess
   the deferred native-Windows package. It must implement and test native
   Windows owner/DACL/reparse protection before enabling Windows launchers.
