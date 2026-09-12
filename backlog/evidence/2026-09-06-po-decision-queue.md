@@ -402,7 +402,9 @@ repository cannot evidence.
 
 ## 7. B1 / Codex: one live provider probe
 
-**Needs:** explicit approval; the run itself is an agent action.
+**DEFERRED BY PO 2026-09-12.** Native Codex sandbox and App-Server execution
+under WSL is not an acceptance environment. Revisit this only in the separate
+native-Windows package; it is not a Nova-B blocker or acceptance criterion.
 
 `local-worker-supervisor.mjs` has never executed a real provider. Its only
 production caller runs it in `fixture` mode, and the `codex-exec` path
@@ -415,8 +417,10 @@ practice.
 
 ## 8. One real end-to-end Codex Critic review run
 
-**Needs:** explicit approval for a live provider execution, plus a working
-Codex the run can reach.
+**DEFERRED BY PO 2026-09-12.** Run this only as part of the separate
+native-Windows package. The supported Nova-B review path is the ordinary fresh
+read-only Critic session; WSL results must not be presented as native
+readiness.
 
 Handed over from the Alfred checkout: the selected-Codex-Critic transport has
 a producer and no consumer, so the `selected-runner-transport` gate has no
@@ -619,3 +623,20 @@ this decision. The prior Critic-PASS note was not candidate- or
 trajectory-bound; a fresh review failed that evidence boundary. Formal
 acceptance therefore also requires exact-candidate deterministic evidence and
 a fresh refs-only review on the stable candidate.
+
+## Terminal-action privacy signoff — final-candidate ceremony
+
+**Needs:** a data-privacy reviewer signature bound to the final candidate.
+
+The terminal-action producer now requires the PO's `humanName` before it can
+prepare authority setup. The independent correction review cleared the
+functional boundary, private request storage, digest-only receipts, rollback,
+dependency surface and secret handling, but governance checklist item 1
+requires an attributed privacy signoff whenever a personal-data field or flow
+changes. This record cannot manufacture that human signature.
+
+The signoff must cover the final candidate containing `614b8daa` and its
+unchanged descendants, and confirm that `humanName` is confined to the
+existing private authority request/receipt flow and is not added to portable
+or public evidence. It is a final-candidate ceremony; it does not block other
+Nova-B implementation batches.
