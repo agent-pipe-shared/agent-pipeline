@@ -1,0 +1,441 @@
+{
+  "schema": "pipeline.human-terminal-action-catalog.v1",
+  "entries": [
+    {
+      "id": "critical-push-authorize",
+      "inventoryId": "push-signature",
+      "revision": 1,
+      "purpose": "Render the existing candidate-bound critical push authorization command",
+      "audience": "user",
+      "disposition": "registered",
+      "templateId": "critical-push-authorize",
+      "builderId": "authorize-critical-push",
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs#authorizeCriticalPushCommand",
+        "plugins/pipeline-core/scripts/push-prepare.mjs#pushPrepareReport"
+      ],
+      "boundary": null,
+      "mutation": true,
+      "requiresPoApproval": true,
+      "slots": [
+        {
+          "name": "repoRoot",
+          "type": "absolute-directory",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Repository root"
+        },
+        {
+          "name": "directory",
+          "type": "absolute-directory",
+          "source": "human-input",
+          "required": true,
+          "sensitivity": "machine-private",
+          "prompt": "External PO material directory"
+        },
+        {
+          "name": "featureId",
+          "type": "safe-id",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Active feature id"
+        },
+        {
+          "name": "plan",
+          "type": "repo-relative-path",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Approved plan path"
+        },
+        {
+          "name": "spec",
+          "type": "repo-relative-path",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Bound specification path"
+        },
+        {
+          "name": "subjectSha256",
+          "type": "sha256",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Prepared push subject digest"
+        },
+        {
+          "name": "expiresAt",
+          "type": "iso8601",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Approval expiry"
+        },
+        {
+          "name": "launcher",
+          "type": "absolute-file",
+          "source": "tool-result",
+          "required": false,
+          "sensitivity": "machine-private",
+          "prompt": "Installed approval driver"
+        }
+      ],
+      "expectedReadback": {
+        "schema": null,
+        "code": "PO-HUMAN-CRITICAL-AUTHORIZATION-READY",
+        "command": "verify-critical"
+      },
+      "runners": [
+        "claude",
+        "codex",
+        "antigravity"
+      ],
+      "platforms": [
+        "posix"
+      ]
+    },
+    {
+      "id": "deploy-signature",
+      "inventoryId": "deploy-signature",
+      "revision": 1,
+      "purpose": "Record the deploy signature terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "publication-signature",
+      "inventoryId": "publication-signature",
+      "revision": 1,
+      "purpose": "Record the publication signature terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#runPublicationCommand"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "feature-package-reconcile-signature",
+      "inventoryId": "feature-package-reconcile-signature",
+      "revision": 1,
+      "purpose": "Record the feature package reconcile signature terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "release-preflight-signature",
+      "inventoryId": "release-preflight-signature",
+      "revision": 1,
+      "purpose": "Record the release preflight signature terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "governance-fork-disposition",
+      "inventoryId": "governance-fork-disposition",
+      "revision": 1,
+      "purpose": "Record the governance fork disposition terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs#runForkDispositionApproval"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "critical-action-family",
+      "inventoryId": "critical-action-family",
+      "revision": 1,
+      "purpose": "Record the critical action family terminal-template disposition",
+      "audience": "user",
+      "disposition": "abstract-family",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/lib/critical-action-approval-request.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "guard-maintenance-window",
+      "inventoryId": "guard-maintenance-window",
+      "revision": 1,
+      "purpose": "Record the guard maintenance window terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/lib/guard-maintenance-window.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "human-guard-override-signature",
+      "inventoryId": "human-guard-override-signature",
+      "revision": 1,
+      "purpose": "Record the human guard override signature terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/guard-human-override.mjs#main"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "threat-model-approval",
+      "inventoryId": "threat-model-approval",
+      "revision": 1,
+      "purpose": "Record the threat model approval terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/lib/threat-model-approval-request.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "security-authority-proof",
+      "inventoryId": "security-authority-proof",
+      "revision": 1,
+      "purpose": "Record the security authority proof terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/lib/security-authority-proof.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "plan-prd-approval",
+      "inventoryId": "plan-prd-approval",
+      "revision": 1,
+      "purpose": "Record the plan prd approval terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-plan"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "po-authority-rebind",
+      "inventoryId": "po-authority-rebind",
+      "revision": 1,
+      "purpose": "Record the po authority rebind terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#runPoAuthorityRebindCommand"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "po-authority-decision",
+      "inventoryId": "po-authority-decision",
+      "revision": 1,
+      "purpose": "Record the po authority decision terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#runPoAuthorityDecisionCommand"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "push-chat-mode",
+      "inventoryId": "push-chat-mode",
+      "revision": 1,
+      "purpose": "Record the push chat mode terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/lib/chat-gate-ceremony.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "deploy-reconcile-waiver",
+      "inventoryId": "deploy-reconcile-waiver",
+      "revision": 1,
+      "purpose": "Record the deploy reconcile waiver terminal-template disposition",
+      "audience": "user",
+      "disposition": "excluded",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/lib/critical-human-proof-policy.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "kickoff-language-confirmation",
+      "inventoryId": "kickoff-language-confirmation",
+      "revision": 1,
+      "purpose": "Record the kickoff language confirmation terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/lib/chat-gate-ceremony.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
+      "id": "remote-provisional-approval",
+      "inventoryId": "remote-provisional-approval",
+      "revision": 1,
+      "purpose": "Record the remote provisional approval terminal-template disposition",
+      "audience": "user",
+      "disposition": "excluded",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/remote-provisional-approval.mjs"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.human-terminal-action-catalog.v1.json",
+  "title": "Pipeline human terminal action catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "entries"],
+  "properties": {
+    "schema": { "const": "pipeline.human-terminal-action-catalog.v1" },
+    "entries": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/entry" } }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "inventoryId", "revision", "purpose", "audience", "disposition", "templateId", "builderId", "producerRefs", "boundary", "mutation", "requiresPoApproval", "slots", "expectedReadback", "runners", "platforms"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+        "inventoryId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "purpose": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "audience": { "enum": ["user", "developer"] },
+        "disposition": { "enum": ["registered", "legacy-renderer", "abstract-family", "excluded"] },
+        "templateId": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+        "builderId": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+        "producerRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 240 } },
+        "boundary": { "anyOf": [{ "$ref": "#/$defs/boundary" }, { "type": "null" }] },
+        "mutation": { "type": ["boolean", "null"] },
+        "requiresPoApproval": { "type": ["boolean", "null"] },
+        "slots": { "type": ["array", "null"], "items": { "$ref": "#/$defs/slot" } },
+        "expectedReadback": { "anyOf": [{ "$ref": "#/$defs/readback" }, { "type": "null" }] },
+        "runners": { "type": ["array", "null"], "minItems": 1, "uniqueItems": true, "items": { "enum": ["claude", "codex", "antigravity"] } },
+        "platforms": { "type": ["array", "null"], "minItems": 1, "uniqueItems": true, "items": { "enum": ["posix", "windows"] } }
+      },
+      "allOf": [{
+        "if": { "properties": { "disposition": { "const": "registered" } }, "required": ["disposition"] },
+        "then": { "properties": {
+          "templateId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+          "builderId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+          "mutation": { "type": "boolean" },
+          "requiresPoApproval": { "type": "boolean" },
+          "slots": { "type": "array", "items": { "$ref": "#/$defs/slot" } },
+          "expectedReadback": { "$ref": "#/$defs/readback" },
+          "runners": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["claude", "codex", "antigravity"] } },
+          "platforms": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["posix", "windows"] } }
+        } },
+        "else": { "properties": {
+          "templateId": { "type": "null" }, "builderId": { "type": "null" }, "boundary": { "type": "null" },
+          "mutation": { "type": "null" }, "requiresPoApproval": { "type": "null" }, "slots": { "type": "null" },
+          "expectedReadback": { "type": "null" }, "runners": { "type": "null" }, "platforms": { "type": "null" }
+        } }
+      }]
+    },
+    "boundary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["executionBoundary", "invocation", "codexToolCallPermitted"],
+      "properties": {
+        "executionBoundary": { "enum": ["host", "external-terminal", "attended-external-terminal", "local-process", "attended-host-terminal", "host-authorized-wsl"] },
+        "invocation": { "const": "user-copy-only" }, "codexToolCallPermitted": { "const": false }
+      }
+    },
+    "slot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "type", "source", "required", "sensitivity", "prompt"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{0,63}$" },
+        "type": { "enum": ["absolute-directory", "absolute-file", "repo-relative-path", "sha256", "git-oid", "safe-id", "human-name", "runner", "iso8601", "enum"] },
+        "source": { "enum": ["tool-result", "repository-observation", "machine-plane", "human-input"] },
+        "required": { "type": "boolean" }, "sensitivity": { "enum": ["public", "machine-private"] },
+        "prompt": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "enum": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "readback": {
+      "type": "object", "additionalProperties": false, "required": ["schema", "code", "command"],
+      "properties": { "schema": { "type": ["string", "null"] }, "code": { "type": "string", "minLength": 1 }, "command": { "type": "string", "minLength": 1 } }
+    }
+  }
+}

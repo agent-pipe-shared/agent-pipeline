@@ -69,10 +69,14 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { parseHumanTerminalActionCatalog } from "../../plugins/pipeline-core/lib/human-terminal-action-catalog.mjs";
+
 const PIPELINE_STATE_PATH = "plugins/pipeline-core/scripts/pipeline-state.mjs";
 const PO_HUMAN_APPROVAL_PATH = "plugins/pipeline-core/scripts/po-human-approval.mjs";
 const CRITICAL_ACTION_PATH = "plugins/pipeline-core/lib/critical-action-approval-request.mjs";
 const INVENTORY_DOC_PATH = "docs/human-authorization-inventory.md";
+const HUMAN_TERMINAL_ACTION_CATALOG_PATH = "plugins/pipeline-core/templates/human-terminal-actions/catalog.json";
+const TERMINAL_DISPOSITIONS = new Set(["registered", "legacy-renderer", "abstract-family", "excluded"]);
 
 function defaultReadText(root) {
   return (repoRelativePath) => readFileSync(join(root, repoRelativePath), "utf8");
@@ -103,20 +107,50 @@ function isAcknowledged(docText, token) {
   return docText.includes(`\`${token}\``);
 }
 
+export function extractHumanTerminalDispositionRows(docText) {
+  const rows = [];
+  const pattern = /^\|\s*`([a-z][a-z0-9-]*)`\s*\|\s*`(registered|legacy-renderer|abstract-family|excluded)`\s*\|\s*(?:`([a-z][a-z0-9-]*)`|—)\s*\|\s*$/gmu;
+  for (const match of docText.matchAll(pattern)) {
+    rows.push({ inventoryId: match[1], disposition: match[2], templateId: match[3] ?? null });
+  }
+  return rows;
+}
+
+export function extractCanonicalHumanAuthorizationRows(docText) {
+  const rows = [];
+  for (const heading of [
+    "## On the shared `pipeline.po-approval-proof.v1` contract",
+    "## NOT on the shared contract (a different mechanism)",
+  ]) {
+    const start = docText.indexOf(heading);
+    if (start === -1) continue;
+    const afterHeading = start + heading.length;
+    const nextHeading = docText.indexOf("\n## ", afterHeading);
+    const section = docText.slice(afterHeading, nextHeading === -1 ? undefined : nextHeading);
+    for (const line of section.split("\n")) {
+      if (!line.startsWith("|") || /^\|\s*(?:---|Intent\/gate\b)/u.test(line)) continue;
+      const firstCell = line.match(/^\|\s*(.*?)\s*\|/u)?.[1] ?? "unknown row";
+      const inventoryId = firstCell.match(/<!--\s*inventory-id:\s*([a-z][a-z0-9-]*)\s*-->/u)?.[1] ?? null;
+      rows.push({ inventoryId, label: firstCell.replace(/<!--.*?-->/gu, "").trim() });
+    }
+  }
+  return rows;
+}
+
 export function checkAuthGateInventoryDrift(rootInput, options = {}) {
   const root = resolve(rootInput);
   const readText = options.readText ?? defaultReadText(root);
   const findings = [];
 
   const sources = {};
-  for (const path of [PIPELINE_STATE_PATH, PO_HUMAN_APPROVAL_PATH, CRITICAL_ACTION_PATH, INVENTORY_DOC_PATH]) {
+  for (const path of [PIPELINE_STATE_PATH, PO_HUMAN_APPROVAL_PATH, CRITICAL_ACTION_PATH, INVENTORY_DOC_PATH, HUMAN_TERMINAL_ACTION_CATALOG_PATH]) {
     try {
       sources[path] = readText(path);
     } catch (error) {
       findings.push(`AUTH-GATE-SOURCE-UNREADABLE ${path}: ${error.message}`);
     }
   }
-  if (findings.length) return { findings, stats: { discovered: 0, cliCommands: 0, kinds: 0 } };
+  if (findings.length) return { findings, stats: { discovered: 0, cliCommands: 0, kinds: 0, dispositions: 0, inventoryRows: 0 } };
 
   const docText = sources[INVENTORY_DOC_PATH];
 
@@ -141,10 +175,65 @@ export function checkAuthGateInventoryDrift(rootInput, options = {}) {
     }
   }
 
+  let catalog = null;
+  try {
+    catalog = parseHumanTerminalActionCatalog(sources[HUMAN_TERMINAL_ACTION_CATALOG_PATH]);
+  } catch (error) {
+    findings.push(`AUTH-GATE-TERMINAL-CATALOG-INVALID ${error.message}`);
+  }
+  const dispositionRows = extractHumanTerminalDispositionRows(docText);
+  const canonicalRows = extractCanonicalHumanAuthorizationRows(docText);
+  const canonicalIds = new Set();
+  for (const row of canonicalRows) {
+    if (row.inventoryId === null) {
+      findings.push(`AUTH-GATE-INVENTORY-ID-MISSING ${row.label}`);
+      continue;
+    }
+    if (canonicalIds.has(row.inventoryId)) findings.push(`AUTH-GATE-INVENTORY-ID-DUPLICATE ${row.inventoryId}`);
+    canonicalIds.add(row.inventoryId);
+  }
+  const rowsById = new Map();
+  for (const row of dispositionRows) {
+    if (!TERMINAL_DISPOSITIONS.has(row.disposition)) {
+      findings.push(`AUTH-GATE-TERMINAL-DISPOSITION-INVALID ${row.inventoryId}`);
+      continue;
+    }
+    if (rowsById.has(row.inventoryId)) findings.push(`AUTH-GATE-TERMINAL-DISPOSITION-DUPLICATE ${row.inventoryId}`);
+    else rowsById.set(row.inventoryId, row);
+  }
+  if (catalog) {
+    const catalogIds = new Set(catalog.entries.map((entry) => entry.inventoryId));
+    for (const inventoryId of canonicalIds) {
+      if (!catalogIds.has(inventoryId)) findings.push(`AUTH-GATE-TERMINAL-CATALOG-MISSING ${inventoryId}`);
+    }
+    for (const inventoryId of catalogIds) {
+      if (!canonicalIds.has(inventoryId)) findings.push(`AUTH-GATE-TERMINAL-INVENTORY-MISSING ${inventoryId}`);
+    }
+    for (const entry of catalog.entries) {
+      const row = rowsById.get(entry.inventoryId);
+      if (!row) {
+        findings.push(`AUTH-GATE-TERMINAL-DISPOSITION-MISSING ${entry.inventoryId}`);
+        continue;
+      }
+      if (row.disposition !== entry.disposition || row.templateId !== entry.templateId) {
+        findings.push(`AUTH-GATE-TERMINAL-DISPOSITION-DRIFT ${entry.inventoryId}`);
+      }
+    }
+    for (const inventoryId of rowsById.keys()) {
+      if (!catalogIds.has(inventoryId)) findings.push(`AUTH-GATE-TERMINAL-CATALOG-MISSING ${inventoryId}`);
+    }
+  }
+
   findings.sort();
   return {
     findings,
-    stats: { discovered: discovered.length, cliCommands: cliTokens.length, kinds: kindTokens.length },
+    stats: {
+      discovered: discovered.length,
+      cliCommands: cliTokens.length,
+      kinds: kindTokens.length,
+      dispositions: dispositionRows.length,
+      inventoryRows: canonicalRows.length,
+    },
   };
 }
 
@@ -166,7 +255,9 @@ function runCli() {
     }
     process.stdout.write(
       `Auth-gate inventory drift check clean: ${result.stats.discovered} surface(s) discovered `
-      + `(${result.stats.cliCommands} CLI command(s), ${result.stats.kinds} kind(s)), all acknowledged.\n`,
+      + `(${result.stats.cliCommands} CLI command(s), ${result.stats.kinds} kind(s)); `
+      + `${result.stats.inventoryRows} canonical inventory row(s), `
+      + `${result.stats.dispositions} terminal disposition(s), all acknowledged.\n`,
     );
   } catch (error) {
     process.stderr.write(`Auth-gate inventory drift check unavailable: ${error.message}\n`);
