@@ -4,6 +4,8 @@ id: pipeline.verify-runtime-concentrated-in-ten-suites
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-09-12
+closure_repository: self
 created: 2026-09-01
 sprint: nova-b
 tracking: "Nova B — the parallelized verify has regressed from 419s to 571s in one week, and the single suite named as its next lever grew 35% in the same period. Also supplies the all-fresh full-run artifact two older items were blocked on."
