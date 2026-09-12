@@ -266,6 +266,16 @@ slices. The item remains `open` until the applicable slices below are green.
   status and candidate-invalidation writes remain admissible.
 - No action producer is enabled in this slice.
 
+**Progress (2026-09-12):** LND-2 is implemented in `12a304ce` and corrected in
+`3ffa075e`. The correction closes both independent Critic majors by validating
+closed action payloads and every D4a equality on read as well as append, and by
+binding the published schema to the lifecycle stream. Focused suites pass
+103/103 across the envelope, action payload, store, lifecycle/parity and human
+ledger surfaces. The final candidate-bound threat-model approval required by
+the governance checklist is collected for candidate freeze; it blocks only
+push/release. Evidence:
+`backlog/evidence/2026-09-12-lnd2-envelope-store-reader-admission.md`.
+
 ### LND-3 — mixed-stream replay and viewer
 
 - Replay v2 routes lifecycle-v1 records into unchanged dispatch timelines and
