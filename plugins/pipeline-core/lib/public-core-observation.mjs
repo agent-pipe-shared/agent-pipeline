@@ -298,22 +298,33 @@ export function snapshotPhysicalPluginRoot(pluginRoot, { afterOpen, rootCode = "
   return snapshotPluginRoot(pluginRoot, afterOpen, rootCode);
 }
 
-function parseManifest(snapshot, side, hostPluginVersion) {
-  const entry = snapshot.files.find(({ path }) => path === MANIFEST_PATH);
+const RUNNER_MANIFEST_PROFILES = Object.freeze({
+  codex: Object.freeze({ path: MANIFEST_PATH, name: "pipeline-core" }),
+  claude: Object.freeze({ path: ".claude-plugin/plugin.json", name: "pipeline-core" }),
+  antigravity: Object.freeze({ path: "plugin.json", name: "agent-pipeline-core", normalizedName: "pipeline-core" }),
+});
+
+function parseManifest(snapshot, side, hostPluginVersion, profile = RUNNER_MANIFEST_PROFILES.codex) {
+  const entry = snapshot.files.find(({ path }) => path === profile.path);
   if (entry === undefined) fail(`SNT-A2-${side}-MANIFEST-MISSING`);
   let manifest;
   try { manifest = JSON.parse(UTF8.decode(entry.bytes)); } catch { fail(`SNT-A2-${side}-MANIFEST-MALFORMED`); }
   const hasDeclaredVersion = Object.hasOwn(manifest, "version");
-  if (!exactObject(manifest, hasDeclaredVersion ? [...MANIFEST_KEYS, "version"] : MANIFEST_KEYS)
-    || manifest.name !== "pipeline-core"
+  const validShape = profile === RUNNER_MANIFEST_PROFILES.codex
+    ? exactObject(manifest, hasDeclaredVersion ? [...MANIFEST_KEYS, "version"] : MANIFEST_KEYS)
+      && manifest.hooks === "./hooks/codex-hooks.json"
+    : profile === RUNNER_MANIFEST_PROFILES.claude
+      ? exactObject(manifest, ["name", "version", "description", "author", "license"])
+      : exactObject(manifest, ["name", "version", "description"]);
+  if (!validShape
+    || manifest.name !== profile.name
     || !PLUGIN_NAME.test(manifest.name)
-    || manifest.license !== "SUL-1.0"
+    || (profile !== RUNNER_MANIFEST_PROFILES.antigravity && manifest.license !== "SUL-1.0")
     || (hasDeclaredVersion && !PLUGIN_VERSION.test(manifest.version))
     || (!hasDeclaredVersion && hostPluginVersion === undefined)
-    || (hasDeclaredVersion && hostPluginVersion !== undefined && manifest.version !== hostPluginVersion)
-    || manifest.hooks !== "./hooks/codex-hooks.json") fail(`SNT-A2-${side}-MANIFEST-SCHEMA`);
+    || (hasDeclaredVersion && hostPluginVersion !== undefined && manifest.version !== hostPluginVersion)) fail(`SNT-A2-${side}-MANIFEST-SCHEMA`);
   return {
-    name: manifest.name,
+    name: profile.normalizedName ?? manifest.name,
     version: hasDeclaredVersion ? manifest.version : hostPluginVersion,
     manifestSha256: entry.sha256,
   };
@@ -335,7 +346,7 @@ function rejected(code) {
   return { schema: SCHEMA, status: "rejected", reasonCodes: [code] };
 }
 
-function observe(input = {}, deps = {}, hostPlugin = undefined) {
+function observe(input = {}, deps = {}, hostPlugin = undefined, profile = RUNNER_MANIFEST_PROFILES.codex) {
   try {
     if (!exactObject(input, ["sourcePluginRoot", "installedPluginRoot"])) fail("SNT-A2-INPUT-SCHEMA");
     const dependencies = resolveDependencies(deps);
@@ -349,8 +360,8 @@ function observe(input = {}, deps = {}, hostPlugin = undefined) {
     const installed = input.installedPluginRoot === layout.sourcePluginRoot
       ? source
       : snapshotPluginRoot(input.installedPluginRoot, dependencies.afterOpen, "SNT-A2-INSTALLED-ROOT-UNSAFE");
-    const sourceManifest = parseManifest(source, "SOURCE", hostPlugin?.version);
-    const installedManifest = parseManifest(installed, "INSTALLED", hostPlugin?.version);
+    const sourceManifest = parseManifest(source, "SOURCE", hostPlugin?.version, profile);
+    const installedManifest = parseManifest(installed, "INSTALLED", hostPlugin?.version, profile);
     if (sourceManifest.name !== installedManifest.name
       || sourceManifest.version !== installedManifest.version
       || sourceManifest.manifestSha256 !== installedManifest.manifestSha256) fail("SNT-A2-MANIFEST-MISMATCH");
@@ -374,6 +385,12 @@ function observe(input = {}, deps = {}, hostPlugin = undefined) {
 /** Generic runners require a version declared by each manifest. */
 export function observePublicCoreIdentity(input = {}, deps = {}) {
   return observe(input, deps);
+}
+
+/** Runner-specific local-install observation using the same physical/Git checks. */
+export function observeRunnerPublicCoreIdentity(runner, input = {}, deps = {}) {
+  if (!Object.hasOwn(RUNNER_MANIFEST_PROFILES, runner)) return rejected("SNT-A2-RUNNER-UNSUPPORTED");
+  return observe(input, deps, undefined, RUNNER_MANIFEST_PROFILES[runner]);
 }
 
 /**

@@ -11,12 +11,15 @@ import { verifyInstalledPluginAttestation } from "../lib/installed-plugin-attest
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import {
   HOST_RESULT_SCHEMA,
+  INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER,
   readExternalInstalledPluginReceipt,
   verifyLocalDevelopmentInstalledPluginReceipt,
+  writeClaudeRegistryInstalledPluginReceipt,
   writeCodexRegistryInstalledPluginReceipt,
   writeLocalDevelopmentInstalledPluginReceipt,
 } from "./installed-plugin-attestation-host.mjs";
 import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+import { attestAntigravityMarketplaceCopy } from "../install-agy.mjs";
 
 const cases = [];
 function check(name, run) {
@@ -27,7 +30,7 @@ function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
-function fixture() {
+function fixture(provider = "codex") {
   const base = mkdtempSync(join(tmpdir(), "ipa-host-"));
   const sourceRoot = join(base, "source");
   const sourcePluginRoot = join(sourceRoot, "plugins", "pipeline-core");
@@ -40,12 +43,19 @@ function fixture() {
   }, null, 2)}\n`;
   for (const root of [sourcePluginRoot, installedPluginRoot]) {
     mkdirSync(join(root, ".codex-plugin"), { recursive: true });
+    mkdirSync(join(root, ".claude-plugin"), { recursive: true });
     mkdirSync(join(root, "hooks"), { recursive: true });
     mkdirSync(join(root, "agents"), { recursive: true });
     mkdirSync(join(root, "skills", "critic-review"), { recursive: true });
     writeFileSync(join(root, ".codex-plugin", "plugin.json"), manifest);
+    writeFileSync(join(root, ".claude-plugin", "plugin.json"), `${JSON.stringify({ name: "pipeline-core", version: "1.2.3-test.1", description: "fixture", author: { name: "fixture" }, license: "SUL-1.0" })}\n`);
+    writeFileSync(join(root, "plugin.json"), `${JSON.stringify({ name: "agent-pipeline-core", version: "1.2.3-test.1", description: "fixture" })}\n`);
+    writeFileSync(join(root, "hooks.json"), "{}\n");
     writeFileSync(join(root, "hooks", "codex-hooks.json"), "{}\n");
     writeFileSync(join(root, "hooks", "codex-pretool-guard.mjs"), "export const guard = true;\n");
+    writeFileSync(join(root, "hooks", "guard-lifecycle-ready.mjs"), "export const guard = true;\n");
+    writeFileSync(join(root, "hooks", "antigravity-pretool-guard.mjs"), "export const guard = true;\n");
+    writeFileSync(join(root, "hooks", "antigravity-start-hint.mjs"), "export const start = true;\n");
     writeFileSync(join(root, "agents", "critic.md"), "critic\n");
     writeFileSync(join(root, "skills", "critic-review", "SKILL.md"), "review\n");
   }
@@ -53,19 +63,17 @@ function fixture() {
   git(sourceRoot, ["remote", "add", "origin", "https://example.test/owner/plugin.git"]);
   git(sourceRoot, ["add", "."]);
   git(sourceRoot, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture"]);
-  const protectedPaths = [
-    ".codex-plugin/plugin.json", "agents/critic.md", "hooks/codex-hooks.json",
-    "hooks/codex-pretool-guard.mjs", "skills/critic-review/SKILL.md",
-  ];
+  const protectedPaths = INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[provider];
   const input = {
-    provider: "codex", plugin: { name: "pipeline-core", version: "1.2.3-test.1" },
+    provider, plugin: { name: "pipeline-core", version: "1.2.3-test.1" },
     sourcePluginRoot, installedPluginRoot, protectedPaths,
   };
   return { base, sourcePluginRoot, installedPluginRoot, receiptDirectory, protectedPaths, input, cleanup: () => rmSync(base, { recursive: true, force: true }) };
 }
 
-check("post-install readback writes one external path-free receipt that the core verifies", (t) => {
-  const repo = fixture(); t.after(repo.cleanup);
+check("post-install readback is runner-neutral and writes path-free receipts that the core verifies", (t) => {
+ for (const provider of ["codex", "claude", "antigravity"]) {
+  const repo = fixture(provider); t.after(repo.cleanup);
   const result = writeLocalDevelopmentInstalledPluginReceipt(repo.input, { receiptDirectory: repo.receiptDirectory });
   assert.equal(result.status, "written", JSON.stringify(result));
   assert.equal(result.schema, HOST_RESULT_SCHEMA);
@@ -76,17 +84,18 @@ check("post-install readback writes one external path-free receipt that the core
   assert.equal(raw.includes(repo.base), false, "durable receipt must contain no host path");
   assert.equal(raw.includes("password"), false);
   const verified = verifyInstalledPluginAttestation({
-    provider: "codex", plugin: repo.input.plugin, installedPluginRoot: repo.installedPluginRoot,
+    provider, plugin: repo.input.plugin, installedPluginRoot: repo.installedPluginRoot,
     source: { class: "local-development", sourcePluginRoot: repo.sourcePluginRoot }, protectedPaths: repo.protectedPaths,
   }, { readExternalReceipt: (request) => readExternalInstalledPluginReceipt(request, { receiptDirectory: repo.receiptDirectory }) });
   assert.equal(verified.status, "verified", JSON.stringify(verified));
   assert.equal(verified.receiptId, result.receiptId);
   const bootstrap = verifyLocalDevelopmentInstalledPluginReceipt({
-    provider: "codex", plugin: repo.input.plugin, installedPluginRoot: repo.installedPluginRoot,
-    registrySourcePluginRoot: repo.sourcePluginRoot,
+    provider, plugin: repo.input.plugin, installedPluginRoot: repo.installedPluginRoot,
+    ...(provider === "antigravity" ? { registryInstalledPluginRoot: repo.installedPluginRoot } : { registrySourcePluginRoot: repo.sourcePluginRoot }),
     protectedPaths: repo.protectedPaths,
   }, { receiptDirectory: repo.receiptDirectory });
   assert.equal(bootstrap.status, "verified", JSON.stringify(bootstrap));
+ }
 });
 
 check("readback is request-selected and a changed installed copy cannot reuse a receipt", (t) => {
@@ -147,7 +156,7 @@ check("bootstrap fails closed when its bound host locator is missing or stale", 
 check("unsupported provider and unsorted or escaping protected paths are refused", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
   for (const input of [
-    { ...repo.input, provider: "claude" },
+    { ...repo.input, provider: "unknown" },
     { ...repo.input, protectedPaths: [...repo.protectedPaths].reverse() },
     { ...repo.input, protectedPaths: ["../secret"] },
   ]) assert.equal(writeLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: repo.receiptDirectory }).reason, "IPA-HOST-INPUT");
@@ -183,6 +192,62 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
   const after = inspect();
   assert.equal(after.status, "ready", JSON.stringify(after));
   assert.equal(after.installedPluginAttestation.status, "verified");
+
+  const claudeRepo = fixture("claude"); t.after(claudeRepo.cleanup);
+  const claudeMarketplace = dirname(dirname(claudeRepo.sourcePluginRoot));
+  const claudeList = () => JSON.stringify([{
+    id: "pipeline-core@agent-pipeline-local", version: "1.2.3-test.1", enabled: true,
+    scope: "user", installPath: claudeRepo.installedPluginRoot,
+  }]);
+  const knownMarketplaces = () => JSON.stringify({
+    "agent-pipeline-local": { source: { source: "directory", path: claudeMarketplace } },
+  });
+  const claudeInspect = () => observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" }, pluginList: claudeList, knownMarketplaces,
+    scriptUrl: pathToFileURL(join(claudeRepo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
+    cwd: claudeRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    verifyLocalInstalledPluginReceiptFn: (input) => verifyLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: claudeRepo.receiptDirectory }),
+    observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
+    observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
+    requireProjectOnboardingReadyFn: () => undefined,
+  });
+  const claudeBefore = claudeInspect();
+  assert.equal(claudeBefore.status, "plugin-attestation-required", JSON.stringify(claudeBefore));
+  assert.deepEqual(claudeBefore.nextAction.argv.slice(1, 4), ["write-local-from-registry", "--provider", "claude"]);
+  assert.equal(writeClaudeRegistryInstalledPluginReceipt({
+    provider: "claude", plugin: claudeRepo.input.plugin, installedPluginRoot: claudeRepo.installedPluginRoot,
+  }, { receiptDirectory: claudeRepo.receiptDirectory, readPluginList: claudeList, readKnownMarketplaces: knownMarketplaces }).status, "written");
+  assert.equal(claudeInspect().status, "ready");
+
+  const agyRepo = fixture("antigravity"); t.after(agyRepo.cleanup);
+  const agyRegistry = () => [JSON.stringify({ entries: [{ path: agyRepo.installedPluginRoot }] })];
+  const agyInspect = () => observePipelineStartPreflight({
+    env: { ANTIGRAVITY_AGENT: "1" }, pluginList: () => JSON.stringify({}),
+    scriptUrl: pathToFileURL(join(agyRepo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
+    cwd: agyRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    antigravityPluginRegistries: agyRegistry,
+    verifyLocalInstalledPluginReceiptFn: (input) => verifyLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: agyRepo.receiptDirectory }),
+    observeAntigravityHardEnforcementFn: () => ({ observed: true }),
+    observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
+    observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
+    requireProjectOnboardingReadyFn: () => undefined,
+  });
+  const agyBefore = agyInspect();
+  assert.equal(agyBefore.status, "plugin-attestation-required", JSON.stringify(agyBefore));
+  assert.equal(agyBefore.nextAction, null, "a legacy AGY copy has no trustworthy source callsite to print");
+  const agyInstalled = attestAntigravityMarketplaceCopy({
+    sourcePluginRoot: agyRepo.sourcePluginRoot,
+    installedPluginRoot: agyRepo.installedPluginRoot,
+    writeReceipt: (input) => writeLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: agyRepo.receiptDirectory }),
+  });
+  assert.equal(agyInstalled.status, "written", JSON.stringify(agyInstalled));
+  assert.equal(agyInspect().status, "ready", JSON.stringify(agyInspect()));
+
+  const rootEntrypoint = readFileSync(new URL("../../../install-agy.mjs", import.meta.url), "utf8");
+  assert.match(rootEntrypoint, /\.\/plugins\/pipeline-core\/install-agy\.mjs/u);
+  assert.match(rootEntrypoint, /runInteractiveInstaller\(\)/u);
+  const shippedEntrypoint = readFileSync(new URL("../install-agy.mjs", import.meta.url), "utf8");
+  assert.match(shippedEntrypoint, /isDirectInvocation\(import\.meta\.url\).*runInteractiveInstaller/u);
 });
 
 assert.equal(cases.length, 7, "the complete installed-plugin-attestation host corpus must be registered before execution begins");

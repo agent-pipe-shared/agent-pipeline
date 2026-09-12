@@ -1,19 +1,28 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
+import { isDirectInvocation } from "./lib/entrypoint.mjs";
+import { writeLocalDevelopmentInstalledPluginReceipt } from "./scripts/installed-plugin-attestation-host.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const LOCAL_MARKETPLACE = join(process.env.HOME || process.env.USERPROFILE, "agent-pipeline-local-marketplace");
 const hasMarketplace = existsSync(join(LOCAL_MARKETPLACE, "plugins", "pipeline-core"));
 
+export function attestAntigravityMarketplaceCopy({ sourcePluginRoot, installedPluginRoot, writeReceipt = writeLocalDevelopmentInstalledPluginReceipt } = {}) {
+  try {
+    const source = realpathSync(sourcePluginRoot);
+    const installed = realpathSync(installedPluginRoot);
+    if (source === installed) return { status: "rejected", reason: "IPA-AGY-SOURCE-UNAVAILABLE" };
+    const manifest = JSON.parse(readFileSync(join(installed, "plugin.json"), "utf8"));
+    return writeReceipt({ provider: "antigravity", plugin: { name: "pipeline-core", version: manifest.version }, sourcePluginRoot: source, installedPluginRoot: installed });
+  } catch { return { status: "rejected", reason: "IPA-AGY-SOURCE-UNAVAILABLE" }; }
+}
+
+export function runInteractiveInstaller() {
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 console.log("\n=== Antigravity Pipeline Installer ===\n");
 if (hasMarketplace) {
   console.log(`Detected local marketplace: ${LOCAL_MARKETPLACE}`);
@@ -72,6 +81,25 @@ rl.question(`Use (1) Dev Source (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCA
       config.entries.push({ path: corePluginPath });
     }
 
+    if (useMarketplace) {
+      let sourcePluginRoot;
+      try { sourcePluginRoot = realpathSync(SCRIPT_DIR); } catch { sourcePluginRoot = null; }
+      if (sourcePluginRoot === null || sourcePluginRoot === realpathSync(corePluginPath)) {
+        console.log("Installation refused: run install-agy.mjs from the source checkout so the copied marketplace tree can be attested.");
+        rl.close();
+        process.exitCode = 2;
+        return;
+      }
+      const attestation = attestAntigravityMarketplaceCopy({ sourcePluginRoot, installedPluginRoot: resolve(corePluginPath) });
+      if (attestation.status !== "written") {
+        console.log(`Installation refused: copied plugin attestation failed (${attestation.reason}).`);
+        rl.close();
+        process.exitCode = 2;
+        return;
+      }
+      console.log(`Installer receipt written: ${attestation.receiptId}`);
+    }
+
     writeFileSync(targetFile, JSON.stringify(config, null, 2) + "\n");
     console.log(`\nSuccess! Pipeline registered in: ${targetFile}`);
 
@@ -113,3 +141,6 @@ rl.question(`Use (1) Dev Source (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCA
     });
   });
 });
+}
+
+if (isDirectInvocation(import.meta.url)) runInteractiveInstaller();

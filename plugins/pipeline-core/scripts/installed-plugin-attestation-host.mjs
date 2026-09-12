@@ -12,7 +12,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { verifyInstalledPluginAttestation } from "../lib/installed-plugin-attestation.mjs";
-import { observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import { observeRunnerPublicCoreIdentity } from "../lib/public-core-observation.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const HOST_RESULT_SCHEMA = "pipeline.installed-plugin-attestation-host-result.v1";
@@ -22,13 +22,12 @@ const SHA256 = /^[0-9a-f]{64}$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
 const SAFE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\\)(?!.*\0)[^\r\n]+$/u;
-export const DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS = Object.freeze([
-  ".codex-plugin/plugin.json",
-  "agents/critic.md",
-  "hooks/codex-hooks.json",
-  "hooks/codex-pretool-guard.mjs",
-  "skills/critic-review/SKILL.md",
-]);
+export const INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER = Object.freeze({
+  codex: Object.freeze([".codex-plugin/plugin.json", "agents/critic.md", "hooks/codex-hooks.json", "hooks/codex-pretool-guard.mjs", "skills/critic-review/SKILL.md"]),
+  claude: Object.freeze([".claude-plugin/plugin.json", "agents/critic.md", "hooks.json", "hooks/guard-lifecycle-ready.mjs", "skills/critic-review/SKILL.md"]),
+  antigravity: Object.freeze(["hooks.json", "hooks/antigravity-pretool-guard.mjs", "hooks/antigravity-start-hint.mjs", "plugin.json", "skills/critic-review/SKILL.md"]),
+});
+export const DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS = INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER.codex;
 const identityKeys = ["dev", "ino", "mode", "uid", "gid", "nlink", "size", "mtimeNs", "ctimeNs"];
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -94,10 +93,10 @@ function locatorValid(value, binding) {
     && value.sourcePluginRootSha256 === hash(value.sourcePluginRoot);
 }
 
-function defaultReceiptDirectory() {
-  const base = process.env.CODEX_HOME && isAbsolute(process.env.CODEX_HOME)
+function defaultReceiptDirectory(provider = "codex") {
+  const base = provider === "codex" && process.env.CODEX_HOME && isAbsolute(process.env.CODEX_HOME)
     ? resolve(process.env.CODEX_HOME)
-    : resolve(homedir(), ".codex");
+    : resolve(homedir(), provider === "claude" ? ".claude" : provider === "antigravity" ? ".gemini" : ".codex");
   return join(base, "agent-pipeline", "installed-plugin-attestations");
 }
 
@@ -155,7 +154,7 @@ function writeAtomic(directory, name, bytes) {
 }
 
 /** Read-only callback for verifyInstalledPluginAttestation; the request alone selects the receipt. */
-export function readExternalInstalledPluginReceipt(request, { receiptDirectory = defaultReceiptDirectory() } = {}) {
+export function readExternalInstalledPluginReceipt(request, { receiptDirectory = defaultReceiptDirectory(request?.provider) } = {}) {
   try {
     const path = readExistingAuthorityDirectory(receiptDirectory);
     return readAuthorityFile(join(path, receiptName(request)));
@@ -166,13 +165,16 @@ export function readExternalInstalledPluginReceipt(request, { receiptDirectory =
 
 /** Bootstrap/readback consumer. The private source path is loaded only from a 0600 host locator. */
 export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
-  receiptDirectory = defaultReceiptDirectory(),
+  receiptDirectory = defaultReceiptDirectory(input?.provider),
   verify = verifyInstalledPluginAttestation,
 } = {}) {
   try {
-    const protectedPaths = input?.protectedPaths ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS;
+    const protectedPaths = input?.protectedPaths ?? INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[input?.provider];
     const normalized = { ...input, protectedPaths };
-    if (!exact(normalized, ["provider", "plugin", "installedPluginRoot", "registrySourcePluginRoot", "protectedPaths"])) throw new Error("IPA-HOST-INPUT");
+    const expectedKeys = normalized.provider === "antigravity"
+      ? ["provider", "plugin", "installedPluginRoot", "registryInstalledPluginRoot", "protectedPaths"]
+      : ["provider", "plugin", "installedPluginRoot", "registrySourcePluginRoot", "protectedPaths"];
+    if (!exact(normalized, expectedKeys) || !Object.hasOwn(INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER, normalized.provider)) throw new Error("IPA-HOST-INPUT");
     const binding = locatorBinding(normalized);
     const authorityDirectory = readExistingAuthorityDirectory(receiptDirectory);
     const locatorAuthority = readAuthorityFile(join(authorityDirectory, locatorName(binding)));
@@ -181,13 +183,18 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
       || BigInt(locatorAuthority.receiptIdentity.gid) !== installedOwner.gid) throw new Error("IPA-HOST-LOCATOR-OWNER");
     const locator = JSON.parse(Buffer.from(locatorAuthority.receiptBytes).toString("utf8"));
     if (!locatorValid(locator, binding)) throw new Error("IPA-HOST-LOCATOR");
-    if (realpathSync(normalized.registrySourcePluginRoot) !== locator.sourcePluginRoot) throw new Error("IPA-HOST-LOCATOR-SOURCE");
+    if (normalized.provider === "antigravity") {
+      if (realpathSync(normalized.registryInstalledPluginRoot) !== realpathSync(normalized.installedPluginRoot)) throw new Error("IPA-HOST-LOCATOR-INSTALLED");
+    } else if (realpathSync(normalized.registrySourcePluginRoot) !== locator.sourcePluginRoot) throw new Error("IPA-HOST-LOCATOR-SOURCE");
     return verify({
       provider: normalized.provider, plugin: normalized.plugin,
       installedPluginRoot: normalized.installedPluginRoot,
       source: { class: "local-development", sourcePluginRoot: locator.sourcePluginRoot },
       protectedPaths,
-    }, { readExternalReceipt: (request) => readExternalInstalledPluginReceipt(request, { receiptDirectory }) });
+    }, {
+      observeLocal: (value, deps) => observeRunnerPublicCoreIdentity(normalized.provider, value, deps),
+      readExternalReceipt: (request) => readExternalInstalledPluginReceipt(request, { receiptDirectory }),
+    });
   } catch {
     return { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-LOCATOR-UNAVAILABLE"] };
   }
@@ -215,6 +222,43 @@ export function resolveCodexRegistrySource({ plugin, readPluginList = () => {
   } catch { return null; }
 }
 
+/** Resolve one Claude local marketplace source and bind the loaded cache root when exposed. */
+export function resolveClaudeRegistrySource({
+  plugin,
+  installedPluginRoot,
+  readPluginList = () => {
+    const result = spawnSync("claude", ["plugin", "list", "--json"], { encoding: "utf8", shell: false, timeout: 5_000, maxBuffer: 1024 * 1024 });
+    return result.status === 0 ? result.stdout : null;
+  },
+  readKnownMarketplaces = () => readFileSync(resolve(homedir(), ".claude", "plugins", "known_marketplaces.json"), "utf8"),
+} = {}) {
+  try {
+    const entries = JSON.parse(readPluginList());
+    const registry = JSON.parse(readKnownMarketplaces());
+    const matches = entries.filter((entry) => entry?.id === "pipeline-core@agent-pipeline-local"
+      && entry.version === plugin.version && entry.enabled === true);
+    if (matches.length !== 1) return null;
+    const source = registry?.["agent-pipeline-local"]?.source;
+    if (source?.source !== "directory" || typeof source.path !== "string" || !isAbsolute(source.path)
+      || resolve(source.path) !== source.path) return null;
+    if (typeof matches[0].installPath === "string"
+      && realpathSync(resolve(matches[0].installPath)) !== realpathSync(installedPluginRoot)) return null;
+    const root = realpathSync(resolve(source.path, "plugins", "pipeline-core"));
+    return lstatSync(root).isDirectory() && !lstatSync(root).isSymbolicLink() ? root : null;
+  } catch { return null; }
+}
+
+/** Resolve the exact Antigravity path registration selecting this loaded plugin. */
+export function resolveAntigravityRegistryInstalledRoot({ installedPluginRoot, registryPayloads = [] } = {}) {
+  try {
+    const roots = registryPayloads.flatMap((payload) => JSON.parse(payload)?.entries ?? [])
+      .filter((entry) => exact(entry, ["path"]) && typeof entry.path === "string" && isAbsolute(entry.path))
+      .map((entry) => realpathSync(resolve(entry.path)))
+      .filter((path) => path === realpathSync(installedPluginRoot));
+    return roots.length === 1 ? roots[0] : null;
+  } catch { return null; }
+}
+
 export function writeCodexRegistryInstalledPluginReceipt(input, dependencies = {}) {
   const sourcePluginRoot = resolveCodexRegistrySource({
     plugin: input?.plugin,
@@ -224,19 +268,30 @@ export function writeCodexRegistryInstalledPluginReceipt(input, dependencies = {
   return writeLocalDevelopmentInstalledPluginReceipt({ ...input, sourcePluginRoot }, dependencies);
 }
 
+export function writeClaudeRegistryInstalledPluginReceipt(input, dependencies = {}) {
+  const sourcePluginRoot = resolveClaudeRegistrySource({
+    plugin: input?.plugin,
+    installedPluginRoot: input?.installedPluginRoot,
+    readPluginList: dependencies.readPluginList,
+    readKnownMarketplaces: dependencies.readKnownMarketplaces,
+  });
+  if (sourcePluginRoot === null) return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-REGISTRY-SOURCE" };
+  return writeLocalDevelopmentInstalledPluginReceipt({ ...input, provider: "claude", sourcePluginRoot }, dependencies);
+}
+
 /**
  * Post-install host operation. It never installs or copies the plugin. It first
  * verifies a clean source↔installed readback, writes a path-free receipt outside
  * both trees, then asks the provider-neutral core to read and verify that file.
  */
 export function writeLocalDevelopmentInstalledPluginReceipt(input, {
-  receiptDirectory = defaultReceiptDirectory(),
-  observe = observePublicCoreIdentity,
+  receiptDirectory = defaultReceiptDirectory(input?.provider),
+  observe = (value, deps) => observeRunnerPublicCoreIdentity(input?.provider, value, deps),
 } = {}) {
-  const protectedPaths = input?.protectedPaths ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS;
+  const protectedPaths = input?.protectedPaths ?? INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[input?.provider];
   const normalized = { ...input, protectedPaths };
   if (!exact(normalized, ["provider", "plugin", "sourcePluginRoot", "installedPluginRoot", "protectedPaths"])
-    || normalized.provider !== "codex" || !ID.test(normalized.plugin?.name ?? "") || !VERSION.test(normalized.plugin?.version ?? "")
+    || !Object.hasOwn(INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER, normalized.provider) || !ID.test(normalized.plugin?.name ?? "") || !VERSION.test(normalized.plugin?.version ?? "")
     || !isAbsolute(normalized.sourcePluginRoot ?? "") || !isAbsolute(normalized.installedPluginRoot ?? "")
     || !Array.isArray(protectedPaths) || protectedPaths.length === 0 || !protectedPaths.every((path) => SAFE_PATH.test(path))
     || new Set(protectedPaths).size !== protectedPaths.length || [...protectedPaths].sort().join("\0") !== protectedPaths.join("\0")) {
@@ -300,32 +355,37 @@ export function writeLocalDevelopmentInstalledPluginReceipt(input, {
 }
 
 function parse(argv) {
-  if (!["write-local", "write-local-from-codex-registry"].includes(argv[0])) return null;
+  if (!["write-local", "write-local-from-registry", "write-local-from-codex-registry"].includes(argv[0])) return null;
   const operation = argv[0];
   const value = { provider: "codex", plugin: { name: "pipeline-core", version: null }, sourcePluginRoot: null, installedPluginRoot: null };
   for (let i = 1; i < argv.length; i += 2) {
     const flag = argv[i]; const arg = argv[i + 1];
     if (!arg) return null;
     if (flag === "--version") value.plugin.version = arg;
+    else if (flag === "--provider" && ["codex", "claude", "antigravity"].includes(arg)) value.provider = arg;
     else if (flag === "--source-plugin-root") value.sourcePluginRoot = resolve(arg);
     else if (flag === "--installed-plugin-root") value.installedPluginRoot = resolve(arg);
     else return null;
   }
   if (!value.plugin.version || !value.installedPluginRoot) return null;
   if (operation === "write-local" && !value.sourcePluginRoot) return null;
-  if (operation === "write-local-from-codex-registry" && value.sourcePluginRoot) return null;
+  if (operation !== "write-local" && value.sourcePluginRoot) return null;
+  if (operation === "write-local-from-codex-registry") value.provider = "codex";
+  if (operation === "write-local-from-registry" && !["codex", "claude"].includes(value.provider)) return null;
   return { operation, input: value };
 }
 
 if (isDirectInvocation(import.meta.url)) {
   const input = parse(process.argv.slice(2));
   if (input === null) {
-    process.stderr.write("installed-plugin-attestation-host: write-local --version <version> --source-plugin-root <path> --installed-plugin-root <path>\n");
+    process.stderr.write("installed-plugin-attestation-host: write-local --provider <codex|claude|antigravity> --version <version> --source-plugin-root <path> --installed-plugin-root <path>\n");
     process.exit(2);
   }
   const result = input === null ? null : input.operation === "write-local"
     ? writeLocalDevelopmentInstalledPluginReceipt(input.input)
-    : writeCodexRegistryInstalledPluginReceipt(input.input);
+    : input.input.provider === "claude"
+      ? writeClaudeRegistryInstalledPluginReceipt(input.input)
+      : writeCodexRegistryInstalledPluginReceipt(input.input);
   if (result === null) {
     process.stderr.write("installed-plugin-attestation-host: write-local[-from-codex-registry] --version <version> [--source-plugin-root <path>] --installed-plugin-root <path>\n");
     process.exit(2);

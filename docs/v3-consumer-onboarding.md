@@ -395,4 +395,12 @@ node ../relative/path/to/agent-pipeline/install-agy.mjs
 agy --execute "/pipeline-start"
 ```
 
+When the selected path is a copied local-marketplace tree, the installer
+compares it with the clean source checkout and writes the same external,
+path-free installed-plugin receipt consumed by bootstrap on every runner. It
+writes the receipt before `.agents/plugins.json` or the global Gemini registry,
+so a stale or unverified copy is never newly registered. Run the installer from
+the source checkout; a legacy copied registration has no trustworthy source path
+that bootstrap can reconstruct from Antigravity's path-only registry.
+
 This ensures that any team member who clones the repository immediately benefits from the pipeline logic without running local installation commands. When switching between beta, stable, or local test versions of the pipeline, simply update the `path` value in `.agents/plugins.json` and commit the change.

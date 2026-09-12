@@ -352,6 +352,13 @@ document; confirm by readback (`claude plugin list --json`) the next time an
 update actually runs, and correct this note if the observed text differs.
 Restart the session to apply the change.
 
+On the next `pipeline-start`, a gitless local cache is accepted only after the
+host post-install action has compared the complete cache tree with this clean
+marketplace source and written an external, path-free installer receipt. The
+bootstrap returns that exact action and runs it as routine installation
+maintenance without a PO gate; it then repeats the same preflight and proceeds
+only on verified readback. A stale cache or ambiguous registry remains closed.
+
 ## Readback contract
 
 Verified on a correct local-development installation:

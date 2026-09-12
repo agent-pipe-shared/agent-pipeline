@@ -10,7 +10,7 @@
       "properties": {
         "schema": { "const": "pipeline.installed-plugin-attestation-host-result.v1" },
         "status": { "const": "written" },
-        "provider": { "const": "codex" },
+        "provider": { "enum": ["codex", "claude", "antigravity"] },
         "plugin": {
           "type": "object", "additionalProperties": false, "required": ["name", "version"],
           "properties": { "name": { "const": "pipeline-core" }, "version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$" } }

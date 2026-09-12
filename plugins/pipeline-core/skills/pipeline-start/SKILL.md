@@ -27,7 +27,7 @@ returned action at its declared boundary. Resolve role before preflight:
 conflicting or unknown carriers stop — Critic is closed, never Elephant.
 
 Status `plugin-attestation-required` is a closed hard recovery, never the
-soft `plugin-refresh-required` advisory. Accept it only with
+soft `plugin-refresh-required` advisory. For Codex and Claude, accept it only with
 `nextAction.schema: pipeline.installed-plugin-attestation-setup-action.v1`,
 `kind: host-postinstall`, `executionBoundary: host`, `mutation: true`,
 `requiresPoApproval: false`, executable `node`, and expected result schema
@@ -39,6 +39,11 @@ asking the PO, accepts only its exact expected result, then reruns the identical
 `plugin-attestation-required`, or any other non-ready status stops bootstrap.
 Goldfish and Critic never perform this mutation and remain blocked for Elephant
 recovery. Never reconstruct the argv or add a source path from conversation.
+For Antigravity, the repository installer writes the same receipt before it
+registers a copied marketplace tree. A legacy copied registration with no
+installer locator returns `plugin-attestation-required` with `nextAction: null`:
+stop and rerun `install-agy.mjs` from the source checkout. The source path cannot
+be recovered safely from Antigravity's path-only registry and must not be guessed.
 
 Print only after a ready result:
 

@@ -41,6 +41,9 @@ import { planInstall } from "./pre-push-hook-install.mjs";
 import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 import {
   DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
+  INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER,
+  resolveAntigravityRegistryInstalledRoot,
+  resolveClaudeRegistrySource,
   resolveCodexRegistrySource,
   verifyLocalDevelopmentInstalledPluginReceipt,
 } from "./installed-plugin-attestation-host.mjs";
@@ -811,6 +814,10 @@ export function observePipelineStartPreflight({
   observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
+  antigravityPluginRegistries = () => [
+    resolve(cwd, ".agents", "plugins.json"),
+    resolve(homedir(), ".gemini", "config", "plugins.json"),
+  ].flatMap((path) => { try { return [read(path, "utf8")]; } catch { return []; } }),
   observe,
   // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
   // descriptor (if any) is "this" call's own, so it is excluded from the
@@ -838,8 +845,18 @@ export function observePipelineStartPreflight({
   const installedIdentity = installedPipelineIdentity(() => pluginListSnapshot, runner, knownMarketplaces, cwd);
   const installedVersion = installedIdentity?.version ?? null;
   const selfApplicationGit = pluginRootHasSelfApplicationGit(pluginRoot);
-  const registrySourcePluginRoot = version && runner === "codex" && installedIdentity?.source === "local-development"
-    ? resolveCodexRegistrySource({ plugin: { name: "pipeline-core", version }, readPluginList: () => pluginListSnapshot })
+  const registrySourcePluginRoot = version && installedIdentity?.source === "local-development"
+    ? runner === "codex"
+      ? resolveCodexRegistrySource({ plugin: { name: "pipeline-core", version }, readPluginList: () => pluginListSnapshot })
+      : runner === "claude"
+        ? resolveClaudeRegistrySource({
+            plugin: { name: "pipeline-core", version }, installedPluginRoot: pluginRoot,
+            readPluginList: () => pluginListSnapshot, readKnownMarketplaces: knownMarketplaces,
+          })
+        : null
+    : null;
+  const registryInstalledPluginRoot = version && runner === "antigravity" && !pluginRootHasSelfApplicationGit(pluginRoot)
+    ? resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: pluginRoot, registryPayloads: antigravityPluginRegistries() })
     : null;
   const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
     && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
@@ -879,23 +896,26 @@ export function observePipelineStartPreflight({
   const attestationFailed = evaluateSelfApplicationAttestation({
     pluginRoot, runner, version, observe: captureObserve,
   }).failed;
-  // Gitless Codex local-development installs require the external receipt
+  // Gitless local-development installs require the external receipt
   // produced by the host install/update coordinator after copy + readback.
   // Bootstrap only consumes its request-selected receipt and restricted
   // source locator; it never writes either authority artifact.
-  const rawInstalledPluginAttestation = version && runner === "codex"
-    && !selfApplicationGit && installedIdentity?.source === "local-development"
-    ? registrySourcePluginRoot === null
+  const localInstalledCopy = version && !selfApplicationGit && (
+    ["codex", "claude"].includes(runner) && installedIdentity?.source === "local-development"
+    || runner === "antigravity" && registryInstalledPluginRoot !== null
+  );
+  const rawInstalledPluginAttestation = localInstalledCopy
+    ? runner !== "antigravity" && registrySourcePluginRoot === null
       ? { schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-SOURCE-UNAVAILABLE"] }
       : verifyLocalInstalledPluginReceiptFn({
-        provider: "codex",
+        provider: runner,
         plugin: { name: "pipeline-core", version },
         installedPluginRoot: pluginRoot,
-        registrySourcePluginRoot,
-        protectedPaths: DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
+        ...(runner === "antigravity" ? { registryInstalledPluginRoot } : { registrySourcePluginRoot }),
+        protectedPaths: INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[runner] ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
       })
     : { schema: "pipeline.installed-plugin-attestation-bootstrap.v1", status: "not-required", reasonCodes: [] };
-  const installedPluginAttestation = rawInstalledPluginAttestation.status === "unavailable"
+  const installedPluginAttestation = rawInstalledPluginAttestation.status === "unavailable" && runner !== "antigravity"
     ? {
         ...rawInstalledPluginAttestation,
         setupAction: {
@@ -904,7 +924,8 @@ export function observePipelineStartPreflight({
           executable: "node",
           argv: [
             resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
-            "write-local-from-codex-registry", "--version", version,
+            runner === "codex" ? "write-local-from-codex-registry" : "write-local-from-registry",
+            ...(runner === "codex" ? [] : ["--provider", runner]), "--version", version,
             "--installed-plugin-root", pluginRoot,
           ],
           mutation: true,

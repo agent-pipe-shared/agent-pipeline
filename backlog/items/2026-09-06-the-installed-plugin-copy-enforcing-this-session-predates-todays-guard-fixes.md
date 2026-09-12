@@ -142,3 +142,23 @@ The five new or changed test suites emit required case-completion evidence in
 normal Verify execution. Focused tests and an independent correction Critic
 passed. The item remains open for the equivalent Claude and Antigravity host
 coordinators and for the acceptance criteria's live resync/reachability probes.
+
+## Portable runner parity — 2026-09-12
+
+The working-tree package now extends the same installer-owned receipt to Claude
+and Antigravity without using the deferred native Codex sandbox/App Server
+route. Claude bootstrap resolves the one exact directory-source local
+marketplace, emits an executable host post-install action with
+`requiresPoApproval: false`, and verifies the renewed cache before readiness.
+Antigravity's repository installer verifies and receipts a copied marketplace
+tree before writing its path registry; bootstrap binds that exact registered
+path and consumes the receipt. Direct clean Git sources remain unchanged.
+
+The package deliberately does not invent a recovery action for a legacy
+Antigravity copy that predates the source locator: Antigravity's registry stores
+only the selected installed path, so bootstrap cannot reconstruct the private
+source path safely. That installation must rerun `install-agy.mjs` from the
+source checkout. Focused evidence is recorded in
+`backlog/evidence/2026-09-12-installed-plugin-attestation-runner-parity.md`.
+The item still requires the acceptance criteria's live resync/reachability
+probes before closure.
