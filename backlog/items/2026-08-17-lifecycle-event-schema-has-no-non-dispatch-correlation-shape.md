@@ -309,6 +309,11 @@ slices. The item remains `open` until the applicable slices below are green.
   WSL is deferred to a future native-Windows package and is neither required
   nor valid evidence. Runner-neutral and offline contracts, including normal
   fresh-session Critic behavior, remain in scope.
+- The deferred native execution topic is owned by the existing `sprint: none`
+  item
+  `pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn`
+  under Pipeline/future native-Windows hardening. Its established review expiry
+  is 2026-12-15; that date requires re-triage and is not a delivery promise.
 - Replays and post-source event failures are idempotent and typed.
 
 ### LND-6 — push/deploy gate producers
@@ -351,4 +356,8 @@ slices. The item remains `open` until the applicable slices below are green.
 Exact-candidate HGO consumption may join LND-6 only after the ADR register
 explicitly accepts the minimal public projection. Until then its authenticated
 private audit ledger remains the sole record and HGO does not block LND-0
-through LND-8 for the other producer families.
+through LND-8 for the other producer families. The PO owns the register
+decision, and the Pipeline Elephant prepares the decision evidence. Review and
+decision are due no later than LND-6 admission; if LND-6 has not begun, the
+calendar re-triage date is 2026-10-15. This is a re-triage obligation, not a
+delivery promise, and the other accepted slices proceed while it remains open.

@@ -329,10 +329,20 @@ neither blocker nor evidence. Runner-neutral and offline contracts, including
 selection and policy logic and the ordinary fresh-session Critic, remain in
 scope.
 
+The deferred native Codex WSL topic is owned by the existing `sprint: none`
+item
+`pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn`
+under Pipeline/future native-Windows hardening. Its established review expiry
+is 2026-12-15. That date requires re-triage; it is not a delivery promise.
+
 ## Remaining register decision
 
 Decide whether exact-candidate HGO consumption receives the minimal portable
 projection in D5. Until explicitly accepted, HGO remains private-only and does
-not block the other four producer families.
+not block the other four producer families. The PO owns this decision, with the
+Pipeline Elephant responsible for preparing its evidence. Review and decision
+are due no later than admission of LND-6; if LND-6 has not begun, the calendar
+re-triage date is 2026-10-15. The date is not a delivery promise, and the other
+accepted slices proceed while the decision remains open.
 
 No new PO gate is required for implementing the remaining accepted slices.
