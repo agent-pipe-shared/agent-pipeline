@@ -149,6 +149,13 @@ change, but the existing artifacts do not justify a finer numeric attribution.
 This item remains open until the residual serial critical path is assessed and
 the release-boundary trend is exercised by subsequent release evidence.
 
+The next bounded batch in `a1446c56` adds exact case-completion evidence to
+three measured legacy suites: `onboarding-continuity-tests` (previously about
+35.3s), `project-authority-tests` (about 25.3s), and
+`runner-profile-migration-v3-tests` (about 5.8s). It improves diagnostic
+completeness for 367 cases but does not claim a runtime reduction; no suite was
+deleted or bypassed. Runtime work remains focused on the measured serial path.
+
 ## Why "sort out old test cases" is not the remedy
 
 Raised by the PO on 2026-09-01 as the intuitive fix. The distribution rules it

@@ -209,3 +209,10 @@ Critic returned PASS with no findings. The registry now contains **15 required
 and 166 legacy-process-only** entries, 181 total. The item remains open for the
 staged migration of the remaining legacy population. See
 `backlog/evidence/2026-09-11-antigravity-preflight-and-case-completion-pass.md`.
+
+Commit `a1446c56` migrates three further normal Verify paths:
+`onboarding-continuity-tests` (280 cases), `project-authority-tests` (36), and
+`runner-profile-migration-v3-tests` (51). All 367 callbacks completed in the
+focused run, and Verify now supplies their exact policies. The unchanged
+181-entry registry therefore contains **18 required and 163
+legacy-process-only** entries. The item remains open for staged migration.
