@@ -42,7 +42,8 @@
         "pipeline.human-governance-decision.v1",
         "pipeline.human-role-exception-decision.v1",
         "pipeline.agent-decision-event.v1",
-        "pipeline.lifecycle-governance-event.v1"
+        "pipeline.lifecycle-governance-event.v1",
+        "pipeline.governance-action-event.v1"
       ]
     },
     "canonicalization": { "const": "RFC8785" },
@@ -99,7 +100,12 @@
       "if": { "properties": { "origin": { "const": "lifecycle" } }, "required": ["origin"] },
       "then": {
         "properties": {
-          "payloadSchema": { "const": "pipeline.lifecycle-governance-event.v1" },
+          "payloadSchema": {
+            "enum": [
+              "pipeline.lifecycle-governance-event.v1",
+              "pipeline.governance-action-event.v1"
+            ]
+          },
           "authorityClass": { "const": "non-authoritative" }
         }
       }

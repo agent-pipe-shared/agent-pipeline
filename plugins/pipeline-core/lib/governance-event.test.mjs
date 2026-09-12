@@ -108,11 +108,11 @@ function validateFocusedEnvelope(value) {
   if (!sha256.test(value.repositoryFingerprint) || value.sourceUri !== `urn:pipeline:repository:${value.repositoryFingerprint}`) return false;
   if (!Number.isSafeInteger(value.sequence) || value.sequence < 1 || !sha256.test(value.eventDigest) || !sha256.test(value.payloadDigest)) return false;
   const expectedPayload = {
-    human: "pipeline.human-governance-decision.v1",
-    agent: "pipeline.agent-decision-event.v1",
-    lifecycle: "pipeline.lifecycle-governance-event.v1",
+    human: ["pipeline.human-governance-decision.v1"],
+    agent: ["pipeline.agent-decision-event.v1"],
+    lifecycle: ["pipeline.lifecycle-governance-event.v1", "pipeline.governance-action-event.v1"],
   };
-  if (expectedPayload[value.origin] !== value.payloadSchema) return false;
+  if (!expectedPayload[value.origin]?.includes(value.payloadSchema)) return false;
   if ((value.origin === "human") !== (value.authorityClass === "human-authority")) return false;
   if (value.storageProfile === "repository-public-safe" && (value.classification !== "repository-public-safe" || value.retentionCompatibility !== "repository-retained")) return false;
   if (value.storageProfile === "restricted-machine-local" && (value.classification !== "restricted" || value.retentionCompatibility !== "machine-local-expiring")) return false;
@@ -138,6 +138,26 @@ test("envelope binds each origin to its payload and cannot collapse authority", 
   assert.equal(validateFocusedEnvelope(eventFixture({ origin: "human" })), false);
   assert.equal(validateFocusedEnvelope(eventFixture({ authorityClass: "human-authority" })), false);
   assert.equal(validateFocusedEnvelope(eventFixture({ payloadSchema: "pipeline.agent-decision-event.v1" })), false);
+});
+
+test("ADR-0083 LND-2: action payload envelopes are admitted only on the non-authoritative lifecycle stream", () => {
+  const action = eventFixture({ payloadSchema: "pipeline.governance-action-event.v1" });
+  assert.equal(validateFocusedEnvelope(action), true);
+  assert.equal(validateGovernanceEventEnvelope(action, { verifyDigests: false }).valid, true);
+  for (const override of [
+    { origin: "agent", streamId: "agent" },
+    { origin: "human", streamId: "human", authorityClass: "human-authority" },
+    { authorityClass: "human-authority" },
+    { streamId: "agent" },
+  ]) {
+    const result = validateGovernanceEventEnvelope({ ...action, ...override }, { verifyDigests: false });
+    assert.equal(result.valid, false, JSON.stringify(override));
+  }
+  const lifecycleRule = envelope.allOf.find((rule) => rule.if?.properties?.origin?.const === "lifecycle");
+  assert.deepEqual(lifecycleRule.then.properties.payloadSchema.enum, [
+    "pipeline.lifecycle-governance-event.v1",
+    "pipeline.governance-action-event.v1",
+  ]);
 });
 
 test("D-1: pipeline.human-decision-attribution.v1 is admitted only under storageProfile restricted-machine-local", () => {

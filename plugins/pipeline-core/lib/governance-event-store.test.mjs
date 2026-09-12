@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
+import { buildGovernanceActionEvent } from "./governance-action-events.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
@@ -127,6 +128,52 @@ function intent(overrides = {}) {
   };
 }
 
+function actionIntent(overrides = {}) {
+  const payload = buildGovernanceActionEvent({
+    kind: "verification",
+    status: "completed",
+    reasonCode: "VERIFICATION_PASSED",
+    requestId: "verify-run-1",
+    featureId: unavailable,
+    sessionId: unavailable,
+    candidate,
+  });
+  return {
+    schema: "pipeline.governance-event-envelope.v1",
+    payloadSchema: "pipeline.governance-action-event.v1",
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventId: payload.eventId,
+    idempotencyKey: payload.correlation.actionId,
+    origin: "lifecycle",
+    authorityClass: "non-authoritative",
+    eventType: "lifecycle.action.verification",
+    occurredAtEpochMs: 1,
+    observedAtEpochMs: 1,
+    timeAssurance: "locally-observed",
+    repositoryFingerprint: fingerprint,
+    sourceUri: `urn:pipeline:repository:${fingerprint}`,
+    streamId: "lifecycle",
+    correlation: {
+      featureId: payload.correlation.featureId,
+      packageId: unavailable,
+      requestId: payload.correlation.requestId,
+      sessionId: payload.correlation.sessionId,
+      dispatchId: unavailable,
+      traceId: payload.correlation.actionId,
+    },
+    candidate,
+    artifacts: [unavailable],
+    policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest, redactionPolicyDigest: unavailable },
+    classification: "repository-public-safe",
+    storageProfile: "repository-public-safe",
+    retentionCompatibility: "repository-retained",
+    disclosureClass: "repository-visible",
+    payload,
+    ...overrides,
+  };
+}
+
 async function append(root, event = intent()) {
   return appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: fingerprint, intent: event });
 }
@@ -217,6 +264,91 @@ test("portable append publishes canonical bytes, readback checkpoint, and source
   const heads = JSON.parse(await readFile(path.join(root, "governance/events/heads.json"), "utf8"));
   assert.deepEqual(heads.streams.lifecycle, { sequence: 1, eventDigest: observed.eventDigest });
   assert.equal((await loadGovernanceEventRegistry({ repositoryRoot: root })).repositoryFingerprint, fingerprint);
+});
+
+test("ADR-0083 LND-2: action payload append validates identifiers and every D4a envelope equality", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const valid = actionIntent();
+  const observed = await append(root, valid);
+  assert.equal(observed.outcome, "appended");
+  const queried = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(canonicalizeJson(queried.events[0].payload), canonicalizeJson(valid.payload));
+
+  const secondRoot = await fixtureRoot(); t.after(() => cleanup(secondRoot));
+  const base = actionIntent();
+  const mismatches = [
+    { ...base, eventId: "f".repeat(64) },
+    { ...base, idempotencyKey: "e".repeat(64) },
+    { ...base, eventType: "lifecycle.action.review" },
+    { ...base, candidate: { commit: "d".repeat(40), tree: candidate.tree } },
+    { ...base, correlation: { ...base.correlation, featureId: "other-feature" } },
+    { ...base, correlation: { ...base.correlation, requestId: "other-request" } },
+    { ...base, correlation: { ...base.correlation, sessionId: "other-session" } },
+    { ...base, correlation: { ...base.correlation, packageId: "fabricated-package" } },
+    { ...base, correlation: { ...base.correlation, dispatchId: "fabricated-dispatch" } },
+    { ...base, correlation: { ...base.correlation, traceId: "wrong-trace" } },
+  ];
+  for (const mismatch of mismatches) {
+    await assert.rejects(
+      () => append(secondRoot, mismatch),
+      (error) => error instanceof GovernanceEventStoreError && error.code === "GES-PAYLOAD-SCHEMA",
+    );
+  }
+
+  const wrongActionId = "d".repeat(64);
+  const corruptAction = {
+    ...base,
+    idempotencyKey: wrongActionId,
+    correlation: { ...base.correlation, traceId: wrongActionId },
+    payload: { ...base.payload, correlation: { ...base.payload.correlation, actionId: wrongActionId } },
+  };
+  const wrongEventId = "c".repeat(64);
+  const corruptEvent = { ...base, eventId: wrongEventId, payload: { ...base.payload, eventId: wrongEventId } };
+  for (const corrupt of [corruptAction, corruptEvent]) {
+    await assert.rejects(
+      () => append(secondRoot, corrupt),
+      (error) => error instanceof GovernanceEventStoreError && error.code === "GES-PAYLOAD-SCHEMA",
+      "the action validator must recompute both canonical identifiers before append",
+    );
+  }
+});
+
+test("ADR-0083 LND-2: legacy lifecycle-v1 action records remain readable but new writes are refused", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const legacyIntent = intent({
+    eventId: "evt-legacy-action",
+    idempotencyKey: "idem-legacy-action",
+    eventType: "lifecycle.review",
+    payload: { ...intent().payload, eventId: "lifecycle-legacy-action", kind: "review", status: "completed", reasonCode: "REVIEWED" },
+  });
+  const legacy = sealGovernanceEvent({
+    ...legacyIntent,
+    sequence: 1,
+    previousEventDigest: null,
+    payloadDigest: "0".repeat(64),
+    eventDigest: "0".repeat(64),
+  });
+  await mkdir(path.join(root, "governance/events/lifecycle"), { recursive: true });
+  await writeFile(path.join(root, "governance/events/lifecycle/1-evt-legacy-action.json"), `${canonicalizeJson(legacy)}\n`);
+  const readable = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(readable.events.length, 1);
+  assert.equal(readable.events[0].payload.kind, "review");
+
+  const writeRoot = await fixtureRoot(); t.after(() => cleanup(writeRoot));
+  for (const kind of ["verification", "review", "gate", "recovery", "reconciliation"]) {
+    const legacyWrite = intent({
+      eventId: `evt-legacy-${kind}`,
+      idempotencyKey: `idem-legacy-${kind}`,
+      eventType: `lifecycle.${kind}`,
+      payload: { ...intent().payload, eventId: `lifecycle-legacy-${kind}`, kind, status: "completed", reasonCode: "LEGACY_ACTION" },
+    });
+    await assert.rejects(
+      () => append(writeRoot, legacyWrite),
+      (error) => error instanceof GovernanceEventStoreError && error.code === "GES-PAYLOAD-SCHEMA",
+    );
+  }
+  const after = await queryPortableGovernanceStream({ repositoryRoot: writeRoot, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(after.events.length, 0, "refused legacy action writes must leave the stream untouched");
 });
 
 test("exact idempotency is a zero-write replay while a conflicting key fails closed", async (t) => {

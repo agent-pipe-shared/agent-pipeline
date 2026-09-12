@@ -170,7 +170,7 @@ function validateEnvelopeShape(value, errors) {
   const payloadByOrigin = {
     human: ["pipeline.human-governance-decision.v1", "pipeline.human-role-exception-decision.v1", "pipeline.human-decision-attribution.v1"],
     agent: ["pipeline.agent-decision-event.v1"],
-    lifecycle: ["pipeline.lifecycle-governance-event.v1"],
+    lifecycle: ["pipeline.lifecycle-governance-event.v1", "pipeline.governance-action-event.v1"],
   };
   if (!Object.hasOwn(payloadByOrigin, value.origin) || !payloadByOrigin[value.origin].includes(value.payloadSchema)) add(errors, "origin-payload-schema");
   // D-1's payload carries the two values the portable record structurally

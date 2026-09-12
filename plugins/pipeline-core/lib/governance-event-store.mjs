@@ -27,6 +27,7 @@ import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
 import { isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
 import { validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.mjs";
+import { GOVERNANCE_ACTION_EVENT_SCHEMA, validateGovernanceActionEvent } from "./governance-action-events.mjs";
 import { EVENT_CLASSES, representedEventClasses, validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
@@ -45,6 +46,7 @@ const STREAMS = new Map([
 ]);
 const RESTRICTED_RECORD_SCHEMA = "pipeline.restricted-governance-record.v1";
 const RESTRICTED_AUTHORITY = "restricted-store-operator";
+const LEGACY_ACTION_KINDS = new Set(["verification", "review", "gate", "recovery", "reconciliation"]);
 
 export class GovernanceEventStoreError extends Error {
   constructor(code, message = "Governance event store operation failed.") {
@@ -459,9 +461,31 @@ function assertPortablePayload(event, policy) {
     return;
   }
   if (event.origin === "lifecycle") {
+    if (event.payloadSchema === GOVERNANCE_ACTION_EVENT_SCHEMA) {
+      let action;
+      try { action = validateGovernanceActionEvent(event.payload); }
+      catch { fail("GES-PAYLOAD-SCHEMA", "Governance action payload is not closed, valid, or digest-bound."); }
+      const notApplicable = (value) => exactKeys(value, ["state"]) && value.state === "not-applicable";
+      const same = (left, right) => canonicalizeJson(left) === canonicalizeJson(right);
+      if (event.eventId !== action.eventId
+        || event.idempotencyKey !== action.correlation.actionId
+        || event.eventType !== `lifecycle.action.${action.kind}`
+        || !same(event.candidate, action.candidate)
+        || !same(event.correlation.featureId, action.correlation.featureId)
+        || !same(event.correlation.requestId, action.correlation.requestId)
+        || !same(event.correlation.sessionId, action.correlation.sessionId)
+        || !notApplicable(event.correlation.packageId)
+        || !notApplicable(event.correlation.dispatchId)
+        || event.correlation.traceId !== action.correlation.actionId) {
+        fail("GES-PAYLOAD-SCHEMA", "Governance action payload does not bind its envelope.");
+      }
+      if (typeof event.policy.capturePolicyDigest !== "string" || event.policy.capturePolicyDigest !== canonicalSha256(policy)) fail("GES-CAPTURE-POLICY-BINDING", "Event does not bind the effective capture policy.");
+      return;
+    }
     let lifecycle;
     try { lifecycle = validateLifecycleGovernanceEvent(event.payload); }
     catch { fail("GES-PAYLOAD-SCHEMA", "Lifecycle payload is not closed or does not meet its schema."); }
+    if (LEGACY_ACTION_KINDS.has(lifecycle.kind)) fail("GES-PAYLOAD-SCHEMA", "New lifecycle-v1 writes cannot encode governance action kinds.");
     if (lifecycle.candidate.commit !== event.candidate.commit || lifecycle.candidate.tree !== event.candidate.tree
       || lifecycle.correlation.packageId !== event.correlation.packageId
       || event.eventType !== `lifecycle.${lifecycle.kind}`) fail("GES-PAYLOAD-SCHEMA", "Lifecycle payload does not bind its envelope.");
