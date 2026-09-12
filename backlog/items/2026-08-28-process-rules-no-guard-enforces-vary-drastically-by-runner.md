@@ -111,3 +111,14 @@ The item remains open. Product-retry enforcement is already documented above;
 the trusted real environment-reroute consumer and authenticated cross-runner
 budget adapters remain absent. See
 `backlog/evidence/2026-09-12-dispatch-record-and-budget-progress.md`.
+
+An independent subaxis audit on 2026-09-12 re-ran the Continuity, lifecycle,
+dispatch-record writer, record-schema and Workflow-return boundary tests. It
+confirmed that the first acceptance criterion (one runner-neutral product
+retry, with the second refused and the consumed counter protected across
+state transitions) and the third acceptance criterion (schema-valid,
+read-back dispatch-record publication) are complete. The second and fourth
+criteria remain open for the trusted real environment-reroute consumer and
+authenticated cross-runner budget measurement. The item therefore remains
+`open`; see
+`backlog/evidence/2026-09-12-process-rule-subaxis-closure-audit.md`.

@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.focused-candidate-test-evidence.v1",
+  "generatedAt": "2026-09-12T01:44:56.255Z",
+  "candidateCommit": "21cf930cacebf26b3d2ceb8c6ebe55ed787c017e",
+  "candidateTree": "b5a54b04b2bada03c837620fc13c68132fd5f8a2",
+  "candidateBinding": {
+    "headAndTreeMatchedExpected": true,
+    "pipelineCodeMatchedCandidateBefore": true,
+    "pipelineCodeMatchedCandidateAfter": true
+  },
+  "tests": [
+    {
+      "command": [
+        "node",
+        "--test",
+        "plugins/pipeline-core/lib/continuity-state.test.mjs",
+        "plugins/pipeline-core/scripts/pipeline-state-lifecycle-event.test.mjs"
+      ],
+      "startedAt": "2026-09-12T01:44:55.959Z",
+      "completedAt": "2026-09-12T01:44:56.146Z",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "6e749ac38465e23583940e32eadd5a26f623feda6bf021e7da36531ec4f6331f",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 12354,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "plugins/pipeline-core/scripts/dispatch-record-write.test.mjs",
+        "plugins/pipeline-core/lib/dispatch-record.test.mjs",
+        "plugins/pipeline-core/lib/workflow-runner-boundary.test.mjs"
+      ],
+      "startedAt": "2026-09-12T01:44:56.147Z",
+      "completedAt": "2026-09-12T01:44:56.248Z",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "fdcbffaffc54fd34bb3d1eb4ce1bd894abba17970cb2ad8213a4d6c7a68ce0d6",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 5328,
+      "stderrBytes": 0
+    }
+  ],
+  "passed": true,
+  "recordSha256": "eb35740399d9340006e8953428db2d137f262569f3b1ba540b37728c710ca0be",
+  "selfCheck": {
+    "algorithm": "sha256-canonical-payload",
+    "verified": true
+  },
+  "publication": {
+    "readbackExact": true
+  }
+}
