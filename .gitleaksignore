@@ -192,3 +192,8 @@ content-v1:7d42e3d3962b10f58824ebf7b423400bc3ad7d5a8a638348f3e6857b21960fa9:gove
 # reproducing the event-5 entry above byte-identically before these two were written.
 content-v1:f5589e082bf9c3692b965dfb5bfa8b2d4fa917187ccb202895b31fc74cafd7f2:governance/events/human/9-evt-hgo-deny-258a9160177f0211af28dee9702e5480-0.json:generic-api-key:1:987
 content-v1:081327d87b1ab19f416c119d3504a9c913f2247cc95b810870c60f24d012f680:governance/events/human/11-evt-hgo-deny-963df309b2c7016255858da133289a8f-0.json:generic-api-key:1:987
+# NVA-GMW-PRECOMMIT-FIX-1 (2026-09-12): the signed maintenance-window revoke
+# envelope is canonical repository-public-safe governance data. Gitleaks matched
+# its structured idempotency key; this exact content fingerprint was generated
+# from the raw finding with gitleaksContentAuthorityLine().
+content-v1:90d2c785141be4f2159703a252dfa0020556b321d8c510484411ec301246efcf:governance/events/human/14-evt-gmw-revoke-593e132e33447e2b0299b238f5fa6841-0.json:generic-api-key:1:1024

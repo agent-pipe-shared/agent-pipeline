@@ -241,6 +241,7 @@
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | closed | requirement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | closed | defect | pipeline | — | 2026-08-16 | — | — |
 | pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges | closed | defect | pipeline | — | 2026-08-17 | — | — |
+| pipeline.gmw-precommit-kernel-precedence-diverges | closed | defect | pipeline | nova-b | 2026-09-12 | — | — |
 | pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | closed | workflow-improvement | pipeline | — | 2026-08-16 | — | — |
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | open | workflow-improvement | pipeline | alfred | 2026-08-17 | — | — |
@@ -665,6 +666,6 @@
 
 - open: 69
 - in_progress: 1
-- closed: 571
+- closed: 572
 - rejected: 3
 - deferred: 11
