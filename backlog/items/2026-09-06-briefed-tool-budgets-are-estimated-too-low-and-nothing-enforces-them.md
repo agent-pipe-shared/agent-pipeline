@@ -161,3 +161,25 @@ sandbox execution under WSL is deferred and is not required by this
 side-effect-free evaluator. The item therefore remains open. Exact contracts,
 commands and results are recorded in
 `backlog/evidence/2026-09-12-dispatch-budget-calibration-foundation.md`.
+
+## Generated-dispatch preflight closure — 2026-09-12
+
+Source commit `a7cb5aef518535bc24a1461af32f99283edeed15` closes a separate
+integration regression exposed by Full Verify: the Codex native, selected
+Codex and Claude Critic hosts generated prompts without the mandatory base-call
+cap, so their own common PREPARE gate rejected them as
+`DBB-BASE-CAP-MISSING` before launch. All three now use the shared default
+budget renderer, and the generated prompt remains byte-identical between
+preflight and launch.
+
+The same correction carries Antigravity's authenticated parent tool-use ID
+into each nested dispatch-policy check. Its positive tests now prepare the
+complete native batch before invoking the guard, covering both the budget
+binding and the pre-existing candidate-bound native authorization. The
+previously red Critic-host, sandbox-duty, Antigravity-host, dispatch-policy and
+case-completion suites passed in the attended repair before commit.
+
+This closes generated-dispatch admission and must not be dispatched again.
+The item remains open for its stated remaining work: broader empirical budget
+calibration and authenticated child-call counting for Codex and Antigravity.
+The WSL native-Codex sandbox lane remains explicitly deferred.
