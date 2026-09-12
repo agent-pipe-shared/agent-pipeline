@@ -39,6 +39,7 @@
  * reconciled honestly; nothing is written, and the blocked items are named.
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,10 +54,18 @@ import {
   validateTransitionShape,
 } from "../lib/backlog-state.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import {
+  GOVERNANCE_RECONCILIATION_SOURCE_SCHEMA,
+  buildGovernanceReconciliationAction,
+  buildGovernanceReconciliationRetry,
+  preflightGovernanceReconciliationActionOutput,
+  writeGovernanceReconciliationAction,
+} from "../lib/governance-recovery-reconciliation-action.mjs";
+import { canonicalSha256 } from "../lib/governance-event.mjs";
 // One owner for "is this citation readable in every checkout, or only in mine" —
 // the reconciler and the state checker must not each carry their own copy of the
 // answer, which is how a producer and its consumer drift apart while both stay green.
-import { repositoryTrackingState, untrackedEvidenceFinding } from "./check-backlog-state.mjs";
+import { checkBacklogState, repositoryTrackingState, untrackedEvidenceFinding } from "./check-backlog-state.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -66,6 +75,8 @@ const STATUS_PATH = "backlog/STATUS.md";
 const INDEX_PATH = "backlog/index.json";
 const JOURNAL_PATH = "backlog/.reconcile-transaction.json";
 const ACTOR = "backlog-reconciliation";
+const RECONCILIATION_PLAN_DOMAIN = "pipeline.backlog-reconciliation-plan.v1";
+const NOT_APPLICABLE = Object.freeze({ state: "not-applicable" });
 // The single linear backbone this tool fills gaps along, one step at a time.
 // `rejected` and `deferred` are deliberately excluded: per backlog/README.md's
 // Triage rules they are reachable only directly from `open` (triage applies to
@@ -159,6 +170,32 @@ function headCommit(root) {
   } catch {
     return null;
   }
+}
+
+/** Observe both immutable Git objects from this repository; callers cannot supply them. */
+function currentCandidate(root) {
+  try {
+    const values = execFileSync("git", ["rev-parse", "HEAD", "HEAD^{tree}"], {
+      cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+    }).trim().split("\n");
+    if (values.length !== 2 || !values.every((value) => /^[a-f0-9]{40}$|^[a-f0-9]{64}$/u.test(value))) return null;
+    return Object.freeze({ commit: values[0], tree: values[1] });
+  } catch {
+    return null;
+  }
+}
+
+function bytesSha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function reconciliationPlanSha256(candidate, plan, targets) {
+  return canonicalSha256({
+    domain: RECONCILIATION_PLAN_DOMAIN,
+    candidate,
+    transitions: plan.planned,
+    targets: targets.map((target) => ({ path: target.path, sha256: bytesSha256(target.after) })),
+  });
 }
 
 /**
@@ -355,7 +392,17 @@ export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, comm
 }
 
 export function applyBacklogReconciliation(root = DEFAULT_ROOT, options = {}) {
-  const plan = planBacklogReconciliation(root, options);
+  const eventRequested = options.eventOutPath !== undefined && options.eventOutPath !== null;
+  // LND-7 deliberately has no candidate argument. The event binds the repository
+  // identity physically observed before planning and source mutation.
+  const candidate = eventRequested ? currentCandidate(root) : null;
+  if (eventRequested && candidate === null) {
+    return {
+      ok: false, findings: ["backlog reconciliation action event refused: current HEAD/tree is unavailable"],
+      planned: [], events: [], items: [], projection: null, wrote: false, status: "event-refused",
+    };
+  }
+  const plan = planBacklogReconciliation(root, eventRequested ? { ...options, commit: candidate.commit } : options);
   if (!plan.ok) return { ...plan, wrote: false };
   const targets = [];
   if (plan.planned.length > 0) {
@@ -382,32 +429,112 @@ export function applyBacklogReconciliation(root = DEFAULT_ROOT, options = {}) {
     if (currentIndex !== plan.projection.indexText) targets.push({ path: INDEX_PATH, after: plan.projection.indexText });
   }
   if (targets.length === 0) return { ...plan, wrote: false };
+  let eventPlan = null;
+  let actionEvent = null;
+  if (eventRequested) {
+    try {
+      eventPlan = preflightGovernanceReconciliationActionOutput({ rootDir: root, eventOutPath: options.eventOutPath });
+      actionEvent = buildGovernanceReconciliationAction({
+        schema: GOVERNANCE_RECONCILIATION_SOURCE_SCHEMA,
+        reconciliationPlanSha256: reconciliationPlanSha256(candidate, plan, targets),
+        candidate,
+        featureId: NOT_APPLICABLE,
+        sessionId: NOT_APPLICABLE,
+      });
+    } catch (error) {
+      return {
+        ...plan, ok: false, wrote: false, status: "event-refused",
+        findings: [`backlog reconciliation action event refused before source mutation: ${error?.code ?? error.message}`],
+      };
+    }
+    const stable = currentCandidate(root);
+    if (stable === null || stable.commit !== candidate.commit || stable.tree !== candidate.tree) {
+      return {
+        ...plan, ok: false, wrote: false, status: "event-refused",
+        findings: ["backlog reconciliation action event refused before source mutation: current HEAD/tree changed during planning"],
+      };
+    }
+  }
   const journalPath = join(root, JOURNAL_PATH);
   const before = targets.map((target) => ({ path: target.path, before: readFileSync(join(root, target.path), "utf8") }));
   writeFileSync(journalPath, `${JSON.stringify({ schema: "pipeline.backlog-reconcile-transaction.v1", files: before })}\n`, { flag: "wx" });
   try {
     for (const target of targets) writeFileSync(join(root, target.path), target.after);
+    if (eventRequested) {
+      const physicalReadback = options.physicalReadback ?? ((path) => readFileSync(path, "utf8"));
+      for (const target of targets) {
+        if (physicalReadback(join(root, target.path)) !== target.after) {
+          throw new Error(`physical postimage readback mismatch for ${target.path}`);
+        }
+      }
+      const state = (options.backlogStateReadback ?? checkBacklogState)(root);
+      if (!state?.ok) throw new Error(`independent backlog state readback failed: ${(state?.findings ?? []).join("; ")}`);
+    }
     unlinkSync(journalPath);
-    return { ...plan, wrote: true };
   } catch (error) {
     for (const entry of before) writeFileSync(join(root, entry.path), entry.before);
     try { unlinkSync(journalPath); } catch { /* best-effort */ }
     return { ...plan, ok: false, findings: [`backlog reconciliation failed: ${error.message}`], wrote: false };
+  }
+  if (!eventRequested) return { ...plan, wrote: true };
+  try {
+    const published = writeGovernanceReconciliationAction({
+      rootDir: root, eventOutPath: eventPlan.eventOutPath, event: actionEvent,
+    });
+    return {
+      ...plan, wrote: true, status: "completed", actionEvent: published.event, eventOutPath: eventPlan.eventOutPath,
+    };
+  } catch (error) {
+    return {
+      ...plan,
+      ok: false,
+      wrote: true,
+      status: "source-complete/event-unavailable",
+      code: error?.code ?? "GRRA-RECONCILIATION-OUTPUT-UNAVAILABLE",
+      findings: [`backlog reconciliation completed, but its action event is unavailable: ${error?.code ?? error.message}`],
+      actionEvent,
+      eventRetry: buildGovernanceReconciliationRetry({ eventOutPath: eventPlan.eventOutPath, event: actionEvent }),
+    };
   }
 }
 
 if (isDirectInvocation(import.meta.url)) {
   const args = process.argv.slice(2);
   const activate = args.includes("--activate");
-  const unsupported = args.filter((arg) => arg !== "--activate");
-  if (unsupported.length > 0) {
-    console.error("Usage: node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs [--activate]");
+  let eventOutPath = null;
+  let eventSeen = false;
+  const unsupported = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--activate") continue;
+    if (arg === "--event-out" && !eventSeen && typeof args[index + 1] === "string" && !args[index + 1].startsWith("--")) {
+      eventSeen = true;
+      eventOutPath = args[index + 1];
+      index += 1;
+      continue;
+    }
+    unsupported.push(arg);
+  }
+  if (unsupported.length > 0 || (eventSeen && !activate)) {
+    console.error("Usage: node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs [--activate [--event-out <repo-relative-path>]]");
     process.exit(2);
   }
-  const result = activate ? applyBacklogReconciliation() : planBacklogReconciliation();
+  const result = activate ? applyBacklogReconciliation(DEFAULT_ROOT, { eventOutPath }) : planBacklogReconciliation();
   for (const finding of result.findings) console.error(`BLOCKED ${finding}`);
   if (!result.ok) {
-    console.error(`Backlog reconciliation blocked: ${result.findings.length} finding(s). Nothing was written.`);
+    if (result.status === "source-complete/event-unavailable") {
+      console.error(JSON.stringify({
+        schema: "pipeline.governance-reconciliation-action-result.v1",
+        status: result.status,
+        source: "completed",
+        code: result.code,
+        event: result.actionEvent,
+        retry: result.eventRetry,
+      }));
+    }
+    console.error(result.wrote
+      ? `Backlog reconciliation source completed, but its requested action event is unavailable: ${result.findings.length} finding(s).`
+      : `Backlog reconciliation blocked: ${result.findings.length} finding(s). Nothing was written.`);
     process.exit(2);
   }
   const byItem = new Map();
@@ -420,5 +547,14 @@ if (isDirectInvocation(import.meta.url)) {
     console.log(`${activate ? "Recorded" : "Would record"} ${result.planned.length} transition(s) across ${byItem.size} item(s).`);
   }
   for (const [id, count] of [...byItem].sort()) console.log(`  ${id}: ${count} transition(s)`);
+  if (result.status === "completed") {
+    console.log(JSON.stringify({
+      schema: "pipeline.governance-reconciliation-action-result.v1",
+      status: result.status,
+      source: "completed",
+      eventOutPath,
+      event: result.actionEvent,
+    }));
+  }
   process.exit(0);
 }

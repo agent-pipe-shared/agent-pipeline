@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { canonicalJson, transitionHash } from "../lib/backlog-state.mjs";
+import { retryGovernanceReconciliationAction } from "../lib/governance-recovery-reconciliation-action.mjs";
 import { checkBacklogState, repositoryTrackingState } from "./check-backlog-state.mjs";
 import { applyBacklogReconciliation, planBacklogReconciliation } from "./reconcile-backlog-ledger.mjs";
 
@@ -484,6 +485,180 @@ try {
     const result = planBacklogReconciliation(base, { at: "2026-08-17" });
     assert.equal(result.ok, false);
     assert.match(result.findings.join("\n"), /reachable only from open/u);
+  });
+
+  check("RBL23 requested reconciliation action binds the physically observed pre-action candidate and closed plan digest", () => {
+    const { base } = fixture({ items: [ITEM("action", "open")] });
+    const candidate = { commit: git(base, "rev-parse", "HEAD"), tree: git(base, "rev-parse", "HEAD^{tree}") };
+    const rel = "evidence/actions/backlog-reconciliation.json";
+    let stateReadbacks = 0;
+    const targetReadbacks = [];
+    const result = applyBacklogReconciliation(base, {
+      at: "2026-08-20",
+      eventOutPath: rel,
+      candidate: { commit: "a".repeat(40), tree: "b".repeat(40) },
+      commit: "c".repeat(40),
+      physicalReadback: (path) => { targetReadbacks.push(path); return readFileSync(path, "utf8"); },
+      backlogStateReadback: (root) => { stateReadbacks += 1; return checkBacklogState(root); },
+    });
+    assert.equal(result.ok, true, result.findings.join("; "));
+    assert.equal(result.wrote, true);
+    assert.equal(result.status, "completed");
+    assert.deepEqual(
+      targetReadbacks.map((path) => path.slice(base.length + 1)).sort(),
+      ["backlog/STATUS.md", "backlog/index.json", "backlog/transitions.ndjson"],
+      "every planned source target must be physically read back",
+    );
+    assert.equal(stateReadbacks, 1, "the independent ledger/projection checker must run after target readback");
+    assert.deepEqual(result.actionEvent.candidate, candidate, "caller-supplied candidate-like options must be ignored");
+    assert.equal(result.actionEvent.kind, "reconciliation");
+    assert.equal(result.actionEvent.reasonCode, "RECONCILIATION_COMPLETED");
+    assert.match(result.actionEvent.correlation.requestId, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(result.actionEvent.correlation.featureId, { state: "not-applicable" });
+    assert.deepEqual(JSON.parse(readFileSync(join(base, rel), "utf8")), result.actionEvent);
+  });
+
+  check("RBL24 event target preflight failure leaves every reconciliation source byte unchanged", () => {
+    const { base } = fixture({ items: [ITEM("preflight", "open")] });
+    mkdirSync(join(base, "evidence", "actions"), { recursive: true });
+    const rel = "evidence/actions/occupied.json";
+    writeFileSync(join(base, rel), "foreign owner\n");
+    const sourcePaths = ["backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"];
+    const before = sourcePaths.map((path) => readFileSync(join(base, path), "utf8"));
+    const result = applyBacklogReconciliation(base, { at: "2026-08-20", eventOutPath: rel });
+    assert.equal(result.ok, false);
+    assert.equal(result.wrote, false);
+    assert.equal(result.status, "event-refused");
+    assert.deepEqual(sourcePaths.map((path) => readFileSync(join(base, path), "utf8")), before);
+    assert.equal(readFileSync(join(base, rel), "utf8"), "foreign owner\n");
+    assert.equal(existsSync(join(base, "backlog", ".reconcile-transaction.json")), false);
+  });
+
+  check("RBL25 physical target readback failure rolls back the transaction and emits no event", () => {
+    const { base } = fixture({ items: [ITEM("readback", "open")] });
+    const rel = "evidence/actions/readback.json";
+    const sourcePaths = ["backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"];
+    const before = sourcePaths.map((path) => readFileSync(join(base, path), "utf8"));
+    let reads = 0;
+    const result = applyBacklogReconciliation(base, {
+      at: "2026-08-20",
+      eventOutPath: rel,
+      physicalReadback: (path) => {
+        reads += 1;
+        return reads === 1 ? "mismatched postimage\n" : readFileSync(path, "utf8");
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.wrote, false);
+    assert.match(result.findings.join("\n"), /physical postimage readback mismatch/u);
+    assert.deepEqual(sourcePaths.map((path) => readFileSync(join(base, path), "utf8")), before);
+    assert.equal(existsSync(join(base, rel)), false);
+    assert.equal(existsSync(join(base, "backlog", ".reconcile-transaction.json")), false);
+  });
+
+  check("RBL26 independent ledger/projection rejection rolls back and emits no event", () => {
+    const { base } = fixture({ items: [ITEM("state-readback", "open")] });
+    const rel = "evidence/actions/state-readback.json";
+    const before = readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8");
+    const result = applyBacklogReconciliation(base, {
+      at: "2026-08-20",
+      eventOutPath: rel,
+      backlogStateReadback: () => ({ ok: false, findings: ["fixture independent rejection"] }),
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.wrote, false);
+    assert.match(result.findings.join("\n"), /independent backlog state readback failed/u);
+    assert.equal(readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8"), before);
+    assert.equal(existsSync(join(base, rel)), false);
+  });
+
+  check("RBL27 a post-source event conflict preserves source and owner bytes and returns an event-only retry", () => {
+    const { base } = fixture({ items: [ITEM("event-conflict", "open")] });
+    const rel = "evidence/actions/conflict.json";
+    const target = join(base, rel);
+    const result = applyBacklogReconciliation(base, {
+      at: "2026-08-20",
+      eventOutPath: rel,
+      backlogStateReadback: (root) => {
+        const checked = checkBacklogState(root);
+        mkdirSync(join(base, "evidence", "actions"), { recursive: true });
+        writeFileSync(target, "concurrent owner\n");
+        return checked;
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.wrote, true, "the durable reconciliation source is not rolled back for an observational conflict");
+    assert.equal(result.status, "source-complete/event-unavailable");
+    assert.equal(checkBacklogState(base).ok, true);
+    assert.equal(readFileSync(target, "utf8"), "concurrent owner\n");
+    assert.equal(result.eventRetry.eventOutPath, rel);
+    assert.deepEqual(result.eventRetry.event, result.actionEvent);
+    rmSync(target);
+    const retried = retryGovernanceReconciliationAction({ rootDir: base, retry: result.eventRetry });
+    assert.equal(retried.status, "written");
+    assert.deepEqual(JSON.parse(readFileSync(target, "utf8")), result.actionEvent);
+    assert.equal(checkBacklogState(base).ok, true, "event-only retry must not touch source state");
+  });
+
+  check("RBL28 a reconciliation replay is a no-op and does not emit another action", () => {
+    const { base } = fixture({ items: [ITEM("replay", "open")] });
+    const first = applyBacklogReconciliation(base, {
+      at: "2026-08-20", eventOutPath: "evidence/actions/first.json",
+    });
+    assert.equal(first.status, "completed", JSON.stringify({ ok: first.ok, wrote: first.wrote, findings: first.findings, planned: first.planned?.length }));
+    const secondPath = "evidence/actions/replay.json";
+    const second = applyBacklogReconciliation(base, { at: "2026-08-20", eventOutPath: secondPath });
+    assert.equal(second.ok, true);
+    assert.equal(second.wrote, false);
+    assert.equal(second.planned.length, 0);
+    assert.equal(existsSync(join(base, secondPath)), false);
+  });
+
+  check("RBL29 an unavailable pre-action Git candidate refuses the event before source mutation", () => {
+    const { base } = fixture({ items: [ITEM("no-candidate", "open")] });
+    const sourcePaths = ["backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"];
+    const before = sourcePaths.map((path) => readFileSync(join(base, path), "utf8"));
+    rmSync(join(base, ".git"), { recursive: true, force: true });
+    const rel = "evidence/actions/no-candidate.json";
+    const result = applyBacklogReconciliation(base, { at: "2026-08-20", eventOutPath: rel });
+    assert.equal(result.ok, false);
+    assert.equal(result.wrote, false);
+    assert.equal(result.status, "event-refused");
+    assert.match(result.findings.join("\n"), /current HEAD\/tree is unavailable/u);
+    assert.deepEqual(sourcePaths.map((path) => readFileSync(join(base, path), "utf8")), before);
+    assert.equal(existsSync(join(base, rel)), false);
+  });
+
+  check("RBL30 the reconciliation request digest changes with either the closed plan or target set", () => {
+    const { base } = fixture({ items: [ITEM("digest-binding", "open")] });
+    const copyFixture = (label) => {
+      const copy = mkdtempSync(join(tmpdir(), `reconcile-${label}-`));
+      rmSync(copy, { recursive: true, force: true });
+      cpSync(base, copy, { recursive: true });
+      roots.push(copy);
+      return copy;
+    };
+    const targetVariant = copyFixture("target");
+    const planVariant = copyFixture("plan");
+    const targetPlan = planBacklogReconciliation(targetVariant, { at: "2026-08-20" });
+    assert.equal(targetPlan.ok, true, targetPlan.findings.join("; "));
+    writeFileSync(join(targetVariant, "backlog", "STATUS.md"), targetPlan.projection.statusText);
+
+    const baseline = applyBacklogReconciliation(base, {
+      at: "2026-08-20", eventOutPath: "evidence/actions/baseline.json",
+    });
+    const changedTargets = applyBacklogReconciliation(targetVariant, {
+      at: "2026-08-20", eventOutPath: "evidence/actions/target.json",
+    });
+    const changedPlan = applyBacklogReconciliation(planVariant, {
+      at: "2026-08-21", eventOutPath: "evidence/actions/plan.json",
+    });
+    for (const result of [baseline, changedTargets, changedPlan]) assert.equal(result.status, "completed", result.findings?.join("; "));
+    assert.deepEqual(changedTargets.actionEvent.candidate, baseline.actionEvent.candidate, "target variants retain the same pre-action candidate");
+    assert.deepEqual(changedPlan.actionEvent.candidate, baseline.actionEvent.candidate, "plan variants retain the same pre-action candidate");
+    const baselineDigest = baseline.actionEvent.correlation.requestId;
+    assert.notEqual(changedTargets.actionEvent.correlation.requestId, baselineDigest, "a different target set must change the request digest");
+    assert.notEqual(changedPlan.actionEvent.correlation.requestId, baselineDigest, "a different closed transition plan must change the request digest");
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);
