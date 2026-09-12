@@ -266,3 +266,30 @@ does not hold.
 — the stanza's matcher names `Task` but not `Agent`, while `guard-dispatch.mjs`'s
 own stanza names both and documents omitting one as a silent no-op. Mechanical,
 TP-4 protected, and narrower than this item.
+
+### Rollback and recovery for the terminal-receipt change — 2026-09-12
+
+This is the concrete rollback path required by governance checklist item 4.
+Before the terminal-receipt implementation is activated in a released plugin,
+it may be reverted as one ordinary forward revert of the change introducing
+`WORKTREE_COUNT_VERDICT_SCHEMA`, its reader/validator and focused tests. Re-run
+the worktree-count suite and hook suite on that revert candidate; no deployed
+receipt compatibility is involved at that point.
+
+After any `*.verdict.json` receipt has been produced in the existing
+`<git-common-dir>/agent-pipeline/worktree-count-checks/` lane, do not revert the
+whole contract or delete/rewrite those records. If publication itself is
+defective, ship a forward correction that stops new terminal-receipt writes at
+the resolver boundary while retaining compatible read and validation of the v1
+receipts, plus the rule that raw pending-baseline existence masks an older
+terminal success. There is no runtime toggle for this; stopping publication is
+a code change and a new plugin candidate.
+
+For recovery, preserve existing terminal receipts and pending baselines, treat
+an invalid receipt as unavailable, and never clear a pending baseline merely to
+make an older success visible. Correct the producer, run one bounded
+isolation-dispatch probe, and let only a successfully written and read-back
+terminal receipt retire that probe's pending baseline. This keeps rollback from
+resurrecting stale success while preserving evidence already created by an
+activated version. The item remains open until its separate live-observation
+bar is met.
