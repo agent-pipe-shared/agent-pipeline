@@ -24,7 +24,7 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-10: migration correction and remaining artifact reviews
+## Current handover — 2026-09-12: Nova-B implementation and deferred native Windows work
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 
@@ -49,8 +49,8 @@ startup diagnosis, missing-record searches or completed review rounds.
 
 Nova-B status reconciliation is active. The pass began at 61 open and 54
 closed `nova-b` items; after the evidence-backed closures and scope
-dispositions through 2026-09-11, the canonical ledger projection contains 36
-open and 76 closed. Every open item's
+dispositions through 2026-09-12, the canonical ledger projection contains 33
+open and 80 closed. Every open item's
 `done_when` is being checked against the current code before that count is
 treated as remaining work. B3 and B4 are implemented:
 the later native Antigravity runner supersedes Nova's historical Alpha-only

@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-29
 sprint: nova-b
-tracking: "Nova B -- design idea, not scoped."
+tracking: "Nova B -- runner-neutral design reviewed; catalog and POSIX prepare/inspect/run slices implemented, producer adoption remains open; native Windows launcher hardening is deferred."
 source: "PO inline observation (2026-08-29, 3-runner greenfield synthesis): Antigravity was the only runner to move quickly through the first 2 phases, in part because it built its OWN scripts to confirm the PRD faster. PO suggests: pre-built template scripts (that runners lightly rewrite, with clear placeholders) for fixed gates/installs/anything the human must run in a terminal, so what needs filling in is always clear."
 done_when: manual
 ---
@@ -69,3 +69,20 @@ corrected design received `VERDICT: yes` with no remaining finding; see
 `backlog/evidence/2026-09-12-human-terminal-templates-design-critic-round2.md`.
 The item remains `open` for the four implementation slices; no new PO gate is
 needed for them.
+
+## Implementation progress — 2026-09-12
+
+Slice 1 ships the authoritative action catalog and fail-closed inventory
+coverage. Slice 2 ships POSIX `prepare`, `inspect`, and attended `run` action
+instances with private request/receipt storage, candidate and builder binding,
+shell-free argv, visible inherited terminal streams, and independent typed
+readback. A successful child followed by absent, failed, or mismatched readback
+is recorded as an outcome requiring manual reconciliation and is never marked
+safe to retry. The correction is implemented in `e4d7539d`; its candidate-bound
+evidence is `backlog/evidence/NVA-B-HUMAN-TERMINAL-TEMPLATES-SLICE2-1.md`.
+
+The item remains open for Slice 3 producer adoption. The pipeline owns that
+runner-neutral work and re-triages it on 2026-09-30. Slice 4 native Windows
+owner/DACL/reparse hardening is deferred to the native-Windows package and is
+re-triaged on 2026-10-31. It is not a Nova-B acceptance blocker and no WSL
+result establishes native readiness.

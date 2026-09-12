@@ -571,7 +571,7 @@
 | pipeline.t1-governance-path-preflight | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | closed | workflow-improvement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
-| pipeline.template-scripts-for-human-terminal-actions | open | idea | pipeline | nova-b | 2026-08-29 | — | Nova B -- design idea, not scoped. |
+| pipeline.template-scripts-for-human-terminal-actions | open | idea | pipeline | nova-b | 2026-08-29 | — | Nova B -- runner-neutral design reviewed; catalog and POSIX prepare/inspect/run slices implemented, producer adoption remains open; native Windows launcher hardening is deferred. |
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | alfred | 2026-08-08 | 2026-08-15 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | nova-b | 2026-08-28 | — | Scheduled for Nova B (PO decision 2026-08-28) |
