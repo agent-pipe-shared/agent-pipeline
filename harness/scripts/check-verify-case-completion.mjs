@@ -206,7 +206,10 @@ function hasVerifyCaseCompletionPolicy(element) {
   let properties;
   try { properties = topLevelElements(element.slice(open + 1, close)); }
   catch { return false; }
-  return properties.filter((property) => /^\s*caseCompletion\s*:/u.test(maskNonCode(property))).length === 1;
+  const matches = properties.filter((property) => /^\s*caseCompletion\s*:/u.test(maskNonCode(property)));
+  if (matches.length !== 1) return false;
+  const value = maskNonCode(matches[0]).replace(/^\s*caseCompletion\s*:/u, "").trim();
+  return value !== "" && value !== "null" && value !== "undefined";
 }
 
 function parseVerifyRegistrations(source, findings) {
