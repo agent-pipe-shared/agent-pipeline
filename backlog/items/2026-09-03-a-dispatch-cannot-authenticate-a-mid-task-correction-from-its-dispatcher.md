@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-03
 sprint: nova-b
 done_when: "contains roles/goldfish.md pipeline.mid-task-instruction-authentication"
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: b64b840e5d8c014eaa86ed3dd3e471af7a1b9241
+closure_evidence: backlog/evidence/2026-09-12-mid-task-instruction-authentication-critic-round2.md
 tracking: "Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it."
 source: "Raised by dispatch NVA-B-RECSHAPE-1 as a finding outside its acceptance criteria, 2026-09-03: it received two coordinator corrections through that channel, verified the content independently before acting on it, and flagged the delivery channel regardless of the content being correct."
 ---
@@ -112,9 +116,10 @@ cannot authenticate the message, repair the briefing, or expand authority.
 
 Focused regression evidence is recorded in
 `backlog/evidence/2026-09-12-mid-task-instruction-authentication-green.txt`.
-The item remains open until the uncommitted implementation has its required
-independent review and commit-bound closure evidence; this progress note does
-not claim either one prematurely.
+The implementation was bound in `f413cc825f88d140d73a93a9f629a169748b5062`;
+the threat-model, SPDX and rollback corrections landed in
+`b64b840e5d8c014eaa86ed3dd3e471af7a1b9241`. The second independent Critic
+round passed with no findings and is the closure evidence named above.
 
 The current authority-bound threat model and its honest approval state are
 recorded in

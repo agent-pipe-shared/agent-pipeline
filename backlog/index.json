@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "966a108b601d7e5570008edda7a4c0f4016cf3dd59e8459e95256d78ff1a0344"
+    "transitionHead": "24bdb71044420b3a03e9b7ed72c8453d47914cbccbe888889b53d757fb16835e"
   },
   "counts": {
-    "open": 76,
+    "open": 75,
     "in_progress": 0,
-    "closed": 565,
+    "closed": 566,
     "rejected": 3,
     "deferred": 11
   },
@@ -119,14 +119,18 @@
     },
     {
       "id": "pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-03",
       "source": "Raised by dispatch NVA-B-RECSHAPE-1 as a finding outside its acceptance criteria, 2026-09-03: it received two coordinator corrections through that channel, verified the content independently before acting on it, and flagged the delivery channel regardless of the content being correct.",
       "deferred": false,
       "tracking": "Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-12",
+      "closureRepository": "self",
+      "closureCommit": "b64b840e5d8c014eaa86ed3dd3e471af7a1b9241",
+      "closureEvidence": "backlog/evidence/2026-09-12-mid-task-instruction-authentication-critic-round2.md"
     },
     {
       "id": "pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it",

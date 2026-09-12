@@ -13,7 +13,7 @@
 | pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs | open | requirement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | nova | 2026-08-29 | — | — |
-| pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher | open | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it. |
+| pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it. |
 | pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the dispatch record is the only artifact that binds a commit to its work package, so a Critic needs it; it also carries the implementor's narrative, which the Critic contract forbids as input. There is no way to hand over one without the other. |
 | pipeline.a-doc-edit-silently-obligates-its-vendored-copy | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path | open | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand. |
@@ -663,8 +663,8 @@
 
 ## Counts
 
-- open: 76
+- open: 75
 - in_progress: 0
-- closed: 565
+- closed: 566
 - rejected: 3
 - deferred: 11
