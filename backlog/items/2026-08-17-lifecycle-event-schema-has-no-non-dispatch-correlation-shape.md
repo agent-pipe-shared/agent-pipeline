@@ -289,6 +289,15 @@ push/release. Evidence:
   Governance actions section and exposes no payload field excluded by the
   privacy contract.
 
+**Progress (2026-09-12):** LND-3 is implemented in `9bdd94c2` and corrected in
+`ceea7968`. Replay/readback v2 separates dispatch and action timelines, retains
+v1 artifact readability and dispatch-only topology, and keeps the export
+projection envelope-only. The review correction rejects any combined history
+that does not cover every sequence from 1 through its terminal checkpoint.
+Focused replay/view/export/schema/store checks pass, documentation contracts
+are green, and the exact correction review returned PASS with no findings.
+Evidence: `backlog/evidence/2026-09-12-lnd3-mixed-stream-replay-viewer.md`.
+
 ### LND-4 — verification producer
 
 - **WHEN** aggregate Verify reaches its terminal evidence boundary with a
