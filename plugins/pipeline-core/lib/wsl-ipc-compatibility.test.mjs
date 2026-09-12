@@ -381,7 +381,9 @@ test("session fallback retires on Codex, config or probe drift and never carries
 });
 
 test("fixed probe uses a physical external canary, bounded scratch and exact cleanup", async () => {
-  const root = mkdtempSync(join(tmpdir(), "wsl-probe-"));
+  // Keep the fixture path below the probe's conservative 96-byte AF_UNIX limit even when
+  // callers select a descriptive external TMPDIR for an isolated Verify run.
+  const root = mkdtempSync(join(tmpdir(), "wp-"));
   try {
     const result = await runFixedIpcProbe({ scratchRoot: root, canaryPath: CANARY, identity: identity() });
     assert.ok(["confirmed", "compatible", "unavailable"].includes(result.status));
