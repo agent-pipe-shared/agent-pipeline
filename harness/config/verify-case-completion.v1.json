@@ -21,14 +21,12 @@
     {
       "name": "async-execution-tests",
       "path": "plugins/pipeline-core/lib/async-execution.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "bootstrap-payload-budget-tests",
       "path": "plugins/pipeline-core/lib/bootstrap-payload-budget.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "bootstrap-payload-measure-cli-tests",
@@ -217,8 +215,7 @@
     {
       "name": "control-catalog-schema-tests",
       "path": "plugins/pipeline-core/lib/control-catalog-schema.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "control-evaluation-receipt-tests",
