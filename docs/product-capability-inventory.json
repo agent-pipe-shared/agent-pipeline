@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "0b34dbc111f98dd4b3b6d1408ef012a924cd9d63",
-    "tree": "ec7e4e0e4ff3a24a9c9bd7e86054c2223089c20f"
+    "commit": "9ced16b44b03495cc62d34d0e0fbc7e56d61e78f",
+    "tree": "cde56ccb6dc8c567ddf3d4f3edcf65e619a4f5b0"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -294,6 +294,7 @@
         "verify-phase:harness/scripts/verify.mjs:deferred-backlog-tests",
         "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-authorship-verify-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-budget-calibration-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
@@ -373,6 +374,7 @@
         "verify-phase:harness/scripts/verify.mjs:manual-check-logic-tests",
         "verify-phase:harness/scripts/verify.mjs:measure-tofu-push-e2e-tests",
         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:module-cluster-reachability-tests",
         "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
         "verify-phase:harness/scripts/verify.mjs:network-lockdown-tests",
         "verify-phase:harness/scripts/verify.mjs:neutral-range-plan-tests",
@@ -1583,10 +1585,12 @@
       "benefit": "A caller can seal and validate RFC 8785 governance-event envelopes with SHA-256 binding; the library is not itself an automatically active runner integration.",
       "status": "optional",
       "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:governance-action-events-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-event-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-event-core-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-event-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-event-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-schema-parity-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-tests"
       ],
       "runners": [

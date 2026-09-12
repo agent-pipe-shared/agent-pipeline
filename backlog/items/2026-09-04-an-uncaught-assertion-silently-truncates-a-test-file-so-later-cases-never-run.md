@@ -226,3 +226,12 @@ instrumentation. The underlying test assertions remain intact and directly
 runnable. Run the registration checker and the three focused suites on the
 revert candidate before accepting it; do not hand-edit receipts or reuse
 completion evidence across the changed candidate.
+
+The 2026-09-12 batch migrates `product-capability-inventory-tests` (28 cases),
+`stack-adapter-contract-tests` (23) and `publication-executor-v2-tests` (14).
+Each suite registers its complete corpus before setup and contains an injected
+case-02 regression proving the final case still receives a disposition. The
+unchanged 181-entry registry is now **21 required and 160 legacy-process-only**.
+Focused normal and early-failure runs passed; details are in
+`backlog/evidence/2026-09-12-case-completion-migration-batch.md`. The item stays
+open for the remaining staged population.

@@ -105,6 +105,28 @@ registration already creates a capability-inventory obligation. Whether that
 becomes a checker, a definition-of-done line, or a Critic prompt is the
 decision this item asks for.
 
+## Progress — 2026-09-12
+
+The scratch-only instrument has been replaced by the versioned, tested
+`harness/scripts/check-module-cluster-reachability.mjs`. It now follows
+statically resolvable `node:child_process` invocation edges, rejects local
+child-process homonyms, groups findings by connected cluster and emits bounded,
+deterministic diagnostics. The current checkout measurement reports 100 Nova-B
+classification candidates rather than presenting its 199 unreachable modules
+as 210 defects.
+
+Actual Codex App-Server, sandbox, WSL IPC and native Critic execution under WSL
+is deferred by the PO to a future native-Windows package. That exception is
+limited to concrete execution surfaces. Offline selection, compatibility and
+policy modules remain in this item's scope, and the checker splits deferred
+nodes before clustering so they cannot suppress runner-neutral findings.
+
+The instrument is intentionally not a blocking Verify registration yet: its
+candidate clusters still require disposition, and a non-zero discovery result
+must not be mistaken for 107 established release blockers. Measurement and
+focused proof are recorded in
+`backlog/evidence/2026-09-12-module-cluster-reachability-instrument.md`.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
