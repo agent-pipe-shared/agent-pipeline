@@ -345,6 +345,16 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "governance-action-artifact-tests",
+      "path": "plugins/pipeline-core/lib/governance-action-artifact.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "governance-gate-action-tests",
+      "path": "plugins/pipeline-core/lib/governance-gate-action.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "governance-verification-action-tests",
       "path": "plugins/pipeline-core/lib/governance-verification-action.test.mjs",
       "disposition": "required"
@@ -593,6 +603,11 @@
       "path": "plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "pipeline-state-gate-action-event-tests",
+      "path": "plugins/pipeline-core/scripts/pipeline-state-gate-action-event.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "pipeline-state-inspection-contract-tests",

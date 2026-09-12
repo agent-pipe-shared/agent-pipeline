@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: SUL-1.0
-/** Runner-neutral projection and create-only artifact boundary for one aggregate terminal Verify fact. */
-
-import { randomBytes } from "node:crypto";
-import {
-  closeSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync,
-  realpathSync, unlinkSync, writeFileSync,
-} from "node:fs";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+/** Runner-neutral projection and compatible wrapper for one aggregate terminal Verify fact. */
 
 import {
-  buildGovernanceActionEvent,
-  validateGovernanceActionEvent,
-} from "./governance-action-events.mjs";
-import { canonicalizeJson } from "./governance-event.mjs";
+  buildGovernanceActionArtifactRetry,
+  preflightGovernanceActionOutput,
+  retryGovernanceActionArtifact,
+  writeGovernanceActionArtifact,
+} from "./governance-action-artifact.mjs";
+import { buildGovernanceActionEvent, validateGovernanceActionEvent } from "./governance-action-events.mjs";
 
 export const GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA = "pipeline.governance-verification-terminal.v1";
 export const GOVERNANCE_VERIFICATION_RETRY_SCHEMA = "pipeline.governance-verification-action-retry.v1";
@@ -43,17 +38,28 @@ function exact(value, keys) {
   return record(value) && Object.keys(value).length === keys.length
     && keys.every((key) => Object.hasOwn(value, key));
 }
-function repoRelativePosixPath(value) {
-  return typeof value === "string" && value.length > 0 && value.length <= 256 && !value.startsWith("/")
-    && !value.includes("\\") && !value.includes("\0")
-    && value.split("/").every((component) => component.length > 0 && component !== "." && component !== ".."
-      && /^[A-Za-z0-9._-]+$/u.test(component));
+function checkedVerificationEvent(event, code) {
+  let checked;
+  try { checked = validateGovernanceActionEvent(event); } catch { fail(code); }
+  if (checked.kind !== "verification") fail(code);
+  return checked;
+}
+function translateArtifactError(error) {
+  const codes = {
+    "GAA-EVENT": "GVA-OUTPUT-EVENT",
+    "GAA-RETRY-PATH": "GVA-RETRY-PATH",
+    "GAA-RETRY-SHAPE": "GVA-RETRY-SHAPE",
+    "GAA-OUTPUT-PATH": "GVA-OUTPUT-PATH",
+    "GAA-OUTPUT-EXISTS": "GVA-OUTPUT-EXISTS",
+    "GAA-OUTPUT-WRITE": "GVA-OUTPUT-WRITE",
+    "GAA-OUTPUT-READBACK": "GVA-OUTPUT-READBACK",
+  };
+  const code = codes[error?.code];
+  if (code !== undefined) fail(code);
+  throw error;
 }
 
-/**
- * Build exactly one closed action from an aggregate terminal Verify binding.
- * The digest is the source identity; no suite or runner detail is admitted.
- */
+/** Build exactly one closed action from an aggregate terminal Verify binding. */
 export function buildGovernanceVerificationAction(source) {
   if (!exact(source, SOURCE_KEYS) || source.schema !== GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA) fail("GVA-SOURCE-SHAPE");
   if (typeof source.terminalEvidenceSha256 !== "string" || !SHA256.test(source.terminalEvidenceSha256)) fail("GVA-SOURCE-DIGEST");
@@ -74,11 +80,14 @@ export function buildGovernanceVerificationAction(source) {
 
 /** Closed data sufficient to retry only the observational artifact write. */
 export function buildGovernanceVerificationRetry({ eventOutPath, event } = {}) {
-  let checked;
-  try { checked = validateGovernanceActionEvent(event); } catch { fail("GVA-RETRY-EVENT"); }
-  if (checked.kind !== "verification") fail("GVA-RETRY-EVENT");
-  if (!repoRelativePosixPath(eventOutPath)) fail("GVA-RETRY-PATH");
-  return Object.freeze({ schema: GOVERNANCE_VERIFICATION_RETRY_SCHEMA, eventOutPath, event: checked });
+  const checked = checkedVerificationEvent(event, "GVA-RETRY-EVENT");
+  try {
+    const retry = buildGovernanceActionArtifactRetry({ eventOutPath, event: checked });
+    return Object.freeze({ schema: GOVERNANCE_VERIFICATION_RETRY_SCHEMA, eventOutPath: retry.eventOutPath, event: retry.event });
+  } catch (error) {
+    if (error?.code === "GAA-RETRY-PATH") fail("GVA-RETRY-PATH");
+    translateArtifactError(error);
+  }
 }
 
 export function validateGovernanceVerificationRetry(retry) {
@@ -86,115 +95,22 @@ export function validateGovernanceVerificationRetry(retry) {
   return buildGovernanceVerificationRetry({ eventOutPath: retry.eventOutPath, event: retry.event });
 }
 
-function physicalDirectory(path) {
-  let info;
-  try { info = lstatSync(path); } catch { fail("GVA-OUTPUT-PATH"); }
-  if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== resolve(path)) fail("GVA-OUTPUT-PATH");
+export function preflightGovernanceVerificationActionOutput(options) {
+  try { return preflightGovernanceActionOutput(options); } catch (error) { translateArtifactError(error); }
 }
 
-/** Read-only target preflight. It creates no directory and never removes a leaf. */
-export function preflightGovernanceVerificationActionOutput({ rootDir, eventOutPath } = {}) {
-  const root = resolve(rootDir);
-  physicalDirectory(root);
-  if (!repoRelativePosixPath(eventOutPath) || isAbsolute(eventOutPath)) fail("GVA-OUTPUT-PATH");
-  const target = resolve(root, eventOutPath);
-  const rel = relative(root, target);
-  if (target === root || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) fail("GVA-OUTPUT-PATH");
-  let cursor = root;
-  const components = rel.split(sep);
-  for (let index = 0; index < components.length; index += 1) {
-    cursor = resolve(cursor, components[index]);
-    let info;
-    try { info = lstatSync(cursor); } catch (error) {
-      if (error?.code === "ENOENT") break;
-      fail("GVA-OUTPUT-PATH");
-    }
-    if (index === components.length - 1) fail("GVA-OUTPUT-EXISTS");
-    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(cursor) !== cursor) fail("GVA-OUTPUT-PATH");
-  }
-  return Object.freeze({ root, target, eventOutPath: rel.split(sep).join("/") });
-}
-
-function ensurePhysicalParents(root, target) {
-  let cursor = root;
-  for (const component of relative(root, dirname(target)).split(sep).filter(Boolean)) {
-    cursor = resolve(cursor, component);
-    try { mkdirSync(cursor, { mode: 0o700 }); } catch (error) { if (error?.code !== "EEXIST") fail("GVA-OUTPUT-WRITE"); }
-    physicalDirectory(cursor);
-  }
-}
-
-function identicalExisting(target, event) {
-  try {
-    const info = lstatSync(target);
-    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(target) !== target) return false;
-    const bytes = readFileSync(target, "utf8");
-    if (bytes !== eventArtifactBytes(event)) return false;
-    const observed = validateGovernanceActionEvent(JSON.parse(bytes));
-    return observed.kind === "verification" && canonicalizeJson(observed) === canonicalizeJson(event);
-  } catch { return false; }
-}
-
-function eventArtifactBytes(event) { return `${JSON.stringify(event, null, 2)}\n`; }
-
-/**
- * Publish one validated payload without replacing an existing path. An
- * event-only retry may accept an already-published byte-equivalent payload.
- */
 export function writeGovernanceVerificationAction({ rootDir, eventOutPath, event, allowExistingIdentical = false } = {}) {
-  let checked;
-  try { checked = validateGovernanceActionEvent(event); } catch { fail("GVA-OUTPUT-EVENT"); }
-  if (checked.kind !== "verification") fail("GVA-OUTPUT-EVENT");
-  let plan;
-  try { plan = preflightGovernanceVerificationActionOutput({ rootDir, eventOutPath }); }
-  catch (error) {
-    if (allowExistingIdentical && error?.code === "GVA-OUTPUT-EXISTS") {
-      const root = resolve(rootDir);
-      const target = resolve(root, eventOutPath);
-      if (identicalExisting(target, checked)) return Object.freeze({ status: "existing-identical", outPath: target, event: checked });
-    }
-    throw error;
-  }
-  ensurePhysicalParents(plan.root, plan.target);
-  // Recheck after directory creation so a replaced component or newly-created
-  // leaf loses the race without being followed or overwritten.
-  try { preflightGovernanceVerificationActionOutput({ rootDir: plan.root, eventOutPath: plan.eventOutPath }); }
-  catch (error) {
-    if (allowExistingIdentical && error?.code === "GVA-OUTPUT-EXISTS" && identicalExisting(plan.target, checked)) {
-      return Object.freeze({ status: "existing-identical", outPath: plan.target, event: checked });
-    }
-    throw error;
-  }
-  const temporary = resolve(dirname(plan.target), `.${randomBytes(16).toString("hex")}.governance-verification.tmp`);
-  let fd;
+  const checked = checkedVerificationEvent(event, "GVA-OUTPUT-EVENT");
   try {
-    fd = openSync(temporary, "wx", 0o600);
-    writeFileSync(fd, eventArtifactBytes(checked));
-    fsyncSync(fd);
-    closeSync(fd);
-    fd = undefined;
-    linkSync(temporary, plan.target);
-    unlinkSync(temporary);
-    const directoryFd = openSync(dirname(plan.target), "r");
-    try { fsyncSync(directoryFd); } finally { closeSync(directoryFd); }
-  } catch (error) {
-    if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve primary error */ } }
-    try { unlinkSync(temporary); } catch { /* absent or retained only until cleanup */ }
-    if (allowExistingIdentical && identicalExisting(plan.target, checked)) {
-      return Object.freeze({ status: "existing-identical", outPath: plan.target, event: checked });
-    }
-    fail("GVA-OUTPUT-WRITE");
-  }
-  if (!identicalExisting(plan.target, checked)) fail("GVA-OUTPUT-READBACK");
-  return Object.freeze({ status: "written", outPath: plan.target, event: checked });
+    return writeGovernanceActionArtifact({ rootDir, eventOutPath, event: checked, allowExistingIdentical });
+  } catch (error) { translateArtifactError(error); }
 }
 
 export function retryGovernanceVerificationAction({ rootDir, retry } = {}) {
   const checked = validateGovernanceVerificationRetry(retry);
-  return writeGovernanceVerificationAction({
-    rootDir,
-    eventOutPath: checked.eventOutPath,
-    event: checked.event,
-    allowExistingIdentical: true,
-  });
+  let artifactRetry;
+  try { artifactRetry = buildGovernanceActionArtifactRetry({ eventOutPath: checked.eventOutPath, event: checked.event }); }
+  catch (error) { translateArtifactError(error); }
+  try { return retryGovernanceActionArtifact({ rootDir, retry: artifactRetry }); }
+  catch (error) { translateArtifactError(error); }
 }

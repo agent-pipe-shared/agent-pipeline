@@ -162,6 +162,14 @@
  *                 --expected-spec-sha256 <sha>    The supplied digests and current
  *                                                 repository authority must agree.
  *   approve-push  --by <name>                     Records pushApproval.lastApproved =
+ *                 [--action-event-out <path>]      Optionally publishes one non-authoritative
+ *                                                 candidate-bound PUSH_APPROVED action only
+ *                                                 after physical State readback and the
+ *                                                 existing external-ledger follow-up. The
+ *                                                 output target is preflighted before any
+ *                                                 approval mutation; a later event failure
+ *                                                 retains the approval and returns a closed
+ *                                                 event-only retry.
  *                                                 {approvedBy, approvedAt, forCommit}
  *                                                 where forCommit is the CURRENT HEAD
  *                                                 (`git rev-parse HEAD`, spawned in the
@@ -214,6 +222,11 @@
  *                                                 or unexplained discard, or an existing
  *                                                 discardedFeatures present but NOT an array.
  *   approve-deploy --env <environment> --artifact <tag-or-sha> --by <name>
+ *                  [--action-event-out <path>]     Optionally publishes one non-authoritative
+ *                                                 candidate-bound DEPLOY_APPROVED action
+ *                                                 after physical State readback, with the
+ *                                                 same preflight and event-only retry boundary
+ *                                                 as approve-push.
  *                                                 Appends a record {forArtifact,
  *                                                 forEnvironment, approvedBy, approvedAt}
  *                                                 to deployApprovals. Artifact is ALWAYS
@@ -454,6 +467,13 @@ import {
   criticalActionSubjectSha256,
   verifyCriticalActionApprovalRequest,
 } from "../lib/critical-action-approval-request.mjs";
+import {
+  GOVERNANCE_GATE_SOURCE_SCHEMA,
+  buildGovernanceGateAction,
+  buildGovernanceGateRetry,
+  preflightGovernanceActionOutput,
+  writeGovernanceGateAction,
+} from "../lib/governance-gate-action.mjs";
 import {
   USER_SOURCE_PATH,
   criticalProofWaiverFor,
@@ -855,6 +875,19 @@ function writeState(dir, state, expectedState, options = {}) {
     const written = atomicWriteContinuityState(dir, nextState, lock, {
       preserveGateEstimate: options.preserveGateEstimate === true,
     });
+    if (written.ok && options.requirePhysicalReadback === true) {
+      const expectedPostimage = options.preserveGateEstimate === true
+        ? nextState
+        : clearGateEstimateForMutation(nextState);
+      let readback;
+      try { readback = (options.physicalReadback ?? readState)(dir); }
+      catch { readback = null; }
+      if (readback?.status !== "ok"
+        || JSON.stringify(readback.state) !== JSON.stringify(expectedPostimage)) {
+        const failed = { ok: false, committed: true, code: "PS-STATE-POSTIMAGE-READBACK" };
+        return transition === undefined ? failed : { ...failed, transition };
+      }
+    }
     return transition === undefined ? written : { ...written, transition };
   } finally {
     if (!reusedLock) releaseContinuityLock(lock);
@@ -871,6 +904,44 @@ function stateWriteSucceeded(result) {
     console.error(`Error: serialized state write failed before commit (${result.code}); zero mutation.`);
   }
   return false;
+}
+
+const GOVERNANCE_GATE_RESULT_SCHEMA = "pipeline.governance-gate-action-result.v1";
+const GOVERNANCE_NOT_APPLICABLE = Object.freeze({ state: "not-applicable" });
+
+function buildRequestedGovernanceGateAction({ dir, state, eventOutPath, action, candidate, approvalSubjectSha256 }) {
+  preflightGovernanceActionOutput({ rootDir: dir, eventOutPath });
+  return buildGovernanceGateAction({
+    schema: GOVERNANCE_GATE_SOURCE_SCHEMA,
+    approvalSubjectSha256,
+    action,
+    candidate,
+    featureId: state.activeFeature?.id ?? GOVERNANCE_NOT_APPLICABLE,
+    sessionId: GOVERNANCE_NOT_APPLICABLE,
+  });
+}
+
+function publishRequestedGovernanceGateAction({ dir, eventOutPath, event }) {
+  try {
+    const published = writeGovernanceGateAction({ rootDir: dir, eventOutPath, event });
+    console.log(JSON.stringify({
+      schema: GOVERNANCE_GATE_RESULT_SCHEMA,
+      status: "completed",
+      source: "approved",
+      eventOutPath,
+      event: published.event,
+    }));
+    return 0;
+  } catch (error) {
+    console.error(JSON.stringify({
+      schema: GOVERNANCE_GATE_RESULT_SCHEMA,
+      status: "source-complete/event-unavailable",
+      source: "approved",
+      code: error?.code ?? "GGA-OUTPUT-UNAVAILABLE",
+      retry: buildGovernanceGateRetry({ eventOutPath, event }),
+    }));
+    return 2;
+  }
 }
 
 /**
@@ -8894,10 +8965,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // would break every existing invocation -- presence detection keeps the absent case's
       // flag set, parse result, approval record and state write byte-for-byte unchanged.
       const decisionReferenceRequested = rest.includes("--decision-reference");
+      const actionEventRequested = rest.includes("--action-event-out");
       const pushBaseFlags = pushWaived
         ? ["by", "remote", "destination"]
         : ["by", "remote", "destination", "proof-request", "proof-authority", "proof"];
-      const expectedFlags = new Set(decisionReferenceRequested ? [...pushBaseFlags, "decision-reference"] : pushBaseFlags);
+      const expectedFlags = new Set([
+        ...pushBaseFlags,
+        ...(decisionReferenceRequested ? ["decision-reference"] : []),
+        ...(actionEventRequested ? ["action-event-out"] : []),
+      ]);
       const parsed = parseExactFlags(rest, expectedFlags);
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
@@ -8938,6 +9014,33 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         || typeof destination !== "string" || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(destination)) {
         console.error("Error: approve-push requires a safe --remote and full --destination ref.");
         return 2;
+      }
+      let gatePlan = null;
+      if (actionEventRequested) {
+        const observedCandidate = gitCandidate(dir);
+        if (!observedCandidate.ok || observedCandidate.commit !== head.commit) {
+          console.error("Error: approve-push action event refused; current candidate commit/tree could not be determined.");
+          return 2;
+        }
+        const candidate = { commit: observedCandidate.commit, tree: observedCandidate.tree };
+        const threatModel = resolvePushThreatModelArtifact(dir);
+        if (!threatModel.ok) {
+          console.error(`Error: approve-push action event refused (${threatModel.code}).`);
+          return 2;
+        }
+        const threatModelBinding = { path: threatModel.path, sha256: threatModel.sha256 };
+        const subject = { sourceCommit: candidate.commit, remote, destination, threatModel: threatModelBinding };
+        try {
+          const approvalSubjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject });
+          const eventOutPath = parsed.value["action-event-out"];
+          const event = buildRequestedGovernanceGateAction({
+            dir, state: base, eventOutPath, action: "push", candidate, approvalSubjectSha256,
+          });
+          gatePlan = { observed: observedCandidate, threatModel, eventOutPath, event };
+        } catch (error) {
+          console.error(`Error: approve-push action event refused (${error?.code ?? "GGA-PREFLIGHT"}); zero mutation.`);
+          return 2;
+        }
       }
       // Global chat is intentionally a terminal-free, non-attested attribution
       // route.  It still binds the approval to the exact commit/remote/ref below,
@@ -8987,12 +9090,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           return 1;
         }
       }
-      const observed = gitCandidate(dir);
+      const observed = gatePlan?.observed ?? gitCandidate(dir);
       if (!observed.ok || observed.commit !== head.commit) {
         console.error("Error: current candidate commit/tree could not be determined; push proof was not recorded.");
         return 2;
       }
-      const threatModel = resolvePushThreatModelArtifact(dir);
+      const threatModel = gatePlan?.threatModel ?? resolvePushThreatModelArtifact(dir);
       if (!threatModel.ok) {
         // AC-3b: a refusal that only names the code leaves a consumer exactly as
         // stuck as they were before this could be materialized at all -- there is
@@ -9067,7 +9170,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         updatedAt: approvedAt,
       };
       delete next.pendingPushChallenge;
-      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+      if (!stateWriteSucceeded(writeState(dir, next, base, {
+        requirePhysicalReadback: actionEventRequested,
+        physicalReadback: deps.physicalStateReadback,
+      }))) {
         return 2;
       }
       // PHX-2 additive external ledger (opt-in, see design doc §2/§5). Placed immediately
@@ -9101,6 +9207,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           console.error(`Error: approve-push refused (${appended.code}).`);
           return 2;
         }
+      }
+      if (gatePlan !== null) {
+        return publishRequestedGovernanceGateAction({
+          dir, eventOutPath: gatePlan.eventOutPath, event: gatePlan.event,
+        });
       }
       console.log(`Push approved by "${by}" for commit ${head.commit} (${approvedAt}).`);
       return 0;
@@ -9454,7 +9565,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const deployWaived = deployMode.waived === true;
-      let deployProofDemanded = deployWaived;
+      let deployProofDemanded = false;
       if (!deployWaived) {
         const policy = criticalHumanProofPolicy(dir);
         if (!policy.ok) { console.error(`Error: approve-deploy refused (${policy.code}).`); return 2; }
@@ -9464,10 +9575,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // approve-push's identical note on why `parseExactFlags` makes unconditional admission a
       // breaking change, and `evaluateOptInDecisionReference` for the dual-evaluation itself.
       const decisionReferenceRequested = rest.includes("--decision-reference");
+      const actionEventRequested = rest.includes("--action-event-out");
       const deployBaseFlags = deployProofDemanded
         ? ["env", "artifact", "by", "proof-request", "proof-authority", "proof"]
         : ["env", "artifact", "by"];
-      const expectedFlags = new Set(decisionReferenceRequested ? [...deployBaseFlags, "decision-reference"] : deployBaseFlags);
+      const expectedFlags = new Set([
+        ...deployBaseFlags,
+        ...(decisionReferenceRequested ? ["decision-reference"] : []),
+        ...(actionEventRequested ? ["action-event-out"] : []),
+      ]);
       const parsed = parseExactFlags(rest, expectedFlags);
       const env = parsed.value?.env;
       const artifact = parsed.value?.artifact;
@@ -9482,11 +9598,32 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: existing deployApprovals is not an array -- aborting WITHOUT changes (no silent overwrite).');
         return 2;
       }
+      let gatePlan = null;
+      if (actionEventRequested) {
+        const observedCandidate = gitCandidate(dir);
+        if (!observedCandidate.ok) {
+          console.error("Error: approve-deploy action event refused; current candidate commit/tree could not be determined.");
+          return 2;
+        }
+        const candidate = { commit: observedCandidate.commit, tree: observedCandidate.tree };
+        const subject = { artifact, environment: env };
+        try {
+          const approvalSubjectSha256 = criticalActionSubjectSha256({ kind: "deploy", candidate, subject });
+          const eventOutPath = parsed.value["action-event-out"];
+          const event = buildRequestedGovernanceGateAction({
+            dir, state: base, eventOutPath, action: "deploy", candidate, approvalSubjectSha256,
+          });
+          gatePlan = { observed: observedCandidate, eventOutPath, event };
+        } catch (error) {
+          console.error(`Error: approve-deploy action event refused (${error?.code ?? "GGA-PREFLIGHT"}); zero mutation.`);
+          return 2;
+        }
+      }
       const approvedAt = now();
       let proof = null;
       let waiver = null;
       if (deployProofDemanded) {
-        const candidate = gitCandidate(dir);
+        const candidate = gatePlan?.observed ?? gitCandidate(dir);
         if (!candidate.ok) { console.error("Error: current candidate commit/tree could not be determined; deploy proof was not recorded."); return 2; }
         const verified = verifyCriticalHumanProof({
           dir, state: base, kind: "deploy", candidate,
@@ -9500,7 +9637,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // before the first mutation (`writeState` below is where the grant becomes effective).
       let decisionReference;
       if (decisionReferenceRequested) {
-        const deployCandidate = gitCandidate(dir);
+        const deployCandidate = gatePlan?.observed ?? gitCandidate(dir);
         if (!deployCandidate.ok) {
           console.error("Error: approve-deploy refused (DECISION-REFERENCE-CANDIDATE-UNRESOLVED); human authority was NOT recorded.");
           return 2;
@@ -9532,8 +9669,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         deployApprovals: [...priorApprovals, entry],
         updatedAt: approvedAt,
       };
-      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+      if (!stateWriteSucceeded(writeState(dir, next, base, {
+        requirePhysicalReadback: actionEventRequested,
+        physicalReadback: deps.physicalStateReadback,
+      }))) {
         return 2;
+      }
+      if (gatePlan !== null) {
+        return publishRequestedGovernanceGateAction({
+          dir, eventOutPath: gatePlan.eventOutPath, event: gatePlan.event,
+        });
       }
       console.log(`Deploy approval granted by "${by}" for artifact "${artifact}" / environment "${env}" (${approvedAt}).`);
       return 0;

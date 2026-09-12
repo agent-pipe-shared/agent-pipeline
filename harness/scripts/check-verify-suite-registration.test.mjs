@@ -592,6 +592,7 @@ const FIXTURE_MODULES = Object.freeze([
   "harness/scripts/self-verify-selection.mjs",
   "harness/scripts/verify-evidence-writer.mjs",
   "plugins/pipeline-core/lib/governance-action-events.mjs",
+  "plugins/pipeline-core/lib/governance-action-artifact.mjs",
   "plugins/pipeline-core/lib/governance-event.mjs",
   "plugins/pipeline-core/lib/governance-verification-action.mjs",
   "plugins/pipeline-core/lib/project-authority.mjs",

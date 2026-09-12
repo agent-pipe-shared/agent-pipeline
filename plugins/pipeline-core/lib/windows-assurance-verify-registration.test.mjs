@@ -154,6 +154,7 @@ const FIXTURE_MODULES = Object.freeze([
   "harness/scripts/self-verify-selection.mjs",
   "harness/scripts/verify-evidence-writer.mjs", // writeEvidenceAtomic (NVA-B-EVSLOTFIXTURE-1)
   "plugins/pipeline-core/lib/governance-action-events.mjs",
+  "plugins/pipeline-core/lib/governance-action-artifact.mjs",
   "plugins/pipeline-core/lib/governance-event.mjs",
   "plugins/pipeline-core/lib/governance-verification-action.mjs",
   "plugins/pipeline-core/lib/project-authority.mjs", // resolveAuthorityArtifactPath (ADR-0054)
