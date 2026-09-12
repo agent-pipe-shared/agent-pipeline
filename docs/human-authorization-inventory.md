@@ -69,6 +69,16 @@ is the live source of truth for which kinds are mandatory: currently
 | Kickoff language confirmation (`project-onboarding-v3.mjs`) <!-- inventory-id: kickoff-language-confirmation --> | Confirming onboarding kickoff language — a confirmation gate, not a critical-action proof; not in scope for `push`/`deploy`/`publication` | `chat-gate-ceremony.mjs`'s attended-TTY confirming-step primitive (the same primitive `chat`-mode push/HGO clearance uses) | `plugins/pipeline-core/lib/chat-gate-ceremony.mjs` header comment |
 | Remote provisional approval (`remote-provisional-approval.mjs`) <!-- inventory-id: remote-provisional-approval --> | Authorizing only a local continuation acknowledgement, never a durable external-effect authorization | Hashed, one-time, candidate-and-scope-bound code, 30-minute expiry — deliberately excluded by design: a code pasted into chat is agent-visible and therefore not a secret or identity proof. Structurally rejected by push, deploy, publication, release, override, merge and deletion flows. | `plugins/pipeline-core/scripts/remote-provisional-approval.mjs` |
 
+## Non-authorization human terminal actions
+
+These actions need copy-safe terminal rendering but do not grant approval. They
+are cataloged here so their templates cannot be mistaken for new PO gates.
+
+| Intent/gate | Authorizes | Mechanism | Authoring file(s) |
+|---|---|---|---|
+| First PO-key setup <!-- inventory-id: po-key-setup --> | Nothing; creates or registers the local signing authority used by later, separately confirmed approvals | Existing `po-human-approval.mjs setup` command and independent authority-file readback | `plugins/pipeline-core/scripts/po-human-approval.mjs` |
+| Installed-plugin attestation setup <!-- inventory-id: installed-plugin-attestation-setup --> | Nothing; writes the existing local-development install receipt after source/install readback | Existing `installed-plugin-attestation-host.mjs` provider-specific writer and receipt verifier | `plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs` |
+
 ## Explicitly out of scope for this inventory
 
 Read-only/mechanical state transitions that do **not** gate on a human
@@ -116,6 +126,8 @@ new approval gates.
 | `deploy-reconcile-waiver` | `excluded` | — |
 | `kickoff-language-confirmation` | `legacy-renderer` | — |
 | `remote-provisional-approval` | `excluded` | — |
+| `po-key-setup` | `registered` | `po-key-setup` |
+| `installed-plugin-attestation-setup` | `registered` | `installed-plugin-attestation-setup` |
 
 The registered push builder is
 `authorizeCriticalPushCommand()` in `po-human-approval.mjs`. Its current output

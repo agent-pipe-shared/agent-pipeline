@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.human-terminal-action-receipt.v2.json",
+  "title": "Pipeline human terminal action result receipt v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "code", "instanceId", "templateId", "revision", "requestSha256", "valuesSha256", "candidateSha256", "exitCode", "outcomeKnown", "retrySafe", "mutationMayHaveOccurred", "resultSchema", "resultCode", "readbackStatus", "readbackSha256", "recordSha256"],
+  "properties": {
+    "schema": { "const": "pipeline.human-terminal-action-receipt.v2" },
+    "status": { "enum": ["completed", "outcome-unknown"] },
+    "code": { "enum": ["HTA-RUN-COMPLETED", "HTA-RUN-MANUAL-RECONCILIATION"] },
+    "instanceId": { "type": "string", "pattern": "^[a-f0-9]{24}$" },
+    "templateId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "requestSha256": { "$ref": "#/$defs/sha256" },
+    "valuesSha256": { "$ref": "#/$defs/sha256" },
+    "candidateSha256": { "$ref": "#/$defs/sha256" },
+    "exitCode": { "const": 0 },
+    "outcomeKnown": { "type": "boolean" },
+    "retrySafe": { "const": false },
+    "mutationMayHaveOccurred": { "const": true },
+    "resultSchema": { "type": ["string", "null"] },
+    "resultCode": { "type": ["string", "null"] },
+    "readbackStatus": { "enum": ["verified", "absent", "failed", "mismatched"] },
+    "readbackSha256": { "$ref": "#/$defs/sha256" },
+    "recordSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": { "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "completed" } } },
+      "then": {
+        "properties": {
+          "code": { "const": "HTA-RUN-COMPLETED" },
+          "outcomeKnown": { "const": true },
+          "resultCode": { "type": "string", "minLength": 1 },
+          "readbackStatus": { "const": "verified" }
+        }
+      },
+      "else": {
+        "properties": {
+          "code": { "const": "HTA-RUN-MANUAL-RECONCILIATION" },
+          "outcomeKnown": { "const": false },
+          "resultSchema": { "const": null },
+          "resultCode": { "const": null },
+          "readbackStatus": { "enum": ["absent", "failed", "mismatched"] }
+        }
+      }
+    }
+  ]
+}

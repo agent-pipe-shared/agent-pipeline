@@ -12,6 +12,8 @@ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import {
   HOST_RESULT_SCHEMA,
   INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER,
+  installedPluginAttestationSetupCommand,
+  readInstalledPluginAttestationSetup,
   readExternalInstalledPluginReceipt,
   verifyLocalDevelopmentInstalledPluginReceipt,
   writeClaudeRegistryInstalledPluginReceipt,
@@ -98,6 +100,34 @@ check("post-install readback is runner-neutral and writes path-free receipts tha
   }, { receiptDirectory: repo.receiptDirectory });
   assert.equal(bootstrap.status, "verified", JSON.stringify(bootstrap));
  }
+});
+
+check("terminal-template attestation producer preserves Codex setupAction argv and verifies its receipt", (t) => {
+  const repo = fixture("codex"); t.after(repo.cleanup);
+  const launcher = join(repo.installedPluginRoot, "scripts", "installed-plugin-attestation-host.mjs");
+  const command = installedPluginAttestationSetupCommand({
+    provider: "codex", version: repo.input.plugin.version,
+    installedPluginRoot: repo.installedPluginRoot, launcher,
+  });
+  assert.deepEqual(command.argv, [
+    launcher, "write-local-from-codex-registry", "--version", repo.input.plugin.version,
+    "--installed-plugin-root", repo.installedPluginRoot,
+  ]);
+  const pluginList = () => JSON.stringify({ installed: [{
+    pluginId: "pipeline-core@agent-pipeline-local", name: "pipeline-core", marketplaceName: "agent-pipeline-local",
+    version: repo.input.plugin.version, installed: true, enabled: true,
+    source: { source: "local", path: repo.sourcePluginRoot },
+    marketplaceSource: { sourceType: "local", source: dirname(dirname(repo.sourcePluginRoot)) },
+  }], available: [] });
+  assert.equal(writeCodexRegistryInstalledPluginReceipt({
+    provider: "codex", plugin: repo.input.plugin, installedPluginRoot: repo.installedPluginRoot,
+    protectedPaths: repo.protectedPaths,
+  }, { receiptDirectory: repo.receiptDirectory, readPluginList: pluginList }).status, "written");
+  const readback = readInstalledPluginAttestationSetup({
+    provider: "codex", version: repo.input.plugin.version, installedPluginRoot: repo.installedPluginRoot,
+  }, { receiptDirectory: repo.receiptDirectory, readPluginList: pluginList });
+  assert.equal(readback.status, "verified", JSON.stringify(readback));
+  assert.equal(readback.code, "IPA-HOST-RECEIPT-VERIFIED");
 });
 
 check("readback is request-selected and a changed installed copy cannot reuse a receipt", (t) => {
@@ -273,7 +303,7 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
   assert.match(shippedEntrypoint, /isDirectInvocation\(import\.meta\.url\).*runInteractiveInstaller/u);
 });
 
-assert.equal(cases.length, 7, "the complete installed-plugin-attestation host corpus must be registered before execution begins");
+assert.equal(cases.length, 8, "the complete installed-plugin-attestation host corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

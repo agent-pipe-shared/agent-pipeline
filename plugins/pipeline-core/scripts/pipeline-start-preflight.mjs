@@ -45,6 +45,7 @@ import {
   resolveAntigravityRegistryInstalledRoot,
   resolveClaudeRegistryBinding,
   resolveCodexRegistrySource,
+  installedPluginAttestationSetupCommand,
   verifyLocalDevelopmentInstalledPluginReceipt,
 } from "./installed-plugin-attestation-host.mjs";
 
@@ -922,22 +923,30 @@ export function observePipelineStartPreflight({
         protectedPaths: INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[runner] ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
       })
     : { schema: "pipeline.installed-plugin-attestation-bootstrap.v1", status: "not-required", reasonCodes: [] };
-  const installedPluginAttestation = rawInstalledPluginAttestation.status === "unavailable" && runner === "codex"
+  const installedPluginAttestationCommand = rawInstalledPluginAttestation.status === "unavailable" && runner === "codex"
+    ? installedPluginAttestationSetupCommand({
+        provider: "codex", version, installedPluginRoot: pluginRoot,
+        launcher: resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
+      })
+    : null;
+  const installedPluginAttestation = installedPluginAttestationCommand !== null
     ? {
         ...rawInstalledPluginAttestation,
         setupAction: {
           schema: "pipeline.installed-plugin-attestation-setup-action.v1",
           kind: "host-postinstall",
-          executable: "node",
-          argv: [
-            resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
-            "write-local-from-codex-registry", "--version", version,
-            "--installed-plugin-root", pluginRoot,
-          ],
+          executable: installedPluginAttestationCommand.executable,
+          argv: installedPluginAttestationCommand.argv,
           mutation: true,
           requiresPoApproval: false,
           executionBoundary: "host",
           expected: { schema: "pipeline.installed-plugin-attestation-host-result.v1", status: "written" },
+        },
+        terminalTemplate: {
+          templateId: "installed-plugin-attestation-setup",
+          builderId: "installed-plugin-attestation-setup",
+          revision: 1,
+          values: { provider: "codex", version, installedPluginRoot: pluginRoot },
         },
       }
     : rawInstalledPluginAttestation;

@@ -64,7 +64,7 @@
       "required": ["name", "type", "source", "required", "sensitivity", "prompt"],
       "properties": {
         "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{0,63}$" },
-        "type": { "enum": ["absolute-directory", "absolute-file", "repo-relative-path", "sha256", "git-oid", "safe-id", "human-name", "runner", "iso8601", "enum"] },
+        "type": { "enum": ["absolute-directory", "absolute-file", "repo-relative-path", "sha256", "git-oid", "safe-id", "human-name", "runner", "iso8601", "enum", "plugin-version"] },
         "source": { "enum": ["tool-result", "repository-observation", "machine-plane", "human-input"] },
         "required": { "type": "boolean" }, "sensitivity": { "enum": ["public", "machine-private"] },
         "prompt": { "type": "string", "minLength": 1, "maxLength": 160 },

@@ -4,7 +4,17 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { authorizeCriticalPushCommand } from "../scripts/po-human-approval.mjs";
+import {
+  PO_HUMAN_APPROVAL_SETUP_BOUNDARY,
+  authorizeCriticalPushCommand,
+  poHumanApprovalSetupCommand,
+  readPoHumanApprovalAuthority,
+} from "../scripts/po-human-approval.mjs";
+import {
+  INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY,
+  installedPluginAttestationSetupCommand,
+  readInstalledPluginAttestationSetup,
+} from "../scripts/installed-plugin-attestation-host.mjs";
 
 export const HUMAN_TERMINAL_ACTION_CATALOG_SCHEMA = "pipeline.human-terminal-action-catalog.v1";
 export const HUMAN_TERMINAL_ACTION_CATALOG_PATH = fileURLToPath(
@@ -32,6 +42,7 @@ const SLOT_KEYS = Object.freeze(["name", "type", "source", "required", "sensitiv
 const SLOT_TYPES = new Set([
   "absolute-directory", "absolute-file", "repo-relative-path", "sha256", "git-oid", "safe-id",
   "human-name", "runner", "iso8601", "enum",
+  "plugin-version",
 ]);
 const SLOT_SOURCES = new Set(["tool-result", "repository-observation", "machine-plane", "human-input"]);
 const RUNNERS = new Set(["claude", "codex", "antigravity"]);
@@ -41,13 +52,29 @@ const PLATFORMS = new Set(["posix", "windows"]);
 // boundary fields. Preserve that absence as null; Slice 1 must not invent a
 // stronger producer contract. A later producer migration may add the exact
 // tuple and update both authorities together.
-const REGISTERED_BOUNDARIES = Object.freeze({ "authorize-critical-push": null });
+const REGISTERED_BOUNDARIES = Object.freeze({
+  "authorize-critical-push": null,
+  "po-human-approval-setup": PO_HUMAN_APPROVAL_SETUP_BOUNDARY,
+  "installed-plugin-attestation-setup": INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY,
+});
 
 const BUILDERS = Object.freeze({
   "authorize-critical-push": Object.freeze({
     build: authorizeCriticalPushCommand,
     boundary: REGISTERED_BOUNDARIES["authorize-critical-push"],
     source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
+  }),
+  "po-human-approval-setup": Object.freeze({
+    build: poHumanApprovalSetupCommand,
+    readback: ({ values }) => readPoHumanApprovalAuthority(values),
+    boundary: REGISTERED_BOUNDARIES["po-human-approval-setup"],
+    source: fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url)),
+  }),
+  "installed-plugin-attestation-setup": Object.freeze({
+    build: installedPluginAttestationSetupCommand,
+    readback: ({ values }) => readInstalledPluginAttestationSetup(values),
+    boundary: REGISTERED_BOUNDARIES["installed-plugin-attestation-setup"],
+    source: fileURLToPath(new URL("../scripts/installed-plugin-attestation-host.mjs", import.meta.url)),
   }),
 });
 
@@ -221,4 +248,15 @@ export function buildRegisteredHumanTerminalAction(builderId, input) {
     output: registered.build(input),
     boundary: structuredClone(registered.boundary),
   });
+}
+
+export function readbackRegisteredHumanTerminalAction(builderId, input) {
+  const registered = BUILDERS[builderId];
+  if (!registered) throw new Error(`HTA-BUILDER-UNKNOWN: ${builderId}`);
+  if (typeof registered.readback !== "function") throw new Error(`HTA-READBACK-UNAVAILABLE: ${builderId}`);
+  return registered.readback(input);
+}
+
+export function hasRegisteredHumanTerminalActionReadback(builderId) {
+  return typeof BUILDERS[builderId]?.readback === "function";
 }

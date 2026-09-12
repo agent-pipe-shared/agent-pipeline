@@ -55,7 +55,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { authorizeCriticalPushCommand, outside, parseHumanArgs, persistExplicitDirectoryIntoMachinePlane, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, outside, parseHumanArgs, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { CRITICAL_ACTION_KINDS, criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
@@ -203,6 +203,26 @@ function cleanup({ repoRoot, directory }) {
   rmSync(repoRoot, { recursive: true, force: true });
   rmSync(directory, { recursive: true, force: true });
 }
+
+test("terminal-template PO setup producer preserves argv and independently reads authority", () => {
+  const dirs = fixtureDirs();
+  try {
+    const produced = poHumanApprovalSetupCommand({
+      repoRoot: dirs.repoRoot, directory: dirs.directory, humanName: "Test Operator",
+      keyReference: "sign-intent-test-key", launcher: "/plugin/scripts/po-human-approval.mjs",
+    });
+    assert.deepEqual(produced.argv, [
+      "/plugin/scripts/po-human-approval.mjs", "setup", "--repo-root", dirs.repoRoot,
+      "--directory", dirs.directory, "--human-name", "Test Operator",
+      "--key-reference", "sign-intent-test-key",
+    ]);
+    keyFixture(dirs.directory);
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(readPoHumanApprovalAuthority(dirs)).filter(([key]) => key !== "digest")),
+      { status: "verified", schema: "pipeline.po-human-authority-readback.v1", code: "PO-HUMAN-AUTHORITY-READY" },
+    );
+  } finally { cleanup(dirs); }
+});
 
 const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
 

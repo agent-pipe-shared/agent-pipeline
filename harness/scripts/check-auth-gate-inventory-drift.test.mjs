@@ -7,7 +7,8 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { authorizeCriticalPushCommand } from "../../plugins/pipeline-core/scripts/po-human-approval.mjs";
+import { authorizeCriticalPushCommand, poHumanApprovalSetupCommand } from "../../plugins/pipeline-core/scripts/po-human-approval.mjs";
+import { installedPluginAttestationSetupCommand } from "../../plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs";
 import {
   HUMAN_TERMINAL_ACTION_CATALOG_PATH as SHIPPED_CATALOG_PATH,
   buildRegisteredHumanTerminalAction,
@@ -73,6 +74,12 @@ const BASE_DOC = `
 |---|---|---|
 | Plan/PRD approval (\`approve-plan\`) <!-- inventory-id: plan-prd-approval --> | ... | ... |
 
+## Non-authorization human terminal actions
+| Intent/gate | Authorizes | Mechanism |
+|---|---|---|
+| First PO-key setup <!-- inventory-id: po-key-setup --> | ... | ... |
+| Installed-plugin attestation setup <!-- inventory-id: installed-plugin-attestation-setup --> | ... | ... |
+
 ## Explicitly out of scope for this inventory
 Explicitly out of scope: \`submit-plan\`, \`set-feature\`.
 
@@ -86,6 +93,8 @@ Explicitly out of scope: \`submit-plan\`, \`set-feature\`.
 | \`governance-fork-disposition\` | \`legacy-renderer\` | — |
 | \`critical-action-family\` | \`abstract-family\` | — |
 | \`plan-prd-approval\` | \`legacy-renderer\` | — |
+| \`po-key-setup\` | \`registered\` | \`po-key-setup\` |
+| \`installed-plugin-attestation-setup\` | \`registered\` | \`installed-plugin-attestation-setup\` |
 `;
 
 const catalogEntry = (inventoryId, disposition, templateId = null, builderId = null, boundary = null) => ({
@@ -118,6 +127,12 @@ const BASE_CATALOG = JSON.stringify({
     catalogEntry("governance-fork-disposition", "legacy-renderer"),
     catalogEntry("critical-action-family", "abstract-family"),
     catalogEntry("plan-prd-approval", "legacy-renderer"),
+    catalogEntry("po-key-setup", "registered", "po-key-setup", "po-human-approval-setup", {
+      executionBoundary: "attended-external-terminal", invocation: "user-copy-only", codexToolCallPermitted: false,
+    }),
+    catalogEntry("installed-plugin-attestation-setup", "registered", "installed-plugin-attestation-setup", "installed-plugin-attestation-setup", {
+      executionBoundary: "host", invocation: "user-copy-only", codexToolCallPermitted: false,
+    }),
   ],
 });
 
@@ -158,11 +173,12 @@ test("extractHumanTerminalDispositionRows reads only explicit closed table rows"
   });
 });
 
-test("canonical authorization rows derive their ids from the two authoritative tables", () => {
+test("canonical terminal rows derive their ids from the authorization and non-authorization tables", () => {
   assert.deepEqual(
     extractCanonicalHumanAuthorizationRows(BASE_DOC).map((row) => row.inventoryId),
     ["push-signature", "deploy-signature", "publication-signature", "feature-package-reconcile-signature",
-      "governance-fork-disposition", "critical-action-family", "plan-prd-approval"],
+      "governance-fork-disposition", "critical-action-family", "plan-prd-approval",
+      "po-key-setup", "installed-plugin-attestation-setup"],
   );
 });
 
@@ -268,10 +284,55 @@ test("shipped terminal catalog is immutable and covers unique inventory disposit
   const catalog = loadHumanTerminalActionCatalog();
   assert.equal(Object.isFrozen(catalog), true);
   assert.equal(Object.isFrozen(catalog.entries), true);
-  assert.equal(catalog.entries.length, 18);
+  assert.equal(catalog.entries.length, 20);
   assert.equal(new Set(catalog.entries.map((entry) => entry.id)).size, catalog.entries.length);
   assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
-  assert.deepEqual(registeredHumanTerminalActionBuilderIds(), ["authorize-critical-push"]);
+  assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [
+    "authorize-critical-push", "installed-plugin-attestation-setup", "po-human-approval-setup",
+  ]);
+});
+
+test("Slice 3 producer commands are byte-equal to their registered builder output", () => {
+  const poInput = {
+    repoRoot: "/repo root", directory: "/private material", humanName: "Test Operator",
+    keyReference: "local-po-key", existingKey: "/existing key.pem",
+    launcher: "/plugin/scripts/po-human-approval.mjs",
+  };
+  assert.deepEqual(
+    buildRegisteredHumanTerminalAction("po-human-approval-setup", poInput),
+    { output: poHumanApprovalSetupCommand(poInput), boundary: {
+      executionBoundary: "attended-external-terminal", invocation: "user-copy-only", codexToolCallPermitted: false,
+    } },
+  );
+  const installedInput = {
+    provider: "codex", version: "0.6.2+codex.test", installedPluginRoot: "/installed plugin",
+    launcher: "/installed plugin/scripts/installed-plugin-attestation-host.mjs",
+  };
+  assert.deepEqual(
+    buildRegisteredHumanTerminalAction("installed-plugin-attestation-setup", installedInput),
+    { output: installedPluginAttestationSetupCommand(installedInput), boundary: {
+      executionBoundary: "host", invocation: "user-copy-only", codexToolCallPermitted: false,
+    } },
+  );
+});
+
+test("Slice 3 producer templates prepare as bound POSIX instances without a PO gate", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "hta-slice3-producers-")));
+  const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
+  let sequence = 1;
+  try {
+    for (const [templateId, values, boundary] of [
+      ["po-key-setup", { repoRoot: root, directory: join(tmpdir(), "po material"), humanName: "Test Operator", launcher: "/plugin/scripts/po-human-approval.mjs" }, "attended-external-terminal"],
+      ["installed-plugin-attestation-setup", { provider: "codex", version: "0.6.2+codex.test", installedPluginRoot: "/installed plugin", launcher: "/installed plugin/scripts/installed-plugin-attestation-host.mjs" }, "host"],
+    ]) {
+      const result = prepareHumanTerminalAction({ rootDir: root, templateId, runner: "codex", platform: "posix", values }, {
+        observeCandidate: () => candidate, randomBytes: () => Buffer.alloc(12, sequence++),
+      });
+      assert.equal(result.status, "prepared", JSON.stringify(result));
+      assert.equal(JSON.parse(readFileSync(result.requestPath, "utf8")).boundary.executionBoundary, boundary);
+      assert.equal(loadHumanTerminalActionCatalog().entries.find((entry) => entry.templateId === templateId).requiresPoApproval, false);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("registered terminal builder delegates deep-equal to its current source and preserves absent boundary fields", () => {
@@ -490,8 +551,8 @@ test("Slice 2 rejects unresolved and unknown slots without creating an instance"
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("Slice 2 publishes closed instance and receipt schemas", () => {
-  for (const name of ["human-terminal-action-instance.schema.json", "human-terminal-action-receipt.schema.json"]) {
+test("Slice 2 publishes closed instance and versioned receipt schemas", () => {
+  for (const name of ["human-terminal-action-instance.schema.json", "human-terminal-action-receipt.schema.json", "human-terminal-action-receipt-v2.schema.json"]) {
     const schema = JSON.parse(readFileSync(new URL(`../../plugins/pipeline-core/schemas/${name}`, import.meta.url), "utf8"));
     assert.equal(schema.additionalProperties, false, name);
     assert.equal(Array.isArray(schema.required), true, name);
@@ -510,7 +571,7 @@ test("Slice 2 shipped entry and Windows fail closed before writing a launcher", 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("Slice 2 refuses unknown caller before spawn and marks absent post-run readback outcome unknown", () => {
+test("Slice 2 refuses unknown caller or absent adapter before spawn and marks failed post-run readback outcome unknown", () => {
   const fixture = preparedInstanceFixture();
   let spawns = 0;
   const spawn = () => { spawns += 1; return { status: 0, signal: null, stdout: "{}", stderr: "" }; };
@@ -518,12 +579,37 @@ test("Slice 2 refuses unknown caller before spawn and marks absent post-run read
   const caller = { trusted: true, ...fixture.entry.boundary, attendedTty: true };
   try {
     assert.equal(runHumanTerminalAction(input, { ...fixture.deps, spawn }).code, "HTA-RUN-INVOCATION-FORBIDDEN");
-    const unknown = runHumanTerminalAction(input, { ...fixture.deps, spawn, callerEvidence: caller });
+    assert.equal(runHumanTerminalAction(input, { ...fixture.deps, spawn, callerEvidence: caller }).code, "HTA-RUN-READBACK-UNAVAILABLE");
+    assert.equal(spawns, 0);
+    const unknown = runHumanTerminalAction(input, {
+      ...fixture.deps, spawn, callerEvidence: caller,
+      readback: () => ({ status: "failed" }),
+    });
     assert.deepEqual(
       { status: unknown.status, code: unknown.code, retrySafe: unknown.retrySafe, mutationMayHaveOccurred: unknown.mutationMayHaveOccurred },
       { status: "outcome-unknown", code: "HTA-RUN-MANUAL-RECONCILIATION", retrySafe: false, mutationMayHaveOccurred: true },
     );
     assert.equal(spawns, 1);
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("Slice 2 treats a post-child readback exception as manual reconciliation", () => {
+  const fixture = preparedInstanceFixture();
+  const input = { requestPath: fixture.prepared.requestPath, requestSha256: fixture.prepared.requestSha256 };
+  const callerEvidence = { trusted: true, ...fixture.entry.boundary, attendedTty: true };
+  let spawns = 0;
+  try {
+    const result = runHumanTerminalAction(input, {
+      ...fixture.deps,
+      callerEvidence,
+      spawn: () => { spawns += 1; return { status: 0, signal: null }; },
+      readback: () => { throw new Error("fixture readback failure"); },
+    });
+    assert.equal(spawns, 1);
+    assert.deepEqual(
+      { schema: result.schema, status: result.status, code: result.code, readbackStatus: result.readbackStatus, retrySafe: result.retrySafe },
+      { schema: "pipeline.human-terminal-action-receipt.v2", status: "outcome-unknown", code: "HTA-RUN-MANUAL-RECONCILIATION", readbackStatus: "absent", retrySafe: false },
+    );
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 });
 

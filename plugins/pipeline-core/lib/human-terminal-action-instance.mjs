@@ -15,13 +15,15 @@ import {
   HUMAN_TERMINAL_ACTION_CATALOG_PATH,
   buildRegisteredHumanTerminalAction,
   humanTerminalActionCatalogEntry,
+  hasRegisteredHumanTerminalActionReadback,
   loadHumanTerminalActionCatalog,
+  readbackRegisteredHumanTerminalAction,
   registeredHumanTerminalActionBuilderIdentity,
 } from "./human-terminal-action-catalog.mjs";
 
 export const HUMAN_TERMINAL_ACTION_INSTANCE_SCHEMA = "pipeline.human-terminal-action-instance.v1";
 export const HUMAN_TERMINAL_ACTION_RESULT_SCHEMA = "pipeline.human-terminal-action-result.v1";
-export const HUMAN_TERMINAL_ACTION_RECEIPT_SCHEMA = "pipeline.human-terminal-action-receipt.v1";
+export const HUMAN_TERMINAL_ACTION_RECEIPT_SCHEMA = "pipeline.human-terminal-action-receipt.v2";
 const SHA256 = /^[a-f0-9]{64}$/u;
 const O_NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 const MAX_REQUEST_BYTES = 1024 * 1024;
@@ -79,6 +81,7 @@ function validateValues(entry, values) {
     if (slot.type === "sha256" && !SHA256.test(value)) return `HTA-VALUES-SHA256:${slot.name}`;
     if (slot.type === "git-oid" && !/^[a-f0-9]{40,64}$/u.test(value)) return `HTA-VALUES-GIT-OID:${slot.name}`;
     if (slot.type === "safe-id" && !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}$/u.test(value)) return `HTA-VALUES-SAFE-ID:${slot.name}`;
+    if (slot.type === "plugin-version" && !/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u.test(value)) return `HTA-VALUES-PLUGIN-VERSION:${slot.name}`;
     if (slot.type === "human-name" && value.trim() === "") return `HTA-VALUES-HUMAN-NAME:${slot.name}`;
     if (slot.type === "runner" && !["claude", "codex", "antigravity"].includes(value)) return `HTA-VALUES-RUNNER:${slot.name}`;
     if (slot.type === "iso8601" && !Number.isFinite(Date.parse(value))) return `HTA-VALUES-ISO8601:${slot.name}`;
@@ -129,7 +132,7 @@ function readPrivateFile(path, mode) {
 
 function supportedBoundary(boundary) {
   return exactKeys(boundary, BOUNDARY_KEYS)
-    && ["external-terminal", "attended-external-terminal"].includes(boundary.executionBoundary)
+    && ["host", "external-terminal", "attended-external-terminal"].includes(boundary.executionBoundary)
     && boundary.invocation === "user-copy-only"
     && boundary.codexToolCallPermitted === false;
 }
@@ -289,6 +292,20 @@ export function runHumanTerminalAction(input, deps = {}) {
     || caller.invocation !== "user-copy-only" || caller.codexToolCallPermitted !== false || caller.attendedTty !== true) {
     return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "refused", code: "HTA-RUN-INVOCATION-FORBIDDEN" };
   }
+  // Readback is part of the authority boundary, not optional telemetry. Refuse
+  // before the mutating child can start when the producer has not supplied its
+  // independent adapter. Once the child has succeeded, however, an adapter
+  // failure is an unknown outcome that requires reconciliation, never a safe
+  // retry.
+  let readbackAdapter = deps.readback;
+  if (readbackAdapter === undefined && hasRegisteredHumanTerminalActionReadback(request.builderId)) {
+    readbackAdapter = ({ request: current }) => readbackRegisteredHumanTerminalAction(
+      current.builderId, { request: current, values: current.values },
+    );
+  }
+  if (typeof readbackAdapter !== "function") {
+    return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "refused", code: "HTA-RUN-READBACK-UNAVAILABLE" };
+  }
   const candidate = (deps.observeCandidate ?? observeCandidate)(request.repositoryRoot);
   if (canonical(candidate) !== canonical(request.candidate)) return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "refused", code: "HTA-RUN-CANDIDATE-DRIFT" };
   const spawn = deps.spawn ?? spawnSync;
@@ -298,9 +315,8 @@ export function runHumanTerminalAction(input, deps = {}) {
   });
   if (result.status !== 0 || result.signal !== null) return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "failed", code: "HTA-RUN-CHILD-FAILED", exitCode: result.status, signal: result.signal };
   let readback = null;
-  try {
-    if (typeof deps.readback === "function") readback = deps.readback({ request, expected: request.expectedReadback });
-  } catch { readback = null; }
+  try { readback = readbackAdapter({ request, expected: request.expectedReadback }); }
+  catch { readback = null; }
   const readbackMatches = readback?.status === "verified"
     && readback.code === request.expectedReadback.code
     && readback.schema === request.expectedReadback.schema;

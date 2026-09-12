@@ -10,12 +10,19 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { verifyInstalledPluginAttestation } from "../lib/installed-plugin-attestation.mjs";
 import { observeRunnerPublicCoreIdentity } from "../lib/public-core-observation.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 
 export const HOST_RESULT_SCHEMA = "pipeline.installed-plugin-attestation-host-result.v1";
+export const INSTALLED_PLUGIN_ATTESTATION_SETUP_BOUNDARY = Object.freeze({
+  executionBoundary: "host",
+  invocation: "user-copy-only",
+  codexToolCallPermitted: false,
+});
 const RECEIPT_SCHEMA = "pipeline.installed-plugin-attestation.v1";
 const REQUEST_SCHEMA = "pipeline.installed-plugin-attestation-authority-request.v1";
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -272,6 +279,68 @@ export function writeCodexRegistryInstalledPluginReceipt(input, dependencies = {
   });
   if (sourcePluginRoot === null) return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-REGISTRY-SOURCE" };
   return writeLocalDevelopmentInstalledPluginReceipt({ ...input, sourcePluginRoot }, dependencies);
+}
+
+/**
+ * Copy-safe rendering of the existing host writer. The operation selection is
+ * exactly the CLI's current provider contract; no second attestation path is
+ * introduced here.
+ */
+export function installedPluginAttestationSetupCommand({
+  provider, version, sourcePluginRoot = null, installedPluginRoot,
+  launcher = fileURLToPath(import.meta.url),
+} = {}) {
+  if (!Object.hasOwn(INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER, provider)
+    || !VERSION.test(version ?? "") || typeof installedPluginRoot !== "string" || !isAbsolute(installedPluginRoot)
+    || typeof launcher !== "string" || !isAbsolute(launcher)) throw new TypeError("installedPluginAttestationSetupCommand requires a supported provider, version, and absolute launcher/installed root");
+  const operation = provider === "codex" ? "write-local-from-codex-registry"
+    : provider === "claude" ? "write-local-from-registry" : "write-local";
+  if ((provider === "codex" && sourcePluginRoot !== null)
+    || (provider !== "codex" && (typeof sourcePluginRoot !== "string" || !isAbsolute(sourcePluginRoot)))) {
+    throw new TypeError("installedPluginAttestationSetupCommand source root does not match provider contract");
+  }
+  const argv = [launcher, operation];
+  if (provider !== "codex") argv.push("--provider", provider);
+  argv.push("--version", version);
+  if (sourcePluginRoot !== null) argv.push("--source-plugin-root", sourcePluginRoot);
+  argv.push("--installed-plugin-root", installedPluginRoot);
+  return boundedCopySafeCommand({ executable: "node", argv });
+}
+
+/** Independent receipt verification used after the host writer exits. */
+export function readInstalledPluginAttestationSetup({ provider, version, sourcePluginRoot = null, installedPluginRoot } = {}, dependencies = {}) {
+  try {
+    const plugin = { name: "pipeline-core", version };
+    let locator = {};
+    if (provider === "codex") {
+      const registrySourcePluginRoot = resolveCodexRegistrySource({
+        plugin,
+        ...(typeof dependencies.readPluginList === "function" ? { readPluginList: dependencies.readPluginList } : {}),
+      });
+      if (registrySourcePluginRoot === null) throw new Error("registry source unavailable");
+      locator = { registrySourcePluginRoot };
+    } else if (provider === "claude") {
+      const binding = resolveClaudeRegistryBinding({
+        plugin, installedPluginRoot,
+        ...(typeof dependencies.readPluginList === "function" ? { readPluginList: dependencies.readPluginList } : {}),
+        ...(typeof dependencies.readKnownMarketplaces === "function" ? { readKnownMarketplaces: dependencies.readKnownMarketplaces } : {}),
+      });
+      if (binding === null || binding.marketplacePluginRoot !== realpathSync(sourcePluginRoot)) throw new Error("registry binding unavailable");
+      locator = { registryInstalledPluginRoot: binding.installedPluginRoot };
+    } else if (provider === "antigravity") {
+      if (typeof sourcePluginRoot !== "string") throw new Error("source unavailable");
+      locator = { registryInstalledPluginRoot: realpathSync(installedPluginRoot) };
+    } else throw new Error("provider unsupported");
+    const result = verifyLocalDevelopmentInstalledPluginReceipt({
+      provider, plugin, installedPluginRoot, ...locator,
+      protectedPaths: INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[provider],
+    }, dependencies);
+    return result.status === "verified"
+      ? { status: "verified", schema: HOST_RESULT_SCHEMA, code: "IPA-HOST-RECEIPT-VERIFIED", digest: result.receiptId }
+      : { status: "failed", schema: HOST_RESULT_SCHEMA, code: result.reasonCodes?.[0] ?? "IPA-HOST-READBACK" };
+  } catch {
+    return { status: "failed", schema: HOST_RESULT_SCHEMA, code: "IPA-HOST-READBACK" };
+  }
 }
 
 export function writeClaudeRegistryInstalledPluginReceipt(input, dependencies = {}) {

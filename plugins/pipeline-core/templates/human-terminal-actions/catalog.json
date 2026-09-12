@@ -436,6 +436,169 @@
       "expectedReadback": null,
       "runners": null,
       "platforms": null
+    },
+    {
+      "id": "po-key-setup",
+      "inventoryId": "po-key-setup",
+      "revision": 1,
+      "purpose": "Render first-machine PO key setup through the existing approval driver",
+      "audience": "user",
+      "disposition": "registered",
+      "templateId": "po-key-setup",
+      "builderId": "po-human-approval-setup",
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/po-human-approval.mjs#poHumanApprovalSetupCommand"
+      ],
+      "boundary": {
+        "executionBoundary": "attended-external-terminal",
+        "invocation": "user-copy-only",
+        "codexToolCallPermitted": false
+      },
+      "mutation": true,
+      "requiresPoApproval": false,
+      "slots": [
+        {
+          "name": "repoRoot",
+          "type": "absolute-directory",
+          "source": "repository-observation",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Repository root"
+        },
+        {
+          "name": "directory",
+          "type": "absolute-directory",
+          "source": "machine-plane",
+          "required": true,
+          "sensitivity": "machine-private",
+          "prompt": "External PO material directory"
+        },
+        {
+          "name": "humanName",
+          "type": "human-name",
+          "source": "human-input",
+          "required": false,
+          "sensitivity": "public",
+          "prompt": "Human name for a new authority"
+        },
+        {
+          "name": "keyReference",
+          "type": "safe-id",
+          "source": "human-input",
+          "required": false,
+          "sensitivity": "public",
+          "prompt": "Non-identifying key reference"
+        },
+        {
+          "name": "existingKey",
+          "type": "absolute-file",
+          "source": "human-input",
+          "required": false,
+          "sensitivity": "machine-private",
+          "prompt": "Existing private key to import"
+        },
+        {
+          "name": "launcher",
+          "type": "absolute-file",
+          "source": "tool-result",
+          "required": false,
+          "sensitivity": "machine-private",
+          "prompt": "Installed PO approval driver"
+        }
+      ],
+      "expectedReadback": {
+        "schema": "pipeline.po-human-authority-readback.v1",
+        "code": "PO-HUMAN-AUTHORITY-READY",
+        "command": "read-authority"
+      },
+      "runners": [
+        "claude",
+        "codex",
+        "antigravity"
+      ],
+      "platforms": [
+        "posix"
+      ]
+    },
+    {
+      "id": "installed-plugin-attestation-setup",
+      "inventoryId": "installed-plugin-attestation-setup",
+      "revision": 1,
+      "purpose": "Render the existing provider-specific installed-plugin attestation writer",
+      "audience": "user",
+      "disposition": "registered",
+      "templateId": "installed-plugin-attestation-setup",
+      "builderId": "installed-plugin-attestation-setup",
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs#installedPluginAttestationSetupCommand"
+      ],
+      "boundary": {
+        "executionBoundary": "host",
+        "invocation": "user-copy-only",
+        "codexToolCallPermitted": false
+      },
+      "mutation": true,
+      "requiresPoApproval": false,
+      "slots": [
+        {
+          "name": "provider",
+          "type": "enum",
+          "enum": [
+            "claude",
+            "codex",
+            "antigravity"
+          ],
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Runner provider"
+        },
+        {
+          "name": "version",
+          "type": "plugin-version",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "public",
+          "prompt": "Installed plugin version"
+        },
+        {
+          "name": "sourcePluginRoot",
+          "type": "absolute-directory",
+          "source": "tool-result",
+          "required": false,
+          "sensitivity": "machine-private",
+          "prompt": "Local source plugin root"
+        },
+        {
+          "name": "installedPluginRoot",
+          "type": "absolute-directory",
+          "source": "tool-result",
+          "required": true,
+          "sensitivity": "machine-private",
+          "prompt": "Installed plugin root"
+        },
+        {
+          "name": "launcher",
+          "type": "absolute-file",
+          "source": "tool-result",
+          "required": false,
+          "sensitivity": "machine-private",
+          "prompt": "Installed attestation driver"
+        }
+      ],
+      "expectedReadback": {
+        "schema": "pipeline.installed-plugin-attestation-host-result.v1",
+        "code": "IPA-HOST-RECEIPT-VERIFIED",
+        "command": "verify-receipt"
+      },
+      "runners": [
+        "claude",
+        "codex",
+        "antigravity"
+      ],
+      "platforms": [
+        "posix"
+      ]
     }
   ]
 }

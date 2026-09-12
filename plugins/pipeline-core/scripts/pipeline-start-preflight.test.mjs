@@ -892,6 +892,12 @@ test("a Gitless Codex local-development install is ready only with its installer
   assert.equal(unavailable.installedPluginAttestation.setupAction.kind, "host-postinstall");
   assert.equal(unavailable.installedPluginAttestation.setupAction.requiresPoApproval, false);
   assert.equal(unavailable.installedPluginAttestation.setupAction.argv.includes("write-local-from-codex-registry"), true);
+  assert.deepEqual(unavailable.installedPluginAttestation.terminalTemplate, {
+    templateId: "installed-plugin-attestation-setup",
+    builderId: "installed-plugin-attestation-setup",
+    revision: 1,
+    values: { provider: "codex", version: "0.4.5+test", installedPluginRoot: installedRoot },
+  });
   assert.equal(unavailable.nextAction.kind, "host-postinstall");
   assert.equal(unavailable.nextAction.executionBoundary, "host");
 

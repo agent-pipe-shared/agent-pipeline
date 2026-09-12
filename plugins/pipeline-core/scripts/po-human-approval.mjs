@@ -942,6 +942,61 @@ export function authorizeCriticalPushCommand({
   return boundedCopySafeCommand({ executable: "node", argv });
 }
 
+export const PO_HUMAN_APPROVAL_SETUP_BOUNDARY = Object.freeze({
+  executionBoundary: "attended-external-terminal",
+  invocation: "user-copy-only",
+  codexToolCallPermitted: false,
+});
+
+/**
+ * Closed, copy-safe producer for first-machine PO key setup. This only renders
+ * the existing `setup` command; `runHumanApproval` remains the sole authority
+ * that validates and performs the operation.
+ */
+export function poHumanApprovalSetupCommand({
+  repoRoot, directory, humanName = null, keyReference = null,
+  existingKey = null, launcher = fileURLToPath(import.meta.url),
+} = {}) {
+  for (const [name, value] of Object.entries({ launcher, repoRoot, directory })) {
+    if (typeof value !== "string" || value.length === 0) throw new TypeError(`poHumanApprovalSetupCommand requires a non-empty ${name}`);
+  }
+  for (const [name, value] of Object.entries({ humanName, keyReference, existingKey })) {
+    if (value !== null && (typeof value !== "string" || value.length === 0)) throw new TypeError(`poHumanApprovalSetupCommand requires ${name} to be null or a non-empty string`);
+  }
+  const argv = [launcher, "setup", "--repo-root", repoRoot, "--directory", directory];
+  if (humanName !== null) argv.push("--human-name", humanName);
+  if (keyReference !== null) argv.push("--key-reference", keyReference);
+  if (existingKey !== null) argv.push("--existing-key", existingKey);
+  return boundedCopySafeCommand({ executable: "node", argv });
+}
+
+/** Independent, path-redacted readback for the setup producer. */
+export function readPoHumanApprovalAuthority({ repoRoot, directory } = {}) {
+  try {
+    const repository = realpathSync(resolve(repoRoot));
+    const external = externalDirectory(repository, resolve(directory), { create: false, source: "terminal action" });
+    const privateKey = artifactPath(external, "po-private.pem");
+    const publicKey = artifactPath(external, "po-public.pem");
+    const authorityPath = artifactPath(external, "trust-policy.json");
+    if (![privateKey, publicKey, authorityPath].every((path) => existsSync(path))) throw new Error("authority material incomplete");
+    const publicKeyPem = readFileSync(publicKey, "utf8");
+    const authority = JSON.parse(readFileSync(authorityPath, "utf8"));
+    if (!own(authority, ["keyReference", "publicKeySha256", "humanName"])
+      || !text(authority.humanName)
+      || authority.publicKeySha256 !== publicKeyPolicy(publicKeyPem, authority.keyReference).publicKeySha256) {
+      throw new Error("authority mismatch");
+    }
+    return {
+      status: "verified",
+      schema: "pipeline.po-human-authority-readback.v1",
+      code: "PO-HUMAN-AUTHORITY-READY",
+      digest: createHash("sha256").update(JSON.stringify(authority)).digest("hex"),
+    };
+  } catch {
+    return { status: "failed", schema: "pipeline.po-human-authority-readback.v1", code: "PO-HUMAN-AUTHORITY-UNAVAILABLE" };
+  }
+}
+
 /**
  * NVA-W5-TTYSIGN (backlog/items/2026-08-29-signing-fails-without-a-tty-and-the-
  * error-reads-as-a-wrong-passphrase.md): OpenSSL needs a controlling terminal to

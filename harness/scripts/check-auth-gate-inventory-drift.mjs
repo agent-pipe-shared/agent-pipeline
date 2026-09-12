@@ -121,6 +121,7 @@ export function extractCanonicalHumanAuthorizationRows(docText) {
   for (const heading of [
     "## On the shared `pipeline.po-approval-proof.v1` contract",
     "## NOT on the shared contract (a different mechanism)",
+    "## Non-authorization human terminal actions",
   ]) {
     const start = docText.indexOf(heading);
     if (start === -1) continue;
