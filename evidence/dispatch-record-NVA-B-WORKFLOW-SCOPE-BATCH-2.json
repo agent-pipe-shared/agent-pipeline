@@ -31,6 +31,11 @@
       "backlog/index.json"
     ]
   },
+  "modelOverride": {
+    "model": "gpt-6-astra",
+    "effort": "xhigh",
+    "rationale": "The Coordinator reused the already-running deep implementation worker for this bounded high-risk workflow admission package; the record preserves the actual inherited model and effort rather than claiming the role default."
+  },
   "criticEvidence": {
     "schema": "pipeline.critic-evidence-reference.v1",
     "taskId": "NVA-B-WORKFLOW-SCOPE-BATCH-2",
