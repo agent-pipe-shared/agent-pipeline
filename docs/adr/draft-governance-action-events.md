@@ -24,7 +24,6 @@ governance/schemas/governance-action-event.schema.json,
 governance/schemas/governance-event-envelope.schema.json,
 governance/artifact-topology.json,
 plugins/pipeline-core/lib/lifecycle-governance-events.mjs,
-plugins/pipeline-core/lib/governance-action-events.mjs,
 plugins/pipeline-core/lib/governance-event.mjs,
 plugins/pipeline-core/lib/governance-event-store.mjs,
 plugins/pipeline-core/lib/governance-event-projection.mjs,
@@ -35,6 +34,10 @@ plugins/pipeline-core/scripts/governance-replay.mjs,
 plugins/pipeline-core/scripts/governance-replay-viewer.mjs,
 the terminal producer boundaries listed below, their focused tests,
 docs/governance-events.md, docs/governance-replay.md, and governance/README.md.
+
+The implementation may add a dedicated action-event module when this draft is
+accepted, but an absent future source file is not part of this draft's current
+`Governs:` set.
 
 ## Context
 
