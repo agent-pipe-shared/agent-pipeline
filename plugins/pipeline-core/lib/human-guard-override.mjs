@@ -2134,11 +2134,65 @@ function auditLockBytes(record) {
 }
 
 function lockIdentity(path, bytes = null) {
-  const info = safePrivateFile(path);
+  const info = lstatSync(path);
+  if (!info.isFile() || info.isSymbolicLink() || ![1, 2].includes(info.nlink)) {
+    fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock inode is unsafe");
+  }
+  if (process.platform !== "win32" && (info.mode & 0o077) !== 0) {
+    fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock permissions are unsafe");
+  }
+  if (process.platform === "win32" && assessWindowsPrivatePath(path).status !== "secure") {
+    fail("HGO-DACL", "audit lock DACL is not owner-private");
+  }
+  let publicationTwin = null;
+  if (info.nlink === 2) {
+    const prefix = `${basename(path)}.publish.`;
+    const siblings = readdirSync(dirname(path), { withFileTypes: true });
+    if (siblings.length > 256) fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock directory exceeds the recovery bound");
+    const matches = siblings.filter((entry) => entry.isFile() && !entry.isSymbolicLink()
+      && entry.name.startsWith(prefix) && entry.name.endsWith(".tmp"))
+      .map((entry) => join(dirname(path), entry.name))
+      .filter((candidate) => {
+        try {
+          const twin = lstatSync(candidate);
+          return twin.isFile() && !twin.isSymbolicLink() && twin.nlink === 2
+            && String(twin.dev) === String(info.dev) && String(twin.ino) === String(info.ino);
+        } catch { return false; }
+      });
+    if (matches.length !== 1) fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock publication twin is ambiguous");
+    publicationTwin = matches[0];
+  }
   const actual = readFileSync(path);
   if (actual.length > 4096) fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock metadata exceeds its bound");
   if (bytes !== null && !actual.equals(bytes)) return null;
-  return { dev: String(info.dev), ino: String(info.ino), bytes: actual };
+  return { dev: String(info.dev), ino: String(info.ino), bytes: actual, publicationTwin };
+}
+
+function finalizeInterruptedAuditLockPublication(path, identity) {
+  if (identity.publicationTwin === null) return identity;
+  let canonicalInfo;
+  let twinInfo;
+  try {
+    canonicalInfo = lstatSync(path);
+    twinInfo = lstatSync(identity.publicationTwin);
+  } catch {
+    fail("HGO-AUDIT-LOCK-CHANGED", "audit lock publication twin changed before recovery");
+  }
+  if (!canonicalInfo.isFile() || canonicalInfo.isSymbolicLink() || canonicalInfo.nlink !== 2
+    || !twinInfo.isFile() || twinInfo.isSymbolicLink() || twinInfo.nlink !== 2
+    || String(canonicalInfo.dev) !== identity.dev || String(canonicalInfo.ino) !== identity.ino
+    || String(twinInfo.dev) !== identity.dev || String(twinInfo.ino) !== identity.ino
+    || !readFileSync(path).equals(identity.bytes) || !readFileSync(identity.publicationTwin).equals(identity.bytes)) {
+    fail("HGO-AUDIT-LOCK-CHANGED", "audit lock publication twin changed before recovery");
+  }
+  try { unlinkSync(identity.publicationTwin); }
+  catch (error) { if (error?.code !== "ENOENT") fail("HGO-AUDIT-LOCK-CHANGED", "audit lock publication twin could not be removed"); }
+  const finalized = lockIdentity(path, identity.bytes);
+  if (finalized === null || finalized.dev !== identity.dev || finalized.ino !== identity.ino
+    || finalized.publicationTwin !== null) {
+    fail("HGO-AUDIT-LOCK-CHANGED", "audit lock changed while finalizing publication");
+  }
+  return finalized;
 }
 
 function sameLockIdentity(path, identity) {
@@ -2175,7 +2229,7 @@ function readAuditLock(path, secret) {
   const core = { schema: value.schema, purpose: value.purpose, owner: value.owner };
   const expected = createHmac("sha256", secret).update(canonical(core)).digest("hex");
   if (value.mac !== expected) fail("HGO-AUDIT-LOCK-UNVERIFIED", "audit lock ownership authentication failed");
-  return { record: value, identity };
+  return { record: value, identity: finalizeInterruptedAuditLockPublication(path, identity) };
 }
 
 function auditLockOwnerState(record) {
@@ -2192,19 +2246,36 @@ function auditLockOwnerState(record) {
   catch (error) { return error?.code === "ENOENT" ? "dead" : "ambiguous"; }
 }
 
-function publishAuditLock(path, secret, purpose) {
+function publishAuditLock(path, secret, purpose, dependencies = {}) {
   const record = auditLockRecord(secret, localAuditLockOwner(), purpose);
   const bytes = auditLockBytes(record);
+  const temporary = `${path}.publish.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
   let fd;
   try {
-    fd = openSync(path, "wx", 0o600);
+    // Build the complete authenticated record under a unique private name.
+    // Publishing with link(2) is create-only and atomic: a competing canonical
+    // lock wins with EEXIST, while a killed publisher can leave only an
+    // unreferenced temporary file, never an empty/partial canonical lock.
+    fd = openSync(temporary, "wx", 0o600);
     writeFileSync(fd, bytes);
     fsyncSync(fd);
-  } finally {
-    if (fd !== undefined) closeSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    safePrivateFile(temporary);
+    dependencies.afterTemporarySyncFn?.({ path, purpose, temporary });
+    linkSync(temporary, path);
+    dependencies.afterCanonicalLinkFn?.({ path, purpose, temporary });
+    unlinkSync(temporary);
+    safePrivateFile(path);
+    const published = { path, record, identity: lockIdentity(path, bytes) };
+    return published;
+  } catch (error) {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch {}
+    }
+    try { unlinkSync(temporary); } catch {}
+    throw error;
   }
-  safePrivateFile(path);
-  return { path, record, identity: lockIdentity(path, bytes) };
 }
 
 function releaseOwnedAuditLock(lock) {
@@ -2245,7 +2316,7 @@ function acquireAuditLock(paths, secret, dependencies = {}) {
   }
   clearAbandonedAuditRecovery(paths, secret);
   try {
-    const lock = publishAuditLock(paths.auditLock, secret, purpose);
+    const lock = publishAuditLock(paths.auditLock, secret, purpose, dependencies);
     if (existsSync(paths.auditLockRecovery)) {
       releaseOwnedAuditLock(lock);
       fail("HGO-AUDIT-LOCK-RECOVERY-BUSY", "audit lock recovery raced acquisition");
@@ -2264,7 +2335,7 @@ function acquireAuditLock(paths, secret, dependencies = {}) {
   }
 
   let recovery;
-  try { recovery = publishAuditLock(paths.auditLockRecovery, secret, "recovery"); }
+  try { recovery = publishAuditLock(paths.auditLockRecovery, secret, "recovery", dependencies); }
   catch (error) {
     if (error?.code === "EEXIST") fail("HGO-AUDIT-LOCK-RECOVERY-BUSY", "audit lock recovery is already active");
     throw error;
@@ -2285,7 +2356,7 @@ function acquireAuditLock(paths, secret, dependencies = {}) {
       try { linkSync(quarantine, paths.auditLock); unlinkSync(quarantine); } catch {}
       fail("HGO-AUDIT-LOCK-CHANGED", "audit lock replacement was quarantined during recovery");
     }
-    acquired = publishAuditLock(paths.auditLock, secret, purpose);
+    acquired = publishAuditLock(paths.auditLock, secret, purpose, dependencies);
     unlinkSync(quarantine);
     return { ...acquired, recovered: true };
   } finally {
@@ -2351,6 +2422,39 @@ function auditRepairPreimage(head, ledgerBytes, entries) {
     ledgerSha256: sha(ledgerBytes),
     ledgerEntries: entries.length,
   };
+}
+
+function completedAuditRepair(ledger, secret, expectedPreimageSha256) {
+  for (let index = ledger.entries.length - 1; index >= 0; index -= 1) {
+    const event = ledger.entries[index].event;
+    if (!exactKeys(event, [
+      "type", "at", "repairPreimageSha256", "priorHeadEntries", "recoveredTailEntries",
+    ]) || event.type !== "audit-repaired"
+      || event.repairPreimageSha256 !== expectedPreimageSha256
+      || !Number.isSafeInteger(event.priorHeadEntries) || event.priorHeadEntries < 0
+      || !Number.isSafeInteger(event.recoveredTailEntries) || event.recoveredTailEntries <= 0
+      || event.priorHeadEntries + event.recoveredTailEntries !== index) {
+      continue;
+    }
+    const priorHeadEnd = event.priorHeadEntries === 0
+      ? 0
+      : ledger.endOffsets[event.priorHeadEntries - 1];
+    const beforeRepairEnd = index === 0 ? 0 : ledger.endOffsets[index - 1];
+    const priorHeadEntries = ledger.entries.slice(0, event.priorHeadEntries);
+    const beforeRepairEntries = ledger.entries.slice(0, index);
+    const priorHead = auditHead(
+      secret,
+      priorHeadEntries,
+      ledger.ledgerBytes.subarray(0, priorHeadEnd),
+    );
+    const reconstructed = sha(auditRepairPreimage(
+      priorHead,
+      ledger.ledgerBytes.subarray(0, beforeRepairEnd),
+      beforeRepairEntries,
+    ));
+    if (reconstructed === expectedPreimageSha256) return ledger.entries[index];
+  }
+  return null;
 }
 
 function validAuditHeadShape(head) {
@@ -3991,14 +4095,11 @@ export function repairHumanGuardOverrideAudit({
   }
   const repo = topology(rootDir, spawn);
   const paths = storage(repo.common);
-  const initial = auditState(paths, key(paths));
+  const initialSecret = key(paths);
+  const initial = auditState(paths, initialSecret);
   if (initial.status === "terminal-invalid") fail("HGO-AUDIT", initial.reason);
-  const initialRepairEvent = initial.status === "valid"
-    ? initial.ledger.entries.at(-1)?.event
-    : null;
   const idempotentRetry = initial.status === "valid"
-    && initialRepairEvent?.type === "audit-repaired"
-    && initialRepairEvent.repairPreimageSha256 === expectedPreimageSha256;
+    && completedAuditRepair(initial.ledger, initialSecret, expectedPreimageSha256) !== null;
   if (initial.status === "valid" && !idempotentRetry) {
     fail("HGO-AUDIT-REPAIR-NOT-REQUIRED", "audit ledger is already valid");
   }
@@ -4032,9 +4133,7 @@ export function repairHumanGuardOverrideAudit({
     const state = auditState(paths, secret);
     if (state.status === "terminal-invalid") fail("HGO-AUDIT", state.reason);
     if (state.status === "valid") {
-      const repaired = state.ledger.entries.at(-1)?.event;
-      if (repaired?.type === "audit-repaired"
-        && repaired.repairPreimageSha256 === expectedPreimageSha256) {
+      if (completedAuditRepair(state.ledger, secret, expectedPreimageSha256) !== null) {
         return {
           schema: AUDIT_REPAIR_SCHEMA,
           status: "already-repaired",
@@ -4075,9 +4174,7 @@ export function repairHumanGuardOverrideAudit({
     }
     writeAtomic(paths.auditHead, Buffer.from(`${JSON.stringify(auditHead(secret, entries, ledgerBytes))}\n`, "utf8"));
     const verified = requireValidAuditState(paths, secret);
-    const repaired = verified.ledger.entries.at(-1)?.event;
-    if (repaired?.type !== "audit-repaired"
-      || repaired.repairPreimageSha256 !== expectedPreimageSha256) {
+    if (completedAuditRepair(verified.ledger, secret, expectedPreimageSha256) === null) {
       fail("HGO-AUDIT", "audit repair readback is invalid");
     }
     return {

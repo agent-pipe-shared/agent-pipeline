@@ -321,7 +321,12 @@ errors; age alone never establishes death.
 Dead-owner reclamation is serialized by an authenticated recovery guard. After
 acquiring that guard, the reclaimer rechecks the dead record and inode, renames
 the lock atomically into a unique quarantine, reads the quarantined identity
-back, and only then publishes its own lock with exclusive creation. Normal
+back, and only then publishes its own lock. Publication first writes and fsyncs
+the complete authenticated record under a unique private sibling, then creates
+the canonical name atomically with a no-overwrite hard link and removes the
+sibling. A crash before the link leaves no canonical lock; a crash after it
+leaves two names for the same complete inode, which a later reader finalizes
+only after authenticating the record and matching both inode and bytes. Normal
 acquirers check the recovery guard on both sides of publication. Release uses the
 same identity discipline: it renames its owned inode and verifies the quarantine
 before unlinking. A concurrent replacement can therefore be detected and

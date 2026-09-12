@@ -1878,6 +1878,107 @@ test("an authenticated killed genesis writer can finish the first audit entry", 
   }
 });
 
+function killedAuditLockPublisher(base, targetPurpose, purpose = "existing", stage = "temporary") {
+  const modulePath = join(PLUGIN_ROOT, "lib", "human-guard-override.mjs");
+  const child = [
+    'import { readFileSync } from "node:fs";',
+    'import { join } from "node:path";',
+    'import { pathToFileURL } from "node:url";',
+    'const [modulePath, base, targetPurpose, purpose, stage] = process.argv.slice(1);',
+    'const loaded = await import(pathToFileURL(modulePath).href);',
+    'const paths = { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") };',
+    'loaded.humanGuardOverrideInternals.acquireAuditLock(paths, readFileSync(join(base, "audit.key")), {',
+    '  purpose,',
+    '  afterTemporarySyncFn: ({ purpose: publishingPurpose }) => {',
+    '    if (stage === "temporary" && publishingPurpose === targetPurpose) process.kill(process.pid, "SIGKILL");',
+    '  },',
+    '  afterCanonicalLinkFn: ({ purpose: publishingPurpose }) => {',
+    '    if (stage === "linked" && publishingPurpose === targetPurpose) process.kill(process.pid, "SIGKILL");',
+    '  },',
+    '});',
+  ].join("\n");
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", child, modulePath, base, targetPurpose, purpose, stage], {
+    encoding: "utf8", shell: false,
+  });
+  assert.equal(result.signal, "SIGKILL", result.stderr);
+}
+
+test("SIGKILL during ordinary lock publication never exposes an empty canonical lock and reacquisition succeeds", () => {
+  const base = mkdtempSync(join(tmpdir(), "hgo-lock-publish-"));
+  try {
+    const secret = Buffer.alloc(32, 0x61);
+    writeFileSync(join(base, "audit.key"), secret, { mode: 0o600 });
+    killedAuditLockPublisher(base, "existing");
+    assert.equal(existsSync(join(base, "audit.lock")), false);
+    const abandoned = readdirSync(base).filter((name) => name.startsWith("audit.lock.publish."));
+    assert.equal(abandoned.length, 1);
+    assert.ok(readFileSync(join(base, abandoned[0])).length > 0);
+    const paths = { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") };
+    const lock = humanGuardOverrideInternals.acquireAuditLock(paths, secret);
+    assert.equal(humanGuardOverrideInternals.releaseOwnedAuditLock(lock), true);
+    assert.equal(existsSync(join(base, "audit.lock")), false);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("SIGKILL after create-only publication finalizes the authenticated ordinary lock before reclamation", () => {
+  const base = mkdtempSync(join(tmpdir(), "hgo-lock-linked-"));
+  try {
+    const secret = Buffer.alloc(32, 0x63);
+    writeFileSync(join(base, "audit.key"), secret, { mode: 0o600 });
+    killedAuditLockPublisher(base, "existing", "existing", "linked");
+    assert.ok(readFileSync(join(base, "audit.lock")).length > 0);
+    const paths = { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") };
+    const lock = humanGuardOverrideInternals.acquireAuditLock(paths, secret);
+    assert.equal(lock.recovered, true);
+    assert.equal(humanGuardOverrideInternals.releaseOwnedAuditLock(lock), true);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("SIGKILL during recovery-guard publication leaves no canonical recovery lock and reclamation retries safely", () => {
+  const base = mkdtempSync(join(tmpdir(), "hgo-recovery-publish-"));
+  try {
+    const secret = Buffer.alloc(32, 0x62);
+    writeFileSync(join(base, "audit.key"), secret, { mode: 0o600 });
+    killedAuditWriter(base);
+    killedAuditLockPublisher(base, "recovery");
+    assert.equal(existsSync(join(base, "audit.lock.recover")), false);
+    const abandoned = readdirSync(base).find((name) => name.startsWith("audit.lock.recover.publish."));
+    assert.equal(typeof abandoned, "string");
+    assert.ok(readFileSync(join(base, abandoned)).length > 0);
+
+    const paths = { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") };
+    const lock = humanGuardOverrideInternals.acquireAuditLock(paths, secret);
+    assert.equal(lock.recovered, true);
+    assert.equal(humanGuardOverrideInternals.releaseOwnedAuditLock(lock), true);
+    assert.equal(existsSync(join(base, "audit.lock")), false);
+    assert.equal(existsSync(join(base, "audit.lock.recover")), false);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("SIGKILL after recovery-guard publication finalizes its authenticated twin and safely retries reclamation", () => {
+  const base = mkdtempSync(join(tmpdir(), "hgo-recovery-linked-"));
+  try {
+    const secret = Buffer.alloc(32, 0x64);
+    writeFileSync(join(base, "audit.key"), secret, { mode: 0o600 });
+    killedAuditWriter(base);
+    killedAuditLockPublisher(base, "recovery", "existing", "linked");
+    assert.ok(readFileSync(join(base, "audit.lock.recover")).length > 0);
+    const paths = { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") };
+    const lock = humanGuardOverrideInternals.acquireAuditLock(paths, secret);
+    assert.equal(lock.recovered, true);
+    assert.equal(humanGuardOverrideInternals.releaseOwnedAuditLock(lock), true);
+    assert.equal(existsSync(join(base, "audit.lock.recover")), false);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 function killedAuditReclaimer(base) {
   const modulePath = join(PLUGIN_ROOT, "lib", "human-guard-override.mjs");
   const child = [
@@ -2202,6 +2303,60 @@ test("a valid authenticated head prefix plus contiguous authenticated tail is cl
     assert.equal(readFileSync(join(base, "audit.jsonl"), "utf8").trim().split("\n")
       .map((line) => JSON.parse(line).event)
       .filter(({ type }) => type === "audit-repaired").length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a completed repair remains idempotent after a later ordinary authenticated append", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
+    repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: state.repairPreimageSha256,
+      activate: true,
+      nowMs: 5000,
+      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
+    });
+    const firstRetry = repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: state.repairPreimageSha256,
+      activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
+    });
+    assert.equal(firstRetry.status, "already-repaired");
+
+    recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "ordinary append after repair\n" },
+      denials: denial,
+      nowMs: 6000,
+    });
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 4);
+    assert.throws(() => repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: "0".repeat(64),
+      activate: true,
+      dependencies: { isattyFn: () => assert.fail("an unrelated preimage must fail before prompting") },
+    }), (error) => error instanceof HumanGuardOverrideError
+      && error.code === "HGO-AUDIT-REPAIR-NOT-REQUIRED");
+
+    const laterRetry = repairHumanGuardOverrideAudit({
+      rootDir: root,
+      expectedPreimageSha256: state.repairPreimageSha256,
+      activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
+    });
+    assert.equal(laterRetry.status, firstRetry.status);
+    assert.equal(laterRetry.repairPreimageSha256, firstRetry.repairPreimageSha256);
+    const events = readFileSync(join(base, "audit.jsonl"), "utf8").trim().split("\n")
+      .map((line) => JSON.parse(line).event);
+    assert.equal(events.filter(({ type }) => type === "audit-repaired").length, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

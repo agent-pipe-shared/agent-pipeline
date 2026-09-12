@@ -135,8 +135,13 @@ all remain fail-closed with distinct diagnostics.
 
 A dead-owner recovery first publishes its own authenticated recovery guard. It
 then rechecks record bytes and inode identity, atomically renames the dead lock to
-a unique quarantine, reads that identity back, and exclusively publishes the new
-owner. Every normal acquirer checks the recovery guard before and after its own
+a unique quarantine, reads that identity back, and publishes the new owner by
+fsyncing a complete authenticated private sibling before an atomic create-only
+hard link establishes the canonical name. A pre-link crash exposes no canonical
+lock. A post-link crash leaves an authenticated two-name inode; a later reader
+removes the private sibling only after exact inode/byte/MAC validation, so an
+empty or partially written canonical lock is never published. Every normal
+acquirer checks the recovery guard before and after its own
 publication. Release also renames and verifies its owned inode before unlinking,
 so neither recovery nor cleanup can unlink a replacement lock. A raced or
 ambiguous replacement remains preserved and fails closed. Lock reclamation does
