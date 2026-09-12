@@ -564,7 +564,16 @@ try {
     assert.equal(readFileSync(join(symlinked, VENDORED, "kept.txt"), "utf8"), "kept\n");
 
     const bare = root();
-    assert.equal(planVendoredPackageSync({ rootDir: bare }).status, "ignore-evidence-unavailable");
+    // Keep the fixture a true non-repository even when a caller deliberately places TMPDIR
+    // below a checkout. Git otherwise discovers the parent checkout and invalidates this case.
+    const priorGitCeilingDirectories = process.env.GIT_CEILING_DIRECTORIES;
+    try {
+      process.env.GIT_CEILING_DIRECTORIES = dirname(bare);
+      assert.equal(planVendoredPackageSync({ rootDir: bare }).status, "ignore-evidence-unavailable");
+    } finally {
+      if (priorGitCeilingDirectories === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+      else process.env.GIT_CEILING_DIRECTORIES = priorGitCeilingDirectories;
+    }
     assert.equal(existsSync(join(bare, VENDORED)), false);
     assert.equal(planVendoredPackageSync({ rootDir: join(bare, "absent") }).status, "invalid-root");
   });

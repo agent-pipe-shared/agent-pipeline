@@ -223,6 +223,9 @@ function scopedRegistrationFailureFixture() {
     );
     copyFileSync(join(repoRoot, "harness", "scripts", "self-verify-selection.mjs"), join(fixtureRoot, "harness", "scripts", "self-verify-selection.mjs"));
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-selection.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-selection.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "governance-action-events.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "governance-action-events.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "governance-event.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "governance-event.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "governance-verification-action.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "governance-verification-action.mjs"));
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));

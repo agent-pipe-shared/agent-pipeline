@@ -23,7 +23,7 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import {
@@ -132,7 +132,13 @@ checkTrue("WTC8 after `git worktree add`, count:2", twoWorktrees.ok === true && 
   JSON.stringify(twoWorktrees));
 
 const notARepo = mkdtempSync(join(tmpdir(), "worktree-count-check-notrepo-"));
-const badResult = countLiveWorktrees(notARepo);
+// Prevent Git from discovering an ancestor checkout when TMPDIR itself is repo-local.
+const badResult = countLiveWorktrees(notARepo, {
+  spawn: (command, args, options) => spawnSync(command, args, {
+    ...options,
+    env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(notARepo) },
+  }),
+});
 checkTrue("WTC9 non-repo path fails open (ok:false, never throws)", badResult.ok === false);
 
 // ---------------------------------------------------------------------------
