@@ -1,0 +1,563 @@
+{
+  "supersedes": {
+    "taskId": "NVA-B-BUDGET-CLOSING-CAP-CORRECTION-1",
+    "payloadSha256": "277de49d513e636c8f2df41532384bb083317018e2bb949f023820bdc7b96166",
+    "fileSha256": "2d88c08dfde622e0b0cd5a6a56db84c9b6e7d4edd5a5931c3b0d1165fc9e495b"
+  },
+  "schema": "pipeline.focused-candidate-test-receipt.v1",
+  "taskId": "NVA-B-BUDGET-CLOSING-CAP-EVIDENCE-1",
+  "auditTaskId": "NVA-B-CI-PATH-TRUE-CLOSURE-1",
+  "generatedAt": "2026-09-12T02:01:25.289Z",
+  "candidateCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
+  "candidateTree": "4df66fa080909db30a819676bf7e12ba43643260",
+  "briefingBaseCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
+  "candidateBinding": {
+    "kind": "committed-source-tree",
+    "committedCorrection": true,
+    "codeScope": [
+      "plugins/pipeline-core",
+      "harness",
+      "templates",
+      ".github/workflows",
+      "package.json",
+      "package-lock.json"
+    ],
+    "before": {
+      "candidateCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
+      "candidateTree": "4df66fa080909db30a819676bf7e12ba43643260",
+      "trackedCodeFileCount": 1310,
+      "trackedCodeSha256": "a644e668908cd0f60c4f31e6714312282895ced8168da67245c948bbd144232a",
+      "patchFromCandidate": "",
+      "patchSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "after": {
+      "candidateCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
+      "candidateTree": "4df66fa080909db30a819676bf7e12ba43643260",
+      "trackedCodeFileCount": 1310,
+      "trackedCodeSha256": "a644e668908cd0f60c4f31e6714312282895ced8168da67245c948bbd144232a",
+      "patchFromCandidate": "",
+      "patchSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "sourceReadbackUnchanged": true,
+    "sources": [
+      {
+        "path": ".github/workflows/verify.yml",
+        "sha256": "3bdfaefa845e1ca1ac72ee81a2d9dd357db72d5be7c228254579c578581a6f33",
+        "candidateSha256": "3bdfaefa845e1ca1ac72ee81a2d9dd357db72d5be7c228254579c578581a6f33",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "sha256": "bfef62eeb810667cee32d051c9d51186e13e676e047d5ea5fc1874ef34978dcd",
+        "candidateSha256": "bfef62eeb810667cee32d051c9d51186e13e676e047d5ea5fc1874ef34978dcd",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+        "sha256": "fed4787c6d32fbb89de113a601dbfc4f9b02390560f9914780791695dd1578f4",
+        "candidateSha256": "fed4787c6d32fbb89de113a601dbfc4f9b02390560f9914780791695dd1578f4",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/lib/rebase-authority.mjs",
+        "sha256": "fdc9281c3f27ef5a024d50c90404a038c2c42859fcf6105240afcc9a2c7db3cc",
+        "candidateSha256": "fdc9281c3f27ef5a024d50c90404a038c2c42859fcf6105240afcc9a2c7db3cc",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/lib/rebase-authority.test.mjs",
+        "sha256": "670217f041985d85ee7167eac5b7f16511602d04a7fe7cff343a8d01d3560b01",
+        "candidateSha256": "670217f041985d85ee7167eac5b7f16511602d04a7fe7cff343a8d01d3560b01",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs",
+        "sha256": "8c65e9e63ed821add23969022766c73d7a0eafb211d71d965461b67b384dd3f5",
+        "candidateSha256": "8c65e9e63ed821add23969022766c73d7a0eafb211d71d965461b67b384dd3f5",
+        "matchesCandidate": true
+      }
+    ],
+    "executionSourcesMatchedCandidateBefore": true,
+    "executionSourcesMatchedCandidateAfter": true,
+    "note": "candidateCommit/candidateTree contain the tested correction; tracked execution-source bytes matched that commit before and after all checks."
+  },
+  "runtime": {
+    "nodeVersion": "v24.15.0",
+    "nodeExecutable": {
+      "name": "node",
+      "locationClass": "host-toolchain",
+      "sha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c",
+      "digestObservedAt": "2026-09-12T02:19:33.321Z"
+    },
+    "platform": "linux"
+  },
+  "tests": [
+    {
+      "executable": {
+        "name": "bash",
+        "locationClass": "host-toolchain",
+        "sha256": "3efccc187bafa75ff1e37d246270ab3e7aa559f242c7a52bf3ec2a1b5450bdbd",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "-c",
+        "command -v \"$1\"",
+        "ci-path-receipt",
+        "node"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:22.858Z",
+      "completedAt": "2026-09-12T02:01:22.861Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 30,
+        "sha256": "7714027f4192642b972577a908eee7f63bd73a6106ea2b4c6fa3da2a6c4de9b2"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "bash",
+        "locationClass": "host-toolchain",
+        "sha256": "3efccc187bafa75ff1e37d246270ab3e7aa559f242c7a52bf3ec2a1b5450bdbd",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "-c",
+        "command -v \"$1\"",
+        "ci-path-receipt",
+        "git"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:22.963Z",
+      "completedAt": "2026-09-12T02:01:22.970Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 13,
+        "sha256": "69e7172187532ccb75be2fac91259a366a9d25b269d74df5fee5a6fcf66a5314"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "bash",
+        "locationClass": "host-toolchain",
+        "sha256": "3efccc187bafa75ff1e37d246270ab3e7aa559f242c7a52bf3ec2a1b5450bdbd",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "-c",
+        "command -v \"$1\"",
+        "ci-path-receipt",
+        "bash"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:22.975Z",
+      "completedAt": "2026-09-12T02:01:22.981Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 14,
+        "sha256": "82794de5df2a04fc2d1672e7faab8d1a133a693e2b5ffec9fa3f115adb9a1d96"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "bash",
+        "locationClass": "host-toolchain",
+        "sha256": "3efccc187bafa75ff1e37d246270ab3e7aa559f242c7a52bf3ec2a1b5450bdbd",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "-c",
+        "command -v \"$1\"",
+        "ci-path-receipt",
+        "sh"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:22.983Z",
+      "completedAt": "2026-09-12T02:01:22.988Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 12,
+        "sha256": "629d642c4ccb6620f44ca59c8ac3dbbc49bc93c329396c696cfe03cbe8e1590a"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "bash",
+        "locationClass": "host-toolchain",
+        "sha256": "3efccc187bafa75ff1e37d246270ab3e7aa559f242c7a52bf3ec2a1b5450bdbd",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "-c",
+        "command -v \"$1\"",
+        "ci-path-receipt",
+        "openssl"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:22.988Z",
+      "completedAt": "2026-09-12T02:01:22.993Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 17,
+        "sha256": "d822bda2f03d508a6d2ec752e52e6985d8cc514f1921471909f733e9b7ab3475"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "bash",
+        "locationClass": "host-toolchain",
+        "sha256": "3efccc187bafa75ff1e37d246270ab3e7aa559f242c7a52bf3ec2a1b5450bdbd",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "-c",
+        "command -v \"$1\"",
+        "ci-path-receipt",
+        "uname"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:22.994Z",
+      "completedAt": "2026-09-12T02:01:22.999Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 15,
+        "sha256": "0c8e9f0e417a2146902b017b00f950c0fc52ef1d4f3f7b75383eb1862a10e7f5"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "true",
+        "locationClass": "absent-from-reconstructed-ci-path",
+        "sha256": null
+      },
+      "argv": [],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:23.009Z",
+      "completedAt": "2026-09-12T02:01:23.013Z",
+      "environmentOverrides": {
+        "PATH": {
+          "locationClass": "ephemeral-reconstructed-ci-tool-directory",
+          "allowedTools": [
+            "node",
+            "git",
+            "bash",
+            "sh",
+            "openssl",
+            "uname"
+          ]
+        }
+      },
+      "exitCode": null,
+      "signal": null,
+      "spawnError": "ENOENT",
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "node",
+        "locationClass": "host-toolchain",
+        "sha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern=rebwire req5-2:|rebdead positive-4:",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:23.013Z",
+      "completedAt": "2026-09-12T02:01:23.599Z",
+      "environmentOverrides": {
+        "PATH": {
+          "locationClass": "ephemeral-reconstructed-ci-tool-directory",
+          "allowedTools": [
+            "node",
+            "git",
+            "bash",
+            "sh",
+            "openssl",
+            "uname"
+          ]
+        }
+      },
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 737,
+        "sha256": "d9379eab6b349558b6eb114244250468ce7be774b094ae0a13f364e36c53469c"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tapSummary": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "executable": {
+        "name": "node",
+        "locationClass": "host-toolchain",
+        "sha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "--test",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/lib/rebase-authority.test.mjs"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:23.599Z",
+      "completedAt": "2026-09-12T02:01:23.694Z",
+      "environmentOverrides": {
+        "PATH": {
+          "locationClass": "ephemeral-reconstructed-ci-tool-directory",
+          "allowedTools": [
+            "node",
+            "git",
+            "bash",
+            "sh",
+            "openssl",
+            "uname"
+          ]
+        }
+      },
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 3136,
+        "sha256": "e6acdb9431d7fa81d81b6aa8f98aa855cdd2eb96050fb4c1364fb12b339c440c"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tapSummary": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "executable": {
+        "name": "node",
+        "locationClass": "host-toolchain",
+        "sha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "--input-type=module",
+        "-e",
+        "import {parseDoneWhen,evaluateDoneWhen} from \"./plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs\"; console.log(JSON.stringify(evaluateDoneWhen(parseDoneWhen(\"contains .github/workflows/verify.yml command -v true\"),{root:process.cwd()})));"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:23.695Z",
+      "completedAt": "2026-09-12T02:01:23.725Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 103,
+        "sha256": "f527dafa57e5b7ab6f2bab86ce192ceebbced8fb255318e309ca36c63dfe89b7"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "gh",
+        "locationClass": "host-toolchain",
+        "sha256": "553949e2efa12842771efe6012aa4de21f1d591530ec17fc435f610f10e017ee",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "run",
+        "list",
+        "--repo",
+        "agent-pipe-shared/agent-pipeline",
+        "--workflow",
+        "verify.yml",
+        "--limit",
+        "20",
+        "--json",
+        "databaseId,headSha,headBranch,status,conclusion,url,createdAt,updatedAt"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:23.725Z",
+      "completedAt": "2026-09-12T02:01:25.192Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 6143,
+        "sha256": "8edc6ddf1d754c1441150fe0d97a36b2063aef9a5dcb1436d69f1f6b3c05438a"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "observations": {
+    "allowlistedTools": [
+      "node",
+      "git",
+      "bash",
+      "sh",
+      "openssl",
+      "uname"
+    ],
+    "toolBindings": [
+      {
+        "name": "node",
+        "locationClass": "host-toolchain-symlinked-into-ephemeral-ci-path",
+        "executableSha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c"
+      },
+      {
+        "name": "git",
+        "locationClass": "host-toolchain-symlinked-into-ephemeral-ci-path",
+        "executableSha256": "5516c9f362c29376ab9a499a33082f9f611941d8c75930c880e30ad109e39c9a"
+      },
+      {
+        "name": "bash",
+        "locationClass": "host-toolchain-symlinked-into-ephemeral-ci-path",
+        "executableSha256": "3efccc187bafa75ff1e37d246270ab3e7aa559f242c7a52bf3ec2a1b5450bdbd"
+      },
+      {
+        "name": "sh",
+        "locationClass": "host-toolchain-symlinked-into-ephemeral-ci-path",
+        "executableSha256": "c626229526bb58ec2d0f585f3c3ae1412e6f973b4353385042d11c38d8426917"
+      },
+      {
+        "name": "openssl",
+        "locationClass": "host-toolchain-symlinked-into-ephemeral-ci-path",
+        "executableSha256": "aca2a81d2d532c78f2657459d3ded5d61a19a2f134fe30f1b931fc8300a7fa08"
+      },
+      {
+        "name": "uname",
+        "locationClass": "host-toolchain-symlinked-into-ephemeral-ci-path",
+        "executableSha256": "48893b0fb21436b54619db80486e83ef39dfccaf1aefe83dfa00c02d6146e8c0"
+      }
+    ],
+    "bareTrueExpectedError": "ENOENT",
+    "fixtureRemoved": true,
+    "latestObservedVerifyRun": {
+      "databaseId": 33595311782,
+      "headSha": "6262d408aa616651232b46ab8ecbfd88ce4055b0",
+      "headBranch": "main",
+      "status": "completed",
+      "conclusion": "failure",
+      "url": "https://github.com/agent-pipe-shared/agent-pipeline/actions/runs/33595311782",
+      "createdAt": "2026-09-02T05:35:47Z",
+      "updatedAt": "2026-09-02T05:42:29Z"
+    },
+    "doneWhen": {
+      "verb": "contains",
+      "path": ".github/workflows/verify.yml",
+      "needle": "command -v true",
+      "satisfied": false
+    },
+    "actualCISuccessClaimed": false,
+    "scope": "Local reproduction of workflow PATH, not a GitHub Actions execution; native Codex Sandbox/App Server under WSL excluded.",
+    "githubObservationBound": {
+      "returnedObservationCount": 1,
+      "rawListPublished": false
+    }
+  },
+  "checksPassed": true,
+  "publication": {
+    "profile": "portable-digest-summary",
+    "sanitizedAt": "2026-09-12T02:19:33.321Z",
+    "sourceCapturePayloadSha256": "21ca10e90b45d5b8fe22b9fb8f7e317d8d3d1897e23786c15b337840ec20f9db",
+    "sourceCaptureFileSha256": "3d958b9528999a29689d0c13f05c368a368965ac886daa3482c0b90c0d090af9",
+    "rawOutputsPublished": false,
+    "executableDigestTiming": "Observed during receipt sanitization; captured test times and command outcomes are retained."
+  },
+  "payloadSha256": "3e945be10cb6c0991185e583f398a416ea85d2449acc8b96e3c7312d33dd93ff"
+}

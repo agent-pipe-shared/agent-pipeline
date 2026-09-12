@@ -1,0 +1,268 @@
+{
+  "supersedes": {
+    "taskId": "NVA-B-BUDGET-CLOSING-CAP-CORRECTION-2",
+    "payloadSha256": "ea6b18492672e4a539bab2ca549530d13768e597f045423920f3cc5608af7fd7",
+    "fileSha256": "7a22882dc667d7322ebabf3af6306a160efc0d0e1cb51aeddb37928d3aeb9956"
+  },
+  "schema": "pipeline.focused-candidate-test-receipt.v1",
+  "taskId": "NVA-B-BUDGET-CLOSING-CAP-EVIDENCE-1",
+  "auditTaskId": "NVA-B-BUDGET-PARTIAL-CLOSURE-1",
+  "generatedAt": "2026-09-12T02:01:22.353Z",
+  "candidateCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
+  "candidateTree": "4df66fa080909db30a819676bf7e12ba43643260",
+  "briefingBaseCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
+  "candidateBinding": {
+    "kind": "committed-source-tree",
+    "committedCorrection": true,
+    "codeScope": [
+      "plugins/pipeline-core",
+      "harness",
+      "templates",
+      ".github/workflows",
+      "package.json",
+      "package-lock.json"
+    ],
+    "before": {
+      "candidateCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
+      "candidateTree": "4df66fa080909db30a819676bf7e12ba43643260",
+      "trackedCodeFileCount": 1310,
+      "trackedCodeSha256": "a644e668908cd0f60c4f31e6714312282895ced8168da67245c948bbd144232a",
+      "patchFromCandidate": "",
+      "patchSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "after": {
+      "candidateCommit": "40a2339e397b0fbaa0929425d8407539fc4ca2c2",
+      "candidateTree": "4df66fa080909db30a819676bf7e12ba43643260",
+      "trackedCodeFileCount": 1310,
+      "trackedCodeSha256": "a644e668908cd0f60c4f31e6714312282895ced8168da67245c948bbd144232a",
+      "patchFromCandidate": "",
+      "patchSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "sourceReadbackUnchanged": true,
+    "sources": [
+      {
+        "path": "plugins/pipeline-core/lib/dispatch-budget-core.mjs",
+        "sha256": "009c5f933dbc8c8517c588d4f12d3ae02090b32b313bc85e80c7a26e832c30aa",
+        "candidateSha256": "009c5f933dbc8c8517c588d4f12d3ae02090b32b313bc85e80c7a26e832c30aa",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/lib/dispatch-budget-core.test.mjs",
+        "sha256": "feee6def1d379eeb859b48f3a196a85f6cdbe9f698db24203a5a9ff68b14d07c",
+        "candidateSha256": "feee6def1d379eeb859b48f3a196a85f6cdbe9f698db24203a5a9ff68b14d07c",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs",
+        "sha256": "94d0639fbfd0eca561c8e7426c67405cd605b71592486cdb1c0e0f526cb70bb4",
+        "candidateSha256": "94d0639fbfd0eca561c8e7426c67405cd605b71592486cdb1c0e0f526cb70bb4",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs",
+        "sha256": "df10f4e0714405661e3be538061c1ff7dc6b783b68a701d8345310e229c0113b",
+        "candidateSha256": "df10f4e0714405661e3be538061c1ff7dc6b783b68a701d8345310e229c0113b",
+        "matchesCandidate": true
+      },
+      {
+        "path": "templates/prompts/goldfish-task.md",
+        "sha256": "792a568f2920c0b7b5c751212bf9f7e0c27e965e0716a340b9666d5fcd207107",
+        "candidateSha256": "792a568f2920c0b7b5c751212bf9f7e0c27e965e0716a340b9666d5fcd207107",
+        "matchesCandidate": true
+      },
+      {
+        "path": "templates/prompts/critic-review.md",
+        "sha256": "e3284a416b397f460d534b06e0ad3a4b4d73239abb4acdb6fbe45276adc4466c",
+        "candidateSha256": "e3284a416b397f460d534b06e0ad3a4b4d73239abb4acdb6fbe45276adc4466c",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/templates/prompts/goldfish-task.md",
+        "sha256": "792a568f2920c0b7b5c751212bf9f7e0c27e965e0716a340b9666d5fcd207107",
+        "candidateSha256": "792a568f2920c0b7b5c751212bf9f7e0c27e965e0716a340b9666d5fcd207107",
+        "matchesCandidate": true
+      },
+      {
+        "path": "plugins/pipeline-core/templates/prompts/critic-review.md",
+        "sha256": "e3284a416b397f460d534b06e0ad3a4b4d73239abb4acdb6fbe45276adc4466c",
+        "candidateSha256": "e3284a416b397f460d534b06e0ad3a4b4d73239abb4acdb6fbe45276adc4466c",
+        "matchesCandidate": true
+      }
+    ],
+    "executionSourcesMatchedCandidateBefore": true,
+    "executionSourcesMatchedCandidateAfter": true,
+    "note": "candidateCommit/candidateTree contain the tested correction; tracked execution-source bytes matched that commit before and after all checks."
+  },
+  "runtime": {
+    "nodeVersion": "v24.15.0",
+    "nodeExecutable": {
+      "name": "node",
+      "locationClass": "host-toolchain",
+      "sha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c",
+      "digestObservedAt": "2026-09-12T02:19:33.321Z"
+    },
+    "platform": "linux"
+  },
+  "tests": [
+    {
+      "executable": {
+        "name": "node",
+        "locationClass": "host-toolchain",
+        "sha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "--test",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/lib/dispatch-budget-core.test.mjs"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:20.817Z",
+      "completedAt": "2026-09-12T02:01:20.896Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 2340,
+        "sha256": "1de1d40d1ab69cf1a53b9d903b8f48db6f9c9f8463ad49dc550f7c3cee3ce0bb"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tapSummary": {
+        "tests": 9,
+        "pass": 9,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "executable": {
+        "name": "node",
+        "locationClass": "host-toolchain",
+        "sha256": "d1de76d8edf2fededf6f8b30d244e2c0529ac607923a018283b77e9c74bd932c",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "--test",
+        "--test-reporter=tap",
+        "plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:20.896Z",
+      "completedAt": "2026-09-12T02:01:22.279Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 13116,
+        "sha256": "ddbd4302bb2bb338d56c0d40534e1066e5acb07974bb39ffa3ad5a60cfc591e5"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "tapSummary": {
+        "tests": 41,
+        "pass": 41,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "executable": {
+        "name": "cmp",
+        "locationClass": "host-toolchain",
+        "sha256": "82b923f0f12706950d696fb63fe3d8d8a4d2e559ec2a8a44f6c97ed2c56de44e",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "templates/prompts/goldfish-task.md",
+        "plugins/pipeline-core/templates/prompts/goldfish-task.md"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:22.279Z",
+      "completedAt": "2026-09-12T02:01:22.282Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "executable": {
+        "name": "cmp",
+        "locationClass": "host-toolchain",
+        "sha256": "82b923f0f12706950d696fb63fe3d8d8a4d2e559ec2a8a44f6c97ed2c56de44e",
+        "digestObservedAt": "2026-09-12T02:19:33.321Z"
+      },
+      "argv": [
+        "templates/prompts/critic-review.md",
+        "plugins/pipeline-core/templates/prompts/critic-review.md"
+      ],
+      "cwd": {
+        "locationClass": "repository-root"
+      },
+      "startedAt": "2026-09-12T02:01:22.282Z",
+      "completedAt": "2026-09-12T02:01:22.284Z",
+      "environmentOverrides": {},
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "stdout": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "observations": {
+    "closingAllowance": 5,
+    "safetyMargin": 10,
+    "coreTapSummary": {
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "adapterRegression": "Five sequential post-cap closing writes are admitted; the sixth and a later git-add shape are denied, with persisted counts 11 and 12. Denials distinguish available slots from exhausted reserve, including a denied work attempt consuming the last slot.",
+    "semantics": "Calls through workingCap are working. Only closing acts with nextCount <= workingCap + 5 proceed thereafter. Denied attempts consume counter slots. Later calls return the existing exhausted decision.",
+    "invalidInput": "Missing/malformed counters and malformed whole input return the existing invalid-input decision/code; budget-call-input-must-be-an-object is an additive reason.",
+    "liveAdapterLimit": "Claude adapter suite only; no Codex or Antigravity authenticated live-call adapter claim."
+  },
+  "checksPassed": true,
+  "publication": {
+    "profile": "portable-digest-summary",
+    "sanitizedAt": "2026-09-12T02:19:33.321Z",
+    "sourceCapturePayloadSha256": "c4a19292492ea435fc9aadc7037b41209e1cb52f82c037f2ce1a724b4d849b3c",
+    "sourceCaptureFileSha256": "6a4c48b6681883e938cae78690437e26d63e0bba54e34ad4ec0e495ac6a876d4",
+    "rawOutputsPublished": false,
+    "executableDigestTiming": "Observed during receipt sanitization; captured test times and command outcomes are retained."
+  },
+  "payloadSha256": "402d024a7112d2ca3f25fd06bfd5f943233bb848b9b228bdfdd97267da2fc4b0"
+}

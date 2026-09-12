@@ -210,3 +210,24 @@ data loss in place.
 - `2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`
   (closed) — the hard cliff. This item is the soft limit's own blind spot, and
   closing that one did not address it.
+
+## Partial closure evidence — 2026-09-12
+
+The runner-neutral arithmetic and decision layer is complete. The committed
+correction `40a2339e397b0fbaa0929425d8407539fc4ca2c2` permits at most five
+post-cap closing calls, then returns typed exhaustion. Against exactly those
+committed source bytes, **9/9 core cases** and **41/41 Claude adapter cases**
+passed at the host subprocess boundary. The adapter regression sequentially
+admits five closing calls and denies the sixth; its existing invariant test
+resolves each Goldfish tier's actual `maxTurns` before checking the reserved
+working cap. These completed subcriteria must not be rebuilt.
+
+The item remains `open`: Codex and Antigravity still have no authenticated
+live payload adapters that attribute their calls to a dispatch and feed them
+through the shared decision layer. Native Codex Sandbox/App Server behavior
+under WSL is deferred and is not required as acceptance evidence for this
+portable adapter gap. See
+`backlog/evidence/NVA-B-BUDGET-PARTIAL-CLOSURE-1.md`.
+NVA-B-BUDGET-CLOSING-CAP-EVIDENCE-1 binds the commands, exits, output digests,
+HEAD/tree and matching committed source blobs in
+`backlog/evidence/NVA-B-BUDGET-PARTIAL-CLOSURE-1.receipt.json`.

@@ -232,3 +232,48 @@ the current source. It still does not satisfy this item's actual-CI criterion
 or prove the much larger current candidate; the item remains open until a new
 push-bound run is observed. See
 `backlog/evidence/2026-09-11-main-verify-33595311782-recheck.md`.
+
+### True-closure audit — 2026-09-12
+
+NVA-B-CI-PATH-TRUE-CLOSURE-1 rechecked commit
+`21cf930cacebf26b3d2ceb8c6ebe55ed787c017e`. Accepted Route 2 remains
+implemented: the test-owned executable `true` shim is supplied to the exact
+`git -c core.editor=true rebase --continue` subprocess. No source fix or CI
+allowlist expansion is needed. The current workflow allowlist has **six** tools
+(`node`, `git`, `bash`, `sh`, `openssl`, `uname`); the five-tool descriptions
+above are historical observations.
+
+Under a PATH reconstructed from the current workflow, bare `true` returned
+`ENOENT`, while both real continuation regressions (`rebwire req5-2` and
+`rebdead positive-4`) passed, **2/2**. The rebase-authority suite also passed,
+**13/13**. Read-only GitHub inspection still returned the failed run
+`33595311782` as the newest Verify run; no later actual-CI success was observed.
+Criterion 2 therefore remains unmet.
+
+The existing `done_when` predicate was evaluated with the repository evaluator
+and returned `satisfied: false`. It still describes unchosen Route 1, as the
+September 8 correction records. Both predicate and `status: open` are preserved;
+this audit does not perform the item-content/ledger rescope needed to replace
+that predicate. Criterion 3 remains answered by the documented September 4
+sweep with its stated limits; a fresh exhaustive sweep is deferred because this
+audit tests the specific continuation failure and finds no remaining local
+source gap. Evidence and exact validation scope:
+`backlog/evidence/NVA-B-CI-PATH-TRUE-CLOSURE-1.md`.
+
+### Committed-candidate receipt refresh — 2026-09-12
+
+NVA-B-BUDGET-CLOSING-CAP-EVIDENCE-1 regenerated
+`backlog/evidence/NVA-B-CI-PATH-TRUE-CLOSURE-1.receipt.json` against HEAD
+`40a2339e397b0fbaa0929425d8407539fc4ca2c2`, tree
+`4df66fa080909db30a819676bf7e12ba43643260`. Every cited source blob matches
+that commit; execution-source bytes were unchanged before and after testing.
+The reconstructed six-tool CI PATH again yielded bare `true = ENOENT`,
+**2/2** real continuation cases and **13/13** rebase-authority cases passed
+with exit 0. Repository-relative commands, structured results, output digests
+and readback checks are recorded by the machine-written receipt. Local paths
+and raw external outputs are excluded from its publication projection.
+
+The refreshed read-only GitHub observation still names failed run
+`33595311782` as the newest Verify execution. Actual-CI criterion 2 therefore
+remains unmet; `status: open` and the existing unsatisfied Route 1 predicate
+remain unchanged. These local results do not supply actual-CI acceptance.

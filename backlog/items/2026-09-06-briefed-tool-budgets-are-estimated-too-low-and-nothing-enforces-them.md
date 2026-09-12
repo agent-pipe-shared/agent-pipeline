@@ -121,7 +121,16 @@ cross-runner enforcement.
 
 `dispatch-budget-core.mjs` supplies the common caller classification,
 working-cap calculation, closing allowance and typed exhausted/invalid results;
-its six focused cases passed on 2026-09-12. The item remains open because no
-broader empirical sample validates the proposed estimation rule and Codex/AGY
+its fixed five-call closing bound is committed in
+`40a2339e397b0fbaa0929425d8407539fc4ca2c2`. Against that exact committed
+candidate, **9/9 core cases** and **41/41 Claude adapter cases** passed on
+2026-09-12, including denial of the sixth post-cap closing call. The item
+remains open because no broader empirical sample validates the proposed estimation rule and Codex/AGY
 still lack authenticated live adapters. See
-`backlog/evidence/2026-09-12-dispatch-record-and-budget-progress.md`.
+`backlog/evidence/2026-09-12-dispatch-record-and-budget-progress.md` and the
+criterion-by-criterion audit in
+`backlog/evidence/NVA-B-BUDGET-PARTIAL-CLOSURE-1.md`.
+The machine-written
+`backlog/evidence/NVA-B-BUDGET-PARTIAL-CLOSURE-1.receipt.json` records exact
+commands, exits, output digests and HEAD/tree/source-blob equality for this
+post-commit verification (NVA-B-BUDGET-CLOSING-CAP-EVIDENCE-1).
