@@ -225,7 +225,7 @@ check("VCR07", "required needs both the suite protocol and the Verify-side compl
   assert.equal(missingPolicy.ok, false);
   assert.ok(missingPolicy.findings.includes("REQUIRED-VERIFY-POLICY required has no Verify caseCompletion policy"));
 
-  for (const nullish of ["null", "undefined", "(null)", "(undefined)", "null ?? {}"]){
+  for (const nullish of ["null", "undefined", "(null)", "(undefined)", "null ?? {}", "{ ...runtimePolicy }", "{ ...undefined }"]){
     write(context.root, verifyPath, verify.replace(/caseCompletion:\s*\{[^}]+\}/u, `caseCompletion: ${nullish}`));
     const nullishPolicy = checkVerifyCaseCompletion({ root: context.root });
     assert.equal(nullishPolicy.ok, false, nullish);

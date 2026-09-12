@@ -208,10 +208,8 @@ function hasVerifyCaseCompletionPolicy(element) {
   catch { return false; }
   const matches = properties.filter((property) => /^\s*caseCompletion\s*:/u.test(maskNonCode(property)));
   if (matches.length !== 1) return false;
-  const value = maskNonCode(matches[0]).replace(/^\s*caseCompletion\s*:/u, "").trim();
-  if (!value.startsWith("{")) return false;
-  const closeValue = matchingClose(value, 0, "{", "}");
-  return closeValue === value.length - 1;
+  const closed = /^\s*caseCompletion\s*:\s*\{\s*schema\s*:\s*"pipeline\.verify-case-completion-policy\.v1"\s*,\s*caseIds\s*:\s*(?:\[(?:\s*"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}"\s*,?)*\]|Array\.from\(\{\s*length\s*:\s*[1-9][0-9]*\s*\},\s*\(_,\s*index\)\s*=>\s*`[A-Za-z0-9._:-]+\$\{String\(index \+ 1\)\.padStart\([1-9][0-9]*,\s*"0"\)\}`\))\s*,\s*maxBytes\s*:\s*([1-9][0-9_]*)\s*\}\s*$/u.exec(matches[0]);
+  return closed !== null && Number(closed[1].replaceAll("_", "")) <= 1_048_576;
 }
 
 function parseVerifyRegistrations(source, findings) {
