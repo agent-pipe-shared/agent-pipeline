@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-02
 sprint: nova-b
 done_when: manual
 source: "Measured live 2026-09-02 during a human-guard-override ceremony for a TP-3 edit: sign-intent succeeded, authorize-by-signature failed with HGO-AUDIT, and verify-audit fails identically with no ceremony in flight."
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: 54a20d83a0501de98d522f7d7da7a829ccf16cc1
+closure_evidence: backlog/evidence/2026-09-12-hgo-audit-repair-critic-round2.md
 ---
 
 # A torn audit append has disabled every human-guard override since 2026-08-20
@@ -110,3 +114,14 @@ fixture that creates the exact authenticated-prefix/contiguous-tail state,
 repairs it once, survives interruption between ledger and head, completes
 idempotently and verifies the result. No live ledger bytes are damaged merely
 to recreate an incident that has already been restored.
+
+## PO disposition and closure — 2026-09-12
+
+The PO accepted the valid live readback plus the exact adversarial repair
+fixture as satisfying the historical live-operation sentence. Manufacturing a
+new torn write in the valid production ledger would add risk without testing a
+different contract. The independent round-two review confirmed the functional
+repair properties and identified this historical-evidence disposition as the
+remaining item-specific decision. Its separate final-candidate threat-model
+signature remains a release-bound governance ceremony and does not reopen this
+implemented defect.
