@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -91,7 +91,9 @@ check("post-install readback is runner-neutral and writes path-free receipts tha
   assert.equal(verified.receiptId, result.receiptId);
   const bootstrap = verifyLocalDevelopmentInstalledPluginReceipt({
     provider, plugin: repo.input.plugin, installedPluginRoot: repo.installedPluginRoot,
-    ...(provider === "antigravity" ? { registryInstalledPluginRoot: repo.installedPluginRoot } : { registrySourcePluginRoot: repo.sourcePluginRoot }),
+    ...(["antigravity", "claude"].includes(provider)
+      ? { registryInstalledPluginRoot: repo.installedPluginRoot }
+      : { registrySourcePluginRoot: repo.sourcePluginRoot }),
     protectedPaths: repo.protectedPaths,
   }, { receiptDirectory: repo.receiptDirectory });
   assert.equal(bootstrap.status, "verified", JSON.stringify(bootstrap));
@@ -194,7 +196,9 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
   assert.equal(after.installedPluginAttestation.status, "verified");
 
   const claudeRepo = fixture("claude"); t.after(claudeRepo.cleanup);
-  const claudeMarketplace = dirname(dirname(claudeRepo.sourcePluginRoot));
+  const claudeMarketplace = join(claudeRepo.base, "gitless-marketplace");
+  cpSync(claudeRepo.sourcePluginRoot, join(claudeMarketplace, "plugins", "pipeline-core"), { recursive: true });
+  assert.equal(existsSync(join(claudeMarketplace, ".git")), false);
   const claudeList = () => JSON.stringify([{
     id: "pipeline-core@agent-pipeline-local", version: "1.2.3-test.1", enabled: true,
     scope: "user", installPath: claudeRepo.installedPluginRoot,
@@ -213,19 +217,28 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
   });
   const claudeBefore = claudeInspect();
   assert.equal(claudeBefore.status, "plugin-attestation-required", JSON.stringify(claudeBefore));
-  assert.deepEqual(claudeBefore.nextAction.argv.slice(1, 4), ["write-local-from-registry", "--provider", "claude"]);
+  assert.equal(claudeBefore.nextAction, null, "a gitless marketplace copy cannot reconstruct its clean Git source");
   assert.equal(writeClaudeRegistryInstalledPluginReceipt({
     provider: "claude", plugin: claudeRepo.input.plugin, installedPluginRoot: claudeRepo.installedPluginRoot,
+  }, { receiptDirectory: claudeRepo.receiptDirectory, readPluginList: claudeList, readKnownMarketplaces: knownMarketplaces }).reason, "IPA-HOST-SOURCE-REQUIRED");
+  const gitlessMarketplacePluginRoot = join(claudeMarketplace, "plugins", "pipeline-core");
+  assert.equal(writeClaudeRegistryInstalledPluginReceipt({
+    provider: "claude", plugin: claudeRepo.input.plugin,
+    sourcePluginRoot: gitlessMarketplacePluginRoot, installedPluginRoot: claudeRepo.installedPluginRoot,
+  }, { receiptDirectory: claudeRepo.receiptDirectory, readPluginList: claudeList, readKnownMarketplaces: knownMarketplaces }).status, "rejected");
+  assert.equal(writeClaudeRegistryInstalledPluginReceipt({
+    provider: "claude", plugin: claudeRepo.input.plugin,
+    sourcePluginRoot: claudeRepo.sourcePluginRoot, installedPluginRoot: claudeRepo.installedPluginRoot,
   }, { receiptDirectory: claudeRepo.receiptDirectory, readPluginList: claudeList, readKnownMarketplaces: knownMarketplaces }).status, "written");
   assert.equal(claudeInspect().status, "ready");
 
   const agyRepo = fixture("antigravity"); t.after(agyRepo.cleanup);
   const agyRegistry = () => [JSON.stringify({ entries: [{ path: agyRepo.installedPluginRoot }] })];
-  const agyInspect = () => observePipelineStartPreflight({
+  const agyInspect = (registries = agyRegistry) => observePipelineStartPreflight({
     env: { ANTIGRAVITY_AGENT: "1" }, pluginList: () => JSON.stringify({}),
     scriptUrl: pathToFileURL(join(agyRepo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
     cwd: agyRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
-    antigravityPluginRegistries: agyRegistry,
+    antigravityPluginRegistries: registries,
     verifyLocalInstalledPluginReceiptFn: (input) => verifyLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: agyRepo.receiptDirectory }),
     observeAntigravityHardEnforcementFn: () => ({ observed: true }),
     observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
@@ -242,6 +255,16 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
   });
   assert.equal(agyInstalled.status, "written", JSON.stringify(agyInstalled));
   assert.equal(agyInspect().status, "ready", JSON.stringify(agyInspect()));
+  for (const registries of [
+    () => [],
+    () => [JSON.stringify({ entries: [{ path: agyRepo.installedPluginRoot }, { path: agyRepo.installedPluginRoot }] })],
+    () => [JSON.stringify({ entries: [{ path: join(agyRepo.base, "other") }] })],
+  ]) {
+    const refused = agyInspect(registries);
+    assert.equal(refused.status, "plugin-attestation-required", JSON.stringify(refused));
+    assert.equal(refused.nextAction, null);
+    assert.equal(refused.installedPluginAttestation.reasonCodes[0], "IPA-HOST-REGISTRY-BINDING-UNAVAILABLE");
+  }
 
   const rootEntrypoint = readFileSync(new URL("../../../install-agy.mjs", import.meta.url), "utf8");
   assert.match(rootEntrypoint, /\.\/plugins\/pipeline-core\/install-agy\.mjs/u);

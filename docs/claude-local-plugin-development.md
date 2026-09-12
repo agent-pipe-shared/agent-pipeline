@@ -324,9 +324,10 @@ claude plugin marketplace add <local-marketplace-root> --scope user
 claude plugin install pipeline-core@agent-pipeline-local --scope user
 ```
 
-Restart the Claude Code session; a plugin change takes effect only after a
-session restart. Then confirm the readback contract below before starting
-live-test sessions.
+Complete the explicit clean-source attestation in
+[Update an existing local build](#update-an-existing-local-build), then restart
+the Claude Code session; a plugin change takes effect only after a session
+restart. Confirm the readback contract below before starting live-test sessions.
 
 ## Update an existing local build
 
@@ -352,12 +353,25 @@ document; confirm by readback (`claude plugin list --json`) the next time an
 update actually runs, and correct this note if the observed text differs.
 Restart the session to apply the change.
 
-On the next `pipeline-start`, a gitless local cache is accepted only after the
-host post-install action has compared the complete cache tree with this clean
-marketplace source and written an external, path-free installer receipt. The
-bootstrap returns that exact action and runs it as routine installation
-maintenance without a PO gate; it then repeats the same preflight and proceeds
-only on verified readback. A stale cache or ambiguous registry remains closed.
+On the next `pipeline-start`, a gitless local cache is accepted only after a
+host post-install command has compared the complete cache tree with the clean
+Git checkout and written an external, path-free installer receipt. The copied
+local marketplace is gitless and is never used as provenance authority.
+
+Bootstrap cannot reconstruct the clean checkout from Claude's registry, so a
+legacy copy without a source locator returns `plugin-attestation-required` and
+`nextAction: null`. Run this explicit-source command from the clean checkout,
+using the version and loaded cache root printed by preflight:
+
+```sh
+node plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs write-local-from-registry --provider claude --version <version> --source-plugin-root "$PWD/plugins/pipeline-core" --installed-plugin-root <absolute-cache-root>
+```
+
+This is routine installation maintenance and needs no PO approval. The command
+accepts only one enabled `pipeline-core@agent-pipeline-local` registration, its
+exact absolute `installPath`, the directory marketplace registration, a clean
+Git source, and complete source/cache equivalence. Rerun `pipeline-start` after
+it reports `status: written`. A stale cache or ambiguous registry remains closed.
 
 ## Readback contract
 

@@ -171,7 +171,7 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
   try {
     const protectedPaths = input?.protectedPaths ?? INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[input?.provider];
     const normalized = { ...input, protectedPaths };
-    const expectedKeys = normalized.provider === "antigravity"
+    const expectedKeys = ["antigravity", "claude"].includes(normalized.provider)
       ? ["provider", "plugin", "installedPluginRoot", "registryInstalledPluginRoot", "protectedPaths"]
       : ["provider", "plugin", "installedPluginRoot", "registrySourcePluginRoot", "protectedPaths"];
     if (!exact(normalized, expectedKeys) || !Object.hasOwn(INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER, normalized.provider)) throw new Error("IPA-HOST-INPUT");
@@ -183,7 +183,7 @@ export function verifyLocalDevelopmentInstalledPluginReceipt(input, {
       || BigInt(locatorAuthority.receiptIdentity.gid) !== installedOwner.gid) throw new Error("IPA-HOST-LOCATOR-OWNER");
     const locator = JSON.parse(Buffer.from(locatorAuthority.receiptBytes).toString("utf8"));
     if (!locatorValid(locator, binding)) throw new Error("IPA-HOST-LOCATOR");
-    if (normalized.provider === "antigravity") {
+    if (["antigravity", "claude"].includes(normalized.provider)) {
       if (realpathSync(normalized.registryInstalledPluginRoot) !== realpathSync(normalized.installedPluginRoot)) throw new Error("IPA-HOST-LOCATOR-INSTALLED");
     } else if (realpathSync(normalized.registrySourcePluginRoot) !== locator.sourcePluginRoot) throw new Error("IPA-HOST-LOCATOR-SOURCE");
     return verify({
@@ -222,8 +222,8 @@ export function resolveCodexRegistrySource({ plugin, readPluginList = () => {
   } catch { return null; }
 }
 
-/** Resolve one Claude local marketplace source and bind the loaded cache root when exposed. */
-export function resolveClaudeRegistrySource({
+/** Resolve one exact Claude local marketplace registration and its loaded cache root. */
+export function resolveClaudeRegistryBinding({
   plugin,
   installedPluginRoot,
   readPluginList = () => {
@@ -241,10 +241,16 @@ export function resolveClaudeRegistrySource({
     const source = registry?.["agent-pipeline-local"]?.source;
     if (source?.source !== "directory" || typeof source.path !== "string" || !isAbsolute(source.path)
       || resolve(source.path) !== source.path) return null;
-    if (typeof matches[0].installPath === "string"
-      && realpathSync(resolve(matches[0].installPath)) !== realpathSync(installedPluginRoot)) return null;
-    const root = realpathSync(resolve(source.path, "plugins", "pipeline-core"));
-    return lstatSync(root).isDirectory() && !lstatSync(root).isSymbolicLink() ? root : null;
+    if (typeof matches[0].installPath !== "string" || !isAbsolute(matches[0].installPath)
+      || resolve(matches[0].installPath) !== matches[0].installPath) return null;
+    const installedRoot = realpathSync(matches[0].installPath);
+    if (installedRoot !== realpathSync(installedPluginRoot)) return null;
+    const marketplacePluginRoot = realpathSync(resolve(source.path, "plugins", "pipeline-core"));
+    const marketplaceInfo = lstatSync(marketplacePluginRoot, { bigint: true });
+    const installedInfo = lstatSync(installedRoot, { bigint: true });
+    if (!marketplaceInfo.isDirectory() || marketplaceInfo.isSymbolicLink()
+      || !installedInfo.isDirectory() || installedInfo.isSymbolicLink()) return null;
+    return { installedPluginRoot: installedRoot, marketplacePluginRoot };
   } catch { return null; }
 }
 
@@ -269,14 +275,17 @@ export function writeCodexRegistryInstalledPluginReceipt(input, dependencies = {
 }
 
 export function writeClaudeRegistryInstalledPluginReceipt(input, dependencies = {}) {
-  const sourcePluginRoot = resolveClaudeRegistrySource({
+  if (typeof input?.sourcePluginRoot !== "string") {
+    return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-SOURCE-REQUIRED" };
+  }
+  const binding = resolveClaudeRegistryBinding({
     plugin: input?.plugin,
     installedPluginRoot: input?.installedPluginRoot,
-    readPluginList: dependencies.readPluginList,
-    readKnownMarketplaces: dependencies.readKnownMarketplaces,
+    ...(typeof dependencies.readPluginList === "function" ? { readPluginList: dependencies.readPluginList } : {}),
+    ...(typeof dependencies.readKnownMarketplaces === "function" ? { readKnownMarketplaces: dependencies.readKnownMarketplaces } : {}),
   });
-  if (sourcePluginRoot === null) return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-REGISTRY-SOURCE" };
-  return writeLocalDevelopmentInstalledPluginReceipt({ ...input, provider: "claude", sourcePluginRoot }, dependencies);
+  if (binding === null) return { schema: HOST_RESULT_SCHEMA, status: "rejected", reason: "IPA-HOST-REGISTRY-BINDING" };
+  return writeLocalDevelopmentInstalledPluginReceipt({ ...input, provider: "claude" }, dependencies);
 }
 
 /**
@@ -369,16 +378,18 @@ function parse(argv) {
   }
   if (!value.plugin.version || !value.installedPluginRoot) return null;
   if (operation === "write-local" && !value.sourcePluginRoot) return null;
-  if (operation !== "write-local" && value.sourcePluginRoot) return null;
+  if (operation === "write-local-from-codex-registry" && value.sourcePluginRoot) return null;
   if (operation === "write-local-from-codex-registry") value.provider = "codex";
   if (operation === "write-local-from-registry" && !["codex", "claude"].includes(value.provider)) return null;
+  if (operation === "write-local-from-registry" && value.provider === "codex" && value.sourcePluginRoot) return null;
+  if (operation === "write-local-from-registry" && value.provider === "claude" && !value.sourcePluginRoot) return null;
   return { operation, input: value };
 }
 
 if (isDirectInvocation(import.meta.url)) {
   const input = parse(process.argv.slice(2));
   if (input === null) {
-    process.stderr.write("installed-plugin-attestation-host: write-local --provider <codex|claude|antigravity> --version <version> --source-plugin-root <path> --installed-plugin-root <path>\n");
+    process.stderr.write("installed-plugin-attestation-host: write-local --provider <codex|claude|antigravity> --version <version> --source-plugin-root <path> --installed-plugin-root <path> | write-local-from-codex-registry --version <version> --installed-plugin-root <path> | write-local-from-registry --provider claude --version <version> --source-plugin-root <path> --installed-plugin-root <path>\n");
     process.exit(2);
   }
   const result = input === null ? null : input.operation === "write-local"
@@ -387,7 +398,7 @@ if (isDirectInvocation(import.meta.url)) {
       ? writeClaudeRegistryInstalledPluginReceipt(input.input)
       : writeCodexRegistryInstalledPluginReceipt(input.input);
   if (result === null) {
-    process.stderr.write("installed-plugin-attestation-host: write-local[-from-codex-registry] --version <version> [--source-plugin-root <path>] --installed-plugin-root <path>\n");
+    process.stderr.write("installed-plugin-attestation-host: operation failed before producing a result\n");
     process.exit(2);
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);

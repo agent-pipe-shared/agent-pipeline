@@ -47,7 +47,7 @@ cache version heuristically.
 | Runner | Linux and macOS | Windows | Update/readback requirement |
 | --- | --- | --- | --- |
 | Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | After installing or updating, start a fresh Codex thread (or use the runner's plugin reload action when available), open `/hooks`, and trust the current plugin hook definitions. Reused/resumed threads may retain their old skill snapshot; accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
-| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Run the project-scoped marketplace/plugin update, then `/reload-plugins`. Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
+| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Run the project-scoped marketplace/plugin update and the explicit clean-source attestation command in [Claude local plugin development](claude-local-plugin-development.md), then `/reload-plugins`. Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
 
 The lifecycle planner returns an executable plus an argv array. Agents must
 render that exact action for the current shell when an operator has to execute
@@ -401,6 +401,9 @@ path-free installed-plugin receipt consumed by bootstrap on every runner. It
 writes the receipt before `.agents/plugins.json` or the global Gemini registry,
 so a stale or unverified copy is never newly registered. Run the installer from
 the source checkout; a legacy copied registration has no trustworthy source path
-that bootstrap can reconstruct from Antigravity's path-only registry.
+that bootstrap can reconstruct from Antigravity's path-only registry. Every
+gitless loaded plugin root must have exactly one matching registry entry and a
+verified receipt; missing, duplicate, or mismatched entries remain
+`plugin-attestation-required` with no generated recovery action.
 
 This ensures that any team member who clones the repository immediately benefits from the pipeline logic without running local installation commands. When switching between beta, stable, or local test versions of the pipeline, simply update the `path` value in `.agents/plugins.json` and commit the change.

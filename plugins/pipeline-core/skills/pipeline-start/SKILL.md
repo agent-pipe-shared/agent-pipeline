@@ -27,7 +27,7 @@ returned action at its declared boundary. Resolve role before preflight:
 conflicting or unknown carriers stop — Critic is closed, never Elephant.
 
 Status `plugin-attestation-required` is a closed hard recovery, never the
-soft `plugin-refresh-required` advisory. For Codex and Claude, accept it only with
+soft `plugin-refresh-required` advisory. For Codex, accept it only with
 `nextAction.schema: pipeline.installed-plugin-attestation-setup-action.v1`,
 `kind: host-postinstall`, `executionBoundary: host`, `mutation: true`,
 `requiresPoApproval: false`, executable `node`, and expected result schema
@@ -39,11 +39,19 @@ asking the PO, accepts only its exact expected result, then reruns the identical
 `plugin-attestation-required`, or any other non-ready status stops bootstrap.
 Goldfish and Critic never perform this mutation and remain blocked for Elephant
 recovery. Never reconstruct the argv or add a source path from conversation.
+For a gitless Claude local marketplace/cache, bootstrap cannot recover the clean
+Git source from Claude's registry. It therefore returns
+`plugin-attestation-required` with `nextAction: null`. Stop and run the explicit
+source-bound host command documented in `docs/claude-local-plugin-development.md`
+from the clean source checkout; never treat the marketplace copy as provenance
+authority or infer a source path from conversation. Rerun bootstrap afterward.
 For Antigravity, the repository installer writes the same receipt before it
-registers a copied marketplace tree. A legacy copied registration with no
-installer locator returns `plugin-attestation-required` with `nextAction: null`:
-stop and rerun `install-agy.mjs` from the source checkout. The source path cannot
-be recovered safely from Antigravity's path-only registry and must not be guessed.
+registers a copied marketplace tree. Every gitless loaded Antigravity root needs
+one exact path-registry binding plus the verified receipt. A missing, ambiguous,
+or mismatched binding, or a legacy copied registration with no installer locator,
+returns `plugin-attestation-required` with `nextAction: null`: stop and rerun
+`install-agy.mjs` from the source checkout. The source path cannot be recovered
+safely from Antigravity's path-only registry and must not be guessed.
 
 Print only after a ready result:
 
