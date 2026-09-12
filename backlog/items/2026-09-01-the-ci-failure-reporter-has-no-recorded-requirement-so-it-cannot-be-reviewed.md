@@ -96,3 +96,18 @@ and failure paths. This item remains open until a fresh exact-candidate Critic
 reviews the implementation, its findings are dispositioned, and the final
 candidate receives the required Privacy and Threat-Model signatures through
 the PO ceremony.
+
+## Correction-review disposition — 2026-09-12
+
+The exact correction candidate `59b1e6f7` closed the original suite-inventory,
+redaction-marker, compatibility and rollback findings. Its independent Critic
+found one new major consequence inside the correction: repeated rows for the
+same otherwise-authoritative suite could consume the bounded public output and
+distort its attribution. Commit `b22d6e2c` now rejects duplicate suite names
+before emitting any failure record and adds the adversarial fixture; all 13
+reporter cases pass.
+
+QG-13 stops another narrow Critic loop after these two rounds. The remaining
+review duty is therefore the normal frozen-candidate Privacy and Threat-Model
+ceremony already recorded above, not a third implementation review. The item
+stays open until that candidate-bound ceremony is complete.
