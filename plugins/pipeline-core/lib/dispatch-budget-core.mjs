@@ -62,10 +62,13 @@ function invalidBudgetInput(reason) {
 
 /**
  * Advance one attributable dispatch call and decide its policy lane. The
- * caller persists `nextCount`; a closing call is still counted even when it
- * is permitted after the working cap.
+ * caller persists `nextCount`, including denied attempts. After the working
+ * cap, only closing acts within the next CLOSING_ALLOWANCE calls may proceed;
+ * neither closing acts nor denied attempts can extend that fixed reserve.
  */
-export function decideDispatchBudgetCall({ maxTurns, currentCount, isClosingAct }) {
+export function decideDispatchBudgetCall(input = {}) {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) return invalidBudgetInput("budget-call-input-must-be-an-object");
+  const { maxTurns, currentCount, isClosingAct } = input;
   if (!Number.isSafeInteger(maxTurns) || maxTurns <= 0) return invalidBudgetInput("max-turns-must-be-a-positive-safe-integer");
   if (!Number.isSafeInteger(currentCount) || currentCount < 0) return invalidBudgetInput("current-count-must-be-a-nonnegative-safe-integer");
   if (currentCount === Number.MAX_SAFE_INTEGER) return invalidBudgetInput("current-count-cannot-be-incremented-safely");
@@ -75,7 +78,7 @@ export function decideDispatchBudgetCall({ maxTurns, currentCount, isClosingAct 
   if (nextCount <= workingCap) {
     return { allowed: true, decision: "working", nextCount, workingCap };
   }
-  if (isClosingAct === true) {
+  if (isClosingAct === true && nextCount <= workingCap + CLOSING_ALLOWANCE) {
     return { allowed: true, decision: "closing", nextCount, workingCap };
   }
   return { allowed: false, decision: "exhausted", nextCount, workingCap };

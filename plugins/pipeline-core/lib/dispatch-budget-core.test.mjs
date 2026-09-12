@@ -57,31 +57,97 @@ check("dispatchWorkingCap reserves five closing and ten safety calls with a zero
   assert.equal(dispatchWorkingCap(-1), null);
 });
 
-check("decideDispatchBudgetCall counts and allows calls through the working cap", () => {
-  assert.deepEqual(decideDispatchBudgetCall({ maxTurns: 20, currentCount: 4, isClosingAct: false }), {
-    allowed: true, decision: "working", nextCount: 5, workingCap: 5,
-  });
+check("decideDispatchBudgetCall distinguishes before, at, and after the working cap", () => {
+  for (const isClosingAct of [false, true]) {
+    for (const currentCount of [3, 4]) {
+      assert.deepEqual(decideDispatchBudgetCall({ maxTurns: 20, currentCount, isClosingAct }), {
+        allowed: true, decision: "working", nextCount: currentCount + 1, workingCap: 5,
+      });
+    }
+    assert.deepEqual(decideDispatchBudgetCall({ maxTurns: 20, currentCount: 5, isClosingAct }), {
+      allowed: isClosingAct, decision: isClosingAct ? "closing" : "exhausted", nextCount: 6, workingCap: 5,
+    });
+  }
 });
 
-check("decideDispatchBudgetCall counts a post-cap closing call and blocks a post-cap working call", () => {
-  assert.deepEqual(decideDispatchBudgetCall({ maxTurns: 20, currentCount: 5, isClosingAct: true }), {
-    allowed: true, decision: "closing", nextCount: 6, workingCap: 5,
-  });
-  assert.deepEqual(decideDispatchBudgetCall({ maxTurns: 20, currentCount: 5, isClosingAct: false }), {
-    allowed: false, decision: "exhausted", nextCount: 6, workingCap: 5,
-  });
+check("decideDispatchBudgetCall allows exactly five closing calls then returns exhausted", () => {
+  let currentCount = 5;
+  for (let ordinal = 1; ordinal <= 5; ordinal += 1) {
+    const result = decideDispatchBudgetCall({ maxTurns: 20, currentCount, isClosingAct: true });
+    assert.deepEqual(result, {
+      allowed: true, decision: "closing", nextCount: 5 + ordinal, workingCap: 5,
+    });
+    currentCount = result.nextCount;
+  }
+  for (const isClosingAct of [true, false, true]) {
+    const result = decideDispatchBudgetCall({ maxTurns: 20, currentCount, isClosingAct });
+    assert.deepEqual(result, {
+      allowed: false, decision: "exhausted", nextCount: currentCount + 1, workingCap: 5,
+    });
+    currentCount = result.nextCount;
+  }
+});
+
+check("decideDispatchBudgetCall denied work attempts consume the fixed closing reserve", () => {
+  let currentCount = 5;
+  for (const isClosingAct of [false, true, false, true, true, true]) {
+    const result = decideDispatchBudgetCall({ maxTurns: 20, currentCount, isClosingAct });
+    const allowed = isClosingAct && currentCount < 10;
+    assert.deepEqual(result, {
+      allowed, decision: allowed ? "closing" : "exhausted", nextCount: currentCount + 1, workingCap: 5,
+    });
+    currentCount = result.nextCount;
+  }
+});
+
+check("decideDispatchBudgetCall zero-floor work caps still have only five closing slots", () => {
+  for (const maxTurns of [1, 8, 15]) {
+    assert.deepEqual(decideDispatchBudgetCall({ maxTurns, currentCount: 0, isClosingAct: false }), {
+      allowed: false, decision: "exhausted", nextCount: 1, workingCap: 0,
+    });
+    for (const currentCount of [0, 1, 2, 3, 4, 5, 6]) {
+      assert.deepEqual(decideDispatchBudgetCall({ maxTurns, currentCount, isClosingAct: true }), {
+        allowed: currentCount < 5,
+        decision: currentCount < 5 ? "closing" : "exhausted",
+        nextCount: currentCount + 1,
+        workingCap: 0,
+      });
+    }
+  }
+});
+
+check("decideDispatchBudgetCall closing arithmetic remains bounded at safe integer limits", () => {
+  const maxTurns = Number.MAX_SAFE_INTEGER;
+  const workingCap = maxTurns - 15;
+  for (const currentCount of [workingCap + 3, workingCap + 4, workingCap + 5, maxTurns - 1]) {
+    const allowed = currentCount < workingCap + 5;
+    assert.deepEqual(decideDispatchBudgetCall({ maxTurns, currentCount, isClosingAct: true }), {
+      allowed, decision: allowed ? "closing" : "exhausted", nextCount: currentCount + 1, workingCap,
+    });
+  }
 });
 
 check("decideDispatchBudgetCall denies invalid numeric and closing inputs with a typed result", () => {
   for (const [input, reason] of [
+    [undefined, "max-turns-must-be-a-positive-safe-integer"],
+    [{}, "max-turns-must-be-a-positive-safe-integer"],
+    [null, "budget-call-input-must-be-an-object"],
+    [[], "budget-call-input-must-be-an-object"],
+    ["20", "budget-call-input-must-be-an-object"],
     [{ maxTurns: Infinity, currentCount: 0, isClosingAct: false }, "max-turns-must-be-a-positive-safe-integer"],
     [{ maxTurns: -1, currentCount: 0, isClosingAct: false }, "max-turns-must-be-a-positive-safe-integer"],
+    [{ maxTurns: 0, currentCount: 0, isClosingAct: false }, "max-turns-must-be-a-positive-safe-integer"],
+    [{ maxTurns: 20, isClosingAct: true }, "current-count-must-be-a-nonnegative-safe-integer"],
+    [{ maxTurns: 20, currentCount: null, isClosingAct: true }, "current-count-must-be-a-nonnegative-safe-integer"],
+    [{ maxTurns: 20, currentCount: Infinity, isClosingAct: true }, "current-count-must-be-a-nonnegative-safe-integer"],
+    [{ maxTurns: 20, currentCount: Number.MAX_SAFE_INTEGER + 1, isClosingAct: true }, "current-count-must-be-a-nonnegative-safe-integer"],
     [{ maxTurns: 20, currentCount: -1, isClosingAct: false }, "current-count-must-be-a-nonnegative-safe-integer"],
     [{ maxTurns: 20, currentCount: Number.NaN, isClosingAct: false }, "current-count-must-be-a-nonnegative-safe-integer"],
     [{ maxTurns: 20, currentCount: "4", isClosingAct: false }, "current-count-must-be-a-nonnegative-safe-integer"],
     [{ maxTurns: 20, currentCount: 1.5, isClosingAct: false }, "current-count-must-be-a-nonnegative-safe-integer"],
     [{ maxTurns: 20, currentCount: Number.MAX_SAFE_INTEGER, isClosingAct: false }, "current-count-cannot-be-incremented-safely"],
     [{ maxTurns: 20, currentCount: 4, isClosingAct: "false" }, "is-closing-act-must-be-boolean"],
+    [{ maxTurns: 20, currentCount: 4 }, "is-closing-act-must-be-boolean"],
   ]) {
     assert.deepEqual(decideDispatchBudgetCall(input), {
       allowed: false,
@@ -94,7 +160,7 @@ check("decideDispatchBudgetCall denies invalid numeric and closing inputs with a
   }
 });
 
-assert.equal(cases.length, 6, "the complete dispatch-budget corpus must be registered before execution begins");
+assert.equal(cases.length, 9, "the complete dispatch-budget corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

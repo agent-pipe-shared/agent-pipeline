@@ -279,6 +279,9 @@ test("evaluateDispatchBudgetGuard: refuses a non-closing working call once the c
   const { DENIAL_CODE } = results[0];
   assert.equal(results[6].exitCode, 2);
   assert.match(results[6].stderr, new RegExp(DENIAL_CODE));
+  assert.match(results[6].stderr, /The working budget is exhausted; 4 closing-call slots remain\./u);
+  assert.match(results[6].stderr, /Within that remaining allowance, only these acts are permitted:/u);
+  assert.doesNotMatch(results[6].stderr, /No further tool calls are permitted/u);
 });
 
 test("evaluateDispatchBudgetGuard: malformed persisted counts fail closed without being reset or overwritten", () => {
@@ -315,6 +318,54 @@ test("evaluateDispatchBudgetGuard: each permitted closing act still passes after
   assert.equal(results[6].exitCode, 0, "git add");
   assert.equal(results[7].exitCode, 0, "git commit");
   assert.equal(results[8].exitCode, 2, "a differently-shaped call after the same cap is still refused");
+});
+
+test("evaluateDispatchBudgetGuard: exactly five post-cap closing calls pass and the sixth is denied", () => {
+  const closingInput = {
+    transcript_path: SUBAGENT_TRANSCRIPT,
+    agent_id: "abc123",
+    agent_type: "pipeline-core:goldfish-deep",
+    tool_name: "Write",
+    tool_input: { file_path: `${FAKE_ROOT}/evidence/dispatch-record-CLOSING-BOUNDARY.json`, content: "{}" },
+  };
+  const steps = [];
+  for (let count = 1; count <= 5; count += 1) steps.push({ op: "guard", input: readInputObj({ file_path: "/x" }) });
+  for (let count = 1; count <= 6; count += 1) {
+    steps.push({ op: "guard", input: closingInput });
+    steps.push({ op: "getFile", path: COUNTER_PATH });
+  }
+  steps.push({ op: "guard", input: { ...closingInput, tool_name: "Bash", tool_input: { command: "git add -- evidence/x.json" } } });
+  steps.push({ op: "getFile", path: COUNTER_PATH });
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  for (let index = 0; index < 5; index += 1) assert.equal(results[index].exitCode, 0);
+  for (let ordinal = 1; ordinal <= 6; ordinal += 1) {
+    const index = 5 + (ordinal - 1) * 2;
+    assert.equal(results[index].exitCode, ordinal <= 5 ? 0 : 2, `closing attempt ${ordinal}`);
+    assert.equal(JSON.parse(results[index + 1]).count, 5 + ordinal, "every attempt must remain counted");
+    if (ordinal <= 5) assert.equal(results[index].stderr, "");
+  }
+  for (const index of [15, 17]) {
+    assert.equal(results[index].exitCode, 2, "changing closing shape cannot renew the allowance");
+    assert.match(results[index].stderr, /DISPATCH-BUDGET-EXHAUSTED/u);
+    assert.match(results[index].stderr, /The closing allowance of 5 tool calls is exhausted\./u);
+    assert.match(results[index].stderr, /No further tool calls are permitted for this dispatch\./u);
+    assert.match(results[index].stderr, /Emit the closing report without another tool call\./u);
+    assert.doesNotMatch(results[index].stderr, /slots remain|these acts.*permitted|git add|git commit|write\/update/u);
+  }
+  assert.equal(JSON.parse(results[18]).count, 12);
+});
+
+test("evaluateDispatchBudgetGuard: a denied work attempt consuming the final slot reports closing exhaustion", () => {
+  const steps = [];
+  for (let count = 1; count <= 10; count += 1) steps.push({ op: "guard", input: readInputObj({ file_path: "/x" }) });
+  steps.push({ op: "getFile", path: COUNTER_PATH });
+  const { results } = run({ rootDir: FAKE_ROOT, files: seedSubagentFiles(20), steps });
+  assert.equal(results[8].exitCode, 2);
+  assert.match(results[8].stderr, /1 closing-call slot remains\./u);
+  assert.equal(results[9].exitCode, 2);
+  assert.match(results[9].stderr, /The closing allowance of 5 tool calls is exhausted\./u);
+  assert.doesNotMatch(results[9].stderr, /slots remain|these acts.*permitted/u);
+  assert.equal(JSON.parse(results[10]).count, 10);
 });
 
 test("evaluateDispatchBudgetGuard: the orchestrating session is never limited, however many calls it makes", () => {

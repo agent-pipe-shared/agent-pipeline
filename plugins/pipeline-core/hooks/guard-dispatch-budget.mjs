@@ -66,24 +66,19 @@
  *
  * ## Budget arithmetic (derived from the dispatched agent's own
  * definition, never from briefing text -- CLOSING_ALLOWANCE and
- * SAFETY_MARGIN below are this guard's own fixed constants; `maxTurns` is
+ * SAFETY_MARGIN come from the shared policy core; `maxTurns` is
  * read live from the agent's frontmatter file on every call, so a future
  * change to that value is picked up automatically with no edit here):
  *
- *   workingCap = maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN)
- *              = maxTurns - 15
+ *   workingCap = max(0, maxTurns - (CLOSING_ALLOWANCE + SAFETY_MARGIN))
+ *              = max(0, maxTurns - 15)
  *
- * For this repository's `goldfish-deep` / `goldfish-implementor` /
- * `goldfish-mechanic` (`maxTurns: 50` today), that is workingCap = 35,
- * matching NVA-BUDGETGUARD-1's own dispatch metadata ("<=35 tool uses,
- * plus +5 closing = 40") exactly, and leaving a 10-call margin before the
- * harness's own hard `maxTurns` cutoff -- the cliff three dispatches fell
- * off on 2026-08-27. CLOSING_ALLOWANCE documents intent (the closing acts
- * are inherently few and self-terminating: one dispatch-record write, one
- * `git add`, one `git commit`); this guard does not additionally hard-cap
- * the COUNT of closing calls once the working cap is crossed -- it caps
- * the SHAPE, exactly the permitted set below, for as long as the subagent
- * keeps trying only those shapes.
+ * At maxTurns = 50, workingCap is 35; at maxTurns = 80, it is 65.
+ * The shared core permits only closing acts during the next five counted
+ * attempts, then denies every further call, including closing-shaped calls.
+ * This adapter recognizes the permitted shapes below and persists nextCount
+ * even for denied attempts, so those attempts also consume the fixed reserve.
+ * Neither repeating a closing shape nor retrying a denial renews the reserve.
  *
  * ## Storage
  * Per-subagent counters persist as one JSON file each under
@@ -154,13 +149,19 @@ function verdict(exitCode, stderr = "") {
 }
 
 function blocked({ agentId, agentType, maxTurns, workingCap, count }) {
+  const remainingClosingCalls = Math.max(0, workingCap + CLOSING_ALLOWANCE - count);
+  const continuation = remainingClosingCalls > 0
+    ? `The working budget is exhausted; ${remainingClosingCalls} closing-call ${remainingClosingCalls === 1 ? "slot remains" : "slots remain"}.\n`
+      + "Within that remaining allowance, only these acts are permitted: (1) write/update evidence/dispatch-record-*.json, (2) `git add` your own paths, (3) `git commit` your own paths.\n"
+      + "Stop working and emit the closing report when finished.\n"
+    : `The closing allowance of ${CLOSING_ALLOWANCE} tool calls is exhausted. No further tool calls are permitted for this dispatch.\n`
+      + "Emit the closing report without another tool call.\n";
   return verdict(
     2,
     "BLOCKED (guard-dispatch-budget, plugin pipeline-core): "
-      + `${DENIAL_CODE}: this dispatch (${agentType}, agent ${agentId}) has used ${count} tool calls against a working cap of ${workingCap} `
+      + `${DENIAL_CODE}: this dispatch (${agentType}, agent ${agentId}) has counted ${count} tool-call attempts against a working cap of ${workingCap} `
       + `(derived from its own maxTurns=${maxTurns} frontmatter minus a fixed ${CLOSING_ALLOWANCE}-closing + ${SAFETY_MARGIN}-safety reserve).\n`
-      + "Only these acts remain permitted: (1) write/update evidence/dispatch-record-*.json, (2) `git add` your own paths, (3) `git commit` your own paths.\n"
-      + "Stop working: restore live state, commit what is green, finalize the dispatch record, and emit the closing report.\n",
+      + continuation,
   );
 }
 
