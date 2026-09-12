@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "893709a7f406528896c689e68856af39eec6ad01c800181ea72243dd0a015dd6"
+    "transitionHead": "a97072b169d0932982abe0901d3d2bcf3a992417dd2ed6b840660697c70ea5fb"
   },
   "counts": {
-    "open": 72,
+    "open": 71,
     "in_progress": 0,
-    "closed": 569,
+    "closed": 570,
     "rejected": 3,
     "deferred": 11
   },
@@ -1990,14 +1990,18 @@
     },
     {
       "id": "pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-12",
       "source": "Goldfish-deep review NVA-B-HGO-AUDIT-REPAIR-2: the bounded torn-append repair correctly refuses to unlink an unowned audit.lock, but a writer killed after acquiring that lock leaves every later append and repair fail-closed with no safe reclamation route.",
       "deferred": false,
       "due": "2026-09-30",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-12",
+      "closureRepository": "self",
+      "closureCommit": "3d3a478451e03b7b241e7751fd9f9b2f3fdf32b0",
+      "closureEvidence": "backlog/evidence/2026-09-12-hgo-crash-and-idempotency-critic-pass.md"
     },
     {
       "id": "pipeline.critic-and-verify-cadence-may-be-too-fine-grained",

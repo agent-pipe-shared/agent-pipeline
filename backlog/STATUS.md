@@ -154,7 +154,7 @@
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | closed | defect | pipeline | nova | 2026-08-28 | — | — |
-| pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock | open | defect | pipeline | nova-b | 2026-09-12 | 2026-09-30 | — |
+| pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock | closed | defect | pipeline | nova-b | 2026-09-12 | 2026-09-30 | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | closed | workflow-improvement | pipeline | alfred | 2026-08-24 | 2026-08-31 | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-07-27 | — |
 | pipeline.critic-md-protected-preimage-drift | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — discovered running the first full verify.mjs gate of this session (last known-green 7cc0b649, 2026-09-02). codex-isolated-critic-protected-preimage-tests fails: roles/critic.md's current content-hash no longer matches the digest pinned in plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json, a preimage snapshot used to detect drift in the Critic role contract for Codex-isolated Critic dispatches. |
@@ -663,8 +663,8 @@
 
 ## Counts
 
-- open: 72
+- open: 71
 - in_progress: 0
-- closed: 569
+- closed: 570
 - rejected: 3
 - deferred: 11

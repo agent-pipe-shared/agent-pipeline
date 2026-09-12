@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-12
 sprint: nova-b
 done_when: manual
 due: 2026-09-30
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: 3d3a478451e03b7b241e7751fd9f9b2f3fdf32b0
+closure_evidence: backlog/evidence/2026-09-12-hgo-crash-and-idempotency-critic-pass.md
 source: "Goldfish-deep review NVA-B-HGO-AUDIT-REPAIR-2: the bounded torn-append repair correctly refuses to unlink an unowned audit.lock, but a writer killed after acquiring that lock leaves every later append and repair fail-closed with no safe reclamation route."
 ---
 
@@ -51,6 +55,10 @@ behavior is therefore correct, but it has no autonomous recovery path.
 - **Rationale:** crash recovery expands lock ownership and concurrency semantics; keeping it separate avoids weakening the reviewed repair with racy stale-path deletion.
 - **Assignment:** Pipeline team, Nova B, due 2026-09-30, after the current HGO repair is independently reviewed.
 - **Date:** 2026-09-12
+- **Closure:** closed on 2026-09-12 against implementation commit
+  `3d3a478451e03b7b241e7751fd9f9b2f3fdf32b0` after the complete focused
+  test corpus and an independent zero-findings Critic PASS proved every
+  required recovery and race-safety condition.
 
 ## Implementation evidence — 2026-09-12
 
