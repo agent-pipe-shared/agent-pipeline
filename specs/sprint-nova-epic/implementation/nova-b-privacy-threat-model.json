@@ -1,0 +1,20 @@
+{
+  "schema": "pipeline.threat-model.v1",
+  "candidate": {
+    "commit": "31d8fc52c222111b875d2290411fdd92453531a3",
+    "tree": "00f1442b98bec3d4936bfbf0cd4f8dd2d10090e7"
+  },
+  "policyRevision": "nova-b-human-name-privacy-v1",
+  "classification": "public",
+  "entities": [
+    { "id": "asset-45d4d0613ce6d575", "kind": "asset", "label": "human-name", "relationships": ["boundary-09197ca817f83699", "boundary-1418d45ae3261896"] },
+    { "id": "boundary-09197ca817f83699", "kind": "boundary", "label": "private-authority-request-receipt", "relationships": ["threat-941c789ed9d69654"] },
+    { "id": "boundary-1418d45ae3261896", "kind": "boundary", "label": "portable-governance-evidence", "relationships": ["threat-dff0dcdfb0feb59d"] },
+    { "id": "threat-dff0dcdfb0feb59d", "kind": "threat", "label": "human-name-publication", "relationships": ["mitigation-a4f4805a73982008", "mitigation-7210b05c05d71790"] },
+    { "id": "threat-941c789ed9d69654", "kind": "threat", "label": "credential-or-key-disclosure", "relationships": ["mitigation-f04b388074128c3d"] },
+    { "id": "mitigation-a4f4805a73982008", "kind": "mitigation", "label": "private-directory-only-human-name", "relationships": [] },
+    { "id": "mitigation-7210b05c05d71790", "kind": "mitigation", "label": "digest-only-public-evidence", "relationships": [] },
+    { "id": "mitigation-f04b388074128c3d", "kind": "mitigation", "label": "secret-and-path-redaction", "relationships": [] }
+  ],
+  "lifecycle": "verified"
+}

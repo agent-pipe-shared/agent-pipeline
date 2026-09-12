@@ -1,0 +1,32 @@
+{
+  "schema": "pipeline.threat-model.v1",
+  "candidate": {
+    "commit": "31d8fc52c222111b875d2290411fdd92453531a3",
+    "tree": "00f1442b98bec3d4936bfbf0cd4f8dd2d10090e7"
+  },
+  "policyRevision": "nova-b-final-boundaries-v1",
+  "classification": "public",
+  "entities": [
+    { "id": "asset-823b69e2162ce6cf", "kind": "asset", "label": "nova-b-local-candidate", "relationships": ["boundary-fe0e2538855b6330", "boundary-932d1147536a5b10", "boundary-12b8e4351cc9eb06", "boundary-4604b3360e50db9d", "boundary-ff1787f198b5e118"] },
+    { "id": "boundary-fe0e2538855b6330", "kind": "boundary", "label": "public-governance-events", "relationships": ["threat-a51ae676cd88edd6"] },
+    { "id": "boundary-932d1147536a5b10", "kind": "boundary", "label": "private-human-authority", "relationships": ["threat-3abef5b7c8da6e6d"] },
+    { "id": "boundary-12b8e4351cc9eb06", "kind": "boundary", "label": "runner-role-dispatch", "relationships": ["threat-f1b7ea38a3ec0d8c", "threat-520dda3287812951", "threat-1e078f4049bb2446"] },
+    { "id": "boundary-4604b3360e50db9d", "kind": "boundary", "label": "ci-public-failure-log", "relationships": ["threat-a51ae676cd88edd6", "threat-cd11843329aa8537"] },
+    { "id": "boundary-ff1787f198b5e118", "kind": "boundary", "label": "continuity-self-repair", "relationships": ["threat-fcf2cb30d7c7e563"] },
+    { "id": "threat-a51ae676cd88edd6", "kind": "threat", "label": "public-detail-disclosure", "relationships": ["mitigation-82fe799eb0a26572", "mitigation-95a0539332d719fc"] },
+    { "id": "threat-3abef5b7c8da6e6d", "kind": "threat", "label": "audit-authority-forgery", "relationships": ["mitigation-17e04ab43d5260d4"] },
+    { "id": "threat-f1b7ea38a3ec0d8c", "kind": "threat", "label": "unauthorized-advisor-egress", "relationships": ["mitigation-2b3e2c0500b4b0e2"] },
+    { "id": "threat-520dda3287812951", "kind": "threat", "label": "stale-or-mutated-dispatch", "relationships": ["mitigation-d165194767f4eea4"] },
+    { "id": "threat-cd11843329aa8537", "kind": "threat", "label": "ci-log-injection-or-duplication", "relationships": ["mitigation-95a0539332d719fc"] },
+    { "id": "threat-1e078f4049bb2446", "kind": "threat", "label": "unbounded-preparation-latency", "relationships": ["mitigation-d8b1000c26ab594e"] },
+    { "id": "threat-fcf2cb30d7c7e563", "kind": "threat", "label": "unsafe-continuity-write", "relationships": ["mitigation-4cbc05f330223a06"] },
+    { "id": "mitigation-82fe799eb0a26572", "kind": "mitigation", "label": "closed-digest-only-event-schema", "relationships": [] },
+    { "id": "mitigation-17e04ab43d5260d4", "kind": "mitigation", "label": "signed-candidate-bound-human-authority", "relationships": [] },
+    { "id": "mitigation-2b3e2c0500b4b0e2", "kind": "mitigation", "label": "dispatch-bound-advisor-denial", "relationships": [] },
+    { "id": "mitigation-d165194767f4eea4", "kind": "mitigation", "label": "candidate-input-array-artifact-binding", "relationships": [] },
+    { "id": "mitigation-95a0539332d719fc", "kind": "mitigation", "label": "inventory-bound-redacted-unique-failure-rows", "relationships": [] },
+    { "id": "mitigation-d8b1000c26ab594e", "kind": "mitigation", "label": "shared-five-second-preflight-deadline", "relationships": [] },
+    { "id": "mitigation-4cbc05f330223a06", "kind": "mitigation", "label": "transactional-readback-and-rollback", "relationships": [] }
+  ],
+  "lifecycle": "verified"
+}
