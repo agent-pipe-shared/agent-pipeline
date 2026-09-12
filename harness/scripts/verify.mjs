@@ -737,7 +737,7 @@ const TEST_SUITES = [
   { name: "dispatch-authorship-verify-tests", file: join(pluginScriptsDir, "dispatch-authorship-verify.test.mjs") },
   { name: "dispatch-record-write-tests", file: join(pluginScriptsDir, "dispatch-record-write.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 10 }, (_, index) => `DRW${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "execution-plane-launch-tests", file: join(pluginScriptsDir, "execution-plane-launch.test.mjs") },
-  { name: "installed-plugin-attestation-host-tests", file: join(pluginScriptsDir, "installed-plugin-attestation-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `IPH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "installed-plugin-attestation-host-tests", file: join(pluginScriptsDir, "installed-plugin-attestation-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 9 }, (_, index) => `IPH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "nova-a8-benchmark-runner-tests", file: join(pluginScriptsDir, "nova-a8-benchmark-runner.test.mjs") },
   { name: "pipeline-start-scratch-lifecycle-tests", file: join(pluginScriptsDir, "pipeline-start-scratch-lifecycle.test.mjs") },
   { name: "pipeline-state-approve-announce-tests", file: join(pluginScriptsDir, "pipeline-state-approve-announce.test.mjs") },
