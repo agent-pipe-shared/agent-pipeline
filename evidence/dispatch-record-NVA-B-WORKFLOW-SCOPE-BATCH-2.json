@@ -1,0 +1,41 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "NVA-B-WORKFLOW-SCOPE-BATCH-2",
+  "agentType": "goldfish-deep",
+  "model": "gpt-6-astra",
+  "effort": "xhigh",
+  "rulesetSha": "0.6.2+codex.20260911033523.8593a8a",
+  "dispatcher": "elephant",
+  "candidateCommit": "a4c77364b8b1fcfc122d19be71e8d7800c3d19a5",
+  "resultSha256": "5a61a3c14f8338c9499fe07ba7e1dc3805ef75a275cc03aa6d526178f91b7316",
+  "outcome": "completed",
+  "commits": [
+    "a4c77364b8b1fcfc122d19be71e8d7800c3d19a5"
+  ],
+  "log": [],
+  "report": {
+    "text": "Accepted Option 3 foundation implemented through explicit batch preflight and synthetic runner APIs. Normalized literal allowedPaths reject exact and ancestor write/write overlap before any adapter call; read-only overlaps remain admissible. Entire-batch schema/capability checks precede invocation, requests are independently copied, and single-request/Phase-2.6 behavior is preserved. Candidate-bound focused tests passed. Two substantive Critic rounds confirmed all blocker findings corrected; one Markdown whitespace minor was directly fixed and format-checked under the review-round cap. The parent item remains open for authoritative coordinator integration, abandoned-scope expiry/recovery and Verify serialization. No live lease, native isolation, full Verify or backlog closure is claimed.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/workflow-writer-preflight.mjs",
+      "plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs",
+      "plugins/pipeline-core/lib/workflow-runner-boundary.mjs",
+      "plugins/pipeline-core/lib/workflow-runner-boundary.test.mjs",
+      "backlog/evidence/NVA-B-WORKFLOW-SCOPE-BATCH-2.md"
+    ],
+    "orchestratorAddedFiles": [
+      "backlog/items/2026-09-01-concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches.md",
+      "backlog/evidence/2026-09-12-workflow-batch-a4c77364-tests.json",
+      "backlog/evidence/2026-09-12-workflow-batch-critic-round1.md",
+      "backlog/evidence/2026-09-12-workflow-batch-critic-round2.md",
+      "backlog/STATUS.md",
+      "backlog/index.json"
+    ]
+  },
+  "criticEvidence": {
+    "schema": "pipeline.critic-evidence-reference.v1",
+    "taskId": "NVA-B-WORKFLOW-SCOPE-BATCH-2",
+    "candidateCommit": "a4c77364b8b1fcfc122d19be71e8d7800c3d19a5",
+    "path": "backlog/evidence/2026-09-12-workflow-batch-critic-round2.md",
+    "sha256": "95e964434cece9c5d719a6dadbecab9590e1a93d63afd4991ed712183f228922"
+  }
+}
