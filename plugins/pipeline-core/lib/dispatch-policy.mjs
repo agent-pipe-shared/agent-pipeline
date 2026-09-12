@@ -49,6 +49,15 @@ const BUDGETED_ROLE_MAX_TURNS = Object.freeze({
   "goldfish-mechanic": 50,
 });
 
+/** True only for an agent type shipped by this plugin, with or without its namespace. */
+export function isShippedPipelineAgentType(subagentType) {
+  if (typeof subagentType !== "string") return false;
+  const bareType = subagentType.startsWith("pipeline-core:")
+    ? subagentType.slice("pipeline-core:".length)
+    : subagentType;
+  return PIPELINE_AGENT_TYPES.has(bareType);
+}
+
 export function dispatchBudgetContractForRole(subagentType) {
   const type = typeof subagentType === "string" ? subagentType : "";
   const bareType = type.startsWith("pipeline-core:") ? type.slice("pipeline-core:".length) : type;

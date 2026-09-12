@@ -1,0 +1,181 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  antigravityNativeDispatchInternals,
+  prepareAntigravityNativeDispatch,
+  verifyAntigravityNativeDispatch,
+} from "./antigravity-native-dispatch-coordinator.mjs";
+import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
+
+const hash = (value) => createHash("sha256").update(value).digest("hex");
+const git = (root, ...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+const prepareScript = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "antigravity-native-dispatch-prepare.mjs");
+const cases = [];
+const test = (name, run) => cases.push({ name, run });
+
+function fixture() {
+  const fixtureParent = process.env.PIPELINE_TEST_TMPDIR ?? join(process.cwd(), "scratch");
+  mkdirSync(fixtureParent, { recursive: true });
+  const root = mkdtempSync(join(fixtureParent, "agy-native-dispatch-"));
+  writeFileSync(join(root, "input-a.txt"), "a\n");
+  writeFileSync(join(root, "input-b.txt"), "b\n");
+  git(root, "init", "-q");
+  git(root, "config", "user.name", "Fixture");
+  git(root, "config", "user.email", "fixture@example.invalid");
+  git(root, "add", "input-a.txt", "input-b.txt");
+  git(root, "commit", "-q", "-m", "fixture");
+  return root;
+}
+
+function request(root) {
+  const commit = git(root, "rev-parse", "HEAD");
+  const tree = git(root, "rev-parse", "HEAD^{tree}");
+  const nativeSubagents = [
+    { TypeName: "consult-advisor", Role: "Advisor", Prompt: "Inspect input-a.txt. Model: gemini-3.7; Ruleset-SHA: local." },
+    { TypeName: "afk-claude-worker", Role: "Worker", Prompt: "Inspect input-b.txt. Model: gemini-3.7; Ruleset-SHA: local." },
+  ];
+  const packets = nativeSubagents.map((entry, index) => ({
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId: `agy-native-${index}`,
+    transport: "antigravity",
+    role: `pipeline-core:${entry.TypeName}`,
+    prompt: entry.Prompt,
+    candidate: { commit, tree },
+    requiredPaths: [`input-${index === 0 ? "a" : "b"}.txt`],
+    requiredPathSha256: { [`input-${index === 0 ? "a" : "b"}.txt`]: hash(`${index === 0 ? "a" : "b"}\n`) },
+    resultDestination: { kind: "return" },
+  }));
+  return { root, packets, nativeSubagents };
+}
+
+function withFixture(run) {
+  const root = fixture();
+  try { run(request(root)); }
+  finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+test("valid full array is prepared and revalidated without changing role, prompt, order or workspace", () => withFixture((value) => {
+  const prepared = prepareAntigravityNativeDispatch({ ...value, nowEpochMs: 1000 });
+  assert.equal(prepared.status, "prepared");
+  assert.deepEqual(prepared.invocation, { Subagents: value.nativeSubagents });
+  const verified = verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: prepared.invocation.Subagents, nowEpochMs: 1001 });
+  assert.equal(verified.status, "prepared");
+  assert.deepEqual(verified.nativeSubagents, value.nativeSubagents);
+  assert.deepEqual(verified.packets, value.packets);
+  assert.equal(verified.workspace, value.root);
+  assert.equal(verified.modelCalls, 0);
+  assert.equal(verified.launcherCalls, 0);
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: value.nativeSubagents, nowEpochMs: 1002 }).code, "AGY-NATIVE-ARTIFACT-MISSING");
+}));
+
+test("artifact publication is create-only and cannot replace an outstanding authorization", () => withFixture((value) => {
+  const first = prepareAntigravityNativeDispatch(value);
+  const second = prepareAntigravityNativeDispatch(value);
+  assert.equal(first.status, "prepared");
+  assert.equal(second.code, "AGY-NATIVE-ARTIFACT-EXISTS");
+  assert.equal(verifyAntigravityNativeDispatch(value).artifactSha256, first.artifactSha256);
+}));
+
+test("CLI prepares a repository-contained request file without launching another CLI or model", () => withFixture((value) => {
+  const requestPath = join(value.root, "agy-dispatch-request.json");
+  writeFileSync(requestPath, `${JSON.stringify({ packets: value.packets, Subagents: value.nativeSubagents })}\n`);
+  const result = spawnSync(process.execPath, [prepareScript, "prepare", "--root", value.root, "--request", "agy-dispatch-request.json"], {
+    cwd: value.root, encoding: "utf8", shell: false,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.status, "prepared");
+  assert.deepEqual(output.invocation, { Subagents: value.nativeSubagents });
+  assert.equal(output.modelCalls, 0);
+  assert.equal(output.launcherCalls, 0);
+  assert.equal(verifyAntigravityNativeDispatch(value).status, "prepared");
+}));
+
+test("missing prepared artifact rejects the entire array", () => withFixture((value) => {
+  assert.equal(verifyAntigravityNativeDispatch(value).code, "AGY-NATIVE-ARTIFACT-MISSING");
+}));
+
+test("a partial array cannot reuse the full-array artifact", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: value.nativeSubagents.slice(0, 1) }).code, "AGY-NATIVE-ARTIFACT-MISSING");
+}));
+
+test("a reordered array cannot reuse the prepared artifact", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: [...value.nativeSubagents].reverse() }).code, "AGY-NATIVE-ARTIFACT-MISSING");
+}));
+
+test("a changed prompt cannot reuse the prepared artifact", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+  const mutated = structuredClone(value.nativeSubagents);
+  mutated[1].Prompt += " changed";
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: mutated }).code, "AGY-NATIVE-ARTIFACT-MISSING");
+}));
+
+test("a forged artifact digest fails closed", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+  const common = git(value.root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+  const path = antigravityNativeDispatchInternals.artifactPath(common, value.nativeSubagents, value.root);
+  const artifact = JSON.parse(readFileSync(path, "utf8"));
+  artifact.packets[0].dispatchId = "forged";
+  writeFileSync(path, `${JSON.stringify(artifact)}\n`);
+  assert.equal(verifyAntigravityNativeDispatch(value).code, "AGY-NATIVE-ARTIFACT-DIGEST");
+}));
+
+test("candidate movement makes an otherwise intact artifact stale", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+  writeFileSync(join(value.root, "later.txt"), "later\n");
+  git(value.root, "add", "later.txt");
+  git(value.root, "commit", "-q", "-m", "later");
+  assert.equal(verifyAntigravityNativeDispatch(value).code, "AGY-NATIVE-ARTIFACT-STALE");
+}));
+
+test("required input movement invalidates all entries at revalidation", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+  writeFileSync(join(value.root, "input-b.txt"), "dirty\n");
+  const verdict = verifyAntigravityNativeDispatch(value);
+  assert.equal(verdict.code, "AGY-NATIVE-BATCH-STALE");
+  assert.equal(verdict.modelCalls, 0);
+  assert.equal(verdict.launcherCalls, 0);
+}));
+
+test("expired artifacts fail closed", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch({ ...value, nowEpochMs: 1000, ttlMs: 1000 }).status, "prepared");
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: value.nativeSubagents, nowEpochMs: 2001 }).code, "AGY-NATIVE-ARTIFACT-EXPIRED");
+}));
+
+test("preparation rejects partial packet arrays", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch({ ...value, packets: value.packets.slice(0, 1) }).code, "AGY-NATIVE-ARRAY-MISMATCH");
+}));
+
+test("preparation rejects non-return native results", () => withFixture((value) => {
+  value.packets[0].resultDestination = { kind: "stream" };
+  assert.equal(prepareAntigravityNativeDispatch(value).code, "AGY-NATIVE-PACKET-BOUNDARY");
+}));
+
+test("preparation rejects a recursive/non-native transport", () => withFixture((value) => {
+  value.packets[0].transport = "direct";
+  assert.equal(prepareAntigravityNativeDispatch(value).code, "AGY-NATIVE-PACKET-BOUNDARY");
+}));
+
+test("artifact is private and kept outside the working tree", () => withFixture((value) => {
+  assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+  const common = git(value.root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+  const path = antigravityNativeDispatchInternals.artifactPath(common, value.nativeSubagents, value.root);
+  assert.equal((lstatSync(path).mode & 0o077), 0);
+  assert.equal(path.startsWith(join(common, "agent-pipeline", "run")), true);
+}));
+
+for (const [index, entry] of cases.entries()) {
+  try { entry.run(); process.stdout.write(`ok ${index + 1} - ${entry.name}\n`); }
+  catch (error) { process.stderr.write(`not ok ${index + 1} - ${entry.name}\n${error.stack}\n`); process.exitCode = 1; }
+}
+if (!process.exitCode) process.stdout.write(`All ${cases.length} Antigravity native dispatch coordinator tests passed.\n`);

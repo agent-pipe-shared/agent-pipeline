@@ -34,6 +34,8 @@ import {
 } from "../lib/native-hook-failure-memory.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
 import { commandIsGitPush } from "../lib/git-cmd.mjs";
+import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
+import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
 
 const { commandDisclosureFields } = humanGuardOverrideInternals;
 
@@ -535,6 +537,23 @@ export async function runAntigravityPreToolGuard(rawInput) {
       continue;
     }
     runNestedGuard(guardName, canonicalPayload, toolInput);
+  }
+
+  // The active Antigravity parent calls its built-in invoke_subagent tool. Pipeline never
+  // starts another `agy` process. Once the ordinary role-policy checks pass, require the whole
+  // native array to match one batch prepared against this exact checkout. A policy denial
+  // keeps its more useful diagnosis; a structurally valid but unprepared launch fails here.
+  const nativeContainsPipelineRole = input?.toolCall?.name === "invoke_subagent"
+    && Array.isArray(input?.toolCall?.args?.Subagents)
+    && input.toolCall.args.Subagents.some((entry) => isShippedPipelineAgentType(entry?.TypeName));
+  if (denials.length === 0 && nativeContainsPipelineRole) {
+    const nativeVerdict = verifyAntigravityNativeDispatch({
+      root: projectRoot,
+      nativeSubagents: input?.toolCall?.args?.Subagents,
+    });
+    if (nativeVerdict.status !== "prepared") {
+      deny(`BLOCKED (Antigravity dispatch preflight): ${nativeVerdict.code}: the complete invoke_subagent batch must be prepared and candidate-bound before launch.`);
+    }
   }
 
   const lifecycleShouldRun = lifecycleGoverned
