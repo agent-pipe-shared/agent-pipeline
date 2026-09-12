@@ -30,7 +30,7 @@
 | pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
-| pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20 | open | defect | pipeline | nova-b | 2026-09-02 | — | — |
+| pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20 | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | — | 2026-08-07 | — | — |
@@ -663,8 +663,8 @@
 
 ## Counts
 
-- open: 71
+- open: 70
 - in_progress: 0
-- closed: 570
+- closed: 571
 - rejected: 3
 - deferred: 11
