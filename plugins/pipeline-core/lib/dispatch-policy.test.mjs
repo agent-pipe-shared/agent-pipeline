@@ -409,11 +409,13 @@ const fixtureCheck = (label, run) => check(label, async () => {
   fixtureCheck("DP19 every shipped role fails in PREPARE with zero launcher calls", async () => {
     const invalidPackets = roles.map((role, index) => packetFor(role, 100 + index, ["missing.txt"]));
     let invalidLaunches = 0;
+    const events = [];
     const invalidStarted = Date.now();
     const invalidBatch = await runRoleDispatchBatch({
       root: dispatchFixture,
       packets: invalidPackets,
       launch: async () => { invalidLaunches += 1; },
+      onEvent: (event) => events.push(event),
     });
     assert.equal(invalidBatch.status, "rejected");
     assert.equal(invalidBatch.code, "RDB-PREPARATION-FAILED");
@@ -422,20 +424,55 @@ const fixtureCheck = (label, run) => check(label, async () => {
     assert.equal(invalidLaunches, 0);
     assert.equal(invalidBatch.modelCalls, 0);
     assert.ok(Date.now() - invalidStarted < 5_000);
+    assert.deepEqual(events.map(({ phase, index, dispatchId, status, code }) => ({ phase, index, dispatchId, status, code })),
+      invalidPackets.map((packet, index) => ({
+        phase: "PREPARE", index, dispatchId: packet.dispatchId, status: "rejected", code: "RDP-REQUIRED-PATH",
+      })));
+    assert.ok(events.every((event) => Object.isFrozen(event)));
+    assert.ok(events.every((event) => JSON.stringify(Object.keys(event).sort())
+      === JSON.stringify(["code", "dispatchId", "index", "phase", "schema", "status"])));
+
+    let sinkFailureLaunches = 0;
+    const sinkFailure = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: [packetFor("critic", 119)],
+      launch: async () => { sinkFailureLaunches += 1; },
+      onEvent: async () => {},
+    });
+    assert.equal(sinkFailure.code, "RDB-EVENT-SINK");
+    assert.equal(sinkFailureLaunches, 0);
+    assert.equal(sinkFailure.launcherCalls, 0);
   });
 
   fixtureCheck("DP20 all packets PREPARE before valid role envelopes reach the launcher unchanged", async () => {
     const validPackets = roles.map((role, index) => packetFor(role, 200 + index));
     const launched = [];
+    const events = [];
     const validBatch = await runRoleDispatchBatch({
       root: dispatchFixture,
       packets: validPackets,
-      launch: async (packet) => { launched.push(packet); return { role: packet.role }; },
+      launch: async (packet) => {
+        assert.equal(events.at(-1)?.phase, "START");
+        assert.equal(events.at(-1)?.dispatchId, packet.dispatchId);
+        launched.push(packet);
+        return { role: packet.role };
+      },
+      onEvent: (event) => events.push(event),
     });
     assert.equal(validBatch.status, "completed");
     assert.equal(validBatch.launcherCalls, roles.length);
     assert.deepEqual(launched, validPackets);
     assert.deepEqual(validBatch.results, validPackets.map(({ role }) => ({ role })));
+    assert.deepEqual(events.slice(0, roles.length).map(({ phase, index, dispatchId, status, code }) => ({ phase, index, dispatchId, status, code })),
+      validPackets.map((packet, index) => ({
+        phase: "PREPARE", index, dispatchId: packet.dispatchId, status: "prepared", code: "RDP-PREPARED",
+      })));
+    assert.deepEqual(events.slice(roles.length).map(({ phase, index, dispatchId, status, code }) => ({ phase, index, dispatchId, status, code })),
+      validPackets.map((packet, index) => ({
+        phase: "START", index, dispatchId: packet.dispatchId, status: "starting", code: "RDB-START",
+      })));
+    assert.ok(events.every((event) => !Object.hasOwn(event, "packet") && !Object.hasOwn(event, "prompt")
+      && !Object.hasOwn(event, "requiredPaths") && !Object.hasOwn(event, "root")));
   });
 
   fixtureCheck("DP21 batch execution propagates resultRoot and preserves mixed destinations", async () => {
@@ -501,6 +538,7 @@ const fixtureCheck = (label, run) => check(label, async () => {
       const second = packetFor("critic", mode === "occupied" ? 307 : 309);
       second.resultPath = "second-parent/result.json";
       const launchedIds = [];
+      const events = [];
       const result = await runRoleDispatchBatch({
         root: dispatchFixture,
         resultRoot,
@@ -514,11 +552,18 @@ const fixtureCheck = (label, run) => check(label, async () => {
           }
           return packet.dispatchId;
         },
+        onEvent: (event) => events.push(event),
       });
         assert.equal(result.code, "RDB-PREPARATION-STALE");
         assert.equal(result.failedPreparation.code, "RDP-RESULT-DESTINATION");
         assert.deepEqual(launchedIds, [first.dispatchId]);
         assert.equal(result.launcherCalls, 1);
+        assert.deepEqual(events.map(({ phase, dispatchId, status, code }) => ({ phase, dispatchId, status, code })), [
+          { phase: "PREPARE", dispatchId: first.dispatchId, status: "prepared", code: "RDP-PREPARED" },
+          { phase: "PREPARE", dispatchId: second.dispatchId, status: "prepared", code: "RDP-PREPARED" },
+          { phase: "START", dispatchId: first.dispatchId, status: "starting", code: "RDB-START" },
+          { phase: "REFUSE", dispatchId: second.dispatchId, status: "rejected", code: "RDP-RESULT-DESTINATION" },
+        ]);
       } finally {
         rmSync(resultRoot, { recursive: true, force: true });
         rmSync(outsideRoot, { recursive: true, force: true });
@@ -534,6 +579,7 @@ const fixtureCheck = (label, run) => check(label, async () => {
     const second = packetFor("critic", 311);
     second.resultPath = "second.json";
     const launchedIds = [];
+    const events = [];
     const result = await runRoleDispatchBatch({
       root: dispatchFixture,
       resultRoot: staleInputRoot,
@@ -543,11 +589,18 @@ const fixtureCheck = (label, run) => check(label, async () => {
         writeFileSync(join(dispatchFixture, "input.txt"), "mutated after PREPARE\n");
         return packet.dispatchId;
       },
+      onEvent: (event) => events.push(event),
     });
       assert.equal(result.code, "RDB-PREPARATION-STALE");
       assert.equal(result.failedPreparation.code, "RDP-REQUIRED-PATH-DRIFT");
       assert.deepEqual(launchedIds, [first.dispatchId]);
       assert.equal(result.launcherCalls, 1);
+      assert.deepEqual(events.map(({ phase, dispatchId, status, code }) => ({ phase, dispatchId, status, code })), [
+        { phase: "PREPARE", dispatchId: first.dispatchId, status: "prepared", code: "RDP-PREPARED" },
+        { phase: "PREPARE", dispatchId: second.dispatchId, status: "prepared", code: "RDP-PREPARED" },
+        { phase: "START", dispatchId: first.dispatchId, status: "starting", code: "RDB-START" },
+        { phase: "REFUSE", dispatchId: second.dispatchId, status: "rejected", code: "RDP-REQUIRED-PATH-DRIFT" },
+      ]);
     } finally {
       writeFileSync(join(dispatchFixture, "input.txt"), "input\n");
       rmSync(staleInputRoot, { recursive: true, force: true });

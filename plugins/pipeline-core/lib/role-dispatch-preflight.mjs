@@ -10,6 +10,7 @@ import { dispatchFindings } from "./dispatch-policy.mjs";
 export const ROLE_DISPATCH_REQUEST_SCHEMA = "pipeline.role-dispatch-request.v1";
 export const ROLE_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.role-dispatch-preflight.v1";
 export const ROLE_DISPATCH_BATCH_SCHEMA = "pipeline.role-dispatch-batch.v1";
+export const ROLE_DISPATCH_BATCH_EVENT_SCHEMA = "pipeline.role-dispatch-batch-event.v1";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/u;
@@ -207,8 +208,42 @@ export function prepareRoleDispatchBatch({ root, resultRoot = root, packets } = 
   return { schema: ROLE_DISPATCH_BATCH_SCHEMA, status: "prepared", code: "RDB-PREPARED", preparations, modelCalls: 0, launcherCalls: 0 };
 }
 
-export async function runRoleDispatchBatch({ root, resultRoot = root, packets, launch } = {}) {
+function batchEvent(phase, index, packet, status, code) {
+  return Object.freeze({
+    schema: ROLE_DISPATCH_BATCH_EVENT_SCHEMA,
+    phase,
+    index,
+    dispatchId: ID.test(packet?.dispatchId ?? "") ? packet.dispatchId : null,
+    status,
+    code,
+  });
+}
+
+function reportBatchEvent(onEvent, event) {
+  if (onEvent === undefined) return true;
+  if (typeof onEvent !== "function") return false;
+  try {
+    const reported = onEvent(event);
+    if (reported && typeof reported.then === "function") {
+      Promise.resolve(reported).catch(() => {});
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function runRoleDispatchBatch({ root, resultRoot = root, packets, launch, onEvent } = {}) {
   const prepared = prepareRoleDispatchBatch({ root, resultRoot, packets });
+  let reportingReady = onEvent === undefined || typeof onEvent === "function";
+  for (const [index, preparation] of prepared.preparations.entries()) {
+    const event = batchEvent("PREPARE", index, packets[index], preparation.status, preparation.code);
+    if (!reportBatchEvent(onEvent, event)) reportingReady = false;
+  }
+  if (!reportingReady) {
+    return { ...prepared, status: "rejected", code: "RDB-EVENT-SINK", launcherCalls: 0 };
+  }
   if (prepared.status !== "prepared") return prepared;
   if (typeof launch !== "function") {
     return { ...prepared, status: "rejected", code: "RDB-LAUNCHER", launcherCalls: 0 };
@@ -217,11 +252,32 @@ export async function runRoleDispatchBatch({ root, resultRoot = root, packets, l
   for (const preparation of prepared.preparations) {
     const current = preflightRoleDispatch({ root, resultRoot, packet: preparation.packet });
     if (current.status !== "prepared") {
+      const refusal = batchEvent("REFUSE", results.length, preparation.packet, "rejected", current.code);
+      if (!reportBatchEvent(onEvent, refusal)) {
+        return {
+          ...prepared,
+          status: "rejected",
+          code: "RDB-EVENT-SINK",
+          failedPreparation: current,
+          results,
+          launcherCalls: results.length,
+        };
+      }
       return {
         ...prepared,
         status: "rejected",
         code: "RDB-PREPARATION-STALE",
         failedPreparation: current,
+        results,
+        launcherCalls: results.length,
+      };
+    }
+    const start = batchEvent("START", results.length, current.packet, "starting", "RDB-START");
+    if (!reportBatchEvent(onEvent, start)) {
+      return {
+        ...prepared,
+        status: "rejected",
+        code: "RDB-EVENT-SINK",
         results,
         launcherCalls: results.length,
       };
