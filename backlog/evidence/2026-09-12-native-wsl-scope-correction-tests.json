@@ -1,0 +1,107 @@
+{
+  "schema": "pipeline.focused-candidate-test-evidence.v1",
+  "generatedAt": "2026-09-12T03:27:12.639Z",
+  "candidateCommit": "e5e243aeba7f220f3907dd3b2650ca4cf4f24b28",
+  "candidateTree": "767983ac8cb41d2d5a3496e9ab0fb058796f21b6",
+  "candidateBinding": {
+    "headAndTreeMatchedExpected": true,
+    "cleanBeforeAndAfter": true
+  },
+  "tests": [
+    {
+      "command": [
+        "node",
+        "--test",
+        "plugins/pipeline-core/scripts/codex-host-advisor-route.test.mjs",
+        "plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs"
+      ],
+      "startedAt": "2026-09-12T03:27:10.422Z",
+      "completedAt": "2026-09-12T03:27:11.344Z",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "74223347522352bbf813436376b7386c01f7fa3b64cd0562386857fe6df2dddb",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 12508,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs"
+      ],
+      "startedAt": "2026-09-12T03:27:11.345Z",
+      "completedAt": "2026-09-12T03:27:11.410Z",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "d79d46df98344c717e9fabe33d92f43773a598d72f9b0f362b5a5e3a213135b6",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 1611,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "plugins/pipeline-core/skills/advisor-consult/advisor-consult-v3.test.mjs"
+      ],
+      "startedAt": "2026-09-12T03:27:11.410Z",
+      "completedAt": "2026-09-12T03:27:11.469Z",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "54810572605abee8ed4099a530cdc3ae283e9737f90d4f07d219576431d47456",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 467,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "plugins/pipeline-core/lib/runtime-projection-v3.test.mjs"
+      ],
+      "startedAt": "2026-09-12T03:27:11.469Z",
+      "completedAt": "2026-09-12T03:27:11.824Z",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "87448aedffb0f424ee92ece8cf64e79e00f305bf373a213d15bcc0e28066166a",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 2563,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "plugins/pipeline-core/scripts/check-routing-projections.mjs"
+      ],
+      "startedAt": "2026-09-12T03:27:11.824Z",
+      "completedAt": "2026-09-12T03:27:11.879Z",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "6317657eaa5e8e3e5f445ab39a9df539d78fd9c95b709ca466f298c7ab7257b4",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 130,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "harness/scripts/check-doc-contracts.mjs"
+      ],
+      "startedAt": "2026-09-12T03:27:11.879Z",
+      "completedAt": "2026-09-12T03:27:12.639Z",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "898190cb50d1a1b5e206ed46c6ef7644da18fe7309fb1f23214071983949683c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 129,
+      "stderrBytes": 0
+    }
+  ],
+  "passed": true,
+  "recordSha256": "3b355c5cdf2e94242428f810886bcf6dd9154d99158c658eb97ad8a01bee551d",
+  "selfCheck": {
+    "algorithm": "sha256-json-payload",
+    "verified": true
+  }
+}
