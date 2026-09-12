@@ -510,7 +510,7 @@ test("Slice 2 shipped entry and Windows fail closed before writing a launcher", 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("Slice 2 run refuses unknown caller and absent readback before spawning", () => {
+test("Slice 2 refuses unknown caller before spawn and marks absent post-run readback outcome unknown", () => {
   const fixture = preparedInstanceFixture();
   let spawns = 0;
   const spawn = () => { spawns += 1; return { status: 0, signal: null, stdout: "{}", stderr: "" }; };
@@ -518,8 +518,12 @@ test("Slice 2 run refuses unknown caller and absent readback before spawning", (
   const caller = { trusted: true, ...fixture.entry.boundary, attendedTty: true };
   try {
     assert.equal(runHumanTerminalAction(input, { ...fixture.deps, spawn }).code, "HTA-RUN-INVOCATION-FORBIDDEN");
-    assert.equal(runHumanTerminalAction(input, { ...fixture.deps, spawn, callerEvidence: caller }).code, "HTA-RUN-READBACK-UNAVAILABLE");
-    assert.equal(spawns, 0);
+    const unknown = runHumanTerminalAction(input, { ...fixture.deps, spawn, callerEvidence: caller });
+    assert.deepEqual(
+      { status: unknown.status, code: unknown.code, retrySafe: unknown.retrySafe, mutationMayHaveOccurred: unknown.mutationMayHaveOccurred },
+      { status: "outcome-unknown", code: "HTA-RUN-MANUAL-RECONCILIATION", retrySafe: false, mutationMayHaveOccurred: true },
+    );
+    assert.equal(spawns, 1);
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 });
 
@@ -532,16 +536,18 @@ test("Slice 2 executes once only with trusted attended evidence and verified typ
     const result = runHumanTerminalAction(input, {
       ...fixture.deps,
       callerEvidence,
-      spawn: () => {
+      spawn: (_executable, _argv, options) => {
         spawns += 1;
-        return {
-          status: 0,
-          signal: null,
-          stdout: JSON.stringify({ schema: fixture.entry.expectedReadback.schema, code: fixture.entry.expectedReadback.code }),
-          stderr: "",
-        };
+        assert.equal(options.shell, false);
+        assert.equal(options.stdio, "inherit");
+        return { status: 0, signal: null };
       },
-      readback: () => ({ status: "verified", digest: "e".repeat(64) }),
+      readback: () => ({
+        status: "verified",
+        schema: fixture.entry.expectedReadback.schema,
+        code: fixture.entry.expectedReadback.code,
+        digest: "e".repeat(64),
+      }),
     });
     assert.equal(result.status, "completed");
     assert.equal(spawns, 1);
@@ -552,7 +558,7 @@ test("Slice 2 executes once only with trusted attended evidence and verified typ
       { templateId: persisted.templateId, revision: persisted.revision, readbackStatus: persisted.readbackStatus },
       { templateId: fixture.entry.templateId, revision: fixture.entry.revision, readbackStatus: "verified" },
     );
-    for (const field of ["requestSha256", "valuesSha256", "candidateSha256", "resultSha256", "readbackSha256", "recordSha256"]) {
+    for (const field of ["requestSha256", "valuesSha256", "candidateSha256", "readbackSha256", "recordSha256"]) {
       assert.match(persisted[field], /^[a-f0-9]{64}$/u, field);
     }
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
@@ -641,14 +647,41 @@ test("Slice 2 rejects cross-entry rebinding and wrong typed result schema", () =
     }, {
       ...fixture.deps,
       callerEvidence: { trusted: true, ...fixture.entry.boundary, attendedTty: true },
-      spawn: () => ({
-        status: 0, signal: null,
-        stdout: JSON.stringify({ schema: "wrong.result.v1", code: fixture.entry.expectedReadback.code }),
-        stderr: "",
-      }),
-      readback: () => { readbacks += 1; return { status: "verified" }; },
+      spawn: () => ({ status: 0, signal: null }),
+      readback: () => {
+        readbacks += 1;
+        return { status: "verified", schema: "wrong.result.v1", code: fixture.entry.expectedReadback.code };
+      },
     });
-    assert.equal(result.code, "HTA-RUN-RESULT-MISMATCH");
-    assert.equal(readbacks, 0);
+    assert.equal(result.code, "HTA-RUN-MANUAL-RECONCILIATION");
+    assert.equal(result.status, "outcome-unknown");
+    assert.equal(result.readbackStatus, "mismatched");
+    assert.equal(result.retrySafe, false);
+    assert.equal(readbacks, 1);
+  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+});
+
+test("Slice 2 treats failed typed readback after successful child as manual reconciliation", () => {
+  const fixture = preparedInstanceFixture();
+  try {
+    const result = runHumanTerminalAction({
+      requestPath: fixture.prepared.requestPath,
+      requestSha256: fixture.prepared.requestSha256,
+    }, {
+      ...fixture.deps,
+      callerEvidence: { trusted: true, ...fixture.entry.boundary, attendedTty: true },
+      spawn: () => ({ status: 0, signal: null }),
+      readback: () => ({ status: "failed", schema: null, code: null }),
+    });
+    assert.deepEqual(
+      {
+        status: result.status, code: result.code, readbackStatus: result.readbackStatus,
+        outcomeKnown: result.outcomeKnown, retrySafe: result.retrySafe, mutationMayHaveOccurred: result.mutationMayHaveOccurred,
+      },
+      {
+        status: "outcome-unknown", code: "HTA-RUN-MANUAL-RECONCILIATION", readbackStatus: "failed",
+        outcomeKnown: false, retrySafe: false, mutationMayHaveOccurred: true,
+      },
+    );
   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
 });

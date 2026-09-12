@@ -289,28 +289,34 @@ export function runHumanTerminalAction(input, deps = {}) {
     || caller.invocation !== "user-copy-only" || caller.codexToolCallPermitted !== false || caller.attendedTty !== true) {
     return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "refused", code: "HTA-RUN-INVOCATION-FORBIDDEN" };
   }
-  if (typeof deps.readback !== "function") {
-    return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "refused", code: "HTA-RUN-READBACK-UNAVAILABLE" };
-  }
   const candidate = (deps.observeCandidate ?? observeCandidate)(request.repositoryRoot);
   if (canonical(candidate) !== canonical(request.candidate)) return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "refused", code: "HTA-RUN-CANDIDATE-DRIFT" };
   const spawn = deps.spawn ?? spawnSync;
-  const result = spawn(request.builderOutput.executable, request.builderOutput.argv, { encoding: "utf8", shell: false, stdio: ["inherit", "pipe", "pipe"] });
+  const result = spawn(request.builderOutput.executable, request.builderOutput.argv, {
+    shell: false,
+    stdio: "inherit",
+  });
   if (result.status !== 0 || result.signal !== null) return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "failed", code: "HTA-RUN-CHILD-FAILED", exitCode: result.status, signal: result.signal };
-  let parsed;
-  try { parsed = JSON.parse(result.stdout); } catch { return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "failed", code: "HTA-RUN-RESULT-INVALID" }; }
-  if (parsed?.code !== request.expectedReadback.code
-    || (request.expectedReadback.schema !== null && parsed?.schema !== request.expectedReadback.schema)) {
-    return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "failed", code: "HTA-RUN-RESULT-MISMATCH" };
-  }
-  const readback = deps.readback({ request, result: parsed, expected: request.expectedReadback });
-  if (readback?.status !== "verified") return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "failed", code: "HTA-RUN-READBACK-FAILED" };
+  let readback = null;
+  try {
+    if (typeof deps.readback === "function") readback = deps.readback({ request, expected: request.expectedReadback });
+  } catch { readback = null; }
+  const readbackMatches = readback?.status === "verified"
+    && readback.code === request.expectedReadback.code
+    && readback.schema === request.expectedReadback.schema;
+  const readbackStatus = readback === null ? "absent"
+    : readback.status !== "verified" ? "failed" : readbackMatches ? "verified" : "mismatched";
+  const outcomeKnown = readbackMatches;
   const receipt = {
-    schema: HUMAN_TERMINAL_ACTION_RECEIPT_SCHEMA, status: "completed", code: "HTA-RUN-COMPLETED",
+    schema: HUMAN_TERMINAL_ACTION_RECEIPT_SCHEMA,
+    status: outcomeKnown ? "completed" : "outcome-unknown",
+    code: outcomeKnown ? "HTA-RUN-COMPLETED" : "HTA-RUN-MANUAL-RECONCILIATION",
     instanceId: request.instanceId, templateId: request.templateId, revision: request.revision,
     requestSha256: request.recordSha256, valuesSha256: sha(request.values), candidateSha256: sha(request.candidate),
-    exitCode: 0, resultCode: parsed.code, resultSha256: sha(result.stdout),
-    readbackStatus: readback.status, readbackSha256: sha(readback), recordSha256: "",
+    exitCode: 0, outcomeKnown, retrySafe: false, mutationMayHaveOccurred: true,
+    resultSchema: outcomeKnown ? readback.schema : null,
+    resultCode: outcomeKnown ? readback.code : null,
+    readbackStatus, readbackSha256: sha(readback), recordSha256: "",
   };
   receipt.recordSha256 = recordDigest(receipt);
   try {
@@ -319,6 +325,16 @@ export function runHumanTerminalAction(input, deps = {}) {
     const persisted = JSON.parse(readPrivateFile(resultPath, 0o600));
     if (!exactKeys(persisted, Object.keys(receipt)) || persisted.recordSha256 !== recordDigest(persisted)) throw new Error("HTA-RESULT-READBACK");
   }
-  catch (error) { return { schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA, status: "failed", code: error.message }; }
+  catch (error) {
+    return {
+      schema: HUMAN_TERMINAL_ACTION_RESULT_SCHEMA,
+      status: "outcome-unknown",
+      code: "HTA-RUN-MANUAL-RECONCILIATION",
+      reason: error.message,
+      outcomeKnown: false,
+      retrySafe: false,
+      mutationMayHaveOccurred: true,
+    };
+  }
   return receipt;
 }
