@@ -657,10 +657,12 @@ equality; the admitted kind/status/reason combinations are fully enumerated.
 Recommended decision: accept and number the ADR so the nine `LND-*` slices can
 proceed reader-first. The alternative is to keep the current false choice:
 either omit these governance actions or fabricate queue/worker identity for
-them. A separate, non-blocking follow-up remains on whether an exact-candidate
-HGO consumption may have a minimal public projection; until decided, HGO stays
-private-only. Native Codex sandbox/App-Server execution under WSL is outside
-this decision. The prior Critic-PASS note was not candidate- or
+them. On 2026-09-12 the PO selected the minimal exact-candidate HGO projection
+described by ADR-0083 D5: the public fact is digest-bound and contains no
+command, path, human name, rationale, target detail, key identity or private
+request/receipt bytes. The authenticated private HGO ledger remains the
+detailed authority record. Native Codex sandbox/App-Server execution under WSL
+is outside this decision. The prior Critic-PASS note was not candidate- or
 trajectory-bound; a fresh review failed that evidence boundary. Formal
 acceptance therefore also requires exact-candidate deterministic evidence and
 a fresh refs-only review on the stable candidate.

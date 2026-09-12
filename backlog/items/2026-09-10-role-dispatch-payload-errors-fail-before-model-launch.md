@@ -233,6 +233,22 @@ caller would not prove product integration. The remaining closure decision is
 whether the external Antigravity host provides that real call boundary or a
 repository-owned coordinator must be added.
 
+The tenth slice makes the shared batch barrier observable at the coordinator
+boundary. `runRoleDispatchBatch()` now emits one bounded, frozen `PREPARE`
+event for every packet before the first `START`, emits `START` immediately
+before the corresponding launcher, and emits `REFUSE` when the launch-time
+recheck detects stale inputs or destinations. A bad or throwing event sink
+fails closed before the affected launch. The event contains only schema,
+phase, input index, dispatch ID, status and code; it cannot expose prompts,
+paths, packets or repository roots.
+
+The dispatch-policy suite passes 34/34 and an independent refs-only Critic
+returned PASS with no findings. See
+`backlog/evidence/2026-09-12-role-dispatch-batch-events-critic-pass.md`. The
+item remains open for the real Antigravity production coordinator selected by
+the PO; this event slice supplies its truthful progress surface without
+inventing a second launch path.
+
 ## Triage — 2026-09-11
 
 - **Decision:** accepted for Nova B; no additional 0.6.2 release blocker was

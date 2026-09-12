@@ -51,3 +51,20 @@ behavior is therefore correct, but it has no autonomous recovery path.
 - **Rationale:** crash recovery expands lock ownership and concurrency semantics; keeping it separate avoids weakening the reviewed repair with racy stale-path deletion.
 - **Assignment:** Pipeline team, Nova B, due 2026-09-30, after the current HGO repair is independently reviewed.
 - **Date:** 2026-09-12
+
+## Implementation evidence — 2026-09-12
+
+Commit `3d3a478451e03b7b241e7751fd9f9b2f3fdf32b0` gives ordinary audit
+append and repair one shared authenticated lock primitive. It writes and
+fsyncs the complete lock record under a unique private sibling and publishes
+the canonical lock create-only with an atomic hard link. Recovery accepts the
+two-link crash residue only when exactly one private sibling has identical
+device, inode, bytes and valid MAC; live, ambiguous, malformed and foreign
+states remain fail-closed.
+
+Four real SIGKILL fixtures cover normal recovery and both sides of canonical
+publication. Concurrent-reclaimer and replacement-writer cases prove that a
+replacement lock is never removed. The focused library suite passes 132/132,
+the CLI suite passes 23/23, documentation contracts pass, and the independent
+Critic returned PASS with no findings. See
+`backlog/evidence/2026-09-12-hgo-crash-and-idempotency-critic-pass.md`.
