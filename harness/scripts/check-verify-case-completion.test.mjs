@@ -225,10 +225,12 @@ check("VCR07", "required needs both the suite protocol and the Verify-side compl
   assert.equal(missingPolicy.ok, false);
   assert.ok(missingPolicy.findings.includes("REQUIRED-VERIFY-POLICY required has no Verify caseCompletion policy"));
 
-  write(context.root, verifyPath, verify.replace(/caseCompletion:\s*\{[^}]+\}/u, "caseCompletion: null"));
-  const nullPolicy = checkVerifyCaseCompletion({ root: context.root });
-  assert.equal(nullPolicy.ok, false);
-  assert.ok(nullPolicy.findings.includes("REQUIRED-VERIFY-POLICY required has no Verify caseCompletion policy"));
+  for (const nullish of ["null", "undefined", "(null)", "(undefined)", "null ?? {}"]){
+    write(context.root, verifyPath, verify.replace(/caseCompletion:\s*\{[^}]+\}/u, `caseCompletion: ${nullish}`));
+    const nullishPolicy = checkVerifyCaseCompletion({ root: context.root });
+    assert.equal(nullishPolicy.ok, false, nullish);
+    assert.ok(nullishPolicy.findings.includes("REQUIRED-VERIFY-POLICY required has no Verify caseCompletion policy"), nullish);
+  }
 });
 
 check("VCR08", "required cannot claim an unreachable helper call as normal suite setup", () => {

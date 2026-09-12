@@ -209,7 +209,9 @@ function hasVerifyCaseCompletionPolicy(element) {
   const matches = properties.filter((property) => /^\s*caseCompletion\s*:/u.test(maskNonCode(property)));
   if (matches.length !== 1) return false;
   const value = maskNonCode(matches[0]).replace(/^\s*caseCompletion\s*:/u, "").trim();
-  return value !== "" && value !== "null" && value !== "undefined";
+  if (!value.startsWith("{")) return false;
+  const closeValue = matchingClose(value, 0, "{", "}");
+  return closeValue === value.length - 1;
 }
 
 function parseVerifyRegistrations(source, findings) {
