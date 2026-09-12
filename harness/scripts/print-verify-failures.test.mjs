@@ -120,6 +120,22 @@ check("syntactically valid token or PII shaped names are not public without inve
   } finally { rmSync(value.root, { recursive: true, force: true }); }
 });
 
+check("duplicate suite rows fail closed before they can consume the public record budget", () => {
+  const value = fixture();
+  try {
+    writeFileSync(value.evidencePath, JSON.stringify(evidence([
+      { name: "unit-tests", exitCode: 1 },
+      { name: "unit-tests", exitCode: 2 },
+    ])));
+    assert.deepEqual(parsed(buildFailureReport(value))[0], {
+      schema: PUBLIC_NOTICE_SCHEMA,
+      kind: "reporter-notice",
+      code: "PVF-EVIDENCE-SHAPE",
+      detail: REDACTION_MARKER,
+    });
+  } finally { rmSync(value.root, { recursive: true, force: true }); }
+});
+
 check("missing or ambiguous repository suite inventory fails closed with visible redaction", () => {
   const value = fixture();
   try {

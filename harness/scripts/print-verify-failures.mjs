@@ -88,10 +88,13 @@ function safeFailingSteps(evidence, suiteInventory) {
   if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)
     || evidence.schema !== "pipeline.verify-evidence.v0" || !Array.isArray(evidence.steps)) return null;
   const rows = [];
+  const seen = new Set();
   for (const [index, step] of evidence.steps.entries()) {
     if (!step || typeof step !== "object" || Array.isArray(step)
       || typeof step.name !== "string" || !SUITE_NAME.test(step.name) || !suiteInventory.has(step.name)
       || !Number.isSafeInteger(step.exitCode) || step.exitCode < 0 || step.exitCode > 255) return null;
+    if (seen.has(step.name)) return null;
+    seen.add(step.name);
     if (step.exitCode !== 0) rows.push({ index, name: step.name, exitCode: step.exitCode });
   }
   return rows;
