@@ -2,12 +2,12 @@
 
 Date: 2026-09-12
 Task: `NVA-B-HUMAN-TERMINAL-TEMPLATES-SLICE1-1`
-Candidate: pending commit
+Implementation candidate: `36c38b6c0e01a65b000622d6b6ac1fab64b378ae`
+Implementation tree: `e1062b153a2719cce51e7e8bdd62f243dd80a447`
 
-The implementation is an uncommitted working candidate. The SHA-256 values
-below bind the exact reviewed working blobs; this evidence does not claim that
-the repository's current `HEAD` tree contains them. A commit-bound receipt must
-replace this working-candidate binding after integration.
+The SHA-256 values below bind the six implementation blobs contained in that
+exact commit and tree. This evidence-only binding update is subsequent to the
+implementation candidate and does not change those six blobs.
 
 ## Delivered boundary
 
