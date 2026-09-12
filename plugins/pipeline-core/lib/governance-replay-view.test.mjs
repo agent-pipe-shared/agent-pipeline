@@ -100,4 +100,12 @@ test("v2 view rejects extra action payload fields and mismatched action timeline
 
 test("v2 view fails closed on an incomplete checkpoint", () => {
   assert.throws(() => buildGovernanceReplayViewModel({ ...observedV2(), checkpoint: { sequence: 3 } }), (error) => error.code === "GRV-READBACK");
+  const gapped = observedV2().dispatchTimelines.map((timeline) => ({
+    ...timeline,
+    events: timeline.events.map((entry) => entry.sequence === 2 ? { ...entry, sequence: 3, eventDigest: "3".repeat(64) } : entry),
+  }));
+  assert.throws(
+    () => buildGovernanceReplayViewModel({ ...observedV2(), dispatchTimelines: gapped, actionTimelines: [], checkpoint: { ...checkpoint, sequence: 3, eventDigest: "3".repeat(64) } }),
+    (error) => error.code === "GRV-SEQUENCE-COVERAGE",
+  );
 });

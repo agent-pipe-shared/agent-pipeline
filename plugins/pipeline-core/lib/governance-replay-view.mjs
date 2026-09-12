@@ -49,7 +49,7 @@ function validateActionTimeline(timeline) {
 }
 function validateV2History(checkpoint, dispatchTimelines, actionTimelines) {
   const events = [...dispatchTimelines, ...actionTimelines].flatMap((timeline) => timeline.events).sort((left, right) => left.sequence - right.sequence);
-  if (events.length === 0 || events.some((event, index) => index > 0 && events[index - 1].sequence === event.sequence)) fail("GRV-SEQUENCE-FORK");
+  if (events.length === 0 || events.some((event, index) => event.sequence !== index + 1)) fail("GRV-SEQUENCE-COVERAGE");
   const last = events.at(-1);
   if (checkpoint.sequence !== last.sequence || checkpoint.eventDigest !== last.eventDigest || checkpoint.candidateCommit !== last.candidate.commit || checkpoint.candidateTree !== last.candidate.tree) fail("GRV-CHECKPOINT");
 }
