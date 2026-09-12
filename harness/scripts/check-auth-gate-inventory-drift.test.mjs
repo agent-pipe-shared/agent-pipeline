@@ -324,6 +324,8 @@ test("terminal catalog JSON schema and runtime validator close every structural 
   assert.equal(schema.$defs.entry.additionalProperties, false);
   assert.equal(schema.$defs.boundary.additionalProperties, false);
   assert.equal(schema.$defs.slot.additionalProperties, false);
+  assert.deepEqual(schema.$defs.slot.allOf[0].then.required, ["enum"]);
+  assert.equal(schema.$defs.slot.allOf[0].else.properties.enum, false);
   assert.equal(schema.$defs.readback.additionalProperties, false);
   const designedFields = [
     "id", "inventoryId", "revision", "purpose", "audience", "disposition", "templateId", "builderId",
@@ -335,6 +337,17 @@ test("terminal catalog JSON schema and runtime validator close every structural 
   catalog.entries[0].unexpected = true;
   assert.equal(validateHumanTerminalActionCatalog(catalog).valid, false);
   assert.throws(() => parseHumanTerminalActionCatalog(JSON.stringify(catalog)), /closed entry fields required/u);
+});
+
+test("slot enum presence has schema/runtime parity", () => {
+  const base = JSON.parse(readFileSync(SHIPPED_CATALOG_PATH, "utf8"));
+  const enumMissingValues = structuredClone(base);
+  enumMissingValues.entries[0].slots[0].type = "enum";
+  assert.equal(validateHumanTerminalActionCatalog(enumMissingValues).valid, false);
+
+  const nonEnumWithValues = structuredClone(base);
+  nonEnumWithValues.entries[0].slots[0].enum = ["unexpected"];
+  assert.equal(validateHumanTerminalActionCatalog(nonEnumWithValues).valid, false);
 });
 
 test("published registered/inactive schema branches and runtime reject the same contract-field mismatches", () => {
