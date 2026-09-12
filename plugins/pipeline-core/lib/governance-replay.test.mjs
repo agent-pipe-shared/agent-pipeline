@@ -63,3 +63,25 @@ test("mixed replay rejects unknown schemas, malformed actions, and forks across 
   assert.throws(() => projectGovernanceReplay([{ ...action(1), payload: { ...action(1).payload, runner: "codex" } }]), (error) => error.code === "GR-ACTION");
   assert.throws(() => projectGovernanceReplay([event(1), action(1)]), (error) => error.code === "GR-SEQUENCE-FORK");
 });
+
+test("upgrade replay preserves legacy dispatch/action records beside current action payloads", () => {
+  const fixture = [
+    event(1),
+    event(2, {
+      eventId: "legacy-recovery",
+      kind: "recovery",
+      status: "completed",
+      reasonCode: "RECOVERED",
+      correlation: { packageId: "phoenix-3", dispatchId: "legacy-action", attemptId: "attempt-1", workerId: "worker-1", correlationId: "correlation-legacy", queueRevision: 0 },
+    }),
+    action(3, { kind: "recovery", status: "completed", reasonCode: "RECOVERY_COMPLETED", requestId: "recovery-plan" }),
+    action(4, { kind: "reconciliation", status: "completed", reasonCode: "RECONCILIATION_COMPLETED", requestId: "reconciliation-plan" }),
+  ];
+  const before = JSON.stringify(fixture);
+  const first = projectGovernanceReplay(fixture);
+  const second = projectGovernanceReplay(structuredClone(fixture));
+  assert.equal(JSON.stringify(first), JSON.stringify(second));
+  assert.equal(JSON.stringify(fixture), before);
+  assert.deepEqual(first.dispatchTimelines.map(({ dispatchId }) => dispatchId), ["dispatch-1", "legacy-action"]);
+  assert.deepEqual(first.actionTimelines.flatMap(({ events }) => events.map(({ kind }) => kind)), ["recovery", "reconciliation"]);
+});
