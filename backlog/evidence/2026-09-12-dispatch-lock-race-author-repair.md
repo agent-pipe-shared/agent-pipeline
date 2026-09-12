@@ -16,4 +16,6 @@
 
 The Author route currently has no cryptographically signed event equivalent to
 the GMW request/grant/revoke chain. This note records the attended action
-honestly; adding signed Author-repair events remains a governance follow-up.
+honestly. The owned, dated remediation is
+[`pipeline.author-repair-route-has-no-signed-event-chain`](../items/2026-09-12-author-repair-route-has-no-signed-event-chain.md),
+assigned to the Pipeline in Nightwing and due 2026-09-30.
