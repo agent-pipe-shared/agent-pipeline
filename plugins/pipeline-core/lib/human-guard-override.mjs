@@ -5,6 +5,8 @@ import {
   chmodSync,
   closeSync,
   existsSync,
+  fsyncSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -15,6 +17,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
+import { hostname } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -72,6 +75,7 @@ const AUDIT_HEAD_SCHEMA = "pipeline.human-guard-override-audit-head.v1";
 const AUDIT_STATE_SCHEMA = "pipeline.human-guard-override-audit-state.v1";
 const AUDIT_REPAIR_SCHEMA = "pipeline.human-guard-override-audit-repair.v1";
 const AUDIT_REPAIR_PREIMAGE_SCHEMA = "pipeline.human-guard-override-audit-repair-preimage.v1";
+const AUDIT_LOCK_SCHEMA = "pipeline.human-guard-override-audit-lock.v1";
 const MAX_REASON_BYTES = 500;
 const LIFECYCLE_NOT_READY_CODE = "GUARD-LIFECYCLE-NOT-READY";
 // 30 minutes, not 5 (PO, 2026-08-08). The window is sized for a HUMAN, and the
@@ -711,6 +715,7 @@ function storage(common) {
     audit: join(base, "audit.jsonl"),
     auditHead: join(base, "audit.head.json"),
     auditLock: join(base, "audit.lock"),
+    auditLockRecovery: join(base, "audit.lock.recover"),
     // R-AC-08: the command-offer journal is a SEPARATE file in the same private
     // directory, never a member of the HMAC-chained override ledger above.
     commandOffers: join(base, "command-offers.jsonl"),
@@ -2077,12 +2082,215 @@ function assertNoRequestDrift(repository, policy, request, { isLocalPluginInstal
 function key(paths, { create = false } = {}) {
   if (!existsSync(paths.key)) {
     if (!create) fail("HGO-AUDIT-KEY", "audit key is missing");
-    writeExclusive(paths.key, randomBytes(32));
+    try { writeExclusive(paths.key, randomBytes(32)); }
+    catch (error) {
+      // Two first appends may race before an audit lock exists. The exclusive
+      // key publication has one winner; every loser authenticates the winner's
+      // exact private key below rather than replacing it.
+      if (error?.code !== "EEXIST") throw error;
+    }
   }
   safePrivateFile(paths.key);
   const bytes = readFileSync(paths.key);
   if (bytes.length !== 32) fail("HGO-AUDIT", "audit key is invalid");
   return bytes;
+}
+
+function procStart(pid) {
+  const text = readFileSync(`/proc/${pid}/stat`, "utf8");
+  const close = text.lastIndexOf(")");
+  if (close < 0) throw new Error("invalid proc stat");
+  const fields = text.slice(close + 2).trim().split(/\s+/u);
+  if (fields.length < 20 || !/^[0-9]+$/u.test(fields[19])) throw new Error("invalid proc start");
+  return fields[19];
+}
+
+function localAuditLockOwner() {
+  const hostId = hostname().toLowerCase();
+  const linux = process.platform === "linux";
+  const bootId = linux
+    ? readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase()
+    : "unavailable";
+  if (!SAFE_ID.test(hostId) || !SAFE_ID.test(bootId)) {
+    fail("HGO-AUDIT-LOCK-AMBIGUOUS", "audit lock host identity is unavailable");
+  }
+  return {
+    platform: process.platform,
+    hostId,
+    bootId,
+    pid: process.pid,
+    processStart: linux ? procStart(process.pid) : "unavailable",
+    nonce: randomBytes(16).toString("hex"),
+  };
+}
+
+function auditLockRecord(secret, owner, purpose) {
+  const core = { schema: AUDIT_LOCK_SCHEMA, purpose, owner };
+  return { ...core, mac: createHmac("sha256", secret).update(canonical(core)).digest("hex") };
+}
+
+function auditLockBytes(record) {
+  return Buffer.from(`${JSON.stringify(record)}\n`, "utf8");
+}
+
+function lockIdentity(path, bytes = null) {
+  const info = safePrivateFile(path);
+  const actual = readFileSync(path);
+  if (actual.length > 4096) fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock metadata exceeds its bound");
+  if (bytes !== null && !actual.equals(bytes)) return null;
+  return { dev: String(info.dev), ino: String(info.ino), bytes: actual };
+}
+
+function sameLockIdentity(path, identity) {
+  try {
+    const current = lockIdentity(path, identity.bytes);
+    return current !== null && current.dev === identity.dev && current.ino === identity.ino;
+  } catch { return false; }
+}
+
+function readAuditLock(path, secret) {
+  let identity;
+  try { identity = lockIdentity(path); }
+  catch (error) {
+    if (error instanceof HumanGuardOverrideError) throw error;
+    fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock metadata is unreadable");
+  }
+  if (identity.bytes.length === 0) fail("HGO-AUDIT-LOCK-LEGACY", "legacy empty audit lock requires manual disposition");
+  let value;
+  try { value = JSON.parse(identity.bytes.toString("utf8")); }
+  catch { fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock metadata is malformed"); }
+  if (!identity.bytes.equals(Buffer.from(`${JSON.stringify(value)}\n`, "utf8"))
+    || !exactKeys(value, ["schema", "purpose", "owner", "mac"])
+    || value.schema !== AUDIT_LOCK_SCHEMA || !SHA256.test(value.mac ?? "")
+    || !["genesis", "existing", "recovery"].includes(value.purpose)
+    || !object(value.owner)
+    || !exactKeys(value.owner, ["platform", "hostId", "bootId", "pid", "processStart", "nonce"])
+    || !SAFE_ID.test(value.owner.platform ?? "")
+    || !SAFE_ID.test(value.owner.hostId ?? "") || !SAFE_ID.test(value.owner.bootId ?? "")
+    || !Number.isSafeInteger(value.owner.pid) || value.owner.pid < 1
+    || !SAFE_ID.test(value.owner.processStart ?? "")
+    || !/^[a-f0-9]{32}$/u.test(value.owner.nonce ?? "")) {
+    fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock metadata is malformed");
+  }
+  const core = { schema: value.schema, purpose: value.purpose, owner: value.owner };
+  const expected = createHmac("sha256", secret).update(canonical(core)).digest("hex");
+  if (value.mac !== expected) fail("HGO-AUDIT-LOCK-UNVERIFIED", "audit lock ownership authentication failed");
+  return { record: value, identity };
+}
+
+function auditLockOwnerState(record) {
+  if (process.platform !== "linux" || record.owner.platform !== "linux") return "ambiguous";
+  let localHost;
+  let localBoot;
+  try {
+    localHost = hostname().toLowerCase();
+    localBoot = readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim().toLowerCase();
+  } catch { return "ambiguous"; }
+  if (record.owner.hostId !== localHost) return "ambiguous";
+  if (record.owner.bootId !== localBoot) return "dead";
+  try { return procStart(record.owner.pid) === record.owner.processStart ? "live" : "dead"; }
+  catch (error) { return error?.code === "ENOENT" ? "dead" : "ambiguous"; }
+}
+
+function publishAuditLock(path, secret, purpose) {
+  const record = auditLockRecord(secret, localAuditLockOwner(), purpose);
+  const bytes = auditLockBytes(record);
+  let fd;
+  try {
+    fd = openSync(path, "wx", 0o600);
+    writeFileSync(fd, bytes);
+    fsyncSync(fd);
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+  safePrivateFile(path);
+  return { path, record, identity: lockIdentity(path, bytes) };
+}
+
+function releaseOwnedAuditLock(lock) {
+  if (!lock || !existsSync(lock.path) || !sameLockIdentity(lock.path, lock.identity)) return false;
+  const quarantine = `${lock.path}.release.${process.pid}.${randomBytes(8).toString("hex")}`;
+  renameSync(lock.path, quarantine);
+  if (!sameLockIdentity(quarantine, lock.identity)) {
+    // Never unlink a pathname that may be a replacement. Restore this inode
+    // only if the canonical lock name is still free; otherwise quarantine is
+    // retained as evidence and all later acquisition remains fail-closed.
+    try { linkSync(quarantine, lock.path); unlinkSync(quarantine); } catch {}
+    return false;
+  }
+  unlinkSync(quarantine);
+  return true;
+}
+
+function clearAbandonedAuditRecovery(paths, secret) {
+  if (!existsSync(paths.auditLockRecovery)) return;
+  const observed = readAuditLock(paths.auditLockRecovery, secret);
+  const state = auditLockOwnerState(observed.record);
+  if (state === "live") fail("HGO-AUDIT-LOCK-RECOVERY-BUSY", "audit lock recovery is already active");
+  if (state !== "dead") fail("HGO-AUDIT-LOCK-AMBIGUOUS", "audit lock recovery owner state is ambiguous");
+  const quarantine = `${paths.auditLockRecovery}.dead.${process.pid}.${randomBytes(8).toString("hex")}`;
+  try { renameSync(paths.auditLockRecovery, quarantine); }
+  catch { fail("HGO-AUDIT-LOCK-CHANGED", "audit lock recovery guard changed during reclamation"); }
+  if (!sameLockIdentity(quarantine, observed.identity)) {
+    try { linkSync(quarantine, paths.auditLockRecovery); unlinkSync(quarantine); } catch {}
+    fail("HGO-AUDIT-LOCK-CHANGED", "audit lock recovery guard replacement was quarantined");
+  }
+  unlinkSync(quarantine);
+}
+
+function acquireAuditLock(paths, secret, dependencies = {}) {
+  const purpose = dependencies.purpose ?? "existing";
+  if (!["genesis", "existing"].includes(purpose)) {
+    fail("HGO-AUDIT-LOCK-MALFORMED", "audit lock purpose is invalid");
+  }
+  clearAbandonedAuditRecovery(paths, secret);
+  try {
+    const lock = publishAuditLock(paths.auditLock, secret, purpose);
+    if (existsSync(paths.auditLockRecovery)) {
+      releaseOwnedAuditLock(lock);
+      fail("HGO-AUDIT-LOCK-RECOVERY-BUSY", "audit lock recovery raced acquisition");
+    }
+    return lock;
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+  }
+
+  const observed = readAuditLock(paths.auditLock, secret);
+  const ownerState = auditLockOwnerState(observed.record);
+  if (ownerState === "live") fail("HGO-AUDIT-LOCKED", "audit ledger is busy");
+  if (ownerState !== "dead") fail("HGO-AUDIT-LOCK-AMBIGUOUS", "audit lock owner state is ambiguous");
+  if (observed.record.purpose !== purpose) {
+    fail("HGO-AUDIT-LOCK-STATE", "audit lock purpose does not match the requested ledger state");
+  }
+
+  let recovery;
+  try { recovery = publishAuditLock(paths.auditLockRecovery, secret, "recovery"); }
+  catch (error) {
+    if (error?.code === "EEXIST") fail("HGO-AUDIT-LOCK-RECOVERY-BUSY", "audit lock recovery is already active");
+    throw error;
+  }
+  let acquired;
+  const quarantine = `${paths.auditLock}.dead.${process.pid}.${randomBytes(8).toString("hex")}`;
+  try {
+    dependencies.afterRecoveryGuardFn?.();
+    const current = readAuditLock(paths.auditLock, secret);
+    if (!sameLockIdentity(paths.auditLock, observed.identity)
+      || canonical(current.record) !== canonical(observed.record)
+      || auditLockOwnerState(current.record) !== "dead") {
+      fail("HGO-AUDIT-LOCK-CHANGED", "audit lock changed during recovery");
+    }
+    renameSync(paths.auditLock, quarantine);
+    dependencies.afterQuarantineFn?.();
+    if (!sameLockIdentity(quarantine, observed.identity)) {
+      try { linkSync(quarantine, paths.auditLock); unlinkSync(quarantine); } catch {}
+      fail("HGO-AUDIT-LOCK-CHANGED", "audit lock replacement was quarantined during recovery");
+    }
+    acquired = publishAuditLock(paths.auditLock, secret, purpose);
+    unlinkSync(quarantine);
+    return { ...acquired, recovered: true };
+  } finally {
+    if (recovery) releaseOwnedAuditLock(recovery);
+  }
 }
 
 function authenticatedAuditLedger(paths, secret) {
@@ -2255,13 +2463,30 @@ function verifiedAuditEntries(paths, secret) {
 }
 
 function appendAudit(paths, event) {
-  let fd;
+  const hasAudit = existsSync(paths.audit);
+  const hasHead = existsSync(paths.auditHead);
+  const initialize = !hasAudit && !hasHead;
+  if (hasAudit !== hasHead) fail("HGO-AUDIT", "audit ledger/head presence is inconsistent");
+  const unauthenticatedLock = existsSync(paths.auditLock)
+    ? paths.auditLock
+    : (existsSync(paths.auditLockRecovery) ? paths.auditLockRecovery : null);
+  if (initialize && !existsSync(paths.key) && unauthenticatedLock !== null) {
+    const size = lstatSync(unauthenticatedLock).size;
+    fail(size === 0 ? "HGO-AUDIT-LOCK-LEGACY" : "HGO-AUDIT-LOCK-UNVERIFIED",
+      "an audit lock exists before authenticated genesis material");
+  }
+  const hadKey = existsSync(paths.key);
+  const secret = key(paths, { create: initialize });
+  if (initialize && hadKey) {
+    if (!existsSync(paths.auditLock)) fail("HGO-AUDIT", "audit ledger/head are missing");
+    const interrupted = readAuditLock(paths.auditLock, secret);
+    if (interrupted.record.purpose !== "genesis" || auditLockOwnerState(interrupted.record) !== "dead") {
+      fail("HGO-AUDIT", "audit genesis cannot be authenticated as an interrupted first append");
+    }
+  }
+  let lock;
   try {
-    fd = openSync(paths.auditLock, "wx", 0o600);
-    const initialize = !existsSync(paths.key)
-      && !existsSync(paths.audit)
-      && !existsSync(paths.auditHead);
-    const secret = key(paths, { create: initialize });
+    lock = acquireAuditLock(paths, secret, { purpose: initialize ? "genesis" : "existing" });
     const prior = initialize ? null : requireValidAuditState(paths, secret).ledger;
     const entries = prior?.entries ?? [];
     const core = {
@@ -2283,14 +2508,8 @@ function appendAudit(paths, event) {
       Buffer.from(`${JSON.stringify(auditHead(secret, [...entries, entry], ledgerBytes))}\n`, "utf8"),
     );
     return entry;
-  } catch (error) {
-    if (error?.code === "EEXIST") fail("HGO-AUDIT-LOCKED", "audit ledger is busy");
-    throw error;
   } finally {
-    if (fd !== undefined) {
-      closeSync(fd);
-      try { unlinkSync(paths.auditLock); } catch {}
-    }
+    releaseOwnedAuditLock(lock);
   }
 }
 
@@ -3806,10 +4025,10 @@ export function repairHumanGuardOverrideAudit({
     fail(code, "audit repair requires an attended terminal and exact typed readback");
   }
 
-  let fd;
+  let lock;
   try {
-    fd = openSync(paths.auditLock, "wx", 0o600);
     const secret = key(paths);
+    lock = acquireAuditLock(paths, secret, { ...dependencies, purpose: "existing" });
     const state = auditState(paths, secret);
     if (state.status === "terminal-invalid") fail("HGO-AUDIT", state.reason);
     if (state.status === "valid") {
@@ -3867,14 +4086,8 @@ export function repairHumanGuardOverrideAudit({
       entries: verified.entries,
       repairPreimageSha256: expectedPreimageSha256,
     };
-  } catch (error) {
-    if (error?.code === "EEXIST") fail("HGO-AUDIT-LOCKED", "audit ledger is busy");
-    throw error;
   } finally {
-    if (fd !== undefined) {
-      closeSync(fd);
-      try { unlinkSync(paths.auditLock); } catch {}
-    }
+    releaseOwnedAuditLock(lock);
   }
 }
 
@@ -4023,4 +4236,6 @@ export const humanGuardOverrideInternals = {
   // externalLocalMarketplaceObservation(), the way the existing NVA-BL-20
   // link-shaped tests already drive that function directly.
   pluginSourceTreeSha256,
+  acquireAuditLock,
+  releaseOwnedAuditLock,
 };

@@ -14,6 +14,7 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -1837,6 +1838,219 @@ function writeAuthenticatedAuditHead(base, entries, bytes) {
   writeFileSync(join(base, "audit.head.json"), `${JSON.stringify({ ...core, mac })}\n`, { mode: 0o600 });
 }
 
+function killedAuditWriter(base, purpose = "existing") {
+  const modulePath = join(PLUGIN_ROOT, "lib", "human-guard-override.mjs");
+  const child = [
+    'import { readFileSync } from "node:fs";',
+    'import { join } from "node:path";',
+    'import { pathToFileURL } from "node:url";',
+    'const [modulePath, base, purpose] = process.argv.slice(1);',
+    'const loaded = await import(pathToFileURL(modulePath).href);',
+    'const paths = { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") };',
+    'loaded.humanGuardOverrideInternals.acquireAuditLock(paths, readFileSync(join(base, "audit.key")), { purpose });',
+    'process.kill(process.pid, "SIGKILL");',
+  ].join("\n");
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", child, modulePath, base, purpose], {
+    encoding: "utf8", shell: false,
+  });
+  assert.equal(result.signal, "SIGKILL", result.stderr);
+  assert.equal(existsSync(join(base, "audit.lock")), true);
+}
+
+test("an authenticated killed genesis writer can finish the first audit entry", () => {
+  const root = fixture();
+  try {
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const base = join(common, "agent-pipeline", "human-guard-overrides");
+    for (const path of [base, ...["requests", "plans", "capabilities", "locks"].map((name) => join(base, name))]) {
+      mkdirSync(path, { recursive: true, mode: 0o700 });
+    }
+    writeFileSync(join(base, "audit.key"), Buffer.alloc(32, 0x5a), { mode: 0o600 });
+    killedAuditWriter(base, "genesis");
+    recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "first after crash\n" }, denials: denial,
+    });
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 1);
+    assert.equal(existsSync(join(base, "audit.lock")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function killedAuditReclaimer(base) {
+  const modulePath = join(PLUGIN_ROOT, "lib", "human-guard-override.mjs");
+  const child = [
+    'import { readFileSync } from "node:fs";',
+    'import { join } from "node:path";',
+    'import { pathToFileURL } from "node:url";',
+    'const [modulePath, base] = process.argv.slice(1);',
+    'const loaded = await import(pathToFileURL(modulePath).href);',
+    'const paths = { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") };',
+    'loaded.humanGuardOverrideInternals.acquireAuditLock(paths, readFileSync(join(base, "audit.key")), {',
+    '  afterRecoveryGuardFn: () => process.kill(process.pid, "SIGKILL"),',
+    '});',
+  ].join("\n");
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", child, modulePath, base], {
+    encoding: "utf8", shell: false,
+  });
+  assert.equal(result.signal, "SIGKILL", result.stderr);
+  assert.equal(existsSync(join(base, "audit.lock.recover")), true);
+}
+
+test("a real killed audit writer is reclaimed by the next ordinary append without rewriting prior bytes", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    // Restore a valid head so the next normal denial exercises append rather
+    // than the separate torn-ledger repair path.
+    const ledger = readFileSync(join(base, "audit.jsonl"));
+    const entries = ledger.toString("utf8").trim().split("\n").map(JSON.parse);
+    writeAuthenticatedAuditHead(base, entries, ledger);
+    const beforeKey = readFileSync(join(base, "audit.key"));
+    const beforeLedger = readFileSync(join(base, "audit.jsonl"));
+    killedAuditWriter(base);
+
+    recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "after killed writer\n" }, denials: denial,
+    });
+    assert.equal(existsSync(join(base, "audit.lock")), false);
+    assert.deepEqual(readFileSync(join(base, "audit.key")), beforeKey);
+    assert.equal(readFileSync(join(base, "audit.jsonl")).subarray(0, beforeLedger.length).equals(beforeLedger), true);
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 3);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("repair-audit uses the same killed-owner reclamation and preserves its authenticated source bytes", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    const state = inspectHumanGuardOverrideAudit({ rootDir: root });
+    const beforeKey = readFileSync(join(base, "audit.key"));
+    const beforeLedger = readFileSync(join(base, "audit.jsonl"));
+    const beforeHead = readFileSync(join(base, "audit.head.json"));
+    killedAuditWriter(base);
+    const challenge = `HGO-AUDIT-${state.repairPreimageSha256.slice(0, 12).toUpperCase()}`;
+    const repaired = repairHumanGuardOverrideAudit({
+      rootDir: root, expectedPreimageSha256: state.repairPreimageSha256, activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => challenge },
+    });
+    assert.equal(repaired.status, "repaired");
+    assert.deepEqual(readFileSync(join(base, "audit.key")), beforeKey);
+    assert.equal(readFileSync(join(base, "audit.jsonl")).subarray(0, beforeLedger.length).equals(beforeLedger), true);
+    assert.notDeepEqual(readFileSync(join(base, "audit.head.json")), beforeHead);
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).status, "valid");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a writer recovers when the prior dead-owner reclaimer was itself killed", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    const ledger = readFileSync(join(base, "audit.jsonl"));
+    const entries = ledger.toString("utf8").trim().split("\n").map(JSON.parse);
+    writeAuthenticatedAuditHead(base, entries, ledger);
+    killedAuditWriter(base);
+    killedAuditReclaimer(base);
+    recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "after killed reclaimer\n" }, denials: denial,
+    });
+    assert.equal(existsSync(join(base, "audit.lock")), false);
+    assert.equal(existsSync(join(base, "audit.lock.recover")), false);
+    assert.equal(verifyHumanGuardOverrideAudit({ rootDir: root }).entries, 3);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("legacy, malformed, unauthenticated and cross-host audit locks remain typed fail-closed", () => {
+  for (const kind of ["legacy", "malformed", "unverified", "ambiguous"]) {
+    const root = fixture();
+    try {
+      const { base } = tornAuditFixture(root);
+      const ledger = readFileSync(join(base, "audit.jsonl"));
+      const entries = ledger.toString("utf8").trim().split("\n").map(JSON.parse);
+      writeAuthenticatedAuditHead(base, entries, ledger);
+      const lockPath = join(base, "audit.lock");
+      if (kind === "legacy") writeFileSync(lockPath, "", { mode: 0o600 });
+      if (kind === "malformed") writeFileSync(lockPath, "not-json\n", { mode: 0o600 });
+      if (kind === "unverified" || kind === "ambiguous") {
+        killedAuditWriter(base);
+        const lock = JSON.parse(readFileSync(lockPath, "utf8"));
+        if (kind === "unverified") lock.mac = "0".repeat(64);
+        if (kind === "ambiguous") {
+          lock.owner.hostId = "different-host";
+          const core = { schema: lock.schema, purpose: lock.purpose, owner: lock.owner };
+          lock.mac = createHmac("sha256", readFileSync(join(base, "audit.key")))
+            .update(humanGuardOverrideInternals.canonical(core)).digest("hex");
+        }
+        writeFileSync(lockPath, `${JSON.stringify(lock)}\n`, { mode: 0o600 });
+      }
+      const expected = {
+        legacy: "HGO-AUDIT-LOCK-LEGACY",
+        malformed: "HGO-AUDIT-LOCK-MALFORMED",
+        unverified: "HGO-AUDIT-LOCK-UNVERIFIED",
+        ambiguous: "HGO-AUDIT-LOCK-AMBIGUOUS",
+      }[kind];
+      assert.throws(() => recordHumanGuardDenial({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+        toolInput: { file_path: "notes.md", content: `${kind}\n` }, denials: denial,
+      }), (error) => error instanceof HumanGuardOverrideError && error.code === expected);
+      assert.equal(existsSync(lockPath), true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("a recovery guard excludes a second reclaimer and a raced replacement is never unlinked", () => {
+  const root = fixture();
+  try {
+    const { base } = tornAuditFixture(root);
+    const secret = readFileSync(join(base, "audit.key"));
+    const protectedBytes = Object.fromEntries(["audit.key", "audit.jsonl", "audit.head.json"]
+      .map((name) => [name, readFileSync(join(base, name))]));
+    const paths = { auditLock: join(base, "audit.lock"), auditLockRecovery: join(base, "audit.lock.recover") };
+    killedAuditWriter(base);
+    const first = humanGuardOverrideInternals.acquireAuditLock(paths, secret, {
+      afterRecoveryGuardFn: () => {
+        assert.throws(() => humanGuardOverrideInternals.acquireAuditLock(paths, secret),
+          (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT-LOCK-RECOVERY-BUSY");
+      },
+    });
+    assert.equal(first.recovered, true);
+    for (const [name, bytes] of Object.entries(protectedBytes)) {
+      assert.deepEqual(readFileSync(join(base, name)), bytes, `${name} changed during lock-only recovery`);
+    }
+    humanGuardOverrideInternals.releaseOwnedAuditLock(first);
+
+    killedAuditWriter(base);
+    let replacement;
+    const parkedRecovery = join(base, "parked.recover");
+    const parkedDead = join(base, "parked.dead");
+    assert.throws(() => humanGuardOverrideInternals.acquireAuditLock(paths, secret, {
+      afterRecoveryGuardFn: () => {
+        renameSync(paths.auditLockRecovery, parkedRecovery);
+        renameSync(paths.auditLock, parkedDead);
+        replacement = humanGuardOverrideInternals.acquireAuditLock(paths, secret);
+        renameSync(parkedRecovery, paths.auditLockRecovery);
+      },
+    }), (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT-LOCK-CHANGED");
+    assert.equal(existsSync(paths.auditLock), true, "the replacement lock remains canonical");
+    assert.equal(humanGuardOverrideInternals.releaseOwnedAuditLock(replacement), true);
+    assert.equal(existsSync(paths.auditLock), false);
+    unlinkSync(parkedDead);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("an authenticated empty head and a multi-entry tail recover without dropping prefix bytes", () => {
   const root = fixture();
   try {
@@ -2141,6 +2355,14 @@ test("deleted ledger, authenticated head, or their pair fails verification", () 
         () => verifyHumanGuardOverrideAudit({ rootDir: root }),
         (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT",
       );
+      assert.throws(() => recordHumanGuardDenial({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+        toolInput: { file_path: "notes.md", content: `retry-${deleted}` }, denials: denial,
+      }), (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT");
+      if (deleted === "both") {
+        assert.equal(existsSync(join(base, "audit.jsonl")), false);
+        assert.equal(existsSync(join(base, "audit.head.json")), false);
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

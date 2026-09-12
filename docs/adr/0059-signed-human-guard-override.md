@@ -306,12 +306,36 @@ before advancing the head, so an interruption between those writes is itself
 detectable and a retry completes without duplicating the event. The same completed
 operation is idempotently readable by its original preimage digest.
 
-This completion guarantee requires an available audit lock. Handled write
-failures release the owning writer's lock; contending writers cannot remove it.
-Abrupt process death may leave a stale `audit.lock`, which remains fail-closed as
-`HGO-AUDIT-LOCKED`. Safe stale-lock reclamation and power-loss durability are not
-provided by this amendment. Missing genesis material without an authenticated
-old head remains terminal-invalid.
+### Authenticated audit-lock recovery amendment (2026-09-12)
+
+Ordinary append and attended repair use one authenticated audit-lock primitive.
+The bounded canonical lock record is MAC-bound to `audit.key` and identifies the
+lock purpose (`genesis`, `existing` or `recovery`), host, boot, PID, process start
+and a random nonce. Linux process identity can
+therefore classify an exact owner as live, a missing or PID-reused owner as dead,
+and a same-host prior-boot owner as dead. Cross-host, unsupported-platform and
+unobservable owners are ambiguous and remain fail-closed. Legacy empty,
+malformed and unauthenticated locks also remain fail-closed under separate typed
+errors; age alone never establishes death.
+
+Dead-owner reclamation is serialized by an authenticated recovery guard. After
+acquiring that guard, the reclaimer rechecks the dead record and inode, renames
+the lock atomically into a unique quarantine, reads the quarantined identity
+back, and only then publishes its own lock with exclusive creation. Normal
+acquirers check the recovery guard on both sides of publication. Release uses the
+same identity discipline: it renames its owned inode and verifies the quarantine
+before unlinking. A concurrent replacement can therefore be detected and
+preserved, never unlinked as though it were the prior owner. Reclamation itself
+does not mutate the ledger, head or key. The recovery guard uses the same owner
+record and dead-owner classification, so a later acquirer can safely reclaim a
+guard left by a reclaimer that itself crashed.
+
+This amendment supplies crash and same-host power-loss recovery where robust
+process identity is available. It deliberately does not infer death from elapsed
+time or from an unverifiable owner. Missing genesis material without an
+authenticated old head remains terminal-invalid. A first append may resume only
+from a dead authenticated `genesis` lock; a bare key or an `existing` lock cannot
+authorize recreation of a missing ledger/head pair.
 
 `prepare-for-signature` authenticates the audit ledger before creating or returning
 a plan or signable intent. Only the recoverable torn-append classification names

@@ -124,13 +124,29 @@ authenticated repair event identifies the pending completion; retry advances the
 head without appending a second event. A completed retry returns idempotently only
 for the same repair-preimage digest.
 
-Recovery requires the exclusive audit lock to be available. A handled write
-failure releases only the current writer's lock; a competing writer never removes
-it. Abrupt process death can leave `audit.lock` behind, and this implementation
-does not reclaim such locks: `HGO-AUDIT-LOCKED` remains fail-closed. The retry
-guarantee covers interruptions that release the lock, not stale-lock recovery or
-power-loss durability. Missing genesis material, before a first authenticated
-head exists, is also terminal-invalid.
+Both ordinary append and attended repair acquire the audit lock through one
+primitive. A lock is a bounded canonical record authenticated by `audit.key`; it
+binds its `genesis`/`existing`/`recovery` purpose, host, boot, PID, process start
+and a random nonce. On Linux, an exact
+same-process identity is live, a missing or reused PID is dead, and a prior boot
+on the same host is dead. A different host, an unavailable process observation,
+an unsupported platform, a legacy empty lock, malformed bytes and an invalid MAC
+all remain fail-closed with distinct diagnostics.
+
+A dead-owner recovery first publishes its own authenticated recovery guard. It
+then rechecks record bytes and inode identity, atomically renames the dead lock to
+a unique quarantine, reads that identity back, and exclusively publishes the new
+owner. Every normal acquirer checks the recovery guard before and after its own
+publication. Release also renames and verifies its owned inode before unlinking,
+so neither recovery nor cleanup can unlink a replacement lock. A raced or
+ambiguous replacement remains preserved and fails closed. Lock reclamation does
+not rewrite the audit ledger, head or key. The recovery guard carries the same
+authenticated owner record; a later acquirer reclaims it only after proving that
+owner dead with the same rename/readback discipline, so a crash of the reclaimer
+does not introduce a second permanent lock. Missing genesis material, before a
+first authenticated head exists, remains terminal-invalid. The only admitted
+first-write continuation is a dead, authenticated `genesis` lock; an orphan key
+or an `existing` lock cannot recreate a deleted ledger/head pair.
 
 ### Phoenix case-migration recovery
 
