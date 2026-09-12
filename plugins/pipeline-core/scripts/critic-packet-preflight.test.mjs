@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { chmodSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   CriticPacketError,
@@ -17,12 +18,23 @@ import {
 } from "./critic-packet-preflight.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
-let passed = 0;
-async function check(name, fn) {
-  await fn();
-  passed += 1;
-  process.stdout.write(`PASS CPP${String(passed).padStart(2, "0")} ${name}\n`);
+const cases = [];
+const injectedFailure = process.env.PIPELINE_CPP_TEST_INJECT_FAILURE ?? "";
+const selfProbeChild = process.env.PIPELINE_CPP_TEST_SELF_PROBE_CHILD === "1";
+function check(name, run) {
+  const id = `CPP${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({
+    id,
+    name,
+    run() {
+      if (injectedFailure === id) {
+        assert.fail("intentional candidate packet case-completion failure");
+      }
+      return run();
+    },
+  });
 }
 function git(root, args) {
   return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" } }).trim();
@@ -121,7 +133,7 @@ function claimInput(prepared, claimantNonce) {
   };
 }
 
-await check("prepares a canonical no-remote packet with sorted diff and explicit empty governance", () => {
+check("prepares a canonical no-remote packet with sorted diff and explicit empty governance", () => {
   const f = fixture();
   try {
     const result = prepareCandidatePacket(options(f), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 7) });
@@ -136,7 +148,7 @@ await check("prepares a canonical no-remote packet with sorted diff and explicit
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-await check("binds an ordinary session preflight explicitly without changing legacy packets", () => {
+check("binds an ordinary session preflight explicitly without changing legacy packets", () => {
   const f = fixture();
   try {
     const legacy = prepareCandidatePacket(options(f, "8".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 16) });
@@ -159,7 +171,7 @@ await check("binds an ordinary session preflight explicitly without changing leg
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-await check("claims once, records once, consumes once and capability-cleans only its checkout", () => {
+check("claims once, records once, consumes once and capability-cleans only its checkout", () => {
   const f = fixture();
   try {
     const prepared = prepareCandidatePacket(options(f, "2".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 8) });
@@ -179,7 +191,7 @@ await check("claims once, records once, consumes once and capability-cleans only
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-await check("fails closed on expiry before a claim", () => {
+check("fails closed on expiry before a claim", () => {
   const f = fixture();
   try {
     const prepared = prepareCandidatePacket(options(f, "3".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 9) });
@@ -187,7 +199,7 @@ await check("fails closed on expiry before a claim", () => {
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-await check("detects candidate mutation before result publication", () => {
+check("detects candidate mutation before result publication", () => {
   const f = fixture();
   try {
     const prepared = prepareCandidatePacket(options(f, "4".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 10) });
@@ -197,7 +209,7 @@ await check("detects candidate mutation before result publication", () => {
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-await check("detects materialized diff mutation before a claim", () => {
+check("detects materialized diff mutation before a claim", () => {
   const f = fixture();
   try {
     const prepared = prepareCandidatePacket(options(f, "5".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 11) });
@@ -206,7 +218,7 @@ await check("detects materialized diff mutation before a claim", () => {
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-await check("binds an admissible closed Nova A5 lineage at claim and rejects a forged binding", () => {
+check("binds an admissible closed Nova A5 lineage at claim and rejects a forged binding", () => {
   const f = fixture();
   try {
     const prepared = prepareCandidatePacket(options(f, "6".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 12) });
@@ -218,6 +230,41 @@ await check("binds an admissible closed Nova A5 lineage at claim and rejects a f
     forged.recordSha256 = "0".repeat(64);
     assert.throws(() => claimCandidatePacket({ controlRoot: f.control, packetId: second.packet.packetId, adapter: second.packet.route.adapter, claimantNonce: "2".repeat(64), lineage: forged }, { now: new Date("2026-07-18T12:01:00.000Z") }), expectCode("CPP-LINEAGE"));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+
+  if (!selfProbeChild) {
+    const probe = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PIPELINE_CPP_TEST_INJECT_FAILURE: "CPP02",
+        PIPELINE_CPP_TEST_SELF_PROBE_CHILD: "1",
+        PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
+        PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: "65536",
+      },
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe", "pipe"],
+      timeout: 30_000,
+    });
+    assert.notEqual(probe.status, 0, "the injected early case must fail");
+    const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
+    const disposed = records.filter((record) => record.event === "DISPOSED");
+    assert.equal(records[0].event, "DECLARED");
+    assert.equal(records[0].caseCount, 7);
+    assert.equal(disposed.length, 7);
+    assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
+    assert.equal(disposed.find((record) => record.id === "CPP07")?.disposition, "pass");
+    assert.deepEqual(records.at(-1).counts, { pass: 6, fail: 1, skip: 0, todo: 0 });
+    assert.equal(records.at(-1).declaredCount, 7);
+    assert.equal(records.at(-1).disposedCount, 7);
+  }
 });
 
-process.stdout.write(`${passed}/7 checks passed.\n`);
+assert.equal(cases.length, 7, "the complete candidate packet corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});
