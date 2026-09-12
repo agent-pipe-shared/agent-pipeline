@@ -253,3 +253,8 @@ the Verify suite-registration checker on the revert candidate. Never reuse a
 completion receipt across the changed candidate. After release evidence has
 consumed these required policies, retain reader compatibility for those
 receipts and correct forward rather than silently downgrading the registry.
+
+Correction commit `35b9dee2` received an independent PASS with no findings.
+The batch evidence, including the first review's detected Verify-policy gap, is
+recorded in
+`backlog/evidence/2026-09-12-case-completion-migration-batch-2.md`.
