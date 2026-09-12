@@ -27,6 +27,8 @@ plugins/pipeline-core/lib/lifecycle-governance-events.mjs,
 plugins/pipeline-core/lib/governance-event.mjs,
 plugins/pipeline-core/lib/governance-event-store.mjs,
 plugins/pipeline-core/lib/governance-event-projection.mjs,
+plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs,
+plugins/pipeline-core/lib/governance-hgo-consumption-action.mjs,
 plugins/pipeline-core/lib/governance-replay.mjs,
 plugins/pipeline-core/lib/governance-replay-view.mjs,
 plugins/pipeline-core/lib/governance-replay-view-renderer.mjs,
@@ -141,7 +143,7 @@ The complete v1 kind/status/reason/candidate matrix is:
 | `verification` | `unknown` | `VERIFICATION_UNKNOWN` | exact commit/tree |
 | `verification` | `unavailable` | `VERIFICATION_UNAVAILABLE` | exact commit/tree |
 | `review` | `completed` | `REVIEW_PASSED` or `REVIEW_FINDINGS` | exact commit/tree |
-| `gate` | `completed` | `PUSH_APPROVED` or `DEPLOY_APPROVED`; `HGO_CONSUMED` only after the independent register decision | exact commit/tree |
+| `gate` | `completed` | `PUSH_APPROVED`, `DEPLOY_APPROVED`, or `HGO_CONSUMED` | exact commit/tree |
 | `recovery` | `completed` | `RECOVERY_COMPLETED` | exact commit/tree |
 | `reconciliation` | `completed` | `RECONCILIATION_COMPLETED` | exact commit/tree |
 
@@ -160,9 +162,9 @@ If a producer cannot observe a valid exact candidate, requesting an event is a
 preflight refusal with zero source mutation; it does not substitute a typed
 candidate or relax the store.
 
-An HGO consumption event is eligible only for an exact-candidate capability
-and only if the register explicitly accepts its public-safe projection. Global
-plugin installation and other candidate-less HGO modes remain in the private
+An HGO consumption event is eligible only for an exact-candidate capability.
+The PO accepted its public-safe projection on 2026-09-12. Global plugin
+installation and other candidate-less HGO modes remain in the private
 authenticated HGO audit ledger.
 
 ### D4a — Payload and envelope are bound by exact equalities
@@ -210,10 +212,17 @@ kind. Identifiers are copied from already validated source receipts or derived
 from their canonical digest; producers do not accept arbitrary descriptive
 identifiers solely for event construction.
 
-The portable HGO projection, if accepted, contains only the fact
+The accepted portable HGO projection contains only the fact
 `HGO_CONSUMED`, its candidate and a digest-derived action identifier. It omits
 reason, signer, key, selected paths, command, tool input, mode and author source
 root. The private HMAC ledger remains the detailed authority audit.
+
+Its producer reads back both the authenticated consumed capability and its
+matching authenticated audit entry. It then derives a domain-separated digest
+from their opaque request/plan digests and exact candidate. The portable source
+shape exposes only that derived digest, the candidate and the closed
+`consumed` status. The action builder accepts no raw request, plan, receipt,
+command, path, target, person or rationale field.
 
 Export projection continues to exclude payload bodies unless a later export
 policy explicitly admits a closed field. No existing allowlist is widened by
@@ -269,8 +278,8 @@ Removing read support would strand a valid stream prefix.
   `consumeCandidatePacket()`, never raw model output. Runner adapters converge
   on this source contract; runner identity is not retained.
 - **Gate:** successful `approve-push` or `approve-deploy` State readback.
-  Approval authority remains the signed proof/State contract. An optional HGO
-  consumption projection follows D4/D5.
+  Approval authority remains the signed proof/State contract. The accepted HGO
+  consumption projection follows D4/D5 and remains non-authoritative.
 - **Recovery:** successful `applySessionCleanupRecovery()` readback, plus an
   exact pre-action candidate observed during event planning. HGO audit
   repair is a later producer only if its public event vocabulary is accepted.
@@ -335,14 +344,12 @@ item
 under Pipeline/future native-Windows hardening. Its established review expiry
 is 2026-12-15. That date requires re-triage; it is not a delivery promise.
 
-## Remaining register decision
+## HGO projection register decision
 
-Decide whether exact-candidate HGO consumption receives the minimal portable
-projection in D5. Until explicitly accepted, HGO remains private-only and does
-not block the other four producer families. The PO owns this decision, with the
-Pipeline Elephant responsible for preparing its evidence. Review and decision
-are due no later than admission of LND-6; if LND-6 has not begun, the calendar
-re-triage date is 2026-10-15. The date is not a delivery promise, and the other
-accepted slices proceed while the decision remains open.
+On 2026-09-12 the PO selected the minimal repository-public-safe projection in
+D5. Exact-candidate HGO consumption may therefore produce `HGO_CONSUMED` with
+only its candidate and digest-derived identity. Detailed HGO authority evidence
+stays solely in the private authenticated ledger; candidate-less HGO modes are
+ineligible. This decision adds an observation and grants no authority.
 
 No new PO gate is required for implementing the remaining accepted slices.

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { canonicalSha256 } from "./governance-event.mjs";
 import {
@@ -14,6 +16,20 @@ import {
   GovernanceActionEventError,
   validateGovernanceActionEvent,
 } from "./governance-action-events.mjs";
+import {
+  GOVERNANCE_HGO_CONSUMPTION_RETRY_SCHEMA,
+  GovernanceHgoConsumptionActionError,
+  buildGovernanceHgoConsumptionAction,
+  buildGovernanceHgoConsumptionRetry,
+  retryGovernanceHgoConsumptionAction,
+  validateGovernanceHgoConsumptionRetry,
+  writeGovernanceHgoConsumptionAction,
+} from "./governance-hgo-consumption-action.mjs";
+import {
+  HGO_GOVERNANCE_CONSUMPTION_SOURCE_SCHEMA,
+  buildGovernanceHgoConsumptionSource,
+  validateGovernanceHgoConsumptionSource,
+} from "./governance-hgo-consumption-source.mjs";
 
 const schema = JSON.parse(readFileSync(new URL("../../../governance/schemas/governance-action-event.schema.json", import.meta.url), "utf8"));
 const candidate = Object.freeze({ commit: "a".repeat(40), tree: "b".repeat(40) });
@@ -35,7 +51,7 @@ function expectCode(code, fn) {
 
 function clone(value) { return structuredClone(value); }
 
-test("schema and runtime expose the same closed fields, kinds, statuses, reasons, and ten matrix rows", () => {
+test("schema and runtime expose the same closed fields, kinds, statuses, reasons, and eleven matrix rows", () => {
   assert.equal(schema.$id, "https://agent-pipeline.dev/schemas/pipeline.governance-action-event.v1.json");
   assert.equal(schema.additionalProperties, false);
   assert.deepEqual(schema.required, ["eventId", "kind", "status", "reasonCode", "correlation", "candidate"]);
@@ -50,7 +66,7 @@ test("schema and runtime expose the same closed fields, kinds, statuses, reasons
     reasonCode: branch.properties.reasonCode.const,
   }));
   assert.deepEqual(schemaRows, runtimeRows);
-  assert.equal(runtimeRows.length, 10);
+  assert.equal(runtimeRows.length, 11);
   assert.equal(schema.$defs.correlation.additionalProperties, false);
   assert.deepEqual(schema.$defs.correlation.required, ["actionId", "featureId", "requestId", "sessionId"]);
   assert.equal(schema.$defs.candidate.additionalProperties, false);
@@ -104,7 +120,7 @@ test("validator rejects every unlisted kind, status, reason, and candidate shape
   expectCode("GAE-STATUS", () => validateGovernanceActionEvent({ ...event, status: "cancelled" }));
   expectCode("GAE-STATUS", () => validateGovernanceActionEvent({ ...event, kind: "review", status: "failed", reasonCode: "REVIEW_FINDINGS" }));
   expectCode("GAE-REASON", () => validateGovernanceActionEvent({ ...event, reasonCode: "ARBITRARY_REASON" }));
-  expectCode("GAE-REASON", () => validateGovernanceActionEvent({ ...event, kind: "gate", reasonCode: "HGO_CONSUMED" }));
+  expectCode("GAE-REASON", () => validateGovernanceActionEvent({ ...event, kind: "gate", reasonCode: "HGO_NOT_CONSUMED" }));
   expectCode("GAE-CANDIDATE", () => validateGovernanceActionEvent({ ...event, candidate: { state: "unavailable" } }));
   expectCode("GAE-CANDIDATE", () => validateGovernanceActionEvent({ ...event, candidate: { commit: "A".repeat(40), tree: candidate.tree } }));
 });
@@ -131,4 +147,97 @@ test("builder is exact and source identity fields admit only validated IDs or no
   assert.deepEqual(input, snapshot);
   assert.deepEqual(event.correlation.featureId, notApplicable());
   assert.equal(event.correlation.sessionId, "session-1");
+});
+
+function hgoSource(overrides = {}) {
+  return {
+    schema: HGO_GOVERNANCE_CONSUMPTION_SOURCE_SCHEMA,
+    status: "consumed",
+    consumptionSha256: "c".repeat(64),
+    candidate,
+    ...overrides,
+  };
+}
+function hgoBuild(overrides = {}) {
+  return buildGovernanceHgoConsumptionAction({
+    source: hgoSource(), featureId: "nova-b", sessionId: notApplicable(), ...overrides,
+  });
+}
+function expectHgoCode(expected, run) {
+  assert.throws(run, (error) => error instanceof GovernanceHgoConsumptionActionError && error.code === expected);
+}
+
+test("private HGO identifiers collapse into one stable public source digest", () => {
+  const input = { planSha256: "d".repeat(64), requestSha256: "e".repeat(64), candidate };
+  const projected = buildGovernanceHgoConsumptionSource(input);
+  assert.deepEqual(Object.keys(projected).sort(), ["candidate", "consumptionSha256", "schema", "status"]);
+  assert.match(projected.consumptionSha256, /^[a-f0-9]{64}$/u);
+  assert.deepEqual(validateGovernanceHgoConsumptionSource(structuredClone(projected)), projected);
+  assert.deepEqual(buildGovernanceHgoConsumptionSource(input), projected);
+  assert.notEqual(
+    buildGovernanceHgoConsumptionSource({ ...input, planSha256: "f".repeat(64) }).consumptionSha256,
+    projected.consumptionSha256,
+  );
+  assert.equal(JSON.stringify(projected).includes(input.planSha256), false);
+  assert.equal(JSON.stringify(projected).includes(input.requestSha256), false);
+});
+
+test("authenticated consumption source maps to the one minimal HGO gate row", () => {
+  const event = hgoBuild();
+  assert.equal(event.kind, "gate");
+  assert.equal(event.status, "completed");
+  assert.equal(event.reasonCode, "HGO_CONSUMED");
+  assert.equal(event.correlation.requestId, "c".repeat(64));
+  assert.deepEqual(event.candidate, candidate);
+  assert.deepEqual(validateGovernanceActionEvent(event), event);
+  assert.deepEqual(Object.keys(event).sort(), ["candidate", "correlation", "eventId", "kind", "reasonCode", "status"]);
+});
+
+test("HGO source and portable result reject every private or descriptive field", () => {
+  for (const extra of [
+    { command: "git push" }, { path: "secret.txt" }, { humanName: "Andre" },
+    { reason: "approved" }, { target: "origin" }, { requestSha256: "d".repeat(64) },
+    { planSha256: "e".repeat(64) }, { receipt: { private: true } },
+  ]) expectHgoCode("GHCA-SOURCE-SHAPE", () => hgoBuild({ source: hgoSource(extra) }));
+});
+
+test("only an exact consumed HGO source with a valid digest and candidate is admitted", () => {
+  expectHgoCode("GHCA-SOURCE-SHAPE", () => hgoBuild({ source: hgoSource({ status: "armed" }) }));
+  expectHgoCode("GHCA-SOURCE-DIGEST", () => hgoBuild({ source: hgoSource({ consumptionSha256: "ABC" }) }));
+  expectHgoCode("GHCA-SOURCE-BINDING", () => hgoBuild({ source: hgoSource({ candidate: { state: "unavailable" } }) }));
+  expectHgoCode("GHCA-SOURCE-SHAPE", () => buildGovernanceHgoConsumptionAction({
+    source: hgoSource(), featureId: "nova-b", sessionId: notApplicable(), signer: "x",
+  }));
+});
+
+test("HGO artifact publication is create-only and retry is byte-identical", () => {
+  const root = mkdtempSync(join(tmpdir(), "governance-hgo-consumption-"));
+  try {
+    const event = hgoBuild();
+    const eventOutPath = "evidence/hgo-consumed.json";
+    const published = writeGovernanceHgoConsumptionAction({ rootDir: root, eventOutPath, event });
+    assert.equal(published.status, "written");
+    assert.deepEqual(JSON.parse(readFileSync(join(root, eventOutPath), "utf8")), event);
+    expectHgoCode("GHCA-OUTPUT-EXISTS", () => writeGovernanceHgoConsumptionAction({ rootDir: root, eventOutPath, event }));
+    const retry = buildGovernanceHgoConsumptionRetry({ eventOutPath, event });
+    assert.equal(retry.schema, GOVERNANCE_HGO_CONSUMPTION_RETRY_SCHEMA);
+    assert.deepEqual(validateGovernanceHgoConsumptionRetry(structuredClone(retry)), retry);
+    assert.equal(retryGovernanceHgoConsumptionAction({ rootDir: root, retry }).status, "existing-identical");
+    writeFileSync(join(root, eventOutPath), JSON.stringify(event));
+    expectHgoCode("GHCA-OUTPUT-EXISTS", () => retryGovernanceHgoConsumptionAction({ rootDir: root, retry }));
+    assert.equal(existsSync(join(root, eventOutPath)), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("HGO retry accepts no other gate fact", () => {
+  const event = hgoBuild();
+  expectHgoCode("GHCA-RETRY-EVENT", () => buildGovernanceHgoConsumptionRetry({
+    eventOutPath: "event.json", event: { ...event, reasonCode: "PUSH_APPROVED" },
+  }));
+  expectHgoCode("GHCA-RETRY-SHAPE", () => validateGovernanceHgoConsumptionRetry({
+    schema: GOVERNANCE_HGO_CONSUMPTION_RETRY_SCHEMA,
+    eventOutPath: "event.json",
+    event,
+    command: "retry",
+  }));
 });

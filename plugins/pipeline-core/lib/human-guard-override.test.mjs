@@ -38,6 +38,7 @@ import {
   humanGuardOverrideInternals,
   humanGuardRouteUnavailableReason,
   inspectHumanGuardOverrideAudit,
+  observeHumanGuardOverrideGovernanceConsumption,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   prepareHumanGuardOverrideForSignature,
@@ -337,14 +338,36 @@ test("ADR-0059 Decision 1: a valid, correctly-bound signed proof arms the identi
     assert.equal(armed.status, "armed");
     assert.equal(armed.mutated, true);
     assert.equal(armed.planSha256, plan.planSha256);
+    assert.throws(
+      () => observeHumanGuardOverrideGovernanceConsumption({ rootDir: root, planSha256: plan.planSha256 }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-GOVERNANCE-CONSUMPTION-NOT-CONSUMED",
+    );
     const consumed = consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
     });
     assert.equal(consumed.status, "consumed");
+    const publicSource = observeHumanGuardOverrideGovernanceConsumption({ rootDir: root, planSha256: plan.planSha256 });
+    assert.deepEqual(Object.keys(publicSource).sort(), ["candidate", "consumptionSha256", "schema", "status"]);
+    assert.equal(publicSource.schema, "pipeline.human-guard-override-governance-consumption-source.v1");
+    assert.equal(publicSource.status, "consumed");
+    assert.match(publicSource.consumptionSha256, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(publicSource.candidate, { commit: plan.repository.head, tree: plan.repository.tree });
+    assert.deepEqual(
+      observeHumanGuardOverrideGovernanceConsumption({ rootDir: root, planSha256: plan.planSha256 }),
+      publicSource,
+      "authenticated consumption projection must be stable on readback",
+    );
     const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
     const audit = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
     const auditEvents = readFileSync(audit, "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
     assert.deepEqual(auditEvents.map(({ type }) => type), ["denied", "authorized", "consumed"]);
+    const auditLines = readFileSync(audit, "utf8").trim().split("\n");
+    writeFileSync(audit, `${auditLines.slice(0, -1).join("\n")}\n`);
+    assert.throws(
+      () => observeHumanGuardOverrideGovernanceConsumption({ rootDir: root, planSha256: plan.planSha256 }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT",
+      "a consumed capability without its matching authenticated audit postimage must not project",
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

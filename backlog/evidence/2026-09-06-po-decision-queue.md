@@ -644,6 +644,32 @@ remain visible but would not create a second CI gate after Verify is already
 red. Alternative: authorize a broader sanitized-excerpt grammar and accept its
 higher residual disclosure risk. No implementation begins until the PO chooses.
 
+## Advisor calls from dispatched children — ready for PO decision
+
+Five known Goldfish/Critic dispatches called the Advisor despite a concrete
+briefing prohibition; the repository learned about them only through voluntary
+self-reporting. The normal demand-gated Advisor submission already produces a
+receipt, but the raw child call that caused these incidents has no durable
+trace. The prohibition is conditional: it is present when the Elephant has
+already bound the relevant Advisor demand, rather than a blanket ban on useful
+consultation.
+
+Recommended decision: when the exact child dispatch is bound to that explicit
+prohibition, block the raw Advisor call before its model effect and record a
+minimal private audit event. Without that prohibition binding, this rule does
+not block the call, but the existing demand, consent, candidate, route and
+evidence checks remain mandatory and the attempt remains auditable. This makes
+the promise in the concrete briefing enforceable while preserving permitted
+Advisor use.
+
+Alternative one is allow-and-audit, which makes the current Forbidden section
+non-binding and requires removing that promise from policy and templates.
+Alternative two blocks every direct child Advisor call and routes all judgment
+through stop, Elephant consultation and re-dispatch; it is simpler but adds
+turns and latency and discards consultation that has measurably improved prior
+work. The implementation stays pending until the PO selects one semantic
+boundary. Native Codex sandbox execution under WSL is outside this decision.
+
 ## Governance-action lifecycle ADR — proposed, review evidence pending
 
 The proposal at `docs/adr/draft-governance-action-events.md` keeps

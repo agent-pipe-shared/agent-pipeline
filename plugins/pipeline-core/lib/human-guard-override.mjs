@@ -64,6 +64,7 @@ import {
   assessWindowsPrivatePath,
   hardenWindowsPrivateDirectory,
 } from "./windows-private-state.mjs";
+import { buildGovernanceHgoConsumptionSource } from "./governance-hgo-consumption-source.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9._-]{1,120}$/u;
@@ -4049,6 +4050,63 @@ export function consumeHumanGuardOverride({
     ...(replanRequired ? { status: "replan", code: "HGO-EXPIRED" } : { status: "absent" }),
     ...(skippedInvalidRecords.length ? { skippedInvalidRecords } : {}),
   };
+}
+
+/**
+ * Read back one already-durable, exact-candidate HGO consumption as the only
+ * public-safe source shape admitted by ADR-0083 D5. The private capability and
+ * authenticated audit ledger remain authoritative; this returns neither of
+ * them and hashes their two opaque identifiers behind a domain-separated
+ * digest. Candidate-less global-plugin-install capabilities are deliberately
+ * ineligible.
+ */
+export function observeHumanGuardOverrideGovernanceConsumption({
+  rootDir,
+  planSha256,
+  spawn = spawnSync,
+} = {}) {
+  if (!SHA256.test(planSha256 ?? "")) {
+    fail("HGO-GOVERNANCE-CONSUMPTION-PLAN", "a lowercase SHA-256 plan digest is required");
+  }
+  const repo = topology(rootDir, spawn);
+  const paths = storage(repo.common);
+  let capability;
+  try { capability = validatedCapability(paths, capabilityPath(paths, planSha256)); }
+  catch (error) {
+    if (error instanceof HumanGuardOverrideError) throw error;
+    fail("HGO-GOVERNANCE-CONSUMPTION-ABSENT", "the requested override capability is unavailable");
+  }
+  if (capability.status !== "consumed" || capability.consumedAt === null) {
+    fail("HGO-GOVERNANCE-CONSUMPTION-NOT-CONSUMED", "the requested override capability has not been consumed");
+  }
+  if (capability.root !== repo.root) {
+    fail("HGO-GOVERNANCE-CONSUMPTION-ROOT", "the consumed override belongs to a different physical checkout");
+  }
+  const oid = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+  const candidate = { commit: capability.repository?.head, tree: capability.repository?.tree };
+  if (capability.mode === "global-plugin-install" || !oid.test(candidate.commit ?? "") || !oid.test(candidate.tree ?? "")) {
+    fail("HGO-GOVERNANCE-CONSUMPTION-CANDIDATE", "the consumed override has no exact repository candidate");
+  }
+  const consumedAuditEntry = verifiedAuditEntries(paths, key(paths)).some(({ event }) =>
+    event?.type === "consumed"
+      && event.requestSha256 === capability.requestSha256
+      && event.planSha256 === capability.planSha256
+      && event.reasonSha256 === capability.reasonSha256
+      && event.mode === capability.mode
+      && event.authorSourceRoot === capability.authorSourceRoot
+      && event.at === capability.consumedAt);
+  if (!consumedAuditEntry) {
+    fail("HGO-GOVERNANCE-CONSUMPTION-AUDIT", "no matching authenticated consumption audit entry exists");
+  }
+  try {
+    return buildGovernanceHgoConsumptionSource({
+      planSha256: capability.planSha256,
+      requestSha256: capability.requestSha256,
+      candidate,
+    });
+  } catch {
+    fail("HGO-GOVERNANCE-CONSUMPTION-SOURCE", "the public-safe consumption source could not be derived");
+  }
 }
 
 export function verifyHumanGuardOverrideAudit({ rootDir, spawn = spawnSync } = {}) {

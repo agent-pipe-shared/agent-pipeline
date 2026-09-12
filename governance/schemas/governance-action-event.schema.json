@@ -13,7 +13,7 @@
     "reasonCode": {
       "enum": [
         "VERIFICATION_PASSED", "VERIFICATION_FAILED", "VERIFICATION_UNKNOWN", "VERIFICATION_UNAVAILABLE",
-        "REVIEW_PASSED", "REVIEW_FINDINGS", "PUSH_APPROVED", "DEPLOY_APPROVED",
+        "REVIEW_PASSED", "REVIEW_FINDINGS", "PUSH_APPROVED", "DEPLOY_APPROVED", "HGO_CONSUMED",
         "RECOVERY_COMPLETED", "RECONCILIATION_COMPLETED"
       ]
     },
@@ -30,6 +30,7 @@
       { "properties": { "kind": { "const": "review" }, "status": { "const": "completed" }, "reasonCode": { "const": "REVIEW_FINDINGS" } } },
       { "properties": { "kind": { "const": "gate" }, "status": { "const": "completed" }, "reasonCode": { "const": "PUSH_APPROVED" } } },
       { "properties": { "kind": { "const": "gate" }, "status": { "const": "completed" }, "reasonCode": { "const": "DEPLOY_APPROVED" } } },
+      { "properties": { "kind": { "const": "gate" }, "status": { "const": "completed" }, "reasonCode": { "const": "HGO_CONSUMED" } } },
       { "properties": { "kind": { "const": "recovery" }, "status": { "const": "completed" }, "reasonCode": { "const": "RECOVERY_COMPLETED" } } },
       { "properties": { "kind": { "const": "reconciliation" }, "status": { "const": "completed" }, "reasonCode": { "const": "RECONCILIATION_COMPLETED" } } }
     ]

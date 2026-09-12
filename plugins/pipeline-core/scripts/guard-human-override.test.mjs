@@ -116,6 +116,72 @@ const COMMITTED_SIGNER = { privateKey: pair.privateKey, publicKey, keyReference:
 /** The forger: a real key of its own, reusing the committed anchor's key REFERENCE so only the public-key digest can tell the two apart. */
 const FOREIGN_SIGNER = { privateKey: foreignPair.privateKey, publicKey: foreignPublicKey, keyReference: KEY_REFERENCE };
 
+test("publish-consumption-action exposes only the minimal digest-bound HGO fact after source readback", () => {
+  const output = io();
+  const calls = [];
+  const source = {
+    schema: "pipeline.human-guard-override-governance-consumption-source.v1",
+    status: "consumed",
+    consumptionSha256: "c".repeat(64),
+    candidate: { commit: "a".repeat(40), tree: "b".repeat(40) },
+  };
+  const code = main([
+    "publish-consumption-action", "--repo", "/fixture", "--plan-sha256", "d".repeat(64),
+    "--event-out", "evidence/hgo.json", "--feature-id", "nova-b",
+  ], output, { governanceHgo: {
+    preflight(value) { calls.push(["preflight", value]); },
+    observe(value) { calls.push(["observe", value]); return source; },
+    write(value) { calls.push(["write", value]); return { status: "written", event: value.event }; },
+  } });
+  assert.equal(code, 0);
+  assert.deepEqual(calls.map(([name]) => name), ["preflight", "observe", "write"]);
+  const result = JSON.parse(output.stdout);
+  assert.equal(result.status, "completed");
+  assert.equal(result.event.reasonCode, "HGO_CONSUMED");
+  assert.equal(result.event.correlation.requestId, source.consumptionSha256);
+  assert.deepEqual(result.event.candidate, source.candidate);
+  for (const forbidden of ["command", "path", "humanName", "reason", "target", "requestSha256", "planSha256", "receipt", "signer", "keyReference"]) {
+    assert.equal(Object.hasOwn(result.event, forbidden), false, forbidden);
+  }
+  assert.equal(output.stderr, "");
+});
+
+test("publish-consumption-action refuses before readback on bad output and returns an event-only retry after a write failure", () => {
+  const digest = "d".repeat(64);
+  const argv = ["publish-consumption-action", "--repo", "/fixture", "--plan-sha256", digest, "--event-out", "evidence/hgo.json"];
+  const refused = io();
+  let observed = false;
+  assert.equal(main(argv, refused, { governanceHgo: {
+    preflight() { const error = new Error("bad path"); error.code = "GAA-OUTPUT-PATH"; throw error; },
+    observe() { observed = true; },
+  } }), 2);
+  assert.equal(observed, false);
+  assert.deepEqual(JSON.parse(refused.stderr), {
+    schema: "pipeline.hgo-governance-consumption-action-result.v1",
+    status: "refused",
+    code: "GAA-OUTPUT-PATH",
+  });
+
+  const unavailable = io();
+  const source = {
+    schema: "pipeline.human-guard-override-governance-consumption-source.v1",
+    status: "consumed",
+    consumptionSha256: "c".repeat(64),
+    candidate: { commit: "a".repeat(40), tree: "b".repeat(40) },
+  };
+  assert.equal(main(argv, unavailable, { governanceHgo: {
+    preflight() {},
+    observe() { return source; },
+    write() { const error = new Error("unavailable"); error.code = "GHCA-OUTPUT-WRITE"; throw error; },
+  } }), 2);
+  const failure = JSON.parse(unavailable.stderr);
+  assert.equal(failure.status, "source-complete/event-unavailable");
+  assert.equal(failure.code, "GHCA-OUTPUT-WRITE");
+  assert.equal(failure.retry.schema, "pipeline.governance-hgo-consumption-action-retry.v1");
+  assert.equal(failure.retry.event.reasonCode, "HGO_CONSUMED");
+  assert.equal(unavailable.stdout, "");
+});
+
 function armRequest(root, toolInput, signer = COMMITTED_SIGNER) {
   // Real, current timestamps throughout (never a fixed nowMs): main() below calls
   // authorizeHumanGuardOverrideBySignature() with the CLI's own real Date.now(), which

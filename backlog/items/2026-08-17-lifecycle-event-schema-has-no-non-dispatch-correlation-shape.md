@@ -386,13 +386,12 @@ returned PASS with no findings. Evidence:
   action spelling and new action-v1 events replays deterministically after an
   upgrade; no canonical event is rewritten.
 
-### Independent HGO decision
+### Independent HGO decision — accepted 2026-09-12
 
-Exact-candidate HGO consumption may join LND-6 only after the ADR register
-explicitly accepts the minimal public projection. Until then its authenticated
-private audit ledger remains the sole record and HGO does not block LND-0
-through LND-8 for the other producer families. The PO owns the register
-decision, and the Pipeline Elephant prepares the decision evidence. Review and
-decision are due no later than LND-6 admission; if LND-6 has not begun, the
-calendar re-triage date is 2026-10-15. This is a re-triage obligation, not a
-delivery promise, and the other accepted slices proceed while it remains open.
+The PO selected ADR-0083 D5's minimal repository-public-safe projection.
+Exact-candidate HGO consumption may join LND-6 as `HGO_CONSUMED`; its public
+source and action carry only a domain-separated digest, exact candidate and
+closed status/reason fields. Commands, paths, targets, people, rationale,
+signer/key data and private request/plan/receipt bytes remain excluded. The
+authenticated private HGO ledger remains the detailed authority record, and
+candidate-less modes remain ineligible.

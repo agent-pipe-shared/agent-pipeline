@@ -12,6 +12,7 @@ import {
   concurrentWorktreeAdvisory,
   HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
+  observeHumanGuardOverrideGovernanceConsumption,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   prepareHumanGuardOverrideForSignature,
@@ -19,6 +20,12 @@ import {
   refreezeHumanGuardOverridePlan,
   verifyHumanGuardOverrideAudit,
 } from "../lib/human-guard-override.mjs";
+import {
+  buildGovernanceHgoConsumptionAction,
+  buildGovernanceHgoConsumptionRetry,
+  preflightGovernanceActionOutput,
+  writeGovernanceHgoConsumptionAction,
+} from "../lib/governance-hgo-consumption-action.mjs";
 // `render-copy-safe` remains a backward-compatible view of the same shared
 // renderer now used in the default hook hand-off.
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
@@ -45,6 +52,7 @@ function usage() {
     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs render-copy-safe --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
+    "  guard-human-override.mjs publish-consumption-action --repo <absolute-root> --plan-sha256 <64hex> --event-out <repo-relative-path> [--feature-id <id>] [--session-id <id>]",
     "  guard-human-override.mjs repair-audit --repo <absolute-root> --preimage-sha256 <64hex> --activate",
   ].join("\n");
 }
@@ -121,6 +129,14 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
   const write = io.write ?? process.stdout.write.bind(process.stdout);
   const writeError = io.writeError ?? process.stderr.write.bind(process.stderr);
   const platform = options.platform ?? process.platform;
+  const governanceHgo = {
+    observe: observeHumanGuardOverrideGovernanceConsumption,
+    preflight: preflightGovernanceActionOutput,
+    build: buildGovernanceHgoConsumptionAction,
+    write: writeGovernanceHgoConsumptionAction,
+    retry: buildGovernanceHgoConsumptionRetry,
+    ...(options.governanceHgo ?? {}),
+  };
   const [command, ...rest] = argv;
   try {
     if (command === "verify-audit") {
@@ -128,6 +144,49 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
       if (!parsed || Object.keys(parsed).length !== 1 || typeof parsed.repo !== "string") throw new Error(usage());
       write(`${JSON.stringify(verifyHumanGuardOverrideAudit({ rootDir: parsed.repo }))}\n`);
       return 0;
+    }
+    if (command === "publish-consumption-action") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "plan-sha256", "event-out"], ["feature-id", "session-id"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["plan-sha256"] ?? "")
+        || typeof parsed["event-out"] !== "string") throw new Error(usage());
+      const notApplicable = Object.freeze({ state: "not-applicable" });
+      let event;
+      try {
+        governanceHgo.preflight({ rootDir: parsed.repo, eventOutPath: parsed["event-out"] });
+        const source = governanceHgo.observe({ rootDir: parsed.repo, planSha256: parsed["plan-sha256"] });
+        event = governanceHgo.build({
+          source,
+          featureId: parsed["feature-id"] ?? notApplicable,
+          sessionId: parsed["session-id"] ?? notApplicable,
+        });
+      } catch (error) {
+        writeError(`${JSON.stringify({
+          schema: "pipeline.hgo-governance-consumption-action-result.v1",
+          status: "refused",
+          code: error?.code ?? "HGO-GOVERNANCE-ACTION-PREFLIGHT",
+        })}\n`);
+        return 2;
+      }
+      try {
+        const published = governanceHgo.write({ rootDir: parsed.repo, eventOutPath: parsed["event-out"], event });
+        write(`${JSON.stringify({
+          schema: "pipeline.hgo-governance-consumption-action-result.v1",
+          status: "completed",
+          eventOutPath: parsed["event-out"],
+          event: published.event,
+        })}\n`);
+        return 0;
+      } catch (error) {
+        writeError(`${JSON.stringify({
+          schema: "pipeline.hgo-governance-consumption-action-result.v1",
+          status: "source-complete/event-unavailable",
+          code: error?.code ?? "HGO-GOVERNANCE-ACTION-OUTPUT",
+          retry: governanceHgo.retry({ eventOutPath: parsed["event-out"], event }),
+        })}\n`);
+        return 2;
+      }
     }
     if (command === "repair-audit") {
       if (rest.at(-1) !== "--activate") throw new Error(usage());

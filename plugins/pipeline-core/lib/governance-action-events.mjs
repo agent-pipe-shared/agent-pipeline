@@ -15,7 +15,7 @@ export const GOVERNANCE_ACTION_MATRIX = Object.freeze({
     unavailable: Object.freeze(["VERIFICATION_UNAVAILABLE"]),
   }),
   review: Object.freeze({ completed: Object.freeze(["REVIEW_PASSED", "REVIEW_FINDINGS"]) }),
-  gate: Object.freeze({ completed: Object.freeze(["PUSH_APPROVED", "DEPLOY_APPROVED"]) }),
+  gate: Object.freeze({ completed: Object.freeze(["PUSH_APPROVED", "DEPLOY_APPROVED", "HGO_CONSUMED"]) }),
   recovery: Object.freeze({ completed: Object.freeze(["RECOVERY_COMPLETED"]) }),
   reconciliation: Object.freeze({ completed: Object.freeze(["RECONCILIATION_COMPLETED"]) }),
 });

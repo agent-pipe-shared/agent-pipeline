@@ -51,6 +51,18 @@ preflight digest, including ignored local candidate evidence; it does not
 fabricate tracked Git references for those files. A model response by itself
 is never a source receipt.
 
+An exact-candidate Human Guard Override consumption can publish the closed
+`HGO_CONSUMED` gate observation after the capability and its matching private
+HMAC audit entry have both been read back. Run
+`guard-human-override.mjs publish-consumption-action --repo CHECKOUT
+--plan-sha256 DIGEST --event-out REPOSITORY_RELATIVE_PATH`; the optional
+`--feature-id` and `--session-id` flags add only validated correlation IDs.
+The public source collapses the private request and plan identifiers into one
+domain-separated digest. Neither the source nor the event contains a command,
+path, target, person, rationale, signer/key identity, or private receipt bytes.
+Candidate-less override modes are ineligible, and the event remains an
+observation rather than authority.
+
 Each producer validates the repository-relative output path and builds the
 complete event before changing its source. A failure before source completion
 emits nothing. If event publication fails after the source has completed, the
