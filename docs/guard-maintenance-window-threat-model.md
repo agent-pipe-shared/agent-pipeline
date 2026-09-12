@@ -72,6 +72,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
   `lib/commit-message-policy.mjs`,
   `lib/critic-route-v3.mjs`,
+  `lib/critic-skip-decision.mjs`,
   `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
   `lib/dispatch-record.mjs`,
   `lib/entrypoint.mjs`, `lib/feature-package-topology.mjs`,

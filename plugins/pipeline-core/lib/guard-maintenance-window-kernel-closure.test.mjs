@@ -394,6 +394,11 @@ check("GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from
     "a newly added plugins/pipeline-core/... entry must be reachable via the project-root anchor (PROJECT_KERNEL_PATHS/PLUGIN_KERNEL_SUFFIXES re-derived from the extended array)",
   );
   assert.equal(
+    isNeverLiftableKernelPath(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "critic-skip-decision.mjs"), { rootDir: REPO_ROOT }),
+    true,
+    "the dispatch-record Critic disposition dependency must be unreachable through a GS-6 window at the project-root anchor",
+  );
+  assert.equal(
     isNeverLiftableKernelPath(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "guard-git.mjs"), { rootDir: REPO_ROOT }),
     false,
     "an ordinary, non-kernel plugin file must still not be claimed as kernel",
@@ -413,6 +418,11 @@ check("GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from
     isNeverLiftableKernelPath(join(globalPluginRoot, "lib", "entrypoint.mjs"), { rootDir: REPO_ROOT, livePluginRoot: globalPluginRoot }),
     true,
     "must be caught via the livePluginRoot anchor once entrypoint.mjs is a kernel path",
+  );
+  assert.equal(
+    isNeverLiftableKernelPath(join(globalPluginRoot, "lib", "critic-skip-decision.mjs"), { rootDir: REPO_ROOT, livePluginRoot: globalPluginRoot }),
+    true,
+    "the dispatch-record Critic disposition dependency must also be protected in an installed plugin root",
   );
 });
 

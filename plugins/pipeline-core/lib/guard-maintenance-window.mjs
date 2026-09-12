@@ -170,6 +170,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // V3 authority. A GS-6 window must not be able to change the authority that
   // determines which model the protected health route probes.
   "plugins/pipeline-core/lib/critic-route-v3.mjs",
+  // NVA-B-GMW-CRITIC-DISPOSITION: dispatch-record.mjs is already kernel and
+  // delegates the required/skip/evidence decision for every dispatch record to
+  // this module. A GS-6 window must not be able to rewrite that decision while
+  // leaving the record validator itself unchanged.
+  "plugins/pipeline-core/lib/critic-skip-decision.mjs",
   "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
   "plugins/pipeline-core/lib/document-hooks.mjs",
   "plugins/pipeline-core/lib/dispatch-record.mjs",
