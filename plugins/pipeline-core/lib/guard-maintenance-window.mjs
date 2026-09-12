@@ -271,6 +271,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/governance-action-artifact.mjs",
   "plugins/pipeline-core/lib/governance-action-events.mjs",
   "plugins/pipeline-core/lib/governance-gate-action.mjs",
+  "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.mjs",
   "plugins/pipeline-core/lib/governance-event-store.mjs",
   "plugins/pipeline-core/lib/governance-event.mjs",
   "plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs",

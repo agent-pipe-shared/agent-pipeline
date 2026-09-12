@@ -29,6 +29,14 @@ import {
   planSessionCleanupRecovery,
 } from "../lib/session-cleanup-recovery.mjs";
 import {
+  GOVERNANCE_RECOVERY_SOURCE_SCHEMA,
+  GovernanceRecoveryReconciliationActionError,
+  buildGovernanceRecoveryAction,
+  buildGovernanceRecoveryRetry,
+  preflightGovernanceRecoveryActionOutput,
+  writeGovernanceRecoveryAction,
+} from "../lib/governance-recovery-reconciliation-action.mjs";
+import {
   WorktreeLifecycleError,
   canonicalJson,
   checkSessionHygiene,
@@ -59,7 +67,7 @@ const USAGE = `Usage:
   session-cleanup.mjs apply-privatization --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs plan-recovery --repo <checkout>
   session-cleanup.mjs plan-human-recovery --repo <checkout>
-  session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate
+  session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate [--event-out <repo-relative-path>]
   session-cleanup.mjs register-intent --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> --type <scratch-file|scratch-directory> --path <absolute> --content-class <scratch|disposable-control|generated-output> --policy <unlink-file|remove-directory>
   session-cleanup.mjs finalize --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> [--canary <relative-file>]
   session-cleanup.mjs seal --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id>
@@ -211,7 +219,8 @@ function parseArgs(argv) {
     : new Set(["status", "release-binding"]).has(command) ? new Set(["repo", "runner"])
       : new Set(["plan-recovery", "plan-human-recovery", "plan-privatization"]).has(command) ? new Set(["repo", "runner"])
       : command === "confirm-privatization" ? new Set(["repo", "plan-sha256", "accept", "runner"])
-      : new Set(["apply-recovery", "apply-privatization"]).has(command) ? new Set(["repo", "plan-sha256", "activate", "runner"])
+      : command === "apply-recovery" ? new Set(["repo", "plan-sha256", "activate", "runner", "event-out"])
+        : command === "apply-privatization" ? new Set(["repo", "plan-sha256", "activate", "runner"])
       : new Set([...common, ...extra]);
   for (const name of Object.keys(flags)) if (!allowed.has(name)) throw new Error(`Unknown option: --${name}`);
   return { command, flags };
@@ -238,6 +247,61 @@ function resolveRunner(flags, env) {
     return flags.runner;
   }
   return env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex";
+}
+
+const NOT_APPLICABLE = Object.freeze({ state: "not-applicable" });
+const RECOVERY_ACTION_RESULT_SCHEMA = "pipeline.session-cleanup-recovery-action-result.v1";
+const GIT_OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
+
+function observeRecoveryCandidate(repo, dependencies = {}) {
+  if (dependencies.observeRecoveryCandidateFn) return dependencies.observeRecoveryCandidateFn(repo);
+  const observe = (revision) => {
+    const result = spawnSync("git", ["-C", repo, "rev-parse", "--verify", revision], {
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const oid = String(result.stdout ?? "").trim();
+    if (result.error || result.status !== 0 || !GIT_OID.test(oid)) {
+      throw new SessionCleanupRecoveryError(
+        "WT-SESSION-RECOVERY-CANDIDATE",
+        "recovery event requires an exact pre-action HEAD and tree",
+      );
+    }
+    return oid;
+  };
+  return Object.freeze({ commit: observe("HEAD^{commit}"), tree: observe("HEAD^{tree}") });
+}
+
+function prepareRecoveryAction({ repo, planSha256, eventOutPath, dependencies }) {
+  const candidate = observeRecoveryCandidate(repo, dependencies);
+  const planRecovery = dependencies.planSessionCleanupRecoveryFn ?? planSessionCleanupRecovery;
+  const plan = planRecovery({ rootDir: repo });
+  if (plan?.status !== "ready" || plan.planSha256 !== planSha256) {
+    throw new SessionCleanupRecoveryError(
+      "WT-SESSION-RECOVERY-PLAN",
+      "recovery event source does not match the current ready recovery plan",
+    );
+  }
+  const stableCandidate = observeRecoveryCandidate(repo, dependencies);
+  if (stableCandidate.commit !== candidate.commit || stableCandidate.tree !== candidate.tree) {
+    throw new SessionCleanupRecoveryError(
+      "WT-SESSION-RECOVERY-CANDIDATE-DRIFT",
+      "recovery event candidate changed during planning",
+    );
+  }
+  const buildAction = dependencies.buildGovernanceRecoveryActionFn ?? buildGovernanceRecoveryAction;
+  const event = buildAction({
+    schema: GOVERNANCE_RECOVERY_SOURCE_SCHEMA,
+    recoveryPlanSha256: plan.planSha256,
+    candidate,
+    featureId: NOT_APPLICABLE,
+    sessionId: NOT_APPLICABLE,
+  });
+  const preflightOutput = dependencies.preflightGovernanceRecoveryActionOutputFn
+    ?? preflightGovernanceRecoveryActionOutput;
+  preflightOutput({ rootDir: repo, eventOutPath });
+  return event;
 }
 
 function ownerNonce(flags, env, { platform = process.platform, assessWindowsPrivate = assessWindowsPrivatePath } = {}) {
@@ -321,10 +385,67 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
     output = planHumanRecovery(repo, dependencies);
   } else if (command === "apply-recovery") {
     const planSha256 = required(flags, "plan-sha256");
-    const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });
-    output = promotionRecovery.status === "not-applicable"
-      ? applySessionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true })
-      : applyOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true });
+    const planPromotionRecovery = dependencies.planOnboardingKickoffPromotionCleanupRecoveryFn
+      ?? planOnboardingKickoffPromotionCleanupRecovery;
+    const promotionRecovery = planPromotionRecovery({ rootDir: repo });
+    const eventOutPath = flags["event-out"] ?? null;
+    if (eventOutPath !== null && promotionRecovery.status !== "not-applicable") {
+      throw new SessionCleanupRecoveryError(
+        "WT-SESSION-RECOVERY-EVENT-UNSUPPORTED",
+        "kickoff-promotion cleanup recovery does not emit a session-cleanup recovery action",
+      );
+    }
+    if (eventOutPath === null) {
+      output = promotionRecovery.status === "not-applicable"
+        ? applySessionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true })
+        : applyOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true });
+    } else {
+      const event = prepareRecoveryAction({ repo, planSha256, eventOutPath, dependencies });
+      const applyRecovery = dependencies.applySessionCleanupRecoveryFn ?? applySessionCleanupRecovery;
+      const sourceResult = applyRecovery({
+        rootDir: repo,
+        expectedPlanSha256: planSha256,
+        activate: flags.activate === true,
+      });
+      if (sourceResult.status === "recovered" && sourceResult.mutated === false) {
+        output = {
+          schema: RECOVERY_ACTION_RESULT_SCHEMA,
+          status: "source-replayed/event-not-emitted",
+          sourceResult,
+          eventOutPath,
+        };
+      } else if (sourceResult.status === "recovered" && sourceResult.mutated === true) {
+        const writeEvent = dependencies.writeGovernanceRecoveryActionFn ?? writeGovernanceRecoveryAction;
+        try {
+          const published = writeEvent({ rootDir: repo, eventOutPath, event });
+          output = {
+            schema: RECOVERY_ACTION_RESULT_SCHEMA,
+            status: "completed",
+            sourceResult,
+            eventOutPath,
+            event: published.event,
+          };
+        } catch (error) {
+          const buildRetry = dependencies.buildGovernanceRecoveryRetryFn ?? buildGovernanceRecoveryRetry;
+          output = {
+            schema: RECOVERY_ACTION_RESULT_SCHEMA,
+            status: "source-complete/event-unavailable",
+            sourceResult,
+            code: error?.code ?? "GRRA-RECOVERY-OUTPUT-UNAVAILABLE",
+            retry: buildRetry({ eventOutPath, event }),
+          };
+          exitCode = 2;
+        }
+      } else {
+        output = {
+          schema: RECOVERY_ACTION_RESULT_SCHEMA,
+          status: "source-incomplete/event-not-emitted",
+          sourceResult,
+          eventOutPath,
+        };
+        exitCode = 2;
+      }
+    }
   } else if (command === "plan-privatization") {
     const planPrivatization = dependencies.planOnboardingSessionCleanupPrivatizationFn
       ?? planOnboardingSessionCleanupPrivatization;
@@ -601,6 +722,7 @@ if (invokedDirectly) {
       || error instanceof ProjectOnboardingReadyError
       || error instanceof KickoffError
       || error instanceof SessionCleanupRecoveryError
+      || error instanceof GovernanceRecoveryReconciliationActionError
       ? error.code
       : "WT-ARGUMENT";
     const detail = error instanceof ProjectOnboardingReadyError

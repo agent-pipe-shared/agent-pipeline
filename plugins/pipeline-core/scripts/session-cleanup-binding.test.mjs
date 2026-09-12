@@ -33,6 +33,10 @@ import {
   SessionCleanupRecoveryError,
   sessionCleanupRecoveryInternals,
 } from "../lib/session-cleanup-recovery.mjs";
+import {
+  retryGovernanceRecoveryAction,
+  validateGovernanceRecoveryRetry,
+} from "../lib/governance-recovery-reconciliation-action.mjs";
 import { validateContinuityState } from "../lib/continuity-state.mjs";
 import {
   cleanupSession,
@@ -783,6 +787,221 @@ test("legacy post-close binding is recovered only from exact Git and closure pro
     assert.equal(replay.status, "recovered");
     assert.equal(replay.mutated, false);
     assert.equal(JSON.parse(readFileSync(fixtureState.statePath, "utf8")).cleanupReleases.length, 1);
+  } finally {
+    rmSync(fixtureState.root, { recursive: true, force: true });
+  }
+});
+
+test("apply-recovery emits one plan- and pre-action-candidate-bound event only after successful source readback", () => {
+  const fixtureState = legacyClosedCleanupFixture("recovery-action-success");
+  try {
+    const candidate = {
+      commit: gitRun(fixtureState.root, ["rev-parse", "HEAD^{commit}"]),
+      tree: gitRun(fixtureState.root, ["rev-parse", "HEAD^{tree}"]),
+    };
+    const plan = invoke(["plan-recovery", "--repo", fixtureState.root]).output;
+    const result = invoke([
+      "apply-recovery", "--repo", fixtureState.root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+      "--event-out", "evidence/actions/session-recovery.json",
+    ]);
+    assert.equal(result.code, 0);
+    assert.equal(result.output.schema, "pipeline.session-cleanup-recovery-action-result.v1");
+    assert.equal(result.output.status, "completed");
+    assert.equal(result.output.sourceResult.status, "recovered");
+    assert.equal(result.output.sourceResult.mutated, true);
+    assert.equal(result.output.event.kind, "recovery");
+    assert.equal(result.output.event.status, "completed");
+    assert.equal(result.output.event.reasonCode, "RECOVERY_COMPLETED");
+    assert.equal(result.output.event.correlation.requestId, plan.planSha256);
+    assert.deepEqual(result.output.event.candidate, candidate);
+    assert.deepEqual(result.output.event.correlation.featureId, { state: "not-applicable" });
+    assert.deepEqual(result.output.event.correlation.sessionId, { state: "not-applicable" });
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(fixtureState.root, "evidence/actions/session-recovery.json"), "utf8")),
+      result.output.event,
+    );
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: fixtureState.root }).status, "released");
+  } finally {
+    rmSync(fixtureState.root, { recursive: true, force: true });
+  }
+});
+
+test("apply-recovery preflights the requested event before source mutation", () => {
+  const fixtureState = legacyClosedCleanupFixture("recovery-action-preflight");
+  try {
+    const plan = invoke(["plan-recovery", "--repo", fixtureState.root]).output;
+    const bindingBefore = readOnboardingSessionCleanupBinding({ rootDir: fixtureState.root });
+    const stateBefore = readFileSync(fixtureState.statePath);
+    writeFileSync(join(fixtureState.root, "evidence", "occupied-recovery-event.json"), "occupied\n");
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", fixtureState.root,
+        "--plan-sha256", plan.planSha256,
+        "--activate",
+        "--event-out", "evidence/occupied-recovery-event.json",
+      ]),
+      (error) => error?.code === "GRRA-RECOVERY-OUTPUT-EXISTS",
+    );
+    assert.deepEqual(readFileSync(fixtureState.statePath), stateBefore);
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: fixtureState.root }), bindingBefore);
+    unlinkSync(join(fixtureState.root, "evidence", "occupied-recovery-event.json"));
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", fixtureState.root,
+        "--plan-sha256", "f".repeat(64),
+        "--activate",
+        "--event-out", "evidence/stale-plan-recovery-event.json",
+      ]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-PLAN",
+    );
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", fixtureState.root,
+        "--plan-sha256", plan.planSha256,
+        "--activate",
+        "--event-out", "evidence/invalid-candidate-recovery-event.json",
+      ], {
+        observeRecoveryCandidateFn() { return { commit: "invalid", tree: "invalid" }; },
+      }),
+      (error) => error?.code === "GRRA-RECOVERY-SOURCE-BINDING",
+    );
+    assert.deepEqual(readFileSync(fixtureState.statePath), stateBefore);
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: fixtureState.root }), bindingBefore);
+    assert.equal(existsSync(join(fixtureState.root, "evidence/stale-plan-recovery-event.json")), false);
+    assert.equal(existsSync(join(fixtureState.root, "evidence/invalid-candidate-recovery-event.json")), false);
+
+    let observation = 0;
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", fixtureState.root,
+        "--plan-sha256", plan.planSha256,
+        "--activate",
+        "--event-out", "evidence/drifted-candidate-recovery-event.json",
+      ], {
+        observeRecoveryCandidateFn() {
+          observation += 1;
+          return observation === 1
+            ? { commit: "a".repeat(40), tree: "b".repeat(40) }
+            : { commit: "c".repeat(40), tree: "d".repeat(40) };
+        },
+      }),
+      (error) => error?.code === "WT-SESSION-RECOVERY-CANDIDATE-DRIFT",
+    );
+    assert.deepEqual(readFileSync(fixtureState.statePath), stateBefore);
+    assert.equal(existsSync(join(fixtureState.root, "evidence/drifted-candidate-recovery-event.json")), false);
+  } finally {
+    rmSync(fixtureState.root, { recursive: true, force: true });
+  }
+});
+
+test("apply-recovery source failure and source replay do not emit a recovery event", () => {
+  const fixtureState = legacyClosedCleanupFixture("recovery-action-source-non-emission");
+  try {
+    const plan = invoke(["plan-recovery", "--repo", fixtureState.root]).output;
+    let writes = 0;
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", fixtureState.root,
+        "--plan-sha256", plan.planSha256,
+        "--activate",
+        "--event-out", "evidence/source-failed-recovery.json",
+      ], {
+        applySessionCleanupRecoveryFn() {
+          throw new SessionCleanupRecoveryError("WT-SESSION-RECOVERY-READBACK", "injected source readback failure");
+        },
+        writeGovernanceRecoveryActionFn() { writes += 1; },
+      }),
+      (error) => error?.code === "WT-SESSION-RECOVERY-READBACK",
+    );
+    assert.equal(writes, 0);
+    assert.equal(existsSync(join(fixtureState.root, "evidence/source-failed-recovery.json")), false);
+
+    const replay = invoke([
+      "apply-recovery", "--repo", fixtureState.root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+      "--event-out", "evidence/source-replayed-recovery.json",
+    ], {
+      planSessionCleanupRecoveryFn() { return plan; },
+      applySessionCleanupRecoveryFn() {
+        return {
+          schema: "pipeline.session-cleanup-recovery-apply.v1",
+          status: "recovered",
+          planSha256: plan.planSha256,
+          mutated: false,
+        };
+      },
+      writeGovernanceRecoveryActionFn() { writes += 1; },
+    });
+    assert.equal(replay.code, 0);
+    assert.equal(replay.output.status, "source-replayed/event-not-emitted");
+    assert.equal(writes, 0);
+    assert.equal(existsSync(join(fixtureState.root, "evidence/source-replayed-recovery.json")), false);
+  } finally {
+    rmSync(fixtureState.root, { recursive: true, force: true });
+  }
+});
+
+test("post-source recovery event failure returns a closed event-only retry without rolling back recovery", () => {
+  const fixtureState = legacyClosedCleanupFixture("recovery-action-event-retry");
+  try {
+    const plan = invoke(["plan-recovery", "--repo", fixtureState.root]).output;
+    const result = invoke([
+      "apply-recovery", "--repo", fixtureState.root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+      "--event-out", "evidence/actions/retry-session-recovery.json",
+    ], {
+      writeGovernanceRecoveryActionFn() {
+        const error = new Error("injected event publication failure");
+        error.code = "GRRA-RECOVERY-OUTPUT-WRITE";
+        throw error;
+      },
+    });
+    assert.equal(result.code, 2);
+    assert.equal(result.output.status, "source-complete/event-unavailable");
+    assert.equal(result.output.sourceResult.status, "recovered");
+    assert.equal(result.output.sourceResult.mutated, true);
+    assert.equal(result.output.code, "GRRA-RECOVERY-OUTPUT-WRITE");
+    assert.deepEqual(validateGovernanceRecoveryRetry(result.output.retry), result.output.retry);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: fixtureState.root }).status, "released");
+    const stateAfterSource = readFileSync(fixtureState.statePath);
+    const retried = retryGovernanceRecoveryAction({ rootDir: fixtureState.root, retry: result.output.retry });
+    assert.equal(retried.status, "written");
+    assert.deepEqual(readFileSync(fixtureState.statePath), stateAfterSource);
+    assert.deepEqual(
+      JSON.parse(readFileSync(join(fixtureState.root, "evidence/actions/retry-session-recovery.json"), "utf8")),
+      result.output.retry.event,
+    );
+  } finally {
+    rmSync(fixtureState.root, { recursive: true, force: true });
+  }
+});
+
+test("kickoff-promotion recovery explicitly refuses a requested session-cleanup event before mutation", () => {
+  const fixtureState = legacyPromotionCleanupMismatch("event-unsupported");
+  try {
+    const plan = invoke(["plan-recovery", "--repo", fixtureState.root]).output;
+    const before = {
+      state: readFileSync(fixtureState.statePath),
+      history: readFileSync(fixtureState.historyPath),
+      binding: readFileSync(fixtureState.bindingPath),
+    };
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", fixtureState.root,
+        "--plan-sha256", plan.planSha256,
+        "--activate",
+        "--event-out", "evidence/promotion-recovery.json",
+      ]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-EVENT-UNSUPPORTED",
+    );
+    assert.deepEqual(readFileSync(fixtureState.statePath), before.state);
+    assert.deepEqual(readFileSync(fixtureState.historyPath), before.history);
+    assert.deepEqual(readFileSync(fixtureState.bindingPath), before.binding);
+    assert.equal(existsSync(join(fixtureState.root, "evidence/promotion-recovery.json")), false);
   } finally {
     rmSync(fixtureState.root, { recursive: true, force: true });
   }
