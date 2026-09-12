@@ -3,12 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-runtime-concentrated-in-ten-suites
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 sprint: nova-b
 tracking: "Nova B — the parallelized verify has regressed from 419s to 571s in one week, and the single suite named as its next lever grew 35% in the same period. Also supplies the all-fresh full-run artifact two older items were blocked on."
 source: "Full verify at commit 0f0ed3f7 on 2026-09-01, exit 0, all 505 steps green and every one of them fresh (reused: 0). Per-suite wall clock from the run's own pipeline.verify-progress.v1 stream; total wall clock computed from its first startedAt to its last completedAt."
 done_when: manual
+closure_commit: 0eba7f80f050d1affc819940e3a834db6cbc18b0
+closure_evidence: backlog/evidence/2026-09-12-verify-runtime-concentration-closure.md
 ---
 
 # The parallelized verify has regressed 36% in one week
@@ -195,3 +197,14 @@ expensive ones untouched.
   boundary, so the next regression is noticed rather than re-discovered.
 - Any obsolete-test cleanup is tracked separately, justified per suite, and
   never on runtime grounds.
+
+## Closure — 2026-09-12
+
+Closed. The regression is decomposed, both measured hot suites were sharded
+without deleting cases, release-mode all-fresh measurement is now a supported
+and exercised regular boundary, and the remaining serial critical path is
+ranked in the fresh evidence. The release-mode run at `0eba7f80` completed
+520/520 fresh suites in 188.208 seconds; two later exact clean 534-suite runs
+completed in 189.320 and 185.594 seconds. This closes the measured regression
+and its missing-observation mechanism. Further case-completion migrations and
+individual suite work remain owned by their existing separate items.
