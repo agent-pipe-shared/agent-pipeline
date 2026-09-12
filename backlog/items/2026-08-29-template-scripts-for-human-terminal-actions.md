@@ -51,3 +51,21 @@ before it can be scoped into acceptance criteria.
   than folded into it, to avoid file-scope collision and because it needs its own design pass
   first (script format, storage location, discovery mechanism).
 - **Date:** 2026-08-29
+
+## Reviewed design — 2026-09-12
+
+The idea is now sliced into an implementation-ready, runner-neutral design at
+`backlog/evidence/NVA-B-HUMAN-TERMINAL-TEMPLATES-DESIGN-1.md`. It extends the
+existing human-authorization inventory and checker rather than creating a
+second authority. Existing producer boundary tuples remain authoritative; a
+generic runner must refuse unsupported caller provenance before spawning any
+child. The first executable slice is POSIX-only. Windows stays typed
+`unsupported` until native owner/DACL/reparse checks and live Windows tests
+exist.
+
+Two Critic rounds were completed. Round 1 found three Majors in inventory
+coverage, authority-boundary preservation, and Windows confidentiality. The
+corrected design received `VERDICT: yes` with no remaining finding; see
+`backlog/evidence/2026-09-12-human-terminal-templates-design-critic-round2.md`.
+The item remains `open` for the four implementation slices; no new PO gate is
+needed for them.
