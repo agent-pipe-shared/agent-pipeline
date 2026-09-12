@@ -144,7 +144,7 @@
 | pipeline.compaction-stable-bootstrap-lease | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | — | 2026-08-10 | — | — |
 | pipeline.complete-adr-governs-coverage-before-reader-review-binding | closed | requirement | pipeline | nova-b | 2026-09-07 | — | — |
-| pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | open | defect | pipeline | nova-b | 2026-09-01 | 2026-09-30 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.consumer-must-allowlist-every-runner-lane | closed | workflow-improvement | pipeline | nova-b | 2026-08-28 | — | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |

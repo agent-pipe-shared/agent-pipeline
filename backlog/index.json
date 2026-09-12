@@ -1853,6 +1853,7 @@
       "created": "2026-09-01",
       "source": "Direct measurement, 2026-09-01: two dispatches independently fixed the same file, a third spent budget confirming a fix already committed by another agent, and a full verify.mjs run failed on candidate-binding drift because the orchestrator committed mid-run.",
       "deferred": false,
+      "due": "2026-09-30",
       "sprint": "nova-b"
     },
     {
