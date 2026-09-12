@@ -134,3 +134,30 @@ The machine-written
 `backlog/evidence/NVA-B-BUDGET-PARTIAL-CLOSURE-1.receipt.json` records exact
 commands, exits, output digests and HEAD/tree/source-blob equality for this
 post-commit verification (NVA-B-BUDGET-CLOSING-CAP-EVIDENCE-1).
+
+## Calibration foundation — 2026-09-12
+
+Commit `c70fe7d41a3a6811f90241ba64bb119f87fc87ac` (tree
+`98037aa5be12a123d26c9a27d398bc99609ba649`) adds a pure, runner-neutral
+evaluator for testing proposed budget rules against sanitized observations.
+Its exact input and result shapes reject additional fields, and truncated runs
+remain strict lower bounds: even a rule that clears such a bound produces an
+inconclusive result rather than evidence that the budget is sufficient.
+
+The initial evaluator suite passed 5/5 tests. Critic review then found a major
+JavaScript sparse-array gap: `forEach` skipped missing sample indices, so an
+array with a positive length but no observation could reach a favorable
+summary. Correction commit `7b580b396a52312e3b2990bffe6eead26385e77a`
+(tree `7bfcce830bc7d7048b4434068b15a95aa58db608`) now walks every integer
+index, requires an own property before validating the sample, and rejects
+fully and partially sparse arrays as `DBC-SAMPLES`. The corrected evaluator
+suite passed 6/6 tests and the unchanged policy-core suite passed 9/9 tests.
+These focused results establish the correction, not an overall PASS.
+
+This is a calibration foundation, not completed calibration:
+no broader multi-run sample has been supplied and no live budget has changed.
+Authenticated Codex and Antigravity adapters also remain absent. Native Codex
+sandbox execution under WSL is deferred and is not required by this
+side-effect-free evaluator. The item therefore remains open. Exact contracts,
+commands and results are recorded in
+`backlog/evidence/2026-09-12-dispatch-budget-calibration-foundation.md`.
