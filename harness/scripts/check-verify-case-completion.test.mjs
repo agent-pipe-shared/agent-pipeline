@@ -54,6 +54,15 @@ function write(root, relPath, content) {
   writeFileSync(target, content);
 }
 
+function requireLegacyVerifyPolicy(root) {
+  const verifyPath = "harness/scripts/verify.mjs";
+  const source = readFileSync(join(root, verifyPath), "utf8");
+  const from = '  { name: "legacy", file: join(libDir, "legacy.test.mjs") },';
+  const to = '  { name: "legacy", file: join(libDir, "legacy.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["case-one"], maxBytes: 4096 } },';
+  assert.equal(source.split(from).length, 2);
+  write(root, verifyPath, source.replace(from, to));
+}
+
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "verify-case-completion-"));
   write(root, "harness/scripts/verify.mjs", `
@@ -65,7 +74,7 @@ const WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([
 ]);
 const TEST_SUITES = [
   { name: "legacy", file: join(libDir, "legacy.test.mjs") },
-  { name: "required", file: join(libDir, "required.test.mjs") },
+  { name: "required", file: join(libDir, "required.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["case-one"], maxBytes: 4096 } },
 ];
 `);
   write(root, "plugins/pipeline-core/lib/legacy.test.mjs", LEGACY);
@@ -166,6 +175,7 @@ check("VCR05", "a touched legacy suite must migrate in the same candidate", () =
   assert.ok(red.findings.includes("LEGACY-TOUCHED legacy must migrate to required in the same candidate"));
   context.registry.entries[0] = { name: "legacy", path: "plugins/pipeline-core/lib/legacy.test.mjs", disposition: "required" };
   write(context.root, "plugins/pipeline-core/lib/legacy.test.mjs", REQUIRED);
+  requireLegacyVerifyPolicy(context.root);
   write(context.root, DEFAULT_REGISTRY, `${JSON.stringify(context.registry)}\n`);
   const green = checkVerifyCaseCompletion({ root: context.root, changedPaths: ["plugins/pipeline-core/lib/legacy.test.mjs"] });
   assert.equal(green.ok, true, green.findings.join("\n"));
@@ -189,6 +199,7 @@ check("VCR06", "base/candidate mode reads the candidate registry and enforces sa
 
   context.registry.entries[0] = { name: "legacy", path: "plugins/pipeline-core/lib/legacy.test.mjs", disposition: "required" };
   write(context.root, "plugins/pipeline-core/lib/legacy.test.mjs", REQUIRED);
+  requireLegacyVerifyPolicy(context.root);
   write(context.root, DEFAULT_REGISTRY, `${JSON.stringify(context.registry)}\n`);
   git(context.root, ["add", "."]);
   git(context.root, ["commit", "-qm", "migrate registry"]);
@@ -197,12 +208,22 @@ check("VCR06", "base/candidate mode reads the candidate registry and enforces sa
   assert.equal(green.ok, true, green.findings.join("\n"));
 });
 
-check("VCR07", "required cannot claim protocol coverage from separate node:test cases alone", () => {
+check("VCR07", "required needs both the suite protocol and the Verify-side completion policy", () => {
   const context = fixture();
   write(context.root, "plugins/pipeline-core/lib/required.test.mjs", FALSE_REQUIRED);
   const result = checkVerifyCaseCompletion({ root: context.root });
   assert.equal(result.ok, false);
   assert.ok(result.findings.includes("REQUIRED-PROTOCOL required does not import and invoke registerTestCaseCompletion"));
+
+  write(context.root, "plugins/pipeline-core/lib/required.test.mjs", REQUIRED);
+  const verifyPath = "harness/scripts/verify.mjs";
+  const verify = readFileSync(join(context.root, verifyPath), "utf8");
+  const withoutPolicy = verify.replace(', caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["case-one"], maxBytes: 4096 }', "");
+  assert.notEqual(withoutPolicy, verify);
+  write(context.root, verifyPath, withoutPolicy);
+  const missingPolicy = checkVerifyCaseCompletion({ root: context.root });
+  assert.equal(missingPolicy.ok, false);
+  assert.ok(missingPolicy.findings.includes("REQUIRED-VERIFY-POLICY required has no Verify caseCompletion policy"));
 });
 
 check("VCR08", "required cannot claim an unreachable helper call as normal suite setup", () => {

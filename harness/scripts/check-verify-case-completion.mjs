@@ -197,6 +197,18 @@ function hasRequiredProtocol(source, suitePath) {
   return keys.length === 3 && [...keys].sort().join("\0") === ["cases", "fd", "maxBytes"].sort().join("\0");
 }
 
+function hasVerifyCaseCompletionPolicy(element) {
+  const masked = maskNonCode(element);
+  const open = masked.indexOf("{");
+  if (open === -1) return false;
+  const close = matchingClose(element, open, "{", "}");
+  if (close === -1) return false;
+  let properties;
+  try { properties = topLevelElements(element.slice(open + 1, close)); }
+  catch { return false; }
+  return properties.filter((property) => /^\s*caseCompletion\s*:/u.test(maskNonCode(property))).length === 1;
+}
+
 function parseVerifyRegistrations(source, findings) {
   const entries = [];
   function accept(entry) {
@@ -221,8 +233,8 @@ function parseVerifyRegistrations(source, findings) {
       }
       if (kind === "join") {
         const segments = [...match[3].matchAll(/"(?:[^"\\]|\\.)*"/gu)].map((item) => JSON.parse(item[0]));
-        parsed.push({ name: match[1], path: posix.join(BASES[match[2]], ...segments), arrayName });
-      } else parsed.push({ name: match[1], path: match[2], arrayName });
+        parsed.push({ name: match[1], path: posix.join(BASES[match[2]], ...segments), arrayName, caseCompletion: hasVerifyCaseCompletionPolicy(element) });
+      } else parsed.push({ name: match[1], path: match[2], arrayName, caseCompletion: hasVerifyCaseCompletionPolicy(element) });
     }
     if (parsed.length !== elements.length) findings.push(`VERIFY-PARSE ${arrayName} declared ${elements.length} entries, parsed ${parsed.length}`);
     for (const entry of parsed) accept(entry);
@@ -402,6 +414,7 @@ export function checkVerifyCaseCompletion({
     const registered = registrationByName.get(entry.name);
     if (registered === undefined) findings.push(`REGISTRY-STALE ${entry.name} is not a Verify registration`);
     else if (registered.path !== entry.path) findings.push(`REGISTRY-STALE ${entry.name} path is ${entry.path}, Verify uses ${registered.path}`);
+    else if (entry.disposition === "required" && !registered.caseCompletion) findings.push(`REQUIRED-VERIFY-POLICY ${entry.name} has no Verify caseCompletion policy`);
   }
   const names = registry.map((entry) => entry.name);
   const sortedNames = [...names].sort((a, b) => a.localeCompare(b));
