@@ -1,6 +1,6 @@
 # Installed-plugin attestation runner parity
 
-Date: 2026-09-12  
+Date: 2026-09-12
 Scope: portable Claude and Antigravity local-development installation paths.
 
 The existing provider-neutral receipt verifier and Codex host implementation
