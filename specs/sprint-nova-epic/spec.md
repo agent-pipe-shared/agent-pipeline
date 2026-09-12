@@ -1714,3 +1714,20 @@ No acceptance ID is satisfied by this document alone.
   required.
 - **Make Nova completion depend on Cyborg:** rejected because both Sprints must
   close independently before a later integration lifecycle.
+## Nova B case-completion migration — Git and continuation safeguards
+
+The next local 0.6.2 candidate migrates three existing Verify registrations
+from legacy process-only observation to the shipped case-completion protocol:
+`commit-message-policy-tests`, `commit-msg-hook-install-tests`, and
+`resume-hint-scripts-tests`. Each suite SHALL register its complete ordered
+case corpus before callbacks execute, emit one terminal disposition per case
+over the bounded inherited descriptor, and retain direct developer execution
+without minting Verify evidence. Verify SHALL require the exact ordered case
+policy and the completion registry SHALL mark all three registrations
+`required`; missing, partial, duplicate, reordered, or stale evidence remains
+red. Each migration SHALL include an injected early-failure regression proving
+that its final declared case still reaches a terminal disposition.
+
+Rollback is one forward revert of the three suite migrations together with
+their Verify policies and registry dispositions. A partial rollback is invalid,
+and no completion receipt may be reused across the changed candidate.
