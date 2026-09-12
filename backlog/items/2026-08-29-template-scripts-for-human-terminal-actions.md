@@ -94,3 +94,23 @@ CLI verbs and `setupAction` remain, the original v1 receipt schema is unchanged,
 and reconciliation receipts use v2. Rollback may remove the new catalog metadata
 and v2 consumer while the original commands continue to work; candidate/builder
 binding makes older prepared instances refuse after drift.
+
+## POSIX reachability audit — 2026-09-12
+
+The registered builders and the prepared-instance core are present, but the
+public `human-terminal-action.mjs run` command deliberately remains
+unreachable without trusted caller evidence. A proposed shortcut that inferred
+that evidence from stdin/stdout plus `/dev/tty` was rejected: a workspace tool
+can allocate its own pseudo-terminal with `script`, satisfy all three TTY
+observations, and reach request processing. That directly falsifies the design
+requirement that an agent/session tool must not execute a `user-copy-only`
+action. TTY presence is useful terminal evidence but cannot authenticate the
+external-launcher origin by itself.
+
+Do not reactivate `run` from TTY state alone. Slice 3 remains open until a
+runner-neutral host adapter supplies non-caller-asserted launch provenance and
+the real producer paths prepare/consume the instances. This is independent of
+the deferred native Codex sandbox/App-Server work. The same audit found a
+narrow schema drift: Runtime and the registered attestation producer support
+`executionBoundary: "host"`, while the published instance schema omitted it.
+That schema parity defect is corrected and regression-tested separately.

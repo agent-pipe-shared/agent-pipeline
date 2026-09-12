@@ -58,6 +58,17 @@ boundary, and the provider-neutral GitHub/GitLab forge adapter package is
 present and tested. The Nova-B plan now records that distinction without
 rewriting immutable historical candidate-freeze evidence.
 
+The latest exact clean baseline is Full Verify run
+`verify-1789190187745-453056d9cdc07532` on commit `1e667395`, tree
+`0293641ce576bba952317e172999b91e83ca4590`: 534/534 registered steps and a
+fresh Security exit 0. A later POSIX terminal-action audit corrected the
+published schema's missing `host` boundary but deliberately did not activate
+the public `run` command. A tool-created pseudo-terminal passed a proposed
+TTY-only provenance check, so that shortcut was rejected and the existing
+human-terminal template item remains open for a non-caller-asserted host
+adapter. Details:
+`backlog/evidence/2026-09-12-posix-terminal-launcher-gap-and-schema-correction.md`.
+
 The genuine migration correction review is retained in
 `backlog/evidence/2026-09-10-migration-correction-critic.json`. Final correction
 `712f2aa3` preserves required input after activation; the parent inspected the

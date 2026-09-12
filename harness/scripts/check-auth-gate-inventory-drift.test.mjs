@@ -570,6 +570,16 @@ test("Slice 2 publishes closed instance and versioned receipt schemas", () => {
   }
 });
 
+test("POSIX CLI schema admits the runtime-supported host boundary", () => {
+  const schema = JSON.parse(readFileSync(
+    new URL("../../plugins/pipeline-core/schemas/human-terminal-action-instance.schema.json", import.meta.url),
+    "utf8",
+  ));
+  assert.deepEqual(schema.$defs.userCopyBoundary.properties.executionBoundary.enum, [
+    "host", "external-terminal", "attended-external-terminal",
+  ]);
+});
+
 test("Slice 2 shipped entry and Windows fail closed before writing a launcher", () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "hta-shipped-")));
   try {
@@ -590,6 +600,11 @@ test("Slice 2 refuses unknown caller or absent adapter before spawn and marks fa
   const caller = { trusted: true, ...fixture.entry.boundary, attendedTty: true };
   try {
     assert.equal(runHumanTerminalAction(input, { ...fixture.deps, spawn }).code, "HTA-RUN-INVOCATION-FORBIDDEN");
+    assert.equal(runHumanTerminalAction(input, {
+      ...fixture.deps,
+      spawn,
+      callerEvidence: { ...caller, executionBoundary: "host" },
+    }).code, "HTA-RUN-INVOCATION-FORBIDDEN");
     assert.equal(runHumanTerminalAction(input, { ...fixture.deps, spawn, callerEvidence: caller }).code, "HTA-RUN-READBACK-UNAVAILABLE");
     assert.equal(spawns, 0);
     const unknown = runHumanTerminalAction(input, {

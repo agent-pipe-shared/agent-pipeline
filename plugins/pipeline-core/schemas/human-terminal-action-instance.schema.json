@@ -35,7 +35,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["executionBoundary", "invocation", "codexToolCallPermitted"],
       "properties": {
-        "executionBoundary": { "enum": ["external-terminal", "attended-external-terminal"] },
+        "executionBoundary": { "enum": ["host", "external-terminal", "attended-external-terminal"] },
         "invocation": { "const": "user-copy-only" },
         "codexToolCallPermitted": { "const": false }
       }
