@@ -137,7 +137,7 @@ check("binds the real preflight packet and launched native prompt to the exact c
       requiredPathSha256: { "specs/work.md": createHash("sha256").update("candidate\n").digest("hex") },
       resultPath: `${prepared.packet.packetId}/result.json`,
     });
-    const prompt = JSON.parse(prepared.prompt);
+    const prompt = JSON.parse(prepared.prompt.slice(prepared.prompt.indexOf("\n") + 1));
     assert.equal(prompt.rulesetSha, prepared.packet.ruleset.oid);
     assert.equal(prompt.selectedModel, prepared.packet.route.modelTier);
     assert.equal(calls.length, 1);

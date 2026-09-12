@@ -14,9 +14,12 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 import { normalizeAntigravityToolInput } from "./antigravity-pretool-guard.mjs";
+import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
+import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
 
 const hookDir = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +36,38 @@ function fixture() {
     project: "test", verify: "node verify.mjs",
   }));
   return root;
+}
+
+function nativeFixture() {
+  const root = fixture();
+  writeFileSync(join(root, "input.txt"), "input\n");
+  for (const args of [
+    ["init", "-q"],
+    ["config", "user.name", "Fixture"],
+    ["config", "user.email", "fixture@example.invalid"],
+    ["add", ".claude/pipeline.json", "input.txt"],
+    ["commit", "-q", "-m", "fixture"],
+  ]) execFileSync("git", args, { cwd: root, encoding: "utf8" });
+  return root;
+}
+
+function prepareNative(root, nativeSubagents) {
+  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
+  const digest = createHash("sha256").update("input\n").digest("hex");
+  const packets = nativeSubagents.map((entry, index) => ({
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId: `agy-pretool-${index}`,
+    transport: "antigravity",
+    role: entry.TypeName,
+    prompt: entry.Prompt,
+    candidate: { commit, tree },
+    requiredPaths: ["input.txt"],
+    requiredPathSha256: { "input.txt": digest },
+    resultDestination: { kind: "return" },
+  }));
+  const prepared = prepareAntigravityNativeDispatch({ root, packets, nativeSubagents });
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
 }
 
 function lifecycleCommand(root, ...args) {
@@ -595,6 +630,7 @@ const CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT = [
   "docs/adr/0014-critic-contract.md",
   "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
   "model: sonnet",
+  "- **Tool budget (hard cap, first-class field):** ≤24 tool uses.",
 ].join("\n");
 
 const ROOT_CRITIC_TEMPLATE = readFileSync(join(pluginRoot, "..", "..", "templates", "prompts", "critic-review.md"), "utf8");
@@ -622,12 +658,15 @@ check("Antigravity Critic template carries a guard-admissible native envelope", 
 });
 
 check("Antigravity pretool guard admits the actual rendered Critic envelope", () => {
-  const root = fixture();
+  const root = nativeFixture();
+  const nativeSubagents = [{ TypeName: "critic", Role: "Critic", Prompt: RENDERED_AGY_CRITIC_ENVELOPE }];
+  prepareNative(root, nativeSubagents);
   const res = decision(run({
+    tool_use_id: "agy-rendered-critic-envelope",
     toolCall: {
       name: "invoke_subagent",
       args: {
-        Subagents: [{ TypeName: "critic", Role: "Critic", Prompt: RENDERED_AGY_CRITIC_ENVELOPE }],
+        Subagents: nativeSubagents,
       },
     },
   }, root));
@@ -655,23 +694,27 @@ check("Antigravity pretool guard still rejects copying the full canonical Critic
 });
 
 check("Antigravity pretool guard does not treat a paths-only critic dispatch as prose (neighbour case)", () => {
-  const root = fixture();
+  const root = nativeFixture();
+  const nativeSubagents = [
+    {
+      TypeName: "critic",
+      Role: "Critic",
+      Prompt: [
+        "specs/feat-1/prd.md",
+        "docs/adr/0014-critic-contract.md",
+        "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+        "model: sonnet",
+        "- **Tool budget (hard cap, first-class field):** ≤24 tool uses.",
+      ].join("\n"),
+    },
+  ];
+  prepareNative(root, nativeSubagents);
   const res = decision(run({
+    tool_use_id: "agy-paths-only-critic-envelope",
     toolCall: {
       name: "invoke_subagent",
       args: {
-        Subagents: [
-          {
-            TypeName: "critic",
-            Role: "Critic",
-            Prompt: [
-              "specs/feat-1/prd.md",
-              "docs/adr/0014-critic-contract.md",
-              "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
-              "model: sonnet",
-            ].join("\n"),
-          },
-        ],
+        Subagents: nativeSubagents,
       },
     },
   }, root));
@@ -681,18 +724,15 @@ check("Antigravity pretool guard does not treat a paths-only critic dispatch as 
 });
 
 check("Antigravity pretool guard allows a Critic dispatch naming the canonical templates/prompts/critic-review.md path (D2)", () => {
-  const root = fixture();
+  const root = nativeFixture();
+  const nativeSubagents = [{ TypeName: "critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT }];
+  prepareNative(root, nativeSubagents);
   const res = decision(run({
+    tool_use_id: "agy-canonical-critic-envelope",
     toolCall: {
       name: "invoke_subagent",
       args: {
-        Subagents: [
-          {
-            TypeName: "critic",
-            Role: "Critic",
-            Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT,
-          },
-        ],
+        Subagents: nativeSubagents,
       },
     },
   }, root));
@@ -800,15 +840,18 @@ check("Antigravity pretool guard blocks a critic dispatch carrying prose at inde
 });
 
 check("Antigravity pretool guard allows a multi-subagent envelope when the critic entry (index 1) carries a clean paths-only prompt (D3 neighbour case)", () => {
-  const root = fixture();
+  const root = nativeFixture();
+  const nativeSubagents = [
+    { TypeName: "researcher", Role: "Researcher", Prompt: "irrelevant" },
+    { TypeName: "critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
+  ];
+  prepareNative(root, nativeSubagents);
   const res = decision(run({
+    tool_use_id: "agy-multi-critic-envelope",
     toolCall: {
       name: "invoke_subagent",
       args: {
-        Subagents: [
-          { TypeName: "researcher", Role: "Researcher", Prompt: "irrelevant" },
-          { TypeName: "critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
-        ],
+        Subagents: nativeSubagents,
       },
     },
   }, root));

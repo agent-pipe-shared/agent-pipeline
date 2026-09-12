@@ -175,6 +175,7 @@ USAGE (Elephant)
    route: {{TRIGGER_ROW}}
    ruleset-sha: {{RULESET_SHA}}
    model: {{MODEL}}
+   - **Tool budget (hard cap, first-class field):** ≤24 tool uses.
    ```
    <!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->
 ═══════════════════════════════════════════════════════════════════════════

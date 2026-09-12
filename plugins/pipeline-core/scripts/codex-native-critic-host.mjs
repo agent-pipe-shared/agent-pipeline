@@ -29,6 +29,7 @@ import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { admitNativeCriticExport } from "../lib/native-critic-export-admission.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = realpathSync(resolve(HERE, ".."));
@@ -332,7 +333,7 @@ export function nativeCriticRoleDispatchPacket({ selection, referenceRecords, bo
     dispatchId: selection.selectionId,
     transport: "codex",
     role: "pipeline-core:critic",
-    prompt: `Independent Critic review for candidate ${selection.dispatch.candidateCommit}. Ruleset-SHA: ${boundRuleset.provenance.identity}; Model: ${selection.route.model}; effort ${selection.route.effort}. Construct your own input from the required paths.`,
+    prompt: `Independent Critic review for candidate ${selection.dispatch.candidateCommit}. Ruleset-SHA: ${boundRuleset.provenance.identity}; Model: ${selection.route.model}; effort ${selection.route.effort}. Construct your own input from the required paths.\n${dispatchBudgetLineForRole("critic")}`,
     candidate: { commit: selection.dispatch.candidateCommit, tree: selection.dispatch.candidateTree },
     requiredPaths,
     requiredPathSha256,

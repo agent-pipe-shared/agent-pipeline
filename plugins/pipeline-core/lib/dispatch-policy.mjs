@@ -48,6 +48,12 @@ const BUDGETED_ROLE_MAX_TURNS = Object.freeze({
   "goldfish-implementor": 50,
   "goldfish-mechanic": 50,
 });
+const DEFAULT_DISPATCH_BASE_CALL_CAP = Object.freeze({
+  critic: 24,
+  "goldfish-deep": 45,
+  "goldfish-implementor": 40,
+  "goldfish-mechanic": 40,
+});
 
 /** True only for an agent type shipped by this plugin, with or without its namespace. */
 export function isShippedPipelineAgentType(subagentType) {
@@ -65,6 +71,16 @@ export function dispatchBudgetContractForRole(subagentType) {
     return Object.freeze({ applicable: false, role: bareType });
   }
   return Object.freeze({ applicable: true, role: bareType, maxTurns: BUDGETED_ROLE_MAX_TURNS[bareType] });
+}
+
+/** Render the canonical first-class budget metadata consumed by PREPARE. */
+export function dispatchBudgetLineForRole(subagentType) {
+  const type = typeof subagentType === "string" ? subagentType : "";
+  const bareType = type.startsWith("pipeline-core:") ? type.slice("pipeline-core:".length) : type;
+  const cap = DEFAULT_DISPATCH_BASE_CALL_CAP[bareType];
+  return Number.isSafeInteger(cap)
+    ? `- **Tool budget (hard cap, first-class field):** ≤${cap} tool uses.`
+    : null;
 }
 
 export function dispatchBudgetBinding({ subagentType, prompt } = {}) {

@@ -23,7 +23,8 @@ const roles = [
   "goldfish-implementor", "goldfish-mechanic", "plan-verifier", "readiness-reviewer",
 ];
 const criticPrompt = `Independent review from frozen references.
-Ruleset-SHA: local-test; Model: gemini-observed; effort high.`;
+Ruleset-SHA: local-test; Model: gemini-observed; effort high.
+- **Tool budget (hard cap, first-class field):** ≤24 tool uses.`;
 const goldfishPrompt = `## Briefing
 ### 1. Goal
 Inspect the required path.
@@ -36,7 +37,8 @@ Inspect the required path.
 ### 5. Stop conditions
 - Required input unavailable.
 ### 6. Dispatch-Metadata
-Model: gemini-observed; effort medium; Ruleset-SHA: local-test.`;
+Model: gemini-observed; effort medium; Ruleset-SHA: local-test.
+- **Tool budget (TB-09, hard cap, first-class field):** ≤40 tool uses.`;
 const promptFor = (role, suffix = "") => `${role.includes("goldfish") ? goldfishPrompt : role === "critic" ? criticPrompt : "Inspect input.txt. Model: gemini-observed; Ruleset-SHA: local-test."}${suffix}`;
 
 const mockProgram = `#!/usr/bin/env node

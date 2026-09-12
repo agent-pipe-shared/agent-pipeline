@@ -4,12 +4,13 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 const hook = join(dirname(fileURLToPath(import.meta.url)), "antigravity-pretool-guard.mjs");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -126,12 +127,18 @@ const cases = [
     assert.equal(result.status, 2);
     assert.match(result.stderr, /AGY-NATIVE-ARTIFACT-STALE/u);
   }],
-];
+].map(([name, run], index) => ({ id: `ANDP${String(index + 1).padStart(2, "0")}`, name, run }));
 
-for (const [index, [name, run]] of cases.entries()) {
-  const value = fixture();
-  try { run(value); process.stdout.write(`ok ${index + 1} - ${name}\n`); }
-  catch (error) { process.stderr.write(`not ok ${index + 1} - ${name}\n${error.stack}\n`); process.exitCode = 1; }
-  finally { rmSync(value.root, { recursive: true, force: true }); }
+for (const entry of cases) {
+  const run = entry.run;
+  entry.run = () => {
+    const value = fixture();
+    try { return run(value); }
+    finally { rmSync(value.root, { recursive: true, force: true }); }
+  };
 }
-if (!process.exitCode) process.stdout.write(`All ${cases.length} Antigravity native pretool integration tests passed.\n`);
+assert.equal(cases.length, 8, "the complete Antigravity native pretool corpus must register before execution");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { dispatchFindings } from "./dispatch-policy.mjs";
+import { dispatchBudgetLineForRole, dispatchFindings } from "./dispatch-policy.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import {
   ROLE_DISPATCH_REQUEST_SCHEMA,
@@ -161,7 +161,10 @@ check("DP8b every budget-bearing role binds its declared cap before launch", () 
   ];
   for (const [role, prompt] of fixtures) {
     assert.equal(codes(dispatchFindings({ subagentType: `pipeline-core:${role}`, prompt })).some((code) => code.startsWith("DBB-")), false, role);
+    const rendered = prompt.replace(/^- \*\*Tool budget.*$/mu, dispatchBudgetLineForRole(role));
+    assert.equal(codes(dispatchFindings({ subagentType: `pipeline-core:${role}`, prompt: rendered })).some((code) => code.startsWith("DBB-")), false, `${role} shared default`);
   }
+  assert.equal(dispatchBudgetLineForRole("consult-advisor"), null);
 });
 
 check("DP8c budget-bearing roles reject missing, ambiguous and nonnumeric caps", () => {

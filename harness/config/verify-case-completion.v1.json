@@ -13,6 +13,16 @@
       "disposition": "required"
     },
     {
+      "name": "antigravity-native-dispatch-coordinator-tests",
+      "path": "plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "antigravity-native-dispatch-pretool-tests",
+      "path": "plugins/pipeline-core/hooks/antigravity-native-dispatch-pretool.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "artifact-topology-tests",
       "path": "plugins/pipeline-core/scripts/check-artifact-topology.test.mjs",
       "disposition": "legacy-process-only",
@@ -278,6 +288,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "dispatch-budget-binding-tests",
+      "path": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "dispatch-budget-core-tests",
       "path": "plugins/pipeline-core/lib/dispatch-budget-core.test.mjs",
       "disposition": "required"
@@ -327,11 +342,6 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
-      "name": "dispatch-budget-binding-tests",
-      "path": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
-      "disposition": "required"
-    },
-    {
       "name": "feature-package-topology-tests",
       "path": "plugins/pipeline-core/lib/feature-package-topology.test.mjs",
       "disposition": "legacy-process-only",
@@ -367,6 +377,11 @@
     {
       "name": "governance-verification-action-tests",
       "path": "plugins/pipeline-core/lib/governance-verification-action.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "guard-dispatch-tests",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
       "disposition": "required"
     },
     {

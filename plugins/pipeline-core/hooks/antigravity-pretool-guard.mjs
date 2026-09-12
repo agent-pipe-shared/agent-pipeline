@@ -462,6 +462,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
     tool_name: toolName,
     tool_input: toolInput,
     cwd: projectRoot,
+    tool_use_id: input?.tool_use_id ?? input?.toolUseId,
   });
 
   const denials = [];
@@ -531,6 +532,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
           tool_name: toolName,
           tool_input: entryToolInput,
           cwd: projectRoot,
+          tool_use_id: input?.tool_use_id ?? input?.toolUseId,
         });
         runNestedGuard(guardName, entryPayload, entryToolInput);
       }

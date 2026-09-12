@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
@@ -15,12 +15,13 @@ import {
   verifyAntigravityNativeDispatch,
 } from "./antigravity-native-dispatch-coordinator.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const git = (root, ...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 const prepareScript = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "antigravity-native-dispatch-prepare.mjs");
 const cases = [];
-const test = (name, run) => cases.push({ name, run });
+const test = (name, run) => cases.push({ id: `ANDC${String(cases.length + 1).padStart(2, "0")}`, name, run });
 
 function fixture() {
   const fixtureParent = process.env.PIPELINE_TEST_TMPDIR ?? join(process.cwd(), "scratch");
@@ -267,8 +268,8 @@ test("artifact is private and kept outside the working tree", () => withFixture(
   assert.equal(path.startsWith(join(common, "agent-pipeline", "run")), true);
 }));
 
-for (const [index, entry] of cases.entries()) {
-  try { entry.run(); process.stdout.write(`ok ${index + 1} - ${entry.name}\n`); }
-  catch (error) { process.stderr.write(`not ok ${index + 1} - ${entry.name}\n${error.stack}\n`); process.exitCode = 1; }
-}
-if (!process.exitCode) process.stdout.write(`All ${cases.length} Antigravity native dispatch coordinator tests passed.\n`);
+assert.equal(cases.length, 20, "the complete Antigravity native dispatch coordinator corpus must register before execution");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

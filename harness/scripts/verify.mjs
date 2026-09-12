@@ -347,7 +347,7 @@ const TEST_SUITES = [
   // The audited escape hatch for guard-testpath. Its own suite is TP-2 protected, so the
   // override's checks live in a separate file; the safety half is what is gated here.
   { name: "guard-testpath-override-tests", file: join(hooksDir, "guard-testpath-override.test.mjs") },
-  { name: "guard-dispatch-tests", file: join(hooksDir, "guard-dispatch.test.mjs") },
+  { name: "guard-dispatch-tests", file: join(hooksDir, "guard-dispatch.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 43 }, (_, index) => `GD${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "guard-slicing-tests", file: join(hooksDir, "guard-slicing.test.mjs") },
   { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
   { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
@@ -728,8 +728,8 @@ const TEST_SUITES = [
   { name: "test-tmpdir-tests", file: join(libDir, "test-tmpdir.test.mjs") },
   { name: "transfer-classification-tests", file: join(libDir, "transfer-classification.test.mjs") },
   { name: "antigravity-execution-host-tests", file: join(libDir, "antigravity-execution-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 18 }, (_, index) => `EPH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
-  { name: "antigravity-native-dispatch-coordinator-tests", file: join(libDir, "antigravity-native-dispatch-coordinator.test.mjs") },
-  { name: "antigravity-native-dispatch-pretool-tests", file: join(hooksDir, "antigravity-native-dispatch-pretool.test.mjs") },
+  { name: "antigravity-native-dispatch-coordinator-tests", file: join(libDir, "antigravity-native-dispatch-coordinator.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 20 }, (_, index) => `ANDC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "antigravity-native-dispatch-pretool-tests", file: join(hooksDir, "antigravity-native-dispatch-pretool.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `ANDP${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "backlog-item-strip-for-dispatch-tests", file: join(pluginScriptsDir, "backlog-item-strip-for-dispatch.test.mjs") },
   { name: "check-backlog-state-tests", file: join(pluginScriptsDir, "check-backlog-state.test.mjs") },
   { name: "check-suite-registration-tests", file: join(pluginScriptsDir, "check-suite-registration.test.mjs") },

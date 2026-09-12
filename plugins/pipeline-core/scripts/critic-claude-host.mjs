@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import {
   canonicalJson,
@@ -67,7 +68,7 @@ function refs(packet) {
   return [...byPath.values()];
 }
 function promptFor(packet) {
-  return canonicalJson({
+  return `${dispatchBudgetLineForRole("critic")}\n${canonicalJson({
     schema: "pipeline.claude-critic-prompt.v1",
     packetId: packet.packetId,
     rulesetSha: packet.ruleset.oid,
@@ -76,7 +77,7 @@ function promptFor(packet) {
     candidate: { ...packet.candidate },
     diff: { ...packet.diff },
     references: refs(packet),
-  });
+  })}`;
 }
 function referenceBlobSha256(packet, reference) {
   const bytes = execFileSync("git", ["-C", packet.checkout.realPath, "cat-file", "blob", reference.candidateBlobOid], {

@@ -34,6 +34,7 @@ import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
 import { resolveCriticHighRiskRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const OID = /^[a-f0-9]{40,64}$/;
@@ -119,7 +120,7 @@ export function prepareSelectedCriticRoleDispatch({ input, route, resultDestinat
     dispatchId,
     transport: "codex",
     role: "pipeline-core:critic",
-    prompt: `Independent Critic review from requiredPaths only. Ruleset-SHA: ${boundRoute.sourceSha256}; Model: ${boundRoute.model}; effort ${boundRoute.effort}.`,
+    prompt: `Independent Critic review from requiredPaths only. Ruleset-SHA: ${boundRoute.sourceSha256}; Model: ${boundRoute.model}; effort ${boundRoute.effort}.\n${dispatchBudgetLineForRole("critic")}`,
     candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree },
     requiredPaths: [...paths],
     requiredPathSha256,

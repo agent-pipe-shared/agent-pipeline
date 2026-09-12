@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +30,7 @@ import {
   resolvePendingAdvisorProhibitionBinding,
 } from "../lib/advisor-prohibition-binding.mjs";
 import { evaluateAdvisorProhibitionGuard } from "./guard-advisor-prohibition.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
 // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
@@ -62,8 +63,11 @@ function filledTemplateBody(relativePath) {
   return body;
 }
 
-let pass = 0;
-const failures = [];
+const cases = [];
+function register(name, run) {
+  const id = `GD${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({ id, name, run });
+}
 function run(payload) {
   const res = spawnSync(process.execPath, [GUARD], {
     input: JSON.stringify(payload), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: bindingRepo },
@@ -71,18 +75,14 @@ function run(payload) {
   return { code: res.status, stderr: res.stderr ?? "" };
 }
 function check(id, payload, expectExit, { stderrIncludes } = {}) {
-  const { code, stderr } = run(payload);
-  const problems = [];
-  if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit}) -- ${stderr.trim().slice(0, 200)}`);
-  for (const needle of [].concat(stderrIncludes ?? [])) {
-    if (!stderr.includes(needle)) problems.push(`stderr missing "${needle}"`);
-  }
-  if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
-  else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
+  register(id, () => {
+    const { code, stderr } = run(payload);
+    assert.equal(code, expectExit, `exit ${code} (expected ${expectExit}) -- ${stderr.trim().slice(0, 200)}`);
+    for (const needle of [].concat(stderrIncludes ?? [])) assert.ok(stderr.includes(needle), `stderr missing "${needle}"`);
+  });
 }
 function manualCheck(id, fn) {
-  try { fn(); pass += 1; console.log(`PASS  ${id}`); }
-  catch (error) { failures.push(`${id}: ${error.message}`); console.log(`FAIL  ${id} -- ${error.message}`); }
+  register(id, fn);
 }
 
 const BLOCK = 2, ALLOW = 0;
@@ -115,10 +115,9 @@ check("GD2a allow and bind a policy-clean Critic dispatch carrying the exact Adv
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)` },
 }, ALLOW);
-{
+manualCheck("GD2b the pre-launch carrier contains only the exact role, disposition and prompt digest", () => {
   const key = createHash("sha256").update(prohibitedToolUseId).digest("hex");
   const path = join(bindingRepo, ".git", "agent-pipeline", "advisor-prohibition", "pending", `${key}.json`);
-  const id = "GD2b the pre-launch carrier contains only the exact role, disposition and prompt digest";
   const problems = [];
   if (!existsSync(path)) problems.push("binding record is absent");
   else {
@@ -130,9 +129,8 @@ check("GD2a allow and bind a policy-clean Critic dispatch carrying the exact Adv
     if (!/^[a-f0-9]{64}$/u.test(value.bindings[0]?.promptSha256 ?? "")) problems.push("prompt digest missing");
     if (JSON.stringify(value).includes(ADVISOR_PROHIBITION_LINE)) problems.push("raw prompt escaped into the private carrier");
   }
-  if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
-  else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
-}
+  assert.deepEqual(problems, []);
+});
 
 check("GD2c block a prohibition-bearing child whose parent tool-use id is absent", {
   tool_name: "Task",
@@ -427,8 +425,7 @@ check("GD15j block a Codex packet with no message before launch", {
 // still report it as one passing test with none of GD1-GD19 having run. Spawning a child process
 // removes that risk: a regression of that shape makes the CHILD exit with no success marker in
 // its stdout, which the assertions below treat as an explicit failure, not a silent pass.
-{
-  const id = "GD16 extractWorkflowDispatches is importable and callable directly, via a subprocess, with no in-process import of the hook module";
+manualCheck("GD16 extractWorkflowDispatches is importable and callable directly, via a subprocess, with no in-process import of the hook module", () => {
   const expected = [{ subagentType: "pipeline-core:critic", prompt: "hello world" }];
   const successMarker = "GD16-IMPORT-OK";
   const runnerDir = mkdtempSync(join(tmpdir(), "guard-dispatch-import-check-"));
@@ -463,12 +460,11 @@ check("GD15j block a Codex packet with no message before launch", {
     // stdout line keeps that same strength under the new subprocess shape.
     const expectedLine = `GD16-RESULT: ${JSON.stringify(expected)}`;
     if (!stdout.split("\n").includes(expectedLine)) problems.push(`child stdout missing the exact line "${expectedLine}" -- got ${JSON.stringify(stdout)}`);
-    if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
-    else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
+    assert.deepEqual(problems, []);
   } finally {
     rmSync(runnerDir, { recursive: true, force: true });
   }
-}
+});
 
 check("GD17 block  via the real path, a refusable dispatch still refuses after the entrypoint gate", {
   tool_name: "Task",
@@ -486,8 +482,7 @@ check("GD18a block a budget-bearing Claude dispatch without its parent tool-use 
   tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
 }, BLOCK, { stderrIncludes: ["DBB-PARENT-TOOL-USE-ID-MISSING"] });
 
-{
-  const id = "GD19 block  invoked through a symlink to the module, the hook still refuses (the 2026-08-06 failure shape)";
+manualCheck("GD19 block  invoked through a symlink to the module, the hook still refuses (the 2026-08-06 failure shape)", () => {
   const linkDir = mkdtempSync(join(tmpdir(), "guard-dispatch-link-"));
   try {
     const linked = join(linkDir, "guard-dispatch.mjs");
@@ -502,20 +497,18 @@ check("GD18a block a budget-bearing Claude dispatch without its parent tool-use 
     if (res.status !== BLOCK) problems.push(`exit ${res.status} (expected ${BLOCK}) through the symlink -- ${stderr.trim().slice(0, 200)}`);
     if (!stderr.includes("DISPATCH-CONTAMINATION-CLAIMS-LIST")) problems.push("stderr missing DISPATCH-CONTAMINATION-CLAIMS-LIST through the symlink");
     if (res.status === 0 && stderr === "") problems.push("silent no-op through the symlink -- exit 0 means ALLOW");
-    if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
-    else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
+    assert.deepEqual(problems, []);
   } finally {
     rmSync(linkDir, { recursive: true, force: true });
   }
-}
+});
 
 // GD20 -- NVA-B-SLICINGRUNNER-1: extractAntigravityDispatches is now exported the same way
 // extractWorkflowDispatches was (adc165bb/GD16 above) -- same subprocess-only proof, for the same
 // reason documented at the top of this file: a module-scope import here would be safe only as
 // long as the entrypoint gate stays in place, and a regression of that gate must fail this case
 // loudly (missing success marker) rather than silently vanish this whole file's coverage.
-{
-  const id = "GD20 extractAntigravityDispatches is importable and callable directly, via a subprocess, with no in-process import of the hook module";
+manualCheck("GD20 extractAntigravityDispatches is importable and callable directly, via a subprocess, with no in-process import of the hook module", () => {
   const expected = [{ subagentType: "pipeline-core:critic", prompt: "hello world" }];
   const successMarker = "GD20-IMPORT-OK";
   const runnerDir = mkdtempSync(join(tmpdir(), "guard-dispatch-antigravity-import-check-"));
@@ -543,17 +536,14 @@ check("GD18a block a budget-bearing Claude dispatch without its parent tool-use 
     if (!stdout.includes(successMarker)) problems.push(`child stdout missing success marker "${successMarker}" -- got ${JSON.stringify(stdout)}`);
     const expectedLine = `GD20-RESULT: ${JSON.stringify(expected)}`;
     if (!stdout.split("\n").includes(expectedLine)) problems.push(`child stdout missing the exact line "${expectedLine}" -- got ${JSON.stringify(stdout)}`);
-    if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
-    else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
+    assert.deepEqual(problems, []);
   } finally {
     rmSync(runnerDir, { recursive: true, force: true });
   }
-}
+});
 
-console.log(`\n${pass}/${pass + failures.length} cases passed.`);
-if (failures.length > 0) {
-  console.log("Failures:");
-  for (const f of failures) console.log(`  - ${f}`);
-  process.exit(1);
-}
-process.exit(0);
+assert.equal(cases.length, 43, "the complete dispatch guard corpus must register before execution");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases: cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
