@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-09-06
+due: 2026-09-30
 sprint: nova-b
 tracking: "Nova B — a T1 Critic reviewing NVA-B-TILDEFIX-1 ran a live reachability probe (a synthetic marker path, never a real credential) and found the shell-expanded tilde was ADMITTED AND EXECUTED by the guard actually enforcing that dispatch's own session — even though the source fix is confirmed present and Critic-approved in the reviewed working tree. Traced by the Elephant: the enforcing hook is loaded from the installed marketplace copy (/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs), a plain regular file (not a symlink) last modified 2026-09-04 07:42, which diverges from the repo's own copy by roughly six commits and predates NVA-B-READCONTAIN-1 entirely, not only NVA-B-TILDEFIX-1."
 done_when: manual
@@ -162,3 +163,8 @@ source checkout. Focused evidence is recorded in
 `backlog/evidence/2026-09-12-installed-plugin-attestation-runner-parity.md`.
 The item still requires the acceptance criteria's live resync/reachability
 probes before closure.
+
+The remaining probes stay owned by `pipeline` through the due date above. They
+must exercise a real Claude cache refresh and an Antigravity marketplace copy
+through their supported installer/registry boundaries; native Codex sandbox or
+App-Server execution under WSL is outside this acceptance surface.

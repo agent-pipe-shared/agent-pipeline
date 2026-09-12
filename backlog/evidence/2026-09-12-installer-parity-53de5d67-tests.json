@@ -1,0 +1,48 @@
+{
+  "schema": "pipeline.focused-candidate-test-evidence.v1",
+  "generatedAt": "2026-09-12T00:23:15.693Z",
+  "candidateCommit": "53de5d6738b749c02da2c81c32721fe9eba79880",
+  "candidateTree": "2790fbaf6a01bca333851511dfaf0de4fbd654d4",
+  "clean": true,
+  "tests": [
+    {
+      "command": [
+        "node",
+        "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "d94b6292e5d1b9bc3e66efdd7020aef4c13b9dce8188ff57673dd50f9bc0352c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 854,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "plugins/pipeline-core/lib/public-core-observation.test.mjs",
+        "plugins/pipeline-core/lib/installed-plugin-attestation.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "e713d5793fc14befac80baf9a21850e0ec1dbfb11c2273c6b222b211e0db0ab6",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 2557,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "7dbf10b56eca07b90b2d513bcb7ba36b0e03d34b71ff7bf94e419e660aa7d720",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 6244,
+      "stderrBytes": 0
+    }
+  ],
+  "passed": true
+}

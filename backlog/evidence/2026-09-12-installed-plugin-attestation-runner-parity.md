@@ -30,5 +30,20 @@ Focused checks:
 - `node --test plugins/pipeline-core/lib/public-core-observation.test.mjs plugins/pipeline-core/lib/installed-plugin-attestation.test.mjs` — both suites passed.
 - `node plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs` — 55/55 passed in the host-side repetition. The earlier restricted-sandbox attempt reached 53 passing cases and refused only two nested-Git fixtures with `EPERM`; the host repetition supersedes that incomplete run.
 
+The machine-written receipt
+`backlog/evidence/2026-09-12-installer-parity-53de5d67-tests.json` binds all
+three exit-zero results, their output digests, clean detached-worktree state and
+tree `2790fbaf6a01bca333851511dfaf0de4fbd654d4` to full commit
+`53de5d6738b749c02da2c81c32721fe9eba79880`.
+
+## Rollback
+
+Before any released adoption, revert
+`53de5d6738b749c02da2c81c32721fe9eba79880` and retain the prior Codex-only
+receipt host plus the previous Antigravity installer entrypoints. Existing
+external receipts are request-selected and content-bound, so stale Claude or
+Antigravity receipts cannot authorize a reverted or changed installed tree and
+need no migration. Rerun bootstrap to obtain the prior closed/advisory state.
+
 No live marketplace was mutated and no native Codex WSL sandbox readiness is
 claimed.
