@@ -249,6 +249,19 @@ item remains open for the real Antigravity production coordinator selected by
 the PO; this event slice supplies its truthful progress surface without
 inventing a second launch path.
 
+## Shared-deadline correction rollback
+
+If the shared monotonic deadline causes an incompatible regression, forward
+revert only the deadline plumbing: stop passing `deadlineEpochMs` from the
+Antigravity native coordinator, restore the role-preflight Git helpers' fixed
+per-process timeout, and remove the repository-plus-batch slow-Git regression
+case. Keep candidate, input-digest, array and artifact authentication intact.
+Before restamping, rerun the role dispatch-policy, Antigravity native
+coordinator and Antigravity pretool suites and record that the restored path
+still reports zero model and launcher calls on rejection. This rollback
+deliberately reopens the bounded-PREPARE finding; it must not be described as
+preserving the under-five-second guarantee.
+
 ## Triage — 2026-09-11
 
 - **Decision:** accepted for Nova B; no additional 0.6.2 release blocker was

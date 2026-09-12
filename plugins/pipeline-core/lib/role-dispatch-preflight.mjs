@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { performance } from "node:perf_hooks";
 
 import { dispatchFindings } from "./dispatch-policy.mjs";
 
@@ -18,6 +19,7 @@ const TRANSPORTS = new Set(["direct", "workflow", "antigravity", "codex"]);
 const PACKET_KEYS = ["candidate", "dispatchId", "prompt", "requiredPathSha256", "requiredPaths", "resultPath", "role", "schema", "transport"];
 const EXPLICIT_DESTINATION_PACKET_KEYS = ["candidate", "dispatchId", "prompt", "requiredPathSha256", "requiredPaths", "resultDestination", "role", "schema", "transport"];
 const SHA256 = /^[a-f0-9]{64}$/u;
+const DEFAULT_PREFLIGHT_DEADLINE_MS = 5_000;
 
 function exactKeys(value, keys) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -42,24 +44,38 @@ function normalizedPath(value) {
     && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
 }
 
-function git(root, args) {
+function remainingDeadlineMs(deadlineEpochMs) {
+  return Math.floor(deadlineEpochMs - performance.now());
+}
+
+function boundedDeadlineEpochMs(deadlineEpochMs) {
+  return Number.isFinite(deadlineEpochMs)
+    ? Math.min(deadlineEpochMs, performance.now() + DEFAULT_PREFLIGHT_DEADLINE_MS)
+    : Number.NaN;
+}
+
+function git(root, args, deadlineEpochMs) {
+  const remainingMs = remainingDeadlineMs(deadlineEpochMs);
+  if (remainingMs < 1) return null;
   const result = spawnSync("git", ["-C", root, ...args], {
     encoding: "utf8",
     env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
     shell: false,
-    timeout: 5_000,
+    timeout: remainingMs,
     maxBuffer: 1024 * 1024,
   });
   if (result.error || result.status !== 0) return null;
   return String(result.stdout).trim();
 }
 
-function candidateBlobSha256(root, oid) {
+function candidateBlobSha256(root, oid, deadlineEpochMs) {
+  const remainingMs = remainingDeadlineMs(deadlineEpochMs);
+  if (remainingMs < 1) return null;
   const result = spawnSync("git", ["-C", root, "cat-file", "blob", oid], {
     encoding: null,
     env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
     shell: false,
-    timeout: 5_000,
+    timeout: remainingMs,
     maxBuffer: 16 * 1024 * 1024,
   });
   if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout)) return null;
@@ -83,8 +99,17 @@ function resultParentIsSafe(root, resultPath) {
   }
 }
 
-export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) {
+export function preflightRoleDispatch({
+  root,
+  resultRoot = root,
+  packet,
+  deadlineEpochMs = performance.now() + DEFAULT_PREFLIGHT_DEADLINE_MS,
+} = {}) {
   if (typeof root !== "string" || root.length === 0) return rejected("RDP-ROOT", "root");
+  const deadline = boundedDeadlineEpochMs(deadlineEpochMs);
+  if (!Number.isFinite(deadline) || remainingDeadlineMs(deadline) < 1) {
+    return rejected("RDP-DEADLINE", "deadlineEpochMs");
+  }
   let realRoot;
   try { realRoot = realpathSync(root); } catch { return rejected("RDP-ROOT", "root"); }
   const legacyPacket = exactKeys(packet, PACKET_KEYS);
@@ -127,17 +152,23 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
   const policy = dispatchFindings({ subagentType: packet.role, prompt: packet.prompt, transport: packet.transport });
   if (policy.findings.length > 0) return rejected(policy.findings[0].code, "role");
 
-  const commit = git(realRoot, ["rev-parse", "--verify", `${packet.candidate.commit}^{commit}`]);
+  const deadlineRejected = () => rejected("RDP-DEADLINE", "deadlineEpochMs");
+  const commit = git(realRoot, ["rev-parse", "--verify", `${packet.candidate.commit}^{commit}`], deadline);
+  if (commit === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
   if (commit !== packet.candidate.commit) return rejected("RDP-CANDIDATE-COMMIT", "candidate.commit");
-  const tree = git(realRoot, ["rev-parse", `${commit}^{tree}`]);
+  const tree = git(realRoot, ["rev-parse", `${commit}^{tree}`], deadline);
+  if (tree === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
   if (tree !== packet.candidate.tree) return rejected("RDP-CANDIDATE-TREE", "candidate.tree");
   for (const path of packet.requiredPaths) {
-    const row = git(realRoot, ["--literal-pathspecs", "ls-tree", "-z", commit, "--", path]);
+    const row = git(realRoot, ["--literal-pathspecs", "ls-tree", "-z", commit, "--", path], deadline);
+    if (row === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
     const match = /^(?:100644|100755) blob ((?:[a-f0-9]{40}|[a-f0-9]{64}))\t/u.exec(row ?? "");
     if (match === null) {
       return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
     }
-    if (candidateBlobSha256(realRoot, match[1]) !== packet.requiredPathSha256[path]) {
+    const candidateDigest = candidateBlobSha256(realRoot, match[1], deadline);
+    if (candidateDigest === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
+    if (candidateDigest !== packet.requiredPathSha256[path]) {
       return rejected("RDP-REQUIRED-BLOB", `requiredPaths:${path}`);
     }
     const physicalPath = resolve(realRoot, path);
@@ -147,7 +178,8 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
         return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
       }
     } catch { return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`); }
-    const physicalBlob = git(realRoot, ["--literal-pathspecs", "hash-object", "--no-filters", "--", path]);
+    const physicalBlob = git(realRoot, ["--literal-pathspecs", "hash-object", "--no-filters", "--", path], deadline);
+    if (physicalBlob === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
     if (physicalBlob !== match[1]) return rejected("RDP-REQUIRED-PATH-DRIFT", `requiredPaths:${path}`);
   }
   if (destination.kind === "file") {
@@ -182,11 +214,17 @@ export function preflightRoleDispatch({ root, resultRoot = root, packet } = {}) 
   };
 }
 
-export function prepareRoleDispatchBatch({ root, resultRoot = root, packets } = {}) {
+export function prepareRoleDispatchBatch({
+  root,
+  resultRoot = root,
+  packets,
+  deadlineEpochMs = performance.now() + DEFAULT_PREFLIGHT_DEADLINE_MS,
+} = {}) {
   if (!Array.isArray(packets) || packets.length === 0 || packets.length > 64) {
     return { schema: ROLE_DISPATCH_BATCH_SCHEMA, status: "rejected", code: "RDB-PACKETS", preparations: [], modelCalls: 0, launcherCalls: 0 };
   }
-  const preparations = packets.map((packet) => preflightRoleDispatch({ root, resultRoot, packet }));
+  const deadline = boundedDeadlineEpochMs(deadlineEpochMs);
+  const preparations = packets.map((packet) => preflightRoleDispatch({ root, resultRoot, packet, deadlineEpochMs: deadline }));
   const ids = packets.map((packet) => packet?.dispatchId);
   const fileDestinations = packets.flatMap((packet) => {
     if (typeof packet?.resultPath === "string") return [packet.resultPath];

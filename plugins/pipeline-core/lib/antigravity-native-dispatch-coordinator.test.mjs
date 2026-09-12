@@ -145,6 +145,38 @@ test("serial repository Git probes share one five-second preparation deadline", 
   process.stdout.write(`# measured shared preparation deadline: ${elapsedMs.toFixed(0)}ms\n`);
 }));
 
+test("repository and batch-preflight Git probes share one five-second preparation deadline", () => withFixture((value) => {
+  const actualGit = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).trim();
+  const fakeBin = mkdtempSync(join(process.env.PIPELINE_TEST_TMPDIR ?? join(process.cwd(), "scratch"), "agy-slow-batch-git-"));
+  const fakeGit = join(fakeBin, "git");
+  const batchProbeLog = join(fakeBin, "batch-probes.log");
+  writeFileSync(fakeGit, `#!/usr/bin/env node\nimport { appendFileSync } from "node:fs";\nimport { spawnSync } from "node:child_process";\nif (process.argv[2] === "-C") {\n  appendFileSync(${JSON.stringify(batchProbeLog)}, process.argv.slice(2).join(" ") + "\\n");\n  const wait = new Int32Array(new SharedArrayBuffer(4));\n  Atomics.wait(wait, 0, 0, 2000);\n}\nconst result = spawnSync(${JSON.stringify(actualGit)}, process.argv.slice(2), { stdio: "inherit" });\nprocess.exit(result.status ?? 1);\n`);
+  chmodSync(fakeGit, 0o755);
+  const priorPath = process.env.PATH;
+  const started = performance.now();
+  let result;
+  let nativeCalls = 0;
+  try {
+    process.env.PATH = `${fakeBin}:${priorPath ?? ""}`;
+    result = prepareAntigravityNativeDispatch(value);
+    if (result.status === "prepared") nativeCalls += 1;
+  } finally {
+    process.env.PATH = priorPath;
+  }
+  const elapsedMs = performance.now() - started;
+  const batchProbes = readFileSync(batchProbeLog, "utf8").trim().split("\n");
+  rmSync(fakeBin, { recursive: true, force: true });
+  assert.equal(result.code, "RDB-PREPARATION-FAILED");
+  assert.equal(result.preparation.preparations[0].code, "RDP-DEADLINE");
+  assert.ok(batchProbes.length >= 3, `expected the timeout inside batch preflight, saw ${batchProbes.length} Git probes`);
+  assert.equal(nativeCalls, 0);
+  assert.equal(result.modelCalls, 0);
+  assert.equal(result.launcherCalls, 0);
+  assert.ok(elapsedMs >= 4_000, `deadline fired unexpectedly early at ${elapsedMs.toFixed(0)}ms`);
+  assert.ok(elapsedMs < 5_000, `repository plus batch preflight exceeded the five-second PREPARE bound: ${elapsedMs.toFixed(0)}ms`);
+  process.stdout.write(`# measured repository-plus-batch preparation deadline: ${elapsedMs.toFixed(0)}ms\n`);
+}));
+
 test("CLI prepares a repository-contained request file without launching another CLI or model", () => withFixture((value) => {
   const requestPath = join(value.root, "agy-dispatch-request.json");
   writeFileSync(requestPath, `${JSON.stringify({ packets: value.packets, Subagents: value.nativeSubagents })}\n`);

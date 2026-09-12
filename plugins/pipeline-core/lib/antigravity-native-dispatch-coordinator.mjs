@@ -180,7 +180,11 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
   if (!Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0 || !Number.isSafeInteger(ttlMs) || ttlMs < 1_000 || ttlMs > DEFAULT_TTL_MS) {
     return rejected("AGY-NATIVE-TTL", "ttlMs");
   }
-  const batch = prepareRoleDispatchBatch({ root: state.physicalRoot, packets });
+  const batch = prepareRoleDispatchBatch({
+    root: state.physicalRoot,
+    packets,
+    deadlineEpochMs: prepareDeadlineEpochMs,
+  });
   if (batch.status !== "prepared") return { ...rejected(batch.code, "packets"), preparation: batch };
   if (packets.some((packet) => packet.transport !== "antigravity" || packet.resultDestination?.kind !== "return")) {
     return rejected("AGY-NATIVE-PACKET-BOUNDARY", "packets");
@@ -222,7 +226,8 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
 
 /** Validate the exact native call against its candidate-bound prepared artifact. */
 export function verifyAntigravityNativeDispatch({ root, nativeSubagents, nowEpochMs = Date.now() } = {}) {
-  const state = repositoryState(root);
+  const prepareDeadlineEpochMs = performance.now() + PREPARE_DEADLINE_MS;
+  const state = repositoryState(root, prepareDeadlineEpochMs);
   if (state === null) return rejected("AGY-NATIVE-ROOT", "root");
   if (!validNativeSubagents(nativeSubagents)) return rejected("AGY-NATIVE-SUBAGENTS", "Subagents");
   const path = artifactPath(state.commonDir, nativeSubagents, state.physicalRoot);
@@ -258,7 +263,11 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, nowEpoc
   if (JSON.stringify(artifact.nativeSubagents) !== JSON.stringify(nativeSubagents)) return rejected("AGY-NATIVE-ARRAY-MUTATED", "Subagents");
   if (!entriesMatchPackets(nativeSubagents, artifact.packets)) return rejected("AGY-NATIVE-ARRAY-MISMATCH", "Subagents");
 
-  const batch = prepareRoleDispatchBatch({ root: state.physicalRoot, packets: artifact.packets });
+  const batch = prepareRoleDispatchBatch({
+    root: state.physicalRoot,
+    packets: artifact.packets,
+    deadlineEpochMs: prepareDeadlineEpochMs,
+  });
   if (batch.status !== "prepared") return { ...rejected("AGY-NATIVE-BATCH-STALE", "packets"), preparation: batch };
   if (artifact.packets.some((packet) => packet.transport !== "antigravity" || packet.resultDestination?.kind !== "return"
     || packet.candidate.commit !== state.head || packet.candidate.tree !== state.tree)) {
