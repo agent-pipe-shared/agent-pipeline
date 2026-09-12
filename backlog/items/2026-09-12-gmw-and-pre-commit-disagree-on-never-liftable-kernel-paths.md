@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gmw-precommit-kernel-precedence-diverges
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: 28ca87187ad96fc94d970fa20c178e954371fa25
+closure_evidence: plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs
 created: 2026-09-12
 sprint: nova-b
 done_when: manual

@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "bf2a09566e915fd10f48a491346f216bdc279d98",
-    "tree": "bcae1b7b7cff7c252b16b1595437d3b478ddd5e0"
+    "commit": "28ca87187ad96fc94d970fa20c178e954371fa25",
+    "tree": "d69bc2caf6dd840a9857c2c9c9cc6213b2b0a106"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -17,6 +17,7 @@
       "benefit": "Configured hook families enforce command, write-path, plan, test-path, push, and lifecycle-readiness safeguards.",
       "status": "shipped",
       "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-advisor-prohibition.mjs:guard-advisor-prohibition",
         "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
         "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
         "guard:plugins/pipeline-core/hooks/guard-dispatch-budget.mjs:guard-dispatch-budget",
@@ -29,8 +30,8 @@
         "guard:plugins/pipeline-core/hooks/guard-slicing.mjs:guard-slicing",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
         "guard:plugins/pipeline-core/hooks/guard-worktree-isolation.mjs:guard-worktree-isolation",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
@@ -42,6 +43,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow|TodoWrite:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:advisor:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
@@ -78,6 +80,7 @@
         "pipeline-core plugin"
       ],
       "productionEvidence": [
+        "plugins/pipeline-core/hooks/guard-advisor-prohibition.mjs",
         "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
         "plugins/pipeline-core/hooks/guard-devplan.mjs",
         "plugins/pipeline-core/hooks/guard-dispatch.mjs",
@@ -198,6 +201,8 @@
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-pretool-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
@@ -294,6 +299,7 @@
         "verify-phase:harness/scripts/verify.mjs:deferred-backlog-tests",
         "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-authorship-verify-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-budget-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-calibration-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
@@ -319,7 +325,6 @@
         "verify-phase:harness/scripts/verify.mjs:gitleaks-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-authority-resolver-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-authority-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-verification-action-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
@@ -500,6 +505,7 @@
         "verify-phase:harness/scripts/verify.mjs:remote-provisional-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-path-identity-tests",
+        "verify-phase:harness/scripts/verify.mjs:requirement-traceability-tests",
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
         "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",
         "verify-phase:harness/scripts/verify.mjs:review-retry-planner-tests",
@@ -549,6 +555,7 @@
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-owner-nonce-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-recovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-critic-finalizer-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-core-tests",
@@ -1586,13 +1593,19 @@
       "benefit": "A caller can seal and validate RFC 8785 governance-event envelopes with SHA-256 binding; the library is not itself an automatically active runner integration.",
       "status": "optional",
       "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:governance-action-artifact-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-action-events-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-event-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-event-core-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-event-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-event-store-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-gate-action-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-recovery-reconciliation-action-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-review-action-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-verification-action-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-schema-parity-tests",
-        "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-tests"
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-gate-action-event-tests"
       ],
       "runners": [
         "host-only"
@@ -1624,10 +1637,24 @@
         "pipeline-core plugin"
       ],
       "productionEvidence": [
-        "plugins/pipeline-core/lib/governance-event.mjs"
+        "plugins/pipeline-core/lib/governance-action-artifact.mjs",
+        "plugins/pipeline-core/lib/governance-event.mjs",
+        "plugins/pipeline-core/lib/governance-gate-action.mjs",
+        "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.mjs",
+        "plugins/pipeline-core/lib/governance-verification-action.mjs",
+        "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs",
+        "plugins/pipeline-core/scripts/session-cleanup.mjs"
       ],
       "testEvidence": [
-        "plugins/pipeline-core/lib/governance-event.test.mjs"
+        "plugins/pipeline-core/lib/governance-action-artifact.test.mjs",
+        "plugins/pipeline-core/lib/governance-event.test.mjs",
+        "plugins/pipeline-core/lib/governance-gate-action.test.mjs",
+        "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.test.mjs",
+        "plugins/pipeline-core/lib/governance-verification-action.test.mjs",
+        "plugins/pipeline-core/scripts/pipeline-state-gate-action-event.test.mjs",
+        "plugins/pipeline-core/scripts/reconcile-backlog-ledger.test.mjs",
+        "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"
       ],
       "targets": [
         {
