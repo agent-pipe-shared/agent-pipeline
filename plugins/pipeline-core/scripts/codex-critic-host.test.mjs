@@ -56,6 +56,7 @@ import {
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
+import { expectedPipelineScriptsRunnerAllowlistEntries } from "../lib/project-onboarding-v3.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
@@ -737,6 +738,12 @@ check("the exact runner value prepareNativeCritic sends the gate is accepted by 
         runtime: {},
         continuity: {},
         appServer: {},
+        runnerPermissions: {
+          target: ".claude/settings.json",
+          status: "current",
+          lanes: ["Bash", "PowerShell"],
+          exactEntries: expectedPipelineScriptsRunnerAllowlistEntries(),
+        },
         nextAction: null,
         diagnostics: [],
         // A real `status: "ready"` observation carries these two extra keys

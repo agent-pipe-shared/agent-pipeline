@@ -16,6 +16,7 @@ import {
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
+import { expectedPipelineScriptsRunnerAllowlistEntries } from "../lib/project-onboarding-v3.mjs";
 import { runCodexAdvisoryBootstrap } from "./codex-advisory-bootstrap.mjs";
 
 const REFERENCE = "plugins/pipeline-core/scripts/advisory-host-bridge.mjs";
@@ -202,6 +203,12 @@ test("the exact runner value the launcher sends the gate is accepted by the real
         runtime: {},
         continuity: {},
         appServer: {},
+        runnerPermissions: {
+          target: ".claude/settings.json",
+          status: "current",
+          lanes: ["Bash", "PowerShell"],
+          exactEntries: expectedPipelineScriptsRunnerAllowlistEntries(),
+        },
         nextAction: null,
         diagnostics: [],
         // A real `status: "ready"` observation carries these two extra keys
