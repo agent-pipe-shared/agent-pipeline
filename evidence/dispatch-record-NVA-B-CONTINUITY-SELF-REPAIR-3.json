@@ -43,21 +43,11 @@
       "evidence/dispatch-record-NVA-B-CONTINUITY-SELF-REPAIR-3.json"
     ]
   },
-  "criticRequired": {
-    "schema": "pipeline.critic-required-decision.v1",
-    "trigger": {
-      "schema": "pipeline.critic-trigger-input.v1",
-      "rigorLevel": 2,
-      "riskClass": "high",
-      "riskFlag": true,
-      "diff": {
-        "mechanical": false,
-        "architecture": true,
-        "guardrails": false,
-        "security": false
-      }
-    },
-    "appliedRow": "T1",
-    "reason": "Independent rereview must validate the corrected repair-record bindings and final-candidate threat-model boundary."
+  "criticEvidence": {
+    "schema": "pipeline.critic-evidence-reference.v1",
+    "taskId": "NVA-B-CONTINUITY-SELF-REPAIR-3",
+    "candidateCommit": "3123003f54fed7c91d7bf3bc4f57eab427edaa47",
+    "path": "backlog/evidence/2026-09-12-continuity-self-repair-critic-round2.md",
+    "sha256": "e4620c617e7b78d05099a232839c7d91f1b65f55bbb66b2df8f7bbe22fc36347"
   }
 }

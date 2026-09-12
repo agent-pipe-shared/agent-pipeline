@@ -29,21 +29,11 @@
       "evidence/dispatch-record-NVA-B-CONTINUITY-SELF-REPAIR-2.json"
     ]
   },
-  "criticRequired": {
-    "schema": "pipeline.critic-required-decision.v1",
-    "trigger": {
-      "schema": "pipeline.critic-trigger-input.v1",
-      "rigorLevel": 2,
-      "riskClass": "high",
-      "riskFlag": true,
-      "diff": {
-        "mechanical": false,
-        "architecture": true,
-        "guardrails": true,
-        "security": false
-      }
-    },
-    "appliedRow": "T1",
-    "reason": "State repair and lifecycle-guard authority require independent review of the final committed candidate."
+  "criticEvidence": {
+    "schema": "pipeline.critic-evidence-reference.v1",
+    "taskId": "NVA-B-CONTINUITY-SELF-REPAIR-2",
+    "candidateCommit": "6e0a558993cd79ac2b0cc99d87a5cc9db23189cc",
+    "path": "backlog/evidence/2026-09-12-continuity-self-repair-critic-round1.md",
+    "sha256": "b59646794bb6316a3a90655dbb0ffece8bc947d143b4aae542b24043e60e3acf"
   }
 }

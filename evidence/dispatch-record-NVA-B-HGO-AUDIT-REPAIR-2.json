@@ -94,21 +94,11 @@
       "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
     ]
   },
-  "criticRequired": {
-    "schema": "pipeline.critic-required-decision.v1",
-    "trigger": {
-      "schema": "pipeline.critic-trigger-input.v1",
-      "rigorLevel": 1,
-      "riskClass": "high",
-      "riskFlag": true,
-      "diff": {
-        "mechanical": false,
-        "architecture": true,
-        "guardrails": true,
-        "security": true
-      }
-    },
-    "appliedRow": "T1",
-    "reason": "Authenticated human-override audit recovery changes a guardrail and security boundary."
+  "criticEvidence": {
+    "schema": "pipeline.critic-evidence-reference.v1",
+    "taskId": "NVA-B-HGO-AUDIT-REPAIR-2",
+    "candidateCommit": "ba2b745b91b6ca5a379dc90bd6c0c28eb324da56",
+    "path": "backlog/evidence/2026-09-12-hgo-audit-repair-critic-round2.md",
+    "sha256": "493b354f0ba07ebe2088b0b9cb0978cab214785bbc65307893d8251c3b049bfb"
   }
 }
