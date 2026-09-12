@@ -438,6 +438,27 @@ function assertMandatoryCaptureNotSkipped(event, policy, captureDecision) {
   if (hit !== undefined) fail("GES-MANDATORY-CAPTURE", `Capture policy marks the ${hit} event class mandatory; it cannot be silently sampled out or discarded.`);
 }
 
+function assertGovernanceActionPayloadBinding(event) {
+  let action;
+  try { action = validateGovernanceActionEvent(event.payload); }
+  catch { fail("GES-PAYLOAD-SCHEMA", "Governance action payload is not closed, valid, or digest-bound."); }
+  const notApplicable = (value) => exactKeys(value, ["state"]) && value.state === "not-applicable";
+  const same = (left, right) => canonicalizeJson(left) === canonicalizeJson(right);
+  if (event.eventId !== action.eventId
+    || event.idempotencyKey !== action.correlation.actionId
+    || event.eventType !== `lifecycle.action.${action.kind}`
+    || !same(event.candidate, action.candidate)
+    || !same(event.correlation.featureId, action.correlation.featureId)
+    || !same(event.correlation.requestId, action.correlation.requestId)
+    || !same(event.correlation.sessionId, action.correlation.sessionId)
+    || !notApplicable(event.correlation.packageId)
+    || !notApplicable(event.correlation.dispatchId)
+    || event.correlation.traceId !== action.correlation.actionId) {
+    fail("GES-PAYLOAD-SCHEMA", "Governance action payload does not bind its envelope.");
+  }
+  return action;
+}
+
 function assertPortablePayload(event, policy) {
   const stream = policy.streams.find((entry) => entry?.origin === event.origin);
   if (!stream || stream.storageProfile !== "repository-public-safe" || stream.personalIdentifiability !== "prohibited" || stream.contextualIdentifiability !== "prohibited") fail("GES-CAPTURE-DENIED", "Capture policy denies this portable event.");
@@ -462,23 +483,7 @@ function assertPortablePayload(event, policy) {
   }
   if (event.origin === "lifecycle") {
     if (event.payloadSchema === GOVERNANCE_ACTION_EVENT_SCHEMA) {
-      let action;
-      try { action = validateGovernanceActionEvent(event.payload); }
-      catch { fail("GES-PAYLOAD-SCHEMA", "Governance action payload is not closed, valid, or digest-bound."); }
-      const notApplicable = (value) => exactKeys(value, ["state"]) && value.state === "not-applicable";
-      const same = (left, right) => canonicalizeJson(left) === canonicalizeJson(right);
-      if (event.eventId !== action.eventId
-        || event.idempotencyKey !== action.correlation.actionId
-        || event.eventType !== `lifecycle.action.${action.kind}`
-        || !same(event.candidate, action.candidate)
-        || !same(event.correlation.featureId, action.correlation.featureId)
-        || !same(event.correlation.requestId, action.correlation.requestId)
-        || !same(event.correlation.sessionId, action.correlation.sessionId)
-        || !notApplicable(event.correlation.packageId)
-        || !notApplicable(event.correlation.dispatchId)
-        || event.correlation.traceId !== action.correlation.actionId) {
-        fail("GES-PAYLOAD-SCHEMA", "Governance action payload does not bind its envelope.");
-      }
+      assertGovernanceActionPayloadBinding(event);
       if (typeof event.policy.capturePolicyDigest !== "string" || event.policy.capturePolicyDigest !== canonicalSha256(policy)) fail("GES-CAPTURE-POLICY-BINDING", "Event does not bind the effective capture policy.");
       return;
     }
@@ -570,6 +575,7 @@ async function readEvent(file) {
   } catch { fail("GES-EVENT-JSON", "A canonical event is not strict JSON."); }
   const validation = validateGovernanceEventEnvelope(value);
   if (!validation.valid) fail("GES-EVENT-INVALID", "A canonical event failed envelope validation.");
+  if (value.payloadSchema === GOVERNANCE_ACTION_EVENT_SCHEMA) assertGovernanceActionPayloadBinding(value);
   if (Buffer.from(`${canonicalizeJson(value)}\n`, "utf8").compare(bytes) !== 0) fail("GES-NONCANONICAL", "A canonical event does not contain exact canonical bytes.");
   return value;
 }

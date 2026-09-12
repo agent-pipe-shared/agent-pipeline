@@ -274,6 +274,23 @@ test("ADR-0083 LND-2: action payload append validates identifiers and every D4a 
   const queried = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
   assert.equal(canonicalizeJson(queried.events[0].payload), canonicalizeJson(valid.payload));
 
+  const injectedRoot = await fixtureRoot(); t.after(() => cleanup(injectedRoot));
+  const injectedReceipt = await append(injectedRoot, actionIntent());
+  const injectedPath = path.join(injectedRoot, injectedReceipt.eventPath);
+  const injected = JSON.parse(await readFile(injectedPath, "utf8"));
+  const genericEnvelopeValidButOpenPayload = sealGovernanceEvent({
+    ...injected,
+    payload: { ...injected.payload, privateReason: "must-not-cross-the-reader-boundary" },
+    payloadDigest: "0".repeat(64),
+    eventDigest: "0".repeat(64),
+  });
+  await writeFile(injectedPath, `${canonicalizeJson(genericEnvelopeValidButOpenPayload)}\n`);
+  await assert.rejects(
+    () => queryPortableGovernanceStream({ repositoryRoot: injectedRoot, repositoryFingerprint: fingerprint, streamId: "lifecycle" }),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-PAYLOAD-SCHEMA",
+    "readback must validate the closed action payload and all D4a bindings, not only its generic envelope",
+  );
+
   const secondRoot = await fixtureRoot(); t.after(() => cleanup(secondRoot));
   const base = actionIntent();
   const mismatches = [

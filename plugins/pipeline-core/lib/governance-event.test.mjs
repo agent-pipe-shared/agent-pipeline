@@ -158,6 +158,7 @@ test("ADR-0083 LND-2: action payload envelopes are admitted only on the non-auth
     "pipeline.lifecycle-governance-event.v1",
     "pipeline.governance-action-event.v1",
   ]);
+  assert.deepEqual(lifecycleRule.then.properties.streamId, { const: "lifecycle" });
 });
 
 test("D-1: pipeline.human-decision-attribution.v1 is admitted only under storageProfile restricted-machine-local", () => {

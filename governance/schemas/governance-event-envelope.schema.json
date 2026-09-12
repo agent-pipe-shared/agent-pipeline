@@ -106,7 +106,8 @@
               "pipeline.governance-action-event.v1"
             ]
           },
-          "authorityClass": { "const": "non-authoritative" }
+          "authorityClass": { "const": "non-authoritative" },
+          "streamId": { "const": "lifecycle" }
         }
       }
     },
