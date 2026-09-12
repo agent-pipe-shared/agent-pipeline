@@ -2,8 +2,8 @@
 
 Date: 2026-09-12
 Task: `NVA-B-HUMAN-TERMINAL-TEMPLATES-SLICE1-1`
-Implementation candidate: `36c38b6c0e01a65b000622d6b6ac1fab64b378ae`
-Implementation tree: `e1062b153a2719cce51e7e8bdd62f243dd80a447`
+Implementation candidate: `956a18a52f3529b49150100d5f69f1a6034cce21`
+Implementation tree: `abeef47ca633713eb2ed2c83a6e50cdaa9be6bdb`
 
 The SHA-256 values below bind the six implementation blobs contained in that
 exact commit and tree. This evidence-only binding update is subsequent to the
@@ -71,7 +71,7 @@ CLI readback:
 Auth-gate inventory drift check clean: 11 surface(s) discovered
 (4 CLI command(s), 7 kind(s)); 18 canonical inventory row(s),
 18 terminal disposition(s), all acknowledged.
-Documentation contracts valid: 1584 Markdown file(s), 1370 link(s),
+Documentation contracts valid: 1585 Markdown file(s), 1370 link(s),
 20 anchor check(s), 41 known vendored-copy link(s) excluded.
 Verify suite registration is complete: 532 registered, 0 declared
 exclusion(s), 0 unregistered.
@@ -83,9 +83,9 @@ human terminal action catalog schema valid
 ```text
 d2a5537beba18b20229557ed35eccf76f7a33914f3c70f19b6652d9ab6c3f15e  docs/human-authorization-inventory.md
 f54d8993b570d3abc46fb6c24c2a23b76a14dd7f2b6a3e2f011be3fe7dbe6c33  harness/scripts/check-auth-gate-inventory-drift.mjs
-b45288af00124ea02d26f1ac6e45c9776114f7ef3e86ec338976bc6121e7d5f3  harness/scripts/check-auth-gate-inventory-drift.test.mjs
+e791f4296e0b3a1f80829e0f129e273a1183f974cda97d8ae8fb6458775b1bd2  harness/scripts/check-auth-gate-inventory-drift.test.mjs
 6da0015abf7c0a53ecd15b894b68f7a0deec008bc111127a90ad64ab5a47d935  plugins/pipeline-core/templates/human-terminal-actions/catalog.json
-02d9d3987f3fa8362af07b0558616260a25fe54b04ea97148625c119f3659f26  plugins/pipeline-core/schemas/human-terminal-action-catalog.schema.json
+25c0f5497fbe77c5edd08d0d1df151c972d851470c05b23d82e7ce1d7d9ec2b6  plugins/pipeline-core/schemas/human-terminal-action-catalog.schema.json
 77a7103ba1ea696d90eb838ce5a55fb4823c0c306508814985c81d4a0e172db3  plugins/pipeline-core/lib/human-terminal-action-catalog.mjs
 ```
 
@@ -98,3 +98,15 @@ b45288af00124ea02d26f1ac6e45c9776114f7ef3e86ec338976bc6121e7d5f3  harness/script
 - Slice 4: native Windows private-state enforcement and runner reachability.
 
 Native Codex Sandbox/App Server execution under WSL remains excluded.
+
+## Final correction after the two review rounds
+
+The correction at `956a18a52f3529b49150100d5f69f1a6034cce21`
+makes slot `enum` presence conditional in the published JSON Schema exactly as
+the runtime validator already required: enum slots require a non-empty unique
+value list, while every other slot type rejects that property. Parent
+self-verification after the two-review cap ran the normal 21-test file plus two
+direct Draft-2020-12 negative probes; both schema-invalid shapes were rejected
+and the shipped catalog remained valid. The documentation check readback at
+this final candidate is 1,585 Markdown files, 1,370 links, 20 anchors and 41
+excluded vendored-copy links.
