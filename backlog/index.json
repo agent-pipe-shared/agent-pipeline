@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "24bdb71044420b3a03e9b7ed72c8453d47914cbccbe888889b53d757fb16835e"
+    "transitionHead": "61e0dd808df997d08dcac784c8e0e2ec784b42e235d64d43bcd9f1c819f6c454"
   },
   "counts": {
-    "open": 75,
+    "open": 74,
     "in_progress": 0,
-    "closed": 566,
+    "closed": 567,
     "rejected": 3,
     "deferred": 11
   },
@@ -81,13 +81,17 @@
     },
     {
       "id": "pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "PO ruling 2026-09-06: sessions still block themselves too often and the repair is still too complicated — an agent has to be able to get out of it alone. Reported from a consumer project driven through a different runner, where two closed features shared one evidence path; the PO explicitly framed it as generic, not as that project's problem.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-12",
+      "closureRepository": "self",
+      "closureCommit": "3123003f54fed7c91d7bf3bc4f57eab427edaa47",
+      "closureEvidence": "backlog/evidence/2026-09-12-continuity-self-repair-closure-reconciliation.md"
     },
     {
       "id": "pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly",

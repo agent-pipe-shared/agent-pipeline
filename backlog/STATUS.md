@@ -10,7 +10,7 @@
 | pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.a-critic-has-no-writable-location-for-its-own-report | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
-| pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs | open | requirement | pipeline | nova-b | 2026-09-06 | — | — |
+| pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs | closed | requirement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it. |
@@ -663,8 +663,8 @@
 
 ## Counts
 
-- open: 75
+- open: 74
 - in_progress: 0
-- closed: 566
+- closed: 567
 - rejected: 3
 - deferred: 11

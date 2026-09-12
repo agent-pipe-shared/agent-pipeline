@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
 source: "PO ruling 2026-09-06: sessions still block themselves too often and the repair is still too complicated — an agent has to be able to get out of it alone. Reported from a consumer project driven through a different runner, where two closed features shared one evidence path; the PO explicitly framed it as generic, not as that project's problem."
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-12
+closure_repository: self
+closure_commit: 3123003f54fed7c91d7bf3bc4f57eab427edaa47
+closure_evidence: backlog/evidence/2026-09-12-continuity-self-repair-closure-reconciliation.md
 ---
 
 # A damaged continuity locks the session out of the repair it needs
@@ -151,9 +155,21 @@ leaves State byte-identical. Distinct paths and older entries without close
 evidence remain admissible. The current full `pipeline-state.test.mjs` run,
 including these regressions, exits 0.
 
-The item stays open. The damaged-state diagnosis still collapses to broad
-continuity-invalid/not-ready outcomes, and no narrowly admitted, recorded
-repair command yet restores an already damaged evidence binding. Those two
-levels require their own bounded design and threat-model review; the existing
-prevention must not be mistaken for recovery of repositories damaged before
-the fix.
+The complete repair followed in `ee5ff783`, with the live-record binding
+correction in `3123003f` and the accepted bounded threat model in ADR-0082.
+Continuity now emits the typed shared-evidence diagnosis, the repair planner
+binds the complete preimage and evidence observation, and the lifecycle guard
+admits only the exact plan-bound apply route. The repair preserves evidence
+bytes, keeps the one matching live assertion, quarantines only the mismatching
+claims into an append-only audit record, and refuses ambiguous, unsafe,
+drifted, locked, or failed-readback cases.
+
+The second Critic round found no remaining implementation defect. Its FAIL was
+caused by the coordinator supplying a range that included the later dispatch
+record while the record correctly bound the preceding implementation commit,
+and by omitted governance paths. QG-13 forbids relabeling that result or
+starting a third broad review. The bounded coordinator reconciliation instead
+confirmed that the governed source blobs are unchanged since `3123003f` and
+ran the four focused recovery/guard suites: 542 passed, 0 failed. This closes
+the item without claiming an independent Critic PASS. Evidence:
+`backlog/evidence/2026-09-12-continuity-self-repair-closure-reconciliation.md`.
