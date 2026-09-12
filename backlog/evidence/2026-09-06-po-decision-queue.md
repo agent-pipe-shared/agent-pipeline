@@ -1,5 +1,16 @@
 # PO decision queue — collected 2026-09-06
 
+## Native Codex sandbox scope under WSL — superseded 2026-09-12
+
+The PO has deferred every native Codex sandbox/App-Server acceptance question
+under WSL to a separate future package that will be exercised on native
+Windows. Those routes are neither Nova-B acceptance evidence nor Nova-B
+blockers. Historical WSL receipts remain diagnostic evidence only; they do not
+establish native execution, isolation, model identity or readiness. The
+ordinary fresh-session Critic remains the supported autonomous review route,
+and platform-neutral/offline contracts remain in Nova-B scope. No new PO
+decision is required to continue that work.
+
 ## Reusable review-transfer consent — 2026-09-10
 
 The PO explicitly requested implementation and a direct test of a one-time,
@@ -182,7 +193,7 @@ approval gate, and prior decisions below must not be asked again.
 | Topic | Current disposition | Human decision needed |
 |---|---|---|
 | Local candidate and subsequent backlog | Continue the accepted candidate scope, then eligible Nova work. | None for ordinary implementation, tests, local commits or review preparation. |
-| Native preflight | Two genuine reviews completed; final correction `d71f9fd6` was directly self-verified under the two-round cap. Fresh native model-free smoke passed. No third round or invented PASS. | None; the approved native route and its protection requirements remain effective. |
+| Native preflight | Historical WSL reviews and smoke receipts remain diagnostic only. Native Codex sandbox/App-Server activation and acceptance are deferred to the future native-Windows package and do not block Nova B. | None for Nova B; revisit only in the separate native-Windows package. |
 | V3 migration recovery | The correction Critic found the later required Verify-command question could be lost. Final correction `712f2aa3` preserves it; parent reproduction returns `collect-input`. Full Verify passed exact/clean 517/517, zero reuse, including security. See `2026-09-10-review-progress-and-input-repair.md`. | None for completed repair and self-verification. Live Alfred acceptance remains unverified. |
 | Remaining inventory and reader technical coverage | Native current-artifact adapter correction passed genuine independent review at `dbd20a2f`, after exact/clean 517/517 Verify. The nineteen-artifact audit found two major inventory defects and four documentation inconsistencies; bounded correction is underway. Exact reports: `2026-09-10-native-artifact-adapter-critic-round-2.json` and `2026-09-10-current-artifact-critic-round-1.json`. | None for these repairs. Candidate completion waits for the single substantive correction review, genuine inventory attestation and fresh reader closure; no waiver is requested. |
 | Final test acceptance | Report the stamped build identity, actual checks, installation status and residual limitations when available. | PO testing/acceptance after delivery. |
