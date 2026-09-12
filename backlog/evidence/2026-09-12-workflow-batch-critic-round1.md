@@ -1,8 +1,11 @@
 # Workflow batch Critic — substantive round 1
 
-Date: 2026-09-12  
-Candidate commit: `a4c77364b8b1fcfc122d19be71e8d7800c3d19a5`  
-Review route: ordinary fresh-session, read-only Critic  
+Date: 2026-09-12
+
+Candidate commit: `a4c77364b8b1fcfc122d19be71e8d7800c3d19a5`
+
+Review route: ordinary fresh-session, read-only Critic
+
 Assurance: functional-equivalent read-only; OS isolation was not asserted
 
 This file transcribes the substantive report returned to the Coordinator by
