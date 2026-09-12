@@ -13,10 +13,23 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import {
+  ADVISOR_PROHIBITION_AUDIT_SCHEMA,
+  ADVISOR_PROHIBITION_DENIAL_CODE,
+  ADVISOR_PROHIBITION_LINE,
+  advisorProhibitionDisposition,
+  persistAdvisorProhibitionAudit,
+  persistPendingAdvisorProhibitionBindings,
+  prepareAdvisorProhibitionBindings,
+  resolvePendingAdvisorProhibitionBinding,
+} from "../lib/advisor-prohibition-binding.mjs";
+import { evaluateAdvisorProhibitionGuard } from "./guard-advisor-prohibition.mjs";
 
 // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
 // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
@@ -29,6 +42,7 @@ import { fileURLToPath } from "node:url";
 // the module and call the function, so a regression of that shape makes GD16 fail loudly
 // (missing success marker) rather than silently vanish the whole file's coverage.
 const GUARD = fileURLToPath(new URL("./guard-dispatch.mjs", import.meta.url));
+const ADVISOR_GUARD = fileURLToPath(new URL("./guard-advisor-prohibition.mjs", import.meta.url));
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const bindingRepo = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-binding-"));
 execFileSync("git", ["init", "-q"], { cwd: bindingRepo });
@@ -66,6 +80,10 @@ function check(id, payload, expectExit, { stderrIncludes } = {}) {
   if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
   else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
 }
+function manualCheck(id, fn) {
+  try { fn(); pass += 1; console.log(`PASS  ${id}`); }
+  catch (error) { failures.push(`${id}: ${error.message}`); console.log(`FAIL  ${id} -- ${error.message}`); }
+}
 
 const BLOCK = 2, ALLOW = 0;
 
@@ -90,6 +108,158 @@ check("GD2 allow  a references-only Critic dispatch", {
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:critic", prompt: CLEAN_CRITIC },
 }, ALLOW);
+
+const prohibitedToolUseId = "gd2-advisor-prohibited";
+check("GD2a allow and bind a policy-clean Critic dispatch carrying the exact Advisor prohibition", {
+  tool_use_id: prohibitedToolUseId,
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)` },
+}, ALLOW);
+{
+  const key = createHash("sha256").update(prohibitedToolUseId).digest("hex");
+  const path = join(bindingRepo, ".git", "agent-pipeline", "advisor-prohibition", "pending", `${key}.json`);
+  const id = "GD2b the pre-launch carrier contains only the exact role, disposition and prompt digest";
+  const problems = [];
+  if (!existsSync(path)) problems.push("binding record is absent");
+  else {
+    const value = JSON.parse(readFileSync(path, "utf8"));
+    if (value.toolUseIdSha256 !== key) problems.push("parent tool-use digest mismatch");
+    if (JSON.stringify(value.bindings.map(({ agentType, disposition }) => [agentType, disposition])) !== JSON.stringify([["critic", "prohibited"]])) {
+      problems.push("role/disposition binding mismatch");
+    }
+    if (!/^[a-f0-9]{64}$/u.test(value.bindings[0]?.promptSha256 ?? "")) problems.push("prompt digest missing");
+    if (JSON.stringify(value).includes(ADVISOR_PROHIBITION_LINE)) problems.push("raw prompt escaped into the private carrier");
+  }
+  if (problems.length === 0) { pass += 1; console.log(`PASS  ${id}`); }
+  else { failures.push(`${id}: ${problems.join("; ")}`); console.log(`FAIL  ${id} -- ${problems.join("; ")}`); }
+}
+
+check("GD2c block a prohibition-bearing child whose parent tool-use id is absent", {
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", prompt: `${CLEAN_CRITIC}\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)` },
+}, BLOCK, { stderrIncludes: ["APB-PARENT-TOOL-USE-ID-MISSING"] });
+
+check("GD2d block a same-role Workflow batch whose mixed Advisor dispositions cannot map to exact children", {
+  tool_use_id: "gd2d",
+  tool_name: "Workflow",
+  tool_input: { script: `
+    agent({ agentType: 'pipeline-core:critic', prompt: \`${CLEAN_CRITIC}\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)\` })
+    agent({ agentType: 'pipeline-core:critic', prompt: \`${CLEAN_CRITIC}\` })
+  ` },
+}, BLOCK, { stderrIncludes: ["APB-DISPATCH-IDENTITY-AMBIGUOUS"] });
+
+manualCheck("GD2e only the exact canonical MP-26 line creates a prohibition", () => {
+  const prohibited = `### 4. Forbidden\n- ${ADVISOR_PROHIBITION_LINE} (MP-26)\n`;
+  assert.equal(advisorProhibitionDisposition(prohibited).disposition, "prohibited");
+  assert.equal(advisorProhibitionDisposition("- Please do not use the Advisor.\n").disposition, "unrestricted");
+  assert.equal(advisorProhibitionDisposition(`Narrative: ${ADVISOR_PROHIBITION_LINE}\n`).disposition, "unrestricted");
+  assert.equal(advisorProhibitionDisposition(`${prohibited}- ${ADVISOR_PROHIBITION_LINE}\n`).code, "APB-PROHIBITION-AMBIGUOUS");
+});
+
+manualCheck("GD2f the portable binding preserves a prohibited child and an unrestricted sibling", () => {
+  const prepared = prepareAdvisorProhibitionBindings([
+    { subagentType: "pipeline-core:critic", prompt: `- ${ADVISOR_PROHIBITION_LINE}` },
+    { subagentType: "pipeline-core:goldfish-deep", prompt: "ordinary child" },
+  ]);
+  assert.equal(prepared.status, "prepared");
+  assert.deepEqual(prepared.bindings.map(({ agentType, disposition }) => [agentType, disposition]), [
+    ["critic", "prohibited"], ["goldfish-deep", "unrestricted"],
+  ]);
+  assert.equal(prepareAdvisorProhibitionBindings([
+    { subagentType: "critic", prompt: `- ${ADVISOR_PROHIBITION_LINE}` },
+    { subagentType: "critic", prompt: "ordinary child" },
+  ]).code, "APB-DISPATCH-IDENTITY-AMBIGUOUS");
+});
+
+manualCheck("GD2g the private carrier resolves only the exact parent and role", () => {
+  const root = mkdtempSync(join(tmpdir(), "advisor-prohibition-binding-"));
+  try {
+    const prepared = prepareAdvisorProhibitionBindings([
+      { subagentType: "critic", prompt: `- ${ADVISOR_PROHIBITION_LINE}` },
+      { subagentType: "goldfish-deep", prompt: "ordinary child" },
+    ]);
+    assert.equal(persistPendingAdvisorProhibitionBindings({ commonDir: root, toolUseId: "parent-1", bindings: prepared.bindings }).status, "prepared");
+    assert.equal(resolvePendingAdvisorProhibitionBinding({ commonDir: root, toolUseId: "parent-1", agentType: "pipeline-core:critic" }).binding.disposition, "prohibited");
+    assert.equal(resolvePendingAdvisorProhibitionBinding({ commonDir: root, toolUseId: "parent-1", agentType: "goldfish-deep" }).binding.disposition, "unrestricted");
+    assert.equal(resolvePendingAdvisorProhibitionBinding({ commonDir: root, toolUseId: "other", agentType: "critic" }).status, "not-bound");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+manualCheck("GD2h a private denial audit is content-free and digest-bound", () => {
+  const root = mkdtempSync(join(tmpdir(), "advisor-prohibition-audit-"));
+  try {
+    const result = persistAdvisorProhibitionAudit({
+      commonDir: root, agentId: "child-secret-identity", agentType: "pipeline-core:critic",
+      parentToolUseId: "parent-secret-identity", callToolUseId: "call-secret-identity",
+      promptSha256: "a".repeat(64), occurredAt: "2026-09-12T12:00:00.000Z",
+    });
+    assert.equal(result.status, "recorded");
+    assert.doesNotMatch(readFileSync(result.path, "utf8"), /secret-identity/u);
+    assert.equal(result.record.schema, ADVISOR_PROHIBITION_AUDIT_SCHEMA);
+    assert.equal(result.record.code, ADVISOR_PROHIBITION_DENIAL_CODE);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+const advisorChild = {
+  tool_name: "advisor", tool_use_id: "advisor-call-1", agent_id: "child-1",
+  agent_type: "pipeline-core:critic", transcript_path: "/measured/session.jsonl",
+  tool_input: { question: "PRIVATE QUESTION MUST NOT ESCAPE" },
+};
+manualCheck("GD2i an unbound child and an orchestrator are not blanket-blocked", () => {
+  assert.equal(evaluateAdvisorProhibitionGuard({ tool_name: "advisor", tool_input: { question: "ordinary" } }).exitCode, 0);
+  assert.equal(evaluateAdvisorProhibitionGuard(advisorChild, {
+    resolveGitCommonDirFn: () => "/private/git-common",
+    resolveParentDispatchToolUseIdFn: () => ({ status: "prepared", toolUseId: "parent-1" }),
+    resolvePendingAdvisorProhibitionBindingFn: () => ({ status: "not-bound" }),
+  }).exitCode, 0);
+});
+
+manualCheck("GD2j an exactly bound prohibited child is content-free audited and blocked", () => {
+  let auditInput;
+  const result = evaluateAdvisorProhibitionGuard(advisorChild, {
+    resolveGitCommonDirFn: () => "/private/git-common",
+    resolveParentDispatchToolUseIdFn: () => ({ status: "prepared", toolUseId: "parent-1" }),
+    resolvePendingAdvisorProhibitionBindingFn: () => ({ status: "bound", binding: { disposition: "prohibited", promptSha256: "a".repeat(64) } }),
+    persistAdvisorProhibitionAuditFn: (input) => { auditInput = input; return { status: "recorded" }; },
+    nowFn: () => "2026-09-12T12:00:00.000Z",
+  });
+  assert.equal(result.exitCode, 2);
+  assert.match(result.stderr, new RegExp(ADVISOR_PROHIBITION_DENIAL_CODE, "u"));
+  assert.doesNotMatch(JSON.stringify(auditInput), /PRIVATE QUESTION/u);
+});
+
+manualCheck("GD2k audit failure remains blocked before a model call", () => {
+  const result = evaluateAdvisorProhibitionGuard(advisorChild, {
+    resolveGitCommonDirFn: () => "/private/git-common",
+    resolveParentDispatchToolUseIdFn: () => ({ status: "prepared", toolUseId: "parent-1" }),
+    resolvePendingAdvisorProhibitionBindingFn: () => ({ status: "bound", binding: { disposition: "prohibited", promptSha256: "a".repeat(64) } }),
+    persistAdvisorProhibitionAuditFn: () => ({ status: "rejected", code: "APB-AUDIT-WRITE" }),
+  });
+  assert.equal(result.exitCode, 2);
+  assert.match(result.stderr, /APB-AUDIT-WRITE/u);
+});
+
+manualCheck("GD2l the real Claude hook path resolves the dispatch carrier, denies, and emits a content-free audit", () => {
+  const transcriptPath = join(bindingRepo, "session.jsonl");
+  const metaDir = join(bindingRepo, "session", "subagents");
+  mkdirSync(metaDir, { recursive: true });
+  writeFileSync(transcriptPath, "");
+  writeFileSync(join(metaDir, "agent-child-1.meta.json"), JSON.stringify({
+    agentType: "pipeline-core:critic", description: "fixture", toolUseId: prohibitedToolUseId, spawnDepth: 1,
+  }));
+  const secret = "PRIVATE-ADVISOR-QUESTION-DO-NOT-PERSIST";
+  const res = spawnSync(process.execPath, [ADVISOR_GUARD], {
+    input: JSON.stringify({ ...advisorChild, transcript_path: transcriptPath, tool_input: { question: secret } }),
+    encoding: "utf8",
+    env: { ...process.env, CLAUDE_PROJECT_DIR: bindingRepo },
+  });
+  assert.equal(res.status, 2, res.stderr);
+  assert.match(res.stderr, new RegExp(ADVISOR_PROHIBITION_DENIAL_CODE, "u"));
+  const auditDir = join(bindingRepo, ".git", "agent-pipeline", "advisor-prohibition", "audit");
+  const audits = readdirSync(auditDir).map((name) => readFileSync(join(auditDir, name), "utf8"));
+  assert.equal(audits.length, 1);
+  assert.doesNotMatch(audits[0], new RegExp(secret, "u"));
+});
 
 // GD3 -- the `subagentType` spelling, so a runner that uses camelCase is not a silent no-op.
 check("GD3 block  the camelCase subagentType field is read too", {

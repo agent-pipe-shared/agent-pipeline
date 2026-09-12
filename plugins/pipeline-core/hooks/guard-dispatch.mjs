@@ -54,6 +54,10 @@
  */
 import { readFileSync } from "node:fs";
 
+import {
+  persistPendingAdvisorProhibitionBindings,
+  prepareAdvisorProhibitionBindings,
+} from "../lib/advisor-prohibition-binding.mjs";
 import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetBinding, dispatchFindings } from "../lib/dispatch-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -164,6 +168,30 @@ if (isDirectInvocation(import.meta.url)) {
   }));
   const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
   if (blocked.length === 0) {
+    const toolUseId = input?.tool_use_id ?? input?.toolUseId;
+    const bindingCapableTool = ["Task", "Agent", "Workflow"].includes(input?.tool_name);
+    const advisorBinding = bindingCapableTool
+      ? prepareAdvisorProhibitionBindings(dispatches)
+      : { status: "not-applicable" };
+    if (advisorBinding.status === "rejected") {
+      process.stderr.write(`BLOCKED (guard-dispatch, plugin pipeline-core): ${advisorBinding.code}: the Advisor prohibition cannot be assigned to one exact child before launch.\n`);
+      process.exit(2);
+    }
+    if (advisorBinding.status === "prepared") {
+      if (typeof toolUseId !== "string" || toolUseId.trim() === "") {
+        process.stderr.write("BLOCKED (guard-dispatch, plugin pipeline-core): APB-PARENT-TOOL-USE-ID-MISSING: a prohibition-bearing dispatch requires the host tool-use id before launch.\n");
+        process.exit(2);
+      }
+      const rootDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+      const commonDir = resolveGitCommonDir(rootDir);
+      const persisted = commonDir === null
+        ? { status: "rejected", code: "APB-PENDING-WRITE" }
+        : persistPendingAdvisorProhibitionBindings({ commonDir, toolUseId, bindings: advisorBinding.bindings });
+      if (persisted.status !== "prepared") {
+        process.stderr.write(`BLOCKED (guard-dispatch, plugin pipeline-core): ${persisted.code}: the Advisor prohibition could not be bound to this dispatch before launch.\n`);
+        process.exit(2);
+      }
+    }
     const budgetBindings = evaluated
       .filter(({ budget }) => budget.status === "prepared")
       .map(({ dispatch, budget }) => ({
@@ -172,8 +200,6 @@ if (isDirectInvocation(import.meta.url)) {
         maxTurns: budget.maxTurns,
         effectiveCap: budget.effectiveCap,
       }));
-    const toolUseId = input?.tool_use_id ?? input?.toolUseId;
-    const bindingCapableTool = ["Task", "Agent", "Workflow"].includes(input?.tool_name);
     if (bindingCapableTool && budgetBindings.length > 0) {
       if (typeof toolUseId !== "string" || toolUseId.trim() === "") {
         process.stderr.write("BLOCKED (guard-dispatch, plugin pipeline-core): DBB-PARENT-TOOL-USE-ID-MISSING: a budget-bearing dispatch requires the host tool-use id before launch.\n");

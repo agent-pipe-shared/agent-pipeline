@@ -178,3 +178,34 @@ current bounded Advisor demand" — not a blanket per-dispatch ban. With no curr
 demand, the line is correctly absent. That observation therefore corroborates the
 item's mechanism rather than adding a sixth occurrence, and the count stated
 above stands unchanged.
+
+## PO decision and implementation, 2026-09-12
+
+The PO selected the conditional blocking direction: when and only when the
+exact child dispatch is machine-bound to the canonical Advisor prohibition,
+the raw Advisor call is denied before model effect and recorded in a minimal
+private audit. A packet without that binding does not gain a blanket ban;
+MP-26's existing demand, consent, candidate, route, evidence, reuse and receipt
+checks continue to govern any otherwise available consultation.
+
+The unprotected package now implements that decision:
+
+- `plugins/pipeline-core/lib/advisor-prohibition-binding.mjs` recognizes the
+  exact canonical line, binds only prompt digests, and rejects a
+  prohibition-bearing same-role batch that the host cannot map back to one
+  exact child.
+- `plugins/pipeline-core/hooks/guard-dispatch.mjs` persists that binding before
+  a Claude `Task`, `Agent`, or statically readable `Workflow` launch.
+- `plugins/pipeline-core/hooks/guard-advisor-prohibition.mjs` resolves the
+  measured Claude child/parent identity chain, writes a content-free private
+  denial event, and blocks the raw `advisor` call before model launch. It does
+  not inspect or store the attempted question, and an audit-write failure
+  remains blocked.
+- The policy core is runner-neutral; native Codex and Antigravity enforcement
+  is not claimed without equivalent host identity evidence.
+
+Focused unit and hook tests are green. Closure remains blocked only on the
+TP-4-attended registration of the Claude Advisor matcher in
+`plugins/pipeline-core/hooks/hooks.json` and a live/readback check that the host
+uses the measured `advisor` PreToolUse name. That protected integration is not
+performed by this implementation package.
