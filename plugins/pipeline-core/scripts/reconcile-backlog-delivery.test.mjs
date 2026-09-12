@@ -12,6 +12,7 @@ import {
   BACKLOG_DELIVERY_INTENT_SCHEMA,
   BACKLOG_SPEC_BINDING_SCHEMA,
   canonicalJson,
+  validateBacklogReconciliationReceipt,
 } from "../lib/backlog-delivery-reconciliation.mjs";
 import { applyBacklogDelivery, materializeBacklogDelivery, previewBacklogDelivery, recoverBacklogDelivery } from "./reconcile-backlog-delivery.mjs";
 
@@ -225,4 +226,56 @@ test("recovery restores an interrupted preimage once, and a committed receipt re
     assert.equal(replay.replayed, true);
     assert.deepEqual(replay.receipt, applied.receipt);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("receipt validation closes replay over exact canonical success evidence", () => {
+  const { root, intent } = fixture();
+  try {
+    const readState = () => ({ ok: true, findings: [], state: stateFor(intent) });
+    const preview = previewBacklogDelivery(root, { intentPath: "intent.json", bindingPath: "binding.json" }, { readState }).preview;
+    const applied = applyBacklogDelivery(root, { intentPath: "intent.json", bindingPath: "binding.json", preview, postimages: postimages(preview) }, { readState, readback: () => true });
+    assert.equal(applied.ok, true);
+    assert.equal(validateBacklogReconciliationReceipt(applied.receipt, {
+      intentSha256: preview.intentSha256,
+      idempotencyKey: intent.idempotencyKey,
+    }).ok, true);
+
+    const rebindRecord = (receipt) => ({
+      ...receipt,
+      recordSha256: semanticDigest("pipeline.backlog-reconciliation-receipt.v1", Object.fromEntries(Object.entries(receipt).filter(([key]) => key !== "recordSha256"))),
+    });
+    const malformed = [
+      rebindRecord({ ...applied.receipt, extra: true }),
+      rebindRecord({ ...applied.receipt, receiptId: "1".repeat(64) }),
+      rebindRecord({ ...applied.receipt, appliedAt: "2026-09-12T25:00:00.000Z" }),
+      rebindRecord({ ...applied.receipt, eventSequences: [1, 1] }),
+      rebindRecord({ ...applied.receipt, targets: [...applied.receipt.targets].reverse() }),
+      rebindRecord({ ...applied.receipt, postSnapshot: { ...applied.receipt.postSnapshot, extra: true } }),
+    ];
+    for (const receipt of malformed) assert.equal(validateBacklogReconciliationReceipt(receipt).ok, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("committed recovery accepts only a closed receipt whose transaction postimages remain present", () => {
+  for (const tamper of [false, true]) {
+    const { root, intent } = fixture();
+    try {
+      const readState = () => ({ ok: true, findings: [], state: stateFor(intent) });
+      const preview = previewBacklogDelivery(root, { intentPath: "intent.json", bindingPath: "binding.json" }, { readState }).preview;
+      const transactionPath = join(root, "backlog/.state-transaction.json");
+      const interrupted = applyBacklogDelivery(root, { intentPath: "intent.json", bindingPath: "binding.json", preview, postimages: postimages(preview) }, {
+        readState,
+        readback: () => true,
+        fs: { rmSync(path, options) { if (path === transactionPath) throw new Error("injected post-commit interruption"); return rmSync(path, options); } },
+      });
+      assert.equal(interrupted.ok, false);
+      assert.equal(existsSync(transactionPath), true);
+      if (tamper) writeFileSync(join(root, preview.targets[0].path), "tampered\n");
+      const recovered = recoverBacklogDelivery(root, { proveOwnerGone: true });
+      assert.equal(recovered.ok, true, recovered.findings.join("\n"));
+      assert.equal(recovered.committed, !tamper);
+      assert.equal(recovered.recovered, tamper);
+      assert.equal(existsSync(transactionPath), false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
 });

@@ -14,7 +14,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { canonicalJson, planBacklogDeliveryReconciliation } from "../lib/backlog-delivery-reconciliation.mjs";
+import { canonicalJson, planBacklogDeliveryReconciliation, validateBacklogReconciliationReceipt } from "../lib/backlog-delivery-reconciliation.mjs";
 import { checkBacklogState, DEFAULT_ROOT, loadBacklogState } from "./check-backlog-state.mjs";
 import { projectBacklog, renderBacklogItem, transitionHash } from "../lib/backlog-state.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -293,10 +293,20 @@ function receiptRecord(intent, preview, appliedAt) {
   return core;
 }
 function validReceipt(receipt, intentSha256, idempotencyKey) {
-  if (!plain(receipt) || receipt.schema !== RECEIPT_SCHEMA || receipt.status !== "applied"
-    || receipt.idempotencyKey !== idempotencyKey || receipt.intentSha256 !== intentSha256
-    || !SHA.test(receipt.receiptId ?? "") || !SHA.test(receipt.recordSha256 ?? "")) return false;
-  return receipt.recordSha256 === semanticDigest(RECEIPT_SCHEMA, Object.fromEntries(Object.entries(receipt).filter(([key]) => key !== "recordSha256")));
+  return validateBacklogReconciliationReceipt(receipt, { intentSha256, idempotencyKey }).ok;
+}
+
+function committedPostimagesPresent(root, transaction, receipt, fs) {
+  if (transaction.expectedLedgerHead !== receipt.preSnapshot.ledgerHead
+    || transaction.intendedLedgerHead !== receipt.postSnapshot.ledgerHead
+    || transaction.receiptPath !== receiptPathFor(receipt)) return false;
+  const targets = new Map(transaction.targets.map((entry) => [entry.path, entry]));
+  const receiptTarget = targets.get(transaction.receiptPath);
+  if (!receiptTarget || !sameImage(readImage(root, transaction.receiptPath, fs), receiptTarget.post)) return false;
+  return receipt.targets.every(({ path }) => {
+    const target = targets.get(path);
+    return target && sameImage(readImage(root, path, fs), target.post);
+  });
 }
 function rejectApply(findings) { return { ok: false, applied: false, replayed: false, receipt: null, findings: [...new Set(findings)].sort() }; }
 
@@ -395,7 +405,8 @@ export function recoverBacklogDelivery(root = DEFAULT_ROOT, deps = {}) {
   try {
     const receipt = transaction.receiptPath ? readJsonFile(root, transaction.receiptPath, fs) : null;
     const committed = transaction.phase === "committed" && receipt && validReceipt(receipt, transaction.operationSha256, transaction.idempotencyKey)
-      && transaction.receiptSha256 === sha256(fs.readFileSync(safePath(root, transaction.receiptPath)));
+      && transaction.receiptSha256 === sha256(fs.readFileSync(safePath(root, transaction.receiptPath)))
+      && committedPostimagesPresent(root, transaction, receipt, fs);
     if (committed) {
       fs.rmSync(safePath(root, TRANSACTION_PATH));
       removeOwnedLock(root, transaction.ownerNonce, fs);

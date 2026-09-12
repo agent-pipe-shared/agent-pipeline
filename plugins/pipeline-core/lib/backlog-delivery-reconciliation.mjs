@@ -149,6 +149,45 @@ export function validateBacklogSpecBinding(value) {
   return { ok: errors.length === 0, findings: errors };
 }
 
+/** Validate the durable success boundary used by delivery replay and recovery. */
+export function validateBacklogReconciliationReceipt(value, { intentSha256 = null, idempotencyKey = null } = {}) {
+  const errors = [];
+  const keys = ["schema", "receiptId", "intentId", "idempotencyKey", "intentSha256", "status", "preSnapshot", "postSnapshot", "targets", "eventSequences", "appliedAt", "recordSha256"];
+  if (!exact(value, keys, "reconciliation receipt", errors)) return { ok: false, findings: errors };
+  if (value.schema !== BACKLOG_RECONCILIATION_RECEIPT_SCHEMA) errors.push(finding("SCHEMA", `reconciliation receipt schema must equal ${BACKLOG_RECONCILIATION_RECEIPT_SCHEMA}`));
+  checkString(value.receiptId, SHA, "receiptId", errors);
+  checkString(value.intentId, ID, "intentId", errors, "SHAPE", 128);
+  checkString(value.idempotencyKey, SHA, "idempotencyKey", errors);
+  checkString(value.intentSha256, SHA, "intentSha256", errors);
+  if (value.status !== "applied") errors.push(finding("BOUND", "reconciliation receipt status must equal applied"));
+  validateSnapshot(value.preSnapshot, errors);
+  validateSnapshot(value.postSnapshot, errors);
+  if (!Array.isArray(value.targets) || value.targets.length === 0) errors.push(finding("BOUND", "reconciliation receipt targets must be non-empty"));
+  else {
+    const paths = value.targets.map((entry) => entry?.path);
+    if (!sortedUnique(paths)) errors.push(finding("BOUND", "reconciliation receipt targets must be sorted and unique by path"));
+    value.targets.forEach((entry, index) => {
+      if (!exact(entry, ["path", "preSha256", "postSha256"], `targets[${index}]`, errors)) return;
+      checkString(entry.path, PATH, `targets[${index}].path`, errors, "BOUND", 512);
+      checkString(entry.preSha256, SHA, `targets[${index}].preSha256`, errors);
+      checkString(entry.postSha256, SHA, `targets[${index}].postSha256`, errors);
+    });
+  }
+  if (!Array.isArray(value.eventSequences) || value.eventSequences.length === 0
+    || !value.eventSequences.every((sequence) => Number.isSafeInteger(sequence) && sequence > 0)
+    || !sortedUnique(value.eventSequences)) errors.push(finding("BOUND", "reconciliation receipt eventSequences must be sorted, unique positive integers"));
+  const appliedAt = typeof value.appliedAt === "string" ? new Date(value.appliedAt) : null;
+  if (typeof value.appliedAt !== "string" || !ISO_INSTANT.test(value.appliedAt)
+    || Number.isNaN(appliedAt?.valueOf()) || appliedAt.toISOString() !== value.appliedAt) errors.push(finding("BOUND", "appliedAt must be a canonical UTC instant"));
+  if (intentSha256 !== null && value.intentSha256 !== intentSha256) errors.push(finding("CONFLICT", "receipt intentSha256 does not match the delivery intent"));
+  if (idempotencyKey !== null && value.idempotencyKey !== idempotencyKey) errors.push(finding("CONFLICT", "receipt idempotencyKey does not match the delivery intent"));
+  const idRecord = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "receiptId" && key !== "recordSha256"));
+  if (value.receiptId !== digest(`${BACKLOG_RECONCILIATION_RECEIPT_SCHEMA}:id`, idRecord)) errors.push(finding("BOUND", "receiptId does not bind canonical receipt content"));
+  const record = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "recordSha256"));
+  if (value.recordSha256 !== digest(BACKLOG_RECONCILIATION_RECEIPT_SCHEMA, record)) errors.push(finding("BOUND", "recordSha256 does not bind canonical receipt content"));
+  return { ok: errors.length === 0, findings: errors };
+}
+
 function reject(findings) { return { ok: false, findings, preview: null }; }
 function sameCandidate(left, right) { return left?.commit === right?.commit && left?.tree === right?.tree; }
 function eventHash(intent, state, from, to) { return digest("pipeline.backlog-transition.v2", { id: intent.item.id, sequence: state.nextSequence, from, to, previousHash: state.ledgerHead }); }
