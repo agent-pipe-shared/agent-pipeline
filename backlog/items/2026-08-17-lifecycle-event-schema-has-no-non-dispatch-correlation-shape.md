@@ -320,6 +320,15 @@ Evidence: `backlog/evidence/2026-09-12-lnd3-mixed-stream-replay-viewer.md`.
   only the identical create-only artifact. A conflicting artifact is preserved
   and rejected rather than overwritten.
 
+**Progress (2026-09-12):** LND-4 is implemented in `bf2a0956` through
+`720d1785`. Both Verify entry paths use the same closed builder and publish one
+aggregate candidate-bound action only when explicitly requested. Target/source
+preflight is mutation-free; a post-source publication failure retains the
+durable Verify evidence and returns a closed event-only retry. The final
+candidate passed 539/539 full Verify steps, and its fresh independent Critic
+returned PASS with no findings. Evidence:
+`backlog/evidence/2026-09-12-lnd4-verification-producer.md`.
+
 ### LND-5 — review producer
 
 - **WHEN** a Critic result has become an accepted durable receipt through the
