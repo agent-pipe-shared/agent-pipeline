@@ -2,20 +2,29 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkEntryPointReachability, discoverEntryPoints, discoverSurfaces, targetAnchorExists, validateInventory } from "./check-product-capability-inventory.mjs";
+import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const inventoryPath = join(repoRoot, "docs", "product-capability-inventory.json");
-let passed = 0;
+const cases = [];
+const injectedFailure = process.env.PIPELINE_PCI_TEST_INJECT_FAILURE ?? "";
+const selfProbeChild = process.env.PIPELINE_PCI_TEST_SELF_PROBE_CHILD === "1";
 
 function check(name, fn) {
-  fn();
-  passed += 1;
-  process.stdout.write(`ok ${passed} - ${name}\n`);
+  const id = `PCI${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({
+    id,
+    name,
+    run() {
+      if (injectedFailure === id) assert.fail("intentional product inventory case-completion failure");
+      return fn();
+    },
+  });
 }
 
 const FIXTURE_RECEIPT_SHA256 = "a".repeat(64);
@@ -439,4 +448,40 @@ check("HAW-B06 a comment citing an evidence filename that merely contains a scri
   });
 });
 
-process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
+check("an early failed case still emits dispositions for the complete declared corpus", () => {
+  if (selfProbeChild) return;
+  const probe = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PIPELINE_PCI_TEST_INJECT_FAILURE: "PCI02",
+      PIPELINE_PCI_TEST_SELF_PROBE_CHILD: "1",
+      PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
+      PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: "65536",
+    },
+    shell: false,
+    stdio: ["ignore", "pipe", "pipe", "pipe"],
+    timeout: 30_000,
+  });
+  assert.notEqual(probe.status, 0, "the injected early case must fail");
+  const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
+  const disposed = records.filter((record) => record.event === "DISPOSED");
+  assert.equal(records[0].event, "DECLARED");
+  assert.equal(records[0].caseCount, 28);
+  assert.equal(disposed.length, 28);
+  assert.equal(disposed.find((record) => record.id === "PCI02")?.disposition, "fail");
+  assert.equal(disposed.find((record) => record.id === "PCI28")?.disposition, "pass");
+  assert.deepEqual(records.at(-1).counts, { pass: 27, fail: 1, skip: 0, todo: 0 });
+  assert.equal(records.at(-1).declaredCount, 28);
+  assert.equal(records.at(-1).disposedCount, 28);
+});
+
+assert.equal(cases.length, 28, "the complete product capability inventory corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

@@ -661,8 +661,7 @@
     {
       "name": "product-capability-inventory-tests",
       "path": "harness/scripts/check-product-capability-inventory.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "project-authority-migration-cli-tests",
@@ -762,8 +761,7 @@
     {
       "name": "publication-executor-v2-tests",
       "path": "plugins/pipeline-core/scripts/publication-executor-v2.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "publication-state-authority-tests",
@@ -935,8 +933,7 @@
     {
       "name": "stack-adapter-contract-tests",
       "path": "plugins/pipeline-core/lib/stack-adapter-contract.test.mjs",
-      "disposition": "legacy-process-only",
-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+      "disposition": "required"
     },
     {
       "name": "stack-capability-plan-tests",

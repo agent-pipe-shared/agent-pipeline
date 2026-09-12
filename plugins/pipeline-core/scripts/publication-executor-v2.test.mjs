@@ -3,11 +3,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, openSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createReleasePreflight } from "./release-preflight.mjs";
 import { readPublicationAuthority } from "../lib/publication-authority.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import {
   applyPublicationAuthorization, executePublication, parseProductivePublicationCli,
   githubCapabilityObservation, planPublicationAuthorization, preflightPublication, preparePublicationTransaction,
@@ -63,7 +65,25 @@ function fixture(name, destinationRef = "refs/heads/release/nova", options = {})
   return { parent, remote, root: physical, common: realpathSync(join(root, ".git")), base, candidate, tree, capability, authority, plan, reference, destinationRef, applyError };
 }
 const selection = (value) => ({ rootDir: value.root, transactionId: value.reference.transactionId, channel: value.reference.channel, expectedAuthorityRawSha256: value.reference.projectionRawSha256 });
-let passed = 0; const check = (name, run) => { run(); passed += 1; console.log(`PASS ${name}`); };
+const cases = [];
+const injectedFailure = process.env.PIPELINE_PEV_TEST_INJECT_FAILURE ?? "";
+const selfProbeChild = process.env.PIPELINE_PEV_TEST_SELF_PROBE_CHILD === "1";
+const check = (name, run) => {
+  const id = `PEV${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({
+    id,
+    name,
+    async run() {
+      const firstRoot = roots.length;
+      try {
+        if (injectedFailure === id) assert.fail("intentional publication executor case-completion failure");
+        await run();
+      } finally {
+        for (const root of roots.splice(firstRoot)) rmSync(root, { recursive: true, force: true });
+      }
+    },
+  });
+};
 
 check("CLI exposes exactly the closed productive operation set", () => {
   const root = "/physical/repository"; const sha = "a".repeat(64);
@@ -224,5 +244,40 @@ check("replay, expiry, arbitrary refspec, force and missing activation are denie
   assert.throws(() => executePublication(selection(value), { now: () => 160 }), /stale/u);
 });
 
-for (const root of roots) rmSync(root, { recursive: true, force: true });
-console.log(`publication-executor-v2: ${passed} tests passed`);
+check("an early failed case still emits dispositions for the complete declared corpus", () => {
+  if (selfProbeChild) return;
+  const probe = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PIPELINE_PEV_TEST_INJECT_FAILURE: "PEV02",
+      PIPELINE_PEV_TEST_SELF_PROBE_CHILD: "1",
+      PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
+      PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: "65536",
+    },
+    shell: false,
+    stdio: ["ignore", "pipe", "pipe", "pipe"],
+    timeout: 30_000,
+  });
+  assert.notEqual(probe.status, 0, "the injected early case must fail");
+  const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
+  const disposed = records.filter((record) => record.event === "DISPOSED");
+  assert.equal(records[0].event, "DECLARED");
+  assert.equal(records[0].caseCount, 14);
+  assert.equal(disposed.length, 14);
+  assert.equal(disposed.find((record) => record.id === "PEV02")?.disposition, "fail");
+  assert.equal(disposed.find((record) => record.id === "PEV14")?.disposition, "pass");
+  assert.deepEqual(records.at(-1).counts, { pass: 13, fail: 1, skip: 0, todo: 0 });
+  assert.equal(records.at(-1).declaredCount, 14);
+  assert.equal(records.at(-1).disposedCount, 14);
+});
+
+assert.equal(cases.length, 14, "the complete publication executor v2 corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

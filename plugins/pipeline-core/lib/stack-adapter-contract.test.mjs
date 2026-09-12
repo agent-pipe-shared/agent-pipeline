@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, openSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   REPRESENTATIVE_STACK_ADAPTERS,
@@ -17,6 +18,7 @@ import { buildStackCapabilityPlan, STACK_CAPABILITIES } from "./stack-capability
 import { createDynamicTargetAuthorization } from "./stack-dynamic-boundary.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 import { validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 function candidateFixture() {
   const root = mkdtempSync(join(tmpdir(), "stack-static-candidate-"));
@@ -50,16 +52,30 @@ function staticPlan(candidate) {
   const discovery = { ok: true, schema: "pipeline.stack-discovery.v1", candidate, observations, digest: createHash("sha256").update(JSON.stringify({ candidate, observations })).digest("hex") };
   return buildStackCapabilityPlan({ candidate, discovery, policyRevision: "policy-v1", threatModel: { candidate, digest: "d".repeat(64) }, observations: STACK_CAPABILITIES.map((capability) => ({ capability, present: true })), requirements: [] });
 }
-const fixture = candidateFixture();
-const candidate = fixture.candidate;
-const observations = [];
-const discovery = { ok: true, schema: "pipeline.stack-discovery.v1", candidate, observations, digest: createHash("sha256").update(JSON.stringify({ candidate, observations })).digest("hex") };
-const threatModel = { candidate, digest: "d".repeat(64) };
-const plan = buildStackCapabilityPlan({ candidate, discovery, policyRevision: "policy-v1", threatModel, observations: STACK_CAPABILITIES.map((capability) => ({ capability, present: true })), requirements: [] });
-const pair = generateKeyPairSync("ed25519"); const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
-const approvalAuthority = { keyReference: "test-external-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+let fixture;
+let candidate;
+let observations;
+let discovery;
+let threatModel;
+let plan;
+let pair;
+let publicKey;
+let approvalAuthority;
+let authorizations;
+function initializeSharedFixture() {
+  if (fixture !== undefined) return;
+  fixture = candidateFixture();
+  candidate = fixture.candidate;
+  observations = [];
+  discovery = { ok: true, schema: "pipeline.stack-discovery.v1", candidate, observations, digest: createHash("sha256").update(JSON.stringify({ candidate, observations })).digest("hex") };
+  threatModel = { candidate, digest: "d".repeat(64) };
+  plan = buildStackCapabilityPlan({ candidate, discovery, policyRevision: "policy-v1", threatModel, observations: STACK_CAPABILITIES.map((capability) => ({ capability, present: true })), requirements: [] });
+  pair = generateKeyPairSync("ed25519");
+  publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
+  approvalAuthority = { keyReference: "test-external-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+  authorizations = { "cap.dast": authorization("dast-target"), "cap.fuzz": authorization("fuzz-target") };
+}
 function authorization(id) { const target = { id, environment: "test", bindingSha256: "c".repeat(64) }; const scope = { id: "scope", paths: ["fixtures"] }; const execution = { network: "offline", credential: "none", timeoutMs: 1000 }; const intent = createDynamicTargetAuthorization({ candidate, target, scope, execution }).intent; return { candidate, target, scope, execution, intent, approvalAuthority, approvalProof: { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: approvalAuthority.keyReference, publicKey, signatureBase64: sign(null, Buffer.from(intent.sha256), pair.privateKey).toString("base64") } }; }
-const authorizations = { "cap.dast": authorization("dast-target"), "cap.fuzz": authorization("fuzz-target") };
 const sources = {
   "cap.iac": "infra/main.tf",
   "cap.container": "Dockerfile",
@@ -78,11 +94,20 @@ const coverage = {
   truncation: { truncated: false, scannedFileCount: 1, totalEligibleFileCount: 1 },
   dataAge: { ageSeconds: 0, snapshotAt: null },
 };
-let pass = 0;
+const cases = [];
+const injectedFailure = process.env.PIPELINE_SAC_TEST_INJECT_FAILURE ?? "";
+const selfProbeChild = process.env.PIPELINE_SAC_TEST_SELF_PROBE_CHILD === "1";
 function check(name, fn) {
-  fn();
-  pass++;
-  console.log(`PASS ${name}`);
+  const id = `SAC${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({
+    id,
+    name,
+    run() {
+      if (injectedFailure === id) assert.fail("intentional stack adapter case-completion failure");
+      initializeSharedFixture();
+      return fn();
+    },
+  });
 }
 
 check("seven representative adapters cover every major family cluster", () => {
@@ -259,4 +284,40 @@ check("v1 execution records keep their pre-bound scanned-source digest", () => {
   }).ok, true);
 });
 
-console.log(`${pass} stack adapter contract checks passed`);
+check("an early failed case still emits dispositions for the complete declared corpus", () => {
+  if (selfProbeChild) return;
+  const probe = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PIPELINE_SAC_TEST_INJECT_FAILURE: "SAC02",
+      PIPELINE_SAC_TEST_SELF_PROBE_CHILD: "1",
+      PIPELINE_VERIFY_CASE_COMPLETION_FD: "3",
+      PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES: "65536",
+    },
+    shell: false,
+    stdio: ["ignore", "pipe", "pipe", "pipe"],
+    timeout: 30_000,
+  });
+  assert.notEqual(probe.status, 0, "the injected early case must fail");
+  const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
+  const disposed = records.filter((record) => record.event === "DISPOSED");
+  assert.equal(records[0].event, "DECLARED");
+  assert.equal(records[0].caseCount, 23);
+  assert.equal(disposed.length, 23);
+  assert.equal(disposed.find((record) => record.id === "SAC02")?.disposition, "fail");
+  assert.equal(disposed.find((record) => record.id === "SAC23")?.disposition, "pass");
+  assert.deepEqual(records.at(-1).counts, { pass: 22, fail: 1, skip: 0, todo: 0 });
+  assert.equal(records.at(-1).declaredCount, 23);
+  assert.equal(records.at(-1).disposedCount, 23);
+});
+
+assert.equal(cases.length, 23, "the complete stack adapter contract corpus must be registered before execution begins");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});
