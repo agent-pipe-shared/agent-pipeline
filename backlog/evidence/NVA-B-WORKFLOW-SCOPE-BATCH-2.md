@@ -37,6 +37,11 @@ live-dispatch registry, scope lease, filesystem-alias resolution, Verify-run
 lock, or native runner-isolation claim. Callers must supply all concurrently
 prepared scopes they want compared.
 
+The residual is owned by the open pipeline backlog item through 2026-09-30.
+Closure requires an authoritative coordinator call site that supplies every
+simultaneously live write scope plus expiry/recovery for abandoned scopes; this
+foundation does not claim that integration.
+
 ## Validation
 
 Both commands exited 0 on the completed code:
@@ -50,6 +55,21 @@ normalized aliases, nonadjacent conflicts, read-only overlaps, disjoint success,
 malformed later members, closed schema rejection, zero calls on refusal,
 independent request snapshots, adapter failure accounting, and the existing
 single-request/continuity/failover regressions. `git diff --check` passed.
+
+The machine-written candidate receipt is
+`backlog/evidence/2026-09-12-workflow-batch-a4c77364-tests.json`. It binds both
+exit-zero results, output digests, the clean detached worktree and tree
+`2b16946487f980e986bf8536909df486e59e201b` to full commit
+`a4c77364b8b1fcfc122d19be71e8d7800c3d19a5`.
+
+## Rollback
+
+The new batch API has no live caller in this commit. If a regression is found,
+stop adopting `validateWorkflowWriterDispatchBatch` and
+`runSyntheticWorkflowDispatchBatch`, keep callers on the unchanged
+single-request boundary, and revert commit
+`a4c77364b8b1fcfc122d19be71e8d7800c3d19a5`. No state or data migration is
+needed.
 
 The v3 dispatch record is
 `evidence/dispatch-record-NVA-B-WORKFLOW-SCOPE-BATCH-2.json`. It remains

@@ -1,0 +1,34 @@
+{
+  "schema": "pipeline.focused-candidate-test-evidence.v1",
+  "generatedAt": "2026-09-12T00:18:01.497Z",
+  "candidateCommit": "a4c77364b8b1fcfc122d19be71e8d7800c3d19a5",
+  "candidateTree": "2b16946487f980e986bf8536909df486e59e201b",
+  "clean": true,
+  "tests": [
+    {
+      "command": [
+        "node",
+        "plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "4e5c99f962a5fa7035b27c35a7823b0810e5a9bf46665d471d105e1c067a2d83",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 3892,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "plugins/pipeline-core/lib/workflow-runner-boundary.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "7ccb520c0de6f7cdb6358f83431a493d2a202aef8880f6545ba5feae8aa6ae71",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 3162,
+      "stderrBytes": 0
+    }
+  ],
+  "passed": true
+}

@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-09-01
+due: 2026-09-30
 source: "Direct measurement, 2026-09-01: two dispatches independently fixed the same file, a third spent budget confirming a fix already committed by another agent, and a full verify.mjs run failed on candidate-binding drift because the orchestrator committed mid-run."
 sprint: nova-b
 done_when: manual
@@ -225,3 +226,20 @@ covers message *identity*, not *staleness*, and the two should not be conflated.
 The practical consequence is a dispatcher-side one and needs no mechanism: a
 mid-task message must not assert present-tense facts about a shared tree. State
 what was observed and when, not what is true now.
+
+## Partial implementation — 2026-09-12
+
+Commit `a4c77364b8b1fcfc122d19be71e8d7800c3d19a5` adds an explicit batch
+admission API that normalizes literal repository-relative scopes and rejects
+exact or ancestor write/write overlaps before the first adapter call. This is a
+tested foundation for ranked option 3, not closure of the item: it coordinates
+only the dispatch envelopes submitted together in one call. Independently
+submitted batches, real dispatcher integration and the verify-in-progress
+collision remain unresolved.
+
+The remaining work stays owned by `pipeline` through the due date above. Before
+that date, wire one authoritative dispatcher/coordinator call site so every
+simultaneously live write scope reaches the batch admission boundary, define
+expiry/recovery for abandoned live scopes, and retain the separately tracked
+release-only Verify serialization. Candidate-bound focused evidence is in
+`backlog/evidence/2026-09-12-workflow-batch-a4c77364-tests.json`.
