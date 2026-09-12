@@ -110,3 +110,13 @@ direct Draft-2020-12 negative probes; both schema-invalid shapes were rejected
 and the shipped catalog remained valid. The documentation check readback at
 this final candidate is 1,585 Markdown files, 1,370 links, 20 anchors and 41
 excluded vendored-copy links.
+
+The fresh refs-only second Critic returned `VERDICT: no` with the schema parity
+finding above and one stale documentation-count minor. It explicitly cleared
+the candidate/tree and six file-digest bindings, all 18 canonical rows and
+dispositions, builder delegation and boundary fidelity, residual-slice
+wording, and the exclusion of native WSL readiness. It observed no briefing
+violation and used the literal assurance
+`functional-equivalent-read-only; OS isolation not asserted`. The two-review
+cap is exhausted; the corrections above use direct parent self-verification
+and no third Critic result is claimed.
