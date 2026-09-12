@@ -130,6 +130,14 @@ from `open` to `closed` in its own file still gets TWO chained ledger
 entries (open→in_progress, then in_progress→closed) to preserve that order —
 this is expected, not a bug.
 
+An activated reconciliation can additionally retain a non-authoritative,
+candidate-bound completion event with `--event-out
+evidence/actions/backlog-reconciliation.json`. The event target and exact
+pre-action Git identity are checked before any ledger write. The event is
+published only after physical projection and canonical-state readback; a
+post-source publication failure keeps the reconciled backlog and returns a
+closed event-only retry. Omit the flag for the existing no-output behavior.
+
 **Run the backlog-state checker before committing any ledger change — full
 rule, recovery split, and OID requirement live in one place:**
 [`guardrails/git.md` `GIT-10`](../guardrails/git.md#git-10--run-the-backlog-state-checker-before-committing-any-ledger-change),

@@ -361,6 +361,12 @@ node plugins/pipeline-core/scripts/session-cleanup.mjs plan-recovery --repo /abs
 node plugins/pipeline-core/scripts/session-cleanup.mjs apply-recovery --repo /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
 ```
 
+To retain the successful recovery as a non-authoritative governance action,
+add `--event-out evidence/actions/session-recovery.json`. The target is
+preflighted before recovery begins. A failed recovery emits no event; a failure
+after successful recovery returns an event-only retry and does not undo the
+recovery. Omitting the flag preserves the ordinary no-output flow.
+
 Every externally archived descriptor must prove a missing, non-sole-copy
 `disposable-control` worktree under `branch/detached`; its descriptor digest
 and manifest digest must still match and its recorded owner must not be live.

@@ -35,6 +35,31 @@ or dispatch identity. Both remain non-authoritative. The replay reader keeps
 their timelines separate and preserves read compatibility for existing v1
 replay artifacts.
 
+### Action producers and rollback
+
+Action production is opt-in and follows a source-first boundary. Verify may
+publish only from its durable candidate-bound evidence; push and deploy may
+publish only after the approval State postimage has been physically read back;
+session cleanup may publish only after a successful recovery result; and the
+backlog reconciler may publish only after every ledger/projection byte and the
+canonical backlog state have been read back. Review production remains
+disabled until the normal fresh-session Critic has a durable accepted receipt
+with the same closed binding. A model response by itself is never a source
+receipt.
+
+Each producer validates the repository-relative output path and builds the
+complete event before changing its source. A failure before source completion
+emits nothing. If event publication fails after the source has completed, the
+source stays committed and the result returns a closed event-only retry; that
+retry can create only the identical event. Calling the same source operation
+as a no-op or replay does not create another event.
+
+Deployment is reader-first. Keep the action-v1 reader enabled permanently so
+old lifecycle-v1 records, the legacy lifecycle action spellings, and current
+action-v1 records continue to replay together without rewriting canonical
+history. To roll back production, stop requesting the optional event output;
+do not delete events, remove reader support, or rewrite a stream.
+
 `preview` does not allocate a sequence or event digest.  `append` accepts only
 `pipeline.governance-event-append-request.v1`; writer-owned sequence and digest
 fields are omitted from its intent.  It returns a sanitized receipt and an
