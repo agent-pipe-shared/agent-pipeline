@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "adfe0e04b6ba434f48e14a638f0840f9ba2253b4e186f57904ab6e9805554574"
+    "transitionHead": "e5c5e675d4d3e2d2237829b4b86024382c82dcdd83062c25baac5e41a6f0718e"
   },
   "counts": {
-    "open": 69,
+    "open": 70,
     "in_progress": 1,
     "closed": 572,
     "rejected": 3,
@@ -896,6 +896,17 @@
       "closureRepository": "self",
       "closureCommit": "025f9e1a2a547b7abc438d998801acddcabdf166",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-gate-strength.mjs"
+    },
+    {
+      "id": "pipeline.author-repair-route-has-no-signed-event-chain",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-12",
+      "source": "Nova B final Critic finding on the attended dispatch-lock repair evidence.",
+      "deferred": false,
+      "due": "2026-09-30",
+      "sprint": "nightwing"
     },
     {
       "id": "pipeline.authority-decision-apply-defaults-to-codex",

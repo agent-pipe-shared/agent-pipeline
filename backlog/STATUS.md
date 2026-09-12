@@ -72,6 +72,7 @@
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.atomic-prd-approval-without-mutation | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.attestation-git-presence-gate-not-gs8-protected | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.author-repair-route-has-no-signed-event-chain | open | requirement | pipeline | nightwing | 2026-09-12 | 2026-09-30 | — |
 | pipeline.authority-decision-apply-defaults-to-codex | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | nightwing | 2026-08-08 | 2026-08-22 | — |
 | pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
@@ -664,7 +665,7 @@
 
 ## Counts
 
-- open: 69
+- open: 70
 - in_progress: 1
 - closed: 572
 - rejected: 3
