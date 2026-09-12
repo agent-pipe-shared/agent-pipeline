@@ -1,0 +1,68 @@
+{
+  "schema": "pipeline.focused-candidate-test-evidence.v1",
+  "generatedAt": "2026-09-12T01:22:20.652Z",
+  "candidateCommit": "83894d49cce15e2fe97ec94a2fd90c17c784ac6d",
+  "candidateTree": "fc3b024ab384d990f4b5d677daf08ddc5d9857c5",
+  "clean": true,
+  "tests": [
+    {
+      "command": [
+        "node",
+        "--test",
+        "backlog/evidence/2026-09-12-mid-task-instruction-authentication.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "a61e3e398d5be5c47624da7bfe76caa28d686003eed976aea4be01547818ec4d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 451,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "plugins/pipeline-core/scripts/check-vendored-template-sync.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "9cf22e1375c67d13285cc6f0c447183bc2baef1e94181f813220f5e7252405e7",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 303,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "plugins/pipeline-core/lib/dispatch-policy.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "de1185e8d9e9dcf8f721b216ca72ed1fe126425b3c2109d7d88c8bccb0019d32",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 2761,
+      "stderrBytes": 0
+    },
+    {
+      "command": [
+        "node",
+        "harness/scripts/check-doc-contracts.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "stdoutSha256": "9654f02ea31d074b78cf77f7cf4bce15019ba6767ee251c4951c7b5779bb43f2",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 129,
+      "stderrBytes": 0
+    }
+  ],
+  "knownPreexisting": [
+    {
+      "command": [
+        "node",
+        "harness/scripts/check-consumer-safe-paths.mjs"
+      ],
+      "finding": "one stale allowlist entry already exists at the parent commit and is unchanged by this package"
+    }
+  ],
+  "passed": true
+}
