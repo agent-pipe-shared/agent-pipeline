@@ -7,16 +7,18 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const GUARDS = [
-  { path: fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url)), args: [] },
-  { path: fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url)), args: [] },
-  { path: fileURLToPath(new URL("./guard-gate-strength.mjs", import.meta.url)), args: [] },
+  { path: fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url)), args: [], lane: "parallel" },
+  { path: fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url)), args: [], lane: "parallel" },
+  { path: fileURLToPath(new URL("./guard-gate-strength.mjs", import.meta.url)), args: [], lane: "parallel" },
   // Authoritative, not inferred (ADR-0051): guard-lifecycle-ready.mjs is
   // reachable only through this script, which is itself spawned only from
   // codex-pretool-guard.mjs (a Codex-only hook target, registered in no hook
   // config of either runner). A stray CLAUDECODE=1 inherited via the
   // propagated environment below must not silently reassign the runner this
   // per-file admission decision is made for.
-  { path: fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url)), args: ["--runner", "codex"] },
+  // The lifecycle guard runs a disposable repository capability probe. Multiple instances
+  // against one checkout would race while rolling back the same private directories.
+  { path: fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url)), args: ["--runner", "codex"], lane: "repository-serial" },
 ];
 const MAX_PARALLEL_GUARDS = 12;
 const CHILD_TIMEOUT_MS = 4_000;
@@ -68,6 +70,14 @@ async function runGuardsInParallel(jobs) {
     }
   }
   await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL_GUARDS, jobs.length) }, worker));
+  return results;
+}
+
+async function runGuardJobs(jobs) {
+  const parallelJobs = jobs.filter((job) => job.lane === "parallel");
+  const serialJobs = jobs.filter((job) => job.lane === "repository-serial");
+  const results = await runGuardsInParallel(parallelJobs);
+  for (const job of serialJobs) results.push({ job, result: await runGuard(job) });
   return results;
 }
 
@@ -159,7 +169,7 @@ const jobs = paths.flatMap((filePath) => GUARDS.map((guard) => ({
 })));
 let exitCode = 0;
 const stderr = [];
-const results = await runGuardsInParallel(jobs);
+const results = await runGuardJobs(jobs);
 for (const { job, result } of results) {
   if (result.stderr) stderr.push(result.stderr.trimEnd());
   if (result.timedOut) {

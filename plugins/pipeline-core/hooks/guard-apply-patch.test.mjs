@@ -225,6 +225,9 @@ check("multi-file patches use bounded parallel guard fan-out", () => {
   assert.match(source, /const MAX_PARALLEL_GUARDS = 12/u);
   assert.match(source, /async function runGuardsInParallel\(jobs\)/u);
   assert.match(source, /Promise\.all\(Array\.from\(\{ length: Math\.min\(MAX_PARALLEL_GUARDS/u);
+  assert.match(source, /guard-lifecycle-ready\.mjs.*lane:\s*"repository-serial"/su);
+  assert.match(source, /for \(const job of serialJobs\) results\.push\(\{ job, result: await runGuard\(job\) \}\)/u);
+  assert.match(source, /const results = await runGuardJobs\(jobs\)/u);
   const patch = [
     "*** Begin Patch",
     ...Array.from({ length: 16 }, (_, index) => [
