@@ -36,7 +36,19 @@ import {
 // returns regardless of the manifest path requested.
 const TEST_VERSION = "0.4.5+test";
 const manifest = JSON.stringify({ version: TEST_VERSION });
-const pluginList = () => () => JSON.stringify({ installed: [], available: [] });
+const pluginList = () => () => JSON.stringify({
+  installed: [{
+    pluginId: "pipeline-core@agent-pipeline",
+    name: "pipeline-core",
+    marketplaceName: "agent-pipeline",
+    version: TEST_VERSION,
+    installed: true,
+    enabled: true,
+    source: { source: "git", path: "/cache/agent-pipeline/plugins/pipeline-core" },
+    marketplaceSource: { sourceType: "git", source: "https://github.com/agent-pipe-shared/agent-pipeline.git" },
+  }],
+  available: [],
+});
 
 // Deterministic, hermetic attestation default for the Claude/Codex-runner
 // tests below (mirrors `readyObservation`/`preflight` in
@@ -84,6 +96,27 @@ function readyObservation() {
 // of the `observe` mock.
 function noSelfApplicationGitScriptUrl(root) {
   return pathToFileURL(join(root, "scripts", "pipeline-start-preflight.mjs")).href;
+}
+
+// Antigravity always consumes the installer-owned receipt for its selected
+// gitless plugin root. Keep that independent gate hermetically ready so these
+// cases measure only the hard-enforcement observation named by the suite.
+function readyAntigravityInstallation(root) {
+  return {
+    antigravityPluginRegistries: () => [JSON.stringify({ entries: [{ path: root }] })],
+    verifyLocalInstalledPluginReceiptFn(input) {
+      assert.equal(input.provider, "antigravity");
+      assert.equal(input.installedPluginRoot, root);
+      assert.equal(input.registryInstalledPluginRoot, root);
+      return {
+        schema: "pipeline.installed-plugin-attestation-verification.v1",
+        status: "verified",
+        request: { installedContentSha256: "d".repeat(64) },
+        receiptId: "e".repeat(64),
+        externalReceiptIdentitySha256: "f".repeat(64),
+      };
+    },
+  };
 }
 
 // Helper mirroring pipeline-start-preflight.test.mjs's own fixture shape:
@@ -292,6 +325,7 @@ test("the Antigravity runner surfaces the observation field end to end, wired th
       read: () => manifest,
       cwd: root,
       scriptUrl: noSelfApplicationGitScriptUrl(root),
+      ...readyAntigravityInstallation(root),
     });
     assert.ok(result.antigravityHardEnforcement);
     assert.equal(result.antigravityHardEnforcement.observed, true);
@@ -309,6 +343,7 @@ test("the Antigravity runner (via AI_AGENT) surfaces a warning when no lock exis
       read: () => manifest,
       cwd: root,
       scriptUrl: noSelfApplicationGitScriptUrl(root),
+      ...readyAntigravityInstallation(root),
     });
     assert.ok(result.antigravityHardEnforcement);
     assert.equal(result.antigravityHardEnforcement.observed, false);
@@ -329,6 +364,7 @@ test("the Antigravity runner surfaces not-observed for a stale prior-session loc
       read: () => manifest,
       cwd: root,
       scriptUrl: noSelfApplicationGitScriptUrl(root),
+      ...readyAntigravityInstallation(root),
     });
     assert.equal(result.antigravityHardEnforcement.observed, false);
     assert.equal(result.status, ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS);
@@ -348,6 +384,7 @@ test("the Antigravity runner surfaces not-observed for a fresh lock bound to an 
       read: () => manifest,
       cwd: root,
       scriptUrl: noSelfApplicationGitScriptUrl(root),
+      ...readyAntigravityInstallation(root),
     });
     assert.equal(result.antigravityHardEnforcement.observed, false);
     assert.equal(result.status, ANTIGRAVITY_HARD_ENFORCEMENT_NOT_OBSERVED_STATUS);
