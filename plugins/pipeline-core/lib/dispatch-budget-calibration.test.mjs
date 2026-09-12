@@ -105,3 +105,14 @@ test("the sample and rule contracts are exact and reject invalid or unsafe arith
     assert.throws(() => evaluateDispatchBudgetCalibration(input), DispatchBudgetCalibrationError);
   }
 });
+
+test("fully and partially sparse sample arrays are rejected before calibration", () => {
+  const sparse = new Array(1);
+  const partiallySparse = [sample(), , sample({ taskClass: "review" })];
+  for (const samples of [sparse, partiallySparse]) {
+    assert.throws(
+      () => evaluateDispatchBudgetCalibration({ rule: rule(), samples }),
+      (error) => error instanceof DispatchBudgetCalibrationError && error.code === "DBC-SAMPLES",
+    );
+  }
+});

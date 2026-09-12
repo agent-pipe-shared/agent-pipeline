@@ -79,7 +79,10 @@ function validateSample(sample) {
 export function evaluateDispatchBudgetCalibration({ rule, samples } = {}) {
   validateRule(rule);
   if (!Array.isArray(samples) || samples.length === 0) fail("DBC-SAMPLES");
-  samples.forEach(validateSample);
+  for (let index = 0; index < samples.length; index += 1) {
+    if (!Object.hasOwn(samples, index)) fail("DBC-SAMPLES");
+    validateSample(samples[index]);
+  }
 
   const evaluations = samples.map((sample) => {
     const perFile = checkedMultiply(rule.callsPerFile[sample.taskClass], sample.fileCount);
