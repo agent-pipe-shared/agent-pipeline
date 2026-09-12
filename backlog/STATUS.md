@@ -364,7 +364,7 @@
 | pipeline.no-check-validates-prose-section-citations | closed | workflow-improvement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
-| pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code | open | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | — |
+| pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code | in_progress | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | closed | workflow-improvement | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.no-governed-directory-contract | closed | workflow-improvement | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
@@ -663,8 +663,8 @@
 
 ## Counts
 
-- open: 70
-- in_progress: 0
+- open: 69
+- in_progress: 1
 - closed: 571
 - rejected: 3
 - deferred: 11

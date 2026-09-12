@@ -3,11 +3,11 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1daf1f43d966bb395fe78848983d736e5e9b2126e36d1d9c418f3d561f152b50"
+    "transitionHead": "00dfc74f39436345f5608d0e8f4a49261678e6dcf12e681649e1a696e5b444f9"
   },
   "counts": {
-    "open": 70,
-    "in_progress": 0,
+    "open": 69,
+    "in_progress": 1,
     "closed": 571,
     "rejected": 3,
     "deferred": 11
@@ -4812,7 +4812,7 @@
     },
     {
       "id": "pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
