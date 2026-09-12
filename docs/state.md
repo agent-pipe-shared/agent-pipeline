@@ -603,21 +603,24 @@ Per the PO's 2026-09-02 instruction. None blocks further Nova-B work.
 
 ### 2026-09-12 Nova-B design update
 
-- The non-dispatch governance-action gap now has a proposed design at
-  `docs/adr/draft-governance-action-events.md`. It keeps dispatch/status on the
+- The non-dispatch governance-action design is accepted as
+  `docs/adr/0083-governance-action-events.md`. It keeps dispatch/status on the
   existing dispatch-correlated lifecycle payload and introduces a separate,
   closed `pipeline.governance-action-event.v1` payload in the same stream for
   verification, review, gate, recovery, and reconciliation actions. The
   candidate binding, envelope equalities, ID derivation and complete
-  kind/status/reason matrix are specified, but the prior claimed Critic pass
-  was not candidate- or trajectory-bound. A fresh review therefore failed the
-  admission/evidence boundary. No reviewed-design or PASS claim is active.
-- Implementation remains unstarted pending formal ADR acceptance. The first
-  slice also repairs the already measured four-versus-six lifecycle correlation
-  schema drift. Exact-candidate deterministic evidence and a fresh refs-only
-  review belong with the next stable candidate. Native Codex sandbox or
-  App-Server behavior under WSL is not an input, acceptance criterion, or
-  readiness claim for this work.
+  kind/status/reason matrix are specified. The LND-1 schema/runtime payload
+  foundation is prepared with focused tests; envelope, store, reader, and
+  producer integration is not claimed. The prior claimed Critic pass was not
+  candidate- or trajectory-bound, so no reviewed-design or PASS claim is
+  active.
+- LND-0 still repairs the measured four-versus-six lifecycle correlation schema
+  drift. Exact-candidate deterministic evidence and a fresh refs-only review
+  belong with the next stable candidate. Actual native Codex sandbox, App
+  Server, IPC, and isolation execution under WSL is deferred to a future
+  native-Windows package and is not an input, acceptance criterion, blocker, or
+  readiness claim for this work. Runner-neutral and offline contracts and the
+  ordinary fresh-session Critic remain in scope.
 
 ## Operational head
 

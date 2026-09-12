@@ -89,6 +89,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0080](0080-parallel-dispatch-slicing-enforcement.md) | Machine-delivered default task-slicing into parallel dispatch — a stateful `PreToolUse` hook nudges toward parallel slicing through `additionalContext` when the Parallel-Safety Predicate holds (three or more packages with disjoint write scopes); increment 1 delivers a default and a ledger entry, never a block | accepted | 2026-09-06 |
 | [0081](0081-boundary-aware-impacted-verify.md) | Boundary-aware impacted Verify selects affected checks for work, Critic, push, and candidate boundaries; release remains full | accepted | 2026-09-10 |
 | [0082](0082-bounded-continuity-self-repair.md) | Damaged continuity has one evidence-preserving, digest-bound self-repair for a legacy shared close-evidence path | accepted | 2026-09-12 |
+| [0083](0083-governance-action-events.md) | Non-dispatch governance actions use a separate closed payload in the lifecycle stream | accepted | 2026-09-12 |
 | [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
 | [0068](0068-backlog-ledger-merge-semantics.md) | Merging two parallel sprints' backlog ledgers: one active chain with archived, integrity-checked siblings; amendments become status-neutral and bind their target by `entryHash` rather than by physical sequence | accepted | 2026-08-27 |
 | [0069](0069-adr-numbers-are-allocated-at-acceptance.md) | ADR numbers are allocated at acceptance into the trunk, never at drafting time, and carry no sprint prefix; duplicates are a hard Verify failure, and an existing collision is resolved by reference load with a forwarding line rather than by rewriting archives | accepted | 2026-08-27 |
@@ -190,6 +191,7 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0050](0050-candidate-bound-verify-run-journal.md) | Kandidatengebundenes privates Verify-Run-Journal | akzeptiert | 2026-08-01 |
 | [0081](0081-boundary-aware-impacted-verify.md) | Boundary-aware Impact Verify; Full Verify nur am Release-Rand | akzeptiert | 2026-09-10 |
 | [0082](0082-bounded-continuity-self-repair.md) | Beschädigte Kontinuität erhält eine beweiserhaltende, digest-gebundene Selbstreparatur für gemeinsam genutzte Close-Evidence-Pfade | akzeptiert | 2026-09-12 |
+| [0083](0083-governance-action-events.md) | Governance-Aktionen ohne Dispatch verwenden einen eigenen geschlossenen Payload im Lifecycle-Stream | akzeptiert | 2026-09-12 |
 
 ## Wiedervorlagen
 

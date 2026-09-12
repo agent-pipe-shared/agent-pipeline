@@ -287,10 +287,10 @@
         "audience": "maintainer",
         "lifecycle": "review-candidate",
         "paths": [
+          "docs/adr/0083-governance-action-events.md",
           "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md",
           "docs/adr/draft-ci-failure-reporter-redaction-requirement.md",
           "docs/adr/draft-critic-report-durable-write-location.md",
-          "docs/adr/draft-governance-action-events.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-session-cut-recommended-by-readiness.md",
           "docs/codex-isolated-critic-foundation.md",

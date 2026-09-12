@@ -189,9 +189,10 @@ dispatches.
 
 ## Nova-B design decision and executable slices — 2026-09-12
 
-Option B is selected in
-`docs/adr/draft-governance-action-events.md`, based on the current-source audit
-in `backlog/evidence/NVA-B-LIFECYCLE-NONDISPATCH-DESIGN-1.md`.
+Option B is accepted as
+`docs/adr/0083-governance-action-events.md`, based on the current-source audit
+in `backlog/evidence/NVA-B-LIFECYCLE-NONDISPATCH-DESIGN-1.md` and the PO's
+2026-09-12 acceptance decision.
 
 The five non-dispatch facts use a separate closed
 `pipeline.governance-action-event.v1` payload in the existing `lifecycle`
@@ -237,15 +238,18 @@ slices. The item remains `open` until the applicable slices below are green.
   `verification`, `review`, `gate`, `recovery`, `reconciliation` and terminal
   statuses `completed`, `failed`, `unknown`, `unavailable`.
 - The validator admits only the kind/status/reason/candidate rows enumerated in
-  draft ADR D3. Every row requires an exact commit/tree candidate. The exact
+  ADR-0083 D3. Every row requires an exact commit/tree candidate. The exact
   payload fields and correlation rules match D3 through D5. Extra fields,
   dispatch identity, arbitrary reason strings,
   free-form text and invalid kind/status/candidate combinations are rejected
   with typed codes.
 - JSON-schema/runtime parity, canonical freezing and digest-stable identifiers
   have focused positive and negative tests. Those tests pin the exact
-  `requestId`, `actionId` and `eventId` source/derivation rules in draft ADR D3,
+  `requestId`, `actionId` and `eventId` source/derivation rules in ADR-0083 D3,
   including rejection when either supplied digest is recomputed differently.
+- The schema/runtime validator and focused parity, freezing, identifier, and
+  rejection tests constitute the LND-1 foundation. This does not claim
+  envelope, store, reader, or producer integration.
 
 ### LND-2 — envelope/store reader-first admission
 
@@ -282,7 +286,7 @@ slices. The item remains `open` until the applicable slices below are green.
   candidate-bound verification action is produced from the terminal evidence
   digest.
 - Passed, failed, unknown and unavailable outcomes map exactly to the four
-  verification rows in draft ADR D3. Per-suite
+  verification rows in ADR-0083 D3. Per-suite
   receipts do not create action events.
 - Target/source preflight failure is zero mutation. Post-source event failure
   returns `source-complete/event-unavailable` with an idempotent event-only
@@ -300,8 +304,11 @@ slices. The item remains `open` until the applicable slices below are green.
   `completed/REVIEW_FINDINGS`. A result rejected before receipt consumption,
   including failed or unavailable execution without an accepted receipt, emits
   no action event.
-- Claude, Codex and future runner adapters satisfy the same builder contract;
-  native Codex WSL sandbox execution is neither required nor valid evidence.
+- Claude, Codex and future runner adapters satisfy the same builder contract.
+  Actual native Codex sandbox, App Server, IPC, and isolation execution under
+  WSL is deferred to a future native-Windows package and is neither required
+  nor valid evidence. Runner-neutral and offline contracts, including normal
+  fresh-session Critic behavior, remain in scope.
 - Replays and post-source event failures are idempotent and typed.
 
 ### LND-6 — push/deploy gate producers

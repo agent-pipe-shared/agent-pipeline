@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.governance-action-event.v1.json",
+  "title": "Pipeline governance action event v1",
+  "description": "Closed, terminal, non-authoritative governance action payload without runner or dispatch identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "kind", "status", "reasonCode", "correlation", "candidate"],
+  "properties": {
+    "eventId": { "$ref": "#/$defs/sha256" },
+    "kind": { "enum": ["verification", "review", "gate", "recovery", "reconciliation"] },
+    "status": { "enum": ["completed", "failed", "unknown", "unavailable"] },
+    "reasonCode": {
+      "enum": [
+        "VERIFICATION_PASSED", "VERIFICATION_FAILED", "VERIFICATION_UNKNOWN", "VERIFICATION_UNAVAILABLE",
+        "REVIEW_PASSED", "REVIEW_FINDINGS", "PUSH_APPROVED", "DEPLOY_APPROVED",
+        "RECOVERY_COMPLETED", "RECONCILIATION_COMPLETED"
+      ]
+    },
+    "correlation": { "$ref": "#/$defs/correlation" },
+    "candidate": { "$ref": "#/$defs/candidate" }
+  },
+  "allOf": [{
+    "oneOf": [
+      { "properties": { "kind": { "const": "verification" }, "status": { "const": "completed" }, "reasonCode": { "const": "VERIFICATION_PASSED" } } },
+      { "properties": { "kind": { "const": "verification" }, "status": { "const": "failed" }, "reasonCode": { "const": "VERIFICATION_FAILED" } } },
+      { "properties": { "kind": { "const": "verification" }, "status": { "const": "unknown" }, "reasonCode": { "const": "VERIFICATION_UNKNOWN" } } },
+      { "properties": { "kind": { "const": "verification" }, "status": { "const": "unavailable" }, "reasonCode": { "const": "VERIFICATION_UNAVAILABLE" } } },
+      { "properties": { "kind": { "const": "review" }, "status": { "const": "completed" }, "reasonCode": { "const": "REVIEW_PASSED" } } },
+      { "properties": { "kind": { "const": "review" }, "status": { "const": "completed" }, "reasonCode": { "const": "REVIEW_FINDINGS" } } },
+      { "properties": { "kind": { "const": "gate" }, "status": { "const": "completed" }, "reasonCode": { "const": "PUSH_APPROVED" } } },
+      { "properties": { "kind": { "const": "gate" }, "status": { "const": "completed" }, "reasonCode": { "const": "DEPLOY_APPROVED" } } },
+      { "properties": { "kind": { "const": "recovery" }, "status": { "const": "completed" }, "reasonCode": { "const": "RECOVERY_COMPLETED" } } },
+      { "properties": { "kind": { "const": "reconciliation" }, "status": { "const": "completed" }, "reasonCode": { "const": "RECONCILIATION_COMPLETED" } } }
+    ]
+  }],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "sourceIdOrNotApplicable": {
+      "oneOf": [
+        { "$ref": "#/$defs/id" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": { "state": { "const": "not-applicable" } }
+        }
+      ]
+    },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actionId", "featureId", "requestId", "sessionId"],
+      "properties": {
+        "actionId": { "$ref": "#/$defs/sha256" },
+        "featureId": { "$ref": "#/$defs/sourceIdOrNotApplicable" },
+        "requestId": { "$ref": "#/$defs/id" },
+        "sessionId": { "$ref": "#/$defs/sourceIdOrNotApplicable" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "tree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+      }
+    }
+  }
+}

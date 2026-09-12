@@ -1,12 +1,12 @@
-# ADR-{{NNNN}}: Non-dispatch governance actions use a separate closed payload in the lifecycle stream
+# ADR-0083: Non-dispatch governance actions use a separate closed payload in the lifecycle stream
 
 > Agent-Pipeline · Sprint Nova-B · as of 2026-09-12
 
-**Status:** proposed — Option B selected for implementation planning; numbered
-only when accepted into the trunk under
-[ADR-0069](0069-adr-numbers-are-allocated-at-acceptance.md). Until then this
-record is `docs/adr/draft-governance-action-events.md` and is referenced by
-slug.
+**Status:** accepted (2026-09-12, PO decision that the approach fits). Actual
+native Codex sandbox, App Server, IPC, and isolation execution under WSL is
+deferred to a future native-Windows package. That deferred execution is neither
+an input nor a blocker for the runner-neutral and offline contracts accepted
+here.
 
 **Basis:**
 `backlog/items/2026-08-17-lifecycle-event-schema-has-no-non-dispatch-correlation-shape.md`
@@ -35,9 +35,9 @@ plugins/pipeline-core/scripts/governance-replay-viewer.mjs,
 the terminal producer boundaries listed below, their focused tests,
 docs/governance-events.md, docs/governance-replay.md, and governance/README.md.
 
-The implementation may add a dedicated action-event module when this draft is
-accepted, but an absent future source file is not part of this draft's current
-`Governs:` set.
+The dedicated action-event schema and module are the payload foundation. The
+envelope, store, reader, and producer integrations remain separate ordered
+slices under this decision.
 
 ## Context
 
@@ -323,15 +323,16 @@ matches the existing lifecycle producer pattern.
 
 The executable acceptance criteria are maintained in the source backlog item.
 They are ordered `LND-0` through `LND-8`; no producer slice may precede the
-reader slices. Native Codex Sandbox/App Server execution under WSL is excluded
-from every slice and is neither blocker nor evidence.
+reader slices. Actual native Codex sandbox, App Server, IPC, and isolation
+execution under WSL is deferred to a future native-Windows package and is
+neither blocker nor evidence. Runner-neutral and offline contracts, including
+selection and policy logic and the ordinary fresh-session Critic, remain in
+scope.
 
-## Remaining register decisions
+## Remaining register decision
 
-1. Accept and number this draft. Number allocation and the `docs/adr/README.md`
-   row occur only in that acceptance commit under ADR-0069.
-2. Decide whether exact-candidate HGO consumption receives the minimal portable
-   projection in D5. Until explicitly accepted, HGO remains private-only and
-   does not block the other four producer families.
+Decide whether exact-candidate HGO consumption receives the minimal portable
+projection in D5. Until explicitly accepted, HGO remains private-only and does
+not block the other four producer families.
 
 No new PO gate is required for implementing the remaining accepted slices.
