@@ -80,3 +80,6 @@ real environment-reroute consumer remains absent. Authenticated live budget
 adapters for every supported runner and the empirical budget calibration also
 remain absent. Therefore the second and fourth acceptance criteria are not
 complete, and the item must stay `open`.
+Both residual axes remain owned by `pipeline` and expire for re-triage on
+**2026-09-30**; the expiry is a recovery deadline and cannot be used as
+completion evidence or silently extended.

@@ -1,17 +1,15 @@
-# Process-rule subaxis closure — Critic round 2
+# Process-rule subaxis closure — prior review note
 
 Date: 2026-09-12
 
-The independent, diff-scoped Critic rechecked the correction to the AC1/AC3
-closure audit. The machine-written receipt binds the exact candidate commit and
-tree, both exact test argument vectors, zero exit results, signals, output
-digests and byte counts, unchanged source bytes before and after execution, and
-an exact publication readback. The Critic found no remaining issue with the
-evidence-quality correction.
+This file preserves a prior review summary that was initially labelled as a
+Critic result. It is **not an admissible governed Critic verdict**: it did not
+record the reviewed diff and ruleset identity, required report sections, or the
+literal assurance required by CR-03/CR-06. Its substantive statements below
+are historical notes only and must be checked against the bound machine
+receipt and a fresh refs-only review before they are used as review evidence.
 
 AC2 and AC4 remain explicitly open. No native Codex sandbox or App-Server
 readiness under WSL was claimed.
 
-`VERDICT: yes`
-
-`ASSURANCE: functional-equivalent-read-only`
+No verdict or assurance is asserted by this note.

@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-28
+due: 2026-09-30
 sprint: nova-b
 tracking: "Nova B"
 source: "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations."
@@ -111,6 +112,11 @@ The item remains open. Product-retry enforcement is already documented above;
 the trusted real environment-reroute consumer and authenticated cross-runner
 budget adapters remain absent. See
 `backlog/evidence/2026-09-12-dispatch-record-and-budget-progress.md`.
+
+The remaining AC2 environment-reroute consumer and AC4 authenticated
+cross-runner budget measurement are owned by `pipeline` and expire for
+re-triage on **2026-09-30**. That date is a recovery deadline, not evidence of
+completion and not permission to extend the gaps silently.
 
 An independent subaxis audit on 2026-09-12 re-ran the Continuity, lifecycle,
 dispatch-record writer, record-schema and Workflow-return boundary tests. It

@@ -621,7 +621,7 @@
 | pipeline.two-signature-ceremonies-overwrite-each-others-proof | open | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.two-v3-scripts-admitted-but-unnamed | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository |
 | pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime | closed | defect | pipeline | nova | 2026-08-29 | — | — |
-| pipeline.unenforced-process-rules-vary-by-runner | open | defect | pipeline | nova-b | 2026-08-28 | — | Nova B |
+| pipeline.unenforced-process-rules-vary-by-runner | open | defect | pipeline | nova-b | 2026-08-28 | 2026-09-30 | Nova B |
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | — | 2026-08-02 | 2026-08-30 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.universal-human-command-renderer | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
