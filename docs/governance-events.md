@@ -25,6 +25,16 @@ governance-event query --repo CHECKOUT --request-file REQUEST.json
 governance-event recover --repo CHECKOUT --request-file REQUEST.json
 ```
 
+The lifecycle stream admits two closed payloads. Dispatch, status, and
+candidate-invalidation records use the dispatch-correlated
+`pipeline.lifecycle-governance-event.v1` payload. Verification, review, gate,
+recovery, and reconciliation observations use
+`pipeline.governance-action-event.v1`, whose correlation contains an action,
+request, feature, and session identity but no runner, model, worker, attempt,
+or dispatch identity. Both remain non-authoritative. The replay reader keeps
+their timelines separate and preserves read compatibility for existing v1
+replay artifacts.
+
 `preview` does not allocate a sequence or event digest.  `append` accepts only
 `pipeline.governance-event-append-request.v1`; writer-owned sequence and digest
 fields are omitted from its intent.  It returns a sanitized receipt and an

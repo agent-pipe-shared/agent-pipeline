@@ -2,9 +2,12 @@
 
 `governance-replay` is a read-only, local reconstruction view for the
 canonical lifecycle stream. It queries the verified stream boundary with an
-optional retained checkpoint and projects only exact lifecycle envelopes into
-per-dispatch timelines. An incomplete, prefix-valid, stale, or invalid stream
-returns `unavailable`; it is never rendered as a partial authoritative history.
+optional retained checkpoint and validates both admitted payload families.
+Dispatch-correlated lifecycle records become per-dispatch timelines. Closed
+governance-action records become a separate action-timeline collection and do
+not acquire package, worker, attempt, or dispatch identity. An incomplete,
+prefix-valid, stale, or invalid stream returns `unavailable`; it is never
+rendered as a partial authoritative history.
 
 The replay is non-authoritative. It cannot approve work, restore a package,
 replace a human decision, or repair canonical records. Candidate invalidation
@@ -14,8 +17,12 @@ or sequence fork fails closed rather than being normalized away.
 ## Local timeline and topology view
 
 `governance-replay-viewer` turns a saved, verified replay readback into a new,
-static offline HTML file. It renders each dispatch in sequence order and a
-correlation topology of package, worker and attempt. `unknown` and
+static offline HTML file. It renders each dispatch in sequence order, a
+dispatch-only correlation topology of package, worker and attempt, and a
+separately labelled, non-authoritative Governance actions section. The action
+section exposes only its closed kind, status, reason, candidate, event and
+action identifiers; request, feature and session correlation stay out of the
+HTML. `unknown` and
 `unavailable` remain distinct states; an unavailable stream has no partial
 timeline. The viewer accepts only the closed replay allowlist, rejects extra
 event fields such as prompts, logs, credentials or private paths, uses a
@@ -59,14 +66,11 @@ justified only by competitor or provider parity.
   silently superseding an earlier one — this document's own text above
   states the reason: "so an uncorrelated candidate change or sequence fork
   fails closed rather than being normalized away."
-- `verification`, `review`, `gate`, `recovery`, `reconciliation` — each
-  marks a distinguishable governance-touchpoint type on a dispatch's
-  timeline (a check run, a review pass, a gate decision, a recovery action,
-  a reconciliation action respectively); the shared audit need across all
-  five is being able to ask "what class of governance event happened here,"
-  not just "something happened," from a durable record instead of a claim —
-  which is exactly what the replay viewer renders per dispatch (see "Local
-  timeline and topology view" above).
+- `verification`, `review`, `gate`, `recovery`, `reconciliation` — legacy
+  lifecycle-v1 records remain readable, but new records use the separate
+  `pipeline.governance-action-event.v1` payload. Replay v2 renders these five
+  kinds in action timelines, apart from dispatch topology, so the audit can
+  show what governance action occurred without inventing a worker execution.
 
 **Fields** (`lifecycle-governance-events.mjs:78`):
 
