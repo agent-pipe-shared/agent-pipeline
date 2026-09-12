@@ -6,11 +6,11 @@ Design: `backlog/evidence/NVA-B-HUMAN-TERMINAL-TEMPLATES-DESIGN-1.md`
 
 ## Candidate binding
 
-Candidate is pending commit. The implementation was checked with repository
-HEAD `4e3447067634b1c01a14330b7eb47c9e1a7d5008` and HEAD tree
-`65fc3ad5e7abb404b144a012ea016dd685eef9ab`. Those objects do not contain the
-working files below. Their exact working-file SHA-256 values at the checked
-point were:
+Implementation candidate: `2b4ffa7d9920dfd33a516b6a0380fb3f752d5420`
+Implementation tree: `76e976d6a2aaf8f68c140b609cb7faf6e1203535`
+
+The implementation commit contains the six implementation blobs below at the
+recorded SHA-256 values:
 
 | Path | SHA-256 |
 |---|---|
@@ -21,9 +21,8 @@ point were:
 | `plugins/pipeline-core/schemas/human-terminal-action-receipt.schema.json` | `dee9837e6534da31c8f52b7e5ecb5893a8e8c271f17585f50d3f8cfcc03ce462` |
 | `plugins/pipeline-core/scripts/human-terminal-action.mjs` | `f28fc920357343ca60b32619bfbc257ff8a25c2f0ba840e6f5419893cc5654b7` |
 
-This evidence file itself is intentionally excluded from that pre-write blob
-table. The final commit must replace this section with the committed candidate
-and tree before claiming candidate-bound acceptance.
+This subsequent evidence update changes only this report and does not alter the
+six candidate blobs.
 
 ## Implemented behavior
 
