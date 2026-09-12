@@ -78,6 +78,8 @@ routing:
           value: "opus"
         state: "default"
       codex:
+        # Generic route intent only. The host route returns typed unavailable on
+        # WSL before export or launch; native Windows activation is future work.
         adapter: "host-consult"
         effort: "max"
         evidence: "advisory-receipt"

@@ -1,6 +1,6 @@
 ---
 name: consult-advisor
-description: "Demand- and consent-gated fresh read-only advisor. Codex uses the selected-sandbox Sol route with Read/Grep/Glob/Bash; Claude retains the registered Read/Grep/Glob consult fallback. Exactly one concrete question/reason, fresh context, no bootstrap invocation, memory, mutation, gate decision or auto-application."
+description: "Demand- and consent-gated fresh read-only advisor. Codex may use the selected-sandbox route only where the host route admits it; WSL is typed unavailable before export or launch. Claude retains the registered Read/Grep/Glob consult fallback. Exactly one concrete question/reason, fresh context, no bootstrap invocation, memory, mutation, gate decision or auto-application."
 effort: max
 maxTurns: 10
 tools: Read, Grep, Glob
@@ -27,7 +27,9 @@ The complete execution and receipt contract lives in
 - Answer exactly **one** supplied question from repository inspection. Claude
   uses Read, Grep and Glob. The selected Codex transport receives exactly Read,
   Grep, Glob and Bash; Bash remains constrained by the repository-read-only
-  profile. A second question requires a separate fresh agent.
+  profile when the host route admits it. On WSL the route returns typed
+  unavailable before export or launch, with no retry, fallback, or PO question.
+  A second question requires a separate fresh agent.
 - Return concise prose with `file:line` evidence where relevant. State when the
   read-only evidence is insufficient.
 - Inform the Elephant's judgment; never make a PO/gate/review decision and
@@ -52,4 +54,5 @@ first child and supplies its exact `selectionId` through
 `sandboxed-readonly-host-bridge.mjs`. Only that bound child receives
 `Read/Grep/Glob/Bash`. A typed `host-mode-unavailable` response means no child
 starts and never authorizes a generic host consult. The execution receipt must
-attest profile readback, child, stdio and cleanup.
+attest profile readback, child, stdio and cleanup. Native Windows activation
+remains future and unverified; WSL is not native readiness evidence.

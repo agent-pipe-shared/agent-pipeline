@@ -27,6 +27,7 @@ const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: proces
 const candidateTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: process.cwd(), encoding: "utf8" }).trim();
 const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit, candidateTree };
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const NON_WSL_HOST = Object.freeze({ platform: "linux", release: "6.8.0-generic", wslDistroName: null });
 const evidenceBundle = () => buildAdvisoryEvidenceBundle(process.cwd(), [
   "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
 ]);
@@ -67,6 +68,7 @@ function selectedAdvisory() {
 
 function selectedTransport() {
   return {
+    hostObservation: NON_WSL_HOST,
     repoRoot: process.cwd(),
     dependencies: {
       async executeSandboxedReadonlyDuty(request, dependencies) {
@@ -104,7 +106,7 @@ function selectedTransport() {
 
 test("an unbound direct host adapter never starts a Codex advisory or claims an answer", async () => {
   let calls = 0; let payload;
-  const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async (value) => { calls += 1; payload = value; return { status: "answered", answer: "Keep it closed." }; }, { repoRoot: process.cwd(), observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }) });
+  const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async (value) => { calls += 1; payload = value; return { status: "answered", answer: "Keep it closed." }; }, { hostObservation: NON_WSL_HOST, repoRoot: process.cwd(), observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }) });
   assert.equal(calls, 0); assert.equal(payload, undefined);
   assert.equal(result.advisoryResult.ok, false); assert.equal(result.advisoryResult.code, "selected-sandbox-required"); assert.equal(result.execution, null);
   assert.equal(result.advisoryResult.receipt.schema, "pipeline.advisory-receipt.v1");
@@ -113,6 +115,7 @@ test("an unbound direct host adapter never starts a Codex advisory or claims an 
 test("workspace observation failure remains typed no-child evidence", async () => {
   let n = 0;
   const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async () => ({ status: "answered", answer: "must be discarded" }), {
+    hostObservation: NON_WSL_HOST,
     repoRoot: process.cwd(),
     observeWorkspace: () => { n += 1; return { workspaceSha256: n === 1 ? "1".repeat(64) : "2".repeat(64) }; },
   });
@@ -123,7 +126,7 @@ test("workspace observation failure remains typed no-child evidence", async () =
 test("an adapter response cannot alter the typed no-child result", async () => {
   for (const response of [{ status: "unavailable" }, { status: "answered" }, null]) {
     let calls = 0;
-    const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async () => { calls += 1; return response; }, { repoRoot: process.cwd(), observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }) });
+    const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async () => { calls += 1; return response; }, { hostObservation: NON_WSL_HOST, repoRoot: process.cwd(), observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }) });
     assert.equal(calls, 0); assert.equal(result.advisoryResult.ok, false); assert.equal(result.advisoryResult.code, "selected-sandbox-required");
     assert.equal(result.execution, null);
   }
@@ -132,11 +135,34 @@ test("an adapter response cannot alter the typed no-child result", async () => {
 test("route authority disables mini and declined input before any child and rejects malformed consent", async () => {
   for (const input of [{ ...base(), profile: "mini" }, { ...base(), advisorExport: { consent: "declined" } }]) {
     let calls = 0;
-    const result = await runCodexAdvisoryThroughSelectedSandbox(input, async () => { calls += 1; return { status: "answered", answer: "must not run" }; }, { repoRoot: process.cwd() });
+    const result = await runCodexAdvisoryThroughSelectedSandbox(input, async () => { calls += 1; return { status: "answered", answer: "must not run" }; }, { hostObservation: NON_WSL_HOST, repoRoot: process.cwd() });
     assert.equal(calls, 0); assert.equal(result.advisoryResult.ok, false); assert.equal(result.execution, null);
   }
   let calls = 0;
-  await assert.rejects(runCodexAdvisoryThroughSelectedSandbox({ ...base(), advisorExport: { consent: "approved", extra: true } }, async () => { calls += 1; }, { repoRoot: process.cwd() }), { code: "invalid-route-input" });
+  await assert.rejects(runCodexAdvisoryThroughSelectedSandbox({ ...base(), advisorExport: { consent: "approved", extra: true } }, async () => { calls += 1; }, { hostObservation: NON_WSL_HOST, repoRoot: process.cwd() }), { code: "invalid-route-input" });
+  assert.equal(calls, 0);
+});
+
+test("WSL returns typed unavailable after local demand/disposition validation and before evidence or child work", async () => {
+  const wsl = { platform: "linux", release: "5.15.153.1-microsoft-standard-WSL2", wslDistroName: "Ubuntu" };
+  let calls = 0;
+  const input = base();
+  input.evidenceBundle = { ...input.evidenceBundle, references: [{ path: "missing/private.txt", sha256: "0".repeat(64), bytes: "not transported" }] };
+  const unavailable = await runCodexAdvisoryThroughSelectedSandbox(input, async () => { calls += 1; }, {
+    hostObservation: wsl,
+    repoRoot: process.cwd(),
+    observeWorkspace: () => { throw new Error("must not observe"); },
+  });
+  assert.equal(unavailable.advisoryResult.code, "advisory_unavailable_wsl_native_deferred");
+  assert.equal(unavailable.advisoryResult.receipt, null);
+  assert.equal(unavailable.execution, null);
+  assert.equal(calls, 0);
+
+  const malformedDemand = await runCodexAdvisoryThroughSelectedSandbox({ ...base(), demand: null }, async () => { calls += 1; }, { hostObservation: wsl });
+  assert.equal(malformedDemand.advisoryResult.code, "advisory_demand_required");
+  const malformedPrior = await runCodexAdvisoryThroughSelectedSandbox({ ...base(), priorConsultation: {} }, async () => { calls += 1; }, { hostObservation: wsl });
+  assert.equal(malformedPrior.advisoryResult.code, "invalid_prior_consultation");
+  assert.notEqual(malformedPrior.advisoryResult.code, "advisory_unavailable_wsl_native_deferred");
   assert.equal(calls, 0);
 });
 
@@ -149,6 +175,7 @@ test("missing or drifted on-demand binding prevents workspace observation and ch
     const result = await runCodexAdvisoryThroughSelectedSandbox(input, async () => {
       throw new Error("adapter must not run");
     }, {
+      hostObservation: NON_WSL_HOST,
       observeWorkspace: () => { observations += 1; return { workspaceSha256: "9".repeat(64) }; },
     });
     assert.equal(result.advisoryResult.ok, false);
@@ -202,7 +229,7 @@ test("production bridge persists typed no-child receipt without accepting a raw 
   const root = await mkdtemp(join(tmpdir(), "host-advisor-")); const inputPath = join(root, "input.json"); const receiptPath = join(root, "status.json");
   try {
     await writeFile(inputPath, JSON.stringify({ ...base(), sandboxRuntime: { repoRoot: process.cwd(), sessionCleanup: { sessionId: "session-test" } } }));
-    const code = await runAdvisoryHostBridge(["--input", inputPath, "--receipt", receiptPath], { makeHostAdapter: () => async () => ({ status: "answered", answer: "private answer" }) });
+    const code = await runAdvisoryHostBridge(["--input", inputPath, "--receipt", receiptPath], { hostObservation: NON_WSL_HOST, makeHostAdapter: () => async () => ({ status: "answered", answer: "private answer" }) });
     assert.equal(code, 2); await assert.rejects(readFile(inputPath));
     const status = JSON.parse(await readFile(receiptPath, "utf8")); assert.equal(status.schema, "pipeline.advisory-receipt.v1"); assert.equal(status.observed.status, "unavailable"); assert.equal(JSON.stringify(status).includes("private answer"), false);
     const recordPath = `${receiptPath}.consultation-v2.json`;

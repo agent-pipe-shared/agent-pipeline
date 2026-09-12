@@ -33,7 +33,7 @@ import { appendPortableGovernanceEvent, readLocalRepositoryFingerprint } from ".
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
-import { ROUTES, selectHostAdvisorRoute } from "./codex-host-advisor-route.mjs";
+import { ROUTES, selectHostAdvisorRoute, selectHostAdvisorRouteForHost } from "./codex-host-advisor-route.mjs";
 import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
 import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
@@ -309,7 +309,11 @@ function disabledHostAdvisory(route) {
   return {
     advisoryResult: {
       ok: false,
-      code: route === ROUTES.NO_CONSENT ? "advisory_disabled_no_consent" : "advisory_disabled",
+      code: route === ROUTES.NO_CONSENT
+        ? "advisory_disabled_no_consent"
+        : route === ROUTES.WSL_UNAVAILABLE
+          ? "advisory_unavailable_wsl_native_deferred"
+          : "advisory_disabled",
       answer: null,
       receipt: null,
       attempts: [],
@@ -345,8 +349,6 @@ function bindConsultationRecord(input, outcome) {
  * until an exact selector record has been read back by the generic bridge.
  */
 export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, transport = {}) {
-  const route = selectHostAdvisorRoute(hostRouteInput(input));
-  if (route !== ROUTES.HOST) return disabledHostAdvisory(route);
   const demand = validateAdvisoryDemand(input?.demand, {
     runner: input?.runner,
     profile: input?.profile,
@@ -370,6 +372,11 @@ export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, tra
       sandboxBinding: null,
     };
   }
+  const routeInput = hostRouteInput(input);
+  const route = transport.hostObservation === undefined
+    ? selectHostAdvisorRoute(routeInput)
+    : selectHostAdvisorRouteForHost(routeInput, transport.hostObservation);
+  if (route !== ROUTES.HOST) return disabledHostAdvisory(route);
   const root = transport.repoRoot ?? process.cwd();
   const advisoryRoute = resolvedAdvisoryRoute(
     input,
@@ -636,7 +643,10 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     const advisorExport = input?.advisorExport;
     if (input.runner === "codex") {
       const invokeCodex = dependencies.runCodexAdvisoryWithHostFallback ?? runCodexAdvisoryWithHostFallback;
-      const outcome = await invokeCodex(input, null, { repoRoot: repositoryRoot });
+      const outcome = await invokeCodex(input, null, {
+        repoRoot: repositoryRoot,
+        ...(dependencies.hostObservation === undefined ? {} : { hostObservation: dependencies.hostObservation }),
+      });
       result = outcome.advisoryResult;
       execution = outcome.execution;
       var sandboxBinding = outcome.sandboxBinding;

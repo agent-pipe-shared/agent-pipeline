@@ -1,7 +1,7 @@
 # ADR-0041: PO-authorized Codex selected-sandbox Advisor
 
-**Status:** accepted transport; trigger semantics governed by ADR-0047 ·
-**Date:** 2026-07-20 · **Amended:** 2026-07-29
+**Status:** accepted transport design; CLI/headless WSL activation suspended ·
+**Date:** 2026-07-20 · **Amended:** 2026-09-12
 
 **Governs:** plugins/pipeline-core/scripts/codex-host-advisor-route.mjs, plugins/pipeline-core/scripts/codex-host-advisor-route.test.mjs, plugins/pipeline-core/scripts/advisory-host-bridge.mjs, plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs, plugins/pipeline-core/scripts/codex-advisory-app-server.mjs, plugins/pipeline-core/scripts/codex-advisory-app-server-child.mjs, plugins/pipeline-core/scripts/codex-advisory-app-server.test.mjs, plugins/pipeline-core/scripts/codex-sandbox-select.mjs, plugins/pipeline-core/scripts/codex-sandbox-select.test.mjs, plugins/pipeline-core/scripts/codex-sandbox-selection.schema.json, plugins/pipeline-core/scripts/codex-sandbox-runtime.mjs, plugins/pipeline-core/scripts/codex-sandbox-runtime.test.mjs, plugins/pipeline-core/scripts/sandboxed-readonly-host-bridge.mjs, plugins/pipeline-core/scripts/sandboxed-readonly-host-bridge.test.mjs, plugins/pipeline-core/scripts/host-advisor-workspace.mjs, plugins/pipeline-core/scripts/host-advisor-workspace.test.mjs, plugins/pipeline-core/lib/advisory-coordinator.mjs, plugins/pipeline-core/lib/advisory-coordinator.test.mjs, plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs, plugins/pipeline-core/lib/advisory-lifecycle-v2.test.mjs, plugins/pipeline-core/lib/advisory-receipt.mjs, plugins/pipeline-core/lib/advisory-receipt.test.mjs, plugins/pipeline-core/lib/advisory-receipt-assurance.mjs, plugins/pipeline-core/lib/advisory-receipt-assurance.test.mjs, plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs, plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs, plugins/pipeline-core/scripts/advisory-receipt.schema.json, plugins/pipeline-core/agents/consult-advisor.md, plugins/pipeline-core/skills/advisor-consult/SKILL.md, roles/elephant.md
 
@@ -13,6 +13,22 @@ bounded, project-scoped Codex Advisor route only when it carries the selected
 sandbox's exact selection, child, model-identity and cleanup evidence.
 
 ## Decision
+
+### Current host disposition (2026-09-12)
+
+The selected-sandbox/App-Server transport below remains the accepted contract
+design, but Codex CLI/headless execution under WSL is deactivated. After the
+closed demand and prior-consultation state validate, the host route returns
+typed `advisory-unavailable-wsl-native-deferred` before evidence export,
+workspace observation, adapter invocation, or child launch. It performs no
+retry or runner fallback and creates no PO question. Native Windows activation
+is unverified and belongs to a separate future package. The ordinary
+fresh-session Critic and runner-neutral offline contracts do not depend on
+this transport. WSL fixtures may validate those contracts, but cannot establish
+native execution, isolation, model identity, or readiness.
+
+The following paragraphs preserve the transport contract for an admitted
+future host; they are not a WSL activation instruction.
 
 For every Codex `epic` or `feature` Advisory entry, the model-free
 `codex-host-advisor-route.mjs` selects exactly one project-scoped

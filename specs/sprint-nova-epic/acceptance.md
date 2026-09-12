@@ -124,7 +124,9 @@ No prior gate implies a later gate.
 - NVA-A29-6: At least one opt-in selected-child execution produces a fresh
   nonce-bound positive receipt; no-child, wrong child/attempt/profile/
   fingerprint, replay, host-only observation, CAS health or fallback fixtures
-  cannot produce `available-attested`.
+  cannot produce `available-attested`. This criterion is satisfied by the
+  model-free synthetic contract fixture; it is not native WSL activation or
+  readiness evidence.
 - NVA-A29-7: The selected-sandbox policy SHALL select a closed semantic
   compatibility class, not a fixed Codex CLI version or released-binary hash.
   The current version and binary hash SHALL instead match a fresh,
@@ -252,7 +254,9 @@ No prior gate implies a later gate.
 - NVA-A98-3h: For `host-authorized-wsl` actions, every Git observation uses
   the declared host execution profile directly. A sandbox Git EPERM is a
   typed routing condition, never repository invalidity or a sandbox retry.
-  Host and sandbox Git observations cannot be combined as one authority.
+  Host and sandbox Git observations cannot be combined as one authority. This
+  host-routing rule avoids the unusable WSL sandbox; it does not attest native
+  Codex sandbox execution.
 - NVA-A98-3i: A shell grammar denial is effect-free and SHALL NOT require a
   Human-override audit reconciliation. Pasted LF or CRLF read-only commands
   may yield only separately executable normalized retries when every line is

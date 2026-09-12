@@ -3,11 +3,13 @@
 
 /** Model-free route authority used only after a valid on-demand trigger. */
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { release as osRelease } from "node:os";
 
 export const ROUTES = Object.freeze({
   HOST: "host-bound-consult",
   NO_CONSENT: "disabled-no-consent",
   PROFILE: "disabled-by-profile",
+  WSL_UNAVAILABLE: "advisory-unavailable-wsl-native-deferred",
 });
 export const HOST_ADVISOR_POLICY = Object.freeze({
   schema: "pipeline.codex-host-advisor-policy.v1",
@@ -25,7 +27,32 @@ function invalid(message) {
   throw error;
 }
 
-export function selectHostAdvisorRoute(input) {
+export function isWslHostObservation(observation) {
+  if (!observation || typeof observation !== "object" || Array.isArray(observation)) return false;
+  const platform = observation.platform;
+  const release = observation.release;
+  const wslDistroName = observation.wslDistroName;
+  return platform === "linux" && (
+    (typeof release === "string" && /(?:microsoft|wsl)/iu.test(release))
+    || (typeof wslDistroName === "string" && wslDistroName.length > 0)
+  );
+}
+
+function currentHostObservation() {
+  return {
+    platform: process.platform,
+    release: osRelease(),
+    wslDistroName: process.env.WSL_DISTRO_NAME,
+  };
+}
+
+export function selectHostAdvisorRouteForHost(input, hostObservation) {
+  const route = selectHostAdvisorRouteWithoutHost(input);
+  if (route === ROUTES.HOST && isWslHostObservation(hostObservation)) return ROUTES.WSL_UNAVAILABLE;
+  return route;
+}
+
+function selectHostAdvisorRouteWithoutHost(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)
     || JSON.stringify(Object.keys(input).sort()) !== JSON.stringify(KEYS)) invalid("input shape is unsupported");
   const { runner, profile, consent } = input;
@@ -35,6 +62,10 @@ export function selectHostAdvisorRoute(input) {
   if (profile === "mini") return ROUTES.PROFILE;
   if (consent === "declined") return ROUTES.NO_CONSENT;
   return ROUTES.HOST;
+}
+
+export function selectHostAdvisorRoute(input) {
+  return selectHostAdvisorRouteForHost(input, currentHostObservation());
 }
 
 // Compatibility name for callers that use the generic advisory terminology.

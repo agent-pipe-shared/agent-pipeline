@@ -115,8 +115,10 @@ above describes.
 profile the PO recalls having configured before, which reportedly did not
 hit this EPERM class -- remains the preferred long-term direction and is
 NOT superseded by this quick fix.** Locating and reintroducing that profile
-(Proposal step 1 above) is still open, Nova B, once the "110%" configuration
-the PO is recalling can actually be found/reconstructed.
+(Proposal step 1 above) was still open in Nova B once the "110%" configuration
+the PO is recalling could be found or reconstructed. This was the status
+when the quick fix was recorded. The later triage below supersedes the Nova-B
+assignment and moves the work to the future native-Windows package.
 
 ## Triage
 

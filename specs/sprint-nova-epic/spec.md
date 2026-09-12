@@ -1592,7 +1592,8 @@ by assumption.
 Each slice runs its matching `node <path>.test.mjs`, relevant unchanged
 dependency tests and `git diff --check`. A1 additionally runs the default
 `node plugins/pipeline-core/scripts/check-backlog-state.mjs`; A2 runs existing
-Codex sandbox compatibility/select/runtime tests; A4 runs existing planner,
+Codex sandbox compatibility/select/runtime tests as model-free contract suites,
+not as WSL native-sandbox or App-Server acceptance; A4 runs existing planner,
 control-exchange and workflow-boundary tests; A5 runs existing Critic and
 review-economy tests. After the mandatory 0.4.7 rebase, the upstream #63
 recovery regressions are rerun on the Nova candidate as baseline compatibility

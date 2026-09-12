@@ -222,8 +222,8 @@ Approval of work is not evidence that it has been implemented or exercised.
 | 13 | Keep the change-request procedure in Nightwing. |
 | 12 | Follow the recommendation: prioritize the ADR reconciliation coverage after the item-10 decision, as its own bounded package; complete coverage before relying on that mechanism for the new review binding. |
 | 4 | Retain the anonymous `AI-Assisted: true` marker; no provider/model co-author or session trailers. Existing dispatch-evidence trailers remain governed by GIT-03 and the previously recorded PO decision. |
-| 8 | A real Codex Critic run is approved once the preflight defect is fixed. The current session is Codex; that alone is not proof that the isolated route works. |
-| 7 | Follow the recommendation: defer the supervisor live probe and revisit alongside the item-8 live-run window. |
+| 8 | **Superseded 2026-09-12:** the former WSL live-run approval is withdrawn from Nova B. Native Codex Critic sandbox/App-Server execution moves to the future native-Windows package; the ordinary fresh-session Critic remains the autonomous route. |
+| 7 | **Superseded 2026-09-12:** the supervisor native live probe moves with item 8 to the future native-Windows package and is not a Nova-B gate. |
 | 6 | The latest PO boundary is read-only. Working operator-local access and actual Desktop/WSL read evidence were supplied; import with provenance and keep B2 execution separate. No CI start, project configuration change or push is authorized. See `2026-09-07-gitlab-read-access-observation.md`. |
 
 The GitLab project coordinate is held in local operational context, not copied into

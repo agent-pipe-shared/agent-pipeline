@@ -23,14 +23,19 @@ Before any child, model request, prompt export or timeout:
    even its own consent check). If that check fails (`PORG-NOT-READY`), do not
    request consent and do not proceed to the steps below — surface it to the
    human as "the Advisor isn't reachable right now" and stop.
-2. For runner `codex`, resolve the `codex` executable next, still ahead of any
-   consent request or evidence-bundle assembly: the same cheap, non-spawning
+2. For runner `codex`, resolve the `codex` executable and model-free host route
+   next, still ahead of any consent request or evidence-bundle assembly: the
+   same cheap, non-spawning
    existence check `codex-advisory-bootstrap.mjs` performs immediately after
    its onboarding-readiness check (before its consent read). A missing or
    unresolvable executable is not a consultation to prepare — surface it to
    the human as "the Advisor isn't reachable right now" and stop, same as
    step 1's failure, before requesting consent or reading/hashing any
-   evidence file.
+   evidence file. On WSL the route returns
+   `advisory-unavailable-wsl-native-deferred`; treat it as typed unavailable
+   without retry, fallback, evidence export, child launch, or PO question.
+   Native Windows remains unverified and requires its separate future
+   activation package.
 3. Require profile `epic` or `feature`, repository Advisor-export consent that
    is not `declined`, exactly one bounded UTF-8 question, bounded allowlisted
    evidence and exactly one reason:
@@ -60,6 +65,11 @@ Missing, malformed, stale or mismatched demand is
 unavailable and never permission to invoke an adapter.
 
 ## Codex consultation
+
+Codex selected-sandbox/App-Server consultation is deactivated on WSL. The
+generic V3 cell remains a portable route description because the registry has
+no platform dimension; it is not WSL readiness or permission to bypass the
+host disposition.
 
 After the trigger gate, resolve exactly `{ runner: "codex", profile, consent }`
 through:
