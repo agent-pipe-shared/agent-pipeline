@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "SPDX-License-Identifier: SUL-1.0",
   "$id": "https://agent-pipeline.dev/schemas/pipeline.human-terminal-action-receipt.v2.json",
   "title": "Pipeline human terminal action result receipt v2",
   "type": "object",

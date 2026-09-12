@@ -83,9 +83,9 @@ evidence is `backlog/evidence/NVA-B-HUMAN-TERMINAL-TEMPLATES-SLICE2-1.md`.
 
 The item remains open for Slice 3 producer adoption. The pipeline owns that
 runner-neutral work and re-triages it on 2026-09-30. Slice 4 native Windows
-owner/DACL/reparse hardening is deferred to the native-Windows package and is
-re-triaged on 2026-10-31. It is not a Nova-B acceptance blocker and no WSL
-result establishes native readiness.
+owner/DACL/reparse hardening is owned by the pipeline team, deferred to the
+dedicated native-Windows package, and re-triaged on 2026-10-31. It is not a
+Nova-B acceptance blocker and no WSL result establishes native readiness.
 
 Slice 3 registers PO-key setup and installed-plugin attestation setup through
 their existing drivers, exact boundary tuples, and independent typed readback.
