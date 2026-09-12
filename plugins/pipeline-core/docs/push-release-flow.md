@@ -421,7 +421,8 @@ node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push \
   --by <name> --remote <remote> --destination refs/heads/<branch> \
   --proof-request <path-to-request-critical-push.json> \
   --proof-authority <path-to-trust-policy.json> \
-  --proof <path-to-proof-critical-push.json>
+  --proof <path-to-proof-critical-push.json> \
+  [--action-event-out <repo-relative-path>]
 ```
 
 `--destination` must match `^refs/heads/[A-Za-z0-9._/-]{1,200}$` — **tags
@@ -430,6 +431,21 @@ below). The candidate commit/tree observed at run time must exactly match
 what the signature was computed over, or this fails closed
 (`gitCandidate(dir).commit !== head.commit`). This step is ordinary agent
 work — no human action needed here beyond having already produced the proof.
+
+`--action-event-out` is optional. When present, `approve-push` validates the
+repo-relative target and constructs the closed event before mutating approval
+state. It publishes the event only after physically reading back the durable
+approval state and, when enabled, completing the existing external push-ledger
+append. Omitting the option preserves the established approval path.
+
+The emitted event is an observation, not an authority record: it neither
+authorizes a push nor replaces the detached signature, pipeline state, or push
+guards. Its closed payload omits the approving person, signer and key data,
+reason text, remote, destination, and other target details. If publication
+fails after approval became durable, the command reports the typed status
+`source-complete/event-unavailable` and returns closed retry material for an
+event-only retry. The durable approval remains in force and is not rolled back
+or repeated merely to repair its observational event.
 
 ### Layer 5 — execute the push (dual-gated: Pipeline + Claude Code harness)
 

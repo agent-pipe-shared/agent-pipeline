@@ -163,8 +163,17 @@ The operational steps, in order:
 
 1. **Obtain promote approval** (before the triggering push happens):
    ```
-   node harness/scripts/pipeline-state.mjs approve-deploy --env <env> --artifact <tag-or-sha> --by <name>
+   node harness/scripts/pipeline-state.mjs approve-deploy --env <env> --artifact <tag-or-sha> --by <name> [--action-event-out <repo-relative-path>]
    ```
+   The optional action-event output is preflighted before any approval
+   mutation and written only after a physical readback confirms the durable
+   approval state. With no output argument, the established approval path is
+   unchanged. The event is observational: it does not authorize deployment or
+   replace the approval signature, pipeline state, or guards, and its closed
+   payload contains no approving person, signer, key, reason, environment, or
+   artifact details. If event publication fails after approval is durable, the
+   command reports `source-complete/event-unavailable` with closed material for
+   an event-only retry; it does not roll back or repeat the approval.
 2. **Trigger via a sanctioned git push** (e.g. pushing the matching tag). The
    `guard-push` deploy branch checks for a matching, unconsumed `deployApproval` for
    {artifact, environment} — independent of any standing push approval.
