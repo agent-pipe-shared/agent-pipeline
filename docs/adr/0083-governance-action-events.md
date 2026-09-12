@@ -222,7 +222,10 @@ matching authenticated audit entry. It then derives a domain-separated digest
 from their opaque request/plan digests and exact candidate. The portable source
 shape exposes only that derived digest, the candidate and the closed
 `consumed` status. The action builder accepts no raw request, plan, receipt,
-command, path, target, person or rationale field.
+command, path, target, person or rationale field. It also fixes `featureId` and
+`sessionId` to `{state: "not-applicable"}` rather than accepting caller input,
+so one consumed capability has one portable action identity and those fields
+cannot become a correlation information channel.
 
 Export projection continues to exclude payload bodies unless a later export
 policy explicitly admits a closed field. No existing allowlist is widened by

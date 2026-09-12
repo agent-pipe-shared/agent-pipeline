@@ -55,8 +55,9 @@ An exact-candidate Human Guard Override consumption can publish the closed
 `HGO_CONSUMED` gate observation after the capability and its matching private
 HMAC audit entry have both been read back. Run
 `guard-human-override.mjs publish-consumption-action --repo CHECKOUT
---plan-sha256 DIGEST --event-out REPOSITORY_RELATIVE_PATH`; the optional
-`--feature-id` and `--session-id` flags add only validated correlation IDs.
+--plan-sha256 DIGEST --event-out REPOSITORY_RELATIVE_PATH`. Feature and session
+correlation are fixed to `not-applicable`; the command accepts no caller value
+for either field.
 The public source collapses the private request and plan identifiers into one
 domain-separated digest. Neither the source nor the event contains a command,
 path, target, person, rationale, signer/key identity, or private receipt bytes.

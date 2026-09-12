@@ -159,9 +159,7 @@ function hgoSource(overrides = {}) {
   };
 }
 function hgoBuild(overrides = {}) {
-  return buildGovernanceHgoConsumptionAction({
-    source: hgoSource(), featureId: "nova-b", sessionId: notApplicable(), ...overrides,
-  });
+  return buildGovernanceHgoConsumptionAction({ source: hgoSource(), ...overrides });
 }
 function expectHgoCode(expected, run) {
   assert.throws(run, (error) => error instanceof GovernanceHgoConsumptionActionError && error.code === expected);
@@ -188,6 +186,9 @@ test("authenticated consumption source maps to the one minimal HGO gate row", ()
   assert.equal(event.status, "completed");
   assert.equal(event.reasonCode, "HGO_CONSUMED");
   assert.equal(event.correlation.requestId, "c".repeat(64));
+  assert.deepEqual(event.correlation.featureId, { state: "not-applicable" });
+  assert.deepEqual(event.correlation.sessionId, { state: "not-applicable" });
+  assert.deepEqual(hgoBuild(), event, "one consumed source must derive one stable action and event identity");
   assert.deepEqual(event.candidate, candidate);
   assert.deepEqual(validateGovernanceActionEvent(event), event);
   assert.deepEqual(Object.keys(event).sort(), ["candidate", "correlation", "eventId", "kind", "reasonCode", "status"]);
@@ -206,7 +207,10 @@ test("only an exact consumed HGO source with a valid digest and candidate is adm
   expectHgoCode("GHCA-SOURCE-DIGEST", () => hgoBuild({ source: hgoSource({ consumptionSha256: "ABC" }) }));
   expectHgoCode("GHCA-SOURCE-BINDING", () => hgoBuild({ source: hgoSource({ candidate: { state: "unavailable" } }) }));
   expectHgoCode("GHCA-SOURCE-SHAPE", () => buildGovernanceHgoConsumptionAction({
-    source: hgoSource(), featureId: "nova-b", sessionId: notApplicable(), signer: "x",
+    source: hgoSource(), featureId: "nova-b",
+  }));
+  expectHgoCode("GHCA-SOURCE-SHAPE", () => buildGovernanceHgoConsumptionAction({
+    source: hgoSource(), sessionId: "session-1",
   }));
 });
 

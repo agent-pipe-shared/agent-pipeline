@@ -19,7 +19,7 @@ export { preflightGovernanceActionOutput };
 export const GOVERNANCE_HGO_CONSUMPTION_RETRY_SCHEMA = "pipeline.governance-hgo-consumption-action-retry.v1";
 
 const SOURCE_KEYS = Object.freeze(["schema", "status", "consumptionSha256", "candidate"]);
-const BUILD_KEYS = Object.freeze(["source", "featureId", "sessionId"]);
+const BUILD_KEYS = Object.freeze(["source"]);
 const RETRY_KEYS = Object.freeze(["schema", "eventOutPath", "event"]);
 
 export class GovernanceHgoConsumptionActionError extends Error {
@@ -69,8 +69,8 @@ export function buildGovernanceHgoConsumptionAction(input) {
       status: "completed",
       reasonCode: "HGO_CONSUMED",
       requestId: source.consumptionSha256,
-      featureId: input.featureId,
-      sessionId: input.sessionId,
+      featureId: Object.freeze({ state: "not-applicable" }),
+      sessionId: Object.freeze({ state: "not-applicable" }),
       candidate: source.candidate,
     });
   } catch { fail("GHCA-SOURCE-BINDING"); }

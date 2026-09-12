@@ -127,7 +127,7 @@ test("publish-consumption-action exposes only the minimal digest-bound HGO fact 
   };
   const code = main([
     "publish-consumption-action", "--repo", "/fixture", "--plan-sha256", "d".repeat(64),
-    "--event-out", "evidence/hgo.json", "--feature-id", "nova-b",
+    "--event-out", "evidence/hgo.json",
   ], output, { governanceHgo: {
     preflight(value) { calls.push(["preflight", value]); },
     observe(value) { calls.push(["observe", value]); return source; },
@@ -139,11 +139,27 @@ test("publish-consumption-action exposes only the minimal digest-bound HGO fact 
   assert.equal(result.status, "completed");
   assert.equal(result.event.reasonCode, "HGO_CONSUMED");
   assert.equal(result.event.correlation.requestId, source.consumptionSha256);
+  assert.deepEqual(result.event.correlation.featureId, { state: "not-applicable" });
+  assert.deepEqual(result.event.correlation.sessionId, { state: "not-applicable" });
   assert.deepEqual(result.event.candidate, source.candidate);
   for (const forbidden of ["command", "path", "humanName", "reason", "target", "requestSha256", "planSha256", "receipt", "signer", "keyReference"]) {
     assert.equal(Object.hasOwn(result.event, forbidden), false, forbidden);
   }
   assert.equal(output.stderr, "");
+});
+
+test("publish-consumption-action rejects caller-supplied feature or session correlation", () => {
+  for (const extra of [["--feature-id", "nova-b"], ["--session-id", "session-1"]]) {
+    const output = io();
+    let preflighted = false;
+    assert.equal(main([
+      "publish-consumption-action", "--repo", "/fixture", "--plan-sha256", "d".repeat(64),
+      "--event-out", "evidence/hgo.json", ...extra,
+    ], output, { governanceHgo: { preflight() { preflighted = true; } } }), 2);
+    assert.equal(preflighted, false);
+    assert.match(output.stderr, /HGO-USAGE/u);
+    assert.equal(output.stdout, "");
+  }
 });
 
 test("publish-consumption-action refuses before readback on bad output and returns an event-only retry after a write failure", () => {

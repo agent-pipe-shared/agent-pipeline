@@ -52,7 +52,7 @@ function usage() {
     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs render-copy-safe --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
-    "  guard-human-override.mjs publish-consumption-action --repo <absolute-root> --plan-sha256 <64hex> --event-out <repo-relative-path> [--feature-id <id>] [--session-id <id>]",
+    "  guard-human-override.mjs publish-consumption-action --repo <absolute-root> --plan-sha256 <64hex> --event-out <repo-relative-path>",
     "  guard-human-override.mjs repair-audit --repo <absolute-root> --preimage-sha256 <64hex> --activate",
   ].join("\n");
 }
@@ -147,20 +147,15 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
     }
     if (command === "publish-consumption-action") {
       const parsed = flags(rest);
-      if (!exactFlagSet(parsed, ["repo", "plan-sha256", "event-out"], ["feature-id", "session-id"])
+      if (!exactFlagSet(parsed, ["repo", "plan-sha256", "event-out"])
         || typeof parsed.repo !== "string"
         || !SHA256.test(parsed["plan-sha256"] ?? "")
         || typeof parsed["event-out"] !== "string") throw new Error(usage());
-      const notApplicable = Object.freeze({ state: "not-applicable" });
       let event;
       try {
         governanceHgo.preflight({ rootDir: parsed.repo, eventOutPath: parsed["event-out"] });
         const source = governanceHgo.observe({ rootDir: parsed.repo, planSha256: parsed["plan-sha256"] });
-        event = governanceHgo.build({
-          source,
-          featureId: parsed["feature-id"] ?? notApplicable,
-          sessionId: parsed["session-id"] ?? notApplicable,
-        });
+        event = governanceHgo.build({ source });
       } catch (error) {
         writeError(`${JSON.stringify({
           schema: "pipeline.hgo-governance-consumption-action-result.v1",
