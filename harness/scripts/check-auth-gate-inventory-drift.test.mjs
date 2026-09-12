@@ -332,6 +332,17 @@ test("Slice 3 producer templates prepare as bound POSIX instances without a PO g
       assert.equal(JSON.parse(readFileSync(result.requestPath, "utf8")).boundary.executionBoundary, boundary);
       assert.equal(loadHumanTerminalActionCatalog().entries.find((entry) => entry.templateId === templateId).requiresPoApproval, false);
     }
+    const missingName = prepareHumanTerminalAction({
+      rootDir: root,
+      templateId: "po-key-setup",
+      runner: "codex",
+      platform: "posix",
+      values: { repoRoot: root, directory: join(tmpdir(), "po material"), launcher: "/plugin/scripts/po-human-approval.mjs" },
+    }, { observeCandidate: () => candidate, randomBytes: () => Buffer.alloc(12, sequence++) });
+    assert.deepEqual(
+      { status: missingName.status, code: missingName.code },
+      { status: "needs-input", code: "HTA-VALUES-MISSING:humanName" },
+    );
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

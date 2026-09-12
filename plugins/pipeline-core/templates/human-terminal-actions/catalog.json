@@ -477,7 +477,7 @@
           "name": "humanName",
           "type": "human-name",
           "source": "human-input",
-          "required": false,
+          "required": true,
           "sensitivity": "public",
           "prompt": "Human name for a new authority"
         },
