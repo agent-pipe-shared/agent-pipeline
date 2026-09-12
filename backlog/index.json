@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e7be89eba40fa9860a923f691ac48671e98b655fd61d5d66c0967443025193b5"
+    "transitionHead": "893709a7f406528896c689e68856af39eec6ad01c800181ea72243dd0a015dd6"
   },
   "counts": {
-    "open": 73,
+    "open": 72,
     "in_progress": 0,
-    "closed": 568,
+    "closed": 569,
     "rejected": 3,
     "deferred": 11
   },
@@ -8534,14 +8534,18 @@
     },
     {
       "id": "pipeline.verify-runtime-concentrated-in-ten-suites",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Full verify at commit 0f0ed3f7 on 2026-09-01, exit 0, all 505 steps green and every one of them fresh (reused: 0). Per-suite wall clock from the run's own pipeline.verify-progress.v1 stream; total wall clock computed from its first startedAt to its last completedAt.",
       "deferred": false,
       "tracking": "Nova B — the parallelized verify has regressed from 419s to 571s in one week, and the single suite named as its next lever grew 35% in the same period. Also supplies the all-fresh full-run artifact two older items were blocked on.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-12",
+      "closureRepository": "self",
+      "closureCommit": "0eba7f80f050d1affc819940e3a834db6cbc18b0",
+      "closureEvidence": "backlog/evidence/2026-09-12-verify-runtime-concentration-closure.md"
     },
     {
       "id": "pipeline.verify-suite-reads-real-machine-state",
