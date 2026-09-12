@@ -6,7 +6,11 @@
  * workflow adapter. It accepts no network, credential, provider, or source
  * transport data; real adapters need a later, separately approved boundary.
  */
-import { validateWorkflowWriterDispatch } from "./workflow-writer-preflight.mjs";
+import {
+  validateWorkflowWriterDispatch,
+  validateWorkflowWriterDispatchBatch,
+  WORKFLOW_WRITER_BATCH_MAX_REQUESTS,
+} from "./workflow-writer-preflight.mjs";
 import { classifyFailureEvidence } from "./review-economy.mjs";
 
 const DISPATCH_KEYS = new Set(["request", "calibration", "capabilities"]);
@@ -32,6 +36,7 @@ const PREFLIGHT_CODE_MAP = Object.freeze({
   "WF-ESCALATION": "WR-WF-ESCALATION", "WF-NO-WRITE": "WR-WF-NO-WRITE",
   "WF-BOUNDED-CAPABILITY": "WR-WF-BOUNDED-CAPABILITY",
   "WF-ISOLATED-CAPABILITY": "WR-WF-ISOLATED-CAPABILITY",
+  "WF-BATCH-SCHEMA": "WR-WF-BATCH-SCHEMA", "WF-SCOPE-OVERLAP": "WR-WF-SCOPE-OVERLAP",
 });
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -164,15 +169,7 @@ function environmentCapture(classification, host) {
  */
 export function runSyntheticWorkflowDispatch(dispatch, adapter) {
   const mode = isObject(dispatch?.request) ? dispatch.request.mode : undefined;
-  if (!exactKeys(dispatch, DISPATCH_KEYS)
-    || !exactKeys(dispatch.request, REQUEST_KEYS)
-    || !exactKeys(dispatch.calibration, CALIBRATION_KEYS)
-    || !exactKeys(dispatch.capabilities, CAPABILITY_KEYS)
-    || !completeCoordinatorShape(dispatch)
-    || containsForbiddenTransport(dispatch)) {
-    return reject("WR-SCHEMA", mode);
-  }
-  if (dispatch.request.sideEffects.network !== "none") return reject("WR-SCHEMA", mode);
+  if (!validSyntheticDispatchShape(dispatch)) return reject("WR-SCHEMA", mode);
   if (!validAdapter(adapter)) return reject("WR-ADAPTER-CAPABILITY", mode);
 
   const preflight = validateWorkflowWriterDispatch(
@@ -188,6 +185,37 @@ export function runSyntheticWorkflowDispatch(dispatch, adapter) {
     return reject("WR-ADAPTER-FAILED", dispatch.request.mode, 1);
   }
   return { ok: true, code: "WR-ACCEPTED", mode: dispatch.request.mode, adapterInvocations: 1 };
+}
+
+function validSyntheticDispatchShape(dispatch) {
+  return exactKeys(dispatch, DISPATCH_KEYS)
+    && exactKeys(dispatch.request, REQUEST_KEYS)
+    && exactKeys(dispatch.calibration, CALIBRATION_KEYS)
+    && exactKeys(dispatch.capabilities, CAPABILITY_KEYS)
+    && completeCoordinatorShape(dispatch)
+    && !containsForbiddenTransport(dispatch)
+    && dispatch.request.sideEffects.network === "none";
+}
+
+/**
+ * Preflight every member and reject overlapping write scopes before the first
+ * adapter call. Receipts stay log-safe; adapter failures report the exact calls
+ * already made and stop the remainder, without claiming to roll back effects.
+ */
+export function runSyntheticWorkflowDispatchBatch(dispatches, adapter) {
+  if (!Array.isArray(dispatches) || dispatches.length === 0
+    || dispatches.length > WORKFLOW_WRITER_BATCH_MAX_REQUESTS
+    || !dispatches.every(validSyntheticDispatchShape)) return reject("WR-SCHEMA", "batch");
+  if (!validAdapter(adapter)) return reject("WR-ADAPTER-CAPABILITY", "batch");
+  const preflight = validateWorkflowWriterDispatchBatch(dispatches);
+  if (!preflight.ok) return reject(PREFLIGHT_CODE_MAP[preflight.code] ?? "WR-PREFLIGHT", "batch");
+  const invoke = adapter.invoke.bind(adapter);
+  let adapterInvocations = 0;
+  for (const request of preflight.requests) {
+    adapterInvocations += 1;
+    try { invoke(request); } catch { return reject("WR-ADAPTER-FAILED", "batch", adapterInvocations); }
+  }
+  return { ok: true, code: "WR-ACCEPTED", mode: "batch", adapterInvocations };
 }
 
 /**

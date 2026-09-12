@@ -8,7 +8,9 @@ import {
   deriveWorkflowFailoverIds,
   preflightAndInvokeWorkflowWriterDispatch,
   validateWorkflowWriterDispatch,
+  validateWorkflowWriterDispatchBatch,
   WORKFLOW_WRITER_ASSURANCE,
+  WORKFLOW_WRITER_BATCH_MAX_REQUESTS,
   WORKFLOW_WRITER_PREFLIGHT_CODES,
 } from "./workflow-writer-preflight.mjs";
 
@@ -96,6 +98,76 @@ check("unknown schema metadata does not auto-route a legacy envelope", () => {
 });
 check("legacy isolation marker is projected only with the OS-isolation non-claim", () => {
   assert.equal(validateWorkflowWriterDispatch(request(), calibration, capabilities).assurance, WORKFLOW_WRITER_ASSURANCE);
+});
+
+function batchMember(mode, paths) {
+  const input = request(mode);
+  input.allowedPaths = paths;
+  return { request: input, calibration, capabilities };
+}
+
+check("batch preflight normalizes literal scopes without changing caller data or single-request behavior", () => {
+  const input = [batchMember("bounded-write", ["./src//b.mjs", "src\\a.mjs", "src/b.mjs", "src/c/./"])];
+  const before = structuredClone(input);
+  const checked = validateWorkflowWriterDispatchBatch(input);
+  assert.equal(checked.ok, true);
+  assert.deepEqual(checked.requests[0].allowedPaths, ["src/a.mjs", "src/b.mjs", "src/c"]);
+  assert.equal(checked.assurance, WORKFLOW_WRITER_ASSURANCE);
+  assert.deepEqual(input, before);
+  assert.equal(validateWorkflowWriterDispatch(input[0].request, calibration, capabilities).code, "WF-PATHS");
+});
+
+check("batch preflight rejects exact and ancestor overlaps across both write modes and either ordering", () => {
+  for (const leftMode of ["bounded-write", "isolated-write"]) {
+    for (const rightMode of ["bounded-write", "isolated-write"]) {
+      for (const [leftPath, rightPath] of [["src/a", "src/a"], ["src", "src/a"], ["src/a", "src"]]) {
+        const checked = validateWorkflowWriterDispatchBatch([
+          batchMember(leftMode, [leftPath]), batchMember(rightMode, [rightPath]),
+        ]);
+        assert.deepEqual(checked, {
+          ok: false, code: "WF-SCOPE-OVERLAP",
+          conflict: { leftIndex: 0, rightIndex: 1, leftPath, rightPath },
+        });
+      }
+    }
+  }
+});
+
+check("normalized aliases collide, while sibling names and read-only scopes do not", () => {
+  assert.equal(validateWorkflowWriterDispatchBatch([
+    batchMember("bounded-write", ["./src//a/"]), batchMember("isolated-write", ["src\\a\\child"]),
+  ]).code, "WF-SCOPE-OVERLAP");
+  const nonconflicting = [
+    batchMember("bounded-write", ["src/a"]), batchMember("isolated-write", ["src/ab"]),
+    batchMember("bounded-write", ["src/a.test"]), batchMember("read-only", ["src"]),
+    batchMember("read-only", ["src/a"]),
+  ];
+  assert.equal(validateWorkflowWriterDispatchBatch(nonconflicting).ok, true);
+  nonconflicting.push(batchMember("bounded-write", ["src/a/child"]));
+  assert.equal(validateWorkflowWriterDispatchBatch(nonconflicting).code, "WF-SCOPE-OVERLAP",
+    "read-only members must not hide a later write/write collision");
+});
+
+check("batch preflight fails closed on unsafe paths, malformed envelopes and missing member capabilities", () => {
+  for (const path of ["../src", "src/../other", "/src", "\\\\server\\src", "C:\\src", ".", "src/*", "src/[ab]", "src/\u0000a", "src/\na"]) {
+    assert.equal(validateWorkflowWriterDispatchBatch([batchMember("bounded-write", [path])]).code, "WF-PATHS", path);
+  }
+  for (const input of [null, [], {}, [null], [{ ...batchMember("bounded-write", ["src"]), extra: true }]]) {
+    assert.equal(validateWorkflowWriterDispatchBatch(input).code, "WF-BATCH-SCHEMA");
+  }
+  const tooMany = Array.from({ length: WORKFLOW_WRITER_BATCH_MAX_REQUESTS + 1 }, () => batchMember("read-only", ["src"]));
+  assert.equal(validateWorkflowWriterDispatchBatch(tooMany).code, "WF-BATCH-SCHEMA");
+  const incomplete = batchMember("isolated-write", ["tests"]);
+  incomplete.capabilities = { ...capabilities, isolatedWorktree: false };
+  const refused = validateWorkflowWriterDispatchBatch([batchMember("bounded-write", ["src"]), incomplete]);
+  assert.equal(refused.code, "WF-ISOLATED-CAPABILITY");
+  assert.equal(refused.requestIndex, 1);
+});
+
+check("batch scopes never reinterpret continuity-bound requests as legacy requests", () => {
+  const input = batchMember("bounded-write", ["src"]);
+  input.request.continuityBinding = {};
+  assert.equal(validateWorkflowWriterDispatchBatch([input]).code, "WF-BATCH-SCHEMA");
 });
 
 const A = "a".repeat(64);

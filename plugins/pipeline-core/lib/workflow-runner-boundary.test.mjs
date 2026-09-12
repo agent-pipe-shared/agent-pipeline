@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { coordinateWorkflowRunnerReturn, normalizeWorkflowRunnerOutcome, runSyntheticWorkflowDispatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
+import { coordinateWorkflowRunnerReturn, normalizeWorkflowRunnerOutcome, runSyntheticWorkflowDispatch, runSyntheticWorkflowDispatchBatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
 import { gitDeps, verifyCommit } from "../scripts/dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "../scripts/dispatch-record-write.mjs";
 
@@ -98,6 +98,107 @@ check("adapter exception is reduced to a log-safe single-call outcome", () => {
   fake.adapter.invoke = () => { throw new Error("secret-shaped adapter error"); };
   const result = runSyntheticWorkflowDispatch(dispatch(), fake.adapter);
   assert.deepEqual(result, { ok: false, code: "WR-ADAPTER-FAILED", mode: "bounded-write", adapterInvocations: 1 });
+});
+
+function batchDispatch(mode, paths) {
+  const input = dispatch(mode);
+  input.request.allowedPaths = paths;
+  return input;
+}
+
+check("the complete batch rejects normalized write overlap before any adapter invocation", () => {
+  for (const [leftPath, rightPath] of [["src/a", "./src//a/"], ["src", "src\\a"], ["src/a", "src"]]) {
+    const fake = fakeAdapter();
+    const result = runSyntheticWorkflowDispatchBatch([
+      batchDispatch("bounded-write", ["unrelated"]),
+      batchDispatch("isolated-write", [leftPath]),
+      batchDispatch("read-only", ["src"]),
+      batchDispatch("bounded-write", [rightPath]),
+    ], fake.adapter);
+    assert.deepEqual(result, { ok: false, code: "WR-WF-SCOPE-OVERLAP", mode: "batch", adapterInvocations: 0 });
+    assert.equal(fake.calls(), 0);
+  }
+});
+
+check("a disjoint batch and overlapping read-only members invoke each adapter with normalized copied scopes", () => {
+  const inputs = [
+    batchDispatch("bounded-write", ["./src//a/", "src/a"]),
+    batchDispatch("isolated-write", ["src\\ab"]),
+    batchDispatch("read-only", ["src"]),
+    batchDispatch("read-only", ["src"]),
+  ];
+  const before = structuredClone(inputs);
+  const observed = [];
+  const adapter = { capabilities: { noRemote: true, noCredentials: true, noFetch: true }, invoke(input) { observed.push(input); } };
+  assert.deepEqual(runSyntheticWorkflowDispatchBatch(inputs, adapter), {
+    ok: true, code: "WR-ACCEPTED", mode: "batch", adapterInvocations: 4,
+  });
+  assert.deepEqual(observed.map((input) => input.allowedPaths), [["src/a"], ["src/ab"], ["src"], ["src"]]);
+  assert.deepEqual(inputs, before);
+  assert.notEqual(observed[0], inputs[0].request);
+});
+
+check("batch schemas and every member capability are checked before the first adapter call", () => {
+  for (const [name, mutate, code] of [
+    ["unknown envelope key", (d) => { d.extra = true; }, "WR-SCHEMA"],
+    ["unknown request key", (d) => { d.request.extra = true; }, "WR-SCHEMA"],
+    ["unknown nested key", (d) => { d.request.guard.extra = true; }, "WR-SCHEMA"],
+    ["unknown capability", (d) => { d.capabilities.extra = true; }, "WR-SCHEMA"],
+    ["transport-bearing member", (d) => { d.request.verify.command = "curl https://example.test"; }, "WR-SCHEMA"],
+    ["missing isolation capability", (d) => { d.capabilities.isolatedWorktree = false; }, "WR-WF-ISOLATED-CAPABILITY"],
+    ["unsafe path", (d) => { d.request.allowedPaths = ["src/../tests"]; }, "WR-WF-PATHS"],
+  ]) {
+    const fake = fakeAdapter();
+    const second = batchDispatch("isolated-write", ["tests"]);
+    mutate(second);
+    const result = runSyntheticWorkflowDispatchBatch([batchDispatch("bounded-write", ["src"]), second], fake.adapter);
+    assert.equal(result.code, code, name);
+    assert.equal(result.adapterInvocations, 0, name);
+    assert.equal(fake.calls(), 0, name);
+  }
+  const fake = fakeAdapter();
+  fake.adapter.capabilities.noRemote = false;
+  assert.equal(runSyntheticWorkflowDispatchBatch([dispatch()], fake.adapter).code, "WR-ADAPTER-CAPABILITY");
+  for (const malformed of [null, [], {}, [null], new Array(2)]) {
+    assert.equal(runSyntheticWorkflowDispatchBatch(malformed, fake.adapter).ok, false);
+  }
+  assert.equal(fake.calls(), 0);
+});
+
+check("earlier adapter calls cannot change the admitted later scopes through caller-owned references", () => {
+  const first = batchDispatch("bounded-write", ["src/a"]);
+  const second = batchDispatch("bounded-write", ["src/b"]);
+  first.request.guard = second.request.guard;
+  let calls = 0;
+  const adapter = {
+    capabilities: { noRemote: true, noCredentials: true, noFetch: true },
+    invoke(input) {
+      calls += 1;
+      if (calls === 1) {
+        second.request.allowedPaths = ["src/a"];
+        input.guard.active = false;
+        adapter.invoke = () => { throw new Error("replacement invoke must not run"); };
+      } else {
+        assert.deepEqual(input.allowedPaths, ["src/b"]);
+        assert.equal(input.guard.active, true);
+      }
+    },
+  };
+  assert.equal(runSyntheticWorkflowDispatchBatch([first, second], adapter).ok, true);
+  assert.equal(calls, 2);
+});
+
+check("batch adapter failure stops the remainder and reports actual calls without leaking the error", () => {
+  let calls = 0;
+  const adapter = {
+    capabilities: { noRemote: true, noCredentials: true, noFetch: true },
+    invoke() { calls += 1; if (calls === 2) throw new Error("private adapter failure"); },
+  };
+  const result = runSyntheticWorkflowDispatchBatch([
+    batchDispatch("bounded-write", ["a"]), batchDispatch("bounded-write", ["b"]), batchDispatch("bounded-write", ["c"]),
+  ], adapter);
+  assert.deepEqual(result, { ok: false, code: "WR-ADAPTER-FAILED", mode: "batch", adapterInvocations: 2 });
+  assert.equal(calls, 2);
 });
 
 const identity = { dispatchId: "P5B-RETURN-1", attemptId: "attempt-01" };

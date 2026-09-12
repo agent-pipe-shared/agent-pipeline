@@ -69,6 +69,8 @@ const ORIGINAL_KEYS = new Set([
 const ROUTE_MAXIMA_KEYS = new Set([
   "environmentRerouteCount", "productRetryCount", "childOrdinal",
 ]);
+const BATCH_DISPATCH_KEYS = new Set(["request", "calibration", "capabilities"]);
+export const WORKFLOW_WRITER_BATCH_MAX_REQUESTS = 64;
 
 function reject(code, escalationTarget) {
   return ESCALATION_TARGETS.has(escalationTarget)
@@ -519,6 +521,66 @@ export function validateWorkflowWriterDispatch(
     : validateLegacy(request, calibration, capabilities);
 }
 
+function normalizedBatchPaths(paths) {
+  if (!Array.isArray(paths) || paths.length === 0) return null;
+  const normalized = new Set();
+  for (const path of paths) {
+    if (!nonEmptyString(path) || /[\x00-\x1f\x7f*?\[\]{}:]/u.test(path)) return null;
+    const separated = path.replaceAll("\\", "/");
+    if (separated.startsWith("/")) return null;
+    const parts = separated.split("/");
+    // Harmless separator/dot aliases are normalized; traversal is refused,
+    // never collapsed into a scope that could differ from the adapter's view.
+    if (parts.includes("..")) return null;
+    const canonical = parts.filter((part) => part !== "" && part !== ".").join("/");
+    if (canonical === "" || !canonicalPaths([canonical])) return null;
+    normalized.add(canonical);
+  }
+  return [...normalized].sort();
+}
+
+/**
+ * Admit one simultaneously prepared batch of legacy allowedPaths dispatches.
+ * Every request is independently copied and checked before scopes are compared.
+ * Paths are literal, repository-relative scopes; no filesystem alias, live
+ * dispatch registry, lease, or OS-isolation assurance is inferred here.
+ */
+export function validateWorkflowWriterDispatchBatch(dispatches) {
+  if (!Array.isArray(dispatches) || dispatches.length === 0
+    || dispatches.length > WORKFLOW_WRITER_BATCH_MAX_REQUESTS) return reject("WF-BATCH-SCHEMA");
+  const requests = [];
+  for (let index = 0; index < dispatches.length; index += 1) {
+    let dispatch;
+    try { dispatch = structuredClone(dispatches[index]); } catch { return reject("WF-BATCH-SCHEMA"); }
+    if (!exactKeys(dispatch, BATCH_DISPATCH_KEYS) || !isObject(dispatch.request)
+      || dispatch.request.schema === PHASE26_SCHEMA
+      || Object.hasOwn(dispatch.request, "continuityBinding")) return reject("WF-BATCH-SCHEMA");
+    const paths = normalizedBatchPaths(dispatch.request.allowedPaths);
+    if (paths === null) return { ...reject("WF-PATHS", dispatch.request.escalationTarget), requestIndex: index };
+    dispatch.request.allowedPaths = paths;
+    const checked = validateWorkflowWriterDispatch(dispatch.request, dispatch.calibration, dispatch.capabilities);
+    if (!checked.ok) return { ...checked, requestIndex: index };
+    requests.push(checked.request);
+  }
+  for (let left = 0; left < requests.length; left += 1) {
+    if (requests[left].mode === "read-only") continue;
+    for (let right = left + 1; right < requests.length; right += 1) {
+      if (requests[right].mode === "read-only") continue;
+      for (const leftPath of requests[left].allowedPaths) {
+        for (const rightPath of requests[right].allowedPaths) {
+          if (pathCovers(leftPath, rightPath)) {
+            return {
+              ok: false, code: "WF-SCOPE-OVERLAP",
+              conflict: { leftIndex: left, rightIndex: right, leftPath, rightPath },
+            };
+          }
+        }
+      }
+    }
+  }
+  return { ok: true, code: "WF-ACCEPTED", requests, assurance: ASSURANCE };
+}
+
 /** Read state, fail closed, then invoke an injected adapter at most once. */
 export function preflightAndInvokeWorkflowWriterDispatch(request, calibration, capabilities, boundary) {
   const isFailover = isObject(request) && request.failover !== null;
@@ -580,6 +642,7 @@ export const WORKFLOW_WRITER_PREFLIGHT_CODES = Object.freeze([
   "WF-FAILOVER-TRUST", "WF-FAILOVER-TRUST-READ", "WF-FAILOVER-NARROWING",
   "WF-FAILOVER-FROZEN", "WF-FAILOVER-IDENTITY", "WF-FAILOVER-STATE",
   "WF-PREFLIGHT-BOUNDARY", "WF-CONTINUITY-READ", "WF-ADAPTER-FAILED", "WF-ACCEPTED",
+  "WF-BATCH-SCHEMA", "WF-SCOPE-OVERLAP",
 ]);
 
 export const WORKFLOW_WRITER_ASSURANCE = ASSURANCE;
