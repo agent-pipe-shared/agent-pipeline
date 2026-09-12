@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "NVA-B-INSTALLER-ATTESTATION-RUNNER-PARITY-1",
+  "agentType": "worker",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "rulesetSha": "0.6.2+codex.20260911033523.8593a8a",
+  "dispatcher": "elephant",
+  "candidateCommit": "53de5d6738b749c02da2c81c32721fe9eba79880",
+  "resultSha256": "849fc5d68ad55d0dbddb7963b829e5501ccf8a5ae8b0c19e0deb7ca2657dc859",
+  "outcome": "completed",
+  "commits": [
+    "53de5d6738b749c02da2c81c32721fe9eba79880"
+  ],
+  "log": [],
+  "report": {
+    "text": "Portable installed-plugin attestation parity is implemented for Claude and Antigravity without native Codex WSL/App-Server work. The correction binds Claude's exact loaded cache while requiring a separate clean Git source, and makes every gitless Antigravity root require one exact registry binding. Candidate-bound focused tests passed. Two substantive Critic rounds found no remaining blocker or major issue; the sole round-two whitespace minor was corrected directly under QG-13. Live resync and reachability probes remain owned and dated in the backlog item, so that parent item stays open.",
+    "changedFiles": [
+      "install-agy.mjs",
+      "plugins/pipeline-core/install-agy.mjs",
+      "plugins/pipeline-core/lib/public-core-observation.mjs",
+      "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+      "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+      "plugins/pipeline-core/scripts/installed-plugin-attestation-host-result.schema.json",
+      "plugins/pipeline-core/scripts/installed-plugin-source-locator.schema.json",
+      "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+      "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+      "docs/claude-local-plugin-development.md",
+      "docs/v3-consumer-onboarding.md",
+      "backlog/items/2026-09-06-the-installed-plugin-copy-enforcing-this-session-predates-todays-guard-fixes.md",
+      "backlog/evidence/2026-09-12-installed-plugin-attestation-runner-parity.md"
+    ],
+    "orchestratorAddedFiles": [
+      "backlog/STATUS.md",
+      "backlog/index.json",
+      "backlog/evidence/2026-09-12-installer-parity-53de5d67-tests.json",
+      "backlog/evidence/2026-09-12-installer-parity-review-bundle-tests.json",
+      "backlog/evidence/2026-09-12-installer-parity-correction.md",
+      "backlog/evidence/2026-09-12-installer-parity-correction-bundle-tests.json",
+      "backlog/evidence/2026-09-12-installer-parity-critic-round1.md",
+      "backlog/evidence/2026-09-12-installer-parity-critic-round2.md"
+    ]
+  },
+  "criticEvidence": {
+    "schema": "pipeline.critic-evidence-reference.v1",
+    "taskId": "NVA-B-INSTALLER-ATTESTATION-RUNNER-PARITY-1",
+    "candidateCommit": "53de5d6738b749c02da2c81c32721fe9eba79880",
+    "path": "backlog/evidence/2026-09-12-installer-parity-critic-round2.md",
+    "sha256": "849fc5d68ad55d0dbddb7963b829e5501ccf8a5ae8b0c19e0deb7ca2657dc859"
+  }
+}
