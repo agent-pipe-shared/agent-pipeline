@@ -139,7 +139,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
-export const INSTALLER_VERSION = "1";
+export const INSTALLER_VERSION = "2";
 export const MARKER_SCHEMA = "pipeline.pre-commit-hook-install.v1";
 // Mirrors pre-push-hook-install.mjs's own decline marker exactly: its own schema, never folded
 // into MARKER_SCHEMA's install marker, so an install and a decline can never be confused for
@@ -530,11 +530,14 @@ async function main() {
   let protectedTestPathRuleFor;
   let defaultHasConsumedCapabilityForPath;
   let resolveHandoverConfig;
+  let isNeverLiftableKernelPath;
+  let windowCoversRule;
   try {
     ({ gateStrengthRuleFor } = await import(pathToFileURL(resolve(PLUGIN_HOOKS_DIR, "guard-gate-strength.mjs")).href));
     ({ loadProtectedTestPathRules, protectedTestPathRuleFor } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
     ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
+    ({ isNeverLiftableKernelPath, windowCoversRule } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "guard-maintenance-window.mjs")).href));
   } catch (error) {
     block([\`the pipeline's own protected-path rule modules could not be loaded from the installed plugin copy (\${error?.name ?? "Error"}) -- cannot evaluate protected-path enforcement.\`]);
     return;
@@ -586,6 +589,13 @@ async function main() {
       try { rule = protectedTestPathRuleFor(testPathRules, relPath); } catch { rule = null; }
     }
     if (!rule) continue;
+    let kernelPath = true;
+    try { kernelPath = isNeverLiftableKernelPath(relPath, { rootDir: projectRoot, livePluginRoot: resolve(PLUGIN_LIB_DIR, "..") }); } catch { kernelPath = true; }
+    if (!kernelPath) {
+      let covered = false;
+      try { ({ covered } = windowCoversRule({ rootDir: projectRoot, ruleId: rule.id })); } catch { covered = false; }
+      if (covered) continue;
+    }
     let consumed = false;
     try { consumed = defaultHasConsumedCapabilityForPath(projectRoot, relPath); } catch { consumed = false; }
     if (consumed) continue;

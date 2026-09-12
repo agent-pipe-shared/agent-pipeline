@@ -432,6 +432,17 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/consumer-baseline-verify.mjs",
   "plugins/pipeline-core/lib/consumer-verify.mjs",
   "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
+  // NVA-B-GMW-KERNEL-PRECEDENCE (2026-09-12): accepted Nova B packages added
+  // imports below already-kernel enforcement modules. The dispatch-budget guard
+  // now delegates its signed, serialized budget decision to dispatch-policy and
+  // dispatch-budget-binding; the HGO library/CLI now delegate their durable
+  // consumption event to the governance-HGO action/source pair. A window that
+  // could rewrite any delegate could change the decision or evidence while
+  // leaving the importing kernel byte-for-byte intact.
+  "plugins/pipeline-core/lib/dispatch-budget-binding.mjs",
+  "plugins/pipeline-core/lib/dispatch-policy.mjs",
+  "plugins/pipeline-core/lib/governance-hgo-consumption-action.mjs",
+  "plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

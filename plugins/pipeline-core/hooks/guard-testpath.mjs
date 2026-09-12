@@ -116,7 +116,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
-import { windowCoversRule } from "../lib/guard-maintenance-window.mjs";
+import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-maintenance-window.mjs";
 import {
   consumeHumanGuardOverride,
   humanGuardRouteUnavailableReason,
@@ -189,15 +189,19 @@ if (matched) {
   // check does not depend on `gates.push_approval`. It is a pure addition alongside
   // the existing overrideAdmitted/HGO logic, checked first and falling through
   // unchanged when the rule is not covered.
-  try {
-    const { covered, window } = windowCoversRule({ rootDir: projectDir, ruleId: matched.id });
-    if (covered) {
-      process.stderr.write(
-        `[pipeline-guard-maintenance-window] ${matched.id} lifted: expires ${new Date(window.expiresAtMs).toISOString()}, reason: ${window.reason}\n`,
-      );
-      process.exit(0);
-    }
-  } catch { /* an unusable window is not a lift; the refusal below still stands */ }
+  let gmwKernelPath = true;
+  try { gmwKernelPath = isNeverLiftableKernelPath(filePath, { rootDir: projectDir, livePluginRoot: PLUGIN_ROOT }); } catch { gmwKernelPath = true; }
+  if (!gmwKernelPath) {
+    try {
+      const { covered, window } = windowCoversRule({ rootDir: projectDir, ruleId: matched.id });
+      if (covered) {
+        process.stderr.write(
+          `[pipeline-guard-maintenance-window] ${matched.id} lifted: expires ${new Date(window.expiresAtMs).toISOString()}, reason: ${window.reason}\n`,
+        );
+        process.exit(0);
+      }
+    } catch { /* an unusable window is not a lift; the refusal below still stands */ }
+  }
 
   // Which clearances count is one setting, and it is not this guard's to decide
   // (ADR-0056). Reading it still matters -- the message below and the CLI continuation

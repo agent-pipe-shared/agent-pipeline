@@ -217,6 +217,12 @@ below assumes it holds and is written to catch a change that would break it.
   suite binds the declared dynamic edge to the exported URL and continues to
   reject unclassified dynamic imports. The generated consumer adapter is checked
   byte-for-byte before evidence production; it is not an author-repository asset.
+- The 2026-09-12 Nova B closure refresh adds
+  `lib/dispatch-budget-binding.mjs`, `lib/dispatch-policy.mjs`,
+  `lib/governance-hgo-consumption-action.mjs`, and
+  `lib/governance-hgo-consumption-source.mjs`. Already-kernel dispatch-budget
+  and HGO enforcement modules import these delegates, so a maintenance window
+  cannot rewrite the delegated decision or its durable evidence.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

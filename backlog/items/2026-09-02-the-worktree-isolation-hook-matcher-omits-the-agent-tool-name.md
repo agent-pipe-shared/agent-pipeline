@@ -102,3 +102,19 @@ item's Done criterion; the TP-4 matcher correction remains required.
 
 Focused results are recorded in
 `backlog/evidence/2026-09-11-nova-b-push-init-and-worktree-matcher-reverification.md`.
+
+## Protected integration applied — 2026-09-12
+
+The attended author-repair result adds `Agent` to the shipped Claude
+`guard-worktree-isolation.mjs` matcher while retaining every existing tool
+name. The manifest-shape suite now asserts the exact `Task|Agent|Workflow`
+dispatch-tool set, so a future generated-manifest change cannot silently remove
+one supported name again. The generated enforcement inventory was refreshed
+from those manifest bytes.
+
+Focused verification passes 14/14 hook-manifest checks and 45/45 worktree-count
+checks. The latter was run on the host because its two real Git fixture cases
+cannot spawn Git in the managed WSL process sandbox; the remaining 43 cases
+also passed there. Documentation contracts pass. The item remains open only
+until an exact-candidate independent Critic has reviewed this hook-surface
+change and its result is recorded in the backlog ledger.

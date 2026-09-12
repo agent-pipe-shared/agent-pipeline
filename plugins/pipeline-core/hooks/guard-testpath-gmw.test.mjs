@@ -62,10 +62,18 @@ try {
   mkdirSync(join(GMW_DIR, ".claude"), { recursive: true });
   mkdirSync(join(GMW_DIR, "project"), { recursive: true });
   writeFileSync(join(GMW_DIR, ".claude", "guard-config.json"), JSON.stringify({
-    protectedTestPaths: [{
-      pattern: "plugins/pipeline-core/hooks/guard-git\\.test\\.mjs$",
-      reason: "The git-guard union test suite is the implementation contract for guard-git.mjs.",
-    }],
+    protectedTestPaths: [
+      {
+        pattern: "plugins/pipeline-core/hooks/guard-git\\.test\\.mjs$",
+        reason: "The git-guard union test suite is the implementation contract for guard-git.mjs.",
+        id: "TP-1",
+      },
+      {
+        pattern: "plugins/pipeline-core/hooks/hooks\\.json$",
+        reason: "hooks.json wires the guard family itself.",
+        id: "TP-1",
+      },
+    ],
   }));
   writeFileSync(join(GMW_DIR, "plan.md"), "plan\n");
   writeFileSync(join(GMW_DIR, "spec.md"), "spec\n");
@@ -100,6 +108,11 @@ try {
       });
       return { projectDir: GMW_DIR, stderrIncludes: ["pipeline-guard-maintenance-window", "TP-1 lifted"] };
     })());
+  check("TP09 kernel precedence: the same TP-1 window cannot lift hooks.json", "Edit",
+    join(GMW_DIR, "plugins/pipeline-core/hooks/hooks.json"), 2, {
+      projectDir: GMW_DIR,
+      stderrIncludes: ["BLOCKED (guard-testpath", "hooks.json wires the guard family itself"],
+    });
   closeGuardMaintenanceWindow({ rootDir: GMW_DIR });
 
   console.log(`\nguard-testpath-gmw: ${passed} passed, ${failed} failed`);

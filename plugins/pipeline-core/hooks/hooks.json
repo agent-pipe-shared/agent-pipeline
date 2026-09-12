@@ -14,6 +14,17 @@
         ]
       },
       {
+        "$comment": "Dispatch-bound Advisor prohibition (NVA-B-ADVISOR-PROHIBITION, 2026-09-12). The matcher is the measured Claude PreToolUse name for the raw Advisor surface. The guard blocks only a child whose exact dispatch was bound to the canonical MP-26 prohibition; unbound calls remain subject to the ordinary Advisor demand and consent gates.",
+        "matcher": "advisor",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "$comment": "Dispatch budget (NVA-BUDGETGUARD-1, 2026-08-27). Counts a dispatched subagent's tool calls externally instead of trusting its self-report, and once the working cap is reached permits only closing acts -- so the dispatch stops BEFORE the harness cliff, at the one point where a handover is still possible. Measured motivation: three dispatches ran 62, 53 and 50 tool calls against a stated ~40-45 allowance, and one reported \"34 logged\" while the runtime recorded 62. The matcher is MATCH-ALL ON PURPOSE -- the budget is a count of ALL tool calls, so a matcher naming individual tools would undercount silently, the same failure class this file already paid for with NotebookEdit; the installed runtime treats an absent matcher, \"*\" and \".*\" as match-all, and that was verified against the running binary rather than assumed, because a matcher the runtime does not recognise is a SILENT no-op that looks exactly like success. The orchestrating session is identified and exempted INSIDE the guard (subagent detection on transcript_path), never by the matcher, so this hook never limits the Elephant. CORRECTION (2026-08-27, same day): this registration first carried a match-all matcher, and it matched NOTHING -- a live dispatch made 34 tool calls without moving the counter once. The runtime binary does contain a match-all predicate accepting an absent matcher and the two wildcard literals, which is why the choice was believed proven; that predicate simply does not govern plugin PreToolUse matchers. Hooks DO reach subagents -- the same dispatch was refused mid-run by guard-lifecycle-ready on its Bash|PowerShell matcher, which is the control separating \"hooks do not fire in subagents\" from \"this matcher is not honoured\". The matcher now enumerates, using the identical alternation construction every other working matcher here already uses, deliberately wider than any single agent's toolset because undercounting is the failure this guard exists to prevent. Wired by harness/scripts/wire-dispatch-budget-hook.mjs; see hooks/guard-dispatch-budget.mjs.",
         "matcher": "Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write",
         "hooks": [
@@ -26,7 +37,7 @@
       },
       {
         "$comment": "Worktree-isolation count check (NVA-W7-WORKTREECOUNT, 2026-08-29). Compares a pre/post `git worktree list` count around an isolation:\"worktree\"-flagged Agent/Workflow dispatch and surfaces a mismatch as a stderr warning (exit 1, never blocks -- it cannot un-launch a dispatch that already ran). Matcher is match-all for the same reason guard-dispatch-budget.mjs's is: the check needs to observe the FIRST tool call after a dispatch launches, whatever tool that happens to be, not just another dispatch call. See lib/worktree-count-check.mjs for the tested comparison logic and backlog/items/2026-08-25-workflow-tool-isolation-worktree-never-created-a-worktree-this-session.md for the incident this closes the detection gap for.",
-        "matcher": "Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write|Workflow",
+        "matcher": "Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow",
         "hooks": [
           {
             "type": "command",

@@ -45,7 +45,7 @@ import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs"
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-migration-v3.mjs";
 import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
-import { planInstall as planPreCommitHookInstall } from "../scripts/pre-commit-hook-install.mjs";
+import { applyInstall as applyPreCommitHookInstall, planInstall as planPreCommitHookInstall } from "../scripts/pre-commit-hook-install.mjs";
 import { planInstall as planCommitMsgHookInstall } from "../scripts/commit-msg-hook-install.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
@@ -5319,6 +5319,33 @@ test("onboarding installs the pre-commit and commit-msg backstops by default", (
     assert.equal(planCommitMsgHookInstall({ rootDir: path }).status, "ready-to-upgrade");
     assert.equal(existsSync(join(path, ".git", "hooks", "pre-commit")), true);
     assert.equal(existsSync(join(path, ".git", "hooks", "commit-msg")), true);
+  } finally { dispose(path); }
+});
+
+test("onboarding upgrades an existing managed pre-commit hook from installer v1 to v2", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const seeded = applyPreCommitHookInstall({ rootDir: path });
+    assert.equal(seeded.status, "installed");
+
+    const markerPath = join(path, ".git", "agent-pipeline", "pre-commit-hook", "install-marker.json");
+    const marker = JSON.parse(readFileSync(markerPath, "utf8"));
+    const v1Impl = readFileSync(marker.implPath, "utf8").replace("installer v2", "installer v1");
+    writeFileSync(marker.implPath, v1Impl);
+    writeFileSync(markerPath, `${JSON.stringify({ ...marker, installerVersion: "1", implSha256: sha256(v1Impl) }, null, 2)}\n`);
+    assert.equal(planPreCommitHookInstall({ rootDir: path }).status, "ready-to-upgrade");
+
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.preCommitHookInstall.status, "installed");
+
+    const upgradedMarker = JSON.parse(readFileSync(markerPath, "utf8"));
+    assert.equal(upgradedMarker.installerVersion, "2");
+    const upgradedImpl = readFileSync(upgradedMarker.implPath, "utf8");
+    assert.match(upgradedImpl, /guard-maintenance-window\.mjs/u);
+    assert.match(upgradedImpl, /isNeverLiftableKernelPath/u);
   } finally { dispose(path); }
 });
 

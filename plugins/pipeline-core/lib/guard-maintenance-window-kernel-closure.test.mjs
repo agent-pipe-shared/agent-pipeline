@@ -195,12 +195,14 @@ const DYNAMIC_IMPORT_EDGES = {
   // -- PLUGIN_HOOKS_DIR/PLUGIN_LIB_DIR/PLUGIN_SCRIPTS_DIR are install-time-bound absolute
   // paths, not literal specifiers the static scanner can read. NVA-B-KERNELEDGE (2026-09-01):
   // commit 54fb5006 added a fourth call site, `../lib/handover-rotation.mjs`, to read the
-  // handover-file configuration ahead of the commit-size check.
+  // handover-file configuration ahead of the commit-size check. The fifth edge loads the
+  // maintenance-window evaluator so the generated hook can honor non-kernel windows.
   "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": [
     "../hooks/guard-gate-strength.mjs",
     "../lib/protected-test-paths.mjs",
     "./check-protected-path-integrity.mjs",
     "../lib/handover-rotation.mjs",
+    "../lib/guard-maintenance-window.mjs",
   ],
   "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs": [
     "../lib/commit-message-policy.mjs",

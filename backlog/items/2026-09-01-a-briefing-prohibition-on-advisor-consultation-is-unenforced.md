@@ -209,3 +209,16 @@ TP-4-attended registration of the Claude Advisor matcher in
 `plugins/pipeline-core/hooks/hooks.json` and a live/readback check that the host
 uses the measured `advisor` PreToolUse name. That protected integration is not
 performed by this implementation package.
+
+### Rollback and recovery
+
+Rollback is a forward revert of the policy carrier, Claude adapter, dispatch
+binding and the matching `hooks.json` registration as one unit. Removing only
+the registration safely disables enforcement but leaves dead code; removing
+only the producer or consumer can create a false enforcement claim. After a
+revert, run the dispatch suite and hook-manifest suite and state explicitly
+that the MP-26 line is advisory again until a corrected candidate is wired.
+Private pending bindings and denial records contain only digests and closed
+fields; they may remain as audit history and are ignored when the adapter is
+absent. A replacement must use a new candidate-bound threat-model approval at
+the stable-candidate freeze rather than reusing an approval for these bytes.

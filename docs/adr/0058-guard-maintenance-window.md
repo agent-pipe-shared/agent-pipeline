@@ -197,6 +197,18 @@ feature follows that convention rather than exercising the trick it would
 otherwise demonstrate. Recorded as a residual risk worth a dedicated guard in
 its own right (see Follow-up).
 
+**Nova B closure correction, 2026-09-12.** The accepted dispatch-budget binding
+and durable HGO-consumption packages added first-party imports from existing
+kernel modules into `lib/dispatch-budget-binding.mjs`, `lib/dispatch-policy.mjs`,
+`lib/governance-hgo-consumption-action.mjs`, and
+`lib/governance-hgo-consumption-source.mjs`. These four modules now compute the
+budget admission or durable evidence consumed by already-kernel enforcement
+code. A maintenance window that could rewrite one could alter that decision or
+evidence without changing its importing kernel module. They therefore join
+`NEVER_LIFTABLE_KERNEL_PATHS` under Decision 3's transitive-closure rule. Both
+TP enforcement boundaries also evaluate kernel membership before accepting a
+signed window: a valid TP-4 window still cannot lift `hooks/hooks.json`.
+
 ## Alternatives considered
 
 - **Extend HGO's existing single-tool-call capability to cover GS-6.** Rejected:

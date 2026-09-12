@@ -14,6 +14,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,6 +31,8 @@ import {
   applyDecline,
   DECLINE_MARKER_SCHEMA,
 } from "./pre-commit-hook-install.mjs";
+import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 
 const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLUGIN_LIB_DIR = join(PLUGIN_ROOT, "lib");
@@ -87,6 +90,39 @@ function writeConsumedCapability(dir, eligiblePaths) {
   const capsDir = join(commonDir, "agent-pipeline", "human-guard-overrides", "capabilities");
   mkdirSync(capsDir, { recursive: true });
   writeFileSync(join(capsDir, "test-capability.json"), JSON.stringify({ status: "consumed", eligiblePaths }));
+}
+
+function installSignedWindow(dir, scopeRuleIds) {
+  const pair = generateKeyPairSync("ed25519");
+  const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
+  const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "plan.md"), "plan\n");
+  writeFileSync(join(dir, "spec.md"), "spec\n");
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push"],
+    trustAnchor: { keyReference: "precommit-gmw", publicKeySha256 },
+  }));
+  const seeded = spawnSync("git", ["add", "-A"], { cwd: dir, encoding: "utf8" });
+  assert.equal(seeded.status, 0, seeded.stderr);
+  const committed = spawnSync("git", ["commit", "-q", "-m", "seed signed-window authority"], { cwd: dir, encoding: "utf8" });
+  assert.equal(committed.status, 0, committed.stderr);
+  const planSha256 = createHash("sha256").update("plan\n").digest("hex");
+  const specSha256 = createHash("sha256").update("spec\n").digest("hex");
+  const { intent, request } = prepareGuardMaintenanceWindowRequest({
+    rootDir: dir, scopeRuleIds, ttlSeconds: 300, reason: "pre-commit GMW parity",
+    featureId: "precommit-gmw", planSha256, specSha256, policyRevision: "precommit-gmw-v1",
+    livePluginRoot: PLUGIN_ROOT, authorshipMode: "goldfish-dispatch",
+  });
+  const proof = {
+    schema: PO_APPROVAL_PROOF_SCHEMA,
+    intentSha256: intent.sha256,
+    keyReference: "precommit-gmw",
+    publicKey,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), pair.privateKey).toString("base64"),
+  };
+  installGuardMaintenanceWindow({ rootDir: dir, request, anchors: [{ keyReference: "precommit-gmw", publicKeySha256 }], proof, livePluginRoot: PLUGIN_ROOT });
 }
 
 /** Writes the legacy-tier calibration file (`.claude/pipeline.json`) carrying a `handover`
@@ -297,6 +333,51 @@ test("installed hook: staged path with a matching CONSUMED capability -> commit 
   git("add", "pipeline.user.yaml");
   const { code, stderr } = commit(dir, "authorized gate-strength change");
   assert.equal(code, 0, stderr);
+});
+
+test("installed hook: matching signed GMW permits a non-kernel TP rewrite", () => {
+  const { dir, git } = freshRepo("e2e-gmw-tp-allowed");
+  writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }]);
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// original\n");
+  git("add", ".claude/guard-config.json", "protected-suite.test.mjs");
+  git("commit", "-q", "-m", "seed protected suite");
+  installSignedWindow(dir, ["TP-1"]);
+  installHook(dir);
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// authorized\n");
+  git("add", "protected-suite.test.mjs");
+  const { code, stderr } = commit(dir, "authorized by signed GMW");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: wrong-scope signed GMW does not permit a TP rewrite", () => {
+  const { dir, git } = freshRepo("e2e-gmw-wrong-scope");
+  writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-1" }]);
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// original\n");
+  git("add", ".claude/guard-config.json", "protected-suite.test.mjs");
+  git("commit", "-q", "-m", "seed protected suite");
+  installSignedWindow(dir, ["TP-2"]);
+  installHook(dir);
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// refused\n");
+  git("add", "protected-suite.test.mjs");
+  const { code, stderr } = commit(dir, "wrong-scope GMW");
+  assert.notEqual(code, 0);
+  assert.match(stderr, /TP-1/);
+});
+
+test("installed hook: matching signed GMW never permits hooks.json kernel rewrite", () => {
+  const { dir, git } = freshRepo("e2e-gmw-kernel-refused");
+  writeTestPathConfig(dir, [{ pattern: "plugins/pipeline-core/hooks/hooks\\.json$", reason: "fixture kernel path", id: "TP-4" }]);
+  mkdirSync(join(dir, "plugins", "pipeline-core", "hooks"), { recursive: true });
+  writeFileSync(join(dir, "plugins", "pipeline-core", "hooks", "hooks.json"), "{}\n");
+  git("add", ".claude/guard-config.json", "plugins/pipeline-core/hooks/hooks.json");
+  git("commit", "-q", "-m", "seed kernel path");
+  installSignedWindow(dir, ["TP-4"]);
+  installHook(dir);
+  writeFileSync(join(dir, "plugins", "pipeline-core", "hooks", "hooks.json"), '{"changed":true}\n');
+  git("add", "plugins/pipeline-core/hooks/hooks.json");
+  const { code, stderr } = commit(dir, "attempt kernel rewrite under GMW");
+  assert.notEqual(code, 0);
+  assert.match(stderr, /TP-4/);
 });
 
 test("installed hook: staged NON-protected path is unaffected -> commit succeeds", () => {

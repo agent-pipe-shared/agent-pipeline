@@ -137,6 +137,30 @@ check("Claude manifest: every command references a hook script that exists on di
   }
 });
 
+check("Claude worktree-isolation hook explicitly matches every supported dispatch tool name", () => {
+  const manifest = loadJson(CLAUDE_PATH);
+  const entry = manifest.hooks.PreToolUse.find(({ hooks }) => hooks.some(({ command }) => command.includes("guard-worktree-isolation.mjs")));
+  assert.ok(entry, "guard-worktree-isolation.mjs must be registered under PreToolUse");
+  const tokens = new Set(entry.matcher.split("|"));
+  assert.deepEqual(
+    [...["Task", "Agent", "Workflow"].filter((tool) => tokens.has(tool))],
+    ["Task", "Agent", "Workflow"],
+    "the worktree baseline must observe Task, Agent, and Workflow dispatch calls",
+  );
+});
+
+check("Claude Advisor prohibition is wired once to the measured raw Advisor tool name", () => {
+  const manifest = loadJson(CLAUDE_PATH);
+  const entries = manifest.hooks.PreToolUse.filter(({ hooks }) => hooks.some(({ command }) => command.includes("guard-advisor-prohibition.mjs")));
+  assert.equal(entries.length, 1, "guard-advisor-prohibition.mjs must have exactly one PreToolUse registration");
+  assert.equal(entries[0].matcher, "advisor");
+  assert.deepEqual(entries[0].hooks.map(({ type, command, timeout }) => ({ type, command, timeout })), [{
+    type: "command",
+    command: "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs\"",
+    timeout: 10,
+  }]);
+});
+
 /* ----------------------------------------------------------------- Codex manifest */
 
 const CODEX_PATH = join(hookDir, "codex-hooks.json");

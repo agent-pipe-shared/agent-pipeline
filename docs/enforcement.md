@@ -31,8 +31,8 @@ no hand-maintained guard count or command list.
 | Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;invoke_subagent | node hooks/antigravity-pretool-guard.mjs |
 | Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;invoke_subagent | node hooks/antigravity-slicing-hint.mjs observe |
 | Antigravity | Stop | (all) | node hooks/antigravity-stop-hook.mjs |
+| Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;Agent&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write&#124;Workflow | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs" |
 | Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs" |
-| Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write&#124;Workflow | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs" |
 | Claude Code | PreToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs" |
 | Claude Code | PreToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs" --runner claude |
 | Claude Code | PreToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs" |
@@ -45,6 +45,7 @@ no hand-maintained guard count or command list.
 | Claude Code | PreToolUse | Edit&#124;Write&#124;NotebookEdit | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs" |
 | Claude Code | PreToolUse | Task&#124;Agent&#124;Workflow | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs" |
 | Claude Code | PreToolUse | Task&#124;Agent&#124;Workflow&#124;TodoWrite | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-slicing.mjs" |
+| Claude Code | PreToolUse | advisor | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-advisor-prohibition.mjs" |
 | Claude Code | SessionStart | compact | node "${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs" |
 | Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs" |
 | Claude Code | SessionStart | startup&#124;resume&#124;clear | node "${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs" |
@@ -74,6 +75,6 @@ The hashes bind this generated page to the exact manifest bytes it read.
 
 | Runner | Manifest | SHA-256 |
 | --- | --- | --- |
-| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `e708edd8e0e1bc82ed2936830f134e0938629f1b3b755b7a16d4e93ca5998572` |
+| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `0a64e116d51db1372862e910a78cdbe49cb084a4875924e87682bea5b7896b1e` |
 | Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `a2b112cf560ca898a8e0799f0c98930d0a2ed76e551611c2aecc1a515738fa99` |
 | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96` |

@@ -327,6 +327,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "dispatch-budget-binding-tests",
+      "path": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "feature-package-topology-tests",
       "path": "plugins/pipeline-core/lib/feature-package-topology.test.mjs",
       "disposition": "legacy-process-only",
@@ -352,6 +357,11 @@
     {
       "name": "governance-gate-action-tests",
       "path": "plugins/pipeline-core/lib/governance-gate-action.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "governance-recovery-reconciliation-action-tests",
+      "path": "plugins/pipeline-core/lib/governance-recovery-reconciliation-action.test.mjs",
       "disposition": "required"
     },
     {
