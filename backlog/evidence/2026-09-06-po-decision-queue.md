@@ -16,7 +16,7 @@ stable delivery candidate and effective policy before the final PO decision.
 - **Evidence:**
   `backlog/evidence/2026-09-12-lnd2-envelope-store-reader-admission.md`.
 
-## Torn HGO audit append — equivalent live evidence decision pending
+## Torn HGO audit append — equivalent live evidence accepted 2026-09-12
 
 The implementation and adversarial repair fixture are complete. The fixture
 constructs the historical authenticated-prefix/contiguous-tail state, exercises
@@ -24,22 +24,18 @@ the attended `repair-audit` command, proves interruption recovery and
 idempotency, and passed the two independent review rounds. The repository's
 actual ledger is currently valid at 6,165 authenticated entries.
 
-- **Question:** may the valid live readback plus the exact adversarial repair
-  fixture satisfy the acceptance sentence that says this repository's ledger
-  is reconciled "by that operation"?
-- **Recommendation:** yes. Deliberately damaging a valid production audit ledger
-  only to replay a historical repair would add risk and no stronger contract
-  evidence.
-- **Alternative/consequence:** keep the item open indefinitely until another
-  natural torn append occurs. Do not manufacture one in live state.
+- **PO decision:** accept the valid live readback plus the exact adversarial
+  repair fixture as satisfying the acceptance sentence that says this
+  repository's ledger is reconciled "by that operation". Deliberately damaging
+  a valid production audit ledger only to replay a historical repair would add
+  risk and no stronger contract evidence.
 - **Evidence:**
   `backlog/evidence/2026-09-12-hgo-audit-repair-critic-round1.md`, the round-two
   review at candidate `54a20d83a0501de98d522f7d7da7a829ccf16cc1`, and
   `backlog/evidence/2026-09-12-hgo-live-audit-readback.json`.
-- **Blocking status:** blocks only closure of
-  `pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`;
-  it does not block other Nova-B implementation. Final release-bound threat
-  model approval remains a separate candidate-freeze obligation.
+- **Execution:** the item is closed and reconciled in the append-only backlog
+  ledger. Final release-bound threat-model approval remains a separate
+  candidate-freeze obligation.
 
 ## Native Codex sandbox scope under WSL — superseded 2026-09-12
 
@@ -670,6 +666,18 @@ turns and latency and discards consultation that has measurably improved prior
 work. The PO declined both alternatives. The runner-neutral core and the
 currently interceptable runner surface may now proceed; native Codex sandbox
 execution under WSL remains outside this decision.
+
+## Tool budgets on runners without authenticated live-call events — PO decision 2026-09-12
+
+Codex and Antigravity may receive budget-bearing role dispatches even though
+their current host surfaces do not provide authenticated per-call events for
+the shared counter. The dispatch and its result must label the base budget as
+not technically enforced on that runner. A shared policy core, briefing duty,
+stop condition or `maxTurns` value is not evidence of live-call enforcement.
+The existing Claude adapter may claim enforcement only for its measured and
+authenticated caller shape. This decision does not weaken the declared stop
+condition or the runner's actual `maxTurns` cliff, and it does not block later
+authenticated Codex or Antigravity adapters.
 
 ## Governance-action lifecycle ADR — proposed, review evidence pending
 
