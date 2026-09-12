@@ -2,6 +2,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import {
   lstatSync,
   linkSync,
@@ -24,6 +25,8 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const MAX_ARTIFACT_BYTES = 1024 * 1024;
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
+// Keep subprocess teardown overhead inside the externally visible five-second PREPARE bound.
+const PREPARE_DEADLINE_MS = 4_500;
 const ARTIFACT_KEYS = ["artifactSha256", "candidate", "expiresAtEpochMs", "nativeSubagents", "packets", "repositoryRootSha256", "schema"];
 const ENTRY_KEYS = new Set(["Prompt", "Role", "TypeName"]);
 
@@ -35,26 +38,28 @@ function rejected(code, field = null) {
   return { schema: AGY_NATIVE_BATCH_VERDICT_SCHEMA, status: "rejected", code, field, modelCalls: 0, launcherCalls: 0 };
 }
 
-function git(root, args) {
+function git(root, args, deadlineEpochMs) {
+  const remainingMs = Math.floor(deadlineEpochMs - performance.now());
+  if (remainingMs < 1) return null;
   try {
     return String(execFileSync("git", args, {
       cwd: root,
       encoding: "utf8",
       shell: false,
       stdio: ["ignore", "pipe", "ignore"],
-      timeout: 5_000,
+      timeout: remainingMs,
       maxBuffer: 1024 * 1024,
     })).trim();
   } catch { return null; }
 }
 
-function repositoryState(root) {
+function repositoryState(root, deadlineEpochMs = performance.now() + PREPARE_DEADLINE_MS) {
   let physicalRoot;
   try { physicalRoot = realpathSync(resolve(root)); }
   catch { return null; }
-  const commonRaw = git(physicalRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  const head = git(physicalRoot, ["rev-parse", "--verify", "HEAD"]);
-  const tree = head === null ? null : git(physicalRoot, ["rev-parse", `${head}^{tree}`]);
+  const commonRaw = git(physicalRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"], deadlineEpochMs);
+  const head = git(physicalRoot, ["rev-parse", "--verify", "HEAD"], deadlineEpochMs);
+  const tree = head === null ? null : git(physicalRoot, ["rev-parse", `${head}^{tree}`], deadlineEpochMs);
   if (commonRaw === null || !OID.test(head ?? "") || !OID.test(tree ?? "")) return null;
   try {
     const commonDir = realpathSync(resolve(commonRaw));
@@ -104,12 +109,72 @@ function artifactPath(commonDir, nativeSubagents, physicalRoot) {
   return join(artifactDirectory(commonDir), `${sha256(physicalRoot)}-${sha256(JSON.stringify(nativeSubagents))}.json`);
 }
 
+function parseAuthenticatedRetirableArtifact(raw, { state, nativeSubagents, nowEpochMs }) {
+  let artifact;
+  try { artifact = JSON.parse(raw); }
+  catch { return null; }
+  if (!exactKeys(artifact, ARTIFACT_KEYS) || artifact.schema !== AGY_NATIVE_BATCH_ARTIFACT_SCHEMA
+    || !SHA256.test(artifact.artifactSha256 ?? "") || !SHA256.test(artifact.repositoryRootSha256 ?? "")
+    || !Number.isSafeInteger(artifact.expiresAtEpochMs) || !exactKeys(artifact.candidate, ["commit", "tree"])) return null;
+  const { artifactSha256, ...body } = artifact;
+  if (sha256(JSON.stringify(body)) !== artifactSha256
+    || artifact.repositoryRootSha256 !== sha256(state.physicalRoot)
+    || JSON.stringify(artifact.nativeSubagents) !== JSON.stringify(nativeSubagents)) return null;
+  return artifact.expiresAtEpochMs < nowEpochMs
+    || artifact.candidate.commit !== state.head
+    || artifact.candidate.tree !== state.tree
+    ? artifactSha256
+    : null;
+}
+
+function publishReplacingRetirable({ temporary, path, state, nativeSubagents, nowEpochMs }) {
+  try {
+    linkSync(temporary, path);
+    return "published";
+  } catch (error) {
+    if (error?.code !== "EEXIST") return "write-failed";
+  }
+
+  let observedRaw;
+  try { observedRaw = readFileSync(path, "utf8"); }
+  catch { return "exists"; }
+  const observedDigest = parseAuthenticatedRetirableArtifact(observedRaw, { state, nativeSubagents, nowEpochMs });
+  if (observedDigest === null) return "exists";
+
+  const retired = join(dirname(path), `.${randomUUID()}.retired`);
+  let claimed = false;
+  try {
+    renameSync(path, retired);
+    claimed = true;
+    const claimedRaw = readFileSync(retired, "utf8");
+    const claimedDigest = parseAuthenticatedRetirableArtifact(claimedRaw, { state, nativeSubagents, nowEpochMs });
+    if (claimedRaw !== observedRaw || claimedDigest !== observedDigest) {
+      try { linkSync(retired, path); } catch { /* another publisher owns the canonical name */ }
+      return "exists";
+    }
+    try {
+      linkSync(temporary, path);
+      return "published";
+    } catch {
+      try { linkSync(retired, path); } catch { /* preserve the winner if the name was concurrently acquired */ }
+      return "write-failed";
+    }
+  } catch {
+    return "exists";
+  } finally {
+    if (claimed) {
+      try { unlinkSync(retired); } catch { /* best-effort cleanup after canonical publication/restoration */ }
+    }
+  }
+}
+
 /**
  * Prepare, but never launch, one native Antigravity invoke_subagent batch.
  * The caller passes the returned Subagents array unchanged to the runner's built-in tool.
  */
 export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagents, nowEpochMs = Date.now(), ttlMs = DEFAULT_TTL_MS } = {}) {
-  const state = repositoryState(root);
+  const prepareDeadlineEpochMs = performance.now() + PREPARE_DEADLINE_MS;
+  const state = repositoryState(root, prepareDeadlineEpochMs);
   if (state === null) return rejected("AGY-NATIVE-ROOT", "root");
   if (!validNativeSubagents(nativeSubagents)) return rejected("AGY-NATIVE-SUBAGENTS", "nativeSubagents");
   if (!Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0 || !Number.isSafeInteger(ttlMs) || ttlMs < 1_000 || ttlMs > DEFAULT_TTL_MS) {
@@ -133,10 +198,11 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
   try {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     writeFileSync(temporary, `${JSON.stringify(artifact)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
-    try { linkSync(temporary, path); }
-    catch (error) {
-      return rejected(error?.code === "EEXIST" ? "AGY-NATIVE-ARTIFACT-EXISTS" : "AGY-NATIVE-ARTIFACT-WRITE", "artifact");
-    }
+    const publication = publishReplacingRetirable({ temporary, path, state, nativeSubagents, nowEpochMs });
+    if (publication !== "published") return rejected(
+      publication === "exists" ? "AGY-NATIVE-ARTIFACT-EXISTS" : "AGY-NATIVE-ARTIFACT-WRITE",
+      "artifact",
+    );
   } catch {
     return rejected("AGY-NATIVE-ARTIFACT-WRITE", "artifact");
   } finally {
@@ -215,4 +281,5 @@ export const antigravityNativeDispatchInternals = Object.freeze({
   artifactPath,
   artifactDirectory,
   sha256,
+  prepareDeadlineMs: PREPARE_DEADLINE_MS,
 });

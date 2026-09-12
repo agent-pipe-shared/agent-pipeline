@@ -87,6 +87,11 @@ const cases = [
     assert.equal(replay.status, 2);
     assert.match(replay.stderr, /AGY-NATIVE-ARTIFACT-MISSING/u);
   }],
+  ["an expired unconsumed batch is replaced before the immediate hook admits the fresh batch", (value) => {
+    assert.equal(prepareAntigravityNativeDispatch({ ...value, nowEpochMs: 1_000, ttlMs: 1_000 }).status, "prepared");
+    assert.equal(prepareAntigravityNativeDispatch({ ...value, nowEpochMs: Date.now() }).status, "prepared");
+    assert.equal(invoke(value.root, value.nativeSubagents).status, 0);
+  }],
   ["a mixed host and Pipeline array requires one preparation for the complete array", (value) => {
     const foreign = foreignEntry();
     const nativeSubagents = [foreign, ...value.nativeSubagents];
