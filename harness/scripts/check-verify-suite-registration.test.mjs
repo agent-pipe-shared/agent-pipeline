@@ -728,4 +728,97 @@ check("verify.mjs without a duplicate enters the journal branch — the duplicat
   assert.deepEqual(run.evidence.steps, [{ name: "verify-journal", exitCode: 1 }]);
 });
 
+
+// -- Declarative suites loading via harness/verify-suites.json -----------------
+check("declarative verify suites from harness/verify-suites.json are loaded and recognized", () => {
+  const root = buildRoot();
+  writeFile(root, "plugins/pipeline-core/scripts/decl-one.test.mjs");
+  writeVerifyFixture(root, {});
+  writeFile(
+    root,
+    "harness/verify-suites.json",
+    JSON.stringify({
+      schema: "pipeline.verify-suites.v1",
+      suites: [
+        { name: "decl-one-tests", file: "plugins/pipeline-core/scripts/decl-one.test.mjs" },
+      ],
+    }, null, 2),
+  );
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, true, result.findings.join(" | "));
+  assert.equal(result.unregisteredCount, 0);
+  assert.ok(result.entries.some((e) => e.name === "decl-one-tests" && e.arrayName === "TEST_SUITES"));
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("declarative suite with duplicate name across verify.mjs and verify-suites.json is detected", () => {
+  const root = buildRoot();
+  writeFile(root, "plugins/pipeline-core/lib/dup-test.test.mjs");
+  writeVerifyFixture(root, {
+    testSuites: [{ name: "shared-name-tests", ident: "libDir", segments: ["dup-test.test.mjs"] }],
+  });
+  writeFile(
+    root,
+    "harness/verify-suites.json",
+    JSON.stringify({
+      schema: "pipeline.verify-suites.v1",
+      suites: [
+        { name: "shared-name-tests", file: "plugins/pipeline-core/lib/dup-test.test.mjs" },
+      ],
+    }, null, 2),
+  );
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, false);
+  assert.ok(
+    result.findings.some((line) => line.startsWith("DUPLICATE-NAME") && line.includes('"shared-name-tests"')),
+    `expected DUPLICATE-NAME finding, got: ${result.findings.join(" | ")}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("declarative verify suites file with invalid schema produces a schema finding", () => {
+  const root = buildRoot();
+  writeFile(root, "plugins/pipeline-core/lib/foo.test.mjs");
+  writeVerifyFixture(root, {});
+  writeFile(
+    root,
+    "harness/verify-suites.json",
+    JSON.stringify({
+      schema: "invalid.schema.version",
+      suites: [
+        { name: "foo-tests", file: "plugins/pipeline-core/lib/foo.test.mjs" },
+      ],
+    }, null, 2),
+  );
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, false);
+  assert.ok(
+    result.findings.some((line) => line.includes("SCHEMA-ERROR") || line.includes("pipeline.verify-suites.v1")),
+    `expected schema finding, got: ${result.findings.join(" | ")}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("declarative verify suites missing required properties produces a schema finding", () => {
+  const root = buildRoot();
+  writeVerifyFixture(root, {});
+  writeFile(
+    root,
+    "harness/verify-suites.json",
+    JSON.stringify({
+      schema: "pipeline.verify-suites.v1",
+      suites: [
+        { name: "incomplete-entry" },
+      ],
+    }, null, 2),
+  );
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, false);
+  assert.ok(
+    result.findings.some((line) => line.includes("SCHEMA-ERROR")),
+    `expected schema finding, got: ${result.findings.join(" | ")}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

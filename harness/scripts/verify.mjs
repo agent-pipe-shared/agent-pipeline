@@ -51,7 +51,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { duplicateSuiteIds } from "./check-verify-suite-registration.mjs";
+import { duplicateSuiteIds, loadDeclarativeVerifySuites } from "./check-verify-suite-registration.mjs";
 import { UNREPLACED_MANUAL_CHECK_PLACEHOLDER, computeManualVerifyStep } from "./manual-check-logic.mjs";
 import { writeVerifyEvidencePair } from "./verify-evidence-writer.mjs";
 import {
@@ -841,6 +841,22 @@ const TEST_SUITES = [
   { name: "verify-evidence-writer-tests", file: join(scriptDir, "verify-evidence-writer.test.mjs") },
   { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 11 }, (_, index) => `DRS${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
 ];
+const declarativeSuitesPath = join(repoRoot, "harness", "verify-suites.json");
+const declarativeSuitesResult = loadDeclarativeVerifySuites(declarativeSuitesPath);
+let declarativeSuitesStep = null;
+if (!declarativeSuitesResult.ok) {
+  console.error(`VERIFY-DECLARATIVE-SUITES: ${declarativeSuitesResult.error}`);
+  declarativeSuitesStep = { name: "declarative-verify-suites-registration", exitCode: 1 };
+} else if (declarativeSuitesResult.exists) {
+  for (const suite of declarativeSuitesResult.suites) {
+    const entry = { name: suite.name, file: join(repoRoot, suite.file) };
+    if (suite.caseCompletion) {
+      entry.caseCompletion = suite.caseCompletion;
+    }
+    TEST_SUITES.push(entry);
+  }
+}
+
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
 // their resolved authority tier (ADR-0054: `project/pipeline.yaml` or the legacy
@@ -910,6 +926,8 @@ if (startedCandidate.status === "dirty") {
     if (!scopedRegistration.ok) {
       console.error(`Invalid scoped Verify registration: ${scopedRegistration.code}`);
       steps.push({ name: "scoped-verify-registration", exitCode: 1 });
+    } else if (declarativeSuitesStep !== null) {
+      steps.push(declarativeSuitesStep);
     } else {
       const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
       const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));

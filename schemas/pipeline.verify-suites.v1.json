@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.verify-suites.v1",
+  "title": "Declarative verify suites registration (pipeline.verify-suites.v1)",
+  "description": "Declarative test suite registration configuration (WP-B2-2, Issue #106).",
+  "type": "object",
+  "required": [
+    "schema",
+    "suites"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "pipeline.verify-suites.v1",
+      "enum": [
+        "pipeline.verify-suites.v1"
+      ]
+    },
+    "suites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "file"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "caseCompletion": {
+            "type": "object",
+            "required": [
+              "schema",
+              "caseIds",
+              "maxBytes"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "schema": {
+                "type": "string",
+                "const": "pipeline.verify-case-completion-policy.v1",
+                "enum": [
+                  "pipeline.verify-case-completion-policy.v1"
+                ]
+              },
+              "caseIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "maxBytes": {
+                "type": "integer",
+                "minimum": 512
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
