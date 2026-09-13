@@ -47,7 +47,7 @@ something to do here without review.
 
 ## Entries
 
-## Candidate a8eb771544c212a5fb7fd230ca15f65739bcdcaf — 2026-09-13, complete repository-scoped acknowledgement signer recovery
+## Candidate 61673c64724ab25ebf213fd4810839700c73241f — 2026-09-13, complete repository-scoped acknowledgement signer recovery and kernel closure
 
 - ADR-0010: checked, no change needed.
 - ADR-0037: checked, no change needed.
