@@ -57,6 +57,12 @@ const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory
 const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
 const BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-request.v1";
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
 function describeBootstrapAcknowledgementRequest(record, intentSha256) {
   const action = record?.action;
   const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
@@ -68,7 +74,8 @@ function describeBootstrapAcknowledgementRequest(record, intentSha256) {
     || typeof action.root !== "string" || typeof action.featureId !== "string"
     || !exactKeys(action.checkpoint, ["revision", "sha256"]) || !Number.isSafeInteger(action.checkpoint.revision) || !sha(action.checkpoint.sha256)
     || !exactKeys(action.prd, ["path", "sha256"]) || !exactKeys(action.spec, ["path", "sha256"])
-    || !sha(action.prd.sha256) || !sha(action.spec.sha256)) return null;
+    || !sha(action.prd.sha256) || !sha(action.spec.sha256)
+    || createHash("sha256").update(canonicalJson(action), "utf8").digest("hex") !== intentSha256) return null;
   return {
     resolved: true,
     lines: [

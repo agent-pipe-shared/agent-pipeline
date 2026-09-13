@@ -8557,6 +8557,7 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     const signatureDeps = {
       ...intakeDeps,
       readMachinePlane: () => ({ status: "valid", plane: { poKeyDirectory: "/external/po-key" } }),
+      readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256: "a".repeat(64) }] }),
     };
     // Exercise the same returned CLI action a Greenfield driver receives; this
     // must not be merely a direct-library happy path.

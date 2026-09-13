@@ -6690,6 +6690,10 @@ export function planOnboardingBootstrapAcknowledgement({
   const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
   const directory = configuredPoKeyDirectory(deps.readMachinePlane ?? readMachinePlane);
   if (directory === null) fail("BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE", "signature acknowledgement requires a configured PO signing-key directory");
+  const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
+  if (!policy.ok) fail("BOOTSTRAP-ACK-TRUST-POLICY", "signature acknowledgement requires a valid project trust policy before signing");
+  const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
+  if (anchors.length === 0) fail("BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE", "signature acknowledgement requires a project trust anchor before signing");
   const request = writeBootstrapAcknowledgementRequest(plan.root, plan);
   return {
     schema: BOOTSTRAP_ACKNOWLEDGEMENT_PLAN_SCHEMA,
