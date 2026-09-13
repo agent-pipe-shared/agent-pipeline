@@ -8582,6 +8582,20 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       assert.equal(awaitingHuman.nextAction.kind, "external-operator", runner);
       assert.deepEqual(awaitingHuman.nextAction.action, acknowledgementPlan.nextAction, runner);
     }
+    // A durable request can survive while its host machine plane is repaired.
+    // That drift must never publish an external-operator action with a null
+    // payload; the existing exact planner remains the admitted diagnostic
+    // route and will report the missing signing directory precisely.
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const missingSigningDirectory = inspectProjectOnboardingV3({
+        runner,
+        rootDir: path,
+        deps: { ...signatureDeps, readMachinePlane: () => ({ status: "valid", plane: {} }) },
+      });
+      assert.equal(missingSigningDirectory.nextAction.kind, "command", runner);
+      assert.equal(missingSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
+      assert.equal(missingSigningDirectory.nextAction.action, undefined, runner);
+    }
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
       rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
       expectedPlanSha256: "f".repeat(64), proofPath: acknowledgementPlan.proofPath,

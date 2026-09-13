@@ -2461,7 +2461,7 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
         true, false, "pipeline.bootstrap-plan-acknowledgement-apply.v1", ["applied"],
       );
     }
-    if (signatureObservation?.requestStatus === "present") {
+    if (signatureObservation?.requestStatus === "present" && signatureObservation.signAction !== null) {
       return {
         kind: "external-operator",
         mutation: false,
@@ -2472,6 +2472,10 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
         expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
       };
     }
+    // A request may outlive a machine-plane change. Never expose an attended
+    // action with a null payload: return the already guard-admitted planner,
+    // which then reports BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE precisely
+    // until the operator restores the configured signing material.
     return commandAction(
       lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-plan", "--root", root, "--activate"], runner, intent),
       true, false, "pipeline.bootstrap-plan-acknowledgement-plan.v1", ["signature-required"],
