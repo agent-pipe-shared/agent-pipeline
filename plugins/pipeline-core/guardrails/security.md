@@ -3,7 +3,7 @@
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
 > Audience: every agent role in every pipeline-bound project and in this repo. Highest-stakes zone: <PROJECT_B> (real devices, alarm system, locks — a living house).
 
-**Precedence and enforcement:** as defined in `guardrails/global.md` (header). Security diffs are always risk class HIGH: every security-relevant change triggers a Critic review in `--bare` isolation, with the review tier escalated to a higher-capability model for these security-class diffs (canonical trigger wording: `harness/review-protocol.md` §2.1, *Trigger decision table*).
+**Precedence and enforcement:** as defined in `guardrails/global.md` (header). Security diffs are always risk class HIGH: every security-relevant change triggers a fresh, contractually read-only Critic on the higher-capability tier with the functional-equivalent assurance. Runner-native isolation is an optional explicit escalation (canonical trigger wording: `harness/review-protocol.md` §2.1, *Trigger decision table*).
 
 Rule IDs: `SEC-xx`.
 
@@ -188,18 +188,19 @@ new term for this case).
   a proposal whose only justification is human-adversary resistance is a
   SEC-10 violation to flag at design review or Critic review.
 
-## SEC-11 — Read-only filesystem visibility is host-owned
+## SEC-11 — Bash read-scope containment: project root plus exact resolved exceptions
 
-- In its non-ready diagnostic lane, the Pipeline guard classifies command
-  shape and blocks mutation, arbitrary execution, unsupported composition and
-  output redirection. It does not impose a second project-root boundary on
-  commands already proven passive and read-only.
-- **Why:** Codex, Claude Code and Antigravity need to inspect installed
-  plugins, their own transcripts, operator-selected evidence and related
-  checkouts. Repository-root containment repeatedly blocked those normal
-  diagnostics without protecting product state. The host sandbox and OS
-  permissions remain the authority for which files the process can read.
-- **Verification:** positive cases cover in-root and outside-root reads in
-  every supported bounded read shape. Negative cases continue to cover
-  mutation flags, output redirects, execution and unsupported pipelines.
-  Decision history: `docs/adr/draft-read-scope-containment-boundary.md`.
+- The lifecycle guard's passive Bash lane permits a read target only inside the
+  project root or an exact, realpathed exception controlled by the runtime:
+  the loaded plugin root, the host-provided current transcript file, or that
+  transcript's derived `memory/` directory. It never grants a shared runner
+  session collection, an arbitrary host path, a guessed layout, or a
+  pattern-matched directory.
+- **Why:** session transcripts can contain data from other projects, private
+  user content, or credentials. A legitimate cross-session diagnostic must
+  therefore go through a dedicated project-filtering reader, not a generic
+  shell exception.
+- **Verification:** regression cases cover every admitted command family,
+  direct external paths, leading tildes, direct symlinks, symlink-plus-`..`
+  escapes, and sibling-session refusal. Decision history:
+  `docs/adr/draft-read-scope-containment-boundary.md`.
