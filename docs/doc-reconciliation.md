@@ -47,7 +47,7 @@ something to do here without review.
 
 ## Entries
 
-## Candidate 42fa136e78228b5ee83c61c6186ebc4f118a53e6 — 2026-09-13, range 3960faa0..42fa136e, Nova B recovery, lifecycle, verification, and governance completion
+## Candidate 88d7da9236252af5b7d145954ebb7ead80583bae — 2026-09-13, range 3960faa0..88d7da92, Nova B recovery, lifecycle, verification, and governance completion
 
 - ADR-0001: checked, no change needed.
 - ADR-0002: checked, no change needed.
