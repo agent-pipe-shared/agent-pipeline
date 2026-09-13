@@ -6671,6 +6671,38 @@ function configuredPoKeyDirectory(readPlane = readMachinePlane) {
   return typeof directory === "string" && directory.length > 0 ? directory : null;
 }
 
+// An external key directory may offer a signing action only when its public
+// identity is already declared by this project's trust policy. This avoids
+// sending a PO through a signature ceremony which apply would deterministically
+// reject. Apply remains the fail-closed authority boundary if the directory
+// changes after this availability read.
+function observeConfiguredPoTrustAnchor(directory, deps = {}) {
+  if (typeof deps.readConfiguredPoTrustAnchor === "function") return deps.readConfiguredPoTrustAnchor(directory);
+  let value;
+  try { value = JSON.parse(readFileSync(join(directory, "trust-policy.json"), "utf8")); } catch { return { status: "unavailable" }; }
+  if (typeof value?.keyReference !== "string" || value.keyReference.length === 0
+    || typeof value?.publicKeySha256 !== "string" || !SHA256_RE.test(value.publicKeySha256)) {
+    return { status: "invalid" };
+  }
+  return { status: "present", anchor: { keyReference: value.keyReference, publicKeySha256: value.publicKeySha256 } };
+}
+
+function projectTrustAnchors(policy) {
+  return Array.isArray(policy?.trustAnchors)
+    ? policy.trustAnchors
+    : (policy?.trustAnchor === null || policy?.trustAnchor === undefined ? [] : [policy.trustAnchor]);
+}
+
+function configuredSignerMatchesProjectTrust(directory, policy, deps = {}) {
+  const observed = observeConfiguredPoTrustAnchor(directory, deps);
+  if (observed?.status !== "present" || observed.anchor === null || typeof observed.anchor !== "object") {
+    return { status: "unavailable" };
+  }
+  const matches = projectTrustAnchors(policy).some((anchor) => anchor?.keyReference === observed.anchor.keyReference
+    && anchor?.publicKeySha256 === observed.anchor.publicKeySha256);
+  return matches ? { status: "matched" } : { status: "mismatch" };
+}
+
 function bootstrapAcknowledgementSignAction(plan, directory) {
   return {
     kind: "external-operator",
@@ -6692,8 +6724,11 @@ export function planOnboardingBootstrapAcknowledgement({
   if (directory === null) fail("BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE", "signature acknowledgement requires a configured PO signing-key directory");
   const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
   if (!policy.ok) fail("BOOTSTRAP-ACK-TRUST-POLICY", "signature acknowledgement requires a valid project trust policy before signing");
-  const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
+  const anchors = projectTrustAnchors(policy);
   if (anchors.length === 0) fail("BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE", "signature acknowledgement requires a project trust anchor before signing");
+  const signer = configuredSignerMatchesProjectTrust(directory, policy, deps);
+  if (signer.status === "unavailable") fail("BOOTSTRAP-ACK-SIGNER-POLICY-UNAVAILABLE", "the configured PO signing-key directory has no readable valid trust-policy.json");
+  if (signer.status !== "matched") fail("BOOTSTRAP-ACK-SIGNER-TRUST-MISMATCH", "the configured PO signing key is not declared by this project's trust policy");
   const request = writeBootstrapAcknowledgementRequest(plan.root, plan);
   return {
     schema: BOOTSTRAP_ACKNOWLEDGEMENT_PLAN_SCHEMA,
@@ -6717,11 +6752,15 @@ export function observeOnboardingBootstrapAcknowledgementSignature({
   const request = readExactBootstrapAcknowledgementRequest(plan.root, plan);
   const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
   const directory = configuredPoKeyDirectory(deps.readMachinePlane ?? readMachinePlane);
+  const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
+  const signer = directory === null || !policy.ok
+    ? { status: "unavailable" }
+    : configuredSignerMatchesProjectTrust(directory, policy, deps);
   return {
     ...plan,
     requestStatus: request.status,
     proofStatus: proof.status,
-    signAction: request.status === "present" && directory !== null
+    signAction: request.status === "present" && directory !== null && signer.status === "matched"
       ? bootstrapAcknowledgementSignAction(plan, directory)
       : null,
   };

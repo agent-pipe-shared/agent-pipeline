@@ -8558,7 +8558,22 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       ...intakeDeps,
       readMachinePlane: () => ({ status: "valid", plane: { poKeyDirectory: "/external/po-key" } }),
       readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256: "a".repeat(64) }] }),
+      readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "test-po-key", publicKeySha256: "a".repeat(64) } }),
     };
+    // The planner must refuse before writing a request or offering an attended
+    // terminal action when the machine-selected signing directory cannot prove
+    // that it carries one of this project's declared trust anchors.
+    assert.throws(() => planOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit,
+      deps: { ...signatureDeps, readConfiguredPoTrustAnchor: () => ({ status: "unavailable" }) },
+    }), (error) => error?.code === "BOOTSTRAP-ACK-SIGNER-POLICY-UNAVAILABLE");
+    assert.throws(() => planOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit,
+      deps: {
+        ...signatureDeps,
+        readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "other-key", publicKeySha256: "b".repeat(64) } }),
+      },
+    }), (error) => error?.code === "BOOTSTRAP-ACK-SIGNER-TRUST-MISMATCH");
     // Exercise the same returned CLI action a Greenfield driver receives; this
     // must not be merely a direct-library happy path.
     const acknowledgementPlanRun = invoke([
@@ -8596,6 +8611,22 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       assert.equal(missingSigningDirectory.nextAction.kind, "command", runner);
       assert.equal(missingSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
       assert.equal(missingSigningDirectory.nextAction.action, undefined, runner);
+    }
+    // A mismatching, but syntactically valid, machine directory is the same
+    // class of non-actionable state: expose the exact planner diagnostic, not
+    // an external signing action which the project's verifier would reject.
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const mismatchedSigningDirectory = inspectProjectOnboardingV3({
+        runner,
+        rootDir: path,
+        deps: {
+          ...signatureDeps,
+          readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "other-key", publicKeySha256: "b".repeat(64) } }),
+        },
+      });
+      assert.equal(mismatchedSigningDirectory.nextAction.kind, "command", runner);
+      assert.equal(mismatchedSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
+      assert.equal(mismatchedSigningDirectory.nextAction.action, undefined, runner);
     }
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
       rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,

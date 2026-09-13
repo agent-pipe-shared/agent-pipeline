@@ -1437,7 +1437,16 @@ function executeHumanApproval(args, dependencies = {}) {
     // the honest fallback below is unchanged.
     const describeGmw = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
     const describeHgo = dependencies.describeHgoIntentRecord ?? describeHumanGuardOverrideSelection;
-    let record = describeBootstrapAcknowledgementRequest(scratchRequestRecord, intentSha256)
+    const bootstrapAcknowledgement = describeBootstrapAcknowledgementRequest(scratchRequestRecord, intentSha256);
+    // A scratch request which claims the bootstrap-acknowledgement schema is
+    // never a generic, opaque `sign-intent` request. In particular, do not
+    // fall through to the generic GMW/HGO disclosure route when its action
+    // and digest disagree: that would display one action while signing another
+    // digest. Other request schemas retain the established resolver below.
+    if (scratchRequestRecord?.schema === BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA && bootstrapAcknowledgement === null) {
+      fail("the bootstrap acknowledgement request does not bind its exact action and intent digest");
+    }
+    let record = bootstrapAcknowledgement
       ?? describeGmw({ rootDir: repository, intentSha256 });
     if (!record.resolved) {
       record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });

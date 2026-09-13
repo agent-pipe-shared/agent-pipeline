@@ -660,6 +660,39 @@ test("sign-intent discloses the exact reviewed PRD, specification, and checkpoin
   }
 });
 
+test("sign-intent rejects a bootstrap acknowledgement request whose displayed action and intent digest disagree", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const action = {
+      kind: "bootstrap-plan-acknowledgement",
+      decision: "content-sound-and-spec-consistent",
+      root: dirs.repoRoot,
+      featureId: "greenfield-tampered",
+      checkpoint: { revision: 7, sha256: "a".repeat(64) },
+      prd: { path: "specs/greenfield-tampered/prd.md", sha256: "b".repeat(64) },
+      spec: { path: "specs/greenfield-tampered/spec.md", sha256: "c".repeat(64) },
+    };
+    const tamperedIntent = "d".repeat(64);
+    const scratchDir = join(dirs.repoRoot, "scratch");
+    mkdirSync(scratchDir, { recursive: true });
+    const requestPath = `scratch/bootstrap-plan-acknowledgement-request-${tamperedIntent}.json`;
+    writeFileSync(join(dirs.repoRoot, requestPath), `${JSON.stringify({
+      schema: "pipeline.bootstrap-plan-acknowledgement-request.v1", intentSha256: tamperedIntent, action,
+    }, null, 2)}\n`);
+    assert.throws(
+      () => runHumanApproval([
+        "sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--request", requestPath,
+      ], { readConfirmation: () => "approve" }),
+      /bootstrap acknowledgement request does not bind its exact action and intent digest/,
+    );
+    assert.equal(existsSync(join(scratchDir, `bootstrap-plan-acknowledgement-proof-${tamperedIntent}.json`)), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("NVA-SWEEP-F2: sign-intent --request is rejected outside this repository's own scratch/ tree", () => {
   const dirs = fixtureDirs();
   try {
