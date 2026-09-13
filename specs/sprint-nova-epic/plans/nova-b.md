@@ -481,6 +481,68 @@ runner-permission repair action when its independent ready readback is
 malformed; it never admits a planner, a different candidate set or an altered
 settings command.
 
+### B8.1 — Runtime-entrypoint and Claude direct-directory recovery amendment (2026-09-13)
+
+**Problem evidence:** the published push guidance constructed a repository-source
+`push-init.mjs` pathname although the non-ready guard admits only the copy that
+is loaded for the active runtime.  A session following that guidance could be
+routed to an external-operator refusal before it reached the read-only push
+precheck.  Separately, a Claude session loaded directly from a registered local
+directory marketplace was treated as a copied installation even where the
+loaded plugin root and the registry-selected marketplace plugin root were the
+same physical, non-symlink directory.  It then required an impossible
+source-to-copy receipt and cited a source-repository document not shipped with
+the plugin.
+
+**Amended outcome:**
+
+1. Push guidance and all shipped delivery references use the absolute
+   `pluginRoot` from the current ready preflight as the sole runtime script
+   root.  They never publish a repository `plugins/pipeline-core/...` path as
+   a lifecycle action.  The guard continues to execute only its own loaded
+   `push-init.mjs`; a source-tree lookalike gains no admission or authority.
+2. A Claude local-directory registration whose registered marketplace plugin
+   root is the loaded plugin root after physical-path and non-symlink checks is
+   a *direct source*, not an installed copy.  It needs no external
+   source-to-copy receipt and reaches normal onboarding.  A cache/copy, an
+   ambiguous entry, a different physical root, a symlink, an absent registry,
+   or a version/content mismatch remains `plugin-attestation-required` and
+   never receives a fabricated source path or receipt.
+3. The only remaining cache/copy recovery explanation is packaged below the
+   shipped `pipeline-start` skill.  It states the exact evidence that is
+   missing and preserves fail-closed behavior; it never points a consumer at a
+   repository-root document that is absent from the distribution.
+
+**Regression proof:** cover a source-tree push-init lookalike versus the
+loaded action; a preflight-root-derived action; direct Claude directory roots
+on Windows path semantics; cache copies and malformed/ambiguous registries;
+and the absence of source-path invention or a receipt write on every rejected
+case.  Existing Codex copy, explicit-clean-source, and guard closed-argv
+negative tests remain required.
+
+### B8.2 — Antigravity manifest-channel parity amendment (2026-09-13)
+
+**Problem evidence:** Antigravity's installer, public-core observation and
+protected graph use `plugins/pipeline-core/plugin.json`, but preflight resolved
+the Codex manifest instead.  Candidate stamping also omitted the Antigravity
+surface despite `release-version-plan.mjs` declaring it.  A valid installer
+receipt was consequently keyed to the Antigravity version while preflight
+looked it up through the different Codex version and reported a false
+`IPA-HOST-LOCATOR-UNAVAILABLE`.
+
+**Amended outcome:** Antigravity resolves only `plugin.json`; Codex and Claude
+retain their existing dedicated manifests. Every local candidate stamp updates
+the Codex, Claude and Antigravity manifest versions atomically from one exact
+pre-stamp OID. Path-sensitive tests use distinct provider versions so a wrong
+manifest reader cannot pass through an unconditional mock. Existing receipt,
+registry, symlink and content checks remain fail-closed.
+
+**Regression proof:** cover three distinct manifest versions, real
+path-sensitive reads, a stamped Antigravity candidate, receipt lookup/readback
+with the Antigravity version, and refusal for a mismatched or missing
+Antigravity manifest. The release-plan surface corpus must prove all three
+plugin manifests are represented together.
+
 **Stop:** any wildcard executable trust, argument normalization, generic Git
 rollback permission, lifecycle bypass, protected-path weakening or Verify
 registration change.

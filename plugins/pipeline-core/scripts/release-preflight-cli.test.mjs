@@ -39,6 +39,7 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
   const manifest = manifestVersion ?? version;
   write("plugins/pipeline-core/.codex-plugin/plugin.json", { name: "pipeline-core", version: manifest });
   write("plugins/pipeline-core/.claude-plugin/plugin.json", { name: "pipeline-core", version: manifest });
+  write("plugins/pipeline-core/plugin.json", { name: "agent-pipeline-core", version: manifest });
   for (const [kind, path] of Object.entries({ prd: "docs/prd.md", spec: "docs/spec.md", acceptance: "docs/acceptance.md", result: "docs/result.md" })) {
     write(path, `# ${kind}\n`);
   }
@@ -354,6 +355,16 @@ try {
     // Exactly this repository's release-time state: VERSION is stable while the
     // plugin manifests still carry a local-development build suffix.
     const { record } = build(fixture({ version: "1.2.3", manifestVersion: "1.2.3+claude.20260806.abcdefg" }));
+    assert.equal(record.status, "blocked");
+    assert.ok(record.reasons.includes("version-decision-mismatch"), record.reasons.join(", "));
+  });
+
+  check("RPC04a an Antigravity-only manifest drift also blocks release", () => {
+    const context = fixture();
+    writeFileSync(join(context.base, "plugins/pipeline-core/plugin.json"), `${JSON.stringify({
+      name: "agent-pipeline-core", version: "1.2.3+antigravity.stale",
+    }, null, 2)}\n`);
+    const { record } = build(context);
     assert.equal(record.status, "blocked");
     assert.ok(record.reasons.includes("version-decision-mismatch"), record.reasons.join(", "));
   });

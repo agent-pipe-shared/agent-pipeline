@@ -545,6 +545,23 @@ of the hotfix.
   `apply-runner-permissions` action, a malformed independent ready readback
   admits only that exact action. Changed script, operation, root, digest,
   `--activate`, executable or argv remain refused.
+- NVA-B8-9: Push guidance emitted from a loaded Pipeline runtime names only
+  the current preflight `pluginRoot` as its script origin. A repository-source
+  lookalike cannot be published as an executable lifecycle action or gain
+  admission in place of the loaded plugin action.
+- NVA-B8-10: A Claude local directory registration is not misclassified as an
+  installed copy when its one enabled, registry-selected marketplace plugin
+  root is exactly the loaded physical non-symlink root. Cache copies,
+  ambiguity, symlinks, missing bindings and differing roots stay fail-closed
+  and never receive an inferred source path or a receipt.
+- NVA-B8-11: Every gitless Claude cache/copy recovery reference required by
+  bootstrap is shipped below the installed skill root; it names neither an
+  unavailable repository-root document nor an executable action without the
+  required provenance evidence.
+- NVA-B8-12: Antigravity preflight, installer, observation and protected graph
+  resolve the same `plugin.json` version. A locally stamped candidate updates
+  the Codex, Claude and Antigravity manifest surfaces together; a fixture with
+  different provider versions fails if any reader selects the wrong channel.
 
 ## Final evidence matrix
 

@@ -3780,7 +3780,34 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     // above) applies just as much to a push destination as to a submitter
     // name. `--by` is derived the same way the `draft` branch derives it,
     // from the same local Git config (resolveLocalGitUserName()).
-    const pushInitScript = join(PLUGIN_ROOT, "scripts", "push-init.mjs");
+    // A source checkout can execute this state reader too.  Its bundled
+    // `push-init.mjs` is deliberately NOT interchangeable with the plugin
+    // currently loaded by an agent session: the lifecycle guard authorizes
+    // only that loaded copy.  Publishing the source-tree path here therefore
+    // used to hand an agent a command that it could not execute, and could
+    // misclassify the resulting denial as an external boundary.  Only a
+    // plugin root outside this project is a runtime entrypoint.  The source
+    // case names the ready preflight as the authoritative producer instead of
+    // manufacturing an argv from the repository tree.
+    const runtimePluginRoot = deps.runtimePluginRoot ?? PLUGIN_ROOT;
+    const pluginRelativeToProject = relative(resolve(dir), resolve(runtimePluginRoot));
+    const isSourceTreePluginRoot = pluginRelativeToProject === ""
+      || (!pluginRelativeToProject.startsWith(`..${sep}`) && pluginRelativeToProject !== ".." && !isAbsolute(pluginRelativeToProject));
+    if (isSourceTreePluginRoot) {
+      return {
+        kind: "collect-input",
+        mutation: false,
+        requiresConfirmation: false,
+        guidance: "the push signature is a detached Ed25519 proof made with a key kept outside this repository"
+          + " -- an agent must never produce or supply it. This state reader is running from the project source tree,"
+          + " which is not a lifecycle runtime entrypoint. Before the signature, rerun the ready Pipeline start"
+          + " preflight from PIPELINE_PLUGIN_ROOT and use only that result's absolute pluginRoot plus"
+          + " /scripts/push-init.mjs. Never substitute a repository plugins/pipeline-core path. The loaded driver"
+          + " walks doc-reconciliation, push-gate-satisfiability and push-prepare, then stops at the signature.",
+        expected: { schema: INSPECT_SCHEMA, statuses: ["implementing"] },
+      };
+    }
+    const pushInitScript = join(runtimePluginRoot, "scripts", "push-init.mjs");
     const pushInitBy = resolveLocalGitUserName(dir);
     const pushInitCommand = boundedCopySafeCommand({
       executable: process.execPath,

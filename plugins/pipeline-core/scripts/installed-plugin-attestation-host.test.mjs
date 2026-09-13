@@ -360,10 +360,20 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
 
   const agyRepo = fixture("antigravity"); t.after(agyRepo.cleanup);
   const agyRegistry = () => [JSON.stringify({ entries: [{ path: agyRepo.installedPluginRoot }] })];
+  const agyManifestRead = (path) => {
+    const value = String(path);
+    if (value.endsWith("/plugin.json") && !value.includes("/.codex-plugin/")) {
+      return JSON.stringify({ version: "1.2.3-test.1" });
+    }
+    if (value.endsWith("/.codex-plugin/plugin.json")) {
+      return JSON.stringify({ version: "9.9.9+wrong-codex-manifest" });
+    }
+    throw new Error(`unexpected Antigravity manifest path: ${path}`);
+  };
   const agyInspect = (registries = agyRegistry) => observePipelineStartPreflight({
     env: { ANTIGRAVITY_AGENT: "1" }, pluginList: () => JSON.stringify({}),
     scriptUrl: pathToFileURL(join(agyRepo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
-    cwd: agyRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    cwd: agyRepo.base, read: agyManifestRead,
     antigravityPluginRegistries: registries,
     verifyLocalInstalledPluginReceiptFn: (input) => verifyLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: agyRepo.receiptDirectory }),
     observeAntigravityHardEnforcementFn: () => ({ observed: true }),

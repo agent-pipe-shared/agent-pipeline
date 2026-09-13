@@ -40,8 +40,13 @@ signed for has been compared against the decisions that govern it.
 signature (NVA-V4-PUSHDRIVER):**
 
 ```
-node plugins/pipeline-core/scripts/push-init.mjs --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]
+node "${PIPELINE_PLUGIN_ROOT}/scripts/push-init.mjs" --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]
 ```
+
+`PIPELINE_PLUGIN_ROOT` is the absolute `pluginRoot` from the current ready
+Pipeline-start preflight. It is the loaded runtime authority. Never replace it
+with a repository `plugins/pipeline-core` path: a source checkout can differ
+from the loaded plugin and is not an admitted lifecycle entrypoint.
 
 `push-init.mjs` chains Layer 1b (when `harness/scripts/check-doc-reconciliation.mjs`
 exists in the target project; `--base` AND `--candidate` both become required

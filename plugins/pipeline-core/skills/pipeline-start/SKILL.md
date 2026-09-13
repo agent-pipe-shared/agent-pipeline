@@ -39,12 +39,14 @@ asking the PO, accepts only its exact expected result, then reruns the identical
 `plugin-attestation-required`, or any other non-ready status stops bootstrap.
 Goldfish and Critic never perform this mutation and remain blocked for Elephant
 recovery. Never reconstruct the argv or add a source path from conversation.
-For a gitless Claude local marketplace/cache, bootstrap cannot recover the clean
-Git source from Claude's registry. It therefore returns
-`plugin-attestation-required` with `nextAction: null`. Stop and run the explicit
-source-bound host command documented in `docs/claude-local-plugin-development.md`
-from the clean source checkout; never treat the marketplace copy as provenance
-authority or infer a source path from conversation. Rerun bootstrap afterward.
+For Claude, an exact directory-marketplace registration whose selected plugin
+root is the loaded root is a direct local-development source and needs no
+receipt. A gitless Claude cache or copied marketplace tree cannot recover its
+clean Git source from the registry, so it returns
+`plugin-attestation-required` with `nextAction: null`. Follow the shipped
+`references/local-plugin-attestation.md` recovery guidance from the clean source
+checkout; never treat the marketplace copy as provenance authority or infer a
+source path from conversation. Rerun bootstrap afterward.
 For Antigravity, the repository installer writes the same receipt before it
 registers a copied marketplace tree. Every gitless loaded Antigravity root needs
 one exact path-registry binding plus the verified receipt. A missing, ambiguous,

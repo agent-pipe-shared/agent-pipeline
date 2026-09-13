@@ -66,6 +66,7 @@ const VERSION_SURFACES = Object.freeze([
   "VERSION",
   "plugins/pipeline-core/.codex-plugin/plugin.json",
   "plugins/pipeline-core/.claude-plugin/plugin.json",
+  "plugins/pipeline-core/plugin.json",
 ]);
 // ADR-0064 Decision 2: the exact subject shape a release-preflight-kind critical
 // action binds -- every field is one this tool already observes for the record

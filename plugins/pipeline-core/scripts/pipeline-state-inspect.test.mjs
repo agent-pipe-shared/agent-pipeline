@@ -380,17 +380,33 @@ test("implementing next-action surfaces push-init.mjs discoverably, with the sub
     `no OTHER unfilled placeholder shape may leak into the guidance text: ${payload.nextAction.guidance}`);
 });
 
+test("implementing source-tree state reader publishes no source push action", () => {
+  const root = implementingFixture("implementing-push-init-source-tree");
+  const result = invoke(root, ["inspect"], { runtimePluginRoot: join(root, "plugins", "pipeline-core") });
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "implementing");
+  assert.match(payload.nextAction.guidance, /not a lifecycle runtime entrypoint/u);
+  assert.match(payload.nextAction.guidance, /absolute pluginRoot/u);
+  assert.doesNotMatch(payload.nextAction.guidance, /node .*plugins\/pipeline-core\/scripts\/push-init\.mjs/u);
+});
+
 test("implementing next-action also asks for the submitter when local Git config carries none", () => {
   const root = implementingFixture("implementing-push-init-no-by");
   // Deliberately no setLocalGitUserName call: the local Git config carries no user.name.
 
-  const result = invoke(root, ["inspect"]);
+  const runtimePluginRoot = join(root, "..", "loaded-plugin", "pipeline-core");
+  const result = invoke(root, ["inspect"], { runtimePluginRoot });
   assert.equal(result.status, 0, result.err);
   const payload = JSON.parse(result.out);
   assert.equal(payload.status, "implementing");
   assert.ok(payload.nextAction.guidance.includes("push-init.mjs"));
   assert.ok(payload.nextAction.guidance.includes("<submitter's name>"),
     `guidance must ask for the submitter it cannot derive: ${payload.nextAction.guidance}`);
+  assert.ok(payload.nextAction.guidance.includes(join(runtimePluginRoot, "scripts", "push-init.mjs")),
+    "the published command must use the loaded runtime root");
+  assert.ok(!payload.nextAction.guidance.includes(join(root, "plugins", "pipeline-core", "scripts", "push-init.mjs")),
+    "a project source-tree lookalike must never be published as the runtime action");
 });
 
 test("draft next-action becomes a runnable submit-plan command once submitter and profile are both derivable", () => {

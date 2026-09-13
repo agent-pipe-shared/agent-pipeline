@@ -258,3 +258,13 @@ for (const source of PUSH_INIT_DOC_SOURCES) {
     }
   });
 }
+
+test("shipped push guidance names PIPELINE_PLUGIN_ROOT, never a repository-source push-init path", () => {
+  for (const source of PUSH_INIT_DOC_SOURCES) {
+    const text = readFileSync(source.path, "utf8");
+    assert.match(text, /PIPELINE_PLUGIN_ROOT\}?\/scripts\/push-init\.mjs/u,
+      `${source.label} must bind its example to the loaded runtime root`);
+    assert.doesNotMatch(text, /node plugins\/pipeline-core\/scripts\/push-init\.mjs/u,
+      `${source.label} must not publish an untrusted repository-source entrypoint`);
+  }
+});

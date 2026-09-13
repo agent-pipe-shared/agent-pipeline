@@ -302,9 +302,8 @@ export function installedPipelineVersion(pluginList = () => readInstalledPluginL
 /**
  * The ONE place this file resolves "what version is this loaded plugin
  * distribution" -- reads the plugin's own manifest file directly
- * (`.claude-plugin/plugin.json` for the Claude runner, `.codex-plugin/plugin.json`
- * for every other runner, Antigravity included: it ships no manifest of its
- * own and is observed through the Codex-shaped one exactly like Codex itself).
+ * (`.claude-plugin/plugin.json` for Claude, `plugin.json` for Antigravity,
+ * and `.codex-plugin/plugin.json` for Codex).
  * `observePipelineStartPreflight` uses this for its own `version` field below;
  * `antigravity-start-hint.mjs` imports it directly for the SAME resolution
  * rather than re-deriving a second one (NVA-ARMEDPROOF-1) -- a lock's
@@ -313,7 +312,11 @@ export function installedPipelineVersion(pluginList = () => readInstalledPluginL
  * from the build it is supposed to name.
  */
 export function resolvePluginManifestVersion(pluginRoot, runner, read = readFileSync) {
-  const manifestRelativePath = runner === "claude" ? ".claude-plugin/plugin.json" : ".codex-plugin/plugin.json";
+  const manifestRelativePath = runner === "claude"
+    ? ".claude-plugin/plugin.json"
+    : runner === "antigravity"
+      ? "plugin.json"
+      : ".codex-plugin/plugin.json";
   try {
     const manifest = JSON.parse(read(resolve(pluginRoot, manifestRelativePath), "utf8"));
     return typeof manifest?.version === "string" && manifest.version.trim() !== "" ? manifest.version : null;

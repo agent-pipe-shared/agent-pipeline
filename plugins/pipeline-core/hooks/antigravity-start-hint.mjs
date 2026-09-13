@@ -63,9 +63,8 @@ function main() {
     // NVA-ARMEDPROOF-1: bind the lock to the exact plugin build that wrote
     // it, using the SAME manifest-version resolution
     // pipeline-start-preflight.mjs already uses for this runner (Antigravity
-    // ships no manifest of its own, so it reads the Codex-shaped
-    // `.codex-plugin/plugin.json` -- see resolvePluginManifestVersion's own
-    // runner branch) rather than a second, independently-derived one. A
+    // owns `plugin.json` -- see resolvePluginManifestVersion's own runner
+    // branch) rather than a second, independently-derived one. A
     // version this hook cannot resolve (manifest missing/unreadable) is
     // written as `null`, which the observer treats exactly like a lock with
     // no version field at all.

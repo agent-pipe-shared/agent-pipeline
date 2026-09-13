@@ -16,6 +16,7 @@ import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
   STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner, resolveCodexAttestationSourceForPreflight,
+  resolvePluginManifestVersion,
 } from "./pipeline-start-preflight.mjs";
 import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
@@ -632,6 +633,17 @@ test("a non-Claude-Code session still reads the Codex source manifest, never the
     cwd: "/projects/current",
   });
   assert.equal(result.version, "0.4.5+test");
+});
+
+test("Antigravity reads its own plugin manifest, never the Codex-shaped manifest", () => {
+  const paths = [];
+  const version = resolvePluginManifestVersion("/plugins/pipeline-core", "antigravity", (path) => {
+    paths.push(String(path));
+    if (String(path).endsWith("/plugin.json")) return JSON.stringify({ version: "0.6.2+antigravity.test" });
+    throw new Error(`unexpected manifest path for Antigravity: ${path}`);
+  });
+  assert.equal(version, "0.6.2+antigravity.test");
+  assert.deepEqual(paths, ["/plugins/pipeline-core/plugin.json"]);
 });
 
 test("a Claude bare-array registry resolves an attested local-development installation", () => {

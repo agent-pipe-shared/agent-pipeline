@@ -22,8 +22,13 @@ Before hand-running the layers below one at a time, one command chains the
 preparatory push layers up to the point of signature:
 
 ```
-node plugins/pipeline-core/scripts/push-init.mjs --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]
+node "${PIPELINE_PLUGIN_ROOT}/scripts/push-init.mjs" --root <repo> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]
 ```
+
+Use the absolute `pluginRoot` from the current ready start-preflight result for
+`PIPELINE_PLUGIN_ROOT`. Never substitute a project source-tree
+`plugins/pipeline-core` path: the lifecycle guard admits the loaded runtime
+copy, not a lookalike checkout script.
 
 It runs the same read-only checks documented in `docs/push-release-flow.md`
 layer by layer, in their existing order, and reports the first one that is
