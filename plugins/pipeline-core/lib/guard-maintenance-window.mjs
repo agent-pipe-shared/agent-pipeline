@@ -240,6 +240,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/schema-lite.mjs",
   "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
   "plugins/pipeline-core/lib/source-observation.mjs",
+  "plugins/pipeline-core/lib/successful-spawn.mjs",
   "plugins/pipeline-core/lib/windows-private-state.mjs",
   "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
   "plugins/pipeline-core/lib/yaml-lite.mjs",
