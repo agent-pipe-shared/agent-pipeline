@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.plan-approval-binds-a-staging-draft-as-project-authority
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-13
+closure_repository: self
+closure_commit: d37e6eff196b7e4786fe58b89742e52f5190404e
+closure_evidence: specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md
 created: 2026-08-27
 sprint: alfred
 source: "Live state of a greenfield Antigravity test project, read 2026-08-27: the PO plan approval bound project/.onboarding-staging/ paths as project authority and advanced the feature to implementation. The generated staging files' own banner states they must not be bound as authority."
@@ -116,3 +120,10 @@ refused with a typed reason naming the promotion action.
   must be removed together, which needs one signed author-repair override. Exact
   steps in `scratch/NVA-INTAKESPECS-1-UMSETZUNG.md`.
 - **Date:** 2026-08-27
+
+### Update, 2026-09-13 — resolved by WP-A4 (Issue #102 / AC-4)
+
+- **Decision:** closed, resolved.
+- **Rationale:** `refusePlanAuthorityStagingPath` in `plugins/pipeline-core/lib/plan-authority-staging-guard.mjs` enforces both path containment (refusing paths resolving inside `project/.onboarding-staging/` / `INTAKE_STAGING_DIRNAME`) and content banner checking (refusing files carrying the generated pre-authority banner line `this staging file is NOT yet bound as project authority` or `PRE_AUTHORITY_BANNER_LINE`), emitting typed code `PLAN-BINDS-PRE-AUTHORITY-DRAFT` and naming the promotion action (`node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote apply`). Both `submit-plan` and `approve-plan` in `pipeline-state.mjs` enforce this check as a mandatory precondition.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md`
+- **Date:** 2026-09-13

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-13
+closure_repository: self
+closure_commit: d37e6eff196b7e4786fe58b89742e52f5190404e
+closure_evidence: specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md
 created: 2026-08-28
 sprint: alfred
 source: "Measured live 2026-08-28 in the Alfred clone, applying the PO's own PRD-gate decisions to the PRD and Spec the gate is about."
@@ -99,7 +103,8 @@ not accept.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed, resolved by WP-A4 (Issue #102 / AC-2).
+- **Rationale:** In `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, `boundAuthorityDocumentPath()` now checks if `state.activeFeature?.phase === "design"` and `state.planApproved !== true`. In this design state prior to plan approval, editing PRD and Spec documents is permitted (returns `null` so write is not refused by `GUARD-LIFECYCLE-AUTHORITY-BOUND`). Authority document freeze is armed during `phase === "implementation"` (or after `planApproved === true` without invalidation), and `reopen-design` properly invalidates and releases the binding so design revisions can proceed.
+- **Assignment (if accepted):** Alfred team (Goldfish ALF-A4-DESIGN-AUTHORITY-SEALING)
+- **Date:** 2026-09-13
+- **Closure:** Closed 2026-09-13 with `plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs`, verified in `guard-lifecycle-ready.test.mjs`, and documented in `specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md`.

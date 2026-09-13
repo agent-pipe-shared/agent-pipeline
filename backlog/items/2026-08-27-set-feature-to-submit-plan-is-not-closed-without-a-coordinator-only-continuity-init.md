@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-13
+closure_repository: self
+closure_commit: d37e6eff196b7e4786fe58b89742e52f5190404e
+closure_evidence: specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md
 created: 2026-08-27
 sprint: alfred
 source: "Second measured occurrence, 2026-08-27, in the Alfred clone (submit-plan refused with PLAN-SUBMIT-CONTINUITY-INVALID after a clean set-feature). First occurrence documented in specs/sprint-phoenix-epic/RECOVERY.md (2026-07, 'second integration gap')."
@@ -65,7 +69,8 @@ advertises.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed, resolved by WP-A4 (Issue #102 / AC-2, AC-4).
+- **Rationale:** `set-feature` in `plugins/pipeline-core/scripts/pipeline-state.mjs` now initializes revision-0 design continuity (`pipeline.continuity.v0`) directly on the active feature state when creating a feature in `phase: "design"`. It binds the PRD and Spec paths and their digests (deriving Spec path from `dirname(planPath)/spec.md` or PO gate authority) with `nextAction: "review"`. Subsequent `submit-plan` transitions cleanly without failing with `PLAN-SUBMIT-CONTINUITY-INVALID` and without requiring a coordinator-only `continuity-init`. `continuity-init` remains compatible for revision-0 initial design states.
+- **Assignment (if accepted):** Alfred team (Goldfish ALF-A4-DESIGN-AUTHORITY-SEALING)
+- **Date:** 2026-09-13
+- **Closure:** Closed 2026-09-13 with `plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs`, verified in `pipeline-state.test.mjs`, and documented in `specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md`.
