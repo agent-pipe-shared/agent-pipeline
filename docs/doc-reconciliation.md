@@ -47,6 +47,32 @@ something to do here without review.
 
 ## Entries
 
+## Candidate a8eb771544c212a5fb7fd230ca15f65739bcdcaf — 2026-09-13, complete repository-scoped acknowledgement signer recovery
+
+- ADR-0010: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0064: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0072: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+
+The acknowledgement route now resolves the exact same precedence chain as the
+human signing terminal: repository-scoped pointer, then machine plane, then
+the explicit environment fallback. The repository pointer is a single shared
+library contract rather than parallel copies. Before offering an attended
+action, the external trust-policy artifact must be an unlinked regular file
+whose identity remains stable while read; symlinks, hard links, oversized and
+malformed files yield the typed planner route instead. The detached proof is
+still verified against project-declared anchors at apply time.
+
 ## Candidate f60068ce6deb73f3aa3601bda737e305af6f195f — 2026-09-13, bind bootstrap acknowledgement signing to project trust
 
 - ADR-0010: checked, no change needed.
