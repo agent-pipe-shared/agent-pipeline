@@ -6334,19 +6334,16 @@ test("read-only diagnostics admit only the exact host-provided transcript and me
   }
 });
 
-test("Codex can recover prior project rollouts only from its trusted sessions directory", () => {
+test("runner session collections never widen the exact current-session read scope", () => {
   const projectDir = hgoGitFixture("signature");
   const codexHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-codex-home-"));
   const sessionsDir = join(codexHome, "sessions");
   const prior = join(sessionsDir, "2026", "09", "prior-rollout.jsonl");
-  const settings = join(codexHome, "settings.json");
   mkdirSync(dirname(prior), { recursive: true });
   writeFileSync(prior, "{\"cwd\":\"fixture\"}\n");
-  writeFileSync(settings, "{\"secret\":true}\n");
   try {
     const deps = { projectDir, ...hgoReadyDeps(), runner: "codex", env: { CODEX_HOME: codexHome } };
-    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior} | head -n 5`), deps).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${settings}`), deps).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior} | head -n 5`), deps).exitCode, 2);
     assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), { ...deps, runner: "claude" }).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
@@ -6354,21 +6351,18 @@ test("Codex can recover prior project rollouts only from its trusted sessions di
   }
 });
 
-test("Claude can read its host-provided projects collection but not sibling host data", () => {
+test("Claude cannot use the current transcript to reach a sibling project transcript", () => {
   const projectDir = hgoGitFixture("signature");
   const claudeHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-home-"));
   const current = join(claudeHome, "projects", "current-project", "current.jsonl");
   const prior = join(claudeHome, "projects", "other-project", "prior.jsonl");
-  const settings = join(claudeHome, "settings.json");
   mkdirSync(dirname(current), { recursive: true });
   mkdirSync(dirname(prior), { recursive: true });
   writeFileSync(current, "{\"cwd\":\"fixture\"}\n");
   writeFileSync(prior, "{\"cwd\":\"prior\"}\n");
-  writeFileSync(settings, "{\"secret\":true}\n");
   try {
     const deps = { projectDir, ...hgoReadyDeps(), runner: "claude" };
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), deps).exitCode, 0);
-    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + settings, current), deps).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), deps).exitCode, 2);
     assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), { ...deps, runner: "codex" }).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });

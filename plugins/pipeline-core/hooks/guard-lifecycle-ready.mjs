@@ -21,7 +21,6 @@ import {
   resolve,
   sep,
 } from "node:path";
-import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -1649,24 +1648,14 @@ function claudeSessionTranscriptFilePath(input, dependencies = {}) {
 }
 
 /**
- * A Claude restart needs bounded access to its prior session records too. The host supplies the
- * current transcript path; when its real grandparent is the documented projects directory,
- * that parent is the one runtime-owned Claude session collection boundary. It deliberately does
- * not include sibling Claude data such as settings, plugins, or credentials.
+ * Session content can contain user data or credentials, so the guard never admits a host-wide
+ * session collection. The host supplies only the current Claude transcript path; its exact file
+ * and the exact derived `memory/` directory are the sole session-derived read roots. A restart
+ * needing a prior transcript must use a dedicated, project-filtering reader rather than turn a
+ * shared runner storage directory into a generic shell-readable boundary.
  *
- * A Codex restart also needs bounded access to its prior rollout records. The SessionStart hint
- * names exactly `$CODEX_HOME/sessions` (or `~/.codex/sessions` when CODEX_HOME is unset), so the
- * lifecycle gate admits that one realpathed directory only for the Codex runner. This is a
- * runtime-owned boundary: it is derived from the hook process environment, never from command
- * text or the project, and it still excludes every sibling under CODEX_HOME (credentials,
- * settings, plugins, and caches). The restart instruction independently requires project-
- * identity filtering before a transcript is selected; this guard only makes that documented,
- * bounded metadata/read workflow executable.
- *
- * Together with Claude's exact transcript file and derived memory directory, these are the
- * session-derived read roots. Each entry is admitted or omitted independently. Deliberately NOT
- * a module-level constant (unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS): both Claude roots vary per
- * invocation with `input`, while the Codex root varies with the trusted hook environment.
+ * Each entry is admitted or omitted independently. Deliberately NOT a module-level constant
+ * (unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS): both roots vary per invocation with `input`.
  *
  * Deliberately excludes the `/tmp` task-output directory a dispatched subagent's own output
  * lands in: that location is not carried in any PreToolUse hook field, and admitting it would
@@ -1674,45 +1663,12 @@ function claudeSessionTranscriptFilePath(input, dependencies = {}) {
  * id, `tasks/`) -- the exact "guessed rather than resolved" shape this function, and MEMPATH-1
  * before it, both refuse to do. That need stays out of scope for this function.
  */
-function codexSessionReadDirectory(dependencies = {}) {
-  if (dependencies.runner !== "codex") return null;
-  const env = dependencies.env ?? process.env;
-  const codexHome = typeof env?.CODEX_HOME === "string" && env.CODEX_HOME.trim() !== ""
-    ? env.CODEX_HOME
-    : join(homedir(), ".codex");
-  if (!isAbsolute(codexHome) || codexHome.includes("\0")) return null;
-  try {
-    const sessions = realpathSync(join(codexHome, "sessions"));
-    return statSync(sessions).isDirectory() ? sessions : null;
-  } catch {
-    return null;
-  }
-}
-
-function claudeSessionReadDirectory(input, dependencies = {}) {
-  if (dependencies.runner !== "claude") return null;
-  const transcript = claudeSessionTranscriptFilePath(input, dependencies);
-  if (transcript === null) return null;
-  const sessions = dirname(dirname(transcript));
-  if (basename(sessions) !== "projects") return null;
-  try {
-    const real = realpathSync(sessions);
-    return statSync(real).isDirectory() ? real : null;
-  } catch {
-    return null;
-  }
-}
-
 function sessionReadScopeRoots(input, dependencies = {}) {
   const roots = [];
   const transcriptFile = claudeSessionTranscriptFilePath(input, dependencies);
   if (transcriptFile !== null) roots.push(transcriptFile);
   const memoryDir = claudeSessionMemoryDirectory(input, dependencies);
   if (memoryDir !== null) roots.push(memoryDir);
-  const claudeSessions = claudeSessionReadDirectory(input, dependencies);
-  if (claudeSessions !== null) roots.push(claudeSessions);
-  const codexSessions = codexSessionReadDirectory(dependencies);
-  if (codexSessions !== null) roots.push(codexSessions);
   return roots;
 }
 
