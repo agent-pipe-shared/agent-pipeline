@@ -1,0 +1,5 @@
+## Release and push actions are deliberately reviewed by the attending operator.
+## The push protocol may bind a substantive candidate S and a later
+## reconciliation-record commit R; automatic review cannot safely infer that
+## documented relationship from a single shell invocation.
+approvals_reviewer = "user"
