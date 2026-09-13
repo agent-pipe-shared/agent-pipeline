@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Hit live, 2026-08-27, in the Alfred clone, executing the epic switch the tool itself directs (discard-feature then set-feature). Reproduced against the source the same session; line references verified."
+done_when: manual
 ---
 
 # `discard-feature` writes a state shape the session-cleanup observer rejects, and the guard then blocks the `set-feature` that would leave it

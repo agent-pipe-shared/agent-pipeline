@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Measured twice on 2026-08-27, independently, by both design-review Critic dispatches of the sprint-alfred-epic package (reports persisted under specs/sprint-alfred-epic/evidence/critic/)."
+done_when: manual
 ---
 
 # Critic dispatches cannot persist their scratch notes, defeating the review protocol's own truncation-recovery mechanism
