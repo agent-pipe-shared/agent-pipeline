@@ -56,6 +56,8 @@ something to do here without review.
 - ADR-0054: checked, no change needed.
 - ADR-0055: checked, no change needed.
 - ADR-0057: checked, no change needed.
+- ADR-0058: checked, no change needed.
+- ADR-0059: checked, no change needed.
 - ADR-0061: checked, no change needed.
 - ADR-0064: checked, no change needed.
 - ADR-0067: checked, no change needed.
@@ -71,7 +73,10 @@ library contract rather than parallel copies. Before offering an attended
 action, the external trust-policy artifact must be an unlinked regular file
 whose identity remains stable while read; symlinks, hard links, oversized and
 malformed files yield the typed planner route instead. The detached proof is
-still verified against project-declared anchors at apply time.
+verified before an apply action is offered and again at apply time. An empty
+v3 anchor list keeps its documented unrestricted semantics; an invalid proof
+re-offers the bound sign action instead of entering an apply loop. The shared
+signer-directory resolver is now included in the never-liftable kernel closure.
 
 ## Candidate f60068ce6deb73f3aa3601bda737e305af6f195f — 2026-09-13, bind bootstrap acknowledgement signing to project trust
 
