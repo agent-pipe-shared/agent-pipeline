@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "ece970e8d3fcb1b48615b40a5992973ae63aab22",
-    "tree": "7036eff8ca36ec9e52868d53b9bffcf9bc5f393b"
+    "commit": "252e761c853db3d2548fb7342bdc643ac762fbdd",
+    "tree": "46e241da4e72880da52f28e53e17debfbde115cb"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -285,7 +285,6 @@
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
-        "verify-phase:harness/scripts/verify.mjs:observe-critic-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
@@ -412,6 +411,7 @@
         "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:observe-critic-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
