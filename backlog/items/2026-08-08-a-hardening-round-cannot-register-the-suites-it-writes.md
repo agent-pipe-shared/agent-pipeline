@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.hardening-round-cannot-register-its-own-suites
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 sprint: alfred
 due: 2026-08-22
@@ -134,3 +134,10 @@ implementation attempted here.
   directions 1/2 as already scoped above; the detector (direction 3) is
   already shipped per the 2026-08-17 update.
 - **Date:** 2026-08-18
+
+### Update, 2026-09-13 — resolved by WP-B2-2 (Issue #106 / AC-11)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Declarative suite registration via `harness/verify-suites.json` was introduced per WP-B2-2 (Issue #106 / AC-11) adhering to the `pipeline.verify-suites.v1` JSON Schema. `verify.mjs` and `check-verify-suite-registration.mjs` load and validate `harness/verify-suites.json`, registering test suites into `TEST_SUITES` without mutating TP-3 protected `verify.mjs`. The two outstanding unregistered suites (`architecture-baseline-tests` and `report-interruptions-tests`) are registered and verified.
+- **Evidence:** `backlog/evidence/2026-09-13-declarative-verify-suite-registration.md`
+- **Date:** 2026-09-13
