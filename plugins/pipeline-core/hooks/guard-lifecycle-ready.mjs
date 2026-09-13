@@ -2355,6 +2355,65 @@ function splitTopLevelAndChain(command) {
   return parts;
 }
 
+/**
+ * The shared command grammar intentionally rejects physical newlines before it
+ * tokenizes a shell command.  That is correct for mutations (a newline can
+ * hide an additional command), but unnecessarily rejects a transcript-style
+ * diagnostic block even when every line is independently admitted read-only.
+ *
+ * This local scanner is deliberately narrower than the existing `&&` lane:
+ * it activates only when a physical line boundary is present and every part
+ * must pass `isReadOnlyDiagnosticCommand` itself.  In particular it does not
+ * inherit the `&&` lane's `mkdir -p` convenience exception.  Semicolons,
+ * redirects, substitution, pipes, parentheses, escaped newlines, and quoted
+ * newlines remain closed; each physical line is merely an alternative spelling
+ * of several separate read-only tool calls.
+ */
+function splitTopLevelReadOnlyNewlineChain(command) {
+  if (typeof command !== "string" || command.trim() === "" || /[\0`]/u.test(command)) return null;
+  const parts = [];
+  let quote = null;
+  let escaped = false;
+  let start = 0;
+  let sawNewline = false;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index];
+    if (escaped) {
+      if (char === "\r" || char === "\n") return null;
+      escaped = false;
+      continue;
+    }
+    if (quote !== "'" && char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "'" || char === "\"") {
+      quote = char;
+      continue;
+    }
+    if (char === "\r" || char === "\n") {
+      const part = command.slice(start, index).trim();
+      if (part === "") return null;
+      parts.push(part);
+      if (char === "\r" && command[index + 1] === "\n") index += 1;
+      start = index + 1;
+      sawNewline = true;
+      continue;
+    }
+    if (";&<>()|".includes(char)) return null;
+  }
+  if (quote !== null || escaped || !sawNewline) return null;
+  const last = command.slice(start).trim();
+  if (last === "") return null;
+  parts.push(last);
+  if (parts.length < 2 || parts.length > MAX_AND_CHAIN_SEGMENTS) return null;
+  return parts;
+}
+
 // Narrow, explicit allowlist of safe `git log` display flags for the `&&`-chain family.
 // A WHITELIST, not a denylist of known-bad flags -- so an unrecognized flag fails closed
 // by construction ("if genuinely unsure whether a specific flag is safe, exclude it and
@@ -2486,6 +2545,11 @@ function isBoundedReadOnlyAndChain(command, root, extraRoots = []) {
   const parts = splitTopLevelAndChain(command);
   if (!parts) return false;
   return parts.every((part) => isChainSegmentAdmitted(part, root, extraRoots));
+}
+
+function isBoundedReadOnlyNewlineChain(command, root, extraRoots = []) {
+  const parts = splitTopLevelReadOnlyNewlineChain(command);
+  return parts !== null && parts.every((part) => isReadOnlyDiagnosticCommand(part, root, extraRoots));
 }
 
 function isChainSegmentAdmitted(part, root, extraRoots = []) {
@@ -2686,6 +2750,7 @@ export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
   if (isBoundedGrepPipeline(parsed, root)) return true;
   if (isBoundedCatPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedGitPipeline(parsed, root, pipelineRoots)) return true;
+  if (isBoundedReadOnlyNewlineChain(command, root, extraRoots)) return true;
   if (isBoundedReadOnlyAndChain(command, root, extraRoots)) return true;
   if (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, extraRoots)) return true;
   return isReadOnlySimpleWords(simpleWords(command, root), root, pipelineRoots);

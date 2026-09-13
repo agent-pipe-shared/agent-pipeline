@@ -38,6 +38,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
@@ -53,6 +54,7 @@ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
+export const PIPELINE_STATE_SCRIPT_PATH = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const REMOTE_RE = /^[A-Za-z0-9._-]{1,80}$/u;
 const DESTINATION_RE = /^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u;
 export const PUSH_THREAT_MODEL_PATH = "project/push-threat-model.md";
@@ -557,7 +559,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
       label: "agent approve-push",
       executable: "node",
       argv: [
-        "plugins/pipeline-core/scripts/pipeline-state.mjs", "approve-push",
+        PIPELINE_STATE_SCRIPT_PATH, "approve-push",
         "--by", by, "--remote", remote, "--destination", destination,
       ],
     });
@@ -582,7 +584,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     report.ready = false;
     report.checks.push({
       id: "subject-hash", ok: false, message: "prepare-push-subject did not produce a usable subject hash.",
-      remedy: `node plugins/pipeline-core/scripts/pipeline-state.mjs prepare-push-subject --by ${by} --remote ${remote} --destination ${destination}`,
+      remedy: `node ${JSON.stringify(PIPELINE_STATE_SCRIPT_PATH)} prepare-push-subject --by ${by} --remote ${remote} --destination ${destination}`,
     });
     return { ok: true, report, lines: null };
   }
@@ -591,7 +593,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   const feature = resolveFeatureContext(dir, deps);
   if (!feature.ok) {
     report.ready = false;
-    report.checks.push({ id: "active-feature", ok: false, message: feature.message, remedy: "node plugins/pipeline-core/scripts/pipeline-state.mjs set-feature --id <id> --plan-path <planPath>" });
+    report.checks.push({ id: "active-feature", ok: false, message: feature.message, remedy: `node ${JSON.stringify(PIPELINE_STATE_SCRIPT_PATH)} set-feature --id <id> --plan-path <planPath>` });
     return { ok: true, report, lines: null };
   }
 
@@ -619,7 +621,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
 
   const artifacts = criticalArtifactPaths(dir, directory, deps);
   const approveArgv = [
-    "plugins/pipeline-core/scripts/pipeline-state.mjs", "approve-push",
+    PIPELINE_STATE_SCRIPT_PATH, "approve-push",
     "--by", by, "--remote", remote, "--destination", destination,
     "--proof-request", artifacts.request, "--proof-authority", artifacts.authority, "--proof", artifacts.proof,
   ];

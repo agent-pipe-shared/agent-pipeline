@@ -108,6 +108,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -115,6 +116,8 @@ import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from
 import { pushPrepareReport as realPushPrepareReport } from "./push-prepare.mjs";
 
 export const SCHEMA = "pipeline.push-init.v1";
+export const RECOVERY_SCHEMA = "pipeline.push-init-recovery.v1";
+export const PUSH_INIT_SCRIPT_PATH = fileURLToPath(import.meta.url);
 
 // Project-root-relative, never plugin-root-relative -- see the header comment "WHY LAYER 1b
 // IS CONDITIONAL". A consumer project without this file simply has no Layer 1b to run.
@@ -153,10 +156,42 @@ export function parseArgs(argv) {
  * feeds the guard's real admission function a REAL emitted argv rather than a hand-typed
  * copy that could silently drift from what this file's own `parseArgs()` actually accepts.
  */
-export function buildPushInitArgv({ root, by, remote, destination, base = null }) {
+export function buildPushInitArgv({ root, by, remote, destination, base = null, candidate = null, recordRef = null }) {
   const argv = ["--root", root, "--by", by, "--remote", remote, "--destination", destination];
   if (base !== null) argv.push("--base", base);
+  if (candidate !== null) argv.push("--candidate", candidate);
+  if (recordRef !== null) argv.push("--record-ref", recordRef);
   return argv;
+}
+
+/**
+ * A push is intentionally not auto-remediated: individual remedies can require
+ * a human signature, a commit, or a project-specific verify command.  The
+ * driver nevertheless returns one closed, machine-readable recovery block so
+ * a caller need not rediscover blockers one shell invocation at a time.
+ */
+export function buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks }) {
+  const blockers = checks.map(({ id, status, message, remedy }) => ({
+    id,
+    ...(typeof status === "string" ? { status } : {}),
+    ...(typeof message === "string" ? { message } : {}),
+    ...(typeof remedy === "string" ? { remedy } : {}),
+  }));
+  return {
+    schema: RECOVERY_SCHEMA,
+    status: "action-required",
+    summary: "Complete every listed remedy, then retry the exact push-init invocation below. The driver never executes a remedy or a human signature.",
+    blockers,
+    retryAction: {
+      kind: "command",
+      executable: process.execPath,
+      argv: [PUSH_INIT_SCRIPT_PATH, ...buildPushInitArgv({ root, by, remote, destination, base, candidate, recordRef })],
+      mutation: false,
+      requiresConfirmation: false,
+      executionBoundary: "local-process",
+      expected: { schema: SCHEMA, outcomes: ["precondition-unmet", "signature-required"] },
+    },
+  };
 }
 
 /**
@@ -271,7 +306,10 @@ export function drivePushInit({
   // one candidate-bound report. The cheap satisfiability checks above are policy-shaped and
   // safe to aggregate; stop here before the R-bound report.
   if (!reconciliationCheck.ok) {
-    return { schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks };
+    return {
+      schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks,
+      recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks }),
+    };
   }
 
   // Layer 2 (full report) -- push-prepare.mjs, in-process.
@@ -285,7 +323,10 @@ export function drivePushInit({
   if (!prepare.report.ready) failedChecks.push(...prepare.report.checks.filter((check) => !check.ok));
 
   if (failedChecks.length > 0) {
-    return { schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks };
+    return {
+      schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks,
+      recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks }),
+    };
   }
 
   // Every precondition is green. Present the signature command; never execute it -- see the

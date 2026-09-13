@@ -35,6 +35,7 @@ import {
   foldPendingPushApprovalWrite,
   isSecurityGateActive,
   parseArgs,
+  PIPELINE_STATE_SCRIPT_PATH,
   preparePushSubject,
   printReport,
   pushPrepareReport,
@@ -520,6 +521,9 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.match(humanText, /Step: agent approve-push\nPOSIX:/u);
   assert.match(humanText, /Step: agent push\nPOSIX:/u);
   assert.match(humanText, /PowerShell:/u);
+  assert.match(PIPELINE_STATE_SCRIPT_PATH, /^\/.*\/plugins\/pipeline-core\/scripts\/pipeline-state\.mjs$/u);
+  const source = readFileSync(fileURLToPath(new URL("./push-prepare.mjs", import.meta.url)), "utf8");
+  assert.match(source, /PIPELINE_STATE_SCRIPT_PATH, "approve-push"/u);
   assert.match(humanText, /cmd\.exe:/u);
   assert.equal(humanText.split(/\r?\n/u).every((line) => line.length <= 72), true, humanText);
   assert.doesNotMatch(humanText, /^git push origin HEAD:refs\/heads\/main$/mu);

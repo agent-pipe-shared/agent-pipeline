@@ -1767,6 +1767,33 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
   }
 });
 
+test("physical newline diagnostic blocks admit only independently read-only lines", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      "git status --short\ngit log --oneline -5",
+      "rg -n lifecycle plugins/pipeline-core\nhead -n 20 docs/push-release-flow.md",
+      "git rev-parse HEAD\nrg -n push-init plugins/pipeline-core/scripts",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(
+        bash(command),
+        { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+      ), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      "git status\ntouch bypass.txt",
+      "git status\nmkdir -p scratch/not-read-only",
+      "git status\n\ngit log --oneline",
+      "git status\ngit log --oneline > output.txt",
+      "git status; git log --oneline",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
 // Critic finding F2 (rework round against commit b3153385): the test above uses an
 // UNGOVERNED root (root() writes no BASE_GOVERNANCE_MARKERS file), so

@@ -60,11 +60,14 @@ test("parseArgs: refuses an unknown argument and a flag with no value", () => {
 // against these same functions in guard-lifecycle-ready.test.mjs, NVA-V4-PUSHDRIVER)
 // ---------------------------------------------------------------------------
 
-test("buildPushInitArgv: omits --base when absent, includes it when supplied", () => {
+test("buildPushInitArgv: preserves every optional reconciliation selector in a retry", () => {
   const withoutBase = buildPushInitArgv({ root: "/x", by: "t", remote: "origin", destination: "refs/heads/main" });
   assert.equal(withoutBase.includes("--base"), false);
-  const withBase = buildPushInitArgv({ root: "/x", by: "t", remote: "origin", destination: "refs/heads/main", base: "HEAD~1" });
-  assert.deepEqual(withBase.slice(-2), ["--base", "HEAD~1"]);
+  const withSelectors = buildPushInitArgv({
+    root: "/x", by: "t", remote: "origin", destination: "refs/heads/main",
+    base: "HEAD~1", candidate: "candidate-S", recordRef: "record-R",
+  });
+  assert.deepEqual(withSelectors.slice(-6), ["--base", "HEAD~1", "--candidate", "candidate-S", "--record-ref", "record-R"]);
 });
 
 test("buildReconciliationArgv: candidate and record-ref are explicit caller inputs, never invented (NVA-B-PUSHINIT-1)", () => {
@@ -355,6 +358,13 @@ test("drivePushInit: one run returns failures from satisfiability and push-prepa
       "security-evidence",
     ]);
     assert.deepEqual(prepareOptions, { foldPendingApprovalWrite: false });
+    assert.equal(result.recovery.schema, "pipeline.push-init-recovery.v1");
+    assert.equal(result.recovery.status, "action-required");
+    assert.deepEqual(result.recovery.blockers.map((check) => check.id), result.checks.map((check) => check.id));
+    assert.deepEqual(result.recovery.retryAction.argv.slice(1), [
+      "--root", root, "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main",
+    ]);
+    assert.equal(result.recovery.retryAction.mutation, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
