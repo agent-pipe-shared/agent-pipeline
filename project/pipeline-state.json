@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-09-02T05:29:56.887Z",
+  "updatedAt": "2026-09-13T07:36:15.419Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -64,32 +64,42 @@
   "activeFeature": {
     "id": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "phase": "implementation"
+    "phase": "implementation",
+    "phaseHistory": [
+      {
+        "phase": "design",
+        "at": "2026-09-13T07:30:08.435Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-09-13T07:36:15.418Z"
+      }
+    ]
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v4",
     "approvedBy": "André",
-    "approvedAt": "2026-08-18T18:33:48.866Z",
-    "submissionSha256": "aa25b676c77c645849211833449180a7dfd133b283f46e35768439ea10f89d74",
-    "profileSha256": "3e737516ac76f1ba1a92f41b9f338eccf07af9503e0c632a377c4ae7d0d62b3b",
+    "approvedAt": "2026-09-13T07:36:03.212Z",
+    "submissionSha256": "40bd1a9c48a81b86e63cfcc318be44ef8a776b6de162954118a00b82a8c8d265",
+    "profileSha256": "e3f62cf8685063aa2297b2766e858e2a0ef1bdcfe9e426d32193b4057af61d79",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
-      "sourceSha256": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
-      "runtimeSha256": "5fa4492e52d5987142bcd7eb466bba8492a4ba53a7938995783e93c3e43df58f",
-      "receiptSha256": "a9ee82326a8135863802829f5621e706c558feb2765627daa2b585139a9fc57e",
+      "sourceSha256": "3ab5f44e6fb471432e243adc1f8a83f9f3b9057d253389c87e79453d808511d0",
+      "runtimeSha256": "1c73ccf3dd28fa5887ace8bec64391a968b47ecf9a5aa6f24566a4cb91946bb0",
+      "receiptSha256": "d4c8445ea2e1c847caa8cc298cf4d2f4fedda59b6bd270d30e5b0cb43c16c56e",
       "repositoryFingerprint": "5172c023ad31e8e1c82402e4d0a657cc6db16c0ba5538a432d48e8d477f2b16d",
       "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "c3f7469cc7a0d273a637050d379fd9266746fef19f9cd78650ddd75b95d2350f",
+      "planSha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298",
       "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "f9b1f508cdc8c85764ef2f907f133c22e52176062329d9a9c98987f07c23be21"
+      "specSha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb"
     },
-    "priorInvalidationSha256": "b9769a79cf2cfcb9f92bcbf1e9edec17f0076aa02026eddc631754ac3791c49b"
+    "priorInvalidationSha256": "ad0ccde76ff816a209a72728194459dd11a8be62e1e63913a43017304ff891cf"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-nova-epic",
-    "revision": 25,
+    "revision": 27,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Elephant",
@@ -98,11 +108,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-        "sha256": "c3f7469cc7a0d273a637050d379fd9266746fef19f9cd78650ddd75b95d2350f"
+        "sha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298"
       },
       "spec": {
         "path": "specs/sprint-nova-epic/spec.md",
-        "sha256": "f9b1f508cdc8c85764ef2f907f133c22e52176062329d9a9c98987f07c23be21"
+        "sha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb"
       },
       "result": null
     },
@@ -118,7 +128,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 25,
+      "sourceRevision": 27,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -136,21 +146,21 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "planSha256": "c3f7469cc7a0d273a637050d379fd9266746fef19f9cd78650ddd75b95d2350f",
+    "planSha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298",
     "specPath": "specs/sprint-nova-epic/spec.md",
-    "specSha256": "f9b1f508cdc8c85764ef2f907f133c22e52176062329d9a9c98987f07c23be21",
+    "specSha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb",
     "profile": "epic",
-    "profileSha256": "3e737516ac76f1ba1a92f41b9f338eccf07af9503e0c632a377c4ae7d0d62b3b",
+    "profileSha256": "e3f62cf8685063aa2297b2766e858e2a0ef1bdcfe9e426d32193b4057af61d79",
     "submittedBy": "Elephant",
-    "submittedAt": "2026-08-18T18:33:48.722Z"
+    "submittedAt": "2026-09-13T07:34:02.295Z"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-nova-epic",
-    "invalidatedSubmissionSha256": "a8af54c63c281179ff4c3258d17b31e44630412fde41c8e383c04b2b7df5e731",
-    "invalidatedApprovalSha256": "c14c05ffed52c9fcba15a2400b7158d2fd6ac636c2ff6ddb6b8c0ed886eb2ecd",
-    "invalidatedBy": "Elephant",
-    "invalidatedAt": "2026-08-18T18:28:46.991Z",
+    "invalidatedSubmissionSha256": "aa25b676c77c645849211833449180a7dfd133b283f46e35768439ea10f89d74",
+    "invalidatedApprovalSha256": "f5f5b31eb7c4fb22b5a34479c1abfdb9a337e6c215db13a175820235d5d000be",
+    "invalidatedBy": "PO",
+    "invalidatedAt": "2026-09-13T07:30:08.435Z",
     "reason": "reopen-design"
   },
   "pushApproval": {
@@ -471,5 +481,35 @@
         }
       }
     }
+  },
+  "planApprovalBriefing": {
+    "schema": "pipeline.plan-approval-briefing.v1",
+    "scope": {
+      "featureId": "sprint-nova-epic",
+      "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+      "planSha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298",
+      "specPath": "specs/sprint-nova-epic/spec.md",
+      "specSha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb",
+      "profile": "epic"
+    },
+    "change": {
+      "kind": "plan-spec-and-profile-changed",
+      "previousApprovalSha256": "f5f5b31eb7c4fb22b5a34479c1abfdb9a337e6c215db13a175820235d5d000be"
+    },
+    "authorizes": [
+      "design-to-implementation-transition"
+    ],
+    "excludes": [
+      "push",
+      "deploy",
+      "publication",
+      "scope-beyond-bound-plan-and-spec"
+    ]
+  },
+  "planPresentation": {
+    "schema": "pipeline.plan-presentation.v1",
+    "submissionSha256": "40bd1a9c48a81b86e63cfcc318be44ef8a776b6de162954118a00b82a8c8d265",
+    "presentedBy": "Codex",
+    "presentedAt": "2026-09-13T07:35:53.787Z"
   }
 }

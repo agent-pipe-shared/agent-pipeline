@@ -58,6 +58,24 @@ test("extractShellWriteTargets: git write verbs yield their operand on the 'git-
   assert.ok(targets.some((t) => t.candidate === TARGET && t.lane === "git-working-tree-write"));
 });
 
+test("NVA-B8: Git revision-only working-tree verbs never invent a path from a commit or ref", () => {
+  for (const command of [
+    "git revert --no-edit d2b1dbfc",
+    "git cherry-pick 0123456789abcdef0123456789abcdef01234567",
+    "git merge --no-ff feature/recovery-route",
+  ]) assert.deepEqual(candidates(command), [], command);
+});
+
+test("NVA-B8: explicit pathspec-bearing Git writes and rebase shell payloads stay detected", () => {
+  const checkout = candidates(`git checkout HEAD -- ${TARGET}`);
+  assert.ok(checkout.includes(TARGET));
+  const payload = extractShellWriteTargets({
+    command: `git rebase --exec 'rm ${TARGET}' main`,
+    root: "/repo",
+  });
+  assert.ok(payload.some((target) => target.candidate === TARGET && target.lane === "opaque-interpreter-code"));
+});
+
 test("extractShellWriteTargets: read-only git subcommands and plain readers contribute nothing", () => {
   for (const command of [
     `cat ${TARGET}`,

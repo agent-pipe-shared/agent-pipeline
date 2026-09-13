@@ -461,5 +461,19 @@ incomplete criterion keeps the issue and Epic open unless the PO explicitly
 changes scope. Canonical backlog transitions use the sanctioned ledger writer
 only after exact closure evidence exists.
 
+## Slice B8 — Recovery-route reachability
+
+**Outcome:** a command action emitted by non-ready onboarding remains
+executable in exactly that shape even when the producer and guard run under
+different absolute Node executables. Admission is derived from a fresh
+session-intent observation and remains intersected with the existing closed
+sanctioned-command validator. The shared Git write-target parser stops
+inventing file paths from revision-only `revert`, `cherry-pick` and `merge`
+operands.
+
+**Stop:** any wildcard executable trust, argument normalization, generic Git
+rollback permission, lifecycle bypass, protected-path weakening or Verify
+registration change.
+
 Nova/Cyborg reconciliation is not part of this close. It is a separate
 post-Sprint integration lifecycle after both independently accepted Results.

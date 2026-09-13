@@ -9,35 +9,40 @@
     {
       "class": "prd",
       "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "sha256": "c3f7469cc7a0d273a637050d379fd9266746fef19f9cd78650ddd75b95d2350f",
-      "authority": true,
-      "mutability": "mutable",
-      "retention": "active"
-    },
-    {
-      "class": "spec",
-      "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "ebb153f90ff26003c08635b5d9d33a6a2adf028ab787e177eb3447936ee8ac52",
+      "sha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298",
       "authority": true,
       "mutability": "mutable",
       "retention": "active",
       "amendment": {
-        "at": "2026-09-12T04:54:05.865Z",
+        "at": "2026-09-13T07:33:52.354Z",
         "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
-        "previousSha256": "f9b1f508cdc8c85764ef2f907f133c22e52176062329d9a9c98987f07c23be21"
+        "previousSha256": "5a412523b8348b134b7dceeca56b3baa71095a61aca4665f29a1f78e81c2c12a"
+      }
+    },
+    {
+      "class": "spec",
+      "path": "specs/sprint-nova-epic/spec.md",
+      "sha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb",
+      "authority": true,
+      "mutability": "mutable",
+      "retention": "active",
+      "amendment": {
+        "at": "2026-09-13T07:32:34.343Z",
+        "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
+        "previousSha256": "ebb153f90ff26003c08635b5d9d33a6a2adf028ab787e177eb3447936ee8ac52"
       }
     },
     {
       "class": "acceptance",
       "path": "specs/sprint-nova-epic/acceptance.md",
-      "sha256": "0c80c22218c2cf8f5d8e58c8dde6fda6e50f8895057b091054676385b94c021f",
+      "sha256": "e90c9a47f9968d091d009448dbfe07af1c831db2c24cb21fa262674b65b587a6",
       "authority": true,
       "mutability": "mutable",
       "retention": "active",
       "amendment": {
-        "at": "2026-09-12T04:54:05.865Z",
+        "at": "2026-09-13T07:32:34.343Z",
         "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
-        "previousSha256": "9a09fe69a11c5b9df45b7fb787431095acee3f3386382aac490df6a0130e1a17"
+        "previousSha256": "0c80c22218c2cf8f5d8e58c8dde6fda6e50f8895057b091054676385b94c021f"
       }
     },
     {
@@ -187,14 +192,14 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/nova-b.md",
-      "sha256": "996a0a739041021cd897125a241ea9ac789a418e8c16f03738f5ed2b8bfc5f4d",
+      "sha256": "65de00a13ee056e8d82bcf1cb0542cc98616e59f32dfc99be2649ade4ad2f712",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain",
       "amendment": {
-        "at": "2026-09-11T16:21:52.182Z",
+        "at": "2026-09-13T07:32:34.344Z",
         "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
-        "previousSha256": "bb82311614f798cd9305ca4433196d0fa69b733a832cb2cac33a1cc4835a79a7"
+        "previousSha256": "996a0a739041021cd897125a241ea9ac789a418e8c16f03738f5ed2b8bfc5f4d"
       }
     },
     {

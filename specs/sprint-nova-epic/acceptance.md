@@ -517,6 +517,22 @@ of the hotfix.
 - NVA-B49-9: Nova records an exact original-Issue transfer comment before its
   narrowed #49 disposition; it neither closes #72 nor claims a native result.
 
+### NVA-B8 recovery-route reachability
+
+- NVA-B8-1: Every command `nextAction` returned by a non-ready session
+  observation is admitted in its exact executable-plus-argv shape by the real
+  lifecycle guard.
+- NVA-B8-2: A different executable, argument, root, observation or neighbouring
+  command remains refused; mutation still requires the existing closed command
+  validator and its digest/confirmation boundary.
+- NVA-B8-3: Absolute Node executable drift between the producer and guard host
+  cannot make a published action unreachable.
+- NVA-B8-4: Git commit/ref operands for revision-only `revert`, `cherry-pick`
+  and `merge` are not classified as file targets; real pathspec and opaque
+  payload writes remain detected.
+- NVA-B8-5: Focused guard, recovery-contract and write-target extraction suites
+  pass without weakening protected-path or lifecycle denials.
+
 ## Final evidence matrix
 
 | Evidence class | Nova A | Nova B / close |

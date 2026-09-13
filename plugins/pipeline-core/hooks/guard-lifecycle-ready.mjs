@@ -30,7 +30,6 @@ import {
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
   inspectProjectOnboardingV3,
-  PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
 import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabilities.mjs";
 // NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: the shared argv-native renderer builds
@@ -3812,61 +3811,6 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
   return rebindApply && (args.length === 6 || (exactRunnerTail(6) && args.length === 8));
 }
 
-/**
- * The rebind planner is read-only but must still be unavailable to every
- * unrelated partial lifecycle state. This narrowly admits its exact argv only
- * when the same inspection reports the diagnosis that the planner repairs.
- *
- * backlog: 2026-08-08-the-guard-refuses-the-recovery-the-inspection-prescribes.md
- * (C1). This used to also require `observed.nextAction === null`, which
- * `project-onboarding-v3.mjs` stopped producing for this diagnostic once it
- * started returning the read-only planner argv as `nextAction` (2026-08-02,
- * commit fb0e9ac1) -- so that clause could never match a real inspection
- * again and this admission was silently dead against production state,
- * covered only by a hand-mocked test shape that had drifted from reality.
- * The admitted code set is read from `PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS`
- * itself rather than named here. That table is the single call site that emits
- * this whole family, and every entry marked `offersPlannerRetry` hands the
- * operator the SAME fixed planner argv under a DIFFERENT diagnostic code. A
- * hardcoded `po_authority_rebind_unavailable` therefore admitted the fallback
- * reason and refused the five named ones -- prescribing a command and then
- * blocking it, which is the exact defect this backlog item is about; the
- * contract suite (`guard-lifecycle-recovery-contract.test.mjs`) found it by
- * enumerating the table. Deriving the set from the producer means a reason
- * added there cannot reopen the gap. `offersPlannerRetry: false` entries stay
- * out: they return `nextAction: null`, so admitting their code would be the
- * mirror-image defect -- a route the guard allows that nothing offers.
- */
-function isExactPoAuthorityRebindPlannerRecovery(command, root, dependencies = {}) {
-  const words = simpleWords(command, root);
-  if (!words || words.length !== 3
-    || !["node", process.execPath].includes(words[0])
-    || words[1] !== PIPELINE_STATE_SCRIPT
-    || words[2] !== "po-authority-rebind-plan") return false;
-  let observed;
-  try {
-    // Threaded from this same evaluation's own resolved runner
-    // (dependencies.runner, set by the caller from --runner argv), never
-    // assumed here: project-onboarding-v3.mjs no longer defaults an absent
-    // runner to "codex" (backlog: absent-runner-flag-silently-defaults-to-codex).
-    observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
-      rootDir: root,
-      intent: "session",
-      runner: dependencies.runner,
-    });
-  } catch {
-    return false;
-  }
-  return observed?.schema === "pipeline.project-onboarding.v4"
-    && observed?.status === "partial"
-    && observed?.root === root
-    && observed?.intent === "session"
-    && Array.isArray(observed?.diagnostics)
-    && observed.diagnostics.length === 1
-    && PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS
-      .some((entry) => entry.offersPlannerRetry && entry.code === observed.diagnostics[0]?.code);
-}
-
 function sanctionedPipelineStateArgs(args, root) {
   const validBy = (value) => typeof value === "string"
     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
@@ -4063,10 +4007,7 @@ export function isSanctionedStartPreflightInvocation(command, root, options = {}
   return resolved !== null && resolved.script === START_PREFLIGHT_SCRIPT && resolved.args.length === 0;
 }
 
-export function isSanctionedLifecycleCommand(command, root, options = {}) {
-  const resolved = resolveSanctionedScriptInvocation(command, root, options);
-  if (resolved === null) return false;
-  const { script, args } = resolved;
+function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
@@ -4133,6 +4074,60 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   return script === APP_SERVER_SCRIPT
     && ["--recover", "--doctor"].includes(args[0])
     && args.length === 1;
+}
+
+export function isSanctionedLifecycleCommand(command, root, options = {}) {
+  const resolved = resolveSanctionedScriptInvocation(command, root, options);
+  return resolved !== null && sanctionedLifecycleScriptArgs(resolved.script, resolved.args, root, options);
+}
+
+/**
+ * NVA-B8: a non-ready onboarding observation must never hand the session a
+ * command that this guard refuses merely because the producer's absolute Node
+ * executable differs from the guard host's. This is not an executable
+ * allowlist: the observed executable and every argv element must be identical,
+ * and the bundled script/argv still has to pass the existing closed lifecycle
+ * validator. A neighbouring executable, an altered argument, a ready or
+ * foreign-root observation, and any producer action outside that validator all
+ * remain refused.
+ */
+function isExactObservedOnboardingNextAction(command, root, dependencies = {}) {
+  const words = simpleWords(command, root);
+  if (!words) return false;
+  let observed;
+  try {
+    observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
+      rootDir: root,
+      intent: "session",
+      runner: dependencies.runner,
+    });
+  } catch {
+    return false;
+  }
+  const action = observed?.nextAction;
+  if (observed?.schema !== "pipeline.project-onboarding.v4"
+    || observed?.status === "ready"
+    || typeof observed?.status !== "string"
+    || observed?.root !== root
+    || observed?.intent !== "session"
+    || action?.kind !== "command"
+    || typeof action.executable !== "string"
+    || !Array.isArray(action.argv)
+    || !action.argv.every((value) => typeof value === "string")
+    || typeof action.mutation !== "boolean"
+    || typeof action.requiresConfirmation !== "boolean"
+    || words.length !== action.argv.length + 1
+    || words[0] !== action.executable
+    || action.argv.some((value, index) => words[index + 1] !== value)) return false;
+  const [script, ...args] = action.argv;
+  // The rebind planner is intentionally not a generally sanctioned lifecycle
+  // command: outside a currently observed action it would make unrelated
+  // partial states look repairable. Here its fixed read-only argv is still
+  // closed by this exact observation/equality corridor.
+  const observedOnlyPlanner = script === PIPELINE_STATE_SCRIPT
+    && args.length === 1 && args[0] === "po-authority-rebind-plan";
+  return typeof script === "string"
+    && (observedOnlyPlanner || sanctionedLifecycleScriptArgs(script, args, root, dependencies));
 }
 
 /**
@@ -4779,13 +4774,12 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && !restartResumeHintNearMissWrite(input, root)
       && isBootstrapBindingScratchWrite(input, root, dependencies);
     if (bootstrapBindingScratchWrite) return verdict(0);
-    const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
+    const exactObservedOnboardingNextAction = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
-      && error.lifecycleStatus === "partial"
       && toolName === "Bash"
-      && isExactPoAuthorityRebindPlannerRecovery((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
-    if (exactPoAuthorityRebindRecovery) return verdict(0);
+      && isExactObservedOnboardingNextAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
+    if (exactObservedOnboardingNextAction) return verdict(0);
     // NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-
     // and-tmp-fallback.md): a session stuck at `partial` has no route at all today to
     // persist a report of its own stuck state -- the in-root write is refused by this very

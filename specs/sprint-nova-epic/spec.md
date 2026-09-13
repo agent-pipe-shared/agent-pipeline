@@ -1549,6 +1549,24 @@ as runtime admission. B1-I uses
 `validateLocalWorkerSupervisorRequest` as that canonical semantic validator;
 standalone Schema success is not supervisor admission.
 
+### 7.2.1 NVA-B8 recovery-route reachability
+
+Every non-ready onboarding observation that publishes a command `nextAction`
+must be executable through the lifecycle guard in exactly the published shape.
+Admission is bound to a fresh session-intent observation, the physical project
+root, the complete executable and argv vector, and the existing closed command
+validator. A matching action grants no authority to neighbouring binaries,
+arguments, roots or mutations; mutating actions retain their digest,
+confirmation and host-boundary requirements.
+
+The shared shell write-target extractor must also distinguish Git revisions
+from pathspecs for revision-only working-tree verbs. In particular, `revert`,
+`cherry-pick` and `merge` commit/ref operands are not invented file targets,
+while explicit pathspec-bearing verbs and opaque `--exec` payloads remain
+fail-closed. Contract tests exercise producer output against the real guard,
+including a different absolute Node executable, exact near misses, mutation
+constraints and revision/pathspec counterexamples.
+
 ### 7.3 Exact implementation paths
 
 Every slice may modify only the listed paths. A new need returns to the Spec
@@ -1578,6 +1596,8 @@ gate with collision review. In this table, “schemas `<name>` under
 | B4 | `plugins/pipeline-core/lib/forge-capability.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/git-transport-contract.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/git-transport-contract.schema.json`; `plugins/pipeline-core/scripts/github-forge-adapter.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/gitlab-forge-adapter.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/forge-capability.schema.json`; `plugins/pipeline-core/scripts/external-mutation.schema.json`; design artifact `specs/sprint-nova-epic/design/forge-capability-b4.md`; exact candidate/evidence bindings `harness/scripts/verify.mjs`, `docs/product-capability-inventory.json`, this Spec, `lifecycle.json` and append-only `result.md` | no live operation, credential or network activation; live mutation additionally needs its own exact approval |
 | External 0.4.7 / #63 | no Nova implementation path; retained `design/v4-recovery-b4r.md` is historical conflict analysis only | rebase onto the exact stable `main` 0.4.7 baseline, resolve conflicts, regenerate bindings and rerun upstream recovery regressions |
 | B5 / #49 narrowed | `plugins/pipeline-core/lib/macos-acceptance.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/macos-acceptance.schema.json`; exact synthetic fixtures `plugins/pipeline-core/scripts/fixtures/nova-macos/filesystem.json`, `unicode.json`, `case-folding.json`, `symlink.json`, `permissions.json`, `durability.json`, `process.json`, `tool-resolution.json`; candidate boundary evidence `specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json`, `evidence-manifest.json`, `macos-acceptance.json`, `verify.json`, `security.json`, `critic.json`, `increment-receipt.json`, `increment-readback.json`, `po-close.json` | `harness/scripts/verify.mjs`; `docs/product-capability-inventory.json` only for the explicitly synthetic/non-native Verify disposition; `specs/sprint-nova-epic/design/backlog-spec-bindings.json` for retained B49-5/B49-7/B49-8 bindings; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md`; native Apple-Silicon execution and evidence are exclusively #72 (`sprint:NONE`) |
+
+| B8 / recovery reachability | none | `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/protected-test-paths.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/guard-lifecycle-recovery-contract.test.mjs`; this Spec; `acceptance.md`; `plans/nova-b.md`; `lifecycle.json`; append-only `result.md`; no generic bypass, hook weakening or `harness/scripts/verify.mjs` edit |
 
 The remaining deliberately deferred Nova manifests are B2-I and live B4
 integration. Direct B3-I work is outside Nova under #69. B1-I is resolved by

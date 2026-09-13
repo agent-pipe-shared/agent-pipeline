@@ -32,6 +32,8 @@
 // prevent.
 
 import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 
 import { evaluateLifecycleReadyGuard } from "./guard-lifecycle-ready.mjs";
@@ -58,7 +60,7 @@ function deny() {
   });
 }
 function commandFor(action) {
-  return `node '${action.argv[0]}' ${action.argv.slice(1).join(" ")}`;
+  return [action.executable, ...action.argv].map((value) => JSON.stringify(value)).join(" ");
 }
 
 test("every offered PO-authority-rebind-planner nextAction is admitted by the real guard", () => {
@@ -90,13 +92,67 @@ test("every offered PO-authority-rebind-planner nextAction is admitted by the re
       // entry in this branch (verified directly against source in this
       // dispatch's report).
       const withCode = { ...observed, diagnostics: [{ ...observed.diagnostics[0], code: entry.code }] };
-      const result = evaluateLifecycleReadyGuard(bash(commandFor(observed.nextAction)), {
+      const publishedByDifferentNode = {
+        ...observed,
+        nextAction: { ...observed.nextAction, executable: "/opt/producer-node/bin/node" },
+      };
+      const result = evaluateLifecycleReadyGuard(bash(commandFor(publishedByDifferentNode.nextAction)), {
         projectDir: path,
         requireProjectOnboardingReadyFn: deny,
-        inspectProjectOnboardingV3Fn() { return withCode; },
+        inspectProjectOnboardingV3Fn() { return { ...withCode, ...publishedByDifferentNode }; },
       });
       assert.deepEqual(result, { exitCode: 0, stderr: "" }, entry.code);
     }
+  } finally { dispose(path); }
+});
+
+test("NVA-B8: only the fresh, complete published action crosses the executable boundary", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const action = {
+      kind: "command",
+      executable: "/opt/producer-node/bin/node",
+      argv: [PLUGIN_PIPELINE_STATE_SCRIPT, "po-authority-rebind-plan"],
+      mutation: false,
+      requiresConfirmation: false,
+    };
+    const observed = {
+      schema: "pipeline.project-onboarding.v4",
+      status: "partial",
+      root: path,
+      intent: "session",
+      nextAction: action,
+      diagnostics: [{ code: "po_authority_rebind_unavailable" }],
+    };
+    const deps = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: deny,
+      inspectProjectOnboardingV3Fn() { return observed; },
+    };
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(commandFor(action)), deps), { exitCode: 0, stderr: "" });
+    assert.equal(evaluateLifecycleReadyGuard(bash(commandFor({ ...action, executable: "/opt/other-node/bin/node" })), deps).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(commandFor({ ...action, argv: [...action.argv, "--unexpected"] })), deps).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(commandFor({
+      ...action,
+      argv: [PLUGIN_PIPELINE_STATE_SCRIPT, "po-authority-rebind-apply", "--plan-sha256", "a".repeat(64), "--updated-at", "2026-09-13T00:00:00.000Z", "--activate"],
+      mutation: true,
+      requiresConfirmation: true,
+    })), deps).exitCode, 2, "a matching executable cannot turn an unoffered mutation into a route");
+    const hostile = {
+      ...observed,
+      nextAction: {
+        kind: "command",
+        executable: "/opt/producer-node/bin/node",
+        argv: ["/tmp/hostile.mjs", "apply"],
+        mutation: true,
+        requiresConfirmation: true,
+      },
+    };
+    assert.equal(evaluateLifecycleReadyGuard(bash(commandFor(hostile.nextAction)), {
+      ...deps,
+      inspectProjectOnboardingV3Fn() { return hostile; },
+    }).exitCode, 2, "exact producer output still needs a closed sanctioned script/argv shape");
   } finally { dispose(path); }
 });
 

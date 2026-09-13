@@ -192,14 +192,18 @@ const GIT_GLOBAL_OPTIONS_WITH_VALUE = Object.freeze(new Set(["-C", "-c", "--git-
 /**
  * git subcommands whose arguments are refs/commits/flags only -- never a real working-tree
  * pathspec -- so operand extraction must not invent a file candidate out of them at all.
+ * `rebase`, `revert`, `cherry-pick` and `merge` take refs/revisions rather
+ * than working-tree pathspecs in their own argv. Treating an abbreviated
+ * commit as a file would make the guards classify a reversible Git operation
+ * as an edit to a fictitious path.
  * `rebase` is the confirmed case (backlog:
  * 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict.md,
  * Requirement 3): every one of its arguments (`--continue`, `--show-current-patch`, `--onto
  * <ref>`, a branch/commit to rebase onto) is a flag or a revision, never a pathspec, so treating
  * the bare `rebase` token (or anything else its argv carries) as a file candidate is inventing
- * one where git's own grammar has none. This is deliberately NOT generalised to `merge`/
- * `cherry-pick`/`revert`/`switch`, which share the same shape but are outside this
- * requirement's stated scope and untested here.
+ * one where Git's own grammar has none. B8 extends the same measured rule to
+ * `merge`, `cherry-pick` and `revert`; `switch` remains outside it because a
+ * branch-switch command can carry a pathspec-like `-- <path>` form.
  *
  * The exclusion covers this subcommand's OWN OPERANDS only -- not every token its argv carries.
  * A shell payload handed to an option (`rebase --exec <cmd>`) is a different token class and
@@ -207,7 +211,7 @@ const GIT_GLOBAL_OPTIONS_WITH_VALUE = Object.freeze(new Set(["-C", "-c", "--git-
  * claimed the wider exclusion and the code matched the claim, which silently admitted
  * `git rebase --exec "<write to a protected path>"` (round-K finding F2).
  */
-const GIT_NO_PATHSPEC_VERBS = Object.freeze(new Set(["rebase"]));
+const GIT_NO_PATHSPEC_VERBS = Object.freeze(new Set(["rebase", "revert", "cherry-pick", "merge"]));
 
 /**
  * Options that hand a git subcommand an opaque SHELL COMMAND rather than a path or a revision,
