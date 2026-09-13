@@ -44,6 +44,7 @@ import {
   KICKOFF_GOAL_MAX_BYTES,
   KICKOFF_PROMOTION_PLAN_SCHEMA,
   observeBootstrapBindAcknowledgement,
+  observeOnboardingBootstrapAcknowledgementSignature,
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
@@ -98,7 +99,7 @@ import {
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
-import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3 } from "./critical-human-proof-policy.mjs";
+import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
 
@@ -2444,23 +2445,38 @@ function bootstrapBindPlanAction(root, runner, intent) {
   );
 }
 
-// NVA-D-ACKASK: sibling of bootstrapBindPlanAction() above, offered INSTEAD of it
-// while the staging PRD does not yet carry the PO's own plan-acknowledgement marker
-// (backlog: 2026-08-28-the-guided-init-ends-in-an-error-where-it-should-ask-the-po.md).
-// bootstrap-bind-plan refuses this exact state with a raw
-// KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING exit and no interpretable
-// next step -- correct as the fail-closed floor for a direct caller, wrong as the
-// only thing a guided driver following nextAction ever sees, since the driver
-// (onboarding-init.mjs) holds no domain knowledge and cannot turn "exit 2" into
-// "ask a human". Deliberately carries no `input`/`inputs`, unlike every other
-// collect-input action in this file: there is no apply command this library may
-// name back, because the staging PRD is not yet promotion-bound, so the sanctioned
-// rebind ceremony (po-authority-acknowledge-plan/apply) does not apply to it either
-// -- po-gate-authority.mjs's own ACKNOWLEDGEMENT_REPAIR text draws exactly this line
-// for the still-freely-editable, pre-bind case: the PO adds the single marker line
-// to the PRD themselves, directly, once satisfied. This function -- and this file's
-// diff as a whole -- must never grow a writer for that line.
-function collectPrdAcknowledgementAction(prd, spec) {
+// A staging PRD that was authored after generation must be acknowledged before
+// it is promoted.  In the repository-wide signature posture the acknowledgement
+// is a detached proof, not a request that the PO edit an HTML comment by hand.
+// The plan writes only a public scratch request; the human-held key signs it in
+// an attended terminal, and the paired apply command verifies the exact proof
+// before adding the one sanctioned marker.  `chat` remains the explicitly
+// configured weaker attribution posture and retains the collect-input surface.
+function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signatureObservation, signatureMode) {
+  if (signatureMode) {
+    if (signatureObservation?.requestStatus === "present" && signatureObservation.proofStatus === "present") {
+      return commandAction(
+        lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-apply", "--root", root,
+          "--plan-sha256", signatureObservation.intentSha256, "--proof", signatureObservation.proofPath, "--activate"], runner, intent),
+        true, false, "pipeline.bootstrap-plan-acknowledgement-apply.v1", ["applied"],
+      );
+    }
+    if (signatureObservation?.requestStatus === "present") {
+      return {
+        kind: "external-operator",
+        mutation: false,
+        requiresConfirmation: true,
+        executionBoundary: "attended-external-tool",
+        guidance: `the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) and specification (${spec.path}, sha256 ${spec.sha256}) require the configured detached-signature acknowledgement. Run the exact host-terminal sign action below; it writes the plan-bound proof back into this repository's scratch directory. Do not edit an acknowledgement marker manually.`,
+        action: signatureObservation.signAction,
+        expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
+      };
+    }
+    return commandAction(
+      lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-plan", "--root", root, "--activate"], runner, intent),
+      true, false, "pipeline.bootstrap-plan-acknowledgement-plan.v1", ["signature-required"],
+    );
+  }
   return {
     kind: "collect-input",
     mutation: false,
@@ -2947,11 +2963,29 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       const needsAcknowledgement = acknowledgement !== null
         && acknowledgement.acknowledged === false
         && acknowledgement.exempt !== true;
+      let signatureObservation = null;
+      let signatureMode = false;
+      if (needsAcknowledgement) {
+        try {
+          const approval = readHumanApprovalMode(root, { spawn: fs.spawnSync });
+          signatureMode = approval.mode === "signature";
+          if (signatureMode) {
+            signatureObservation = (fs.observeOnboardingBootstrapAcknowledgementSignature ?? observeOnboardingBootstrapAcknowledgementSignature)({
+              rootDir: root, repositoryCapability: repository.mode, spawn: fs.spawnSync, deps: fs,
+            });
+          }
+        } catch {
+          // A missing/unreadable approval policy is fail-closed: the default
+          // signature posture remains selected, and the plan command will
+          // return its typed trust-anchor/preimage diagnosis.
+          signatureMode = true;
+        }
+      }
       return lifecycleResult({
         status: "bootstrap-binding-required",
         root, runner, intent, repository, runtime, continuity, appServer,
         nextAction: needsAcknowledgement
-          ? collectPrdAcknowledgementAction(acknowledgement.prd, acknowledgement.spec)
+          ? collectPrdAcknowledgementAction(root, runner, intent, acknowledgement.prd, acknowledgement.spec, signatureObservation, signatureMode)
           : bootstrapBindPlanAction(root, runner, intent),
         diagnostics: [lifecycleDiagnostic(
           "$.continuity",
@@ -2960,7 +2994,9 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
             ? "staging PRD/spec/design-input are generated but the PO has not yet acknowledged the staging PRD"
             : "staging PRD/spec/design-input are generated but not yet bound as authority",
           needsAcknowledgement
-            ? "ask the PO to review the staging PRD and spec named in the collect-input action's guidance, then have the PO add the acknowledgement marker themselves"
+            ? (signatureMode
+              ? "review the staging PRD and specification, then follow the digest-bound host signature action; do not edit an acknowledgement marker manually"
+              : "ask the PO to review the staging PRD and spec named in the collect-input action's guidance, then have the PO add the acknowledgement marker themselves")
             : "review the read-only bootstrap-bind-plan action, then apply it",
         )],
       });

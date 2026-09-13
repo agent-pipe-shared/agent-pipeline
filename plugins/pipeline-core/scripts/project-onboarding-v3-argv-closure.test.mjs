@@ -20,7 +20,6 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { main as onboardingCli } from "./project-onboarding-v3.mjs";
-import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER } from "../lib/po-gate-authority.mjs";
 
 function freshDir(prefix) {
   return mkdtempSync(join(tmpdir(), `project-onboarding-argv-${prefix}-`));
@@ -146,19 +145,11 @@ test("project-onboarding-v3 CLI: the intake -> generate -> bootstrap-bind chain 
 
     result = invoke(["intake-generate-apply", "--root", dir, "--plan-sha256", generatePlan.planSha256, "--activate"]);
     assert.equal(result.status, 0, result.output);
-    const generated = JSON.parse(result.output);
 
-    // The staged PRD is an explicitly unreviewed draft (design SSa.4/SSc.3): the generator
-    // (buildIntakePrdContent(), NVA-BL-INTAKEBIND-1) now emits the po-language and
-    // technical-spec-sha256 markers mechanically, so only the one marker representing a
-    // genuine review decision -- po-plan-acknowledged -- still needs adding here, mirroring
-    // onboarding-continuity.test.mjs's own bootstrapBindReadyRoot() fixture. This is fixture
-    // setup via direct file edit, not part of the CLI surface under test.
-    const prdAbsolute = join(dir, generated.targets.prd.path);
-    writeFileSync(prdAbsolute, [
-      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
-      readFileSync(prdAbsolute, "utf8"),
-    ].join("\n"));
+    // An untouched generated draft is exempt from acknowledgement. This
+    // closure test deliberately exercises that normal bind path; an authored
+    // draft follows the separate detached-signature ceremony below instead
+    // of a fixture (or PO) editing an acknowledgement comment by hand.
 
     result = invoke(["bootstrap-bind-plan", "--root", dir]);
     assert.equal(result.status, 0, result.output);
@@ -184,7 +175,7 @@ test("project-onboarding-v3 CLI: the intake -> generate -> bootstrap-bind chain 
   }
 });
 
-test("project-onboarding-v3 CLI: bootstrap-bind-plan/apply are registered subcommands reaching their own precondition error, not 'unknown argument'", () => {
+test("project-onboarding-v3 CLI: bootstrap bind and signature acknowledgement subcommands reach their own precondition errors, not 'unknown argument'", () => {
   const dir = neutralGitFixture("bootstrap-bind-no-checkpoint");
   try {
     const plan = invoke(["bootstrap-bind-plan", "--root", dir]);
@@ -197,6 +188,19 @@ test("project-onboarding-v3 CLI: bootstrap-bind-plan/apply are registered subcom
     assert.equal(apply.status, 2);
     assert.match(apply.output, /BOOTSTRAP-BIND-PRECONDITION/);
     assert.doesNotMatch(apply.output, /unknown argument/);
+
+    const acknowledgementPlan = invoke(["bootstrap-acknowledge-plan", "--root", dir, "--activate"]);
+    assert.equal(acknowledgementPlan.status, 2);
+    assert.match(acknowledgementPlan.output, /BOOTSTRAP-ACK-PRECONDITION/);
+    assert.doesNotMatch(acknowledgementPlan.output, /unknown argument/);
+
+    const acknowledgementApply = invoke([
+      "bootstrap-acknowledge-apply", "--root", dir, "--plan-sha256", sha,
+      "--proof", "scratch/bootstrap-plan-acknowledgement-proof-test.json", "--activate",
+    ]);
+    assert.equal(acknowledgementApply.status, 2);
+    assert.match(acknowledgementApply.output, /BOOTSTRAP-ACK-PRECONDITION/);
+    assert.doesNotMatch(acknowledgementApply.output, /unknown argument/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

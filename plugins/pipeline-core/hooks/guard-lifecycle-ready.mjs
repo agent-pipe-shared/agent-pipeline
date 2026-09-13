@@ -3613,6 +3613,7 @@ function sanctionedOnboardingArgs(rawArgs, root, options = {}) {
     "--text-file": nonEmptyTrimmedNotFlag,
     "--answers-json": nonEmptyTrimmedNotFlag,
     "--plan-sha256": isHexDigest,
+    "--proof": nonEmptyTrimmedNotFlag,
     "--git-author-name": nonEmptyTrimmedNotFlag,
     "--git-author-email": nonEmptyTrimmedNotFlag,
     "--language": isLanguageValue,

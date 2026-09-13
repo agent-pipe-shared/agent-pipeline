@@ -55,6 +55,33 @@ const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory
 // follows that convention rather than inventing a new one, and is read ONLY as a
 // fallback when no explicit --directory is supplied on the command line.
 const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
+const BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-request.v1";
+
+function describeBootstrapAcknowledgementRequest(record, intentSha256) {
+  const action = record?.action;
+  const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+  const sha = (value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+  if (record?.schema !== BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA || record.intentSha256 !== intentSha256
+    || !exactKeys(action, ["kind", "decision", "root", "featureId", "checkpoint", "prd", "spec"])
+    || action.kind !== "bootstrap-plan-acknowledgement" || action.decision !== "content-sound-and-spec-consistent"
+    || typeof action.root !== "string" || typeof action.featureId !== "string"
+    || !exactKeys(action.checkpoint, ["revision", "sha256"]) || !Number.isSafeInteger(action.checkpoint.revision) || !sha(action.checkpoint.sha256)
+    || !exactKeys(action.prd, ["path", "sha256"]) || !exactKeys(action.spec, ["path", "sha256"])
+    || !sha(action.prd.sha256) || !sha(action.spec.sha256)) return null;
+  return {
+    resolved: true,
+    lines: [
+      "action: acknowledge the reviewed bootstrap staging plan before it can be bound",
+      `repository root: ${action.root}`,
+      `feature id: ${action.featureId}`,
+      `staging PRD: ${action.prd.path} (sha256 ${action.prd.sha256})`,
+      `staging specification: ${action.spec.path} (sha256 ${action.spec.sha256})`,
+      `intake checkpoint: revision ${action.checkpoint.revision}, sha256 ${action.checkpoint.sha256}`,
+      "decision: the PRD is content-sound and consistent with the specification",
+    ],
+  };
+}
 // SETUP-2b/AC-13: a third source, ordered between --directory and the environment
 // fallback (SETUP-2b/AC-11) -- the machine-scoped configuration plane's own
 // poKeyDirectory field (specs/sprint-nova-epic/plans/nova-setup-bootstrap.md SS2/SS6a).
@@ -1353,7 +1380,7 @@ function executeHumanApproval(args, dependencies = {}) {
     // Everything below (disclosure, confirmation, signing) is unchanged and driven by
     // the SAME `intentSha256` local either way -- `--request` only changes where that
     // value comes from and, further below, adds a second write target for the result.
-    let scratchProofPath = null; let scratchSignerPath = null;
+    let scratchProofPath = null; let scratchSignerPath = null; let scratchRequestRecord = null;
     if (text(args.request)) {
       const requestPath = resolve(repository, args.request);
       // NVA-SWEEP-F2f-REWORK (Critic finding 1): canonicalize both the repository root
@@ -1375,6 +1402,7 @@ function executeHumanApproval(args, dependencies = {}) {
       try { record = JSON.parse(raw); } catch { fail("--request must contain valid JSON"); }
       if (!SHA.test(record?.intentSha256 ?? "")) fail("--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)");
       args.intentSha256 = record.intentSha256;
+      scratchRequestRecord = record;
       scratchProofPath = scratchSiblingPath(canonicalRequestPath, "proof");
       scratchSignerPath = scratchSiblingPath(canonicalRequestPath, "signer");
       if (scratchProofPath === null || scratchSignerPath === null) {
@@ -1402,7 +1430,8 @@ function executeHumanApproval(args, dependencies = {}) {
     // the honest fallback below is unchanged.
     const describeGmw = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
     const describeHgo = dependencies.describeHgoIntentRecord ?? describeHumanGuardOverrideSelection;
-    let record = describeGmw({ rootDir: repository, intentSha256 });
+    let record = describeBootstrapAcknowledgementRequest(scratchRequestRecord, intentSha256)
+      ?? describeGmw({ rootDir: repository, intentSha256 });
     if (!record.resolved) {
       record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });
     }

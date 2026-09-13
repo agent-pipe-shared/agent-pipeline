@@ -616,6 +616,50 @@ test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scra
   }
 });
 
+test("sign-intent discloses the exact reviewed PRD, specification, and checkpoint for a bootstrap acknowledgement request", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const action = {
+      kind: "bootstrap-plan-acknowledgement",
+      decision: "content-sound-and-spec-consistent",
+      root: dirs.repoRoot,
+      featureId: "greenfield-42",
+      checkpoint: { revision: 7, sha256: "a".repeat(64) },
+      prd: { path: "specs/greenfield-42/prd.md", sha256: "b".repeat(64) },
+      spec: { path: "specs/greenfield-42/spec.md", sha256: "c".repeat(64) },
+    };
+    const intentSha256 = createHash("sha256").update(JSON.stringify(action, Object.keys(action).sort())).digest("hex");
+    // The implementation's canonical digest is deliberately not JSON.stringify
+    // order dependent; request the real digest through a locally equivalent,
+    // sorted canonical encoder so the signer cannot receive a fabricated view.
+    const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]`
+      : value !== null && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`
+      : JSON.stringify(value);
+    const exactIntent = createHash("sha256").update(canonical(action)).digest("hex");
+    const scratchDir = join(dirs.repoRoot, "scratch");
+    mkdirSync(scratchDir, { recursive: true });
+    writeFileSync(join(scratchDir, `bootstrap-plan-acknowledgement-request-${exactIntent}.json`), `${JSON.stringify({
+      schema: "pipeline.bootstrap-plan-acknowledgement-request.v1", intentSha256: exactIntent, action,
+    }, null, 2)}\n`);
+    const prompts = [];
+    const result = runHumanApproval([
+      "sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--request", `scratch/bootstrap-plan-acknowledgement-request-${exactIntent}.json`,
+    ], { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } });
+    assert.equal(result.ok, true);
+    assert.equal(prompts.length, 1);
+    const [prompt] = prompts;
+    assert.ok(prompt.includes(action.prd.path) && prompt.includes(action.prd.sha256));
+    assert.ok(prompt.includes(action.spec.path) && prompt.includes(action.spec.sha256));
+    assert.ok(prompt.includes("revision 7") && prompt.includes(action.checkpoint.sha256));
+    assert.ok(prompt.includes("content-sound and consistent"));
+    assert.equal(intentSha256.length, 64, "sanity check: unrelated JSON ordering digest is not authority");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("NVA-SWEEP-F2: sign-intent --request is rejected outside this repository's own scratch/ tree", () => {
   const dirs = fixtureDirs();
   try {

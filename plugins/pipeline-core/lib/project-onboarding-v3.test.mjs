@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   chmodSync, closeSync, copyFileSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
   openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
@@ -64,7 +65,8 @@ import {
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import {
   applyOnboardingBootstrapBind, applyOnboardingIntakeGenerate, observeBootstrapBindAcknowledgement,
-  planOnboardingBootstrapBind, planOnboardingIntakeGenerate, readOnboardingIntakeCheckpoint,
+  planOnboardingBootstrapBind, planOnboardingBootstrapAcknowledgement, applyOnboardingBootstrapAcknowledgement,
+  planOnboardingIntakeGenerate, readOnboardingIntakeCheckpoint,
   readOnboardingSessionCleanupBinding,
 } from "./onboarding-continuity.mjs";
 import {
@@ -8473,15 +8475,15 @@ test("all three runners execute the exact returned consent and design-question a
   }
 });
 
-test("NVA-D-ACKASK: bootstrap-binding-required asks the PO for the acknowledgement instead of naming a command that can only fail, then names bootstrap-bind-plan again once it is present and the bind succeeds", () => {
+test("bootstrap-binding-required routes a hand-authored staging PRD through the exact detached-signature acknowledgement and then binds", () => {
   const path = root();
   let stderr = "";
   const intakeDeps = { ...fakeDeps, spawn: fakeGit };
-  const invoke = (args) => {
+  const invoke = (args, deps = intakeDeps) => {
     let output = "";
     stderr = "";
     const code = onboardingCli(args, {
-      deps: intakeDeps,
+      deps,
       write: (chunk) => { output += chunk; },
       writeError: (chunk) => { stderr += chunk; },
     });
@@ -8530,23 +8532,19 @@ test("NVA-D-ACKASK: bootstrap-binding-required asks the PO for the acknowledgeme
     const prdAbsolutePath = join(path, exemptObservation.prd.path);
     writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n`, "utf8");
 
-    // DoD 1: while the marker is missing AND required, nextAction is the ask, never
-    // the command that bootstrap-bind-plan's own refusal proves cannot succeed.
+    // While the marker is missing and required, the signature posture returns a
+    // runnable request planner, never the bind command that would fail.
     const before = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
     assert.equal(before.acknowledged, false);
     assert.equal(before.exempt, false, "a hand-edited draft is no longer exempt");
-    const beforeAck = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
-    assert.equal(beforeAck.status, "bootstrap-binding-required");
-    assert.equal(beforeAck.nextAction.kind, "collect-input");
-    // DoD 3: the ask names the artifacts by repository-relative path and by digest.
-    assert.ok(beforeAck.nextAction.guidance.includes(before.prd.path));
-    assert.ok(beforeAck.nextAction.guidance.includes(before.prd.sha256));
-    assert.ok(beforeAck.nextAction.guidance.includes(before.spec.path));
-    assert.ok(beforeAck.nextAction.guidance.includes(before.spec.sha256));
-    // DoD 4: the ask states the exact marker line and that the PO adds it
-    // themselves; this diff writes it nowhere.
-    assert.ok(beforeAck.nextAction.guidance.includes(PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER));
-    assert.ok(/PO (adds|themselves)/u.test(beforeAck.nextAction.guidance));
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const beforeAck = inspectProjectOnboardingV3({ runner, rootDir: path, deps: fakeDeps });
+      assert.equal(beforeAck.status, "bootstrap-binding-required", runner);
+      assert.equal(beforeAck.nextAction.kind, "command", runner);
+      assert.equal(beforeAck.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
+      assert.equal(beforeAck.nextAction.argv.at(-1), runner, runner);
+      assert.equal(beforeAck.nextAction.argv.includes("--activate"), true, runner);
+    }
 
     // DoD 5: bootstrap-bind-plan's own direct refusal for a caller that
     // skips the ask is unchanged -- still a hard exit 2, still the exact
@@ -8556,10 +8554,75 @@ test("NVA-D-ACKASK: bootstrap-binding-required asks the PO for the acknowledgeme
       (error) => error?.code === "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
     );
 
-    // The PO's own act: append the marker line to the staging PRD directly
-    // (never through a code path this diff adds).
-    const prdBytes = readFileSync(prdAbsolutePath, "utf8");
-    writeFileSync(prdAbsolutePath, `${prdBytes}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`, "utf8");
+    const signatureDeps = {
+      ...intakeDeps,
+      readMachinePlane: () => ({ status: "valid", plane: { poKeyDirectory: "/external/po-key" } }),
+    };
+    // Exercise the same returned CLI action a Greenfield driver receives; this
+    // must not be merely a direct-library happy path.
+    const acknowledgementPlanRun = invoke([
+      "bootstrap-acknowledge-plan", "--root", path, "--activate", "--runner", "codex",
+    ], signatureDeps);
+    assert.equal(acknowledgementPlanRun.code, 0, stderr);
+    const acknowledgementPlan = acknowledgementPlanRun.result;
+    assert.equal(acknowledgementPlan.status, "signature-required");
+    assert.equal(acknowledgementPlan.nextAction.argv.at(-1), acknowledgementPlan.requestPath);
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
+    const proof = {
+      schema: "pipeline.po-approval-proof.v1",
+      intentSha256: acknowledgementPlan.intentSha256,
+      keyReference: "test-po-key",
+      publicKey: publicKeyPem,
+      signatureBase64: sign(null, Buffer.from(acknowledgementPlan.intentSha256, "utf8"), privateKey).toString("base64"),
+    };
+    const proofAbsolute = join(path, acknowledgementPlan.proofPath);
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const awaitingHuman = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
+      assert.equal(awaitingHuman.nextAction.kind, "external-operator", runner);
+      assert.deepEqual(awaitingHuman.nextAction.action, acknowledgementPlan.nextAction, runner);
+    }
+    assert.throws(() => applyOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
+      expectedPlanSha256: "f".repeat(64), proofPath: acknowledgementPlan.proofPath,
+    }), (error) => error?.code === "BOOTSTRAP-ACK-PLAN-DRIFT");
+    const prdPreimage = readFileSync(prdAbsolutePath, "utf8");
+    writeFileSync(proofAbsolute, JSON.stringify({ ...proof, signatureBase64: "AAAA" }), "utf8");
+    assert.throws(() => applyOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
+      expectedPlanSha256: acknowledgementPlan.intentSha256, proofPath: acknowledgementPlan.proofPath,
+      deps: { readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") }] }) },
+    }), (error) => error?.code === "BOOTSTRAP-ACK-PROOF-INVALID");
+    writeFileSync(proofAbsolute, JSON.stringify(proof), "utf8");
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const signed = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
+      assert.equal(signed.nextAction.kind, "command", runner);
+      assert.equal(signed.nextAction.argv[1], "bootstrap-acknowledge-apply", runner);
+      assert.equal(signed.nextAction.argv.includes(acknowledgementPlan.intentSha256), true, runner);
+      assert.equal(signed.nextAction.argv.includes(acknowledgementPlan.proofPath), true, runner);
+      assert.equal(signed.nextAction.argv.at(-1), runner, runner);
+    }
+    const proofPolicy = {
+      readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") }] }),
+    };
+    // A valid proof never authorizes bytes that changed after the plan. Restore
+    // the exact preimage afterwards so the same proof can complete its one
+    // legitimate acknowledgement.
+    writeFileSync(prdAbsolutePath, `${prdPreimage}\nUnreviewed drift.\n`, "utf8");
+    assert.throws(() => applyOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
+      expectedPlanSha256: acknowledgementPlan.intentSha256, proofPath: acknowledgementPlan.proofPath,
+      deps: proofPolicy,
+    }), (error) => error?.code === "BOOTSTRAP-ACK-PRD-DRIFT");
+    writeFileSync(prdAbsolutePath, prdPreimage, "utf8");
+    const acknowledgementApplyRun = invoke([
+      "bootstrap-acknowledge-apply", "--root", path, "--plan-sha256", acknowledgementPlan.intentSha256,
+      "--proof", acknowledgementPlan.proofPath, "--activate", "--runner", "codex",
+    ], { ...signatureDeps, ...proofPolicy });
+    assert.equal(acknowledgementApplyRun.code, 0, stderr);
+    const acknowledgementApplied = acknowledgementApplyRun.result;
+    assert.equal(acknowledgementApplied.status, "applied");
+    assert.equal(readFileSync(prdAbsolutePath, "utf8").includes(PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER), true);
 
     // DoD 2: once the marker is present, nextAction is bootstrap-bind-plan
     // exactly as today, and the bind succeeds.

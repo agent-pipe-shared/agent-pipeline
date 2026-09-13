@@ -1063,7 +1063,7 @@ test("driveOnboardingInit: a genuinely non-converging chain stops with its own o
   }
 });
 
-test("driveOnboardingInit: collect-input, ready, unsupported-next-action and error outcomes reached directly are unchanged", () => {
+test("driveOnboardingInit: collect-input, external-operator, ready, unsupported-next-action and error outcomes reached directly are typed", () => {
   const collectInputRoot = freshRoot();
   try {
     const collectInputAction = { kind: "collect-input", input: { name: "example" } };
@@ -1073,6 +1073,17 @@ test("driveOnboardingInit: collect-input, ready, unsupported-next-action and err
     assert.deepEqual(collectInputResult.collectInput, collectInputAction);
   } finally {
     dispose(collectInputRoot);
+  }
+
+  const externalRoot = freshRoot();
+  try {
+    const externalAction = { kind: "external-operator", executionBoundary: "attended-external-tool", invocation: "user-copy-only" };
+    const externalRun = () => respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction: externalAction });
+    const externalResult = driveOnboardingInit({ rootDir: externalRoot, run: externalRun });
+    assert.equal(externalResult.outcome, "external-operator");
+    assert.deepEqual(externalResult.externalOperator, externalAction);
+  } finally {
+    dispose(externalRoot);
   }
 
   const readyRoot = freshRoot();

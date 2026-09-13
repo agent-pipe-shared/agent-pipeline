@@ -21,6 +21,8 @@ import {
   planOnboardingIntakeGenerate,
   planOnboardingBootstrapBind,
   applyOnboardingBootstrapBind,
+  planOnboardingBootstrapAcknowledgement,
+  applyOnboardingBootstrapAcknowledgement,
   INTAKE_CONSENT_APPLY_SCHEMA,
   INTAKE_CAPTURE_APPLY_SCHEMA,
   INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
@@ -201,6 +203,8 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   // NVA-W5-GUARDADMIT-1's closure). Both branches exist today.
   { name: "bootstrap-bind-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "bootstrap-bind-apply", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "bootstrap-acknowledge-plan", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "bootstrap-acknowledge-apply", flat: true, mutates: true, automatedArgvShape: null },
 ].map((entry) => Object.freeze(entry)));
 
 export { ONBOARDING_SUBCOMMANDS };
@@ -256,7 +260,7 @@ function resolveOnboardingCliRunner(env, root, deps) {
 
 function usage() {
   return [
-    "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
+    "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
@@ -307,6 +311,7 @@ function parse(args) {
     else if (arg === "--spec-path") { const specPath = args[index + 1]; if (!specPath || specPath.startsWith("--")) return { error: "--spec-path requires a repository path" }; output.specPath = specPath; index += 1; }
     else if (arg === "--design-input-path") { const designInputPath = args[index + 1]; if (!designInputPath || designInputPath.startsWith("--")) return { error: "--design-input-path requires a repository path" }; output.designInputPath = designInputPath; index += 1; }
     else if (arg === "--plan-sha256") { const digest = args[index + 1]; if (!/^[a-f0-9]{64}$/u.test(digest ?? "")) return { error: "--plan-sha256 requires a lowercase SHA-256 digest" }; output.planSha256 = digest; index += 1; }
+    else if (arg === "--proof") { const proof = args[index + 1]; if (!proof || proof.startsWith("--")) return { error: "--proof requires one repository-relative proof path" }; output.proof = proof; index += 1; }
     else if (arg === "--granted") output.granted = true;
     else if (arg === "--git-author-name") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--git-author-name requires a name" }; output.gitAuthorName = value; index += 1; }
     else if (arg === "--git-author-email") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--git-author-email requires an email" }; output.gitAuthorEmail = value; index += 1; }
@@ -321,6 +326,7 @@ function parse(args) {
   if (!output.help && !output.root) return { error: "--root is required" };
   if (output.command?.startsWith("adopt-remote-") && (!output.remote || !output.ref)) return { error: "adopt-remote requires --remote and --ref" };
   if (output.command === "adopt-remote-apply" && !output.planSha256) return { error: "adopt-remote apply requires --plan-sha256" };
+  if (output.command === "bootstrap-acknowledge-apply" && (!output.planSha256 || !output.proof)) return { error: "bootstrap-acknowledge-apply requires --plan-sha256 and --proof" };
   // `plan-repair`/`apply-repair` are the only non-kickoff commands that accept
   // the operator-confirmed continuity authority claim
   // (`onboarding-continuity.mjs`'s `operatorConfirmedContinuity()`, surfaced
@@ -755,6 +761,16 @@ export function main(args = process.argv.slice(2), {
     else if (options.command === "bootstrap-bind-apply") output = applyOnboardingBootstrapBind({
       rootDir: options.root, runner: options.runner, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
     });
+    else if (options.command === "bootstrap-acknowledge-plan") {
+      if (!options.activate) throw Object.assign(new Error("signature acknowledgement request requires explicit activation"), { code: "BOOTSTRAP-ACK-ACTIVATION-REQUIRED" });
+      output = planOnboardingBootstrapAcknowledgement({
+        rootDir: options.root, runner: options.runner, spawn: deps?.spawn ?? hostSpawnSync, deps,
+      });
+    }
+    else if (options.command === "bootstrap-acknowledge-apply") output = applyOnboardingBootstrapAcknowledgement({
+      rootDir: options.root, expectedPlanSha256: options.planSha256, proofPath: options.proof,
+      activate: options.activate, spawn: deps?.spawn ?? hostSpawnSync, deps,
+    });
     else {
       const operation = options.command === "initialize-runtime"
         ? "runtime"
@@ -815,6 +831,7 @@ export function main(args = process.argv.slice(2), {
   if ([
     INTAKE_CONSENT_APPLY_SCHEMA, INTAKE_CAPTURE_APPLY_SCHEMA, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
     INTAKE_GENERATE_APPLY_SCHEMA,
+    "pipeline.bootstrap-plan-acknowledgement-plan.v1", "pipeline.bootstrap-plan-acknowledgement-apply.v1",
   ].includes(output.schema)) return 0;
   // Wave 4 onboarding coordinator, step 5 (NVA-W5-COORD-STEP5-2): bootstrap-bind-apply calls
   // applyOnboardingBootstrapBind(), which calls applyOnboardingKickoffPromotion() DIRECTLY --

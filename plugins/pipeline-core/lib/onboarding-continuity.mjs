@@ -23,6 +23,7 @@ import {
   constants,
   existsSync,
   fstatSync,
+  ftruncateSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
@@ -66,6 +67,7 @@ import {
   validatePortablePipelineState,
 } from "./project-authority.mjs";
 import {
+  PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
   PRD_ACKNOWLEDGEMENT_MARKER,
   PRD_LANGUAGE_MARKER,
   TECHNICAL_SPEC_MARKER,
@@ -81,6 +83,8 @@ import {
   loadSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+import { readMachinePlane } from "./machine-plane.mjs";
 
 export const KICKOFF_PLAN_SCHEMA = "pipeline.codex-onboarding-kickoff-plan.v1";
 export const KICKOFF_HISTORY_SCHEMA = "pipeline.codex-onboarding-continuity-history.v1";
@@ -105,6 +109,12 @@ export const PRIVATE_SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_SCHEMA = "pipeli
 export const SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_SCHEMA = "pipeline.session-cleanup-privatization-confirmation.v1";
 export const KICKOFF_PROMOTION_CLEANUP_RECOVERY_PLAN_SCHEMA = "pipeline.kickoff-promotion-cleanup-recovery-plan.v1";
 export const KICKOFF_PROMOTION_CLEANUP_RECOVERY_APPLY_SCHEMA = "pipeline.kickoff-promotion-cleanup-recovery-apply.v1";
+// A generated PRD which has subsequently been authored is no longer eligible
+// for the generator exemption.  This is the runner-neutral, detached-proof
+// route that records the PO's judgement without asking them to edit markup.
+export const BOOTSTRAP_ACKNOWLEDGEMENT_PLAN_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-plan.v1";
+export const BOOTSTRAP_ACKNOWLEDGEMENT_APPLY_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-apply.v1";
+export const BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-request.v1";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ONBOARDING_SCRIPT = join(HERE, "..", "scripts", "project-onboarding-v3.mjs");
@@ -6548,6 +6558,225 @@ export function observeBootstrapBindAcknowledgement({
     exempt,
     prd: { path: resolved.prdPath, sha256: prd.sha256 },
     spec: { path: resolved.specPath, sha256: spec.sha256 },
+  };
+}
+
+function bootstrapAcknowledgementPlan({ rootDir, repositoryCapability = "local", spawn = defaultGitSpawn } = {}) {
+  let resolved;
+  try {
+    resolved = resolveBootstrapBindInputs({ rootDir, repositoryCapability, spawn });
+  } catch (error) {
+    if (error?.code === "BOOTSTRAP-BIND-PRECONDITION") {
+      fail("BOOTSTRAP-ACK-PRECONDITION", "signature acknowledgement requires an existing generated intake checkpoint");
+    }
+    throw error;
+  }
+  const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: resolved.root, repositoryCapability, spawn });
+  if (checkpoint.status !== "present" || checkpoint.value.transactionState !== "generated") {
+    fail("BOOTSTRAP-ACK-PRECONDITION", "signature acknowledgement requires a generated intake checkpoint");
+  }
+  const prd = observeOptionalProjectFile(resolved.root, resolved.prdPath, "staging PRD");
+  const spec = observeOptionalProjectFile(resolved.root, resolved.specPath, "staging specification");
+  if (prd.status !== "present" || spec.status !== "present") {
+    fail("BOOTSTRAP-ACK-PRECONDITION", "signature acknowledgement requires the generated staging PRD and specification");
+  }
+  const prdText = decodeBootstrapAcknowledgementPrd(prd.raw);
+  if (prdText === null) fail("BOOTSTRAP-ACK-PRD-ENCODING", "the staging PRD is not valid UTF-8");
+  const markers = [...prdText.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
+  if (markers.length !== 0) fail("BOOTSTRAP-ACK-ALREADY-ACKNOWLEDGED", "the staging PRD already carries an acknowledgement marker");
+  if (pureGeneratorPromotionPrdSha256({ rootDir: resolved.root, repositoryCapability, spawn }) === prd.sha256) {
+    fail("BOOTSTRAP-ACK-NOT-REQUIRED", "an unmodified generator draft does not require a plan acknowledgement");
+  }
+  const action = {
+    kind: "bootstrap-plan-acknowledgement",
+    decision: "content-sound-and-spec-consistent",
+    root: resolved.root,
+    featureId: resolved.featureId,
+    checkpoint: { revision: checkpoint.value.revision, sha256: checkpoint.sha256 },
+    prd: { path: resolved.prdPath, sha256: prd.sha256 },
+    spec: { path: resolved.specPath, sha256: spec.sha256 },
+  };
+  const intentSha256 = canonicalSha256(action);
+  const requestPath = `scratch/bootstrap-plan-acknowledgement-request-${intentSha256}.json`;
+  const proofPath = `scratch/bootstrap-plan-acknowledgement-proof-${intentSha256}.json`;
+  const request = { schema: BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA, intentSha256, action };
+  return { root: resolved.root, action, intentSha256, requestPath, proofPath, request };
+}
+
+function decodeBootstrapAcknowledgementPrd(bytes) {
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { return null; }
+}
+
+function appendBootstrapAcknowledgementMarker(bytes) {
+  const current = decodeBootstrapAcknowledgementPrd(bytes);
+  if (current === null || [...current.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length !== 0) return null;
+  return Buffer.from(`${current.replace(/\n+$/u, "")}\n\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`, "utf8");
+}
+
+function safeBootstrapAcknowledgementScratch(root, relativePath) {
+  const target = absoluteProjectPath(root, relativePath, "signature acknowledgement request");
+  const parent = dirname(target);
+  ensurePhysicalParent(root, target);
+  assertPhysicalChain(root, parent, { leafMayBeAbsent: false });
+  return target;
+}
+
+function readExactBootstrapAcknowledgementRequest(root, plan) {
+  const observed = readBootstrapAcknowledgementRequestByIntent(root, plan.intentSha256);
+  if (observed.status !== "present") return observed;
+  return canonicalJson(observed.value) === canonicalJson(plan.request)
+    ? observed
+    : { status: "invalid", path: observed.path };
+}
+
+function readBootstrapAcknowledgementRequestByIntent(root, intentSha256) {
+  const requestPath = `scratch/bootstrap-plan-acknowledgement-request-${intentSha256}.json`;
+  const path = absoluteProjectPath(root, requestPath, "signature acknowledgement request");
+  if (!existsSync(path)) return { status: "absent", path };
+  assertPhysicalChain(root, path, { leafMayBeAbsent: false });
+  const raw = readPhysicalFile(path, "signature acknowledgement request");
+  let value;
+  try { value = JSON.parse(raw.toString("utf8")); } catch { return { status: "invalid", path }; }
+  if (value?.schema !== BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA || value?.intentSha256 !== intentSha256
+    || value?.action === null || typeof value?.action !== "object" || Array.isArray(value.action)
+    || canonicalSha256(value.action) !== intentSha256) return { status: "invalid", path };
+  return { status: "present", path, value };
+}
+
+function onlyBootstrapAcknowledgementPrdDrift(expectedAction, currentAction) {
+  if (expectedAction?.prd?.sha256 === currentAction?.prd?.sha256) return false;
+  const withoutPrdSha = (action) => ({ ...action, prd: { ...action.prd, sha256: "<PRD_SHA256>" } });
+  return canonicalJson(withoutPrdSha(expectedAction)) === canonicalJson(withoutPrdSha(currentAction));
+}
+
+function writeBootstrapAcknowledgementRequest(root, plan) {
+  const target = safeBootstrapAcknowledgementScratch(root, plan.requestPath);
+  const bytes = Buffer.from(`${JSON.stringify(plan.request, null, 2)}\n`, "utf8");
+  if (existsSync(target)) {
+    const existing = readExactBootstrapAcknowledgementRequest(root, plan);
+    if (existing.status !== "present") fail("BOOTSTRAP-ACK-REQUEST-DRIFT", "an existing signature acknowledgement request differs from the current plan");
+    return { path: target, written: false };
+  }
+  try {
+    writeExclusiveSynced(target, bytes, 0o600);
+    fsyncDirectory(dirname(target));
+    return { path: target, written: true };
+  } catch {
+    fail("BOOTSTRAP-ACK-REQUEST-WRITE", "the signature acknowledgement request could not be written safely");
+  }
+}
+
+function configuredPoKeyDirectory(readPlane = readMachinePlane) {
+  const plane = readPlane();
+  const directory = plane.status === "valid" ? plane.plane?.poKeyDirectory : null;
+  return typeof directory === "string" && directory.length > 0 ? directory : null;
+}
+
+function bootstrapAcknowledgementSignAction(plan, directory) {
+  return {
+    kind: "external-operator",
+    executionBoundary: "attended-external-tool",
+    invocation: "user-copy-only",
+    mutation: true,
+    requiresConfirmation: true,
+    executable: process.execPath,
+    argv: [join(dirname(DEFAULT_ONBOARDING_SCRIPT), "po-human-approval.mjs"), "sign-intent", "--repo-root", plan.root, "--directory", directory, "--request", plan.requestPath],
+    expected: { schema: "pipeline.po-approval-proof.v1", intentSha256: plan.intentSha256 },
+  };
+}
+
+export function planOnboardingBootstrapAcknowledgement({
+  rootDir, runner = "codex", repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
+} = {}) {
+  const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
+  const directory = configuredPoKeyDirectory(deps.readMachinePlane ?? readMachinePlane);
+  if (directory === null) fail("BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE", "signature acknowledgement requires a configured PO signing-key directory");
+  const request = writeBootstrapAcknowledgementRequest(plan.root, plan);
+  return {
+    schema: BOOTSTRAP_ACKNOWLEDGEMENT_PLAN_SCHEMA,
+    status: "signature-required",
+    root: plan.root,
+    runner,
+    intentSha256: plan.intentSha256,
+    prd: plan.action.prd,
+    spec: plan.action.spec,
+    requestPath: plan.requestPath,
+    proofPath: plan.proofPath,
+    requestWritten: request.written,
+    nextAction: bootstrapAcknowledgementSignAction(plan, directory),
+  };
+}
+
+export function observeOnboardingBootstrapAcknowledgementSignature({
+  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
+} = {}) {
+  const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
+  const request = readExactBootstrapAcknowledgementRequest(plan.root, plan);
+  const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
+  const directory = configuredPoKeyDirectory(deps.readMachinePlane ?? readMachinePlane);
+  return {
+    ...plan,
+    requestStatus: request.status,
+    proofStatus: proof.status,
+    signAction: request.status === "present" && directory !== null
+      ? bootstrapAcknowledgementSignAction(plan, directory)
+      : null,
+  };
+}
+
+export function applyOnboardingBootstrapAcknowledgement({
+  rootDir, expectedPlanSha256, proofPath, activate = false, repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
+} = {}) {
+  if (activate !== true) fail("BOOTSTRAP-ACK-ACTIVATION-REQUIRED", "signature acknowledgement apply requires explicit activation");
+  const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
+  if (expectedPlanSha256 !== plan.intentSha256) {
+    const expectedRequest = typeof expectedPlanSha256 === "string" && /^[a-f0-9]{64}$/u.test(expectedPlanSha256)
+      ? readBootstrapAcknowledgementRequestByIntent(plan.root, expectedPlanSha256)
+      : { status: "invalid" };
+    if (expectedRequest.status === "present" && onlyBootstrapAcknowledgementPrdDrift(expectedRequest.value.action, plan.action)) {
+      fail("BOOTSTRAP-ACK-PRD-DRIFT", "the staging PRD changed after the signature plan was created");
+    }
+    fail("BOOTSTRAP-ACK-PLAN-DRIFT", "the signature acknowledgement plan is no longer current");
+  }
+  if (proofPath !== plan.proofPath) fail("BOOTSTRAP-ACK-PROOF-PATH", "the signature acknowledgement proof path is not the plan-bound scratch path");
+  if (readExactBootstrapAcknowledgementRequest(plan.root, plan).status !== "present") fail("BOOTSTRAP-ACK-REQUEST-DRIFT", "the signature acknowledgement request is absent or changed");
+  const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
+  if (proof.status !== "present") fail("BOOTSTRAP-ACK-PROOF-UNAVAILABLE", "the signed acknowledgement proof is unavailable");
+  let proofValue;
+  try { proofValue = JSON.parse(proof.raw.toString("utf8")); } catch { fail("BOOTSTRAP-ACK-PROOF-INVALID", "the signed acknowledgement proof is malformed"); }
+  const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
+  if (!policy.ok) fail("BOOTSTRAP-ACK-TRUST-POLICY", "the project trust policy is unavailable");
+  const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
+  const verified = (deps.verifyAgainstTrustAnchors ?? verifyAgainstTrustAnchors)({ intent: { sha256: plan.intentSha256 }, anchors, proof: proofValue });
+  if (!verified.verified) fail("BOOTSTRAP-ACK-PROOF-INVALID", "the signed acknowledgement proof does not verify for this exact plan");
+  const target = absoluteProjectPath(plan.root, plan.action.prd.path, "staging PRD");
+  assertPhysicalChain(plan.root, target, { leafMayBeAbsent: false });
+  const current = readPhysicalFile(target, "staging PRD");
+  if (sha256(current) !== plan.action.prd.sha256) fail("BOOTSTRAP-ACK-PRD-DRIFT", "the staging PRD changed after the signature plan was created");
+  const next = appendBootstrapAcknowledgementMarker(current);
+  if (next === null) fail("BOOTSTRAP-ACK-PRD-MARKER", "the staging PRD cannot safely receive one acknowledgement marker");
+  let fd;
+  try {
+    fd = openSync(target, constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0));
+    const opened = fstatSync(fd);
+    const before = lstatSync(target);
+    if (!opened.isFile() || before.isSymbolicLink() || opened.dev !== before.dev || opened.ino !== before.ino) fail("BOOTSTRAP-ACK-PRD-IDENTITY", "the staging PRD identity changed before acknowledgement");
+    ftruncateSync(fd, 0);
+    writeFileSync(fd, next);
+    fsyncSync(fd);
+  } catch (error) {
+    if (error?.code?.startsWith("BOOTSTRAP-ACK-")) throw error;
+    fail("BOOTSTRAP-ACK-WRITE", "the staging PRD acknowledgement could not be written safely");
+  } finally { if (fd !== undefined) closeSync(fd); }
+  return {
+    schema: BOOTSTRAP_ACKNOWLEDGEMENT_APPLY_SCHEMA,
+    status: "applied",
+    root: plan.root,
+    intentSha256: plan.intentSha256,
+    prd: { ...plan.action.prd, postSha256: sha256(next) },
+    spec: plan.action.spec,
+    signer: verified.signer,
+    proofSha256: verified.proofSha256,
   };
 }
 

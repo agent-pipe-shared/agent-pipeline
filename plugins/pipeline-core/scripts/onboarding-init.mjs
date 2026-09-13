@@ -64,9 +64,11 @@
  *     standalone recovery command's own plan response (`plan-partial-authority`'s
  *     `"selection-required"`, which uses a `selection` field instead of `nextAction` and
  *     is never reached by a fresh repository's own `inspect` walk in the first place).
- *   - any `nextAction.kind` other than `"command"`/`"collect-input"` (e.g.
- *     `"restart-process"`), which needs an attended external terminal this driver cannot
- *     provide.
+ *   - `kind: "external-operator"` -- a typed, attended host step such as a
+ *     detached PO signature. The driver surfaces it verbatim and stops; it
+ *     never downgrades that deliberate pause to an "unsupported" error.
+ *   - any other `nextAction.kind` (e.g. `"restart-process"`), which this
+ *     driver cannot provide.
  *
  * NEVER INVENTS A VALUE. Not a language, not a profile, not a git author identity, not a
  * goal -- those are the human's. This driver holds no logic that could fabricate one: a
@@ -1078,6 +1080,20 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
       };
     }
 
+    if (nextAction && typeof nextAction === "object" && nextAction.kind === "external-operator") {
+      return {
+        schema: SCHEMA,
+        runner,
+        root,
+        outcome: "external-operator",
+        stepCap,
+        stepsExecuted: steps.length,
+        steps,
+        externalOperator: nextAction,
+        final: output,
+      };
+    }
+
     const isUnappliedMigrationPlan = output?.schema === "pipeline.runner-profile-migration-plan.v3"
       && output?.status === "ready"
       && (output?.activation?.required === true || (Array.isArray(output?.changes) && output.changes.length > 0));
@@ -1222,6 +1238,7 @@ export function main(args = process.argv.slice(2), {
   write(`${JSON.stringify(result, null, 2)}\n`);
   return result.outcome === "ready"
     || result.outcome === "collect-input"
+    || result.outcome === "external-operator"
     || result.outcome === "pending-asks"
     || ((initialAnswers !== null || bootstrap !== null) && result.outcome === "unsupported-next-action") ? 0 : 1;
 }

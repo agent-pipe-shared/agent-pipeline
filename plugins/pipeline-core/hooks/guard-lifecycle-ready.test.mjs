@@ -3304,6 +3304,8 @@ test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is a
       },
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
+      "bootstrap-acknowledge-plan": {},
+      "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
     };
     assert.deepEqual(
       Object.keys(sampleValues).sort(),
@@ -3338,6 +3340,8 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
       },
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
+      "bootstrap-acknowledge-plan": {},
+      "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
     };
     for (const name of Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES)) {
       const argv = automatedMutatingApplyArgv(name, path, sampleValues[name]).filter((token) => token !== "--activate");
@@ -8161,6 +8165,7 @@ test("NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, an
     "--text-file": "scratch/design-input.md",
     "--answers-json": JSON.stringify([{ question: "What is the goal?", answer: "Ship it." }]),
     "--plan-sha256": "a".repeat(64),
+    "--proof": "scratch/bootstrap-plan-acknowledgement-proof-test.json",
     "--git-author-name": "PO Name",
     "--git-author-email": "po@example.com",
     "--language": "en",
