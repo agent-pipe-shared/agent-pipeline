@@ -36,6 +36,7 @@ import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApproval
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
+import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectoryPath, resolveGitCommonDir, resolveRepoScopedDirectory } from "../lib/po-key-directory.mjs";
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -175,75 +176,6 @@ function poKeyDirectoryStillExists(directory, dependencies) {
 // write failure here never fails `setup` itself, an already-identical value is a
 // silent no-op, and a different already-valid stored value is never silently
 // overwritten.
-const REPO_KEY_DIRECTORY_SCHEMA = "pipeline.po-key-directory.v1";
-function repoScopedKeyDirectoryPath(gitCommonDir) { return join(gitCommonDir, "agent-pipeline", "po-key-directory.json"); }
-
-/**
- * Resolves this repository's Git common directory. Used both by the repo-scoped
- * store above (fix (A)) and by the filename fingerprint below (fix (B)) -- ONE
- * resolution primitive, not two competing ones. `dependencies.gitCommonDirFn
- * (repository)` is the injectable seam a test uses to supply a distinct fake
- * common dir per fixture repository; this is deliberately never routed through
- * `dependencies.spawn`, which existing tests already override to observe/refuse
- * the OpenSSL invocation inside signIntentIntoProof()/command() and must not
- * also start receiving `git` argv.
- *
- * lib/human-guard-override.mjs implements the equivalent `physicalRoot`/
- * `topology` pair, but it is a read-only reference for this script (never to be
- * modified) and exports neither in an importable form -- so this is an
- * intentional, narrow, local copy of the same pattern already duplicated a
- * second time in lib/guard-maintenance-window.mjs (see that file's own
- * "DUPLICATION NOTE"), not an oversight.
- *
- * Never throws; returns null whenever resolution is unavailable for any reason
- * (not a Git checkout, `git` missing, a hostile/symlinked control path). A null
- * result means different things to its two callers: fix (A)'s repo-scoped tier
- * simply does not resolve (falls through to the machine plane, exactly as if
- * this repository had never been set up); fix (B)'s fingerprint falls back to
- * the repository root itself, still a deterministic, repository-distinguishing
- * value on its own (see its call site in runHumanApproval).
- */
-function resolveGitCommonDir(repository, dependencies) {
-  if (typeof dependencies.gitCommonDirFn === "function") return dependencies.gitCommonDirFn(repository);
-  let physical;
-  try {
-    physical = realpathSync(resolve(repository));
-    const info = lstatSync(physical);
-    if (!info.isDirectory() || info.isSymbolicLink()) return null;
-  } catch { return null; }
-  let result;
-  try { result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: physical, encoding: "utf8", shell: false, timeout: 5000 }); }
-  catch { return null; }
-  if (result?.status !== 0 || result?.error) return null;
-  const raw = String(result.stdout ?? "").trim();
-  if (raw === "") return null;
-  try {
-    const common = realpathSync(isAbsolute(raw) ? raw : resolve(physical, raw));
-    const info = lstatSync(common);
-    if (!info.isDirectory() || info.isSymbolicLink()) return null;
-    return common;
-  } catch { return null; }
-}
-
-/** Three-valued, never-throwing reader mirroring readMachinePlane()'s own
- * shape/discipline (status: "absent" | "invalid" | "valid"), scoped to exactly
- * one field instead of the machine plane's wider schema. */
-function readRepoKeyDirectory(gitCommonDir, dependencies) {
-  const path = repoScopedKeyDirectoryPath(gitCommonDir);
-  const exists = dependencies.existsSyncFn ?? existsSync;
-  if (!exists(path)) return { status: "absent", directory: null };
-  const read = dependencies.readFileSyncFn ?? readFileSync;
-  let raw;
-  try { raw = read(path, "utf8"); } catch { return { status: "invalid", directory: null, code: "RKD-UNREADABLE" }; }
-  let parsed;
-  try { parsed = JSON.parse(raw); } catch { return { status: "invalid", directory: null, code: "RKD-MALFORMED" }; }
-  if (!own(parsed, ["schema", "poKeyDirectory", "updatedAt"]) || parsed.schema !== REPO_KEY_DIRECTORY_SCHEMA
-    || !text(parsed.poKeyDirectory) || !isAbsolute(parsed.poKeyDirectory) || !text(parsed.updatedAt)) {
-    return { status: "invalid", directory: null, code: "RKD-SHAPE" };
-  }
-  return { status: "valid", directory: parsed.poKeyDirectory };
-}
-
 /** The directory is created owner-private (0700, mirroring lib/human-guard-
  * override.mjs's secureDirectory() convention this script cannot import -- see
  * resolveGitCommonDir's own doc comment) and the file itself owner-private
@@ -256,12 +188,6 @@ function writeRepoKeyDirectory(gitCommonDir, value, dependencies) {
   try { chmod(dir, 0o700); } catch { /* best-effort hardening only */ }
   const write = dependencies.writeFileSyncFn ?? writeFileSync;
   write(repoScopedKeyDirectoryPath(gitCommonDir), `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-}
-
-function resolveRepoScopedDirectory(repoRoot, dependencies) {
-  const gitCommonDir = resolveGitCommonDir(resolve(repoRoot), dependencies);
-  if (gitCommonDir === null) return { status: "absent", directory: null };
-  return (dependencies.readRepoKeyDirectoryFn ?? readRepoKeyDirectory)(gitCommonDir, dependencies);
 }
 
 function persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies) {

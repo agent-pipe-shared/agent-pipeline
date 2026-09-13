@@ -84,6 +84,7 @@ import {
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
+import { resolveRepoScopedDirectory } from "./po-key-directory.mjs";
 
 export const KICKOFF_PLAN_SCHEMA = "pipeline.codex-onboarding-kickoff-plan.v1";
 export const KICKOFF_HISTORY_SCHEMA = "pipeline.codex-onboarding-continuity-history.v1";
@@ -6665,10 +6666,27 @@ function writeBootstrapAcknowledgementRequest(root, plan) {
   }
 }
 
-function configuredPoKeyDirectory(readPlane = readMachinePlane) {
-  const plane = readPlane();
-  const directory = plane.status === "valid" ? plane.plane?.poKeyDirectory : null;
-  return typeof directory === "string" && directory.length > 0 ? directory : null;
+function configuredPoKeyDirectory(root, deps = {}) {
+  // Match po-human-approval.mjs's resolution order. `setup --directory`
+  // intentionally persists its pointer in this repository's Git-common-dir,
+  // not in the machine plane, so consulting only the latter would deadlock the
+  // ordinary successful setup path.
+  const repoScope = resolveRepoScopedDirectory(root, deps);
+  if (repoScope.status === "invalid") return { status: "invalid-repo-scope", directory: null };
+  if (repoScope.status === "valid" && typeof repoScope.directory === "string" && repoScope.directory.length > 0) {
+    return { status: "present", directory: repoScope.directory, source: "repo-scope" };
+  }
+  const plane = (deps.readMachinePlane ?? readMachinePlane)();
+  if (plane.status === "invalid") return { status: "invalid-machine-plane", directory: null };
+  const machineDirectory = plane.status === "valid" ? plane.plane?.poKeyDirectory : null;
+  if (typeof machineDirectory === "string" && machineDirectory.length > 0) {
+    return { status: "present", directory: machineDirectory, source: "machine-plane" };
+  }
+  const environmentDirectory = deps.poApprovalDirectory ?? process.env.PIPELINE_PO_APPROVAL_DIRECTORY;
+  if (typeof environmentDirectory === "string" && environmentDirectory.length > 0) {
+    return { status: "present", directory: environmentDirectory, source: "environment" };
+  }
+  return { status: "absent", directory: null };
 }
 
 // An external key directory may offer a signing action only when its public
@@ -6678,8 +6696,17 @@ function configuredPoKeyDirectory(readPlane = readMachinePlane) {
 // changes after this availability read.
 function observeConfiguredPoTrustAnchor(directory, deps = {}) {
   if (typeof deps.readConfiguredPoTrustAnchor === "function") return deps.readConfiguredPoTrustAnchor(directory);
+  const path = join(directory, "trust-policy.json");
+  let before; let raw; let after;
+  try {
+    before = lstatSync(path);
+    if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.size > 65_536) return { status: "unsafe" };
+    raw = readFileSync(path, "utf8");
+    after = lstatSync(path);
+    if (!after.isFile() || after.isSymbolicLink() || after.nlink !== 1 || after.dev !== before.dev || after.ino !== before.ino) return { status: "unsafe" };
+  } catch { return { status: "unavailable" }; }
   let value;
-  try { value = JSON.parse(readFileSync(join(directory, "trust-policy.json"), "utf8")); } catch { return { status: "unavailable" }; }
+  try { value = JSON.parse(raw); } catch { return { status: "invalid" }; }
   if (typeof value?.keyReference !== "string" || value.keyReference.length === 0
     || typeof value?.publicKeySha256 !== "string" || !SHA256_RE.test(value.publicKeySha256)) {
     return { status: "invalid" };
@@ -6720,8 +6747,9 @@ export function planOnboardingBootstrapAcknowledgement({
   rootDir, runner = "codex", repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
 } = {}) {
   const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
-  const directory = configuredPoKeyDirectory(deps.readMachinePlane ?? readMachinePlane);
-  if (directory === null) fail("BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE", "signature acknowledgement requires a configured PO signing-key directory");
+  const configuredDirectory = configuredPoKeyDirectory(plan.root, deps);
+  if (configuredDirectory.status !== "present") fail("BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE", "signature acknowledgement requires a valid configured PO signing-key directory");
+  const directory = configuredDirectory.directory;
   const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
   if (!policy.ok) fail("BOOTSTRAP-ACK-TRUST-POLICY", "signature acknowledgement requires a valid project trust policy before signing");
   const anchors = projectTrustAnchors(policy);
@@ -6751,16 +6779,17 @@ export function observeOnboardingBootstrapAcknowledgementSignature({
   const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
   const request = readExactBootstrapAcknowledgementRequest(plan.root, plan);
   const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
-  const directory = configuredPoKeyDirectory(deps.readMachinePlane ?? readMachinePlane);
+  const configuredDirectory = configuredPoKeyDirectory(plan.root, deps);
+  const directory = configuredDirectory.directory;
   const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
-  const signer = directory === null || !policy.ok
+  const signer = configuredDirectory.status !== "present" || !policy.ok
     ? { status: "unavailable" }
     : configuredSignerMatchesProjectTrust(directory, policy, deps);
   return {
     ...plan,
     requestStatus: request.status,
     proofStatus: proof.status,
-    signAction: request.status === "present" && directory !== null && signer.status === "matched"
+    signAction: request.status === "present" && configuredDirectory.status === "present" && signer.status === "matched"
       ? bootstrapAcknowledgementSignAction(plan, directory)
       : null,
   };

@@ -8560,6 +8560,21 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256: "a".repeat(64) }] }),
       readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "test-po-key", publicKeySha256: "a".repeat(64) } }),
     };
+    // `po-human-approval setup --directory` persists its preferred key
+    // directory in the repository's Git-common-dir, ahead of the machine
+    // plane. The acknowledgement planner must use that same ordinary path.
+    const repoCommonDir = join(path, "repo-key-directory-fixture");
+    const repoScopedDirectory = "/external/repo-scoped-po-key";
+    mkdirSync(join(repoCommonDir, "agent-pipeline"), { recursive: true });
+    writeFileSync(join(repoCommonDir, "agent-pipeline", "po-key-directory.json"), `${JSON.stringify({
+      schema: "pipeline.po-key-directory.v1", poKeyDirectory: repoScopedDirectory, updatedAt: "2026-09-13T00:00:00.000Z",
+    })}\n`);
+    const repoScopedPlan = planOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit,
+      deps: { ...signatureDeps, gitCommonDirFn: () => repoCommonDir },
+    });
+    assert.equal(repoScopedPlan.nextAction.argv.includes(repoScopedDirectory), true);
+    assert.equal(repoScopedPlan.nextAction.argv.includes("/external/po-key"), false);
     // The planner must refuse before writing a request or offering an attended
     // terminal action when the machine-selected signing directory cannot prove
     // that it carries one of this project's declared trust anchors.
@@ -8628,6 +8643,27 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       assert.equal(mismatchedSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
       assert.equal(mismatchedSigningDirectory.nextAction.action, undefined, runner);
     }
+    // A trust-policy symlink is rejected by the human signer itself. The
+    // planner must detect that unsafe artifact before it offers the same
+    // inevitably failing external action.
+    const unsafePolicyDirectory = mkdtempSync(join(tmpdir(), "bootstrap-ack-unsafe-policy-"));
+    const unsafePolicyTarget = join(unsafePolicyDirectory, "outside-policy.json");
+    writeFileSync(unsafePolicyTarget, JSON.stringify({ keyReference: "test-po-key", publicKeySha256: "a".repeat(64) }));
+    symlinkSync(unsafePolicyTarget, join(unsafePolicyDirectory, "trust-policy.json"));
+    const unsafePolicyDeps = {
+      ...signatureDeps,
+      readMachinePlane: () => ({ status: "valid", plane: { poKeyDirectory: unsafePolicyDirectory } }),
+    };
+    delete unsafePolicyDeps.readConfiguredPoTrustAnchor;
+    assert.throws(() => planOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit, deps: unsafePolicyDeps,
+    }), (error) => error?.code === "BOOTSTRAP-ACK-SIGNER-POLICY-UNAVAILABLE");
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const unsafePolicy = inspectProjectOnboardingV3({ runner, rootDir: path, deps: unsafePolicyDeps });
+      assert.equal(unsafePolicy.nextAction.kind, "command", runner);
+      assert.equal(unsafePolicy.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
+    }
+    rmSync(unsafePolicyDirectory, { recursive: true, force: true });
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
       rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
       expectedPlanSha256: "f".repeat(64), proofPath: acknowledgementPlan.proofPath,
