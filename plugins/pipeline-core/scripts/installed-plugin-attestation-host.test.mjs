@@ -322,6 +322,22 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
   assert.equal(claudeDirect.status, "ready", JSON.stringify(claudeDirect));
   assert.equal(claudeDirect.installedPluginAttestation.status, "not-required");
 
+  const claudeDirectWithoutInstallPath = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: () => JSON.stringify([{
+      id: "pipeline-core@agent-pipeline-local", version: "1.2.3-test.1", enabled: true, scope: "user",
+    }]),
+    knownMarketplaces: claudeDirectMarketplaces,
+    scriptUrl: pathToFileURL(join(claudeDirectPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
+    cwd: claudeRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    verifyLocalInstalledPluginReceiptFn: () => { throw new Error("direct directory must not consume a receipt"); },
+    observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
+    observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
+    requireProjectOnboardingReadyFn: () => undefined,
+  });
+  assert.equal(claudeDirectWithoutInstallPath.status, "ready", JSON.stringify(claudeDirectWithoutInstallPath));
+  assert.equal(claudeDirectWithoutInstallPath.installedPluginAttestation.status, "not-required");
+
   const claudeMarketplace = join(claudeRepo.base, "gitless-marketplace");
   cpSync(claudeRepo.sourcePluginRoot, join(claudeMarketplace, "plugins", "pipeline-core"), { recursive: true });
   assert.equal(existsSync(join(claudeMarketplace, ".git")), false);

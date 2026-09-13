@@ -259,11 +259,17 @@ export function resolveClaudeRegistryBinding({
     const source = registry?.["agent-pipeline-local"]?.source;
     if (source?.source !== "directory" || typeof source.path !== "string" || !isAbsolute(source.path)
       || resolve(source.path) !== source.path) return null;
-    if (typeof matches[0].installPath !== "string" || !isAbsolute(matches[0].installPath)
-      || resolve(matches[0].installPath) !== matches[0].installPath) return null;
-    const installedRoot = realpathSync(matches[0].installPath);
-    if (installedRoot !== realpathSync(installedPluginRoot)) return null;
     const marketplacePluginRoot = realpathSync(resolve(source.path, "plugins", "pipeline-core"));
+    // Claude's list payload has shipped both with and without `installPath`.
+    // When it is absent, the executing script's physical root is the only
+    // observed loaded root; it is not reconstructed from the marketplace.
+    // A present installPath remains an exact, non-negotiable cross-check.
+    const loadedPluginRoot = realpathSync(installedPluginRoot);
+    const installPath = matches[0].installPath;
+    if (installPath !== undefined && (typeof installPath !== "string" || !isAbsolute(installPath)
+      || resolve(installPath) !== installPath)) return null;
+    const installedRoot = typeof installPath === "string" ? realpathSync(installPath) : loadedPluginRoot;
+    if (installedRoot !== loadedPluginRoot) return null;
     const marketplaceInfo = lstatSync(marketplacePluginRoot, { bigint: true });
     const installedInfo = lstatSync(installedRoot, { bigint: true });
     if (!marketplaceInfo.isDirectory() || marketplaceInfo.isSymbolicLink()
