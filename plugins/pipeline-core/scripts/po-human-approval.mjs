@@ -409,6 +409,16 @@ function mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, 
  */
 const FORK_DISPOSITION_COMMANDS = new Set(["prepare-fork-disposition", "approve-fork-disposition", "verify-fork-disposition"]);
 
+export const HUMAN_SIGNING_COMMANDS = Object.freeze([
+  "setup",
+  "approve",
+  "approve-all",
+  "approve-critical",
+  "authorize-critical",
+  "sign-intent",
+  "approve-fork-disposition",
+]);
+
 // NVA-CLI-FEEDBACK-1 (backlog/items/2026-08-09-critical-push-signing-
 // ceremony-gives-no-path-feedback.md): the fixed set of recognised
 // subcommands, named once and reused both for validation (below) and for the
