@@ -47,6 +47,25 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 84f8200c7878d5f7f7ecaecc04ab0d37a670ae1d — 2026-09-13, signed bootstrap acknowledgement recovery completion
+
+- ADR-0010: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0058: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0064: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0072: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+
 ## Candidate e56549bbcdc14a3b4264c7dac5e147a0bfbbabbc — 2026-09-13, signed bootstrap acknowledgement and atomic recovery completion
 
 - ADR-0010: checked, no change needed.
