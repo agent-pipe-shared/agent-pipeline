@@ -10,6 +10,7 @@ import {
   hardenWindowsPrivateDirectory,
   sanitizeChildEnvironment,
 } from "./windows-private-state.mjs";
+import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { PrivateBoundaryError, assureWindowsPrivateDirectories } from "./private-boundary.mjs";
 
 let passed = 0;
@@ -19,6 +20,22 @@ check("accepts only the concrete owner with no reparse point", () => assert.equa
 check("rejects SYSTEM and Administrators as implicit exceptions", () => { for (const principal of ["SYSTEM", "BUILTIN\\Administrators", "Everyone", "DESKTOP\\other"]) { const value = secure(); value.principals.push(principal); assert.equal(evaluateWindowsPrivateState(value).status, "insecure"); } });
 check("rejects owner drift and reparse points", () => { const owner = secure(); owner.owner = "SYSTEM"; assert.equal(evaluateWindowsPrivateState(owner).status, "insecure"); const link = secure(); link.reparsePoint = true; assert.equal(evaluateWindowsPrivateState(link).status, "insecure"); });
 check("keeps malformed observations unavailable", () => { assert.equal(evaluateWindowsPrivateState(null).status, "unavailable"); assert.equal(evaluateWindowsPrivateState({}).status, "unavailable"); });
+check("accepts only the documented completed WSL EPERM shape", () => {
+  const eperm = Object.assign(new Error("spawnSync git EPERM"), { code: "EPERM" });
+  assert.equal(isSuccessfulSpawn({ status: 0, error: eperm, stdout: "ready\n" }), true);
+  assert.equal(isSuccessfulSpawn({ status: 0, error: Object.assign(new Error("denied"), { code: "EACCES" }) }), false);
+  assert.equal(isSuccessfulSpawn({ status: 1, error: eperm }), false);
+  assert.equal(isSuccessfulSpawn({ status: null, error: eperm }), false);
+  assert.equal(isSuccessfulSpawn({ status: 0, error: new Error("unknown") }), false);
+});
+check("requires callers to enumerate typed nonzero completion statuses", () => {
+  const eperm = Object.assign(new Error("spawnSync session-power EPERM"), { code: "EPERM" });
+  assert.equal(hasExpectedSpawnStatus({ status: 3, error: eperm }, [0, 3]), true);
+  assert.equal(hasExpectedSpawnStatus({ status: 3, error: eperm }, [0]), false);
+  assert.equal(hasExpectedSpawnStatus({ status: 3, error: Object.assign(new Error("denied"), { code: "EACCES" }) }, [0, 3]), false);
+  assert.equal(hasExpectedSpawnStatus({ status: 5, error: eperm }, [0, 5]), true);
+  assert.equal(hasExpectedSpawnStatus({ status: 5, error: Object.assign(new Error("denied"), { code: "EACCES" }) }, [0, 5]), false);
+});
 check("hardens every newly-created component of a recursive private directory", () => {
   const hardened = [];
   assureWindowsPrivateDirectories([
