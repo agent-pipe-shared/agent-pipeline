@@ -44,7 +44,7 @@ import {
   KICKOFF_GOAL_MAX_BYTES,
   KICKOFF_PROMOTION_PLAN_SCHEMA,
   observeBootstrapBindAcknowledgement,
-  observeOnboardingBootstrapAcknowledgementSignature,
+  planOnboardingBootstrapAcknowledgementChat,
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
@@ -99,7 +99,7 @@ import {
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
-import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
+import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3 } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
 
@@ -2445,54 +2445,27 @@ function bootstrapBindPlanAction(root, runner, intent) {
   );
 }
 
-// A staging PRD that was authored after generation must be acknowledged before
-// it is promoted.  In the repository-wide signature posture the acknowledgement
-// is a detached proof, not a request that the PO edit an HTML comment by hand.
-// The plan writes only a public scratch request; the human-held key signs it in
-// an attended terminal, and the paired apply command verifies the exact proof
-// before adding the one sanctioned marker.  `chat` remains the explicitly
-// configured weaker attribution posture and retains the collect-input surface.
-function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signatureObservation, signatureMode) {
-  if (signatureMode) {
-    if (signatureObservation?.requestStatus === "present" && signatureObservation.proofVerificationStatus === "verified") {
-      return commandAction(
-        lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-apply", "--root", root,
-          "--plan-sha256", signatureObservation.intentSha256, "--proof", signatureObservation.proofPath, "--activate"], runner, intent),
-        true, false, "pipeline.bootstrap-plan-acknowledgement-apply.v1", ["applied"],
-      );
-    }
-    if (signatureObservation?.requestStatus === "present" && signatureObservation.signAction !== null) {
-      return {
-        kind: "external-operator",
-        mutation: false,
-        requiresConfirmation: true,
-        executionBoundary: "attended-external-tool",
-        guidance: `the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) and specification (${spec.path}, sha256 ${spec.sha256}) require the configured detached-signature acknowledgement. Run the exact host-terminal sign action below; it writes the plan-bound proof back into this repository's scratch directory. Do not edit an acknowledgement marker manually.`,
-        action: signatureObservation.signAction,
-        expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
-      };
-    }
-    // A request may outlive a machine-plane change. Never expose an attended
-    // action with a null payload: return the already guard-admitted planner,
-    // which then reports BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE precisely
-    // until the operator restores the configured signing material.
-    return commandAction(
-      lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-plan", "--root", root, "--activate"], runner, intent),
-      true, false, "pipeline.bootstrap-plan-acknowledgement-plan.v1", ["signature-required"],
-    );
+// A staging PRD authored after generation needs an explicit PO chat decision,
+// but plan/design gates never require an external signature. The returned
+// command is exact-plan bound and requires runner confirmation; Codex/Claude
+// invoke it only after the PO confirms in chat, while Antigravity can present
+// the same command to its attended user.
+function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, spawn) {
+  let plan;
+  try { plan = planOnboardingBootstrapAcknowledgementChat({ rootDir: root, spawn }); } catch {
+    return {
+      kind: "collect-input", mutation: false, requiresConfirmation: false,
+      guidance: `Read the staging PRD at ${prd.path} (sha256 ${prd.sha256}) and specification at ${spec.path} (sha256 ${spec.sha256}), then rerun inspection before confirming; their binding changed while the acknowledgement action was being prepared.`,
+      expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
+    };
   }
   return {
-    kind: "collect-input",
-    mutation: false,
-    requiresConfirmation: false,
-    guidance: "binding requires the PO's own acknowledgement that the generated staging plan is content-sound and"
-      + " consistent with its neighboring specification -- an agent must never supply this on the PO's behalf."
-      + ` Ask the PO to read the staging PRD at ${prd.path} (sha256 ${prd.sha256}) and the staging specification at`
-      + ` ${spec.path} (sha256 ${spec.sha256}); if and only if satisfied, the PO adds the single line`
-      + " <!-- po-plan-acknowledged: content-sound-and-spec-consistent --> on its own line to the PRD themselves --"
-      + " there is no command that writes this line on their behalf, and none should ever be offered."
-      + " Once that line is present, review the read-only bootstrap-bind-plan action, then apply it.",
-    expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
+    ...commandAction(
+      lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-chat-apply", "--root", root,
+        "--plan-sha256", plan.intentSha256, "--activate"], runner, intent),
+      true, true, "pipeline.bootstrap-plan-acknowledgement-apply.v1", ["applied"],
+    ),
+    guidance: `After the PO confirms in chat that staging PRD ${prd.path} (sha256 ${prd.sha256}) is content-sound and consistent with ${spec.path} (sha256 ${spec.sha256}), run this exact bound acknowledgement action. Do not ask the PO to edit the PRD manually.`,
   };
 }
 
@@ -2967,29 +2940,11 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       const needsAcknowledgement = acknowledgement !== null
         && acknowledgement.acknowledged === false
         && acknowledgement.exempt !== true;
-      let signatureObservation = null;
-      let signatureMode = false;
-      if (needsAcknowledgement) {
-        try {
-          const approval = readHumanApprovalMode(root, { spawn: fs.spawnSync });
-          signatureMode = approval.mode === "signature";
-          if (signatureMode) {
-            signatureObservation = (fs.observeOnboardingBootstrapAcknowledgementSignature ?? observeOnboardingBootstrapAcknowledgementSignature)({
-              rootDir: root, repositoryCapability: repository.mode, spawn: fs.spawnSync, deps: fs,
-            });
-          }
-        } catch {
-          // A missing/unreadable approval policy is fail-closed: the default
-          // signature posture remains selected, and the plan command will
-          // return its typed trust-anchor/preimage diagnosis.
-          signatureMode = true;
-        }
-      }
       return lifecycleResult({
         status: "bootstrap-binding-required",
         root, runner, intent, repository, runtime, continuity, appServer,
         nextAction: needsAcknowledgement
-          ? collectPrdAcknowledgementAction(root, runner, intent, acknowledgement.prd, acknowledgement.spec, signatureObservation, signatureMode)
+          ? collectPrdAcknowledgementAction(root, runner, intent, acknowledgement.prd, acknowledgement.spec, fs.spawnSync)
           : bootstrapBindPlanAction(root, runner, intent),
         diagnostics: [lifecycleDiagnostic(
           "$.continuity",
@@ -2998,9 +2953,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
             ? "staging PRD/spec/design-input are generated but the PO has not yet acknowledged the staging PRD"
             : "staging PRD/spec/design-input are generated but not yet bound as authority",
           needsAcknowledgement
-            ? (signatureMode
-              ? "review the staging PRD and specification, then follow the digest-bound host signature action; do not edit an acknowledgement marker manually"
-              : "ask the PO to review the staging PRD and spec named in the collect-input action's guidance, then have the PO add the acknowledgement marker themselves")
+            ? "ask the PO to review the staging PRD and specification, then run the exact digest-bound chat acknowledgement action after their confirmation; do not edit an acknowledgement marker manually"
             : "review the read-only bootstrap-bind-plan action, then apply it",
         )],
       });

@@ -6766,6 +6766,24 @@ function bootstrapAcknowledgementSignAction(plan, directory) {
   };
 }
 
+// Plan/design acknowledgement is a chat gate, not an external-effect
+// authorization. This read-only reconstruction binds the exact PRD and spec
+// bytes that the PO reviewed before the runner executes the chat-confirmed
+// apply action.
+export function planOnboardingBootstrapAcknowledgementChat({
+  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
+} = {}) {
+  const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
+  return {
+    schema: "pipeline.bootstrap-plan-acknowledgement-chat-plan.v1",
+    status: "confirmation-required",
+    root: plan.root,
+    intentSha256: plan.intentSha256,
+    prd: plan.action.prd,
+    spec: plan.action.spec,
+  };
+}
+
 export function planOnboardingBootstrapAcknowledgement({
   rootDir, runner = "codex", repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
 } = {}) {
@@ -6818,9 +6836,9 @@ export function observeOnboardingBootstrapAcknowledgementSignature({
 }
 
 export function applyOnboardingBootstrapAcknowledgement({
-  rootDir, expectedPlanSha256, proofPath, activate = false, repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
+  rootDir, expectedPlanSha256, proofPath, chatConfirmed = false, activate = false, repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
 } = {}) {
-  if (activate !== true) fail("BOOTSTRAP-ACK-ACTIVATION-REQUIRED", "signature acknowledgement apply requires explicit activation");
+  if (activate !== true) fail("BOOTSTRAP-ACK-ACTIVATION-REQUIRED", "plan acknowledgement apply requires explicit activation");
   const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
   if (expectedPlanSha256 !== plan.intentSha256) {
     const expectedRequest = typeof expectedPlanSha256 === "string" && /^[a-f0-9]{64}$/u.test(expectedPlanSha256)
@@ -6831,17 +6849,20 @@ export function applyOnboardingBootstrapAcknowledgement({
     }
     fail("BOOTSTRAP-ACK-PLAN-DRIFT", "the signature acknowledgement plan is no longer current");
   }
-  if (proofPath !== plan.proofPath) fail("BOOTSTRAP-ACK-PROOF-PATH", "the signature acknowledgement proof path is not the plan-bound scratch path");
-  if (readExactBootstrapAcknowledgementRequest(plan.root, plan).status !== "present") fail("BOOTSTRAP-ACK-REQUEST-DRIFT", "the signature acknowledgement request is absent or changed");
-  const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
-  if (proof.status !== "present") fail("BOOTSTRAP-ACK-PROOF-UNAVAILABLE", "the signed acknowledgement proof is unavailable");
-  let proofValue;
-  try { proofValue = JSON.parse(proof.raw.toString("utf8")); } catch { fail("BOOTSTRAP-ACK-PROOF-INVALID", "the signed acknowledgement proof is malformed"); }
-  const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
-  if (!policy.ok) fail("BOOTSTRAP-ACK-TRUST-POLICY", "the project trust policy is unavailable");
-  const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
-  const verified = (deps.verifyAgainstTrustAnchors ?? verifyAgainstTrustAnchors)({ intent: { sha256: plan.intentSha256 }, anchors, proof: proofValue });
-  if (!verified.verified) fail("BOOTSTRAP-ACK-PROOF-INVALID", "the signed acknowledgement proof does not verify for this exact plan");
+  let verified = null;
+  if (!chatConfirmed) {
+    if (proofPath !== plan.proofPath) fail("BOOTSTRAP-ACK-PROOF-PATH", "the signature acknowledgement proof path is not the plan-bound scratch path");
+    if (readExactBootstrapAcknowledgementRequest(plan.root, plan).status !== "present") fail("BOOTSTRAP-ACK-REQUEST-DRIFT", "the signature acknowledgement request is absent or changed");
+    const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
+    if (proof.status !== "present") fail("BOOTSTRAP-ACK-PROOF-UNAVAILABLE", "the signed acknowledgement proof is unavailable");
+    let proofValue;
+    try { proofValue = JSON.parse(proof.raw.toString("utf8")); } catch { fail("BOOTSTRAP-ACK-PROOF-INVALID", "the signed acknowledgement proof is malformed"); }
+    const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
+    if (!policy.ok) fail("BOOTSTRAP-ACK-TRUST-POLICY", "the project trust policy is unavailable");
+    const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
+    verified = (deps.verifyAgainstTrustAnchors ?? verifyAgainstTrustAnchors)({ intent: { sha256: plan.intentSha256 }, anchors, proof: proofValue });
+    if (!verified.verified) fail("BOOTSTRAP-ACK-PROOF-INVALID", "the signed acknowledgement proof does not verify for this exact plan");
+  }
   const target = absoluteProjectPath(plan.root, plan.action.prd.path, "staging PRD");
   assertPhysicalChain(plan.root, target, { leafMayBeAbsent: false });
   const current = readPhysicalFile(target, "staging PRD");
@@ -6892,8 +6913,9 @@ export function applyOnboardingBootstrapAcknowledgement({
     intentSha256: plan.intentSha256,
     prd: { ...plan.action.prd, postSha256: sha256(next) },
     spec: plan.action.spec,
-    signer: verified.signer,
-    proofSha256: verified.proofSha256,
+    signer: verified?.signer ?? null,
+    proofSha256: verified?.proofSha256 ?? null,
+    acknowledgementMode: chatConfirmed ? "chat" : "signature",
   };
 }
 

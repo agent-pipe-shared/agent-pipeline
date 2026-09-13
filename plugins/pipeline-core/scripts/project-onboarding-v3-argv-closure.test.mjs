@@ -175,7 +175,7 @@ test("project-onboarding-v3 CLI: the intake -> generate -> bootstrap-bind chain 
   }
 });
 
-test("project-onboarding-v3 CLI: bootstrap bind and signature acknowledgement subcommands reach their own precondition errors, not 'unknown argument'", () => {
+test("project-onboarding-v3 CLI: bootstrap bind and acknowledgement subcommands reach their own precondition errors, not 'unknown argument'", () => {
   const dir = neutralGitFixture("bootstrap-bind-no-checkpoint");
   try {
     const plan = invoke(["bootstrap-bind-plan", "--root", dir]);
@@ -201,6 +201,13 @@ test("project-onboarding-v3 CLI: bootstrap bind and signature acknowledgement su
     assert.equal(acknowledgementApply.status, 2);
     assert.match(acknowledgementApply.output, /BOOTSTRAP-ACK-PRECONDITION/);
     assert.doesNotMatch(acknowledgementApply.output, /unknown argument/);
+
+    const chatAcknowledgementApply = invoke([
+      "bootstrap-acknowledge-chat-apply", "--root", dir, "--plan-sha256", sha, "--activate",
+    ]);
+    assert.equal(chatAcknowledgementApply.status, 2);
+    assert.match(chatAcknowledgementApply.output, /BOOTSTRAP-ACK-PRECONDITION/);
+    assert.doesNotMatch(chatAcknowledgementApply.output, /unknown argument/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

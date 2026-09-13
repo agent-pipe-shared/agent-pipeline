@@ -3305,6 +3305,7 @@ test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is a
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
       "bootstrap-acknowledge-plan": {},
+      "bootstrap-acknowledge-chat-apply": { "--plan-sha256": "c".repeat(64) },
       "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
     };
     assert.deepEqual(
@@ -3341,6 +3342,7 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
       "bootstrap-acknowledge-plan": {},
+      "bootstrap-acknowledge-chat-apply": { "--plan-sha256": "c".repeat(64) },
       "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
     };
     for (const name of Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES)) {

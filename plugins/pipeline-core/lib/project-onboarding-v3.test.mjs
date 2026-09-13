@@ -8475,7 +8475,7 @@ test("all three runners execute the exact returned consent and design-question a
   }
 });
 
-test("bootstrap-binding-required routes a hand-authored staging PRD through the exact detached-signature acknowledgement and then binds", () => {
+test("bootstrap-binding-required routes a hand-authored staging PRD through the exact chat-confirmed acknowledgement and then binds", () => {
   const path = root();
   let stderr = "";
   const intakeDeps = { ...fakeDeps, spawn: fakeGit };
@@ -8532,8 +8532,9 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     const prdAbsolutePath = join(path, exemptObservation.prd.path);
     writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n`, "utf8");
 
-    // While the marker is missing and required, the signature posture returns a
-    // runnable request planner, never the bind command that would fail.
+    // While the marker is missing and required, every approval posture returns
+    // the same chat-confirmed, digest-bound apply driver -- never an external
+    // signer ceremony and never the bind command that would fail.
     const before = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
     assert.equal(before.acknowledged, false);
     assert.equal(before.exempt, false, "a hand-edited draft is no longer exempt");
@@ -8541,9 +8542,10 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       const beforeAck = inspectProjectOnboardingV3({ runner, rootDir: path, deps: fakeDeps });
       assert.equal(beforeAck.status, "bootstrap-binding-required", runner);
       assert.equal(beforeAck.nextAction.kind, "command", runner);
-      assert.equal(beforeAck.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
+      assert.equal(beforeAck.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
       assert.equal(beforeAck.nextAction.argv.at(-1), runner, runner);
       assert.equal(beforeAck.nextAction.argv.includes("--activate"), true, runner);
+      assert.equal(beforeAck.nextAction.requiresConfirmation, true, runner);
     }
 
     // DoD 5: bootstrap-bind-plan's own direct refusal for a caller that
@@ -8592,8 +8594,8 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
         readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "other-key", publicKeySha256: "b".repeat(64) } }),
       },
     }), (error) => error?.code === "BOOTSTRAP-ACK-SIGNER-TRUST-MISMATCH");
-    // Exercise the same returned CLI action a Greenfield driver receives; this
-    // must not be merely a direct-library happy path.
+    // Keep the legacy explicit-signature API covered independently. The
+    // inspection route below must not select it for this non-final plan gate.
     const acknowledgementPlanRun = invoke([
       "bootstrap-acknowledge-plan", "--root", path, "--activate", "--runner", "codex",
     ], signatureDeps);
@@ -8611,13 +8613,11 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     const proofAbsolute = join(path, acknowledgementPlan.proofPath);
     for (const runner of ["claude", "codex", "antigravity"]) {
       const awaitingHuman = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
-      assert.equal(awaitingHuman.nextAction.kind, "external-operator", runner);
-      assert.deepEqual(awaitingHuman.nextAction.action, acknowledgementPlan.nextAction, runner);
+      assert.equal(awaitingHuman.nextAction.kind, "command", runner);
+      assert.equal(awaitingHuman.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
+      assert.equal(awaitingHuman.nextAction.requiresConfirmation, true, runner);
     }
-    // A durable request can survive while its host machine plane is repaired.
-    // That drift must never publish an external-operator action with a null
-    // payload; the existing exact planner remains the admitted diagnostic
-    // route and will report the missing signing directory precisely.
+    // The non-final chat route does not depend on a host signing directory.
     for (const runner of ["claude", "codex", "antigravity"]) {
       const missingSigningDirectory = inspectProjectOnboardingV3({
         runner,
@@ -8625,12 +8625,10 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
         deps: { ...signatureDeps, readMachinePlane: () => ({ status: "valid", plane: {} }) },
       });
       assert.equal(missingSigningDirectory.nextAction.kind, "command", runner);
-      assert.equal(missingSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
+      assert.equal(missingSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
       assert.equal(missingSigningDirectory.nextAction.action, undefined, runner);
     }
-    // A mismatching, but syntactically valid, machine directory is the same
-    // class of non-actionable state: expose the exact planner diagnostic, not
-    // an external signing action which the project's verifier would reject.
+    // A mismatching signing directory likewise cannot alter the chat route.
     for (const runner of ["claude", "codex", "antigravity"]) {
       const mismatchedSigningDirectory = inspectProjectOnboardingV3({
         runner,
@@ -8641,7 +8639,7 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
         },
       });
       assert.equal(mismatchedSigningDirectory.nextAction.kind, "command", runner);
-      assert.equal(mismatchedSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
+      assert.equal(mismatchedSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
       assert.equal(mismatchedSigningDirectory.nextAction.action, undefined, runner);
     }
     // A v3 policy with no listed anchors intentionally accepts any well-formed
@@ -8656,8 +8654,9 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     assert.equal(unrestrictedPlan.status, "signature-required");
     for (const runner of ["claude", "codex", "antigravity"]) {
       const unrestricted = inspectProjectOnboardingV3({ runner, rootDir: path, deps: unrestrictedSignatureDeps });
-      assert.equal(unrestricted.nextAction.kind, "external-operator", runner);
-      assert.deepEqual(unrestricted.nextAction.action, unrestrictedPlan.nextAction, runner);
+      assert.equal(unrestricted.nextAction.kind, "command", runner);
+      assert.equal(unrestricted.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
+      assert.equal(unrestricted.nextAction.requiresConfirmation, true, runner);
     }
     // A trust-policy symlink is rejected by the human signer itself. The
     // planner must detect that unsafe artifact before it offers the same
@@ -8677,7 +8676,7 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     for (const runner of ["claude", "codex", "antigravity"]) {
       const unsafePolicy = inspectProjectOnboardingV3({ runner, rootDir: path, deps: unsafePolicyDeps });
       assert.equal(unsafePolicy.nextAction.kind, "command", runner);
-      assert.equal(unsafePolicy.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
+      assert.equal(unsafePolicy.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
     }
     rmSync(unsafePolicyDirectory, { recursive: true, force: true });
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
@@ -8686,13 +8685,12 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     }), (error) => error?.code === "BOOTSTRAP-ACK-PLAN-DRIFT");
     const prdPreimage = readFileSync(prdAbsolutePath, "utf8");
     writeFileSync(proofAbsolute, JSON.stringify({ ...proof, signatureBase64: "AAAA" }), "utf8");
-    // A bad proof is not ready for apply. Every runner must re-offer the exact
-    // existing sign action so the PO can replace it, instead of looping on a
-    // deterministically failing apply action.
+    // A stray invalid legacy proof cannot change the non-final chat route.
+    // Every runner continues to expose the exact chat-confirmed driver.
     for (const runner of ["claude", "codex", "antigravity"]) {
       const invalidProof = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
-      assert.equal(invalidProof.nextAction.kind, "external-operator", runner);
-      assert.deepEqual(invalidProof.nextAction.action, acknowledgementPlan.nextAction, runner);
+      assert.equal(invalidProof.nextAction.kind, "command", runner);
+      assert.equal(invalidProof.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
     }
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
       rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
@@ -8703,9 +8701,8 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     for (const runner of ["claude", "codex", "antigravity"]) {
       const signed = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
       assert.equal(signed.nextAction.kind, "command", runner);
-      assert.equal(signed.nextAction.argv[1], "bootstrap-acknowledge-apply", runner);
+      assert.equal(signed.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
       assert.equal(signed.nextAction.argv.includes(acknowledgementPlan.intentSha256), true, runner);
-      assert.equal(signed.nextAction.argv.includes(acknowledgementPlan.proofPath), true, runner);
       assert.equal(signed.nextAction.argv.at(-1), runner, runner);
     }
     const proofPolicy = {
@@ -8738,9 +8735,9 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     assert.equal(readFileSync(prdAbsolutePath, "utf8"), prdPreimage);
     unlinkSync(acknowledgementTemporaryPath);
     const acknowledgementApplyRun = invoke([
-      "bootstrap-acknowledge-apply", "--root", path, "--plan-sha256", acknowledgementPlan.intentSha256,
-      "--proof", acknowledgementPlan.proofPath, "--activate", "--runner", "codex",
-    ], { ...signatureDeps, ...proofPolicy });
+      "bootstrap-acknowledge-chat-apply", "--root", path, "--plan-sha256", acknowledgementPlan.intentSha256,
+      "--activate", "--runner", "codex",
+    ], intakeDeps);
     assert.equal(acknowledgementApplyRun.code, 0, stderr);
     const acknowledgementApplied = acknowledgementApplyRun.result;
     assert.equal(acknowledgementApplied.status, "applied");

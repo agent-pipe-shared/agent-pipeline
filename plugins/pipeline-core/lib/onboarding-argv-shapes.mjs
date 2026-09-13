@@ -92,6 +92,12 @@ export const MUTATING_ONBOARDING_ARGV_SHAPES = Object.freeze({
     requiredValueOneOf: Object.freeze([]),
     optionalValue: Object.freeze([]),
   }),
+  "bootstrap-acknowledge-chat-apply": Object.freeze({
+    required: Object.freeze(["--activate"]),
+    requiredValue: Object.freeze(["--root", "--plan-sha256"]),
+    requiredValueOneOf: Object.freeze([]),
+    optionalValue: Object.freeze([]),
+  }),
   "bootstrap-acknowledge-apply": Object.freeze({
     required: Object.freeze(["--activate"]),
     requiredValue: Object.freeze(["--root", "--plan-sha256", "--proof"]),

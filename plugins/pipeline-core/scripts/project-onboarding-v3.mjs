@@ -203,6 +203,7 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   // NVA-W5-GUARDADMIT-1's closure). Both branches exist today.
   { name: "bootstrap-bind-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "bootstrap-bind-apply", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "bootstrap-acknowledge-chat-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "bootstrap-acknowledge-plan", flat: true, mutates: true, automatedArgvShape: null },
   { name: "bootstrap-acknowledge-apply", flat: true, mutates: true, automatedArgvShape: null },
 ].map((entry) => Object.freeze(entry)));
@@ -260,7 +261,7 @@ function resolveOnboardingCliRunner(env, root, deps) {
 
 function usage() {
   return [
-    "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]",
+    "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|bootstrap-acknowledge-chat-apply|bootstrap-acknowledge-plan|bootstrap-acknowledge-apply> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex|antigravity] [--plan-sha256 <sha256>] [--proof <repo-scratch-path>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
@@ -327,6 +328,7 @@ function parse(args) {
   if (output.command?.startsWith("adopt-remote-") && (!output.remote || !output.ref)) return { error: "adopt-remote requires --remote and --ref" };
   if (output.command === "adopt-remote-apply" && !output.planSha256) return { error: "adopt-remote apply requires --plan-sha256" };
   if (output.command === "bootstrap-acknowledge-apply" && (!output.planSha256 || !output.proof)) return { error: "bootstrap-acknowledge-apply requires --plan-sha256 and --proof" };
+  if (output.command === "bootstrap-acknowledge-chat-apply" && !output.planSha256) return { error: "bootstrap-acknowledge-chat-apply requires --plan-sha256" };
   // `plan-repair`/`apply-repair` are the only non-kickoff commands that accept
   // the operator-confirmed continuity authority claim
   // (`onboarding-continuity.mjs`'s `operatorConfirmedContinuity()`, surfaced
@@ -769,6 +771,10 @@ export function main(args = process.argv.slice(2), {
     }
     else if (options.command === "bootstrap-acknowledge-apply") output = applyOnboardingBootstrapAcknowledgement({
       rootDir: options.root, expectedPlanSha256: options.planSha256, proofPath: options.proof,
+      activate: options.activate, spawn: deps?.spawn ?? hostSpawnSync, deps,
+    });
+    else if (options.command === "bootstrap-acknowledge-chat-apply") output = applyOnboardingBootstrapAcknowledgement({
+      rootDir: options.root, expectedPlanSha256: options.planSha256, chatConfirmed: true,
       activate: options.activate, spawn: deps?.spawn ?? hostSpawnSync, deps,
     });
     else {
