@@ -8554,11 +8554,14 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       (error) => error?.code === "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
     );
 
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
+    const publicKeySha256 = createHash("sha256").update(publicKeyPem).digest("hex");
     const signatureDeps = {
       ...intakeDeps,
       readMachinePlane: () => ({ status: "valid", plane: { poKeyDirectory: "/external/po-key" } }),
-      readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256: "a".repeat(64) }] }),
-      readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "test-po-key", publicKeySha256: "a".repeat(64) } }),
+      readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256 }] }),
+      readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "test-po-key", publicKeySha256 } }),
     };
     // `po-human-approval setup --directory` persists its preferred key
     // directory in the repository's Git-common-dir, ahead of the machine
@@ -8598,8 +8601,6 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     const acknowledgementPlan = acknowledgementPlanRun.result;
     assert.equal(acknowledgementPlan.status, "signature-required");
     assert.equal(acknowledgementPlan.nextAction.argv.at(-1), acknowledgementPlan.requestPath);
-    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
-    const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
     const proof = {
       schema: "pipeline.po-approval-proof.v1",
       intentSha256: acknowledgementPlan.intentSha256,
@@ -8643,6 +8644,21 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       assert.equal(mismatchedSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
       assert.equal(mismatchedSigningDirectory.nextAction.action, undefined, runner);
     }
+    // A v3 policy with no listed anchors intentionally accepts any well-formed
+    // Ed25519 signer. Planning must mirror apply's unrestricted contract.
+    const unrestrictedSignatureDeps = {
+      ...signatureDeps,
+      readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [] }),
+    };
+    const unrestrictedPlan = planOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit, deps: unrestrictedSignatureDeps,
+    });
+    assert.equal(unrestrictedPlan.status, "signature-required");
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const unrestricted = inspectProjectOnboardingV3({ runner, rootDir: path, deps: unrestrictedSignatureDeps });
+      assert.equal(unrestricted.nextAction.kind, "external-operator", runner);
+      assert.deepEqual(unrestricted.nextAction.action, unrestrictedPlan.nextAction, runner);
+    }
     // A trust-policy symlink is rejected by the human signer itself. The
     // planner must detect that unsafe artifact before it offers the same
     // inevitably failing external action.
@@ -8670,6 +8686,14 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     }), (error) => error?.code === "BOOTSTRAP-ACK-PLAN-DRIFT");
     const prdPreimage = readFileSync(prdAbsolutePath, "utf8");
     writeFileSync(proofAbsolute, JSON.stringify({ ...proof, signatureBase64: "AAAA" }), "utf8");
+    // A bad proof is not ready for apply. Every runner must re-offer the exact
+    // existing sign action so the PO can replace it, instead of looping on a
+    // deterministically failing apply action.
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const invalidProof = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
+      assert.equal(invalidProof.nextAction.kind, "external-operator", runner);
+      assert.deepEqual(invalidProof.nextAction.action, acknowledgementPlan.nextAction, runner);
+    }
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
       rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
       expectedPlanSha256: acknowledgementPlan.intentSha256, proofPath: acknowledgementPlan.proofPath,

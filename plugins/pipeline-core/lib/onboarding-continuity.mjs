@@ -6725,9 +6725,32 @@ function configuredSignerMatchesProjectTrust(directory, policy, deps = {}) {
   if (observed?.status !== "present" || observed.anchor === null || typeof observed.anchor !== "object") {
     return { status: "unavailable" };
   }
-  const matches = projectTrustAnchors(policy).some((anchor) => anchor?.keyReference === observed.anchor.keyReference
+  const anchors = projectTrustAnchors(policy);
+  // An empty v3 trust-anchor list deliberately means that the project accepts
+  // any otherwise well-formed Ed25519 proof. The planner must mirror the
+  // verifier's contract: the configured signer still has to expose a safe,
+  // readable identity, but it need not match a deliberately unrestricted set.
+  if (anchors.length === 0) return { status: "matched" };
+  const matches = anchors.some((anchor) => anchor?.keyReference === observed.anchor.keyReference
     && anchor?.publicKeySha256 === observed.anchor.publicKeySha256);
   return matches ? { status: "matched" } : { status: "mismatch" };
+}
+
+function observeBootstrapAcknowledgementProofVerification(plan, deps = {}) {
+  const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
+  if (proof.status !== "present") return { proof, status: proof.status };
+  let value;
+  try { value = JSON.parse(proof.raw.toString("utf8")); } catch { return { proof, status: "invalid" }; }
+  const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
+  if (!policy.ok) return { proof, status: "invalid" };
+  try {
+    const verified = (deps.verifyAgainstTrustAnchors ?? verifyAgainstTrustAnchors)({
+      intent: { sha256: plan.intentSha256 }, anchors: projectTrustAnchors(policy), proof: value,
+    });
+    return { proof, status: verified.verified ? "verified" : "invalid" };
+  } catch {
+    return { proof, status: "invalid" };
+  }
 }
 
 function bootstrapAcknowledgementSignAction(plan, directory) {
@@ -6752,8 +6775,6 @@ export function planOnboardingBootstrapAcknowledgement({
   const directory = configuredDirectory.directory;
   const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
   if (!policy.ok) fail("BOOTSTRAP-ACK-TRUST-POLICY", "signature acknowledgement requires a valid project trust policy before signing");
-  const anchors = projectTrustAnchors(policy);
-  if (anchors.length === 0) fail("BOOTSTRAP-ACK-TRUST-ANCHOR-UNAVAILABLE", "signature acknowledgement requires a project trust anchor before signing");
   const signer = configuredSignerMatchesProjectTrust(directory, policy, deps);
   if (signer.status === "unavailable") fail("BOOTSTRAP-ACK-SIGNER-POLICY-UNAVAILABLE", "the configured PO signing-key directory has no readable valid trust-policy.json");
   if (signer.status !== "matched") fail("BOOTSTRAP-ACK-SIGNER-TRUST-MISMATCH", "the configured PO signing key is not declared by this project's trust policy");
@@ -6778,7 +6799,7 @@ export function observeOnboardingBootstrapAcknowledgementSignature({
 } = {}) {
   const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
   const request = readExactBootstrapAcknowledgementRequest(plan.root, plan);
-  const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
+  const proofVerification = observeBootstrapAcknowledgementProofVerification(plan, deps);
   const configuredDirectory = configuredPoKeyDirectory(plan.root, deps);
   const directory = configuredDirectory.directory;
   const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(plan.root);
@@ -6788,7 +6809,8 @@ export function observeOnboardingBootstrapAcknowledgementSignature({
   return {
     ...plan,
     requestStatus: request.status,
-    proofStatus: proof.status,
+    proofStatus: proofVerification.proof.status,
+    proofVerificationStatus: proofVerification.status,
     signAction: request.status === "present" && configuredDirectory.status === "present" && signer.status === "matched"
       ? bootstrapAcknowledgementSignAction(plan, directory)
       : null,

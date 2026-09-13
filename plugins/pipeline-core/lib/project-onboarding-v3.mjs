@@ -2454,7 +2454,7 @@ function bootstrapBindPlanAction(root, runner, intent) {
 // configured weaker attribution posture and retains the collect-input surface.
 function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signatureObservation, signatureMode) {
   if (signatureMode) {
-    if (signatureObservation?.requestStatus === "present" && signatureObservation.proofStatus === "present") {
+    if (signatureObservation?.requestStatus === "present" && signatureObservation.proofVerificationStatus === "verified") {
       return commandAction(
         lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-apply", "--root", root,
           "--plan-sha256", signatureObservation.intentSha256, "--proof", signatureObservation.proofPath, "--activate"], runner, intent),
