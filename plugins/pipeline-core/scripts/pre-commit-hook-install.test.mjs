@@ -134,6 +134,29 @@ function writeHandoverCalibration(dir, handover) {
   writeFileSync(join(dir, ".claude", "pipeline.json"), JSON.stringify({ handover }));
 }
 
+/** The complete three-file delta produced by the sanctioned
+ * `pipeline-state set-phase --phase implementation --verify-command` writer.
+ * These fixtures deliberately use ordinary filesystem writes: the assertion is
+ * at the Git boundary, where the hook must distinguish the exact semantic
+ * transaction from every wider rewrite regardless of the process that wrote it. */
+function writeVerifyTransitionFixture(dir, { command = null, phase = "design", extraCalibration = {}, updatedAt = "2026-09-13T12:00:00.000Z" } = {}) {
+  mkdirSync(join(dir, "project"), { recursive: true });
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  const calibration = { project: "fixture", verify: command, handover: "docs/state.md", ...extraCalibration };
+  writeFileSync(join(dir, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  writeFileSync(join(dir, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  const feature = { id: "fixture", planPath: "plan.md", phase };
+  if (phase === "implementation") feature.phaseHistory = [{ phase: "implementation", at: updatedAt }];
+  writeFileSync(join(dir, "project", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: true,
+    updatedAt,
+    activeFeature: feature,
+    planSubmission: { submissionSha256: "fixture-submission" },
+    planApproval: { submissionSha256: "fixture-submission" },
+  }, null, 2)}\n`);
+}
+
 /** Installs the real hook into `dir`, then runs an actual `git commit` -- exactly the boundary
  * this hook exists to guard, not a direct invocation of the hook binary. */
 function installHook(dir) {
@@ -306,6 +329,51 @@ test("installed hook: a spawned Node process re-writing an ALREADY-COMMITTED pro
   const { code, stderr } = commit(dir, "attempt via spawned bypass against already-tracked content");
   assert.notEqual(code, 0);
   assert.match(stderr, /GS-10/);
+});
+
+test("installed hook: admits only the complete sanctioned baseline-verify to implementation transaction without a second human override", () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-verify-transition");
+  writeVerifyTransitionFixture(dir);
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and approved design");
+  installHook(dir);
+
+  const command = "node --test test.mjs";
+  writeVerifyTransitionFixture(dir, { command, phase: "implementation", updatedAt: "2026-09-13T12:01:00.000Z" });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  const { code, stderr } = commit(dir, "configure verify while entering implementation");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction", () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-verify-transition-extra-field");
+  writeVerifyTransitionFixture(dir);
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and approved design");
+  installHook(dir);
+
+  writeVerifyTransitionFixture(dir, {
+    command: "node --test test.mjs",
+    phase: "implementation",
+    extraCalibration: { autonomy: "unguarded" },
+    updatedAt: "2026-09-13T12:01:00.000Z",
+  });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  const { code } = commit(dir, "attempt wider calibration rewrite");
+  assert.notEqual(code, 0);
+});
+
+test("installed hook: refuses the verify rewrite when the lifecycle state is not the matching design-to-implementation transition", () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-verify-transition-missing-state");
+  writeVerifyTransitionFixture(dir);
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and approved design");
+  installHook(dir);
+
+  writeVerifyTransitionFixture(dir, { command: "node --test test.mjs", updatedAt: "2026-09-13T12:01:00.000Z" });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  const { code } = commit(dir, "attempt verify rewrite without lifecycle transition");
+  assert.notEqual(code, 0);
 });
 
 test("installed hook: a spawned Node process CREATING a brand-new protected path (first appearance, never committed before) is exempt -- commit ALLOWED", () => {

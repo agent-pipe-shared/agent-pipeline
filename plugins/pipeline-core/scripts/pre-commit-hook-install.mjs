@@ -434,6 +434,131 @@ function isTrustAnchorBootstrapUpgrade(projectRoot, relPath) {
   return true;
 }
 
+// DESIGN-TO-IMPLEMENTATION VERIFY TRANSITION (NVA-B8.3, greenfield evidence
+// 2026-09-13): pipeline-state.mjs set-phase --phase implementation
+// --verify-command <command> is the one runtime-authorized writer for a
+// project's verify contract.  It atomically changes both calibration twins and
+// the tracked lifecycle state.  The generic commit backstop used to reject that
+// exact result because it knew only human-override capabilities, creating a
+// second, unnecessary signing ceremony after the writer had already been
+// admitted by the lifecycle guard.
+//
+// This is deliberately NOT a general GS-10 exception and it does not trust a
+// mutable marker.  It derives the only admissible staged semantic delta from
+// HEAD and the index at the commit boundary: every existing calibration twin
+// must change ONLY verify, from baseline-only to one identical non-blank
+// command, while the tracked state must be the exact design -> implementation
+// transition the sanctioned writer emits.  Parse/read ambiguity, a missing
+// twin, a changed unrelated key, a pre-existing configured command, or any
+// extra protected-path rewrite all fail closed and remain subject to the normal
+// capability check.
+const VERIFY_CALIBRATION_PATHS = Object.freeze([
+  "project/pipeline.json",
+  ".claude/pipeline.json",
+]);
+const VERIFY_TRANSITION_STATE_PATH = "project/pipeline-state.json";
+const UNCONFIGURED_VERIFY_MARKER = "the verify contract of this project is not configured";
+
+function plainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function sameJsonValue(left, right) {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right)
+      && left.length === right.length
+      && left.every((entry, index) => sameJsonValue(entry, right[index]));
+  }
+  if (!plainObject(left) || !plainObject(right)) return false;
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key, index) => key === rightKeys[index] && sameJsonValue(left[key], right[key]));
+}
+
+function jsonAt(projectRoot, revSpec) {
+  const shown = git(["show", revSpec], projectRoot);
+  if (shown.status !== 0) return null;
+  try {
+    const parsed = JSON.parse(shown.stdout);
+    return plainObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function classifyVerifyContract(command) {
+  if (typeof command !== "string" || command.trim() === "") return "baseline-only";
+  return command.includes(UNCONFIGURED_VERIFY_MARKER) ? "baseline-only" : "configured";
+}
+
+function sameExceptVerify(before, after) {
+  const left = { ...before };
+  const right = { ...after };
+  delete left.verify;
+  delete right.verify;
+  return sameJsonValue(left, right);
+}
+
+function exactImplementationStateTransition(before, after) {
+  if (!plainObject(before) || !plainObject(after)
+    || !plainObject(before.activeFeature) || !plainObject(after.activeFeature)
+    || !plainObject(before.planSubmission) || !plainObject(before.planApproval)
+    || before.planApproved !== true
+    || typeof before.activeFeature.id !== "string" || before.activeFeature.id.trim() === ""
+    || typeof before.activeFeature.planPath !== "string" || before.activeFeature.planPath.trim() === ""
+    || typeof before.planSubmission.submissionSha256 !== "string" || before.planSubmission.submissionSha256.trim() === ""
+    || before.planApproval.submissionSha256 !== before.planSubmission.submissionSha256
+    || before.activeFeature.phase !== "design" || after.activeFeature.phase !== "implementation"
+    || typeof after.updatedAt !== "string" || after.updatedAt.trim() === "") return false;
+  const beforeHistory = Object.hasOwn(before.activeFeature, "phaseHistory") ? before.activeFeature.phaseHistory : [];
+  const afterHistory = after.activeFeature.phaseHistory;
+  if (!Array.isArray(beforeHistory) || !Array.isArray(afterHistory)
+    || afterHistory.length !== beforeHistory.length + 1
+    || !beforeHistory.every((entry, index) => sameJsonValue(entry, afterHistory[index]))) return false;
+  const appended = afterHistory.at(-1);
+  if (!plainObject(appended) || appended.phase !== "implementation"
+    || typeof appended.at !== "string" || appended.at.trim() === "") return false;
+  const left = { ...before };
+  const right = { ...after };
+  delete left.updatedAt;
+  delete right.updatedAt;
+  left.activeFeature = { ...left.activeFeature };
+  right.activeFeature = { ...right.activeFeature };
+  delete left.activeFeature.phase;
+  delete right.activeFeature.phase;
+  delete left.activeFeature.phaseHistory;
+  delete right.activeFeature.phaseHistory;
+  return sameJsonValue(left, right);
+}
+
+/** Returns the exact calibration paths exempted by the sanctioned writer's
+ * complete three-file transaction, or an empty set for every other diff. */
+function sanctionedVerifyTransitionPaths(projectRoot, paths) {
+  const stagedCalibrations = paths.filter((path) => VERIFY_CALIBRATION_PATHS.includes(path));
+  if (stagedCalibrations.length === 0 || !paths.includes(VERIFY_TRANSITION_STATE_PATH)) return new Set();
+  const expected = [];
+  const commands = [];
+  for (const path of VERIFY_CALIBRATION_PATHS) {
+    const before = jsonAt(projectRoot, "HEAD:" + path);
+    if (before === null) continue;
+    const after = jsonAt(projectRoot, ":" + path);
+    if (after === null || !sameExceptVerify(before, after)
+      || classifyVerifyContract(before.verify) !== "baseline-only"
+      || classifyVerifyContract(after.verify) !== "configured") return new Set();
+    expected.push(path);
+    commands.push(after.verify);
+  }
+  if (expected.length === 0 || stagedCalibrations.length !== expected.length
+    || !expected.every((path) => stagedCalibrations.includes(path))
+    || !commands.every((command) => command === commands[0])) return new Set();
+  const stateBefore = jsonAt(projectRoot, "HEAD:" + VERIFY_TRANSITION_STATE_PATH);
+  const stateAfter = jsonAt(projectRoot, ":" + VERIFY_TRANSITION_STATE_PATH);
+  if (!exactImplementationStateTransition(stateBefore, stateAfter)) return new Set();
+  return new Set(expected);
+}
+
 /**
  * HANDOVER-SIZE COMPANION CHECK (NVA-B-HANDOVERPATH, 2026-09-01, backlog/items/
  * 2026-09-01-the-handover-size-guard-only-sees-one-of-two-write-paths.md; buffer/encoding fix
@@ -581,6 +706,9 @@ async function main() {
     ({ rules: testPathRules } = loadProtectedTestPathRules({ rootDir: projectRoot }));
   } catch { testPathRules = []; }
 
+  let sanctionedVerifyPaths;
+  try { sanctionedVerifyPaths = sanctionedVerifyTransitionPaths(projectRoot, paths); } catch { sanctionedVerifyPaths = new Set(); }
+
   const findings = [];
   for (const relPath of paths) {
     let rule = null;
@@ -589,6 +717,7 @@ async function main() {
       try { rule = protectedTestPathRuleFor(testPathRules, relPath); } catch { rule = null; }
     }
     if (!rule) continue;
+    if (sanctionedVerifyPaths.has(relPath) && (rule.id === "GS-10" || rule.id === "GS-11")) continue;
     let kernelPath = true;
     try { kernelPath = isNeverLiftableKernelPath(relPath, { rootDir: projectRoot, livePluginRoot: resolve(PLUGIN_LIB_DIR, "..") }); } catch { kernelPath = true; }
     if (!kernelPath) {
