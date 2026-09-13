@@ -1174,11 +1174,34 @@ test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survive
     const invalidObservation = () => {
       throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "invalid", { intent: "session" });
     };
+    const projectionDrift = () => {
+      throw new ProjectOnboardingReadyError("PORG-NOT-READY", "projection drift", {
+        intent: "session",
+        lifecycleStatus: "projection-drift",
+      });
+    };
     const run = (command, observed = observation) => evaluateLifecycleReadyGuard(
       { tool_name: "Bash", tool_input: { command } },
       { projectDir: path, requireProjectOnboardingReadyFn: invalidObservation, inspectProjectOnboardingV3Fn: () => observed },
     );
     assert.equal(run(`node ${argv.join(" ")}`).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command: `node ${argv.join(" ")}` } },
+      { projectDir: path, requireProjectOnboardingReadyFn: projectionDrift, inspectProjectOnboardingV3Fn: () => observation },
+    ).exitCode, 0, "the producer's ordinary projection-drift state admits its exact repair");
+    assert.equal(evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command: `node ${argv.join(" ")}` } },
+      {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: () => {
+          throw new ProjectOnboardingReadyError("PORG-NOT-READY", "different lifecycle state", {
+            intent: "session",
+            lifecycleStatus: "runtime-initialization-required",
+          });
+        },
+        inspectProjectOnboardingV3Fn: () => observation,
+      },
+    ).exitCode, 2, "the repair remains unavailable for every other non-ready lifecycle state");
     assert.equal(run(`node ${[...argv.slice(0, 5), "b".repeat(64), ...argv.slice(6)].join(" ")}`).exitCode, 2);
     assert.equal(run(`node ${argv.join(" ")}`, { ...observation, status: "ready" }).exitCode, 2);
     assert.equal(run(`node ${argv.join(" ")}`, {

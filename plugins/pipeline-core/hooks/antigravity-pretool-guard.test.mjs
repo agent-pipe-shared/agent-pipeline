@@ -102,6 +102,14 @@ function readyLifecycleFixture(mode = "chat") {
   lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "antigravity");
   const bind = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), "bootstrap-bind-plan");
   followLifecycleAction(root, bind, "bootstrap-bind-apply");
+  const permissionsDrift = lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity");
+  assert.equal(permissionsDrift.status, "projection-drift");
+  assert.equal(permissionsDrift.runnerPermissions.status, "pending-runtime-initialization");
+  const permissionsApplied = spawnSync(permissionsDrift.nextAction.executable, permissionsDrift.nextAction.argv, {
+    cwd: root, encoding: "utf8", shell: false,
+  });
+  assert.equal(permissionsApplied.status, 0, `${permissionsApplied.stderr}\n${permissionsApplied.stdout}`);
+  assert.equal(JSON.parse(permissionsApplied.stdout).status, "ready");
   assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity").status, "ready");
   return root;
 }

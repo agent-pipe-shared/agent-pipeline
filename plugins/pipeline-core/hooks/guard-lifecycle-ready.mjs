@@ -4880,7 +4880,15 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && isExactObservedInstalledPluginAttestationAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
     if (exactObservedInstalledPluginAttestationAction) return verdict(0);
     const exactObservedRunnerPermissionsRepairAction = error instanceof ProjectOnboardingReadyError
-      && error.code === "PORG-INVALID-OBSERVATION"
+      // A well-formed projection-drift observation is deliberately a non-ready
+      // lifecycle state.  The old invalid-observation-only condition made the
+      // exact recovery route below unreachable for the producer's normal
+      // result, so the guard blocked the one repair it had just prescribed.
+      // Retain the existing invalid-observation lane for its narrow historical
+      // compatibility case, but admit PORG-NOT-READY only for this one typed
+      // lifecycle state and only after the full observed-action equality check.
+      && ((error.code === "PORG-NOT-READY" && error.lifecycleStatus === "projection-drift")
+        || error.code === "PORG-INVALID-OBSERVATION")
       && error.intent === "session"
       && toolName === "Bash"
       && isExactObservedRunnerPermissionsRepairAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);

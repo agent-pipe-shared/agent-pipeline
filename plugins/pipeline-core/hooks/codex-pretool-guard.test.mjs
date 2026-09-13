@@ -190,6 +190,11 @@ function createReadyLifecycleFixture(mode = "chat") {
   lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "codex");
   const bind = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-bind-plan");
   followLifecycleAction(root, bind, "bootstrap-bind-apply");
+  const permissionsDrift = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+  assert.equal(permissionsDrift.status, "projection-drift");
+  assert.equal(permissionsDrift.runnerPermissions.status, "pending-runtime-initialization");
+  const permissionsApplied = executeFixtureAction(root, permissionsDrift.nextAction, {});
+  assert.equal(permissionsApplied.status, "ready");
   assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex").status, "ready");
   return root;
 }
@@ -306,7 +311,10 @@ function guardRecoveryRoute(reason) {
 // version convention"); the Claude manifest carries the same shape with a
 // `claude.` prefix. Base versions are compared by splitting at `+`, so both
 // manifests agree while carrying different stamps.
-const CODEX_BUILD_METADATA = /^codex\.\d{14}\.[0-9a-f]{7}$/u;
+// Git's configured abbreviation length is repository-local. Release stamping
+// records a lowercase unambiguous abbreviation, which may be seven or more
+// characters; this repository's candidate generator emits eight.
+const CODEX_BUILD_METADATA = /^codex\.\d{14}\.[0-9a-f]{7,40}$/u;
 
 check("Codex manifest matches the repository version and has a native hook descriptor", () => {
   const manifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
@@ -329,7 +337,7 @@ check("Codex build-metadata stamp admits timestamp-and-OID and rejects malformed
   for (const rejected of [
     "codex.20260808104333", // timestamp only, no OID
     "codex.20260808104333.c4be06", // OID too short
-    "codex.20260808104333.c4be0633", // OID too long
+    `codex.20260808104333.${"a".repeat(41)}`, // OID exceeds a full Git object ID
     "codex.20260808104333.C4BE063", // OID not lowercase hex
     "codex.20260808104333.zzzzzzz", // OID not hex
     "codex.2026080810433.c4be063", // timestamp too short

@@ -21,6 +21,7 @@ import test from "node:test";
 import { main as onboardingCli } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
+import { main as settingsAllowlistMergeCli } from "./settings-allowlist-merge.mjs";
 import { run as pipelineStateCli } from "./pipeline-state.mjs";
 import {
   applyInitialOnboardingAnswers,
@@ -213,6 +214,15 @@ function publicDriverRun(path, invocations) {
         console.error = originalError;
       }
     }
+    if (typeof script === "string" && script.split(/[\\/]/u).at(-1) === "settings-allowlist-merge.mjs") {
+      let stdout = "";
+      let stderr = "";
+      const status = settingsAllowlistMergeCli(args, {
+        write: (chunk) => { stdout += chunk; },
+        writeError: (chunk) => { stderr += chunk; },
+      });
+      return { status, stdout, stderr };
+    }
     return { status: 1, stdout: "", stderr: `unsupported public driver target: ${script}` };
   };
 }
@@ -356,6 +366,17 @@ function makeReady(path) {
     deps: fixtureDeps,
   });
   assert.equal(ready.status, "ready");
+  const permissionsDrift = run(onboarding, ["inspect", "--root", path], path);
+  assert.equal(permissionsDrift.json.status, "projection-drift");
+  assert.equal(permissionsDrift.json.runnerPermissions.status, "pending-runtime-initialization");
+  const permissionsAction = permissionsDrift.json.nextAction;
+  assert.equal(permissionsAction.kind, "command");
+  assert.equal(permissionsAction.argv[0].split(/[\\/]/u).at(-1), "settings-allowlist-merge.mjs");
+  assert.equal(permissionsAction.argv[1], "apply-runner-permissions");
+  const applied = publicDriverRun(path, [])(permissionsAction.executable, permissionsAction.argv);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.equal(JSON.parse(applied.stdout).status, "ready");
+  assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
 }
 function git(args, cwd) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
