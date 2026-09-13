@@ -498,6 +498,7 @@ const TEST_SUITES = [
   { name: "delivery-course-tests", file: join(libDir, "delivery-course.test.mjs") },
   { name: "critic-packet-governance-tests", file: join(libDir, "critic-packet-governance.test.mjs") },
   { name: "critic-dispatch-preflight-tests", file: join(pluginScriptsDir, "critic-dispatch-preflight.test.mjs") },
+  { name: "observe-critic-preflight-tests", file: join(pluginScriptsDir, "observe-critic-preflight.test.mjs") },
   { name: "requirement-traceability-tests", file: join(libDir, "requirement-traceability.test.mjs") },
   { name: "session-critic-finalizer-tests", file: join(pluginScriptsDir, "session-critic-finalizer.test.mjs") },
   { name: "windows-private-state-tests", file: join(libDir, "windows-private-state.test.mjs") },
