@@ -1,0 +1,109 @@
+{
+  "schema": "pipeline.rigor-derivation-policy.v1",
+  "policyRevision": 1,
+  "derivationRevision": "b1-r1",
+  "profiles": [
+    "mini",
+    "feature",
+    "epic"
+  ],
+  "profileHierarchy": {
+    "mini": 0,
+    "feature": 1,
+    "epic": 2
+  },
+  "profileEvidenceClasses": {
+    "mini": [
+      "verify"
+    ],
+    "feature": [
+      "verify",
+      "critic"
+    ],
+    "epic": [
+      "verify",
+      "critic",
+      "security"
+    ]
+  },
+  "diffThresholds": {
+    "maxChangedFiles": 5,
+    "maxChangedLines": 150
+  },
+  "reversibilityHierarchy": {
+    "high": "mini",
+    "medium": "feature",
+    "low": "epic",
+    "irreversible": "epic"
+  },
+  "rules": [
+    {
+      "id": "protected-baseline-touch",
+      "dimension": "protectedTouches",
+      "targetProfile": "epic",
+      "requiredEvidence": [
+        "verify",
+        "critic",
+        "security"
+      ],
+      "trigger": "TOUCHES_PROTECTED_BASELINE",
+      "description": "Touches to protected baseline (A3/TP paths) or guardrails escalate to epic"
+    },
+    {
+      "id": "irreversible-change",
+      "dimension": "reversibility",
+      "targetProfile": "epic",
+      "requiredEvidence": [
+        "verify",
+        "critic",
+        "security"
+      ],
+      "trigger": "IRREVERSIBLE_OR_LOW_REVERSIBILITY",
+      "description": "Changes with low reversibility or irreversible effects escalate to epic"
+    },
+    {
+      "id": "public-contract-delta",
+      "dimension": "contractDeltas",
+      "targetProfile": "feature",
+      "requiredEvidence": [
+        "verify",
+        "critic"
+      ],
+      "trigger": "CONTRACT_OR_SCHEMA_DELTA",
+      "description": "Touches to public contracts, core dependencies, schemas, or storage deltas require at least feature"
+    },
+    {
+      "id": "surface-expansion",
+      "dimension": "actualPaths",
+      "targetProfile": "feature",
+      "requiredEvidence": [
+        "verify",
+        "critic"
+      ],
+      "trigger": "SURFACE_EXPANSION",
+      "description": "Actual surface expansion beyond planned paths escalates to at least feature"
+    },
+    {
+      "id": "diff-threshold-exceeded",
+      "dimension": "diffStats",
+      "targetProfile": "feature",
+      "requiredEvidence": [
+        "verify",
+        "critic"
+      ],
+      "trigger": "DIFF_SIZE_EXCEEDED_THRESHOLD",
+      "description": "Actual candidate diff size or file count exceeding thresholds escalates from mini to feature"
+    },
+    {
+      "id": "unavailable-or-unknown-input",
+      "dimension": "*",
+      "targetProfile": "feature",
+      "requiredEvidence": [
+        "verify",
+        "critic"
+      ],
+      "trigger": "UNAVAILABLE_OR_UNKNOWN_INPUT",
+      "description": "Unknown or unavailable inputs raise floor to at least feature and never lower"
+    }
+  ]
+}
