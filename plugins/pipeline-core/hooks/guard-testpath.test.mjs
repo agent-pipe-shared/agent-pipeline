@@ -30,17 +30,18 @@ import { fileURLToPath } from "node:url";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 
 import { closeGuardMaintenanceWindow, installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import { createBriefedTestChangeAuthorization } from "../lib/human-guard-override.mjs";
 import { livePluginRoots } from "./guard-gate-strength.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url));
 
 /** Run the guard exactly like Claude Code does: tool-input JSON on stdin. */
-function runGuard(toolName, filePath, projectDir, extraInput = {}) {
+function runGuard(toolName, filePath, projectDir, extraInput = {}, env = {}) {
   const res = spawnSync(process.execPath, [GUARD], {
     input: JSON.stringify({ tool_name: toolName, tool_input: { file_path: filePath, ...extraInput } }),
     encoding: "utf8",
-    env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir },
+    env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir, ...env },
   });
   return { code: res.status, stderr: res.stderr ?? "" };
 }
@@ -54,8 +55,8 @@ const failures = [];
 // properties are shapes rather than literals -- "a real 64-hex request digest was offered"
 // is not the same claim as "the string --request-sha256 appears somewhere". Existing cases
 // pass none and are unaffected.
-function check(id, toolName, filePath, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrMatches, stderrEmpty, extraInput } = {}) {
-  const { code, stderr } = runGuard(toolName, filePath, projectDir, extraInput);
+function check(id, toolName, filePath, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrMatches, stderrEmpty, extraInput, env } = {}) {
+  const { code, stderr } = runGuard(toolName, filePath, projectDir, extraInput, env);
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit})`);
   for (const needle of [].concat(stderrIncludes ?? [])) {
@@ -418,8 +419,84 @@ check(
   },
 );
 
+
+// ---- WP-B2-1: Briefed test-change authorization and refusal differentiation --------
+check(
+  "TP15 block  test path refusal clearly states route-available-via-briefed-authorization",
+  "Edit",
+  "plugins/pipeline-core/hooks/guard-git.test.mjs",
+  BLOCK,
+  {
+    projectDir: CFG_DIR,
+    stderrIncludes: ["route-available-via-briefed-authorization"],
+    extraInput: { old_string: "a", new_string: "b" },
+  },
+);
+
+check(
+  "TP16 block  non-test path refusal clearly states no-route-for-this-target",
+  "Write",
+  "harness/scripts/verify.mjs",
+  BLOCK,
+  {
+    projectDir: ROUTE_DIR,
+    stderrIncludes: ["no-route-for-this-target"],
+    extraInput: { content: "x\n" },
+  },
+);
+
+const BRIEFED_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-briefed-"));
+mkdirSync(join(BRIEFED_DIR, ".claude"), { recursive: true });
+writeFileSync(
+  join(BRIEFED_DIR, ".claude", "guard-config.json"),
+  JSON.stringify({
+    protectedTestPaths: [
+      { id: "TP-1", pattern: "plugins/pipeline-core/hooks/guard-git\\.test\\.mjs$", reason: "test suite" },
+    ],
+  }),
+);
+gitCommitAll(BRIEFED_DIR);
+
+const testTarget = "plugins/pipeline-core/hooks/guard-git.test.mjs";
+const matchingDigest = "c".repeat(64);
+const mismatchDigest = "d".repeat(64);
+
+createBriefedTestChangeAuthorization({
+  rootDir: BRIEFED_DIR,
+  targetPath: testTarget,
+  briefingDigest: matchingDigest,
+  expiry: Date.now() + 600000,
+  mode: "chat",
+  reason: "briefed test change for TP17",
+});
+
+check(
+  "TP17 allow  briefed test-change authorization admits exact target with matching digest",
+  "Edit",
+  testTarget,
+  ALLOW,
+  {
+    projectDir: BRIEFED_DIR,
+    env: { PIPELINE_BRIEFING_DIGEST: matchingDigest },
+    extraInput: { old_string: "a", new_string: "b" },
+  },
+);
+
+check(
+  "TP18 block  briefed test-change authorization blocks when presenting mismatching digest",
+  "Edit",
+  testTarget,
+  BLOCK,
+  {
+    projectDir: BRIEFED_DIR,
+    env: { PIPELINE_BRIEFING_DIGEST: mismatchDigest },
+    stderrIncludes: ["route-available-via-briefed-authorization"],
+    extraInput: { old_string: "a", new_string: "b" },
+  },
+);
+
 // ---- Summary -----------------------------------------------------------------------------
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, GMW_SEL_DIR, MODE_CHAT_DIR, ROUTE_DIR]) {
+for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, GMW_SEL_DIR, MODE_CHAT_DIR, ROUTE_DIR, BRIEFED_DIR]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {

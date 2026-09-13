@@ -29,10 +29,14 @@ import {
 } from "./chat-gate-ceremony.mjs";
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import {
+  confirmTrustAnchorKey,
+  isRecognizedTrustAnchorKey,
+  isWellFormedEd25519PublicKey,
   readCriticalHumanProofPolicy,
   readHumanApprovalMode,
   verifyAgainstTrustAnchors,
 } from "./critical-human-proof-policy.mjs";
+import { isNeverLiftableKernelPath } from "./guard-maintenance-window.mjs";
 // Dependency-free string helpers ONLY (see git-cmd.mjs's own header). guard-push.mjs owns
 // the normative `parsePushBinding()`, but that file is a HOOK with top-level side effects:
 // importing it to reuse one function would run a guard as a side effect of loading this
@@ -711,6 +715,7 @@ function storage(common) {
     // writeExclusive/writeAtomic discipline `requests`/`capabilities` already use.
     plans: secureDirectory(join(base, "plans")),
     capabilities: secureDirectory(join(base, "capabilities")),
+    briefedAuthorizations: secureDirectory(join(base, "briefed-authorizations")),
     locks: secureDirectory(join(base, "locks")),
     key: join(base, "audit.key"),
     audit: join(base, "audit.jsonl"),
@@ -3755,25 +3760,57 @@ export function authorizeHumanGuardOverrideBySignature({
   // posture here. Kept on the stricter (fail-closed) side per this merge's security-conflict
   // rule (stricter wins absent a demonstrable, scoped-to-this-call-site later fix); flagged
   // for Elephant/PO review rather than silently resolved either way.
-  const resolvedTrustAnchors = trustPolicy !== null
-    ? [trustPolicy]
-    : (() => {
-      const policy = readCriticalHumanProofPolicy(rootDir);
-      if (policy.ok && Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0) {
-        return policy.trustAnchors;
-      }
-      if (policy.ok && policy.trustAnchor !== null) return [policy.trustAnchor];
-      fail("HGO-TRUST-ANCHOR-MISSING", "project/critical-human-proof.json carries no trustAnchor");
-    })();
-  // Defense in depth (belt-and-suspenders with the resolution above): never let an empty
-  // anchor set reach verification, regardless of how `resolvedTrustAnchors` was resolved --
-  // a future code path that resolves it differently must still be unable to pass an empty
-  // set through to verifyAgainstTrustAnchors().
-  if (!Array.isArray(resolvedTrustAnchors) || resolvedTrustAnchors.length === 0) {
-    fail("HGO-TRUST-ANCHOR-MISSING", "project/critical-human-proof.json carries no trustAnchor");
+  // Per-Key TOFU Trust Anchors (WP-B2-4):
+  // When in signature mode and an unrecognized well-formed Ed25519 key signs an override or critical proof,
+  // emit code HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED requiring human confirmation before first use,
+  // rather than blindly failing with HGO-TRUST-ANCHOR-MISSING or unconditionally accepting.
+  if (!proof || typeof proof !== "object") {
+    fail("HGO-PROOF-INVALID", "proof is required");
   }
-  const verified = verifyAgainstTrustAnchors({ intent, anchors: resolvedTrustAnchors, proof });
-  if (!verified.verified) fail("HGO-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
+  if (!isWellFormedEd25519PublicKey(proof?.publicKey)) {
+    fail("HGO-PROOF-INVALID", "PO-APPROVAL-PROOF-INVALID");
+  }
+
+  const derivedSigner = {
+    keyReference: proof.keyReference,
+    publicKeySha256: createHash("sha256").update(proof.publicKey).digest("hex"),
+  };
+
+  const keySigCheck = verifyPoApprovalProof({ intent, trustPolicy: derivedSigner, proof });
+  if (!keySigCheck.verified) {
+    fail("HGO-PROOF-INVALID", keySigCheck.code ?? "PO-APPROVAL-PROOF-INVALID");
+  }
+
+  let resolvedTrustAnchors;
+  if (trustPolicy !== null) {
+    resolvedTrustAnchors = [trustPolicy];
+    const verified = verifyAgainstTrustAnchors({ intent, anchors: resolvedTrustAnchors, proof });
+    if (!verified.verified) fail("HGO-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
+  } else {
+    const policy = readCriticalHumanProofPolicy(rootDir);
+    if (!policy.ok || (policy.trustAnchor === null && !Array.isArray(policy.trustAnchors))) {
+      fail("HGO-TRUST-ANCHOR-MISSING", "project/critical-human-proof.json carries no trustAnchor");
+    }
+    if (policy.trustAnchor !== null) {
+      resolvedTrustAnchors = [policy.trustAnchor];
+      const verified = verifyAgainstTrustAnchors({ intent, anchors: resolvedTrustAnchors, proof });
+      if (!verified.verified) fail("HGO-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
+    } else {
+      resolvedTrustAnchors = policy.trustAnchors;
+      const isRecognized = Array.isArray(resolvedTrustAnchors) && resolvedTrustAnchors.some(
+        (anchor) => anchor?.publicKeySha256 === derivedSigner.publicKeySha256
+      );
+      if (!isRecognized) {
+        fail(
+          "HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED",
+          `unrecognized well-formed key ${derivedSigner.publicKeySha256} (${derivedSigner.keyReference}); human confirmation required before first use`,
+          { keyReference: derivedSigner.keyReference, publicKeySha256: derivedSigner.publicKeySha256 }
+        );
+      }
+      const verified = verifyAgainstTrustAnchors({ intent, anchors: resolvedTrustAnchors, proof });
+      if (!verified.verified) fail("HGO-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
+    }
+  }
 
   // global-plugin-install is already excluded above, so this is always the ordinary
   // physical-repository topology -- exactly what authorizeHumanGuardOverride() also
@@ -4394,3 +4431,199 @@ export const humanGuardOverrideInternals = {
   acquireAuditLock,
   releaseOwnedAuditLock,
 };
+
+// ---------------------------------------------------------------------------------
+// Briefed Test-Change Authorization (WP-B2-1, Spec §5.2 item 1, AC-11)
+// ---------------------------------------------------------------------------------
+export const BRIEFED_TEST_AUTHORIZATION_SCHEMA = "pipeline.briefed-test-authorization.v1";
+export const BRIEFED_TEST_CHANGE_KIND = "briefed-test-change";
+export const HGO_TRUST_ANCHOR_NEW_KEY_CONFIRMATION_REQUIRED = "HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED";
+export { confirmTrustAnchorKey, isRecognizedTrustAnchorKey };
+
+export function briefedAuthorizationId(targetPath, briefingDigest) {
+  const norm = typeof targetPath === "string" ? targetPath.replace(/\\/g, "/") : "";
+  return sha(`${norm}:${briefingDigest}`);
+}
+
+export function createBriefedTestChangeAuthorization({
+  rootDir,
+  targetPath,
+  briefingDigest,
+  expiry,
+  mode = "chat",
+  reason = "briefed test-change authorization",
+  proof = null,
+  trustPolicy = null,
+  nowMs = Date.now(),
+  spawn = spawnSync,
+} = {}) {
+  if (typeof targetPath !== "string" || targetPath.trim() === "") {
+    fail("HGO-BRIEFED-TARGET-INVALID", "targetPath must be a non-empty string");
+  }
+  if (typeof briefingDigest !== "string" || !SHA256.test(briefingDigest)) {
+    fail("HGO-BRIEFED-DIGEST-INVALID", "briefingDigest must be a 64-char sha256 hex string");
+  }
+  const expiresAtMs = typeof expiry === "number" ? expiry : Date.parse(expiry);
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs) {
+    fail("HGO-BRIEFED-EXPIRY-INVALID", "expiry must be a future timestamp or ISO date string");
+  }
+
+  const normTarget = targetPath.replace(/\\/g, "/");
+  let repo;
+  try { repo = topology(rootDir, spawn); }
+  catch {
+    try { repo = controlPathTopology(rootDir); }
+    catch { fail("HGO-ROOT", "repository root could not be established"); }
+  }
+  const paths = storage(repo.common);
+
+  let signer = null;
+  if (mode === "signature") {
+    if (!proof || typeof proof !== "object") {
+      fail("HGO-PROOF-INVALID", "proof is required for signature mode");
+    }
+    if (!isWellFormedEd25519PublicKey(proof.publicKey)) {
+      fail("HGO-PROOF-INVALID", "PO-APPROVAL-PROOF-INVALID");
+    }
+    const intent = createPoApprovalIntent({
+      kind: BRIEFED_TEST_CHANGE_KIND,
+      featureId: "briefed-test-change",
+      planSha256: sha({ targetPath: normTarget, briefingDigest, expiry: new Date(expiresAtMs).toISOString() }),
+      specSha256: sha(BRIEFED_TEST_AUTHORIZATION_SCHEMA),
+      candidate: { commit: "0".repeat(40), tree: "1".repeat(40) },
+      policyRevision: "briefed-test-authorization-v1",
+      subjectSha256: sha({ targetPath: normTarget, briefingDigest, expiry: new Date(expiresAtMs).toISOString() }),
+      decision: "authorize",
+    });
+    const derived = {
+      keyReference: proof.keyReference,
+      publicKeySha256: createHash("sha256").update(proof.publicKey).digest("hex"),
+    };
+    const sigCheck = verifyPoApprovalProof({ intent, trustPolicy: derived, proof });
+    if (!sigCheck.verified) {
+      fail("HGO-PROOF-INVALID", sigCheck.code ?? "PO-APPROVAL-PROOF-INVALID");
+    }
+    const resolvedTrustAnchors = trustPolicy !== null
+      ? [trustPolicy]
+      : (() => {
+        const policy = readCriticalHumanProofPolicy(rootDir);
+        if (policy.ok && Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0) {
+          return policy.trustAnchors;
+        }
+        if (policy.ok && policy.trustAnchor !== null) return [policy.trustAnchor];
+        return [];
+      })();
+    const isRecognized = Array.isArray(resolvedTrustAnchors) && resolvedTrustAnchors.some(
+      (a) => a?.publicKeySha256 === derived.publicKeySha256
+    );
+    if (!isRecognized) {
+      fail(
+        "HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED",
+        `public key ${derived.publicKeySha256} (${derived.keyReference}) is not recognized in trustAnchors; human confirmation required before first use`,
+        { keyReference: derived.keyReference, publicKeySha256: derived.publicKeySha256 }
+      );
+    }
+    signer = derived;
+  }
+
+  const id = briefedAuthorizationId(normTarget, briefingDigest);
+  const record = {
+    schema: BRIEFED_TEST_AUTHORIZATION_SCHEMA,
+    kind: BRIEFED_TEST_CHANGE_KIND,
+    id,
+    targetPath: normTarget,
+    briefingDigest,
+    expiry: new Date(expiresAtMs).toISOString(),
+    expiresAtMs,
+    grantedAt: new Date(nowMs).toISOString(),
+    mode,
+    reason,
+    signer,
+    proof: proof || null,
+  };
+
+  const recordPath = join(paths.briefedAuthorizations, `${id}.json`);
+  writeAtomic(recordPath, Buffer.from(JSON.stringify(record, null, 2) + "\n", "utf8"));
+
+  return {
+    schema: BRIEFED_TEST_AUTHORIZATION_SCHEMA,
+    status: "granted",
+    id,
+    targetPath: normTarget,
+    briefingDigest,
+    expiry: record.expiry,
+    expiresAtMs,
+    mode,
+  };
+}
+
+export function readActiveBriefedTestAuthorizations({
+  rootDir,
+  targetPath = null,
+  briefingDigest = null,
+  nowMs = Date.now(),
+  spawn = spawnSync,
+} = {}) {
+  let repo;
+  try { repo = topology(rootDir, spawn); }
+  catch {
+    try { repo = controlPathTopology(rootDir); }
+    catch { return []; }
+  }
+  const paths = storage(repo.common);
+  const normTarget = typeof targetPath === "string" ? targetPath.replace(/\\/g, "/") : null;
+  const results = [];
+  try {
+    const entries = readdirSync(paths.briefedAuthorizations).filter((n) => n.endsWith(".json"));
+    for (const name of entries) {
+      try {
+        const content = readFileSync(join(paths.briefedAuthorizations, name), "utf8");
+        const rec = JSON.parse(content);
+        if (rec?.schema !== BRIEFED_TEST_AUTHORIZATION_SCHEMA || rec?.kind !== BRIEFED_TEST_CHANGE_KIND) continue;
+        if (typeof rec.expiresAtMs === "number" && rec.expiresAtMs <= nowMs) continue;
+        if (typeof rec.expiry === "string" && Date.parse(rec.expiry) <= nowMs) continue;
+        if (normTarget !== null) {
+          const recNorm = String(rec.targetPath ?? "").replace(/\\/g, "/");
+          if (recNorm !== normTarget && !normTarget.endsWith(recNorm) && !recNorm.endsWith(normTarget)) continue;
+        }
+        if (briefingDigest !== null && rec.briefingDigest !== briefingDigest) continue;
+        results.push(rec);
+      } catch {}
+    }
+  } catch {}
+  return results;
+}
+
+export function checkBriefedTestChangeAdmitted({
+  rootDir,
+  targetPath,
+  briefingDigest = null,
+  nowMs = Date.now(),
+  spawn = spawnSync,
+} = {}) {
+  if (!targetPath) return { admitted: false, code: "NO-TARGET" };
+  const norm = targetPath.replace(/\\/g, "/");
+  const active = readActiveBriefedTestAuthorizations({ rootDir, targetPath: norm, nowMs, spawn });
+  if (active.length === 0) {
+    return { admitted: false, code: "NO-AUTHORIZATION" };
+  }
+  if (briefingDigest !== null && typeof briefingDigest === "string") {
+    const match = active.find((a) => a.briefingDigest === briefingDigest);
+    if (match) return { admitted: true, authorization: match };
+    return { admitted: false, code: "BRIEFING-DIGEST-MISMATCH" };
+  }
+  return { admitted: true, authorization: active[0] };
+}
+
+export function isBriefedTestChangeEligible(filePath, { rootDir = null, livePluginRoot = null } = {}) {
+  if (typeof filePath !== "string" || filePath.trim() === "") return false;
+  const normalized = filePath.replace(/\\/g, "/");
+  if (rootDir) {
+    try {
+      if (isNeverLiftableKernelPath(filePath, { rootDir, livePluginRoot })) {
+        return false;
+      }
+    } catch {}
+  }
+  return /\.(?:test|spec)\.[cm]?[jt]sx?$/iu.test(normalized);
+}

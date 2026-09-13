@@ -29,6 +29,14 @@ import test from "node:test";
 import {
   authorizeHumanGuardOverride,
   authorizeHumanGuardOverrideBySignature,
+  confirmTrustAnchorKey,
+  createBriefedTestChangeAuthorization,
+  checkBriefedTestChangeAdmitted,
+  readActiveBriefedTestAuthorizations,
+  isBriefedTestChangeEligible,
+  BRIEFED_TEST_AUTHORIZATION_SCHEMA,
+  BRIEFED_TEST_CHANGE_KIND,
+  HGO_TRUST_ANCHOR_NEW_KEY_CONFIRMATION_REQUIRED,
   buildHumanGuardOverrideSignatureIntent,
   concurrentWorktreeAdvisory,
   consumeHumanGuardOverride,
@@ -723,7 +731,7 @@ test("NVA-HGOFIX-1: a v3-only trustAnchors array (no legacy singular trustAnchor
 // with no legacy singular fallback either, must still fail closed -- HGO is a general
 // override of an arbitrary guard denial (ADR-0059), the same risk class as GMW, not one of
 // the four CRITICAL_ACTION_KINDS ceremonies that posture is deliberate for.
-test("NVA-HGOFIX-1: an EMPTY v3 trustAnchors array with no legacy trustAnchor still fails closed with HGO-TRUST-ANCHOR-MISSING (never the any-well-formed-key posture)", () => {
+test("WP-B2-4: an EMPTY v3 trustAnchors array with an unrecognized well-formed key requires TOFU confirmation (HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED)", () => {
   const root = fixtureSignatureV3([]);
   try {
     const toolInput = { file_path: "notes.md", content: "v3 empty trust anchors\n" };
@@ -732,8 +740,123 @@ test("NVA-HGOFIX-1: an EMPTY v3 trustAnchors array with no legacy trustAnchor st
       () => authorizeHumanGuardOverrideBySignature({
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
       }),
-      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-TRUST-ANCHOR-MISSING",
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED",
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("WP-B2-4: an unrecognized well-formed key emits HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED, and succeeds after TOFU confirmation", () => {
+  // Configured with key A (different key)
+  const root = fixtureSignatureV3([{ keyReference: "po-key-other", publicKeySha256: "0".repeat(64) }]);
+  try {
+    const toolInput = { file_path: "notes.md", content: "v3 new key\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+
+    // First attempt: unrecognized key triggers confirmation required
+    let caught = null;
+    try {
+      authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+      });
+    } catch (err) {
+      caught = err;
+    }
+    assert.ok(caught instanceof HumanGuardOverrideError);
+    assert.equal(caught.code, "HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED");
+
+    // Human confirms the key via TOFU confirmation
+    const confirmed = confirmTrustAnchorKey(root, {
+      keyReference: proof.keyReference,
+      publicKeySha256: sigPublicKeySha256,
+    });
+    assert.equal(confirmed.ok, true);
+    assert.equal(confirmed.confirmed, true);
+
+    // Second attempt: key is now recognized and arming succeeds
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("WP-B2-4: a malformed public key fails with HGO-PROOF-INVALID rather than TOFU confirmation", () => {
+  const root = fixtureSignatureV3([]);
+  try {
+    const toolInput = { file_path: "notes.md", content: "v3 malformed key\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    const malformedProof = { ...proof, publicKey: "not-a-valid-ed25519-public-key" };
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof: malformedProof, nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PROOF-INVALID",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("WP-B2-1: createBriefedTestChangeAuthorization lifecycle, query, and eligibility", () => {
+  const root = fixture();
+  try {
+    const targetPath = "plugins/pipeline-core/hooks/guard-git.test.mjs";
+    const briefingDigest = "a".repeat(64);
+    const expiry = Date.now() + 600000;
+
+    // Eligibility check
+    assert.equal(isBriefedTestChangeEligible(targetPath), true);
+    assert.equal(isBriefedTestChangeEligible("harness/scripts/verify.mjs"), false);
+    assert.equal(isBriefedTestChangeEligible("plugins/pipeline-core/hooks/hooks.json"), false);
+
+    // Initial check: no authorization
+    const before = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest });
+    assert.equal(before.admitted, false);
+
+    // Grant authorization
+    const granted = createBriefedTestChangeAuthorization({
+      rootDir: root,
+      targetPath,
+      briefingDigest,
+      expiry,
+      mode: "chat",
+      reason: "briefed test-change for WP-B2-1",
+    });
+    assert.equal(granted.schema, BRIEFED_TEST_AUTHORIZATION_SCHEMA);
+    assert.equal(granted.status, "granted");
+    assert.equal(granted.targetPath, targetPath);
+    assert.equal(granted.briefingDigest, briefingDigest);
+
+    // Query active authorizations
+    const active = readActiveBriefedTestAuthorizations({ rootDir: root, targetPath });
+    assert.equal(active.length, 1);
+    assert.equal(active[0].kind, BRIEFED_TEST_CHANGE_KIND);
+
+    // Admission check with matching briefingDigest: admitted
+    const matched = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest });
+    assert.equal(matched.admitted, true);
+    assert.equal(matched.authorization.briefingDigest, briefingDigest);
+
+    // Admission check without briefingDigest: admitted for active target
+    const admittedNoDigest = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest: null });
+    assert.equal(admittedNoDigest.admitted, true);
+
+    // Admission check with mismatching briefingDigest: refused
+    const mismatched = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest: "b".repeat(64) });
+    assert.equal(mismatched.admitted, false);
+    assert.equal(mismatched.code, "BRIEFING-DIGEST-MISMATCH");
+
+    // Admission check with different target: refused
+    const differentTarget = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath: "plugins/pipeline-core/hooks/guard-testpath.test.mjs", briefingDigest });
+    assert.equal(differentTarget.admitted, false);
+
+    // Expired check: not admitted
+    const expiredCheck = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest, nowMs: Date.now() + 1000000 });
+    assert.equal(expiredCheck.admitted, false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -18,8 +18,8 @@
  */
 import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
 import { verifyPoApprovalProof } from "./po-approval-proof.mjs";
@@ -548,4 +548,81 @@ export function verifyAgainstTrustAnchors({ intent, anchors, proof }) {
     lastCode = result.code;
   }
   return { verified: false, code: lastCode };
+}
+
+/**
+ * Per-key TOFU confirmation and storage of confirmed keys in `trustAnchors[]` (WP-B2-4).
+ *
+ * Gated by signature-or-chat confirmation before first use; confirmed keys persist in
+ * `project/critical-human-proof.json` under schema v3.
+ */
+export function confirmTrustAnchorKey(dir, { keyReference, publicKeySha256, publicKey } = {}) {
+  let resolvedSha = publicKeySha256;
+  if (typeof publicKey === "string" && publicKey.trim() !== "") {
+    if (!isWellFormedEd25519PublicKey(publicKey)) {
+      return { ok: false, code: "PO-APPROVAL-PROOF-INVALID" };
+    }
+    resolvedSha = createHash("sha256").update(publicKey).digest("hex");
+  }
+  if (typeof keyReference !== "string" || !KEY_REFERENCE.test(keyReference)
+    || typeof resolvedSha !== "string" || !SHA256.test(resolvedSha)) {
+    return { ok: false, code: "CRITICAL-PROOF-POLICY-TRUST-ANCHOR-INVALID" };
+  }
+  const path = resolve(dir, CRITICAL_HUMAN_PROOF_POLICY_PATH);
+  let doc;
+  if (existsSync(path)) {
+    try {
+      doc = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      return { ok: false, code: "CRITICAL-PROOF-POLICY-UNREADABLE" };
+    }
+  } else {
+    doc = {
+      schema: CRITICAL_HUMAN_PROOF_POLICY_V3,
+      requiredKinds: ["push"],
+      waivedKinds: [],
+      trustAnchors: [],
+    };
+  }
+  doc.schema = CRITICAL_HUMAN_PROOF_POLICY_V3;
+  if (!Array.isArray(doc.requiredKinds)) doc.requiredKinds = ["push"];
+  if (!Array.isArray(doc.waivedKinds)) doc.waivedKinds = [];
+  const existingAnchors = Array.isArray(doc.trustAnchors)
+    ? [...doc.trustAnchors]
+    : (doc.trustAnchor && anchorShapeOk(doc.trustAnchor) ? [{ ...doc.trustAnchor }] : []);
+  const alreadyPresent = existingAnchors.some((a) => a.publicKeySha256 === resolvedSha);
+  if (!alreadyPresent) {
+    existingAnchors.push({ keyReference, publicKeySha256: resolvedSha });
+  }
+  doc.trustAnchors = existingAnchors;
+  delete doc.trustAnchor;
+  const dirName = dirname(path);
+  mkdirSync(dirName, { recursive: true });
+  writeFileSync(path, `${JSON.stringify(doc, null, 2)}\n`);
+  return {
+    ok: true,
+    confirmed: !alreadyPresent,
+    alreadyPresent,
+    anchor: { keyReference, publicKeySha256: resolvedSha },
+    trustAnchors: doc.trustAnchors,
+  };
+}
+
+export const storeConfirmedTrustAnchor = confirmTrustAnchorKey;
+
+export function isRecognizedTrustAnchorKey(dir, { publicKeySha256, publicKey } = {}) {
+  let resolvedSha = publicKeySha256;
+  if (typeof publicKey === "string" && isWellFormedEd25519PublicKey(publicKey)) {
+    resolvedSha = createHash("sha256").update(publicKey).digest("hex");
+  }
+  if (!resolvedSha || typeof resolvedSha !== "string") return false;
+  const policy = readCriticalHumanProofPolicy(dir);
+  if (!policy.ok) return false;
+  if (Array.isArray(policy.trustAnchors)) {
+    return policy.trustAnchors.some((a) => a.publicKeySha256 === resolvedSha);
+  }
+  if (policy.trustAnchor !== null) {
+    return policy.trustAnchor.publicKeySha256 === resolvedSha;
+  }
+  return false;
 }
