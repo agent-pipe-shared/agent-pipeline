@@ -118,8 +118,10 @@ import { fileURLToPath } from "node:url";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-maintenance-window.mjs";
 import {
+  checkBriefedTestChangeAdmitted,
   consumeHumanGuardOverride,
   humanGuardRouteUnavailableReason,
+  isBriefedTestChangeEligible,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 // NVA-W12-COPYSAFE: the shared argv-native renderer builds every human
@@ -201,6 +203,29 @@ if (matched) {
         process.exit(0);
       }
     } catch { /* an unusable window is not a lift; the refusal below still stands */ }
+  }
+
+  // Briefed test-change authorization check (WP-B2-1):
+  const briefingDigest = process.env.PIPELINE_BRIEFING_DIGEST
+    || process.env.BRIEFING_DIGEST
+    || toolInput?.briefingDigest
+    || toolInput?.briefing_digest
+    || null;
+
+  try {
+    const briefed = checkBriefedTestChangeAdmitted({
+      rootDir: projectDir,
+      targetPath: filePath,
+      briefingDigest,
+    });
+    if (briefed.admitted) {
+      process.stderr.write(
+        `[pipeline-briefed-test-authorization] admitted exact target ${filePath} (briefing=${briefed.authorization?.briefingDigest ?? "active"}).\n`,
+      );
+      process.exit(0);
+    }
+  } catch {
+    /* fail open to normal refusal evaluation */
   }
 
   // Which clearances count is one setting, and it is not this guard's to decide
@@ -342,6 +367,11 @@ if (matched) {
     }
   }
 
+  const isBriefedEligible = isBriefedTestChangeEligible(filePath, { rootDir: projectDir, livePluginRoot: PLUGIN_ROOT });
+  const briefedRouteGuidance = isBriefedEligible
+    ? "Briefed test-change route: route-available-via-briefed-authorization (target is an eligible test file; a PO may grant authorization binding { targetPath, briefingDigest, expiry } before dispatch)."
+    : "Briefed test-change route: no-route-for-this-target (target is not an eligible test file for briefed test-change authorization).";
+
   emit(2, [
     `BLOCKED (guard-testpath, plugin pipeline-core): ${matched.reason}`,
     `Rule ID: ${matched.id}`,
@@ -349,6 +379,7 @@ if (matched) {
     `Why: an implementing Goldfish MUST NOT modify, weaken, skip or delete the tests/checks ` +
       `that gate its own implementation (QG-04 / roles/goldfish.md GF-04). A genuine test ` +
       `change is its own, explicitly briefed task.`,
+    briefedRouteGuidance,
     approvalMode === "chat"
       ? (globalChat
         ? "Clearance: committed gates.human_approval is \"chat\", so this exact edit is chat-attributed-unattested without a terminal ceremony, key, or proof — see below."
