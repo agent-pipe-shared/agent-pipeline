@@ -395,14 +395,15 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     assert.equal(readFileSync(scratchPath, "utf8"), scratchBytes);
     const postAuthoring = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
     assert.equal(postAuthoring.status, "bootstrap-binding-required", JSON.stringify(postAuthoring));
-    assert.equal(postAuthoring.nextAction?.kind, "collect-input", JSON.stringify(postAuthoring));
-    assert.ok(postAuthoring.nextAction.guidance.includes(prd), JSON.stringify(postAuthoring));
-    assert.ok(postAuthoring.nextAction.guidance.includes(sha256(prdBytes)), JSON.stringify(postAuthoring));
-    assert.ok(postAuthoring.nextAction.guidance.includes(spec), JSON.stringify(postAuthoring));
-    assert.ok(postAuthoring.nextAction.guidance.includes(sha256(specBytes)), JSON.stringify(postAuthoring));
+    assert.equal(postAuthoring.nextAction?.kind, "command", JSON.stringify(postAuthoring));
+    assert.deepEqual(postAuthoring.nextAction.argv.slice(1), [
+      "bootstrap-acknowledge-plan", "--root", created.root, "--activate", "--runner", "codex",
+    ], JSON.stringify(postAuthoring));
+    assert.equal(postAuthoring.nextAction.expected?.schema, "pipeline.bootstrap-plan-acknowledgement-plan.v1");
+    assert.deepEqual(postAuthoring.nextAction.expected?.statuses, ["signature-required"]);
     // Bootstrap binding is deliberately earlier than plan approval. This test
-    // proves its bounded authoring window and returns the real PO-only ask;
-    // it never fabricates the acknowledgement marker or a binding approval.
+    // proves its bounded authoring window and returns the real signature-plan
+    // action; it never fabricates the acknowledgement marker or a binding approval.
     assert.notEqual(postAuthoring.status, "ready");
     nativeDenial(
       runNativeCodexPatchGuard(
