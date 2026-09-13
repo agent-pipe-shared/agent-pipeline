@@ -20,6 +20,15 @@ import {
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WORKLOADS_DIR = join(SCRIPT_DIR, "fixtures", "nova-benchmark", "workloads");
+const WORKLOAD_CLASSES = ["mini", "feature", "review", "migration", "failure-recovery"];
+
+// The direct workload checks deliberately exercise the real fixture tasks.
+// Their result files are generated output, never plugin-source content: remove
+// them even when a later assertion fails so a local Marketplace copy cannot
+// accidentally package untracked benchmark artifacts.
+process.on("exit", () => {
+  for (const cls of WORKLOAD_CLASSES) rmSync(join(WORKLOADS_DIR, cls, "result.txt"), { force: true });
+});
 
 let n = 0;
 const check = (name, fn) => {

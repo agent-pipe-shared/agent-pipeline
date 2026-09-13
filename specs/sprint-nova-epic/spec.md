@@ -1559,6 +1559,23 @@ validator. A matching action grants no authority to neighbouring binaries,
 arguments, roots or mutations; mutating actions retain their digest,
 confirmation and host-boundary requirements.
 
+The same exact-match corridor covers the one Codex local-install receipt writer
+only when this installed plugin's fresh preflight reports
+`plugin-attestation-required` and publishes that typed `host-postinstall`
+action. This repairs the self-blocking first-run path without granting a
+general host-write, a reconstructed command, or any action from an unrelated
+preflight result.
+
+For Codex, the registry always selects the marketplace-copy root. If that
+root is itself a valid Git source, the action omits an explicit source. A
+gitless marketplace copy receives an explicit project-checkout source only
+after the same runner-neutral observation used by the host writer proves the
+checkout clean, non-detached, manifest-identical and content-identical to the
+registry copy. Any failed pre-observation yields no host action and retains
+the sanitized `IPA-HOST-SOURCE-MISMATCH` plus underlying observation code;
+an older, dirty, detached or divergent checkout can therefore never produce a
+deterministically failing source-to-cache receipt request.
+
 The shared shell write-target extractor must also distinguish Git revisions
 from pathspecs for revision-only working-tree verbs. In particular, `revert`,
 `cherry-pick` and `merge` commit/ref operands are not invented file targets,
@@ -1597,7 +1614,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | External 0.4.7 / #63 | no Nova implementation path; retained `design/v4-recovery-b4r.md` is historical conflict analysis only | rebase onto the exact stable `main` 0.4.7 baseline, resolve conflicts, regenerate bindings and rerun upstream recovery regressions |
 | B5 / #49 narrowed | `plugins/pipeline-core/lib/macos-acceptance.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/macos-acceptance.schema.json`; exact synthetic fixtures `plugins/pipeline-core/scripts/fixtures/nova-macos/filesystem.json`, `unicode.json`, `case-folding.json`, `symlink.json`, `permissions.json`, `durability.json`, `process.json`, `tool-resolution.json`; candidate boundary evidence `specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json`, `evidence-manifest.json`, `macos-acceptance.json`, `verify.json`, `security.json`, `critic.json`, `increment-receipt.json`, `increment-readback.json`, `po-close.json` | `harness/scripts/verify.mjs`; `docs/product-capability-inventory.json` only for the explicitly synthetic/non-native Verify disposition; `specs/sprint-nova-epic/design/backlog-spec-bindings.json` for retained B49-5/B49-7/B49-8 bindings; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md`; native Apple-Silicon execution and evidence are exclusively #72 (`sprint:NONE`) |
 
-| B8 / recovery reachability | none | `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/protected-test-paths.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/guard-lifecycle-recovery-contract.test.mjs`; this Spec; `acceptance.md`; `plans/nova-b.md`; `lifecycle.json`; append-only `result.md`; no generic bypass, hook weakening or `harness/scripts/verify.mjs` edit |
+| B8 / recovery reachability | none | `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/protected-test-paths.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/guard-lifecycle-recovery-contract.test.mjs`; this Spec; `acceptance.md`; `plans/nova-b.md`; `lifecycle.json`; append-only `result.md`; no generic bypass, hook weakening or `harness/scripts/verify.mjs` edit |
 
 The remaining deliberately deferred Nova manifests are B2-I and live B4
 integration. Direct B3-I work is outside Nova under #69. B1-I is resolved by

@@ -245,32 +245,53 @@ check("unsupported provider and unsorted or escaping protected paths are refused
 
 check("missing receipt stays non-ready, registry host repair writes it, and renewed preflight becomes ready", (t) => {
   const repo = fixture(); t.after(repo.cleanup);
-  const marketplaceRoot = dirname(dirname(repo.sourcePluginRoot));
+  const marketplaceRoot = join(repo.base, "marketplace");
+  const marketplacePluginRoot = join(marketplaceRoot, "plugins", "pipeline-core");
+  cpSync(repo.sourcePluginRoot, marketplacePluginRoot, { recursive: true });
+  // A gitless Marketplace copy needs a clean Git checkout as its origin.
+  // An old checkout must produce no writer action; the exact clean checkout
+  // produces the same action that the host then writes and reads back.
+  const staleCheckout = join(repo.base, "stale-checkout");
+  cpSync(join(repo.base, "source"), staleCheckout, { recursive: true });
+  writeFileSync(join(staleCheckout, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), `${JSON.stringify({
+    name: "pipeline-core", version: "0.0.0-stale", description: "stale fixture",
+    hooks: "./hooks/codex-hooks.json", author: { name: "fixture" }, license: "SUL-1.0",
+    interface: { displayName: "Fixture" },
+  }, null, 2)}\n`);
   const pluginList = () => JSON.stringify({ installed: [{
     pluginId: "pipeline-core@agent-pipeline-local", name: "pipeline-core", marketplaceName: "agent-pipeline-local",
     version: "1.2.3-test.1", installed: true, enabled: true,
-    source: { source: "local", path: repo.sourcePluginRoot },
+    source: { source: "local", path: marketplacePluginRoot },
     marketplaceSource: { sourceType: "local", source: marketplaceRoot },
   }], available: [] });
   const scriptUrl = pathToFileURL(join(repo.installedPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href;
-  const inspect = () => observePipelineStartPreflight({
-    env: {}, pluginList, scriptUrl, cwd: repo.base,
+  const inspect = (cwd) => observePipelineStartPreflight({
+    env: {}, pluginList, scriptUrl, cwd,
     read: () => JSON.stringify({ version: "1.2.3-test.1" }),
     verifyLocalInstalledPluginReceiptFn: (input) => verifyLocalDevelopmentInstalledPluginReceipt(input, { receiptDirectory: repo.receiptDirectory }),
     observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
     observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
     requireProjectOnboardingReadyFn: () => undefined,
   });
-  const before = inspect();
+  const stale = inspect(staleCheckout);
+  assert.equal(stale.status, "plugin-attestation-required");
+  assert.equal(stale.nextAction, null, "a divergent checkout must not render a host action");
+  assert.ok(stale.installedPluginAttestation.reasonCodes.includes("IPA-HOST-SOURCE-MISMATCH"));
+
+  const before = inspect(dirname(dirname(repo.sourcePluginRoot)));
   assert.equal(before.status, "plugin-attestation-required");
+  assert.ok(before.nextAction, JSON.stringify(before.installedPluginAttestation));
   assert.equal(before.nextAction.kind, "host-postinstall");
   assert.equal(before.installedPluginAttestation.setupAction.argv.includes("write-local-from-codex-registry"), true);
+  assert.equal(before.installedPluginAttestation.setupAction.argv.includes("--source-plugin-root"), true,
+    "a gitless marketplace copy needs its independently observed Git source");
+  assert.equal(before.installedPluginAttestation.setupAction.argv.includes(repo.sourcePluginRoot), true);
   const repaired = writeCodexRegistryInstalledPluginReceipt({
-    provider: "codex", plugin: repo.input.plugin, installedPluginRoot: repo.installedPluginRoot,
+    provider: "codex", plugin: repo.input.plugin, sourcePluginRoot: repo.sourcePluginRoot, installedPluginRoot: repo.installedPluginRoot,
     protectedPaths: repo.protectedPaths,
   }, { receiptDirectory: repo.receiptDirectory, readPluginList: pluginList });
   assert.equal(repaired.status, "written", JSON.stringify(repaired));
-  const after = inspect();
+  const after = inspect(dirname(dirname(repo.sourcePluginRoot)));
   assert.equal(after.status, "ready", JSON.stringify(after));
   assert.equal(after.installedPluginAttestation.status, "verified");
 

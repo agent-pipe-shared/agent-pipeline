@@ -532,6 +532,15 @@ of the hotfix.
   payload writes remain detected.
 - NVA-B8-5: Focused guard, recovery-contract and write-target extraction suites
   pass without weakening protected-path or lifecycle denials.
+- NVA-B8-6: A fresh local Codex install's receipt writer is admitted only when
+  it exactly equals the current installed plugin's typed
+  `plugin-attestation-required` preflight action; a changed argv, a non-required
+  preflight state, or another host action remains refused.
+- NVA-B8-7: A Codex attestation setup action treats the selected registry entry
+  as authoritative. It may add `--source-plugin-root` only for a clean,
+  non-detached, manifest- and content-identical Git checkout proven through
+  the writer's own runner-neutral observation; a gitless registry copy without
+  such a source yields no host action and typed sanitized mismatch codes.
 
 ## Final evidence matrix
 

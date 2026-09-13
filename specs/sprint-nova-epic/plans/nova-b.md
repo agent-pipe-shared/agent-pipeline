@@ -469,7 +469,13 @@ different absolute Node executables. Admission is derived from a fresh
 session-intent observation and remains intersected with the existing closed
 sanctioned-command validator. The shared Git write-target parser stops
 inventing file paths from revision-only `revert`, `cherry-pick` and `merge`
-operands.
+operands. A local Codex install's sole preflight-issued receipt writer is
+additionally admitted only by exact fresh preflight equality when the guard's
+own session observation is malformed. The selected Codex registry entry always
+leads source selection; a gitless registry copy gains an explicit checkout
+source only after the writer's own runner-neutral observation proves that
+checkout clean, non-detached and byte-/manifest-identical. Otherwise preflight
+publishes no writer action and typed sanitized mismatch evidence.
 
 **Stop:** any wildcard executable trust, argument normalization, generic Git
 rollback permission, lifecycle bypass, protected-path weakening or Verify

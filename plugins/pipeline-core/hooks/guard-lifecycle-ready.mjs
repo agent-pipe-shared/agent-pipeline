@@ -31,6 +31,7 @@ import {
 import {
   inspectProjectOnboardingV3,
 } from "../lib/project-onboarding-v3.mjs";
+import { observePipelineStartPreflight } from "../scripts/pipeline-start-preflight.mjs";
 import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabilities.mjs";
 // NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: the shared argv-native renderer builds
 // every human ceremony step below. The default denial is therefore bounded
@@ -4131,6 +4132,49 @@ function isExactObservedOnboardingNextAction(command, root, dependencies = {}) {
 }
 
 /**
+ * NVA-B8-IPA: a newly installed local Codex plugin has no receipt until its
+ * own preflight publishes the one host writer that creates it. The guard used
+ * to reject that writer whenever its separate onboarding readback was malformed,
+ * creating an install loop. This admits no independently constructed command:
+ * it re-observes this installed plugin's preflight and requires byte-for-byte
+ * executable/argv equality with its sole typed host-postinstall action.
+ */
+function isExactObservedInstalledPluginAttestationAction(command, root, dependencies = {}) {
+  const words = simpleWords(command, root);
+  if (!words) return false;
+  let observed;
+  try {
+    observed = (dependencies.observePipelineStartPreflightFn ?? observePipelineStartPreflight)({
+      cwd: root,
+      scriptUrl: new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url).href,
+      ...(dependencies.preflightEnv === undefined ? {} : { env: dependencies.preflightEnv }),
+    });
+  } catch {
+    return false;
+  }
+  const action = observed?.nextAction;
+  const expected = action?.expected;
+  const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
+  return observed?.schema === "pipeline.start-preflight.v1"
+    && observed?.status === "plugin-attestation-required"
+    && typeof observed?.pluginRoot === "string" && isAbsolute(observed.pluginRoot)
+    && exactKeys(action, ["schema", "kind", "executable", "argv", "mutation", "requiresPoApproval", "executionBoundary", "expected"])
+    && action.schema === "pipeline.installed-plugin-attestation-setup-action.v1"
+    && action.kind === "host-postinstall"
+    && action.executable === "node"
+    && Array.isArray(action.argv) && action.argv.length >= 6 && action.argv.every((value) => typeof value === "string")
+    && action.argv[0] === resolve(observed.pluginRoot, "scripts", "installed-plugin-attestation-host.mjs")
+    && action.mutation === true && action.requiresPoApproval === false && action.executionBoundary === "host"
+    && exactKeys(expected, ["schema", "status"])
+    && expected.schema === "pipeline.installed-plugin-attestation-host-result.v1"
+    && expected.status === "written"
+    && words.length === action.argv.length + 1
+    && words[0] === action.executable
+    && action.argv.every((value, index) => words[index + 1] === value);
+}
+
+/**
  * GF-097: a bare `gh --version` and a bare `gh auth status` are GitHub CLI's own
  * documented read-only diagnostics -- the former only prints the installed CLI version
  * (`gh --help`), the latter only reports which account(s) are authenticated and to which
@@ -4780,6 +4824,12 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && toolName === "Bash"
       && isExactObservedOnboardingNextAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
     if (exactObservedOnboardingNextAction) return verdict(0);
+    const exactObservedInstalledPluginAttestationAction = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-INVALID-OBSERVATION"
+      && error.intent === "session"
+      && toolName === "Bash"
+      && isExactObservedInstalledPluginAttestationAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
+    if (exactObservedInstalledPluginAttestationAction) return verdict(0);
     // NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-
     // and-tmp-fallback.md): a session stuck at `partial` has no route at all today to
     // persist a report of its own stuck state -- the in-root write is refused by this very

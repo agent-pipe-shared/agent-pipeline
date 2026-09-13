@@ -1089,6 +1089,62 @@ test("PORG-INVALID-OBSERVATION is named as an invalid observation, distinct from
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("NVA-B8-IPA: only the exact fresh preflight attestation writer survives an invalid onboarding observation", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const pluginRoot = "/opt/agent-pipeline/pipeline-core";
+    const argv = [
+      join(pluginRoot, "scripts", "installed-plugin-attestation-host.mjs"),
+      "write-local-from-codex-registry",
+      "--version", "0.6.2+test",
+      "--source-plugin-root", "/source/pipeline-core",
+      "--installed-plugin-root", pluginRoot,
+    ];
+    const preflight = {
+      schema: "pipeline.start-preflight.v1",
+      status: "plugin-attestation-required",
+      pluginRoot,
+      nextAction: {
+        schema: "pipeline.installed-plugin-attestation-setup-action.v1",
+        kind: "host-postinstall",
+        executable: "node",
+        argv,
+        mutation: true,
+        requiresPoApproval: false,
+        executionBoundary: "host",
+        expected: { schema: "pipeline.installed-plugin-attestation-host-result.v1", status: "written" },
+      },
+    };
+    const invalidObservation = () => {
+      throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "invalid", { intent: "session" });
+    };
+    const run = (command, observed = preflight) => evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command } },
+      { projectDir: path, requireProjectOnboardingReadyFn: invalidObservation, observePipelineStartPreflightFn: () => observed },
+    );
+    assert.equal(run(`node ${argv.join(" ")}`).exitCode, 0);
+    assert.equal(run(`node ${[...argv.slice(0, -1), "/other/pipeline-core"].join(" ")}`).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, { ...preflight, status: "ready" }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, executionBoundary: "default" },
+    }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, argv: [
+        ...argv.slice(0, 1), "write-local", ...argv.slice(2),
+      ] },
+    }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, argv: [
+        "/other/installed-plugin-attestation-host.mjs", ...argv.slice(1),
+      ] },
+    }).exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("closed command grammar preserves native Windows paths and direct node.exe identity", () => {
   const windowsRoot = "C:\\Users\\Pipeline User\\consumer";
   const script = "C:\\Pipeline Plugin\\scripts\\project-onboarding-v3.mjs";
@@ -3569,7 +3625,13 @@ test("partial PO authority rebind admits only the exact read-only planner", () =
       status: "partial",
       root: path,
       intent: "session",
-      nextAction: null,
+      nextAction: {
+        kind: "command",
+        executable: "node",
+        argv: [PIPELINE_STATE_SCRIPT, "po-authority-rebind-plan"],
+        mutation: false,
+        requiresConfirmation: false,
+      },
       diagnostics: [{ code: "po_authority_rebind_unavailable" }],
     };
     const denied = {
@@ -3584,7 +3646,7 @@ test("partial PO authority rebind admits only the exact read-only planner", () =
     assert.equal(evaluateLifecycleReadyGuard(bash(planner), {
       ...denied,
       inspectProjectOnboardingV3Fn() {
-        return { ...partialRebind, diagnostics: [{ code: "continuity_damaged" }] };
+        return { ...partialRebind, nextAction: null, diagnostics: [{ code: "continuity_damaged" }] };
       },
     }).exitCode, 2);
   } finally { rmSync(path, { recursive: true, force: true }); }

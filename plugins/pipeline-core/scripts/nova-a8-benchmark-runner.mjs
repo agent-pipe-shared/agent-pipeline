@@ -301,8 +301,12 @@ export async function runObservation(route, cls, repetition, clockEpoch, deps) {
   const correctnessSha256 = sha256(resultBytes);
   const t4 = process.hrtime.bigint();
 
-  // cleanup: counter-file cleanup for failure-recovery, else a near-0 no-op
+  // cleanup: benchmark outputs are evidence only through the digest returned
+  // below.  Retaining generated result.txt files in plugin fixtures would make
+  // a later raw Marketplace copy differ from its clean Git source and block
+  // local-install attestation.
   const c0 = process.hrtime.bigint();
+  if (existsSync(resultPath)) unlinkSync(resultPath);
   if (counterPath && existsSync(counterPath)) unlinkSync(counterPath);
   const c1 = process.hrtime.bigint();
   const cleanupMs = msBetween(c0, c1);

@@ -15,7 +15,7 @@ import { applyInstall } from "./pre-push-hook-install.mjs";
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
-  STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner,
+  STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner, resolveCodexAttestationSourceForPreflight,
 } from "./pipeline-start-preflight.mjs";
 import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
@@ -885,6 +885,7 @@ test("a Gitless Codex local-development install is ready only with its installer
     verifyLocalInstalledPluginReceiptFn: () => ({
       schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-LOCATOR-UNAVAILABLE"],
     }),
+    resolveCodexAttestationSourceFn: () => ({ status: "registry-source", sourcePluginRoot: null, reasonCodes: [] }),
   });
   assert.equal(unavailable.status, "plugin-attestation-required");
   assert.equal(pipelineStartPreflightExitCode(unavailable), 2);
@@ -892,6 +893,8 @@ test("a Gitless Codex local-development install is ready only with its installer
   assert.equal(unavailable.installedPluginAttestation.setupAction.kind, "host-postinstall");
   assert.equal(unavailable.installedPluginAttestation.setupAction.requiresPoApproval, false);
   assert.equal(unavailable.installedPluginAttestation.setupAction.argv.includes("write-local-from-codex-registry"), true);
+  assert.equal(unavailable.installedPluginAttestation.setupAction.argv.includes("--source-plugin-root"), false,
+    "the host writer must resolve Codex's registered marketplace source rather than inherit an arbitrary checkout");
   assert.deepEqual(unavailable.installedPluginAttestation.terminalTemplate, {
     templateId: "installed-plugin-attestation-setup",
     builderId: "installed-plugin-attestation-setup",
@@ -900,6 +903,37 @@ test("a Gitless Codex local-development install is ready only with its installer
   });
   assert.equal(unavailable.nextAction.kind, "host-postinstall");
   assert.equal(unavailable.nextAction.executionBoundary, "host");
+
+  const staleCheckout = preflight({
+    env: {}, pluginList: localPluginList,
+    read: () => manifest, scriptUrl,
+    verifyLocalInstalledPluginReceiptFn: () => ({
+      schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-LOCATOR-UNAVAILABLE"],
+    }),
+    resolveCodexAttestationSourceFn: () => ({
+      status: "unavailable",
+      reasonCodes: ["IPA-HOST-SOURCE-MISMATCH", "SNT-A2-MANIFEST-MISMATCH"],
+    }),
+  });
+  assert.equal(staleCheckout.status, "plugin-attestation-required");
+  assert.deepEqual(staleCheckout.installedPluginAttestation.reasonCodes, [
+    "IPA-HOST-LOCATOR-UNAVAILABLE", "IPA-HOST-SOURCE-MISMATCH", "SNT-A2-MANIFEST-MISMATCH",
+  ]);
+  assert.equal(staleCheckout.installedPluginAttestation.setupAction, undefined);
+  assert.equal(staleCheckout.nextAction, null, "a divergent checkout must never render a deterministically failing host action");
+
+  const exactCheckout = preflight({
+    env: {}, pluginList: localPluginList,
+    read: () => manifest, scriptUrl,
+    verifyLocalInstalledPluginReceiptFn: () => ({
+      schema: "pipeline.installed-plugin-attestation-verification.v1", status: "unavailable", reasonCodes: ["IPA-HOST-LOCATOR-UNAVAILABLE"],
+    }),
+    resolveCodexAttestationSourceFn: () => ({
+      status: "checkout-source", sourcePluginRoot: "/trusted/source/plugins/pipeline-core", reasonCodes: [],
+    }),
+  });
+  assert.equal(exactCheckout.nextAction.argv.includes("--source-plugin-root"), true);
+  assert.equal(exactCheckout.nextAction.argv.includes("/trusted/source/plugins/pipeline-core"), true);
 
   const mismatchedRegistry = () => JSON.stringify({ installed: [{
     pluginId: "pipeline-core@agent-pipeline-local", name: "pipeline-core", marketplaceName: "agent-pipeline-local",
@@ -913,8 +947,36 @@ test("a Gitless Codex local-development install is ready only with its installer
   });
   assert.equal(mismatch.status, "plugin-attestation-required");
   assert.equal(pipelineStartPreflightExitCode(mismatch), 2);
-  assert.notEqual(mismatch.nextAction.kind, "advisory");
-  assert.equal(mismatch.nextAction.kind, "host-postinstall");
+  assert.equal(mismatch.nextAction, null, "an unresolved registry source cannot produce a host writer action");
+});
+
+test("Codex attestation source selection binds only a verified checkout and retains sanitized observation codes", () => {
+  const plugin = { name: "pipeline-core", version: "0.4.5+test" };
+  const registrySourcePluginRoot = "/marketplace/plugins/pipeline-core";
+  const ready = { schema: "pipeline.public-core-observation.v1", status: "ready", plugin };
+  const gitlessRegistry = { schema: "pipeline.public-core-observation.v1", status: "rejected", reasonCodes: ["SNT-A2-GIT-MISSING"] };
+  const exact = resolveCodexAttestationSourceForPreflight({
+    cwd: "/project", registrySourcePluginRoot, plugin,
+    observe: ({ sourcePluginRoot }) => sourcePluginRoot === registrySourcePluginRoot ? gitlessRegistry : ready,
+  });
+  assert.deepEqual(exact, {
+    status: "checkout-source",
+    sourcePluginRoot: "/project/plugins/pipeline-core",
+    reasonCodes: [],
+  });
+
+  const stale = resolveCodexAttestationSourceForPreflight({
+    cwd: "/old-project", registrySourcePluginRoot, plugin,
+    observe: () => ({ schema: "pipeline.public-core-observation.v1", status: "rejected", reasonCodes: ["SNT-A2-MANIFEST-MISMATCH"] }),
+  });
+  assert.equal(stale.status, "unavailable");
+  assert.deepEqual(stale.reasonCodes, ["IPA-HOST-SOURCE-MISMATCH", "SNT-A2-MANIFEST-MISMATCH"]);
+
+  const registryGitSource = resolveCodexAttestationSourceForPreflight({
+    cwd: "/irrelevant-project", registrySourcePluginRoot, plugin,
+    observe: () => ready,
+  });
+  assert.deepEqual(registryGitSource, { status: "registry-source", sourcePluginRoot: null, reasonCodes: [] });
 });
 
 test("a non-local Claude installation id reports unknown source without touching the host marketplace registry", () => {

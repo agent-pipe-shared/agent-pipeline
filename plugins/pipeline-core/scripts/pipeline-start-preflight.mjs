@@ -20,7 +20,7 @@ import {
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
-import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import { observeCodexPublicCoreIdentity, observePublicCoreIdentity, observeRunnerPublicCoreIdentity } from "../lib/public-core-observation.mjs";
 import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
@@ -803,6 +803,64 @@ export function resolveActiveRunner({ env = process.env, rootDir = null, read = 
   return "codex";
 }
 
+function observedCodexPluginIdentity(observation, plugin) {
+  return observation?.schema === "pipeline.public-core-observation.v1"
+    && observation.status === "ready"
+    && observation.plugin?.name === plugin.name
+    && observation.plugin?.version === plugin.version;
+}
+
+function publicReasonCodes(observation) {
+  return Array.isArray(observation?.reasonCodes)
+    ? observation.reasonCodes.filter((code) => typeof code === "string" && /^[A-Z0-9-]{3,80}$/.test(code))
+    : [];
+}
+
+/**
+ * The Codex registry selects the marketplace copy. A gitless copy needs a
+ * separate, clean Git checkout that observes byte-identically against it;
+ * otherwise preflight must not emit a writer argv that will fail readback.
+ */
+export function resolveCodexAttestationSourceForPreflight({
+  cwd,
+  registrySourcePluginRoot,
+  plugin,
+  // Match the writer's own runner-neutral observation exactly.  The Codex
+  // host-specific observer additionally requires an App-Server binding that
+  // a PO's host-postinstall command never has, and would make a valid action
+  // fail before it is even rendered.
+  observe = (input) => observeRunnerPublicCoreIdentity("codex", input),
+} = {}) {
+  if (typeof cwd !== "string" || typeof registrySourcePluginRoot !== "string"
+    || !plugin || typeof plugin.name !== "string" || typeof plugin.version !== "string") {
+    return { status: "unavailable", reasonCodes: ["IPA-HOST-SOURCE-UNAVAILABLE"] };
+  }
+  let registryObservation = null;
+  try {
+    registryObservation = observe({ sourcePluginRoot: registrySourcePluginRoot, installedPluginRoot: registrySourcePluginRoot });
+  } catch { /* observer faults remain a closed, typed unavailable result */ }
+  if (observedCodexPluginIdentity(registryObservation, plugin)) {
+    return { status: "registry-source", sourcePluginRoot: null, reasonCodes: [] };
+  }
+
+  const checkoutPluginRoot = resolve(cwd, "plugins", "pipeline-core");
+  let checkoutObservation = null;
+  try {
+    checkoutObservation = observe({ sourcePluginRoot: checkoutPluginRoot, installedPluginRoot: registrySourcePluginRoot });
+  } catch { /* observer faults remain a closed, typed unavailable result */ }
+  if (observedCodexPluginIdentity(checkoutObservation, plugin)) {
+    return { status: "checkout-source", sourcePluginRoot: checkoutPluginRoot, reasonCodes: [] };
+  }
+  return {
+    status: "unavailable",
+    reasonCodes: [...new Set([
+      "IPA-HOST-SOURCE-MISMATCH",
+      ...publicReasonCodes(checkoutObservation),
+      ...publicReasonCodes(registryObservation),
+    ])],
+  };
+}
+
 export function observePipelineStartPreflight({
   env = process.env,
   pluginList,
@@ -815,6 +873,7 @@ export function observePipelineStartPreflight({
   observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
+  resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
   antigravityPluginRegistries = () => [
     resolve(cwd, ".agents", "plugins.json"),
     resolve(homedir(), ".gemini", "config", "plugins.json"),
@@ -856,11 +915,6 @@ export function observePipelineStartPreflight({
     ? runner === "codex"
       ? resolveCodexRegistrySource({ plugin: { name: "pipeline-core", version }, readPluginList: () => pluginListSnapshot })
       : null
-    : null;
-  const codexCheckoutPluginRoot = resolve(cwd, "plugins", "pipeline-core");
-  const codexSourcePluginRoot = runner === "codex"
-    && pluginRootHasSelfApplicationGit(codexCheckoutPluginRoot)
-    ? codexCheckoutPluginRoot
     : null;
   const registryInstalledPluginRoot = version && runner === "antigravity" && !pluginRootHasSelfApplicationGit(pluginRoot)
     ? resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: pluginRoot, registryPayloads: antigravityPluginRegistries() })
@@ -928,17 +982,36 @@ export function observePipelineStartPreflight({
         protectedPaths: INSTALLED_PLUGIN_PROTECTED_PATHS_BY_PROVIDER[runner] ?? DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
       })
     : { schema: "pipeline.installed-plugin-attestation-bootstrap.v1", status: "not-required", reasonCodes: [] };
-  const installedPluginAttestationCommand = rawInstalledPluginAttestation.status === "unavailable" && runner === "codex"
+  const codexAttestationSource = rawInstalledPluginAttestation.status === "unavailable"
+    && runner === "codex" && registrySourcePluginRoot !== null
+    ? resolveCodexAttestationSourceFn({
+        cwd,
+        registrySourcePluginRoot,
+        plugin: { name: "pipeline-core", version },
+      })
+    : null;
+  const installedPluginAttestationBase = codexAttestationSource?.status === "unavailable"
+    ? {
+        ...rawInstalledPluginAttestation,
+        reasonCodes: [...new Set([
+          ...(rawInstalledPluginAttestation.reasonCodes ?? []),
+          ...codexAttestationSource.reasonCodes,
+        ])],
+      }
+    : rawInstalledPluginAttestation;
+  const installedPluginAttestationCommand = installedPluginAttestationBase.status === "unavailable"
+    && runner === "codex" && codexAttestationSource !== null
+    && codexAttestationSource.status !== "unavailable"
     ? installedPluginAttestationSetupCommand({
         provider: "codex", version,
-        ...(codexSourcePluginRoot === null ? {} : { sourcePluginRoot: codexSourcePluginRoot }),
+        ...(codexAttestationSource?.sourcePluginRoot === null ? {} : { sourcePluginRoot: codexAttestationSource?.sourcePluginRoot }),
         installedPluginRoot: pluginRoot,
         launcher: resolve(pluginRoot, "scripts/installed-plugin-attestation-host.mjs"),
       })
     : null;
   const installedPluginAttestation = installedPluginAttestationCommand !== null
     ? {
-        ...rawInstalledPluginAttestation,
+        ...installedPluginAttestationBase,
         setupAction: {
           schema: "pipeline.installed-plugin-attestation-setup-action.v1",
           kind: "host-postinstall",
@@ -956,7 +1029,7 @@ export function observePipelineStartPreflight({
           values: { provider: "codex", version, installedPluginRoot: pluginRoot },
         },
       }
-    : rawInstalledPluginAttestation;
+    : installedPluginAttestationBase;
   const installedPluginAttestationFailed = installedPluginAttestation.status !== "not-required"
     && installedPluginAttestation.status !== "verified";
   // NVA-ARMEDPROOF-1: computed once, here, so both the `status` decision

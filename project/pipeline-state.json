@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-09-13T07:36:15.419Z",
+  "updatedAt": "2026-09-13T09:04:46.148Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -73,14 +73,38 @@
       {
         "phase": "implementation",
         "at": "2026-09-13T07:36:15.418Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-13T08:06:07.566Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-09-13T08:10:37.673Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-13T08:12:37.582Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-09-13T08:15:53.592Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-13T09:02:39.695Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-09-13T09:04:46.147Z"
       }
     ]
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v4",
     "approvedBy": "André",
-    "approvedAt": "2026-09-13T07:36:03.212Z",
-    "submissionSha256": "40bd1a9c48a81b86e63cfcc318be44ef8a776b6de162954118a00b82a8c8d265",
+    "approvedAt": "2026-09-13T09:04:42.766Z",
+    "submissionSha256": "9069078635915259370f7308556b7a95c7065406ca2afa3da0dc463ac62346c1",
     "profileSha256": "e3f62cf8685063aa2297b2766e858e2a0ef1bdcfe9e426d32193b4057af61d79",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
@@ -90,16 +114,16 @@
       "receiptSha256": "d4c8445ea2e1c847caa8cc298cf4d2f4fedda59b6bd270d30e5b0cb43c16c56e",
       "repositoryFingerprint": "5172c023ad31e8e1c82402e4d0a657cc6db16c0ba5538a432d48e8d477f2b16d",
       "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298",
+      "planSha256": "275ce8613f019ef6f026efaaf346a9efe9a438f9eb13ed2337c36f35d54598af",
       "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb"
+      "specSha256": "dd7768e2aa3ad1bf2370d4c6249f3bb9b04261a7f1618318f6f42dfc6999d41c"
     },
-    "priorInvalidationSha256": "ad0ccde76ff816a209a72728194459dd11a8be62e1e63913a43017304ff891cf"
+    "priorInvalidationSha256": "89541e40cc27ed7f7dd8d529269353cb39c55218501b4a05133f6f81dceb86ac"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-nova-epic",
-    "revision": 27,
+    "revision": 32,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Elephant",
@@ -108,11 +132,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-        "sha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298"
+        "sha256": "275ce8613f019ef6f026efaaf346a9efe9a438f9eb13ed2337c36f35d54598af"
       },
       "spec": {
         "path": "specs/sprint-nova-epic/spec.md",
-        "sha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb"
+        "sha256": "dd7768e2aa3ad1bf2370d4c6249f3bb9b04261a7f1618318f6f42dfc6999d41c"
       },
       "result": null
     },
@@ -128,7 +152,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 27,
+      "sourceRevision": 32,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -146,21 +170,21 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "planSha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298",
+    "planSha256": "275ce8613f019ef6f026efaaf346a9efe9a438f9eb13ed2337c36f35d54598af",
     "specPath": "specs/sprint-nova-epic/spec.md",
-    "specSha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb",
+    "specSha256": "dd7768e2aa3ad1bf2370d4c6249f3bb9b04261a7f1618318f6f42dfc6999d41c",
     "profile": "epic",
     "profileSha256": "e3f62cf8685063aa2297b2766e858e2a0ef1bdcfe9e426d32193b4057af61d79",
-    "submittedBy": "Elephant",
-    "submittedAt": "2026-09-13T07:34:02.295Z"
+    "submittedBy": "The Agent-Pipeline Contributors",
+    "submittedAt": "2026-09-13T09:04:33.647Z"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-nova-epic",
-    "invalidatedSubmissionSha256": "aa25b676c77c645849211833449180a7dfd133b283f46e35768439ea10f89d74",
-    "invalidatedApprovalSha256": "f5f5b31eb7c4fb22b5a34479c1abfdb9a337e6c215db13a175820235d5d000be",
-    "invalidatedBy": "PO",
-    "invalidatedAt": "2026-09-13T07:30:08.435Z",
+    "invalidatedSubmissionSha256": "b9fcfba56c1b6cb70dc475306bf7da7dfe02ef7ebddd973038e91634a53a651d",
+    "invalidatedApprovalSha256": "025bbe963ed49629fbb30a62d41e30ab2dfc756710a1af6e24991a99c6554860",
+    "invalidatedBy": "André",
+    "invalidatedAt": "2026-09-13T09:02:39.695Z",
     "reason": "reopen-design"
   },
   "pushApproval": {
@@ -487,14 +511,14 @@
     "scope": {
       "featureId": "sprint-nova-epic",
       "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "9e5bbfd67c745fb2f04f1be8ada918bf115e7b2452cf575e13ee7579055b5298",
+      "planSha256": "275ce8613f019ef6f026efaaf346a9efe9a438f9eb13ed2337c36f35d54598af",
       "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "4dbb459389a4ab55c95aa7b5fc68c7f76b550817cd55acc01fe2a65a03e54ecb",
+      "specSha256": "dd7768e2aa3ad1bf2370d4c6249f3bb9b04261a7f1618318f6f42dfc6999d41c",
       "profile": "epic"
     },
     "change": {
-      "kind": "plan-spec-and-profile-changed",
-      "previousApprovalSha256": "f5f5b31eb7c4fb22b5a34479c1abfdb9a337e6c215db13a175820235d5d000be"
+      "kind": "plan-and-spec-changed",
+      "previousApprovalSha256": "025bbe963ed49629fbb30a62d41e30ab2dfc756710a1af6e24991a99c6554860"
     },
     "authorizes": [
       "design-to-implementation-transition"
@@ -508,8 +532,8 @@
   },
   "planPresentation": {
     "schema": "pipeline.plan-presentation.v1",
-    "submissionSha256": "40bd1a9c48a81b86e63cfcc318be44ef8a776b6de162954118a00b82a8c8d265",
-    "presentedBy": "Codex",
-    "presentedAt": "2026-09-13T07:35:53.787Z"
+    "submissionSha256": "9069078635915259370f7308556b7a95c7065406ca2afa3da0dc463ac62346c1",
+    "presentedBy": "André",
+    "presentedAt": "2026-09-13T09:04:37.059Z"
   }
 }
