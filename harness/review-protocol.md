@@ -10,9 +10,9 @@ Governing principle: **deterministic before probabilistic.** Stage 1 is machine 
 
 ## 1. Stage 1 — deterministic gate chain (blocking)
 
-**Rule:** The fixed chain **format → lint → typecheck → tests → build** runs as ONE verify script per project (`{{VERIFY_COMMAND}}` from the project calibration). Stop hook, goldfish delivery, and CI execute the same command.
-**Why:** Three diverging check paths are three truths (anti-pattern AP1); one script makes "green" unambiguous (ADR-0005).
-**Check:** The evidence artifact names script + commit state + exit code; CI demonstrably calls the same command.
+**Rule:** The fixed chain **format → lint → typecheck → tests → build** runs through ONE verify engine and project command (`{{VERIFY_COMMAND}}` from the project calibration). Its bound run type selects the fixed baseline plus every registered area affected since the bound base; release, tag, marketplace and publication run the full registry (ADR-0081). Stop hook, goldfish delivery, Critic/local-candidate work, CI, and release all invoke that same engine and emit its selection evidence; an unknown path, missing base, or incomplete registration falls back to full execution.
+**Why:** Three diverging check engines are three truths (anti-pattern AP1); one engine makes "green" and its boundary-aware scope unambiguous (ADR-0005, ADR-0081).
+**Check:** The evidence artifact names engine/command + commit state + selected scope + exit code; CI demonstrably invokes the same engine.
 
 **Rule (evidence):** A delivery without a machine-written evidence artifact counts as NOT verified — regardless of what the report claims.
 **Why:** "Reported done but not tested" is the documented main failure mode (P4).
@@ -184,7 +184,11 @@ standard-stage report names the auto-injected context observed (CLAUDE.md,
 git-status snapshot, memory); that injected git status/commit log is NEVER used
 as a freshness reference — diff range and commit state come exclusively from
 the dispatch (§2.2), confirmed via the Critic's own `git` commands.
-**Check:** Writable tools available to a Critic = failed bootstrap → abort (wrong agent definition loaded).
+**Check:** A runner-native lane with write capability is a failed bootstrap and
+aborts. In the functional-equivalent lane, host-exposed write tools are a
+mandatory residual-risk disclosure, not an automatic abort: the Critic invokes
+no write tool, mutating command, or delegation and records the literal
+functional-equivalent assurance.
 
 ### 2.4 Findings format (the Critic → Elephant transfer format)
 

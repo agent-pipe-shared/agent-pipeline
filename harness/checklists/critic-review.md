@@ -15,7 +15,7 @@
 ## Run (Critic)
 
 - [ ] Construct your input YOURSELF: run `git diff`, read spec + guardrails + evidence — nothing else
-- [ ] Read-only bootstrap confirmed (write tools absent; else abort)
+- [ ] Read-only bootstrap confirmed: runner-native lanes require write tools absent (else abort); the functional-equivalent lane invokes no write tool, mutating command, or delegation and discloses any host-exposed write capability as residual risk
 - [ ] T1 assurance recorded: runner-native evidence, or exactly `functional-equivalent-read-only; OS isolation not asserted`; no OS-isolation or effective-model-identity claim
 - [ ] Search harshly, report honestly — findings only with evidence
 - [ ] Per finding: Gap · Risk (blocker/major/minor) · Evidence `file:line` · Spec/guardrail ref
