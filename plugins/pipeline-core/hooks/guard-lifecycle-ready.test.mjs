@@ -46,6 +46,7 @@ import {
   isRestartResumeHintInputWrite,
   isSanctionedGhReadOnlyDiagnostic,
   isSanctionedLifecycleCommand,
+  isHumanPoSigningCommand,
   isSanctionedStartPreflightInvocation,
   machinePlaneFilePath,
   main,
@@ -108,7 +109,7 @@ import { buildPushInitArgv } from "../scripts/push-init.mjs";
 // (push-prepare.mjs's own `authorize` line calls this with no override) -- used to prove the
 // exact command push-init.mjs would present to a human is refused for an agent's own Bash
 // tool call, never reconstructed by hand.
-import { authorizeCriticalPushCommand } from "../scripts/po-human-approval.mjs";
+import { authorizeCriticalPushCommand, HUMAN_SIGNING_COMMANDS } from "../scripts/po-human-approval.mjs";
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
@@ -720,6 +721,44 @@ test("newly-recognized human-signing commands (approve-critical, authorize-criti
   } finally {
     rmSync(path, { recursive: true, force: true });
     rmSync(external, { recursive: true, force: true });
+  }
+});
+
+// ALF-B2-5-SIGNING-DERIVATION (backlog/items/2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md):
+// The guard's isHumanPoSigningCommand derives directly from HUMAN_SIGNING_COMMANDS exported by
+// po-human-approval.mjs. Assert that every command in HUMAN_SIGNING_COMMANDS is recognized, and
+// non-signing commands (prepare, verify, etc.) are rejected.
+test("isHumanPoSigningCommand recognizes every HUMAN_SIGNING_COMMANDS command and rejects non-signing commands", () => {
+  const repoRoot = root();
+  try {
+    for (const cmd of HUMAN_SIGNING_COMMANDS) {
+      const command = `node ${PO_HUMAN_APPROVAL_SCRIPT} ${cmd} --repo-root ${repoRoot}`;
+      assert.equal(
+        isHumanPoSigningCommand(command, repoRoot),
+        true,
+        `expected ${cmd} to be recognized as a human signing command`,
+      );
+    }
+    const nonSigningCommands = [
+      "prepare",
+      "prepare-all",
+      "verify",
+      "verify-all",
+      "prepare-critical",
+      "verify-critical",
+      "prepare-fork-disposition",
+      "verify-fork-disposition",
+    ];
+    for (const cmd of nonSigningCommands) {
+      const command = `node ${PO_HUMAN_APPROVAL_SCRIPT} ${cmd} --repo-root ${repoRoot}`;
+      assert.equal(
+        isHumanPoSigningCommand(command, repoRoot),
+        false,
+        `expected ${cmd} to NOT be recognized as a human signing command`,
+      );
+    }
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
   }
 });
 

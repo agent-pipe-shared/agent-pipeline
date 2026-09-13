@@ -342,7 +342,7 @@
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | closed | defect | pipeline | — | 2026-08-11 | 2026-08-25 | — |
 | pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | open | defect | pipeline | nova-b | 2026-08-17 | — | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | — | 2026-08-17 | — | — |
-| pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | alfred | 2026-08-07 | 2026-08-21 | — |
+| pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | closed | defect | pipeline | alfred | 2026-08-07 | 2026-08-21 | — |
 | pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | — | 2026-08-16 | — | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
@@ -673,8 +673,8 @@
 
 ## Counts
 
-- open: 78
+- open: 77
 - in_progress: 1
-- closed: 572
+- closed: 573
 - rejected: 3
 - deferred: 11

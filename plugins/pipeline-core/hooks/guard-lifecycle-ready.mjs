@@ -58,6 +58,7 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { machinePlaneFilePath } from "../lib/machine-plane.mjs";
+import { HUMAN_SIGNING_COMMANDS } from "../scripts/po-human-approval.mjs";
 import {
   DEVPLAN_SHELL_DENIAL_CODE,
   devPlanGateVerdict,
@@ -3109,11 +3110,9 @@ export function isAgentPoPublicCommand(command, root) {
 // would regress the existing agent-executable prepare/verify path this guard's own test suite
 // pins ("agents prepare and verify only public PO artifacts while human signing stays
 // external").
-function isHumanPoSigningCommand(command, root) {
+export function isHumanPoSigningCommand(command, root) {
   const args = poApprovalArgs(command, root, PO_HUMAN_APPROVAL_SCRIPT);
-  return args !== null && [
-    "setup", "approve", "approve-all", "approve-critical", "authorize-critical", "sign-intent",
-  ].includes(args[0]);
+  return args !== null && HUMAN_SIGNING_COMMANDS.includes(args[0]);
 }
 
 /**

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "70de58bddf4bc51c7021f23e08224b3e2d8b1891920135d6faa3ba1952d30a46"
+    "transitionHead": "c30fa3033edf800030a8f78dbbde305fe5be524f59c488ef7fe66cc5ac3f0456"
   },
   "counts": {
-    "open": 78,
+    "open": 77,
     "in_progress": 1,
-    "closed": 572,
+    "closed": 573,
     "rejected": 3,
     "deferred": 11
   },
@@ -4496,14 +4496,18 @@
     },
     {
       "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope.",
       "deferred": true,
       "due": "2026-08-21",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "e87aac79b4f01d6084aa58fcdc75d439bb771da1",
+      "closureEvidence": "backlog/evidence/2026-09-13-lifecycle-guard-human-signing-commands.md"
     },
     {
       "id": "pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes",

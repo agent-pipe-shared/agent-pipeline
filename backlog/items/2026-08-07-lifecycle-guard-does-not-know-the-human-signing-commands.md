@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.lifecycle-guard-does-not-know-the-human-signing-commands
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 sprint: alfred
 due: 2026-08-21
+closed_at: 2026-09-13
+closure_repository: self
+closure_commit: e87aac79b4f01d6084aa58fcdc75d439bb771da1
+closure_evidence: backlog/evidence/2026-09-13-lifecycle-guard-human-signing-commands.md
 source: "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope."
 done_when: manual
 ---
@@ -103,3 +107,16 @@ but it does not substitute for Direction #2 (deriving the list from the
 CLI's actual command set, or a drift-detection check), which remains
 genuinely deferred to Sprint Alfred and is the reason this item's
 `status:` stays **open**.
+
+### Closure, 2026-09-13 (Sprint Alfred Batch 1, task ALF-B2-5-SIGNING-DERIVATION)
+
+Direction #2 implemented per Sprint Alfred Roadmap Work Package B2-5.
+`plugins/pipeline-core/scripts/po-human-approval.mjs` exports `HUMAN_SIGNING_COMMANDS`
+as an immutable frozen array containing all human signing commands:
+`setup`, `approve`, `approve-all`, `approve-critical`, `authorize-critical`,
+`sign-intent`, and `approve-fork-disposition`.
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` imports `HUMAN_SIGNING_COMMANDS`
+and exports `isHumanPoSigningCommand(command, root)` deriving directly from it.
+Regression suite `guard-lifecycle-ready.test.mjs` validates recognition of all
+signing commands and rejection of all non-signing commands.
+Durable closure evidence recorded in `backlog/evidence/2026-09-13-lifecycle-guard-human-signing-commands.md`.
