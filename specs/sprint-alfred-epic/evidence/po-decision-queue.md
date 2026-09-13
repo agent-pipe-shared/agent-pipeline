@@ -1,6 +1,6 @@
 # Alfred autonomous continuation — PO decision queue
 
-Updated 2026-09-09. This is the collection point for decisions that genuinely
+Updated 2026-09-13. This is the collection point for decisions that genuinely
 need the PO during the approved Alfred continuation. It is not a new approval
 mechanism, a substitute for signed gates, or a record of feature acceptance.
 
@@ -22,7 +22,18 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## PO decisions
 
-### Event 16 deterministic scanner collision — permanently approved and applied
+### Rebase governance disposition — approved and applied 2026-09-13
+
+The PO explicitly approved keeping Nova's Human governance sequence 12–14 and
+Human head 14 while removing Alfred's five divergent events 12–16 and the two
+scanner exceptions that were needed only for those discarded events. The
+rebase onto `d2b1dbfc9f70d1ae45ba036b65968c1d9302e5e4` is complete. Store
+verification observes a prefix-valid 14-event Human chain ending at sequence
+14, digest `7d695d1ec1c4ce85896bdbab63d48ac32962967d0bb6afc496f45e4c82d7234e`.
+No fork disposition, replacement Human event, or retained Alfred exception was
+inferred.
+
+### Event 16 deterministic scanner collision — superseded by rebase disposition
 
 The exact clean candidate is `d88b543486ddc8e6215d3944fafc1e38aa6790da`
 (tree `f803aa1a4b353ee6093676b3f33961359d193fe1`). Full Verify is red (exit 1,
@@ -42,7 +53,10 @@ mutation route and read back. The event remains immutable; the ignore file
 pre-edit and post-edit hashes, event hash, and fixture result are recorded in
 [event16-permanent-scanner-exception-2026-09-09.md](event16-permanent-scanner-exception-2026-09-09.md)
 and [event16-permanent-scanner-exception-2026-09-09.json](event16-permanent-scanner-exception-2026-09-09.json).
-Candidate Security and Full Verify remain separate pending gates.
+That historical decision remains recorded here, but its target event and
+exception were removed under the later 2026-09-13 rebase disposition above.
+It is no longer an active scanner exception. Candidate Security and Full
+Verify remain separate pending gates.
 
 The candidate `84eeb02fc4b7aec0f808d8549efb48993d0c5045` then recorded Full
 Verify exit 1 at 500/508 with the same eight failures; Security exited 0 with no
@@ -59,14 +73,14 @@ push prerequisites before any execution; do not claim a push or signature.
 
 | Topic | Current status | Next owner/action |
 |---|---|---|
-| C1 observer/store suite registration | Preparation is documented in [the registration route](c1-suite-registration-route-2026-09-08.md); implementation and focused tests are not yet complete | Implement the observer/store suites, run focused tests, prepare the exact registration patch, then evaluate the actual current TP-3 authorization; apply only through the valid active TP-3 route; no signature is presumed and no new approval is requested prematurely |
+| C1 observer/store suite registration | After the Nova rebase, the authoritative checker reports exactly one finding: `observe-critic-preflight.test.mjs` is unregistered; 0 honoured and 0 expired exclusions | Prepare the exact registration and matching capability surface against the current registry, then use only the current author-repair/TP-3 route; no signature is presumed |
 | C1 pure aggregation | Implementation and focused tests committed at `854b0da8`; receipt 64/64 and consumer checks 9/9 pass | With source projection now landed, prepare emission/local-report refinement, then run the next candidate Verify and independent T1 review |
 | C1 source projection | Committed at `125a2d160ac7b3c4d16979ed4cfbe305a98f8ed5`, tree `173ccbd8f7b0e6e5438742c6a79be6692d01e9c6`; C1 receipt suite 80/80 (64 preserved plus 16 source-projection tests), consumer 9/9, diff-check 0; candidate `96238c3c` Verify is now recorded red at 499/508 | Prepare store/controller contract and later usage/observer work; T1 remains gated by red Verify and baseline is not started |
 | C1 producer capture | Committed at `3e11cdadfe8c0e6ab9bd864211fc6dc6e03270dc`, tree `ab433771e3711d999d75d04fbc3f71acbeb7a845`; focused checks baseline 6/6 then 20/20, consumer 9/9, diff-check 0 | Integrate the reviewed store/observer/controller plans, then run a new candidate Full Verify; no emission or baseline claim |
 | Slice/parallel hooks | Exact hook identity, native tool coverage and live invocation evidence unmeasured | Read-only investigation, then bounded tests where admitted |
 | Existing first-core and scanner-exception review | Installed CAS-READY health and physical Critic adapter layout fix are observed; selected execution and T1 remain pending while Verify is red | Recheck the selected transport and candidate-bound review after the next green Verify |
 | Real collection baseline | Native evidence and measured 14-day window remain open | Implement/validate collection before recording a real start; never backdate |
-| Future publication | Local-priority rebase is complete and ready for the user terminal push; agents must not push | User performs the terminal push against `origin/feat/sprint-alfred` after independently checking the configured gates; refresh refs afterward |
+| Future publication | Rebase onto Nova `d2b1dbfc…` is complete; reconciliation, Full Verify and current review/acceptance gates remain open | User performs any later terminal push against `origin/feat/sprint-alfred` only after independently checking the configured gates; agents must not push |
 | Feature acceptance | Open | Present only after the required work and evidence exist |
 
 The two earlier A1 decisions remain resolved as recorded in
