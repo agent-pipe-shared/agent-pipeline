@@ -463,19 +463,3 @@ only after exact closure evidence exists.
 
 Nova/Cyborg reconciliation is not part of this close. It is a separate
 post-Sprint integration lifecycle after both independently accepted Results.
-## Local-candidate completion batch — 13 September 2026
-
-Before the next local 0.6.2 stamp, migrate the three existing registrations
-`commit-message-policy-tests`, `commit-msg-hook-install-tests`, and
-`resume-hint-scripts-tests` from `legacy-process-only` to the required
-case-completion channel. Treat each suite as one independently checkable item:
-declare its full ordered corpus before callback execution, add an injected
-early-failure proof that the last case is still disposed, bind the exact policy
-in Verify, and change the registry disposition only when the direct suite and
-registry checker both pass. Commit the three migrations and the TP-3 Verify
-registration as one atomic batch so no intermediate revision advertises
-completion evidence it does not consume.
-
-The batch does not change production behavior, loosen Git hooks, or close the
-repository-wide migration item. Rollback is a forward revert of the complete
-batch followed by fresh direct-suite and registry checks.
