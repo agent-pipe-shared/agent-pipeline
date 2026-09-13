@@ -51,6 +51,9 @@ tmp-inbounds.txt
 # via `git add -f`. Only the machine-generated root directory was ever meant.
 /evidence/
 
+# Local interruption reporting / store runs (C1 Slice 2)
+/telemetry/interruptions/
+
 # Dispatch records written to the repository ROOT instead of `evidence/`. Anchored,
 # so it never touches `evidence/dispatch-record-*.json`, which is where the template
 # (`templates/prompts/goldfish-task.md` field 6) says these belong. 26 of them were
