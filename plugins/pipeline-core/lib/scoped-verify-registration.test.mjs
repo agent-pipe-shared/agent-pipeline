@@ -231,6 +231,7 @@ function scopedRegistrationFailureFixture() {
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "successful-spawn.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "successful-spawn.mjs"));
     // verify.mjs delegates its candidate classification to the freeze library (ADR-0061
     // Change 3), which in turn needs review-economy's canonical hashing. Both must exist in
     // the fixture root or verify.mjs fails to LOAD -- which looks like this case failing for

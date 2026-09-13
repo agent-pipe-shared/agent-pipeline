@@ -601,6 +601,7 @@ const FIXTURE_MODULES = Object.freeze([
   "plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs",
   "plugins/pipeline-core/lib/worktree-lifecycle.mjs", // via project-authority.mjs
   "plugins/pipeline-core/lib/windows-private-state.mjs", // via worktree-lifecycle.mjs
+  "plugins/pipeline-core/lib/successful-spawn.mjs", // via windows-private-state.mjs
   "plugins/pipeline-core/lib/nova-candidate-freeze.mjs",
   "plugins/pipeline-core/lib/review-economy.mjs", // via nova-candidate-freeze.mjs
   "plugins/pipeline-core/lib/verify-selection.mjs",
