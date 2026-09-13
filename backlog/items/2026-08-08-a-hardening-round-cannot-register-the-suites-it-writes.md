@@ -4,6 +4,10 @@ id: pipeline.hardening-round-cannot-register-its-own-suites
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-09-13
+closure_repository: self
+closure_commit: d37e6eff196b7e4786fe58b89742e52f5190404e
+closure_evidence: backlog/evidence/2026-09-13-declarative-verify-suite-registration.md
 created: 2026-08-08
 sprint: alfred
 due: 2026-08-22
