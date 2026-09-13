@@ -4,6 +4,7 @@ id: pipeline.identical-lifecycle-argv-must-have-shell-lane-parity
 type: defect
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — the Claude Windows run observed an exact `--push-approval signature` lifecycle invocation rejected as Bash parse-unsupported but admitted via PowerShell."
@@ -31,4 +32,3 @@ similarity alone.
 - Deliberately different shell syntax remains parsed according to its actual
   dialect and cannot gain an unrelated admission.
 - Regression fixtures include the captured Windows invocation.
-

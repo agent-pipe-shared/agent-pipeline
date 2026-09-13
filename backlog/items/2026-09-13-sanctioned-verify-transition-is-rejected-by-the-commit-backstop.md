@@ -4,6 +4,7 @@ id: pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop
 type: defect
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova
 tracking: "NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies."
@@ -40,4 +41,3 @@ other protected path must remain blocked normally.
 - A wider calibration rewrite, a missing state transition, and an inconsistent
   twin remain refused at the real Git-hook boundary.
 - Existing generic GS-10/GS-11 refusal coverage remains green.
-

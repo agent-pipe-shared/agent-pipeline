@@ -4,6 +4,7 @@ id: pipeline.verify-evidence-needs-an-explicit-strength-class
 type: workflow-improvement
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — a syntax/offline fallback can be honest and useful, but must not be treated as equivalent to the browser behavior evidence a product or release criterion implies."
@@ -29,4 +30,3 @@ make a weaker valid result visibly insufficient when a stronger claim is made.
 - Release readiness distinguishes an unavailable required browser proof from a
   failed test and from an acceptable low-stakes fallback.
 - Product-facing reports cannot silently label a weaker class as browser-E2E.
-

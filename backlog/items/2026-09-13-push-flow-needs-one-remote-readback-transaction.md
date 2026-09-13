@@ -4,6 +4,7 @@ id: pipeline.push-flow-needs-one-remote-readback-transaction
 type: workflow-improvement
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps."
@@ -31,4 +32,3 @@ observed.
 - A failed remote readback is non-success and yields an exact safe retry.
 - Sole pending audit state is folded only under the existing no-unrelated-work
   constraint.
-

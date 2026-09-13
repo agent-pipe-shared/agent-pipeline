@@ -4,6 +4,7 @@ id: pipeline.runner-native-subagent-tool-identity-is-not-portable
 type: defect
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — Antigravity reports DBB-PARENT-TOOL-USE-ID-MISSING for ordinary roles; do not weaken dispatch binding before collecting the native sanitized payload."
@@ -30,4 +31,3 @@ such binding is available.
 - A missing or unrelated binding remains denied.
 - Fixtures are captured from native payloads, rather than inferred from another
   runner's schema.
-

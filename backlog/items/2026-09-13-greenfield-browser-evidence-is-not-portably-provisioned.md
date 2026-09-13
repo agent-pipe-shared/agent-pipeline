@@ -4,6 +4,7 @@ id: pipeline.greenfield-browser-evidence-is-not-portably-provisioned
 type: workflow-improvement
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable."
@@ -30,4 +31,3 @@ release criteria must then consume that result explicitly.
 - It never installs dependencies or downloads browsers without the applicable
   host/PO authority.
 - Consumer verification and CI can reproduce the selected evidence mode.
-

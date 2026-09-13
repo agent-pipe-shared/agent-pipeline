@@ -4,6 +4,7 @@ id: pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors
 type: defect
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry."
@@ -31,4 +32,3 @@ runner/session identity rather than directory guessing.
 - Multiple runner session directories cannot make close telemetry ambiguous.
 - Tests cover interrupted release, local-only completion, and normal remote
   release separately.
-

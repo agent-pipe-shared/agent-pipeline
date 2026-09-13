@@ -4,6 +4,7 @@ id: pipeline.baseline-only-verify-needs-an-actionable-release-recovery
 type: workflow-improvement
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — the intentionally permitted baseline-only verify state becomes expensive when it is discovered late at push time and a runner cannot discover the exact recovery through its normal driver."
@@ -30,4 +31,3 @@ both before implementation and when push readiness first detects the omission.
 - A test follows fresh seed → implementation → late discovery → confirmed
   configured verify → push readiness without scratch files or a human guard
   override.
-

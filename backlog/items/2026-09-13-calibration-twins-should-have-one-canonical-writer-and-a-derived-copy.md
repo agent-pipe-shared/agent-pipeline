@@ -4,6 +4,7 @@ id: pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-co
 type: workflow-improvement
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes."
@@ -30,4 +31,3 @@ is a migration design, not a shortcut around GS-10/GS-11.
   closed with an actionable repair.
 - Existing consumer projects have a migration/readback path before the legacy
   tier is retired.
-

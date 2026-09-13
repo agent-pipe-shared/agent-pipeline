@@ -4,6 +4,7 @@ id: pipeline.commit-trailer-authoring-needs-a-typed-single-command-route
 type: workflow-improvement
 owner: pipeline
 status: open
+done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — newline-free shell grammar makes ordinary multi-paragraph git commit commands expensive; retain strict trailer validation while removing scratch-file choreography from the normal path."
@@ -30,4 +31,3 @@ result.  It must not make arbitrary multiline shell grammar admissible.
 - A valid structured message commits without a user-created scratch file.
 - Invalid/missing required trailers remain refused before Git is invoked.
 - The emitted command and error recovery are copy-safe on POSIX and Windows.
-
