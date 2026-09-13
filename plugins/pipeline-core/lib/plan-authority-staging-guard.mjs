@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
- * plan-authority-staging-guard — NVA-STAGINGBOLT-1.
+ * plan-authority-staging-guard — NVA-STAGINGBOLT-1 / WP-A4 (#102, AC-2, AC-4).
  *
  * WHY THIS FILE EXISTS
  *   A live greenfield project (2026-08-27) reached `phase: implementation` with
@@ -15,7 +15,8 @@
  *   (backlog/items/2026-08-27-plan-approval-binds-a-staging-draft-as-project-authority.md).
  *
  *   This module is the smallest correct bolt: a plan path or spec path that
- *   resolves inside the staging directory is refused, with a typed reason
+ *   resolves inside the staging directory, or whose file content carries the
+ *   generated pre-authority banner line, is refused, with a typed reason
  *   naming the real promotion action to run instead. It is a refusal, not a
  *   migration — a project already in the bad state is unaffected beyond the
  *   refusal becoming legible for its NEXT submit-plan/approve-plan call.
@@ -35,11 +36,23 @@
  *   than trusting the string here to stay honest on its own.
  */
 import { join, resolve, sep } from "node:path";
+import { readFileSync } from "node:fs";
 
 import { INTAKE_STAGING_DIRNAME } from "./onboarding-continuity.mjs";
 
 /** Typed refusal code shared by both the submit-plan and approve-plan writers. */
-export const PLAN_AUTHORITY_STAGING_CODE = "PLAN-AUTHORITY-STAGING-UNPROMOTED";
+export const PLAN_BINDS_PRE_AUTHORITY_DRAFT = "PLAN-BINDS-PRE-AUTHORITY-DRAFT";
+
+/** Backwards-compatibility aliases. */
+export const PLAN_AUTHORITY_STAGING_CODE = PLAN_BINDS_PRE_AUTHORITY_DRAFT;
+export const PLAN_AUTHORITY_STAGING_UNPROMOTED = PLAN_BINDS_PRE_AUTHORITY_DRAFT;
+
+/** Pre-authority banner snippet/line checked in staging documents. */
+export const PRE_AUTHORITY_BANNER_LINE =
+  "do not hand-edit -- this staging file is NOT yet bound as project authority";
+
+export const PRE_AUTHORITY_BANNER_SNIPPET =
+  "this staging file is NOT yet bound as project authority";
 
 /**
  * The real promotion action's internal command id, exactly as registered in
@@ -69,22 +82,56 @@ export function pathIsInsideOnboardingStaging(rootDir, relativePath) {
 
 /**
  * Refuse a plan-submission/plan-approval authority binding whose plan path or
- * spec path resolves inside the onboarding staging directory. Returns
- * `{ ok: true }` when neither is staged, else `{ ok: false, code, message }`
- * naming which path(s) triggered the refusal and the exact promotion action
- * to run instead.
+ * spec path resolves inside the onboarding staging directory, or whose file
+ * content carries the generated pre-authority banner line. Returns
+ * `{ ok: true }` when neither is staged and neither carries the banner, else
+ * `{ ok: false, code, message }` naming which path(s) triggered the refusal and
+ * the exact promotion action to run instead.
  */
-export function refusePlanAuthorityStagingPath({ rootDir, planPath, specPath }) {
+export function refusePlanAuthorityStagingPath({ rootDir, planPath, specPath, readFileFn = readFileSync }) {
   const staged = [];
   if (pathIsInsideOnboardingStaging(rootDir, planPath)) staged.push("plan");
   if (pathIsInsideOnboardingStaging(rootDir, specPath)) staged.push("spec");
-  if (staged.length === 0) return { ok: true };
+
+  const banner = [];
+  const checkBanner = (relPath, label) => {
+    if (typeof relPath !== "string" || relPath === "") return;
+    try {
+      const fullPath = resolve(rootDir, relPath);
+      const content = readFileFn(fullPath, "utf-8");
+      if (typeof content === "string" && (
+        content.includes(PRE_AUTHORITY_BANNER_SNIPPET)
+        || content.includes(PRE_AUTHORITY_BANNER_LINE)
+      )) {
+        banner.push(label);
+      }
+    } catch {
+      // Handled upstream: missing/unreadable file handled by poGateAuthority
+    }
+  };
+
+  checkBanner(planPath, "plan");
+  checkBanner(specPath, "spec");
+
+  if (staged.length === 0 && banner.length === 0) return { ok: true };
+
+  const reasons = [];
+  if (staged.length > 0) {
+    reasons.push(
+      `the ${staged.join(" and ")} path resolves inside ${INTAKE_STAGING_DIRNAME}, the onboarding staging directory`
+    );
+  }
+  if (banner.length > 0) {
+    reasons.push(
+      `the ${banner.join(" and ")} file carries a pre-authority staging banner`
+    );
+  }
+
   return {
     ok: false,
-    code: PLAN_AUTHORITY_STAGING_CODE,
+    code: PLAN_BINDS_PRE_AUTHORITY_DRAFT,
     message:
-      `the ${staged.join(" and ")} path resolves inside ${INTAKE_STAGING_DIRNAME}, the onboarding staging `
-      + "directory -- these files are explicitly marked as not yet bound as project authority. "
+      `${reasons.join(" and ")} -- these files are explicitly marked as not yet bound as project authority. `
       + `Run \`${PLAN_AUTHORITY_PROMOTION_CLI_INVOCATION}\` (subcommand "${PLAN_AUTHORITY_PROMOTION_SUBCOMMAND}") `
       + "to promote them to specs/<feature>/ first.",
   };
