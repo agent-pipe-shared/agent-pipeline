@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e5c5e675d4d3e2d2237829b4b86024382c82dcdd83062c25baac5e41a6f0718e"
+    "transitionHead": "7e39c3c716a84034747a304c2e158cb00667d03fad04ae3c7d8fb6a1f3ae3387"
   },
   "counts": {
-    "open": 70,
+    "open": 80,
     "in_progress": 1,
     "closed": 572,
     "rejected": 3,
@@ -1148,6 +1148,17 @@
       "closureEvidence": "backlog/items/2026-08-09-bare-branch-name-in-git-push-fails-approval-with-a-misleading-code.md"
     },
     {
+      "id": "pipeline.baseline-only-verify-needs-an-actionable-release-recovery",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-retrospective-2026-09-13.md.",
+      "deferred": false,
+      "tracking": "Nova B — the intentionally permitted baseline-only verify state becomes expensive when it is discovered late at push time and a runner cannot discover the exact recovery through its normal driver.",
+      "sprint": "nova-b"
+    },
+    {
       "id": "pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code",
       "status": "closed",
       "type": "workflow-improvement",
@@ -1306,6 +1317,17 @@
       "closureRepository": "self",
       "closureCommit": "b1ecbef2ee5cac36eb168641ca4f41ab9800eab7",
       "closureEvidence": "backlog/evidence/2026-09-06-nva-b-guardfix-critic-round1.md"
+    },
+    {
+      "id": "pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md §§55–89.",
+      "deferred": false,
+      "tracking": "Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes.",
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.canonical-verify-evidence-path",
@@ -1789,6 +1811,17 @@
       "closureRepository": "self",
       "closureCommit": "94fe6cc6e38bd690ee87af68092ac75789af00a0",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+    },
+    {
+      "id": "pipeline.commit-trailer-authoring-needs-a-typed-single-command-route",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-analysis-agy-062-103.md §§42–55, 125–134; evidence/pipeline-retrospective-2026-09-13.md §§55–88.",
+      "deferred": false,
+      "tracking": "Nova B — newline-free shell grammar makes ordinary multi-paragraph git commit commands expensive; retain strict trailer validation while removing scratch-file choreography from the normal path.",
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty",
@@ -2811,6 +2844,17 @@
       "closureEvidence": "backlog/items/2026-08-09-external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system.md"
     },
     {
+      "id": "pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-retrospective-2026-09-13.md §§37–39, 95–118.",
+      "deferred": false,
+      "tracking": "Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry.",
+      "sprint": "nova-b"
+    },
+    {
       "id": "pipeline.first-verify-run-is-red-with-four-failures",
       "status": "closed",
       "type": "defect",
@@ -3294,6 +3338,17 @@
       "closureRepository": "self",
       "closureCommit": "b5354f250e2ff10698062fa4927f471f5fc3357a",
       "closureEvidence": "plugins/pipeline-core/hooks/onboarding-consent-guard.test.mjs"
+    },
+    {
+      "id": "pipeline.greenfield-browser-evidence-is-not-portably-provisioned",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md.",
+      "deferred": false,
+      "tracking": "Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable.",
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference",
@@ -4083,6 +4138,17 @@
       "closureRepository": "self",
       "closureCommit": "8acfd9361028b400418a8b6035a04eeb827b9e49",
       "closureEvidence": "backlog/items/2026-08-06-human-legible-approval-record.md"
+    },
+    {
+      "id": "pipeline.identical-lifecycle-argv-must-have-shell-lane-parity",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md §5.2 and §10.3.",
+      "deferred": false,
+      "tracking": "Nova B — the Claude Windows run observed an exact `--push-approval signature` lifecycle invocation rejected as Bash parse-unsupported but admitted via PowerShell.",
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.identity-attestation-fails-open-on-unresolved-transcript-path",
@@ -6274,6 +6340,17 @@
       "closureEvidence": "backlog/evidence/2026-08-11-push-approval-md-already-current.md"
     },
     {
+      "id": "pipeline.push-flow-needs-one-remote-readback-transaction",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-retrospective-2026-09-13.md §4 and recommendations.",
+      "deferred": false,
+      "tracking": "Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps.",
+      "sprint": "nova-b"
+    },
+    {
       "id": "pipeline.push-gate-is-silent-in-every-consumer-project",
       "status": "closed",
       "type": "defect",
@@ -6958,6 +7035,17 @@
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state.test.mjs"
     },
     {
+      "id": "pipeline.runner-native-subagent-tool-identity-is-not-portable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-analysis-agy-062-103.md.",
+      "deferred": false,
+      "tracking": "Nova B — Antigravity reports DBB-PARENT-TOOL-USE-ID-MISSING for ordinary roles; do not weaken dispatch binding before collecting the native sanitized payload.",
+      "sprint": "nova-b"
+    },
+    {
       "id": "pipeline.runner-neutrality-before-third-runner",
       "status": "closed",
       "type": "workflow-improvement",
@@ -6998,6 +7086,17 @@
       "closureRepository": "self",
       "closureCommit": "505a2e0fd5f470c7089dc217e64198b6349bacc5",
       "closureEvidence": "backlog/items/2026-08-28-the-two-runtime-projections-drift-apart-after-a-v3-refresh.md"
+    },
+    {
+      "id": "pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md §5.1; independently reproduced against the current source's pipeline-state writer and generated pre-commit backstop.",
+      "deferred": false,
+      "tracking": "NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies.",
+      "sprint": "nova"
     },
     {
       "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",
@@ -8447,6 +8546,17 @@
       "source": "Agy/WSL greenfield run, 2026-08-28, its own hardening self-analysis (pipeline-analysis.md), corroborated by the Codex/WSL run's independent script-indirection probe.",
       "deferred": false,
       "sprint": "nightwing"
+    },
+    {
+      "id": "pipeline.verify-evidence-needs-an-explicit-strength-class",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-13",
+      "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md §10.8; evidence/pipeline-retrospective-2026-09-13.md §§33–39, 95–112.",
+      "deferred": false,
+      "tracking": "Nova B — a syntax/offline fallback can be honest and useful, but must not be treated as equivalent to the browser behavior evidence a product or release criterion implies.",
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.verify-gate-scoped-registration",
