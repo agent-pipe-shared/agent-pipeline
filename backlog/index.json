@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "150163dcf773d8f4cadf47fc6aa1c794ac8ad46303f0fb8cfd62e5bf5d3313a0"
+    "transitionHead": "d72085924ea83e6c6d1894f296e9b56712ea960c5b3984d3362dcfe7c9ab7163"
   },
   "counts": {
-    "open": 76,
+    "open": 72,
     "in_progress": 1,
-    "closed": 574,
+    "closed": 578,
     "rejected": 3,
     "deferred": 11
   },
@@ -2315,13 +2315,17 @@
     },
     {
       "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Measured live 2026-08-28 in the Alfred clone, applying the PO's own PRD-gate decisions to the PRD and Spec the gate is about.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d37e6eff196b7e4786fe58b89742e52f5190404e",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md"
     },
     {
       "id": "pipeline.design-to-implementation-path-has-no-driver",
@@ -3927,14 +3931,18 @@
     },
     {
       "id": "pipeline.hardening-round-cannot-register-its-own-suites",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed 2026-08-08 during the 0.5.4 hardening block itself: the SETUP-2b dispatch was refused when registering its own new suite, correctly stopped rather than routing around the guard, and the registration is still outstanding. Second confirmed instance of the guard-testpath gap already recorded in docs/state.md.",
       "deferred": true,
       "due": "2026-08-22",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d37e6eff196b7e4786fe58b89742e52f5190404e",
+      "closureEvidence": "backlog/evidence/2026-09-13-declarative-verify-suite-registration.md"
     },
     {
       "id": "pipeline.harness-classifier-blocks-authorized-onboarding-action",
@@ -5594,13 +5602,17 @@
     },
     {
       "id": "pipeline.plan-approval-binds-a-staging-draft-as-project-authority",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Live state of a greenfield Antigravity test project, read 2026-08-27: the PO plan approval bound project/.onboarding-staging/ paths as project authority and advanced the feature to implementation. The generated staging files' own banner states they must not be bound as authority.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d37e6eff196b7e4786fe58b89742e52f5190404e",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md"
     },
     {
       "id": "pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown",
@@ -7350,13 +7362,17 @@
     },
     {
       "id": "pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Second measured occurrence, 2026-08-27, in the Alfred clone (submit-plan refused with PLAN-SUBMIT-CONTINUITY-INVALID after a clean set-feature). First occurrence documented in specs/sprint-phoenix-epic/RECOVERY.md (2026-07, 'second integration gap').",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d37e6eff196b7e4786fe58b89742e52f5190404e",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md"
     },
     {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",

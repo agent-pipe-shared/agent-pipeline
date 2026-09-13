@@ -179,7 +179,7 @@
 | pipeline.dead-key-directory-pointer-is-permanent-and-silent | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking at the last touch: on a machine that HAS a valid PO key, a freshly onboarded project still gets no trust anchor, so the signature push the PO is asked to perform is functionless. |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | batman | 2026-08-28 | — | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
-| pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | open | defect | pipeline | alfred | 2026-08-28 | — | — |
+| pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
@@ -299,7 +299,7 @@
 | pipeline.happy-path-key-onboarding-must-install-directly-as-critical-human-proof | closed | workflow-improvement | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- PO explicit future requirement, 2026-08-30, filed alongside the trust-anchor-circularity fix it depends on. |
 | pipeline.happy-path-local-telemetry | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | closed | workflow-improvement | pipeline | — | 2026-08-10 | — | — |
-| pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
+| pipeline.hardening-round-cannot-register-its-own-suites | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.heredoc-refusal-teaches-no-substitute | open | defect | pipeline | nightwing | 2026-08-28 | — | — |
@@ -422,7 +422,7 @@
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | — | 2026-08-05 | — | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony | closed | defect | pipeline | nova | 2026-08-29 | — | — |
-| pipeline.plan-approval-binds-a-staging-draft-as-project-authority | open | defect | pipeline | alfred | 2026-08-27 | — | — |
+| pipeline.plan-approval-binds-a-staging-draft-as-project-authority | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
@@ -552,7 +552,7 @@
 | pipeline.session-keep-awake | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.session-told-ready-but-not-how-to-repair | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
-| pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init | open | defect | pipeline | alfred | 2026-08-27 | — | — |
+| pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | — | 2026-08-05 | — | — |
 | pipeline.setup-promises-a-human-name-repair-it-cannot-perform | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.seven-unregistered-suites-are-red | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -673,8 +673,8 @@
 
 ## Counts
 
-- open: 76
+- open: 72
 - in_progress: 1
-- closed: 574
+- closed: 578
 - rejected: 3
 - deferred: 11
