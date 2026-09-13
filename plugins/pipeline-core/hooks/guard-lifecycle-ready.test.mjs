@@ -1876,7 +1876,6 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       ["rg -n lifecycle . | tee output.txt", "GUARD-OPERATOR-UNAPPROVED"],
       ["rg -n lifecycle . && touch output.txt", "GUARD-PARSE-UNSUPPORTED"],
       ["rg -n lifecycle . ; head -n 20 output.txt", "GUARD-PARSE-UNSUPPORTED"],
-      ["rg -n lifecycle .\nhead -n 20 output.txt", "GUARD-PARSE-UNSUPPORTED"],
     ]) {
       const result = evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -1895,6 +1894,15 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       assert.match(result.stderr, /The complete admitted grammar, with bounds and exact spellings:/u, command);
       assert.match(result.stderr, /N in 1\.\.500/u, command);
     }
+
+    // A physical newline is now an alternative spelling of separately-admitted
+    // diagnostic reads. The dedicated newline corpus above proves the broader
+    // closure; retain this nearby regression for the original reproduction too.
+    const newlineReadBlock = "rg -n lifecycle .\nhead -n 20 output.txt";
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(newlineReadBlock), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+    }), { exitCode: 0, stderr: "" }, newlineReadBlock);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
