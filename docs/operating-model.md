@@ -534,6 +534,14 @@ gehen dieses Dokument und die passenden ADRs vor.
 > kein Native-Sandbox-, Modellidentitäts- oder Plattform-Claim über die für
 > den jeweiligen Runner festgehaltene Evidenz hinaus.
 
+Verify ist grenzbewusst (ADR-0081). Arbeits-, Critic-, lokale
+Kandidaten- und gewöhnliche Push-Läufe führen die feste Baseline plus jeden
+seit der gebundenen Basis betroffenen registrierten Bereich aus. Release-,
+Tag-, Marketplace- und Veröffentlichungs-Läufe führen die vollständige
+Registry aus. Auswahl und Regeldigest sind Evidenz; ein unbekannter Pfad,
+eine fehlende Basis oder unvollständige Registrierung fallen auf die
+vollständige Ausführung zurück.
+
 ## 1. Was das Modell schützt
 
 Agentenarbeit scheitert oft banal: Das Ziel lebt nur im Chat, ein Agent prüft
@@ -802,6 +810,18 @@ Der Critic arbeitet aus Pfaden/Refs, Kandidat, Grenzen und Evidenz. Zuerst
 sucht er nach Fehlern, dann meldet er nur belegbare Befunde. „Keine Befunde“
 ist gültig. Der Elephant entscheidet, ob jeder Befund behoben, mit Begründung
 akzeptiert oder eskaliert wird; er darf keinen still verwerfen.
+
+QG-13 sieht standardmäßig eine erste Critic-Runde und eine frische
+Nachprüfung vor, danach Selbstverifikation. Verlangt der Delivery-Vertrag
+ausdrücklich einen tatsächlichen unabhängigen PASS, dürfen weitere Reviews nur
+den unmittelbar zuvor geprüften Commit bis zum neuen Korrekturkandidaten,
+seine Fixes und direkte Regressionen betrachten. Der Koordinator muss die
+erhaltene Quellenabdeckung und die lückenlose Receipt-/Befund-Dispositionslinie
+prüfen, bevor ein PASS für den neuesten Diff diesen Vertrag erfüllen kann.
+Unveränderte bereits geklärte Bereiche werden nicht erneut geöffnet; ein
+Diff-Receipt behauptet nie eine neue Gesamtartefakt-Prüfung. Selbstverifikation
+liefert niemals PASS; Ausführungs-, Kosten- und Kursbudgets gelten weiter
+(`guardrails/quality-gates.md` QG-13).
 
 Ist eine Duty nicht verfügbar, driftet eine Vorbedingung, ist Evidenz veraltet,
 tritt eine Stop-Bedingung auf oder scheitert derselbe Versuch wiederholt, wird

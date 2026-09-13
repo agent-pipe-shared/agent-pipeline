@@ -59,3 +59,13 @@ test("Hawkeye language scope is fixed to the three maintained bilingual docs", (
   assert.match(source, /const bilingualFrontDoors = \["README\.md", "PIPELINE_FLOW\.md", "docs\/operating-model\.md"\]/);
   assert.match(source, /const englishOnlyUserDocs = \["SETUP\.md", "docs\/README\.md", "docs\/overview\.md", "docs\/usage\.md", "docs\/migration\.md"\]/);
 });
+
+test("the complete German Operating Model copy retains its boundary-aware Verify and QG-13 correction rules", () => {
+  const text = readFileSync(join(repoRoot, "docs", "operating-model.md"), "utf8");
+  const [english, german] = text.split("<!-- DE-REFERENCE-BELOW", 2);
+  assert.ok(german, "expected the complete German reader-copy boundary");
+  assert.match(english, /Verify is boundary-aware \(ADR-0081\)/);
+  assert.match(german, /Verify ist grenzbewusst \(ADR-0081\)/);
+  assert.match(english, /When the delivery contract explicitly requires actual\nindependent PASS/);
+  assert.match(german, /Verlangt der Delivery-Vertrag\nausdrücklich einen tatsächlichen unabhängigen PASS/);
+});
