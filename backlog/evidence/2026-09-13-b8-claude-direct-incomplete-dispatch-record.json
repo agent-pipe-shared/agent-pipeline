@@ -1,0 +1,32 @@
+{
+  "schema": "pipeline.incomplete-dispatch-record-archive.v1",
+  "archivedAt": "2026-09-13",
+  "classification": "unverifiable-historical-v3-record",
+  "source": {
+    "activeEvidencePath": "evidence/dispatch-record-B8-CLAUDE-DIRECT-20260913.json",
+    "introducedByCommit": "58a1e426ae6e498e66564a8e8cdd376e6116a368",
+    "originalSha256": "1a536d3b212c54f643cfadb9c227690d834e7cb5165f17703f933c2e4f881d77",
+    "validationFailure": "The claimed v3 dispatch record omits model, effort, and resultSha256; it also declares no committed result. Those historical facts cannot be reconstructed from the repository or local pipeline audit."
+  },
+  "originalRecord": {
+    "schema": "pipeline.dispatch-record.v3",
+    "taskId": "B8-CLAUDE-DIRECT-20260913",
+    "agentType": "worker",
+    "rulesetSha": "0.6.2+codex.20260913113500.19462d9 / 59e4a5ec0bbd95dd3bc64be427a3ffb4768a6ceafad17f6c469789455ed17b52",
+    "dispatcher": "elephant",
+    "candidateCommit": "57b15ecd5013dcc6c0f5ceca170226c558183c27",
+    "outcome": "completed",
+    "commits": [],
+    "log": [],
+    "report": {
+      "text": "A registered Claude directory marketplace whose physical plugin root is the loaded root now bootstraps as a direct source without a copied-install receipt. The IPH direct-directory regression and consumer-safe-paths suite pass. The unchanged preflight multi-session fixture has an environment-level WT-GIT-SPAWN/EPERM failure and is not represented as fixed by this package.",
+      "changedFiles": [
+        "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
+        "plugins/pipeline-core/scripts/installed-plugin-attestation-host.test.mjs",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs",
+        "evidence/dispatch-record-B8-CLAUDE-DIRECT-20260913.json"
+      ]
+    }
+  }
+}
