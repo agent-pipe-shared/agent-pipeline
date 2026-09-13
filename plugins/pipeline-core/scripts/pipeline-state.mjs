@@ -2517,7 +2517,12 @@ function continuityTransition(sub, base, expectedRevision, request) {
   const featureId = base.activeFeature?.id;
   if (typeof featureId !== "string" || featureId.trim() === "") return { ok: false, code: "PS-CONTINUITY-NO-ACTIVE-FEATURE" };
   if (sub === "continuity-init") {
-    if (expectedRevision !== "absent" || base.continuity !== undefined) return { ok: false, code: "PS-CONTINUITY-STALE" };
+    const isInitialDesign = base.continuity !== undefined
+      && base.continuity.revision === 0
+      && base.activeFeature?.phase === "design"
+      && base.planApproved === false
+      && base.planSubmission === undefined;
+    if (expectedRevision !== "absent" || (base.continuity !== undefined && !isInitialDesign)) return { ok: false, code: "PS-CONTINUITY-STALE" };
     const valid = validateContinuityState(request, featureId);
     return valid.ok && request.revision === 0
       ? { ok: true, code: "PS-CONTINUITY-INITIALIZED", state: structuredClone(request), mutated: true }
@@ -8272,11 +8277,77 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const timestamp = now();
+
+      let prdSha256 = null;
+      let specSha256 = null;
+      let resolvedSpecPath = flags["spec-path"] ?? (dirname(planPath) === "." ? "spec.md" : join(dirname(planPath), "spec.md").split(sep).join("/"));
+
+      const auth = poGateAuthority({ repoRoot: dir });
+      if (auth?.ok && auth.value?.planPath === planPath) {
+        resolvedSpecPath = auth.value.specPath;
+        prdSha256 = auth.value.planSha256;
+        specSha256 = auth.value.specSha256;
+      }
+      const readFile = deps.readFile ?? readFileSync;
+      if (!prdSha256) {
+        try {
+          const content = readFile(resolve(dir, planPath));
+          prdSha256 = createHash("sha256").update(content).digest("hex");
+        } catch {
+          prdSha256 = "0".repeat(64);
+        }
+      }
+      if (!specSha256) {
+        try {
+          const content = readFile(resolve(dir, resolvedSpecPath));
+          specSha256 = createHash("sha256").update(content).digest("hex");
+        } catch {
+          specSha256 = "0".repeat(64);
+        }
+      }
+
+      const initialContinuity = {
+        schema: "pipeline.continuity.v0",
+        featureId: id,
+        revision: 0,
+        runtime: {
+          humanFacingLanguage: "en",
+          activeDuty: "Coordinator",
+          sessionCleanup: null,
+        },
+        authority: {
+          prd: { path: planPath, sha256: prdSha256 },
+          spec: { path: resolvedSpecPath, sha256: specSha256 },
+          result: null,
+        },
+        queueHead: {
+          packageId: "continuity-adoption",
+          actionId: "review-active-feature",
+          nextAction: "review",
+          productRetryCount: 0,
+          environmentRerouteCount: 0,
+          dispatch: null,
+        },
+        blocker: null,
+        acknowledgedFinal: null,
+        resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+        recovery: null,
+        decisionTxn: null,
+        closeTransition: null,
+        capacity: {
+          concurrencyLimit: 4,
+          reservedCriticSlots: 1,
+          reservedRecoverySlots: 1,
+          fallbackPolicy: "defer",
+        },
+      };
+
       const next = {
         ...base,
         schema: SCHEMA_ID,
         activeFeature: { id, planPath, phase: "design" },
         planApproved: false,
+        continuity: initialContinuity,
         updatedAt: timestamp,
       };
       delete next.planApproval;
@@ -8378,7 +8449,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // onboarding staging directory carries its own "not yet bound as
       // project authority" banner -- submit-plan must not bind it as
       // authority regardless of what else checks out.
-      const submitStagingRefusal = refusePlanAuthorityStagingPath({ rootDir: dir, planPath: authority.value.planPath, specPath: authority.value.specPath });
+      const submitStagingRefusal = refusePlanAuthorityStagingPath({
+        rootDir: dir,
+        planPath: authority.value.planPath,
+        specPath: authority.value.specPath,
+        readFileFn: deps.readFile ?? readFileSync,
+      });
       if (!submitStagingRefusal.ok) {
         console.error(`Error: submit-plan blocked by ${submitStagingRefusal.code}: ${submitStagingRefusal.message}`);
         return 2;
@@ -8707,7 +8783,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // depth -- a submission bound before this bolt existed, or written by
       // any other path, must not be approvable while its authority still
       // resolves inside the onboarding staging directory).
-      const approveStagingRefusal = refusePlanAuthorityStagingPath({ rootDir: dir, planPath: authority.value.planPath, specPath: authority.value.specPath });
+      const approveStagingRefusal = refusePlanAuthorityStagingPath({
+        rootDir: dir,
+        planPath: authority.value.planPath,
+        specPath: authority.value.specPath,
+        readFileFn: deps.readFile ?? readFileSync,
+      });
       if (!approveStagingRefusal.ok) {
         console.error(`Error: approve-plan blocked by ${approveStagingRefusal.code}: ${approveStagingRefusal.message}`);
         return 2;

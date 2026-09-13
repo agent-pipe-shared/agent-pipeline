@@ -868,12 +868,19 @@ function boundAuthorityDocumentPath(root, requested) {
     }
     if (state === null || typeof state !== "object" || Array.isArray(state)) return null;
     if (state.planInvalidation !== null && typeof state.planInvalidation === "object") return null;
+    if (state.activeFeature?.phase === "design" && state.planApproved !== true) return null;
     const authority = state.continuity?.authority;
     if (authority === null || typeof authority !== "object") return null;
     const prdPath = authority.prd?.path;
     const specPath = authority.spec?.path;
     if (typeof prdPath !== "string" || prdPath === "" || typeof specPath !== "string" || specPath === "") return null;
-    const candidates = [prdPath, specPath, join(dirname(specPath), "design-input.md")];
+    const candidates = [
+      prdPath,
+      specPath,
+      join(dirname(specPath), "design-input.md"),
+      state.planApproval?.poGateAuthority?.planPath,
+      state.planApproval?.poGateAuthority?.specPath,
+    ].filter((p) => typeof p === "string" && p !== "");
     for (const candidate of candidates) {
       let candidateAbsolute;
       try {
