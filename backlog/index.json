@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e5c5e675d4d3e2d2237829b4b86024382c82dcdd83062c25baac5e41a6f0718e"
+    "transitionHead": "70de58bddf4bc51c7021f23e08224b3e2d8b1891920135d6faa3ba1952d30a46"
   },
   "counts": {
-    "open": 70,
+    "open": 78,
     "in_progress": 1,
     "closed": 572,
     "rejected": 3,
@@ -64,6 +64,16 @@
       "closureRepository": "self",
       "closureCommit": "615bcd247ccc0f339102d669e5d78cd6e684d874",
       "closureEvidence": "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
+    },
+    {
+      "id": "pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Hit live, 2026-08-27, in the Alfred clone: the sprint-nova-epic discard exposed a 2026-07-31 post-close amendment to the 0.4.7-hotfix Result that had been invisible for four weeks. Full incident narrative: scratch/incident-report.md of that session; durable facts restated here in full.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.a-critic-has-no-writable-location-for-its-own-report",
@@ -160,6 +170,16 @@
       "source": "Measured live, twice, in the 2026-09-01 0.6.0 release range: docs/push-release-flow.md drift caught in commit 62ba638b, docs/adr/0076-global-chat-attributed-unattested-approval-mode.md drift caught in commit 56e91858.",
       "deferred": false,
       "sprint": "nova-b"
+    },
+    {
+      "id": "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Measured 2026-08-27 in the Alfred clone (fresh clone of the Nova line): each missing machine-local artifact surfaced as an isolated refusal at a different lifecycle point, none at bootstrap.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path",
@@ -884,6 +904,16 @@
       "closureEvidence": "backlog/items/2026-08-18-atomic-prd-approval-without-mutation.md"
     },
     {
+      "id": "pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured live 2026-08-28 in the Alfred clone: two attended PO acknowledge ceremonies, the first failing its postimage readback and rolling back, the second succeeding with an explicit --runner flag.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.attestation-git-presence-gate-not-gs8-protected",
       "status": "closed",
       "type": "defect",
@@ -1224,7 +1254,7 @@
       "source": "PO, 2026-08-08, on raising the pipeline-start byte budget 15,000 -> 18,000: optimisation is worth doing, but as an efficiency pass later, when more files still need to become modules — not as a detour inside the 0.5.4 hardening block.",
       "deferred": true,
       "due": "2026-09-05",
-      "sprint": "alfred"
+      "sprint": "nightwing"
     },
     {
       "id": "pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason",
@@ -2048,6 +2078,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
     },
     {
+      "id": "pipeline.critic-dispatches-cannot-persist-their-scratch-notes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Measured twice on 2026-08-27, independently, by both design-review Critic dispatches of the sprint-alfred-epic package (reports persisted under specs/sprint-alfred-epic/evidence/critic/).",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.critic-md-protected-preimage-drift",
       "status": "closed",
       "type": "defect",
@@ -2274,6 +2314,16 @@
       "sprint": "batman"
     },
     {
+      "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured live 2026-08-28 in the Alfred clone, applying the PO's own PRD-gate decisions to the PRD and Spec the gate is about.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.design-to-implementation-path-has-no-driver",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2287,6 +2337,16 @@
       "closureRepository": "self",
       "closureCommit": "d7600de57502e89fc18bb95d2324f02e022e5352",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs"
+    },
+    {
+      "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Hit live, 2026-08-27, in the Alfred clone, executing the epic switch the tool itself directs (discard-feature then set-feature). Reproduced against the source the same session; line references verified.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.discarded-feature-dead-end",
@@ -4915,6 +4975,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
     },
     {
+      "id": "pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Flagged independently by both 2026-08-27 design-review Critics (round 1A finding F1, round 1B finding F10; reports under specs/sprint-alfred-epic/evidence/critic/); scope question resolved against docs/operating-model.md §3.3 in the round-1 response.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.no-sanctioned-way-to-start-over",
       "status": "closed",
       "type": "defect",
@@ -7271,6 +7341,16 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Second measured occurrence, 2026-08-27, in the Alfred clone (submit-plan refused with PLAN-SUBMIT-CONTINUITY-INVALID after a clean set-feature). First occurrence documented in specs/sprint-phoenix-epic/RECOVERY.md (2026-07, 'second integration gap').",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
       "status": "closed",
       "type": "defect",
@@ -7515,7 +7595,7 @@
       "source": "Cross-repo observation from a sibling Phoenix session, relayed by the PO into this Nova session for filing.",
       "deferred": true,
       "due": "2026-09-12",
-      "sprint": "alfred"
+      "sprint": "nightwing"
     },
     {
       "id": "pipeline.stale-worktree-directories-accumulate-with-no-sweep",

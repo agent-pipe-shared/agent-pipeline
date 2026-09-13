@@ -420,9 +420,9 @@ test("source callback emits exactly one closed detached packet-ready observation
   assert.deepEqual(result, expected);
   assert.deepEqual(seen, [expectedSource(fx)]);
   assert.notEqual(seen[0].candidate, result.candidate);
-  assert.deepEqual(Object.keys(result), ["schema", "status", "base", "candidate", "spec", "guardrails", "governance", "evidence", "priorCriticEvidence", "dispatch"]);
-  assert.deepEqual(result.dispatch, { mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
-    spawnAuthorized: false, requiredNextGate: "selected-runner-transport" });
+  assert.deepEqual(Object.keys(result), ["schema", "status", "base", "candidate", "spec", "guardrails", "governance", "requirementTraceability", "evidence", "coordinatorOnly", "dispatch"]);
+  assert.equal(result.dispatch.requiredNextGate, "session-critic-dispatch");
+  assert.equal(result.dispatch.spawnAuthorized, false);
   seen[0].candidate.commit = "0".repeat(40); seen[0].specSha256 = null; seen[0].extra = "synthetic";
   assert.deepEqual(result, expected);
   result.candidate.tree = "f".repeat(40); assert.equal(seen[0].candidate.tree, fx.tree);
@@ -451,16 +451,17 @@ test("actual direct CLI preserves complete packet-ready and representative rejec
 });
 
 test("shared argument parser preserves defaults scalar overwrites arrays and exact flag errors", () => {
-  assert.deepEqual(parseCriticDispatchPreflightArgs([]), { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null });
+  const defaults = { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null, sweepEvidenceTaskId: null };
+  assert.deepEqual(parseCriticDispatchPreflightArgs([]), defaults);
   const argv = ["--root", "first", "--root", "second", "--base", "base", "--candidate", "candidate", "--spec", "spec",
     "--guardrail", "z", "--guardrail", "z", "--evidence", "e", "--evidence", "e", "--prior-critic", "old", "--prior-critic", "new"];
   const before = [...argv];
   assert.deepEqual(parseCriticDispatchPreflightArgs(argv), { guardrailPaths: ["z", "z"], evidencePaths: ["e", "e"],
-    priorCriticEvidencePath: "new", root: "second", base: "base", candidate: "candidate", specPath: "spec" });
+    priorCriticEvidencePath: "new", sweepEvidenceTaskId: null, root: "second", base: "base", candidate: "candidate", specPath: "spec" });
   assert.deepEqual(argv, before);
   // A flag-looking value remains a value exactly as in the original parser.
-  assert.deepEqual(parseCriticDispatchPreflightArgs(["--root", "--base"]), { guardrailPaths: [], evidencePaths: [], priorCriticEvidencePath: null, root: "--base" });
-  for (const flag of ["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic"])
+  assert.deepEqual(parseCriticDispatchPreflightArgs(["--root", "--base"]), { ...defaults, root: "--base" });
+  for (const flag of ["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence"])
     assert.throws(() => parseCriticDispatchPreflightArgs([flag]), { name: "CriticDispatchPreflightError", code: "CDP-ARGUMENT", message: flag + " requires a value." });
   assert.throws(() => parseCriticDispatchPreflightArgs(["--other", "value"]),
     { name: "CriticDispatchPreflightError", code: "CDP-ARGUMENT", message: "Unknown argument: --other" });
@@ -642,4 +643,3 @@ test("callback capture adds no Git operations and candidate never follows later 
   });
   assert.equal(moved, true); assert.deepEqual(seen, [expectedSource(fx)]);
 });
-

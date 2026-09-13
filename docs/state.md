@@ -24,7 +24,44 @@
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
 
-## Current handover — 2026-09-12: Nova-B implementation and deferred native Windows work
+## Current handover — 2026-09-13: Alfred rebased onto current Nova
+
+**Lifecycle phase:** feature `sprint-alfred-epic` · phase `implementation`
+
+`feat/sprint-alfred` has been rebased onto Nova commit
+`d2b1dbfc9f70d1ae45ba036b65968c1d9302e5e4`. The Nova target is an ancestor
+of the rebased branch with zero commits on the Nova-only side. The user's
+explicit governance disposition keeps Nova's Human sequence 12–14 chain and
+Human head 14 (`7d695d1e…`), and removes Alfred's divergent Human events 12–16
+plus the two scanner exceptions that existed only for those discarded events.
+The repository store verifier reports a prefix-valid 14-event Human chain with
+the same sequence-14 digest; completeness remains unknown without an
+independent external checkpoint.
+
+The only substantive code overlap combined Nova's current-artifact scope,
+requirement traceability and evidence sweep with Alfred's synchronous Critic
+preflight observation. The focused interruption/preflight/observer set passes
+127/127 outside the process sandbox. The CLI argument-error containment found
+during that integration is corrected. Backlog reconciliation recorded eight
+pre-existing Alfred item states that were missing from Nova's transition
+projection; current generated counts are 78 open, 1 in progress, 572 closed and
+3 rejected.
+
+The protected Verify registration check now has exactly one finding:
+`plugins/pipeline-core/scripts/observe-critic-preflight.test.mjs` is
+unregistered. It has no honoured or expired exclusion. Registration must use
+the repository's current author-repair/TP-3 route; no gate bypass or signature
+is presumed. C1 completion, diagnostics/reporting, real collection and its
+non-backdated 14-day baseline remain open. Full Verify and independent T1
+review are not yet current for this rebased candidate.
+
+Continue approved Alfred work locally and collect genuine PO decisions in
+`specs/sprint-alfred-epic/evidence/po-decision-queue.md`. The installed-plugin
+attestation still requires the separately supplied user-terminal command; no
+installed-state success is claimed here. Agents must not push, release, or
+replace the installed plugin.
+
+## Earlier handover — 2026-09-12: Nova-B implementation and deferred native Windows work
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
 

@@ -447,25 +447,26 @@ export function parseCriticDispatchPreflightArgs(argv) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  const args = parseCriticDispatchPreflightArgs(process.argv.slice(2));
-  if (args.sweepEvidenceTaskId !== null) {
-    try {
+  const argv = process.argv.slice(2);
+  try {
+    const args = parseCriticDispatchPreflightArgs(argv);
+    if (args.sweepEvidenceTaskId !== null) {
       const result = enumerateEvidenceArtifacts({ root: args.root, taskId: args.sweepEvidenceTaskId });
       process.stdout.write(`${JSON.stringify(result)}\n`);
-    } catch (error) {
-      const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
-      process.stderr.write(`${JSON.stringify({ schema: EVIDENCE_SWEEP_SCHEMA, status: "rejected", code })}\n`);
-      process.exitCode = 1;
-    }
-  } else {
-    try {
+    } else {
       const result = preflightCriticDispatch(args);
       process.stdout.write(`${JSON.stringify(result)}\n`);
-    } catch (error) {
-      const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
-      const details = error instanceof CriticDispatchPreflightError ? error.details : null;
-      process.stderr.write(`${JSON.stringify({ schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA, status: "rejected", code, ...(details ?? {}) })}\n`);
-      process.exitCode = 1;
     }
+  } catch (error) {
+    const code = error instanceof CriticDispatchPreflightError ? error.code : "CDP-UNEXPECTED";
+    const details = error instanceof CriticDispatchPreflightError ? error.details : null;
+    const sweep = argv.includes("--sweep-evidence");
+    process.stderr.write(`${JSON.stringify({
+      schema: sweep ? EVIDENCE_SWEEP_SCHEMA : CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+      status: "rejected",
+      code,
+      ...(!sweep && details !== null ? details : {}),
+    })}\n`);
+    process.exitCode = 1;
   }
 }
