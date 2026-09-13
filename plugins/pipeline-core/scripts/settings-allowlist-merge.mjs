@@ -56,7 +56,12 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA = "pipeline.settings-allowlist-merge-plan.v1";
 export const SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA = "pipeline.settings-allowlist-merge-apply.v1";
-const TARGET_RELATIVE = ".claude/settings.json";
+// The project settings file is committed policy.  Cache-versioned runner paths
+// are machine state, so they belong in the ignored local overlay instead.  A
+// plugin refresh must never mutate a tracked project file merely to admit the
+// newly installed script directory.
+export const PROJECT_SETTINGS_TARGET_RELATIVE = ".claude/settings.json";
+export const RUNNER_PERMISSIONS_TARGET_RELATIVE = ".claude/settings.local.json";
 const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
 
 export function pipelineScriptsRunnerAllowlistEntries(scriptsDirAbsolute = SCRIPTS_DIR) {
@@ -126,13 +131,19 @@ function selectedCandidates(candidateSet) {
     : PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES;
 }
 
+function targetForCandidateSet(candidateSet) {
+  return candidateSet === "runner-permissions"
+    ? RUNNER_PERMISSIONS_TARGET_RELATIVE
+    : PROJECT_SETTINGS_TARGET_RELATIVE;
+}
+
 function candidateSummaries(candidateSet) {
   return selectedCandidates(candidateSet).map(({ id, pattern, cliScript, scope, guardVerification }) => ({ id, pattern, cliScript, scope, guardVerification }));
 }
 
 /**
  * Read-only. Never writes. Computes what `apply` WOULD change in
- * `<rootDir>/.claude/settings.json`: which of the plugin-owned candidate entries are
+ * the candidate set's owned settings target: which of the plugin-owned candidate entries are
  * already present, which are missing, and the exact proposed after-bytes -- so a caller
  * (a human, or a report written by one) can review the full diff without ever calling
  * `applySettingsAllowlistMerge`.
@@ -140,7 +151,8 @@ function candidateSummaries(candidateSet) {
 export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateSet = "legacy", deps: overrides = {} } = {}) {
   const fs = { ...defaultDeps(), ...overrides };
   const root = resolve(rootDir);
-  const targetPath = join(root, TARGET_RELATIVE);
+  const target = targetForCandidateSet(candidateSet);
+  const targetPath = join(root, target);
   const selected = selectedCandidates(candidateSet);
   const candidates = candidateSummaries(candidateSet);
 
@@ -151,8 +163,8 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateS
       raw = fs.readFileSync(targetPath, "utf8");
     } catch (error) {
       return {
-        schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target: TARGET_RELATIVE,
-        diagnostics: [diagnostic("$.target", "target_unreadable", error.message, "repair filesystem access to .claude/settings.json and re-plan")],
+        schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target,
+        diagnostics: [diagnostic("$.target", "target_unreadable", error.message, `repair filesystem access to ${target} and re-plan`)],
       };
     }
     let parsed;
@@ -160,14 +172,14 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateS
       parsed = JSON.parse(raw);
     } catch (error) {
       return {
-        schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target: TARGET_RELATIVE,
-        diagnostics: [diagnostic("$.target", "target_invalid_json", `existing .claude/settings.json is not valid JSON: ${error.message}`, "repair the file by hand; this mechanism will not blind-overwrite invalid JSON")],
+        schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target,
+        diagnostics: [diagnostic("$.target", "target_invalid_json", `existing ${target} is not valid JSON: ${error.message}`, "repair the file by hand; this mechanism will not blind-overwrite invalid JSON")],
       };
     }
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {
-        schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target: TARGET_RELATIVE,
-        diagnostics: [diagnostic("$.target", "target_invalid_shape", "existing .claude/settings.json is not a JSON object", "repair the file by hand")],
+        schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target,
+        diagnostics: [diagnostic("$.target", "target_invalid_shape", `existing ${target} is not a JSON object`, "repair the file by hand")],
       };
     }
     before = { present: true, bytes: raw, sha256: sha256(raw), parsed };
@@ -178,14 +190,14 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateS
     || typeof before.parsed.permissions !== "object"
     || Array.isArray(before.parsed.permissions))) {
     return {
-      schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target: TARGET_RELATIVE,
+      schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target,
       diagnostics: [diagnostic("$.permissions", "permissions_invalid_shape", "existing permissions must be a JSON object", "repair permissions by hand; this mechanism will not replace an existing value")],
     };
   }
   const existingPermissions = hasPermissions ? before.parsed.permissions : {};
   if (Object.hasOwn(existingPermissions, "allow") && !Array.isArray(existingPermissions.allow)) {
     return {
-      schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target: TARGET_RELATIVE,
+      schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "unrepairable", root, target,
       diagnostics: [diagnostic("$.permissions.allow", "permissions_allow_invalid_shape", "existing permissions.allow must be an array", "repair permissions.allow by hand; this mechanism will not replace an existing value")],
     };
   }
@@ -203,7 +215,7 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateS
 
   if (added.length === 0) {
     return {
-      schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "no-op", root, target: TARGET_RELATIVE,
+      schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "no-op", root, target,
       before: beforeSummary, candidates, added, skipped, after: null, planSha256: null, diagnostics: [],
     };
   }
@@ -216,10 +228,10 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateS
   const afterBytes = `${JSON.stringify(afterParsed, null, 2)}\n`;
   const after = { bytes: afterBytes, sha256: sha256(afterBytes), byteLength: Buffer.byteLength(afterBytes, "utf8") };
 
-  const planSha256 = sha256(JSON.stringify(stable({ root, target: TARGET_RELATIVE, before: beforeSummary, added, skipped, after: { sha256: after.sha256, byteLength: after.byteLength } })));
+  const planSha256 = sha256(JSON.stringify(stable({ root, target, before: beforeSummary, added, skipped, after: { sha256: after.sha256, byteLength: after.byteLength } })));
 
   return {
-    schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "ready", root, target: TARGET_RELATIVE,
+    schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "ready", root, target,
     before: beforeSummary, candidates, added, skipped, after, planSha256, diagnostics: [],
   };
 }
@@ -234,7 +246,7 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateS
 export function applySettingsAllowlistMerge({ rootDir = process.cwd(), candidateSet = "legacy", planSha256, activate = false, deps: overrides = {} } = {}) {
   if (!activate) {
     return {
-      schema: SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA, status: "activation-required", root: resolve(rootDir), target: TARGET_RELATIVE,
+      schema: SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA, status: "activation-required", root: resolve(rootDir), target: targetForCandidateSet(candidateSet),
       diagnostics: [diagnostic("$.activate", "activation_required", "apply requires explicit activation", "review the plan's proposed diff, then pass --activate only after explicit human review")],
     };
   }
@@ -254,7 +266,7 @@ export function applySettingsAllowlistMerge({ rootDir = process.cwd(), candidate
   }
 
   const root = plan.root;
-  const targetPath = join(root, TARGET_RELATIVE);
+  const targetPath = join(root, plan.target);
   const nowPresent = fs.existsSync(targetPath);
   const nowSha256 = nowPresent ? sha256(fs.readFileSync(targetPath, "utf8")) : null;
   if (nowSha256 !== plan.before.sha256) {
@@ -264,7 +276,7 @@ export function applySettingsAllowlistMerge({ rootDir = process.cwd(), candidate
     };
   }
 
-  const tempPath = join(root, ".claude", `.settings-allowlist-merge-${randomBytes(8).toString("hex")}.tmp`);
+  const tempPath = join(dirname(targetPath), `.settings-allowlist-merge-${randomBytes(8).toString("hex")}.tmp`);
   try {
     fs.writeFileSync(tempPath, plan.after.bytes, { encoding: "utf8", mode: 0o600 });
     fs.renameSync(tempPath, targetPath);
@@ -299,7 +311,9 @@ function usage() {
     "",
     "Read-only `plan` proposes the plugin-owned Pipeline-CLI allowlist entries",
     "(backlog/items/2026-08-08-the-harness-classifier-blocks-the-onboarding-action-the-pipeline-just-authorized.md)",
-    "for <dir>/.claude/settings.json without writing anything. `apply` writes only when",
+    "for the candidate set's settings target without writing anything. Legacy project policy uses",
+    "<dir>/.claude/settings.json; runner permissions use ignored <dir>/.claude/settings.local.json.",
+    "`apply` writes only when",
     "given the exact --plan-sha256 a fresh plan produces AND --activate; both are required.",
   ].join("\n");
 }

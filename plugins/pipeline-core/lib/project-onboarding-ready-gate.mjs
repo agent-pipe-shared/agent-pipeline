@@ -10,6 +10,7 @@ import {
   PROJECT_ONBOARDING_BASE_RESULT_KEYS,
   PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS,
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
+  RUNNER_PERMISSIONS_TARGET,
 } from "./project-onboarding-v3.mjs";
 import { isSessionCapabilityFailurePhase } from "./codex-onboarding-capabilities.mjs";
 
@@ -125,7 +126,7 @@ function safeLifecycleStatus(value) {
 
 function validRunnerPermissions(value, runner, repository) {
   if (!exactKeys(value, ["target", "status", "lanes", "exactEntries"])
-    || value.target !== ".claude/settings.json"
+    || ![RUNNER_PERMISSIONS_TARGET, ".claude/settings.json"].includes(value.target)
     || !Array.isArray(value.lanes)
     || !Array.isArray(value.exactEntries)) return false;
   if (value.status === "not-applicable") {

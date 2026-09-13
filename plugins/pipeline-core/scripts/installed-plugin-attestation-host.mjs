@@ -268,12 +268,28 @@ export function resolveClaudeRegistryBinding({
     const installPath = matches[0].installPath;
     if (installPath !== undefined && (typeof installPath !== "string" || !isAbsolute(installPath)
       || resolve(installPath) !== installPath)) return null;
+    const marketplaceInfo = lstatSync(marketplacePluginRoot, { bigint: true });
+    const loadedInfo = lstatSync(loadedPluginRoot, { bigint: true });
+    if (!marketplaceInfo.isDirectory() || marketplaceInfo.isSymbolicLink()
+      || !loadedInfo.isDirectory() || loadedInfo.isSymbolicLink()) return null;
+    // Claude may report a retained cache mirror in installPath while it is
+    // executing the plugin directly from the registered directory source.
+    // The actual script URL is the observed loaded root.  When that root is
+    // exactly the registered non-symlink marketplace root, it is the direct
+    // topology and the cache metadata must not make the reachable direct path
+    // disappear.  For every non-direct topology, installPath remains an exact
+    // physical-root cross-check before a receipt can be considered.
+    if (marketplacePluginRoot === loadedPluginRoot) {
+      if (typeof installPath === "string") {
+        const cacheInfo = lstatSync(realpathSync(installPath), { bigint: true });
+        if (!cacheInfo.isDirectory() || cacheInfo.isSymbolicLink()) return null;
+      }
+      return { installedPluginRoot: loadedPluginRoot, marketplacePluginRoot };
+    }
     const installedRoot = typeof installPath === "string" ? realpathSync(installPath) : loadedPluginRoot;
     if (installedRoot !== loadedPluginRoot) return null;
-    const marketplaceInfo = lstatSync(marketplacePluginRoot, { bigint: true });
     const installedInfo = lstatSync(installedRoot, { bigint: true });
-    if (!marketplaceInfo.isDirectory() || marketplaceInfo.isSymbolicLink()
-      || !installedInfo.isDirectory() || installedInfo.isSymbolicLink()) return null;
+    if (!installedInfo.isDirectory() || installedInfo.isSymbolicLink()) return null;
     return { installedPluginRoot: installedRoot, marketplacePluginRoot };
   } catch { return null; }
 }
@@ -281,10 +297,18 @@ export function resolveClaudeRegistryBinding({
 /** Resolve the exact Antigravity path registration selecting this loaded plugin. */
 export function resolveAntigravityRegistryInstalledRoot({ installedPluginRoot, registryPayloads = [] } = {}) {
   try {
+    const loadedRoot = realpathSync(installedPluginRoot);
+    const loadedInfo = lstatSync(loadedRoot, { bigint: true });
+    if (!loadedInfo.isDirectory() || loadedInfo.isSymbolicLink()) return null;
     const roots = registryPayloads.flatMap((payload) => JSON.parse(payload)?.entries ?? [])
       .filter((entry) => exact(entry, ["path"]) && typeof entry.path === "string" && isAbsolute(entry.path))
-      .map((entry) => realpathSync(resolve(entry.path)))
-      .filter((path) => path === realpathSync(installedPluginRoot));
+      .map((entry) => {
+        const configuredPath = resolve(entry.path);
+        const configuredInfo = lstatSync(configuredPath, { bigint: true });
+        if (!configuredInfo.isDirectory() || configuredInfo.isSymbolicLink()) return null;
+        return realpathSync(configuredPath);
+      })
+      .filter((path) => path === loadedRoot);
     return roots.length === 1 ? roots[0] : null;
   } catch { return null; }
 }

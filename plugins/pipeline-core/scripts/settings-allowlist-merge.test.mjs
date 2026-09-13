@@ -30,6 +30,7 @@ function freshDir(prefix) {
 }
 
 function settingsPath(dir) { return join(dir, ".claude", "settings.json"); }
+function localSettingsPath(dir) { return join(dir, ".claude", "settings.local.json"); }
 
 function invoke(args) {
   let output = "";
@@ -156,11 +157,11 @@ test("plan and apply preserve present non-object permissions and non-array permi
     const dir = freshDir(fixture.label);
     try {
       const bytes = `${JSON.stringify({ unrelated: true, ...fixture.value }, null, 2)}\n`;
-      writeFileSync(settingsPath(dir), bytes, "utf8");
+      writeFileSync(localSettingsPath(dir), bytes, "utf8");
       const plan = planSettingsAllowlistMerge({ rootDir: dir, candidateSet: "runner-permissions" });
       assert.equal(plan.status, "unrepairable", fixture.label);
       assert.equal(plan.diagnostics[0].code, fixture.code, fixture.label);
-      assert.equal(readFileSync(settingsPath(dir), "utf8"), bytes, `${fixture.label}: plan changed bytes`);
+      assert.equal(readFileSync(localSettingsPath(dir), "utf8"), bytes, `${fixture.label}: plan changed bytes`);
       const applied = applySettingsAllowlistMerge({
         rootDir: dir,
         candidateSet: "runner-permissions",
@@ -169,10 +170,33 @@ test("plan and apply preserve present non-object permissions and non-array permi
       });
       assert.equal(applied.status, "unrepairable", fixture.label);
       assert.equal(applied.diagnostics[0].code, fixture.code, fixture.label);
-      assert.equal(readFileSync(settingsPath(dir), "utf8"), bytes, `${fixture.label}: apply changed bytes`);
+      assert.equal(readFileSync(localSettingsPath(dir), "utf8"), bytes, `${fixture.label}: apply changed bytes`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  }
+});
+
+test("runner permissions are written only to ignored local settings and never dirty project policy", () => {
+  const dir = freshDir("runner-local-target");
+  try {
+    const committedBytes = `${JSON.stringify({ permissions: { allow: ["Bash(git push *)"] } }, null, 2)}\n`;
+    writeFileSync(settingsPath(dir), committedBytes, "utf8");
+    const plan = planSettingsAllowlistMerge({ rootDir: dir, candidateSet: "runner-permissions" });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.target, ".claude/settings.local.json");
+    const applied = applySettingsAllowlistMerge({
+      rootDir: dir,
+      candidateSet: "runner-permissions",
+      planSha256: plan.planSha256,
+      activate: true,
+    });
+    assert.equal(applied.status, "ready");
+    assert.equal(readFileSync(settingsPath(dir), "utf8"), committedBytes);
+    assert.equal(readFileSync(localSettingsPath(dir), "utf8"), plan.after.bytes);
+    assert.equal(planSettingsAllowlistMerge({ rootDir: dir, candidateSet: "runner-permissions" }).status, "no-op");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

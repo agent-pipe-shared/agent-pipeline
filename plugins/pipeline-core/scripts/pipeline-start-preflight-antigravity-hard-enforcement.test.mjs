@@ -98,24 +98,12 @@ function noSelfApplicationGitScriptUrl(root) {
   return pathToFileURL(join(root, "scripts", "pipeline-start-preflight.mjs")).href;
 }
 
-// Antigravity always consumes the installer-owned receipt for its selected
-// gitless plugin root. Keep that independent gate hermetically ready so these
-// cases measure only the hard-enforcement observation named by the suite.
+// An exact Antigravity registry root is a direct local-development source.
+// Keep its registry binding hermetically ready so these cases measure only the
+// hard-enforcement observation named by the suite.
 function readyAntigravityInstallation(root) {
   return {
     antigravityPluginRegistries: () => [JSON.stringify({ entries: [{ path: root }] })],
-    verifyLocalInstalledPluginReceiptFn(input) {
-      assert.equal(input.provider, "antigravity");
-      assert.equal(input.installedPluginRoot, root);
-      assert.equal(input.registryInstalledPluginRoot, root);
-      return {
-        schema: "pipeline.installed-plugin-attestation-verification.v1",
-        status: "verified",
-        request: { installedContentSha256: "d".repeat(64) },
-        receiptId: "e".repeat(64),
-        externalReceiptIdentitySha256: "f".repeat(64),
-      };
-    },
   };
 }
 

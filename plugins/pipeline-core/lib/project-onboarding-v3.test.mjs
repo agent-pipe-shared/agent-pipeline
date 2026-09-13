@@ -38,6 +38,7 @@ import {
   freshCriticalHumanProofPolicyBytes,
   freshSettingsJsonBytes,
   observeLocalTrustAnchorPointer,
+  expectedPipelineScriptsRunnerAllowlistEntries,
   pipelineScriptsRunnerAllowlistEntries,
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "./project-onboarding-v3.mjs";
@@ -324,6 +325,12 @@ export function initializeRestartRequiredRoot(path, deps = fakeDeps, runner = "c
     runner,
   });
   assert.equal(initialized.status, "restart-required");
+  // The public onboarding driver applies runner permissions before it hands a
+  // completed runtime back to normal lifecycle inspection. Mirror that local,
+  // ignored host artifact in this shared ready-runtime fixture.
+  writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify({
+    permissions: { allow: expectedPipelineScriptsRunnerAllowlistEntries() },
+  }, null, 2)}\n`);
   return readRestartBarrier({ rootDir: path, spawn: fakeGit });
 }
 
@@ -375,6 +382,11 @@ export function completeKickoff(path, goal = "Build a safe project", deps = fake
   });
   assert.equal(result.status, expectedStatus);
   assert.equal(result.continuity.status, "valid");
+  if (result.status === "ready") {
+    writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify({
+      permissions: { allow: expectedPipelineScriptsRunnerAllowlistEntries() },
+    }, null, 2)}\n`);
+  }
   return plan;
 }
 
@@ -5637,6 +5649,13 @@ function initializeClaudeOnboardedRoot(path, deps = fakeDeps) {
   });
   assert.equal(initialized.runner, "claude");
   assert.equal(initialized.status, "intake-required");
+  // Runner paths are machine-local state. The production onboarding-init
+  // driver applies the same digest-bound merge after this lifecycle step;
+  // seed it here so historical ready-state fixtures model that completed
+  // host initialization without putting cache paths in settings.json.
+  writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify({
+    permissions: { allow: expectedPipelineScriptsRunnerAllowlistEntries() },
+  }, null, 2)}\n`);
   return initialized;
 }
 
@@ -6745,7 +6764,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(inspected.status, "portable-seed-required");
     assert.equal(inspected.repository.status, "host-managed");
     assert.deepEqual(inspected.runnerPermissions, {
-      target: ".claude/settings.json",
+      target: ".claude/settings.local.json",
       status: "not-applicable",
       lanes: [],
       exactEntries: [],
@@ -8611,20 +8630,21 @@ test("pipelineScriptsRunnerAllowlistEntries() covers both runner lanes, and both
   ]);
 });
 
-test("fresh lifecycle writes and reports the exact runner permission seed", () => {
+test("fresh lifecycle keeps project settings portable and reports local runner permissions", () => {
   const path = root();
   try {
     initializeClaudeOnboardedRoot(path);
     const expectedBytes = freshSettingsJsonBytes();
     assert.equal(readFileSync(join(path, ".claude", "settings.json"), "utf8"), expectedBytes);
-    const expectedEntries = JSON.parse(expectedBytes).permissions.allow;
+    assert.equal(expectedBytes, "{}\n");
+    const expectedEntries = expectedPipelineScriptsRunnerAllowlistEntries();
     const observed = inspectProjectOnboardingV3({
       rootDir: path,
       deps: fakeDeps,
       runner: "claude",
     });
     assert.deepEqual(observed.runnerPermissions, {
-      target: ".claude/settings.json",
+      target: ".claude/settings.local.json",
       status: "current",
       lanes: ["Bash", "PowerShell"],
       exactEntries: expectedEntries,
@@ -8637,12 +8657,13 @@ test("a ready one-entry consumer receives and completes the authenticated runner
   try {
     initializeClaudeOnboardedRoot(path);
     completeKickoff(path, "Repair runner permissions", fakeDeps, "ready", "claude");
-    const expectedEntries = JSON.parse(freshSettingsJsonBytes()).permissions.allow;
+    const expectedEntries = expectedPipelineScriptsRunnerAllowlistEntries();
     const partial = {
       statusLine: { type: "command", command: "node user-statusline.mjs" },
       permissions: { allow: ["Bash(git status *)", expectedEntries[1]] },
     };
-    writeFileSync(join(path, ".claude", "settings.json"), `${JSON.stringify(partial, null, 2)}\n`);
+    const projectSettingsBytes = readFileSync(join(path, ".claude", "settings.json"), "utf8");
+    writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify(partial, null, 2)}\n`);
 
     const drifted = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
     assert.equal(drifted.status, "projection-drift");
@@ -8653,7 +8674,8 @@ test("a ready one-entry consumer receives and completes the authenticated runner
     assert.equal(applied.status, 0, applied.stderr);
     assert.equal(JSON.parse(applied.stdout).status, "ready");
 
-    const merged = JSON.parse(readFileSync(join(path, ".claude", "settings.json"), "utf8"));
+    assert.equal(readFileSync(join(path, ".claude", "settings.json"), "utf8"), projectSettingsBytes);
+    const merged = JSON.parse(readFileSync(join(path, ".claude", "settings.local.json"), "utf8"));
     assert.deepEqual(merged.statusLine, partial.statusLine);
     assert.equal(merged.permissions.allow.includes("Bash(git status *)"), true);
     for (const entry of expectedEntries) assert.equal(merged.permissions.allow.includes(entry), true, entry);
@@ -8670,7 +8692,7 @@ test("a ready consumer with malformed permission shapes receives only the typed 
     try {
       initializeClaudeOnboardedRoot(path);
       completeKickoff(path, "Reject malformed runner permissions", fakeDeps, "ready", "claude");
-      const settings = join(path, ".claude", "settings.json");
+      const settings = join(path, ".claude", "settings.local.json");
       const bytes = `${JSON.stringify({ unrelated: true, permissions }, null, 2)}\n`;
       writeFileSync(settings, bytes);
       const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });

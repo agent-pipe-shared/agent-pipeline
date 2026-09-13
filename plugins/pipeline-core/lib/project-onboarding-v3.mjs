@@ -77,6 +77,7 @@ import { applyInstall as applyCommitMsgHookInstallOnboarding } from "../scripts/
 import {
   pipelineScriptsRunnerAllowlistEntries as registeredPipelineScriptsRunnerAllowlistEntries,
   planSettingsAllowlistMerge,
+  RUNNER_PERMISSIONS_TARGET_RELATIVE,
   SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA,
 } from "../scripts/settings-allowlist-merge.mjs";
 import { applySessionCleanupRecovery, planSessionCleanupRecovery, SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
@@ -1222,15 +1223,15 @@ export function pipelineScriptsRunnerAllowlistEntries(scriptsDirAbsolute) {
 export function expectedPipelineScriptsRunnerAllowlistEntries() {
   return pipelineScriptsRunnerAllowlistEntries(SCRIPTS_DIR);
 }
-// Materializes `.claude/settings.json`'s fresh-onboarding seed bytes. Kept as
-// its own exported function (mirrors `freshCriticalHumanProofPolicyBytes`,
-// `freshCalibrationBytes` immediately above) so a test can assert on the
-// bytes directly rather than only through the larger `freshBaselines` map.
+// Materializes the committed project settings seed. Runner cache paths are
+// intentionally excluded: they are machine-local permissions materialized via
+// the digest-bound merge into ignored settings.local.json.
 export function freshSettingsJsonBytes() {
-  return `${JSON.stringify({ permissions: { allow: expectedPipelineScriptsRunnerAllowlistEntries() } }, null, 2)}\n`;
+  return "{}\n";
 }
 
-const RUNNER_PERMISSIONS_TARGET = ".claude/settings.json";
+export const RUNNER_PERMISSIONS_TARGET = RUNNER_PERMISSIONS_TARGET_RELATIVE;
+const LEGACY_RUNNER_PERMISSIONS_TARGET = ".claude/settings.json";
 const RUNNER_PERMISSION_LANES = Object.freeze(["Bash", "PowerShell"]);
 
 function runnerPermissionsReadback({ root = null, runner = null, repository = null, fs = null } = {}) {
@@ -1252,7 +1253,21 @@ function runnerPermissionsReadback({ root = null, runner = null, repository = nu
   if (root === null || fs === null) return base;
   try {
     const target = safePath(root, RUNNER_PERMISSIONS_TARGET, fs);
-    if (!fs.existsSync(target)) return { ...base, status: "pending-runtime-initialization" };
+    if (!fs.existsSync(target)) {
+      // Compatibility is read-only: an older project may already hold the
+      // complete exact runner set in committed settings.json. It remains
+      // usable, but never becomes a write target again. Any missing/new cache
+      // path is repaired through settings.local.json only.
+      const legacyTarget = safePath(root, LEGACY_RUNNER_PERMISSIONS_TARGET, fs);
+      if (fs.existsSync(legacyTarget)) {
+        const legacyBytes = decodeUtf8Strict(readBoundPhysicalFile(legacyTarget, fs), "legacy runner permissions target");
+        const legacyAllow = JSON.parse(legacyBytes)?.permissions?.allow;
+        if (Array.isArray(legacyAllow) && exactEntries.every((entry) => legacyAllow.includes(entry))) {
+          return { ...base, target: LEGACY_RUNNER_PERMISSIONS_TARGET, status: "current" };
+        }
+      }
+      return { ...base, status: "pending-runtime-initialization" };
+    }
     const bytes = decodeUtf8Strict(readBoundPhysicalFile(target, fs), "runner permissions target");
     const allow = JSON.parse(bytes)?.permissions?.allow;
     if (!Array.isArray(allow)) return { ...base, status: "drifted" };

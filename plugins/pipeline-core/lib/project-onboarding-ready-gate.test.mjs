@@ -47,7 +47,7 @@ function fieldPlaceholder(key, rootDir, intent, runner) {
     case "continuity": return {};
     case "appServer": return {};
     case "runnerPermissions": return {
-      target: ".claude/settings.json",
+      target: ".claude/settings.local.json",
       status: "current",
       lanes: ["Bash", "PowerShell"],
       exactEntries: expectedPipelineScriptsRunnerAllowlistEntries(),

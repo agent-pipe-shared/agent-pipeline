@@ -20,7 +20,12 @@ import {
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
-import { observeCodexPublicCoreIdentity, observePublicCoreIdentity, observeRunnerPublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import {
+  observeCodexPublicCoreIdentity,
+  observePublicCoreIdentity,
+  observeRunnerPublicCoreIdentity,
+  snapshotPhysicalPluginRoot,
+} from "../lib/public-core-observation.mjs";
 import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
@@ -819,6 +824,51 @@ function publicReasonCodes(observation) {
     : [];
 }
 
+function snapshotReasonCode(error, fallback) {
+  const code = error && typeof error === "object" ? error.code : null;
+  return typeof code === "string" && /^SNT-A2-[A-Z0-9-]{3,80}$/u.test(code) ? code : fallback;
+}
+
+/**
+ * Codex loads a cache copy but its local marketplace registry selects the
+ * physical source directory. For a local-development installation, that
+ * explicit registry selection is the operator authority equivalent to a
+ * Claude/Antigravity direct directory root. It is admitted only when two
+ * complete, non-symlink physical snapshots are byte-identical and their
+ * Codex manifest declares the selected identity. No Git checkout is inferred
+ * and no source path is taken from a consumer project.
+ */
+export function observeCodexRegistryContentBinding({
+  registrySourcePluginRoot,
+  installedPluginRoot,
+  plugin,
+  snapshot = snapshotPhysicalPluginRoot,
+} = {}) {
+  if (typeof registrySourcePluginRoot !== "string" || typeof installedPluginRoot !== "string"
+    || !plugin || plugin.name !== "pipeline-core" || typeof plugin.version !== "string") {
+    return { status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-BINDING-UNAVAILABLE"] };
+  }
+  try {
+    const source = snapshot(registrySourcePluginRoot, { rootCode: "SNT-A2-SOURCE-ROOT-UNSAFE" });
+    const installed = source.root === installedPluginRoot
+      ? source
+      : snapshot(installedPluginRoot, { rootCode: "SNT-A2-INSTALLED-ROOT-UNSAFE" });
+    const sourceManifest = source.files.find((entry) => entry.path === ".codex-plugin/plugin.json");
+    const installedManifest = installed.files.find((entry) => entry.path === ".codex-plugin/plugin.json");
+    if (!sourceManifest || !installedManifest || sourceManifest.sha256 !== installedManifest.sha256
+      || source.contentSha256 !== installed.contentSha256) {
+      return { status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-CONTENT-MISMATCH"] };
+    }
+    const manifest = JSON.parse(Buffer.from(sourceManifest.bytes).toString("utf8"));
+    if (manifest?.name !== plugin.name || manifest?.version !== plugin.version) {
+      return { status: "unavailable", reasonCodes: ["IPA-HOST-REGISTRY-MANIFEST-MISMATCH"] };
+    }
+    return { status: "ready", reasonCodes: [] };
+  } catch (error) {
+    return { status: "unavailable", reasonCodes: [snapshotReasonCode(error, "IPA-HOST-REGISTRY-CONTENT-UNAVAILABLE")] };
+  }
+}
+
 /**
  * The Codex registry selects the marketplace copy. A gitless copy needs a
  * separate, clean Git checkout that observes byte-identically against it;
@@ -929,6 +979,13 @@ export function observePipelineStartPreflight({
       ? resolveCodexRegistrySource({ plugin: { name: "pipeline-core", version }, readPluginList: () => pluginListSnapshot })
       : null
     : null;
+  const codexRegistryContentBinding = version && runner === "codex" && registrySourcePluginRoot !== null
+    ? observeCodexRegistryContentBinding({
+        registrySourcePluginRoot,
+        installedPluginRoot: pluginRoot,
+        plugin: { name: "pipeline-core", version },
+      })
+    : null;
   const registryInstalledPluginRoot = version && runner === "antigravity" && !pluginRootHasSelfApplicationGit(pluginRoot)
     ? resolveAntigravityRegistryInstalledRoot({ installedPluginRoot: pluginRoot, registryPayloads: antigravityPluginRegistries() })
     : null;
@@ -970,14 +1027,16 @@ export function observePipelineStartPreflight({
   const attestationFailed = evaluateSelfApplicationAttestation({
     pluginRoot, runner, version, observe: captureObserve,
   }).failed;
-  // Gitless local-development installs require the external receipt
+  // Gitless copied local-development installs require the external receipt
   // produced by the host install/update coordinator after copy + readback.
-  // Bootstrap only consumes its request-selected receipt and restricted
-  // source locator; it never writes either authority artifact.
+  // A runner's exact, non-symlinked registry root is different: it is the
+  // operator-selected direct development root, not a separate cache/copy, so
+  // it needs no invented source locator or receipt. Bootstrap only consumes
+  // a receipt for the distinct-copy topology; it never writes authority.
   const localInstalledCopy = version && !selfApplicationGit && (
-    runner === "codex" && installedIdentity?.source === "local-development"
+    runner === "codex" && installedIdentity?.source === "local-development" && codexRegistryContentBinding?.status !== "ready"
     || runner === "claude" && installedIdentity?.source === "local-development" && !claudeDirectDirectory
-    || runner === "antigravity"
+    || runner === "antigravity" && registryInstalledPluginRoot === null
   );
   const rawInstalledPluginAttestation = localInstalledCopy
     ? runner === "codex" && registrySourcePluginRoot === null

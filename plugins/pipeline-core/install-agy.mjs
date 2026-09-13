@@ -82,22 +82,12 @@ rl.question(`Use (1) Dev Source (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCA
     }
 
     if (useMarketplace) {
-      let sourcePluginRoot;
-      try { sourcePluginRoot = realpathSync(SCRIPT_DIR); } catch { sourcePluginRoot = null; }
-      if (sourcePluginRoot === null || sourcePluginRoot === realpathSync(corePluginPath)) {
-        console.log("Installation refused: run install-agy.mjs from the source checkout so the copied marketplace tree can be attested.");
-        rl.close();
-        process.exitCode = 2;
-        return;
-      }
-      const attestation = attestAntigravityMarketplaceCopy({ sourcePluginRoot, installedPluginRoot: resolve(corePluginPath) });
-      if (attestation.status !== "written") {
-        console.log(`Installation refused: copied plugin attestation failed (${attestation.reason}).`);
-        rl.close();
-        process.exitCode = 2;
-        return;
-      }
-      console.log(`Installer receipt written: ${attestation.receiptId}`);
+      // Antigravity registers and loads this exact directory.  Unlike a
+      // separate cache copy, the registered physical root is the explicit
+      // operator-selected development source and preflight verifies that
+      // exact non-symlinked binding.  Do not manufacture a second source
+      // locator or require a receipt for this direct-root topology.
+      console.log("Direct local marketplace root selected; registry binding is the provenance boundary.");
     }
 
     writeFileSync(targetFile, JSON.stringify(config, null, 2) + "\n");

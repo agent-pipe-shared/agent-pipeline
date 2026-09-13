@@ -739,7 +739,7 @@ check("the exact runner value prepareNativeCritic sends the gate is accepted by 
         continuity: {},
         appServer: {},
         runnerPermissions: {
-          target: ".claude/settings.json",
+          target: ".claude/settings.local.json",
           status: "current",
           lanes: ["Bash", "PowerShell"],
           exactEntries: expectedPipelineScriptsRunnerAllowlistEntries(),
