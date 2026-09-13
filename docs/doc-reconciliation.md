@@ -47,6 +47,35 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 20114936bc21f0480407cd563b90e44b7eeb5f73 — 2026-09-13, chat-bound plan acknowledgement recovery
+
+- ADR-0010: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0058: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0064: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0072: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+
+The final plan/design acknowledgement is now an explicit PO chat decision
+carried by one exact, digest-bound runner command for Claude, Codex, and
+Antigravity. It neither asks a PO to edit a PRD marker manually nor selects an
+external signer, proof, or trust-policy route. Immediately before replacement,
+the apply still verifies the plan-bound PRD and specification preimages and
+performs the existing atomic write/readback. The older explicit signing API
+remains a compatibility surface, but the non-final lifecycle planner cannot
+select it. Repository-scoped signing resolution and the never-liftable kernel
+closure continue to protect final external-effect ceremonies only.
+
 ## Candidate 87df90a54cb8d6d140a7b3ffdf33df094921e4cb — 2026-09-13, complete repository-scoped acknowledgement signer recovery and kernel closure
 
 - ADR-0010: checked, no change needed.
