@@ -47,6 +47,94 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 42fa136e78228b5ee83c61c6186ebc4f118a53e6 — 2026-09-13, range 3960faa0..42fa136e, Nova B recovery, lifecycle, verification, and governance completion
+
+- ADR-0001: checked, no change needed.
+- ADR-0002: checked, no change needed.
+- ADR-0003: checked, no change needed.
+- ADR-0004: checked, no change needed.
+- ADR-0005: checked, no change needed.
+- ADR-0006: checked, no change needed.
+- ADR-0007: checked, no change needed.
+- ADR-0008: checked, no change needed.
+- ADR-0009: checked, no change needed.
+- ADR-0010: checked, no change needed.
+- ADR-0011: checked, no change needed.
+- ADR-0012: checked, no change needed.
+- ADR-0013: checked, no change needed.
+- ADR-0014: checked, no change needed.
+- ADR-0015: checked, no change needed.
+- ADR-0016: checked, no change needed.
+- ADR-0018: checked, no change needed.
+- ADR-0019: checked, no change needed.
+- ADR-0020: checked, no change needed.
+- ADR-0023: checked, no change needed.
+- ADR-0024: checked, no change needed.
+- ADR-0025: checked, no change needed.
+- ADR-0026: checked, no change needed.
+- ADR-0027: checked, no change needed.
+- ADR-0028: checked, no change needed.
+- ADR-0029: checked, no change needed.
+- ADR-0030: checked, no change needed.
+- ADR-0032: checked, no change needed.
+- ADR-0033: checked, no change needed.
+- ADR-0034: checked, no change needed.
+- ADR-0035: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0038: checked, no change needed.
+- ADR-0040: checked, no change needed.
+- ADR-0041: checked, no change needed.
+- ADR-0042: checked, no change needed.
+- ADR-0043: checked, no change needed.
+- ADR-0044: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0047: checked, no change needed.
+- ADR-0048: checked, no change needed.
+- ADR-0049: checked, no change needed.
+- ADR-0050: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0052: checked, no change needed.
+- ADR-0053: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0058: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0060: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0062: checked, no change needed.
+- ADR-0063: checked, no change needed.
+- ADR-0064: checked, no change needed.
+- ADR-0065: checked, no change needed.
+- ADR-0066: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0068: checked, no change needed.
+- ADR-0069: checked, no change needed.
+- ADR-0070: checked, no change needed.
+- ADR-0071: checked, no change needed.
+- ADR-0072: checked, no change needed.
+- ADR-0073: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0075: checked, no change needed.
+- ADR-0076: checked, no change needed.
+- ADR-0077: checked, no change needed.
+- ADR-0078: checked, no change needed.
+- ADR-0079: checked, no change needed.
+- ADR-0080: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+- ADR-0083: checked, no change needed.
+
+The range implements and verifies existing decisions rather than changing their
+authority: it closes local-marketplace recovery for Codex, Claude, and
+Antigravity; makes the lifecycle's exact read-only and repair paths reachable;
+and completes the already-governed verification, dispatch, worktree, and
+governance action work. The current candidate preserves the existing
+fail-closed provenance, human-signature, runner-boundary, and push-gate
+contracts. No implicated decision requires an amendment.
+
 ## Candidate e7233fe618d6f3fa442e5630e9cbdb536c41c611 — 2026-09-02, range 266d691f..e7233fe6, re-head onto the final candidate: the one additional commit beyond 6a44b152 answers four obligations the full verify surfaced
 
 The five ADRs implicated by this range are the same five, for the same changed
