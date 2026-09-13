@@ -901,14 +901,19 @@ test("driveOnboardingInit: binds a returned root-less project action to the Driv
           },
         });
       }
-      assert.equal(executable, process.execPath);
-      assert.deepEqual(argv, ["/pipeline-state.mjs", "inspect"]);
-      assert.equal(options.env.CLAUDE_PROJECT_DIR, root);
-      return respond({ schema: "pipeline.inspect.v1", status: "ready", nextAction: null });
+      if (calls === 2) {
+        assert.equal(executable, process.execPath);
+        assert.deepEqual(argv, ["/pipeline-state.mjs", "inspect"]);
+        assert.equal(options.env.CLAUDE_PROJECT_DIR, root);
+        return respond({ schema: "pipeline.inspect.v1", status: "ready", nextAction: null });
+      }
+      assert.equal(executable, "node");
+      assert.equal(argv.includes("--root"), true);
+      return respond({ schema: "pipeline.project-onboarding.v4", status: "ready", nextAction: null });
     };
     const result = driveOnboardingInit({ rootDir: root, runner: "codex", run });
     assert.equal(result.outcome, "ready", JSON.stringify(result));
-    assert.equal(calls, 2);
+    assert.equal(calls, 3, "a command's own ready response requires a fresh inspect readback");
   } finally {
     dispose(root);
   }
@@ -1082,11 +1087,13 @@ test("driveOnboardingInit: a command nextAction with no pendingAsks (absent or e
           if (pendingAsks !== undefined) nextAction.pendingAsks = pendingAsks;
           return respond({ schema: "pipeline.synthetic.v1", status: "in-progress", nextAction });
         }
-        return respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null });
+        return step === 2
+          ? respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null })
+          : respond({ schema: "pipeline.project-onboarding.v4", status: "ready", nextAction: null });
       };
       const result = driveOnboardingInit({ rootDir: root, run });
       assert.equal(result.outcome, "ready", JSON.stringify(result));
-      assert.equal(step, 2, "the command must have been executed, exactly as before this change");
+      assert.equal(step, 3, "the command must execute and then receive a fresh inspect readback");
     } finally {
       dispose(root);
     }
@@ -1122,11 +1129,13 @@ test("driveOnboardingInit: malformed pendingAsks does not crash the driver and i
             nextAction: { kind: "command", executable: "node", argv: ["--eval", "0"], pendingAsks: malformed },
           });
         }
-        return respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null });
+        return step === 2
+          ? respond({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null })
+          : respond({ schema: "pipeline.project-onboarding.v4", status: "ready", nextAction: null });
       };
       const result = driveOnboardingInit({ rootDir: root, run });
       assert.equal(result.outcome, "ready", JSON.stringify(result));
-      assert.equal(step, 2, "malformed metadata is not treated as a valid stop-worthy ask -- the command must still execute");
+      assert.equal(step, 3, "malformed metadata is not treated as a valid stop-worthy ask -- the command must execute and re-anchor");
       assert.equal(result.steps[0].pendingAsksFault, "malformed-pending-asks-ignored",
         "the malformed field must be visible on the step record, not silently dropped");
     } finally {

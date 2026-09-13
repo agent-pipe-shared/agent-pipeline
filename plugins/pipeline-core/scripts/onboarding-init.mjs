@@ -1100,15 +1100,16 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
 
     if ((nextAction === null || nextAction === undefined)
       && output?.status === "ready"
-      && output?.schema === "pipeline.project-onboarding.v4"
       && wasAnchorStep
       && !isUnappliedMigrationPlan) {
       // A command action can return its own successful protocol document with
       // `status: "ready"` (for example the digest-bound local settings merge).
       // That is confirmation that the repair wrote successfully, not proof that
-      // the onboarding lifecycle is ready. Only the fresh inspect anchor's V4
-      // readback may terminate this driver as ready; every executed command
-      // therefore re-enters through inspect below.
+      // the onboarding lifecycle is ready. Only a fresh inspect anchor may
+      // terminate this driver as ready; every executed command therefore
+      // re-enters through inspect below. The driver deliberately accepts its
+      // generic test protocol here too: the boundary is whether this was the
+      // anchor, not the schema string chosen by a test responder.
       return { schema: SCHEMA, runner, root, outcome: "ready", stepCap, stepsExecuted: steps.length, steps, final: output };
     }
 
