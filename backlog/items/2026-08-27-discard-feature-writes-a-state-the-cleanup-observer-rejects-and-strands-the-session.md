@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-13
+closure_repository: self
+closure_commit: d590bbfdbdbc3c6e44a6ecf124d6b5015da9f481
+closure_evidence: backlog/evidence/2026-09-13-discard-feature-observer-conformance.md
 created: 2026-08-27
 sprint: alfred
 source: "Hit live, 2026-08-27, in the Alfred clone, executing the epic switch the tool itself directs (discard-feature then set-feature). Reproduced against the source the same session; line references verified."
@@ -88,9 +92,10 @@ Not designed here; three candidate layers, first is the direct fix:
    `damaged`/`malformed` classification of a sanctioned outcome fails the
    suite. This is the mechanical-governance fix; 1 alone fixes one instance.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted for resolution via observer conformance suite and direct observer fix per WP-A5(ii) / PRD §7 AC-3.
+- **Rationale:** `observeSessionCleanupState` in `lib/onboarding-continuity.mjs` was updated to accept `validDiscardedTransitionState` alongside `validClosedTransitionState`, avoiding `SESSION-CLEANUP-STATE-MALFORMED` after `discard-feature`. Full regression prevention is established via an exhaustive observer conformance test suite (`pipeline-state-observer-conformance.test.mjs`) covering all sanctioned lifecycle verbs (`init`, `set-feature`, `submit-plan`, `approve-plan`, `set-phase`, `close-feature`, `discard-feature`).
+- **Assignment:** Alfred team (Goldfish ALF-A5-II-OBSERVER-CONFORMANCE)
+- **Date:** 2026-09-13
+- **Closure:** Closed 2026-09-13 with exhaustive conformance test suite `plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs`, registration in `harness/scripts/verify.mjs`, capability inventory entry, and evidence in `backlog/evidence/2026-09-13-discard-feature-observer-conformance.md`.
