@@ -47,7 +47,7 @@ something to do here without review.
 
 ## Entries
 
-## Candidate 88d7da9236252af5b7d145954ebb7ead80583bae — 2026-09-13, range 3960faa0..88d7da92, Nova B recovery, lifecycle, verification, and governance completion
+## Candidate ed6ec9949605ef7270eae4e4e7ee583fcdc7d6b1 — 2026-09-13, range 3960faa0..ed6ec994, Nova B recovery, lifecycle, verification, governance completion, and release-path friction intake
 
 - ADR-0001: checked, no change needed.
 - ADR-0002: checked, no change needed.
@@ -133,7 +133,11 @@ Antigravity; makes the lifecycle's exact read-only and repair paths reachable;
 and completes the already-governed verification, dispatch, worktree, and
 governance action work. The current candidate preserves the existing
 fail-closed provenance, human-signature, runner-boundary, and push-gate
-contracts. No implicated decision requires an amendment.
+contracts. Its project-local Codex configuration routes boundary approvals to
+the attending human rather than an automatic reviewer; it does not widen the
+sandbox or any guard. The new backlog intake records a future literal
+multiline commit-message ergonomics improvement and changes no governing
+decision. No implicated decision requires an amendment.
 
 ## Candidate e7233fe618d6f3fa442e5630e9cbdb536c41c611 — 2026-09-02, range 266d691f..e7233fe6, re-head onto the final candidate: the one additional commit beyond 6a44b152 answers four obligations the full verify surfaced
 
