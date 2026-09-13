@@ -21,6 +21,7 @@ import {
   resolve,
   sep,
 } from "node:path";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -1648,13 +1649,24 @@ function claudeSessionTranscriptFilePath(input, dependencies = {}) {
 }
 
 /**
- * NVA-B-READCONTAIN-2. Exactly two session-derived read roots, no more: the transcript file
- * itself (claudeSessionTranscriptFilePath() above) and this session's own memory directory
- * (claudeSessionMemoryDirectory(), reused directly rather than re-derived a second way). Each
- * entry is admitted or omitted independently -- a session with a materialized transcript but no
- * memory/ directory yet still gets the transcript exception, and vice versa. Deliberately NOT a
- * module-level constant (unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS): both roots vary per
- * invocation with `input`, so this must be recomputed per call, never cached across commands.
+ * A Claude restart needs bounded access to its prior session records too. The host supplies the
+ * current transcript path; when its real grandparent is the documented projects directory,
+ * that parent is the one runtime-owned Claude session collection boundary. It deliberately does
+ * not include sibling Claude data such as settings, plugins, or credentials.
+ *
+ * A Codex restart also needs bounded access to its prior rollout records. The SessionStart hint
+ * names exactly `$CODEX_HOME/sessions` (or `~/.codex/sessions` when CODEX_HOME is unset), so the
+ * lifecycle gate admits that one realpathed directory only for the Codex runner. This is a
+ * runtime-owned boundary: it is derived from the hook process environment, never from command
+ * text or the project, and it still excludes every sibling under CODEX_HOME (credentials,
+ * settings, plugins, and caches). The restart instruction independently requires project-
+ * identity filtering before a transcript is selected; this guard only makes that documented,
+ * bounded metadata/read workflow executable.
+ *
+ * Together with Claude's exact transcript file and derived memory directory, these are the
+ * session-derived read roots. Each entry is admitted or omitted independently. Deliberately NOT
+ * a module-level constant (unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS): both Claude roots vary per
+ * invocation with `input`, while the Codex root varies with the trusted hook environment.
  *
  * Deliberately excludes the `/tmp` task-output directory a dispatched subagent's own output
  * lands in: that location is not carried in any PreToolUse hook field, and admitting it would
@@ -1662,12 +1674,45 @@ function claudeSessionTranscriptFilePath(input, dependencies = {}) {
  * id, `tasks/`) -- the exact "guessed rather than resolved" shape this function, and MEMPATH-1
  * before it, both refuse to do. That need stays out of scope for this function.
  */
+function codexSessionReadDirectory(dependencies = {}) {
+  if (dependencies.runner !== "codex") return null;
+  const env = dependencies.env ?? process.env;
+  const codexHome = typeof env?.CODEX_HOME === "string" && env.CODEX_HOME.trim() !== ""
+    ? env.CODEX_HOME
+    : join(homedir(), ".codex");
+  if (!isAbsolute(codexHome) || codexHome.includes("\0")) return null;
+  try {
+    const sessions = realpathSync(join(codexHome, "sessions"));
+    return statSync(sessions).isDirectory() ? sessions : null;
+  } catch {
+    return null;
+  }
+}
+
+function claudeSessionReadDirectory(input, dependencies = {}) {
+  if (dependencies.runner !== "claude") return null;
+  const transcript = claudeSessionTranscriptFilePath(input, dependencies);
+  if (transcript === null) return null;
+  const sessions = dirname(dirname(transcript));
+  if (basename(sessions) !== "projects") return null;
+  try {
+    const real = realpathSync(sessions);
+    return statSync(real).isDirectory() ? real : null;
+  } catch {
+    return null;
+  }
+}
+
 function sessionReadScopeRoots(input, dependencies = {}) {
   const roots = [];
   const transcriptFile = claudeSessionTranscriptFilePath(input, dependencies);
   if (transcriptFile !== null) roots.push(transcriptFile);
   const memoryDir = claudeSessionMemoryDirectory(input, dependencies);
   if (memoryDir !== null) roots.push(memoryDir);
+  const claudeSessions = claudeSessionReadDirectory(input, dependencies);
+  if (claudeSessions !== null) roots.push(claudeSessions);
+  const codexSessions = codexSessionReadDirectory(dependencies);
+  if (codexSessions !== null) roots.push(codexSessions);
   return roots;
 }
 
@@ -1951,6 +1996,38 @@ function isValidPipelineGrepArgs(argv) {
   return !argv.some((arg) => arg === "--files-with-matches");
 }
 
+function isValidScopedPipelineGrepSourceArgs(argv, root, extraRoots) {
+  if (!isValidPipelineGrepArgs(argv)) return false;
+  const booleanShortFlags = new Set(["n", "r", "R", "i", "v", "E", "F", "G", "w", "x", "c", "l", "L", "q", "s", "H", "h", "o", "a", "I", "z", "b", "T", "Z"]);
+  const valueOptions = new Set([
+    "-e", "--regexp", "-f", "--file", "-m", "--max-count", "-A", "--after-context",
+    "-B", "--before-context", "-C", "--context", "--color", "--binary-files", "--directories",
+    "--exclude", "--exclude-from", "--include", "--label",
+  ]);
+  let patternSeen = false;
+  let afterDashDash = false;
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (!afterDashDash && arg === "--") { afterDashDash = true; continue; }
+    if (!afterDashDash && arg.startsWith("-")) {
+      if (valueOptions.has(arg)) {
+        const value = argv[index + 1];
+        if (typeof value !== "string" || value === "" || value.startsWith("-")) return false;
+        if (["-f", "--file", "--exclude-from"].includes(arg)
+          && !isApprovedSingleCommandReadArg(value, root, extraRoots)) return false;
+        if (["-e", "--regexp"].includes(arg)) patternSeen = true;
+        index += 1;
+        continue;
+      }
+      if (arg.length < 2 || [...arg.slice(1)].some((flag) => !booleanShortFlags.has(flag))) return false;
+      continue;
+    }
+    if (!patternSeen) { patternSeen = true; continue; }
+    if (!isApprovedSingleCommandReadArg(arg, root, extraRoots)) return false;
+  }
+  return patternSeen;
+}
+
 // Shared by every bounded-pipeline SINK ending in `head`: the exact two-token `-n N` shape
 // (N in the same canonical 1..500 range guard-command-grammar.mjs's rg-to-head pipeline
 // uses) isBoundedGrepPipeline already enforced inline.
@@ -1985,7 +2062,7 @@ function isValidPipelineHeadArgs(argv) {
  * (`--files-with-matches` excluded) -- this recognizes the SAME already-safe
  * command now composed via one bounded pipe, nothing more permissive.
  */
-function isBoundedGrepPipeline(parsed, root) {
+function isBoundedGrepPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE_ADDITIONAL_ROOTS) {
   if (!parsed || parsed.parseStatus !== "accepted"
     || parsed.segments.length !== 2
     || parsed.operators.length !== 1
@@ -1995,7 +2072,7 @@ function isBoundedGrepPipeline(parsed, root) {
   const expectedGrep = windows ? "grep.exe" : "grep";
   const sourceName = basename(parsed.segments[0].executable).toLowerCase();
   if (sourceName !== expectedGrep) return false;
-  if (!isValidPipelineGrepArgs(parsed.segments[0].argv)) return false;
+  if (!isValidScopedPipelineGrepSourceArgs(parsed.segments[0].argv, root, extraRoots)) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   if (sinkName === expectedGrep) {
     return parsed.redirects.length === 0 && isValidPipelineGrepArgs(parsed.segments[1].argv);
@@ -2181,7 +2258,13 @@ function rawReadCandidatePath(value, root) {
 // keeps its own copy rather than merging the two, a different pipeline family from the
 // single-command shape (pipeline.read-scope-single-command-root-check).
 function isApprovedCatPipelineReadPath(value, root, extraRoots = []) {
-  return typeof value === "string" && value !== "" && !value.includes("\0");
+  const path = commandPath(value, root);
+  if (path === null) return false;
+  const candidate = rawReadCandidatePath(value, root);
+  return candidate !== null
+    && [root, ...extraRoots].some((boundary) => typeof boundary === "string"
+      && boundary !== ""
+      && isRealpathedWithinBoundary(candidate, boundary));
 }
 
 // cat's argv, source side: zero or more CAT_PIPELINE_DISPLAY_FLAGS entries (an optional `--`
@@ -2633,7 +2716,12 @@ function isReadOnlyDiagnosticCommandWithTrailingStderrRedirect(command, root, ex
  * against).
  */
 function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
-  return typeof arg === "string" && !arg.includes("\0");
+  if (commandPath(arg, root) === null) return true;
+  const candidate = rawReadCandidatePath(arg, root);
+  return candidate !== null
+    && [root, ...extraRoots].some((boundary) => typeof boundary === "string"
+      && boundary !== ""
+      && isRealpathedWithinBoundary(candidate, boundary));
 }
 
 /**
@@ -2747,7 +2835,7 @@ export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   const pipelineRoots = [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots];
   if (isBoundedReadOnlyPipeline(parsed, root, pipelineRoots)) return true;
-  if (isBoundedGrepPipeline(parsed, root)) return true;
+  if (isBoundedGrepPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedCatPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedGitPipeline(parsed, root, pipelineRoots)) return true;
   if (isBoundedReadOnlyNewlineChain(command, root, extraRoots)) return true;
@@ -3000,14 +3088,18 @@ function hasExternalOutputRedirect(command, root) {
  */
 export function isOutsideRootBoundedDiagnosticRead(parsed, root) {
   if (!parsed || parsed.parseStatus !== "accepted") return false;
-  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
+  const isBoundedRead = (roots) => isBoundedReadOnlyPipeline(parsed, root, roots)
+    || isBoundedGrepPipeline(parsed, root, roots)
+    || isBoundedCatPipeline(parsed, root, roots)
+    || isBoundedGitPipeline(parsed, root, roots);
+  if (isBoundedRead(BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   const scopeLifted = parsed.segments.flatMap((segment) => segment.argv
     .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))
     .map((token) => {
       try { return rawReadCandidatePath(token, root); } catch { return null; }
     })
     .filter((value) => value !== null));
-  return isBoundedReadOnlyPipeline(parsed, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted]);
+  return isBoundedRead([...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted]);
 }
 
 /**

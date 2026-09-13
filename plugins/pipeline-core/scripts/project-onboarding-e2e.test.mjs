@@ -897,8 +897,16 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         tool_name: "Bash",
         tool_input: { command: `rg --files -uu '${source}' | rg 'existing-private'` },
       }, { projectDir: path, runner });
-      assert.deepEqual(externalInventory, { exitCode: 0, stderr: "" },
-        `${runner}: closed passive inventory reads use host filesystem visibility`);
+      assert.equal(externalInventory.exitCode, 2,
+        `${runner}: arbitrary host inventory reads stay outside the bounded read scope`);
+      assert.match(externalInventory.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u,
+        `${runner}: the external read must receive the precise scope denial`);
+      const projectInventory = evaluateLifecycleReadyGuard({
+        tool_name: "Bash",
+        tool_input: { command: "rg --files -uu . | rg 'pipeline-state'" },
+      }, { projectDir: path, runner });
+      assert.deepEqual(projectInventory, { exitCode: 0, stderr: "" },
+        `${runner}: the identical bounded inventory remains available within the project`);
 
       // The hook script is necessarily a nested Node process. Exercise its
       // shared policy directly here so this runner-contract test remains

@@ -245,10 +245,11 @@ export function isRealpathedWithinBoundary(resolved, boundary, dependencies = {}
  */
 function approvedReadPath(value, root, additionalRoots = []) {
   if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
-  // The lifecycle guard owns command shape and mutation prevention. Read
-  // visibility is bounded by the host sandbox and OS permissions, not by a
-  // second repository-root policy invented by this grammar.
-  return true;
+  const candidate = rawReadCandidatePath(value, root);
+  return candidate !== null
+    && [root, ...additionalRoots].some((boundary) => typeof boundary === "string"
+      && boundary !== ""
+      && isRealpathedWithinBoundary(candidate, boundary));
 }
 
 function validateRg(argv, root, windows, additionalRoots = []) {

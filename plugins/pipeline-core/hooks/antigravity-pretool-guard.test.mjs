@@ -83,8 +83,41 @@ function followLifecycleAction(root, result, name) {
 
 function readyLifecycleFixture(mode = "chat") {
   const root = mkdtempSync(join(tmpdir(), "agy-ready-hgo-"));
-  followLifecycleAction(root, lifecycleCommand(root, "plan", "--root", root, "--runner", "antigravity"), "apply-portable-seed");
-  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", mode], { cwd: root, encoding: "utf8", shell: false });
+  const home = join(root, "fixture-home");
+  mkdirSync(home, { recursive: true });
+  if (mode === "signature") {
+    const keyDirectory = join(home, "po-key-directory");
+    mkdirSync(keyDirectory, { recursive: true });
+    mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+    const publicKeySha256 = createHash("sha256").update("agy-signature-fixture-key").digest("hex");
+    writeFileSync(join(keyDirectory, "trust-policy.json"), JSON.stringify({
+      keyReference: "agy-signature-fixture-key",
+      publicKeySha256,
+      humanName: "Antigravity Signature Fixture PO",
+    }, null, 2) + "\n");
+    writeFileSync(join(home, ".agent-pipeline", "machine.json"), JSON.stringify({
+      schema: "pipeline.machine-plane.v1",
+      poKeyDirectory: keyDirectory,
+      pushApprovalDefault: "signature",
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    }, null, 2) + "\n");
+  }
+  const env = { ...process.env, HOME: home, USERPROFILE: home, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+  const invoke = (...args) => {
+    const result = spawnSync(process.execPath, [onboardingScript, ...args], { cwd: root, env, encoding: "utf8", shell: false });
+    assert.equal(result.status, 0, String(result.stderr) + "\n" + String(result.stdout));
+    return JSON.parse(result.stdout);
+  };
+  const follow = (result, name) => {
+    assert.equal(result.nextAction?.argv?.[1], name, JSON.stringify(result));
+    return invoke(...result.nextAction.argv.slice(1));
+  };
+  follow(invoke("plan", "--root", root, "--runner", "antigravity"), "apply-portable-seed");
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", mode], { cwd: root, env, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
   for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy"]]) {
     const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
@@ -95,22 +128,22 @@ function readyLifecycleFixture(mode = "chat") {
     const issued = issueLaunchTicket({ rootDir: root, barrierSha256: barrier.rawSha256 });
     consumeRuntimeReadback({ rootDir: root, ticketId: issued.ticketId, token: issued.token, receipt: { schema: "pipeline.codex-project-runtime-readback.v1", barrierSha256: barrier.rawSha256, repositoryFingerprint: barrier.barrier.repositoryFingerprint, sourceSha256: barrier.barrier.sourceSha256, runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256, readerGenerationSha256: sha256("test-agy-readback"), effectiveConfigSha256: sha256("test-agy-config"), validatedAgentsSha256: sha256("test-agy-agents"), ticketId: issued.ticketId, observedAtEpochMs: Date.now() } });
   }
-  const collect = (result, values, material = null) => { const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value); const index = argv.indexOf("--text-file"); if (material !== null && index >= 0) { const path = join(root, argv[index + 1]); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, material); } return lifecycleCommand(root, ...argv.slice(1)); };
-  collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_GIT_AUTHOR_NAME>": "Test Fixture", "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "fixture@example.invalid", "<PO_INTAKE_LANGUAGE>": "en", "<PO_INTAKE_PROFILE>": "feature" }, "AGY test fixture material.\n");
-  collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "AGY fixture." }]) });
-  const generated = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), "intake-generate-plan");
-  lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "antigravity");
-  const bind = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity"), "bootstrap-bind-plan");
-  followLifecycleAction(root, bind, "bootstrap-bind-apply");
-  const permissionsDrift = lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity");
+  const collect = (result, values, material = null) => { assert.ok(result.nextAction?.applyAction, JSON.stringify(result)); const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value); const index = argv.indexOf("--text-file"); if (material !== null && index >= 0) { const path = join(root, argv[index + 1]); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, material); } return invoke(...argv.slice(1)); };
+  collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_GIT_AUTHOR_NAME>": "Test Fixture", "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "fixture@example.invalid", "<PO_INTAKE_LANGUAGE>": "en", "<PO_INTAKE_PROFILE>": "feature" }, "AGY test fixture material.\n");
+  collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "AGY fixture." }]) });
+  const generated = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "intake-generate-plan");
+  invoke("intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "antigravity");
+  const bind = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "bootstrap-bind-plan");
+  follow(bind, "bootstrap-bind-apply");
+  const permissionsDrift = invoke("inspect", "--root", root, "--runner", "antigravity");
   assert.equal(permissionsDrift.status, "projection-drift");
   assert.equal(permissionsDrift.runnerPermissions.status, "pending-runtime-initialization");
   const permissionsApplied = spawnSync(permissionsDrift.nextAction.executable, permissionsDrift.nextAction.argv, {
-    cwd: root, encoding: "utf8", shell: false,
+    cwd: root, env, encoding: "utf8", shell: false,
   });
   assert.equal(permissionsApplied.status, 0, `${permissionsApplied.stderr}\n${permissionsApplied.stdout}`);
   assert.equal(JSON.parse(permissionsApplied.stdout).status, "ready");
-  assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "antigravity").status, "ready");
+  assert.equal(invoke("inspect", "--root", root, "--runner", "antigravity").status, "ready");
   return root;
 }
 
@@ -324,7 +357,7 @@ check("Antigravity run_command fails closed for a malformed explicit Cwd", () =>
   } finally { rmSync(readyRoot, { recursive: true, force: true }); }
 });
 
-check("Antigravity run_command leaves relative passive-read visibility to the selected host Cwd", () => {
+check("Antigravity run_command refuses a relative passive read outside the selected project root", () => {
   const firstWorkspace = readyLifecycleFixture();
   const executedWorkspace = readyLifecycleFixture();
   try {
@@ -335,7 +368,8 @@ check("Antigravity run_command leaves relative passive-read visibility to the se
         args: { CommandLine: "cat ../outside.txt", Cwd: executedWorkspace },
       },
     }, firstWorkspace, { hookCwd: firstWorkspace }));
-    assert.equal(res.decision, "allow");
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
   } finally {
     rmSync(firstWorkspace, { recursive: true, force: true });
     rmSync(executedWorkspace, { recursive: true, force: true });

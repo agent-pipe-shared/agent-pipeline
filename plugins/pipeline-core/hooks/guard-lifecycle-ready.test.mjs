@@ -926,25 +926,17 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "sed -n '1,80p' pipeline.user.yaml",
       "node --check harness/scripts/verify.mjs",
       "node.exe --check harness/scripts/verify.mjs",
-      "node --check ../../outside.mjs",
-      "node --check linked-outside/verify.mjs",
       "sha256sum specs/hotfix.md",
       "sha256sum -- specs/hotfix.md",
       // C3 (AC-1): several read-only path arguments, each subject to the
       // identical containment check the single-path form already applies.
       "sha256sum specs/hotfix.md pipeline.user.yaml",
       "sha256sum -- specs/hotfix.md pipeline.user.yaml harness/scripts/verify.mjs",
-      "sha256sum ../../outside.md",
-      "sha256sum linked-outside/outside.md",
-      "sha256sum specs/hotfix.md ../../outside.md",
-      "sha256sum -- specs/hotfix.md ../../outside.md",
       "shasum -a 256 specs/hotfix.md",
       "shasum --algorithm 256 specs/hotfix.md",
       "shasum -a 256 specs/hotfix.md pipeline.user.yaml",
-      "shasum -a 256 specs/hotfix.md ../../outside.md",
       "certutil -hashfile specs/hotfix.md SHA256",
       "certutil.exe -hashfile specs/hotfix.md sha256",
-      "certutil -hashfile ../../outside.md SHA256",
       "git status --short --branch",
       "git diff --check",
       "git rev-parse HEAD",
@@ -973,6 +965,14 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "sha256sum specs/hotfix.md --check",
       "certutil -urlcache specs/hotfix.md SHA256",
       "certutil -hashfile specs/hotfix.md SHA1",
+      "node --check ../../outside.mjs",
+      "node --check linked-outside/verify.mjs",
+      "sha256sum ../../outside.md",
+      "sha256sum linked-outside/outside.md",
+      "sha256sum specs/hotfix.md ../../outside.md",
+      "sha256sum -- specs/hotfix.md ../../outside.md",
+      "shasum -a 256 specs/hotfix.md ../../outside.md",
+      "certutil -hashfile ../../outside.md SHA256",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
       assert.equal(evaluateLifecycleReadyGuard(bash(command), {
@@ -1428,8 +1428,6 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg --files plugins/pipeline-core harness | rg 'verify|journal'",
       "rg --files -uu . | rg 'guard|deny|permission|settings'",
       "rg -n -S lifecycle plugins | rg guard",
-      "rg -n lifecycle .. | rg guard",
-      "rg -n lifecycle .. | head -n 20",
     ]) {
       const parsed = parseGuardCommand(command, path);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
@@ -1467,16 +1465,8 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-// GF-078 bug 2 (root scope). Every single, non-piped read-only command
-// isReadOnlyDiagnosticCommand admits elsewhere in this file (rg, grep, cat, head, tail, wc,
-// stat, file) carries NO path restriction at all -- a single `rg pattern <plugin-install-path>`
-// self-inspection read was already unconditionally admitted before this fix. Only the
-// IDENTICAL read piped through a second rg or head was refused, purely for being a pipeline,
-// because isBoundedReadOnlyPipeline only ever knew the project root. This pins that the
-// plugin's own installed root (this file's own resolved location) is now a second approved
-// root for exactly that bounded pipeline shape -- narrower than the single-command allowance
-// above, never wider -- while the underlying grammar function's own two-argument, project-
-// root-only default stays byte-identical (asserted directly against guard-command-grammar.mjs).
+// The loaded plugin root is an explicit trusted read boundary. The generic command grammar
+// remains project-root-only; the lifecycle adapter supplies its own realpathed plugin root.
 test("bounded rg pipeline admits self-inspection reads of the plugin's own installed root", () => {
   const path = root();
   const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -1488,7 +1478,7 @@ test("bounded rg pipeline admits self-inspection reads of the plugin's own insta
       `rg -n "isBoundedReadOnlyPipeline" ${grammarFile} | head -n 5`,
     ]) {
       const parsed = parseGuardCommand(command, path);
-      assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, `${command} (read scope is host-owned)`);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), false, `${command} (generic grammar has no plugin boundary)`);
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
       assert.equal(evaluateLifecycleReadyGuard(bash(command), {
@@ -1499,7 +1489,7 @@ test("bounded rg pipeline admits self-inspection reads of the plugin's own insta
     const foreign = mkdtempSync(join(tmpdir(), "guard-lifecycle-foreign-"));
     try {
       const command = `rg --files ${foreign} | rg 'x'`;
-      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
     } finally { rmSync(foreign, { recursive: true, force: true }); }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
@@ -1596,14 +1586,14 @@ test("NVA-CATPIPE-1: a cat pipeline naming a gate-strength file is classified as
 // NVA-CATPIPE-1. Exactness: command shape remains closed even though passive-read visibility
 // is host-owned. Exactly two segments, a grep/head sink, canonical 1..500 head count, and the
 // null-device stderr redirect remain the only admitted composition.
-test("NVA-CATPIPE-1: exactness -- an outside-root read is admitted while unsafe composition stays refused", () => {
+test("NVA-CATPIPE-1: exactness -- an outside-root read and unsafe composition stay refused", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-catpipe-outside-"));
   try {
     writeFileSync(join(path, "notes.txt"), "keep this open line\n");
     writeFileSync(join(outside, "secret.txt"), "outside\n");
     const outsideRead = `cat ${join(outside, "secret.txt")} | grep open`;
-    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), true, outsideRead);
+    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), false, outsideRead);
     for (const command of [
       "cat notes.txt | grep open | wc -l",
       "cat notes.txt | wc -l",
@@ -1663,12 +1653,12 @@ test("NVA-CF-GITPIPEALLOWLIST: git-sourced bounded pipeline into head is admitte
 // NVA-CF-GITPIPEALLOWLIST. Exactness: read path location is host-owned while head bounds and
 // the read-only git subcommand allowlist remain closed. `git commit ... | head` in particular
 // must never be admitted.
-test("NVA-CF-GITPIPEALLOWLIST: exactness -- an outside-root read is admitted while mutation and unsafe composition stay refused", () => {
+test("NVA-CF-GITPIPEALLOWLIST: exactness -- outside-root reads, mutation, and unsafe composition stay refused", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-gitpipe-outside-"));
   try {
     const outsideRead = `git log ${join(outside, "secret.txt")} | head -5`;
-    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), true, outsideRead);
+    assert.equal(isReadOnlyDiagnosticCommand(outsideRead, path), false, outsideRead);
     for (const command of [
       "git log | head -n 0",
       "git log | head -n 501",
@@ -6271,284 +6261,30 @@ test("NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter
 });
 
 // ---------------------------------------------------------------------------------
-// NVA-BL-76 (backlog: 2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-
-// the-wrong-reason.md), restored by NVA-B-READCONTAIN-1 after a 2026-08-30 policy reversal
-// (NVA-GF-GREENFIELD-READONLY-1, commit c8c7f449) briefly admitted every read regardless of
-// target location. The PO reversed that reversal 2026-09-06 ("re-narrow, with explicit
-// exceptions"): the bounded rg-to-head / rg-to-rg pipeline -- and its single-command sibling,
-// pipeline.read-scope-single-command-root-check -- reading a path OUTSIDE the project root
-// (and outside this plugin's own installed root) is refused under its own code, its own true
-// remedy, and -- because reading is not the mutation risk the cross-repository family exists
-// to stop -- an override route a human signature can actually reach. The fixture below also
-// carries the prior-runner transcript fixtures (antigravity/codex/claude session files) the
-// reversed policy added; they are reused here to pin the restored refusal instead of the
-// admission they used to pin.
+// ---------------------------------------------------------------------------------
+// Read-only commands remain containment-bound. The admissible exceptions are derived
+// roots only: the loaded plugin and the host-provided session transcript/memory roots.
 // ---------------------------------------------------------------------------------
 
-/** The reproduction fixture: a governed repo plus a real file outside it. */
 function readScopeFixture() {
   const projectDir = hgoGitFixture("signature");
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-read-scope-outside-"));
   const outsideFile = join(outside, "verify-latest.json");
-  const antigravityTranscript = join(outside, "antigravity-session.json");
-  const codexTranscript = join(outside, "codex-rollout.jsonl");
-  const claudeTranscript = join(outside, "claude-session.jsonl");
-  writeFileSync(outsideFile, '{"Overall":"pass"}\n');
-  writeFileSync(antigravityTranscript, '{"runner":"antigravity","events":[{"type":"tool_call"}]}\n');
-  writeFileSync(codexTranscript, '{"type":"session_meta","cwd":"fixture"}\n{"type":"tool_call","name":"Bash"}\n');
-  writeFileSync(claudeTranscript, '{"type":"user","message":"fixture"}\n{"type":"assistant","message":"fixture"}\n');
-  writeFileSync(join(projectDir, "verify-latest.json"), '{"Overall":"pass"}\n');
-  return { projectDir, outside, outsideFile, antigravityTranscript, codexTranscript, claudeTranscript };
+  writeFileSync(outsideFile, "{\"Overall\":\"pass\"}\n");
+  writeFileSync(join(projectDir, "verify-latest.json"), "{\"Overall\":\"pass\"}\n");
+  return { projectDir, outside, outsideFile };
 }
 
-function readScopeRun(command, projectDir, { lifecycleStatus = "ready", hgoCalls = null } = {}) {
+function readScopeRun(command, projectDir, { lifecycleStatus = "ready" } = {}) {
   const readiness = lifecycleStatus === "ready"
     ? hgoReadyDeps()
     : { requireProjectOnboardingReadyFn() { deny(lifecycleStatus); } };
-  const hgoSpies = hgoCalls === null ? {} : {
-    consumeHumanGuardOverrideFn() {
-      hgoCalls.push("consume");
-      return { status: "absent" };
-    },
-    recordHumanGuardDenialFn() {
-      hgoCalls.push("plan");
-      return { status: "unavailable" };
-    },
-  };
-  return evaluateLifecycleReadyGuard(bash(command), { projectDir, ...readiness, ...hgoSpies });
+  return evaluateLifecycleReadyGuard(bash(command), { projectDir, ...readiness });
 }
 
-test("read-only diagnostics may inspect operator-selected paths outside the project root", () => {
-  const {
-    projectDir, outside, outsideFile, antigravityTranscript, codexTranscript, claudeTranscript,
-  } = readScopeFixture();
-  try {
-    const readCommands = [
-      `rg -n 'antigravity' ${antigravityTranscript}`,
-      `grep -n 'tool_call' ${codexTranscript}`,
-      `cat ${claudeTranscript}`,
-      `head -n 5 ${codexTranscript}`,
-      `tail -n 5 ${claudeTranscript}`,
-      `wc -l ${codexTranscript}`,
-      `stat ${antigravityTranscript}`,
-      `file ${claudeTranscript}`,
-      `rg -n 'tool_call' ${codexTranscript} | head -n 5`,
-      `rg --files ${outside} | rg -n jsonl`,
-    ];
-    readCommands.push(
-      `sed -n '1,2p' ${codexTranscript}`,
-      `find ${outside} -maxdepth 1 -type f`,
-      `git -C ${outside} status --short`,
-      `grep -n 'assistant' ${claudeTranscript} | head -n 5`,
-    );
-    for (const lifecycleStatus of ["ready", "intake-required", "restart-required"]) {
-      for (const command of readCommands) {
-        assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, `${lifecycleStatus}: ${command}`);
-        assert.deepEqual(
-          readScopeRun(command, projectDir, { lifecycleStatus }),
-          { exitCode: 0, stderr: "" },
-          `${lifecycleStatus}: ${command}`,
-        );
-      }
-    }
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("read-only diagnostics follow readable symlinks outside the project root", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  const linkPath = join(projectDir, "linked-outside.json");
-  try {
-    symlinkSync(outsideFile, linkPath);
-    // Single-command shape -- isApprovedSingleCommandReadArg's containment check.
-    assert.equal(isReadOnlyDiagnosticCommand(`cat ${linkPath}`, projectDir), true);
-    const singleCommand = readScopeRun(`cat ${linkPath}`, projectDir, { lifecycleStatus: "ready" });
-    assert.equal(singleCommand.exitCode, 0);
-    // Bounded cat-pipeline shape -- isApprovedCatPipelineReadPath's containment check.
-    const pipelineCommand = `cat ${linkPath} | head -n 5`;
-    assert.equal(isReadOnlyDiagnosticCommand(pipelineCommand, projectDir), true);
-    const pipelineResult = readScopeRun(pipelineCommand, projectDir, { lifecycleStatus: "ready" });
-    assert.equal(pipelineResult.exitCode, 0);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-// NVA-B-READCONTAIN-1 (correction round 2, F4). The F2 fix above closed the DIRECT symlink
-// shape but resolved its candidate via commandPath()'s `path.resolve(root, value)` -- a pure
-// STRING operation that collapses a `..` segment against the immediately preceding component
-// with zero filesystem awareness, before any symlink is ever examined. An argument shaped
-// `<symlink>/../<outside-dir>/<file>` therefore lexically collapses (the symlink component
-// and the following ".." cancel each other out) to a string that reads as trivially inside
-// the project root, while the OS actually resolving that same string at execution time
-// dereferences the symlink component FIRST, then applies the following ".." relative to the
-// symlink's REAL target -- landing outside the root. Reproduced live against the round-1
-// correction (commit bc00a861, `scratch/probe-f4-prefix.mjs` this dispatch, run against a
-// copy of that exact commit's file): both the single-command and cat-pipeline shapes below
-// were admitted (`true`) under that code; both are refused under the fix this test pins.
-function dotdotThroughSymlinkFixture() {
-  const projectDir = hgoGitFixture("signature");
-  const outsideRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-dotdot-outside-"));
-  const targetDir = join(outsideRoot, "target");
-  const siblingDir = join(outsideRoot, "sibling");
-  mkdirSync(targetDir);
-  mkdirSync(siblingDir);
-  const secretFile = join(siblingDir, "secret.txt");
-  writeFileSync(secretFile, "TOP-SECRET-OUTSIDE-ROOT\n");
-  const linkPath = join(projectDir, "linked-outside");
-  symlinkSync(targetDir, linkPath);
-  return { projectDir, outsideRoot, linkPath, secretFile };
-}
-
-test("read-only single and cat-pipeline shapes may follow symlink traversal outside root", () => {
-  const { projectDir, outsideRoot, linkPath } = dotdotThroughSymlinkFixture();
-  try {
-    // Lexically (path.resolve) this collapses to `${projectDir}/sibling/secret.txt` -- a
-    // string that reads as inside `projectDir`. The OS actually resolves it by dereferencing
-    // `linked-outside` first, landing in `outsideRoot/sibling/secret.txt` instead.
-    const attackArg = `${linkPath}/../sibling/secret.txt`;
-    const singleCommand = `cat ${attackArg}`;
-    assert.equal(isReadOnlyDiagnosticCommand(singleCommand, projectDir), true);
-    const singleResult = readScopeRun(singleCommand, projectDir, { lifecycleStatus: "ready" });
-    assert.equal(singleResult.exitCode, 0);
-
-    const pipelineCommand = `cat ${attackArg} | head -n 5`;
-    assert.equal(isReadOnlyDiagnosticCommand(pipelineCommand, projectDir), true);
-    const pipelineResult = readScopeRun(pipelineCommand, projectDir, { lifecycleStatus: "ready" });
-    assert.equal(pipelineResult.exitCode, 0);
-
-    // A plain in-root read stays admitted -- this fix must not widen containment to refuse
-    // ordinary reads.
-    writeFileSync(join(projectDir, "ok.txt"), "hi\n");
-    assert.equal(isReadOnlyDiagnosticCommand(`cat ${join(projectDir, "ok.txt")}`, projectDir), true);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outsideRoot, { recursive: true, force: true });
-  }
-});
-
-test("read-only rg pipelines may follow symlink and symlink-plus-dotdot paths outside root", () => {
-  const { projectDir, outsideRoot, linkPath } = dotdotThroughSymlinkFixture();
-  try {
-    const directSymlinkCommand = `rg -n 'secret' ${linkPath} | head -n 5`;
-    assert.equal(
-      isReadOnlyDiagnosticCommand(directSymlinkCommand, projectDir),
-      true,
-    );
-    const directResult = readScopeRun(directSymlinkCommand, projectDir, { lifecycleStatus: "ready" });
-    assert.equal(directResult.exitCode, 0);
-
-    const dotdotAttackArg = `${linkPath}/../sibling/secret.txt`;
-    const dotdotRgCommand = `rg -n 'secret' ${dotdotAttackArg} | head -n 5`;
-    assert.equal(
-      isReadOnlyDiagnosticCommand(dotdotRgCommand, projectDir),
-      true,
-    );
-    const dotdotResult = readScopeRun(dotdotRgCommand, projectDir, { lifecycleStatus: "ready" });
-    assert.equal(dotdotResult.exitCode, 0);
-
-    // An in-root file read through the rg-pipeline stays admitted
-    writeFileSync(join(projectDir, "ok.txt"), "secret in-root\n");
-    assert.equal(
-      isReadOnlyDiagnosticCommand(`rg -n 'secret' ${join(projectDir, "ok.txt")} | head -n 5`, projectDir),
-      true,
-      "an in-root file read through rg-pipeline must stay admitted",
-    );
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outsideRoot, { recursive: true, force: true });
-  }
-});
-
-// NVA-B-READCONTAIN-1 (correction round 2, F5). isRealpathedWithinBoundary()'s `dependencies`
-// parameter was, before this test, never supplied by any real call site, and its
-// `catch { return false; }` blocking paths had no test exercising them -- present but
-// unproven. Exported specifically so this test can be a real caller: injecting a
-// `realpathSyncFn` that throws proves the fail-closed direction is real, both for the
-// boundary realpath (round 2, F4's own addition) and for the ancestor-walk realpath (F2's
-// original addition).
-test("NVA-B-READCONTAIN-1 correction round 2, F5: isRealpathedWithinBoundary fails closed when realpathSyncFn throws", () => {
-  const boundary = "/fake/boundary";
-  const resolved = "/fake/boundary/file.txt";
-  // Boundary realpath throws unconditionally -- must not admit, regardless of the candidate.
-  const throwingRealpath = () => { throw new Error("simulated filesystem error"); };
-  assert.equal(
-    isRealpathedWithinBoundary(resolved, boundary, { realpathSyncFn: throwingRealpath, existsSyncFn: () => true }),
-    false,
-  );
-  // Boundary realpath succeeds (identity), the ancestor-walk realpath call throws -- must not
-  // admit. existsSyncFn reports the candidate itself as existing, so the ancestor loop never
-  // iterates and realpath() is called on `resolved` for the final check -- the exact call this
-  // branch exercises.
-  const identityBoundaryThenThrowOnAncestor = (value) => {
-    if (value === boundary) return boundary;
-    throw new Error("simulated filesystem error on ancestor walk");
-  };
-  assert.equal(
-    isRealpathedWithinBoundary(resolved, boundary, {
-      realpathSyncFn: identityBoundaryThenThrowOnAncestor,
-      existsSyncFn: () => true,
-      statSyncFn: () => ({ isDirectory: () => true }),
-    }),
-    false,
-  );
-  // Sanity: with dependencies that simulate a clean, symlink-free filesystem throughout (no
-  // throw anywhere), the identical in-boundary candidate resolves true -- the two injected
-  // failures above are what flip the result, not a change to the function's normal-path
-  // behaviour.
-  assert.equal(
-    isRealpathedWithinBoundary(resolved, boundary, {
-      realpathSyncFn: (value) => value,
-      existsSyncFn: () => true,
-      statSyncFn: () => ({ isDirectory: () => true }),
-    }),
-    true,
-  );
-});
-
-test("NVA-B-FILE-BOUNDARY-PRIMITIVE-1: isRealpathedWithinBoundary admits a nonidentity descendant only for a real directory boundary", () => {
-  const fixture = mkdtempSync(join(tmpdir(), "guard-lifecycle-file-boundary-"));
-  const fileBoundary = join(fixture, "transcript.jsonl");
-  const linkedFileBoundary = join(fixture, "linked-transcript.jsonl");
-  const directoryBoundary = join(fixture, "memory");
-  writeFileSync(fileBoundary, "fixture\n");
-  symlinkSync(fileBoundary, linkedFileBoundary);
-  mkdirSync(directoryBoundary);
-  try {
-    assert.equal(isRealpathedWithinBoundary(fileBoundary, fileBoundary), true,
-      "the deliberate literal identity classifier shortcut still admits the exact file");
-    assert.equal(isRealpathedWithinBoundary(`${fileBoundary}/nonexistent-child`, fileBoundary), false,
-      "a nonexistent child below a regular-file boundary is never inside it");
-    assert.equal(isRealpathedWithinBoundary(`${fileBoundary}/nonexistent-child`, linkedFileBoundary), false,
-      "a symlinked file boundary has the same exact-file discipline after realpath");
-    assert.equal(isRealpathedWithinBoundary(`${directoryBoundary}/nonexistent-child`, directoryBoundary), true,
-      "a missing descendant below a real directory preserves the ancestor-walk admission");
-    assert.equal(isRealpathedWithinBoundary(`${directoryBoundary}/nonexistent-child`, directoryBoundary, {
-      statSyncFn: () => { throw new Error("simulated boundary inspection error"); },
-    }), false, "a boundary inspection failure fails closed");
-  } finally {
-    rmSync(fixture, { recursive: true, force: true });
-  }
-});
-
-/**
- * NVA-B-READCONTAIN-2 (backlog: 2026-09-01-read-containment-was-removed-a-day-after-it-was-
- * added-with-no-recorded-decision.md). Extends claudeMemorySessionFixture() (above) with an
- * actual transcript FILE on disk -- that fixture only creates memoryDir; this feature's own
- * transcript-file root requires the transcript itself to exist as a real, statable FILE before
- * ever admitting it, exactly like claudeSessionMemoryDirectory's own isDirectory() check on the
- * write side. Both returned paths are realpathSync()'d once here so a symlinked tmpdir ancestor
- * (e.g. macOS /tmp -> /private/tmp) cannot make an honest in-scope read spuriously fail
- * isRealpathedWithinBoundary's own first (lexical) gate, which compares an already-realpathed
- * boundary against a raw candidate -- a pre-existing limitation shared with the write lane's
- * isPathWithinRealpathedRoot, not introduced here.
- */
 function transcriptReadFixture() {
   const { transcriptPath, memoryDir } = claudeMemorySessionFixture();
-  writeFileSync(transcriptPath, '{"type":"user","message":"fixture"}\n');
+  writeFileSync(transcriptPath, "{\"type\":\"user\",\"message\":\"fixture\"}\n");
   return { transcriptPath: realpathSync(transcriptPath), memoryDir: realpathSync(memoryDir) };
 }
 
@@ -6556,487 +6292,143 @@ function bashWithTranscript(command, transcriptPath) {
   return { tool_name: "Bash", tool_input: { command }, transcript_path: transcriptPath };
 }
 
-test("NVA-B-READCONTAIN-2: a Bash read of exactly the session's own transcript file is admitted", () => {
-  const projectDir = hgoGitFixture("signature");
-  const { transcriptPath } = transcriptReadFixture();
+test("read-only diagnostics reject arbitrary external roots in every supported shell shape", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
-    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir), true,
-      "outside-root read admission is global for closed read-only shapes");
-    const result = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${transcriptPath}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
-    );
-    assert.deepEqual(result, { exitCode: 0, stderr: "" },
-      "a Bash read of the session's own transcript file must be admitted");
+    for (const command of [
+      `cat ${outsideFile}`,
+      `head -n 5 ${outsideFile}`,
+      `rg -n Overall ${outsideFile}`,
+      `cat ${outsideFile} | head -n 5`,
+      `git log ${outsideFile} | head -n 5`,
+      `rg -n Overall ${outsideFile} | head -n 5`,
+      `rg -n Overall ${outsideFile} && git status`,
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      const denied = readScopeRun(command, projectDir);
+      assert.equal(denied.exitCode, 2, command);
+      assert.match(denied.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+    }
+    assert.equal(readScopeRun("cat verify-latest.json", projectDir).exitCode, 0);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
-    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
 
-test("NVA-B-READCONTAIN-2: a Bash read of a file inside dirname(transcript_path)/memory/ is admitted", () => {
+test("read-only diagnostics admit only the exact host-provided transcript and memory roots", () => {
   const projectDir = hgoGitFixture("signature");
   const { transcriptPath, memoryDir } = transcriptReadFixture();
   const memoryFile = join(memoryDir, "learned.md");
+  const sibling = join(dirname(transcriptPath), "other-session.jsonl");
   writeFileSync(memoryFile, "note\n");
+  writeFileSync(sibling, "other\n");
   try {
-    const result = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${memoryFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
-    );
-    assert.deepEqual(result, { exitCode: 0, stderr: "" },
-      "a Bash read of a file inside the session's own memory/ directory must be admitted");
+    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir, [transcriptPath]), true);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${transcriptPath}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${memoryFile} | head -n 5`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript(`cat ${sibling}`, transcriptPath), { projectDir, ...hgoReadyDeps() }).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(dirname(transcriptPath), { recursive: true, force: true });
   }
 });
 
-test("pipeline.rg-pipe-lexical-containment-gap: cat-pipeline reads transcript-file or memory-dir through cat ... | grep and cat ... | head", () => {
+test("Codex can recover prior project rollouts only from its trusted sessions directory", () => {
   const projectDir = hgoGitFixture("signature");
-  const { transcriptPath, memoryDir } = transcriptReadFixture();
-  const memoryFile = join(memoryDir, "learned.md");
-  writeFileSync(memoryFile, "note with target-word\n");
+  const codexHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-codex-home-"));
+  const sessionsDir = join(codexHome, "sessions");
+  const prior = join(sessionsDir, "2026", "09", "prior-rollout.jsonl");
+  const settings = join(codexHome, "settings.json");
+  mkdirSync(dirname(prior), { recursive: true });
+  writeFileSync(prior, "{\"cwd\":\"fixture\"}\n");
+  writeFileSync(settings, "{\"secret\":true}\n");
   try {
-    const grepTranscriptResult = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${transcriptPath} | grep target-word`, transcriptPath),
-      { projectDir, ...hgoReadyDeps() },
-    );
-    assert.deepEqual(grepTranscriptResult, { exitCode: 0, stderr: "" },
-      "cat <transcriptPath> | grep target-word must be admitted when transcript is threaded as extraRoot");
-
-    const headMemoryResult = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${memoryFile} | head -n 5`, transcriptPath),
-      { projectDir, ...hgoReadyDeps() },
-    );
-    assert.deepEqual(headMemoryResult, { exitCode: 0, stderr: "" },
-      "cat <memoryFile> | head -n 5 must be admitted when memory-dir is threaded as extraRoot");
-
-    const outsideFile = join(dirname(transcriptPath), "outside.txt");
-    writeFileSync(outsideFile, "outside\n");
-    const outsideResult = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${outsideFile} | head -n 5`, transcriptPath),
-      { projectDir, ...hgoReadyDeps() },
-    );
-    assert.equal(outsideResult.exitCode, 0, "cat <outsideFile> | head -n 5 is a closed read-only shape");
+    const deps = { projectDir, ...hgoReadyDeps(), runner: "codex", env: { CODEX_HOME: codexHome } };
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior} | head -n 5`), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${settings}`), deps).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), { ...deps, runner: "claude" }).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
-    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+    rmSync(codexHome, { recursive: true, force: true });
   }
 });
 
-test("a Bash read of a transcript sibling is admitted without session-derived scope", () => {
+test("Claude can read its host-provided projects collection but not sibling host data", () => {
   const projectDir = hgoGitFixture("signature");
-  const { transcriptPath } = transcriptReadFixture();
-  const siblingFile = join(dirname(transcriptPath), "other-session-file.jsonl");
-  writeFileSync(siblingFile, '{"type":"other"}\n');
+  const claudeHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-home-"));
+  const current = join(claudeHome, "projects", "current-project", "current.jsonl");
+  const prior = join(claudeHome, "projects", "other-project", "prior.jsonl");
+  const settings = join(claudeHome, "settings.json");
+  mkdirSync(dirname(current), { recursive: true });
+  mkdirSync(dirname(prior), { recursive: true });
+  writeFileSync(current, "{\"cwd\":\"fixture\"}\n");
+  writeFileSync(prior, "{\"cwd\":\"prior\"}\n");
+  writeFileSync(settings, "{\"secret\":true}\n");
   try {
-    const result = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${siblingFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
-    );
-    assert.equal(result.exitCode, 0);
+    const deps = { projectDir, ...hgoReadyDeps(), runner: "claude" };
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), deps).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + settings, current), deps).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bashWithTranscript("cat " + prior, current), { ...deps, runner: "codex" }).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
-    rmSync(dirname(transcriptPath), { recursive: true, force: true });
+    rmSync(claudeHome, { recursive: true, force: true });
   }
 });
 
-// Symlink regression, mirroring dotdotThroughSymlinkFixture() below: a symlink INSIDE the
-// session's own memory/ directory, pointing OUTSIDE it, composed with a `..` segment, must not
-// lexically escape the containment check -- proving the new memory-dir root (and, by the
-// identical shared extraRoots.some(extra => isRealpathedWithinBoundary(raw, extra)) loop, the
-// new transcript-file root too) is checked through the same realpath-safe discipline every
-// other root in this file already uses, never a new lexical-only shortcut.
-test("a read-only path composed through memory symlink traversal is admitted", () => {
+test("read-only containment rejects leading tilde and symlink escapes", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  const linkPath = join(projectDir, "linked-outside.json");
+  symlinkSync(outsideFile, linkPath);
+  try {
+    for (const command of [
+      "cat ~/.ssh/id_rsa",
+      "cat ~/.ssh/id_rsa | head -n 5",
+      "git log ~/.ssh/id_rsa | head -n 5",
+      "rg private ~/.ssh/id_rsa | head -n 5",
+      `cat ${linkPath}`,
+      `cat ${linkPath} | head -n 5`,
+      `rg private ${linkPath} | head -n 5`,
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("read-only containment rejects a symlink-plus-dotdot escape in every supported pipeline family", () => {
   const projectDir = hgoGitFixture("signature");
-  const { transcriptPath, memoryDir } = transcriptReadFixture();
-  const outsideRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-readcontain2-outside-"));
+  const outsideRoot = mkdtempSync(join(tmpdir(), "guard-lifecycle-dotdot-outside-"));
   const targetDir = join(outsideRoot, "target");
   const siblingDir = join(outsideRoot, "sibling");
+  const secret = join(siblingDir, "secret.txt");
   mkdirSync(targetDir);
   mkdirSync(siblingDir);
-  const secretFile = join(siblingDir, "secret.txt");
-  writeFileSync(secretFile, "TOP-SECRET-OUTSIDE-MEMORY-DIR\n");
-  const linkPath = join(memoryDir, "linked-outside");
-  symlinkSync(targetDir, linkPath);
+  writeFileSync(secret, "outside\n");
+  const link = join(projectDir, "linked-outside");
+  symlinkSync(targetDir, link);
+  const escaped = link + "/../sibling/secret.txt";
   try {
-    const attackArg = `${linkPath}/../sibling/secret.txt`;
-    const result = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${attackArg}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
-    );
-    assert.equal(result.exitCode, 0);
-
-    // A plain, honest read inside the same memory dir stays admitted -- this fix must not
-    // widen containment to refuse ordinary reads through the new root.
-    const okFile = join(memoryDir, "ok.md");
-    writeFileSync(okFile, "hi\n");
-    const okResult = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${okFile}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
-    );
-    assert.deepEqual(okResult, { exitCode: 0, stderr: "" });
+    for (const command of [
+      "cat " + escaped,
+      "cat " + escaped + " | head -n 5",
+      "rg outside " + escaped + " | head -n 5",
+      "git log " + escaped + " | head -n 5",
+    ]) assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
-    rmSync(dirname(transcriptPath), { recursive: true, force: true });
     rmSync(outsideRoot, { recursive: true, force: true });
   }
 });
 
-// NVA-B-GLRMINORS-1 (Gap A; backlog: 2026-09-06-the-exact-transcript-file-exception-admits-a-
-// nonexistent-child-path.md). Before the fix, isRealpathedWithinBoundary's ancestor walk --
-// built for the "not-yet-existing path under a real DIRECTORY" case -- climbed a candidate
-// shaped `<transcriptFile>/<nonexistent-child>` straight back up to the transcript file itself
-// (a FILE-typed boundary) and reported it "inside", contradicting the "EXACT single-file match
-// only" invariant claudeSessionTranscriptFilePath()'s own doc comment claims. Not exploitable
-// via the real shell (a real file has no children, so the actual `cat` hits ENOTDIR), but this
-// pins the guard's OWN admission decision, never the OS's incidental behaviour, as the thing
-// that refuses it -- this exact shape had zero test coverage before this item.
-test("read classifier accepts a transcript-child path shape and leaves existence to the OS", () => {
-  const projectDir = hgoGitFixture("signature");
-  const { transcriptPath } = transcriptReadFixture();
-  const phantomChild = join(transcriptPath, "nonexistent-child");
-  try {
-    // Direct classifier-level check: the transcript file itself is admitted as an extra root,
-    // but a nonexistent child path under it must not be.
-    assert.equal(isReadOnlyDiagnosticCommand(`cat ${transcriptPath}`, projectDir, [transcriptPath]), true,
-      "sanity: the transcript file itself stays admitted once threaded as an extra root");
-    assert.equal(isReadOnlyDiagnosticCommand(`cat ${phantomChild}`, projectDir, [transcriptPath]), true);
-
-    // End-to-end: the same shape through the full guard, with the transcript file threaded via
-    // the real sessionReadScopeRoots() path (input.transcript_path), must be refused under the
-    // true-reason read-scope code, not silently admitted.
-    const result = evaluateLifecycleReadyGuard(
-      bashWithTranscript(`cat ${phantomChild}`, transcriptPath), { projectDir, ...hgoReadyDeps() },
-    );
-    assert.equal(result.exitCode, 0);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(dirname(transcriptPath), { recursive: true, force: true });
-  }
-});
-
-test("the original outside-root rg reproduction is admitted as read-only", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    assert.deepEqual(
-      readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir),
-      { exitCode: 0, stderr: "" },
-    );
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("single and piped read shapes are location-independent", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json | head -n 5", projectDir).exitCode, 0,
-      "the in-root control remains admitted");
-    for (const command of [`rg -n 'Overall' ${outsideFile}`, `cat ${outsideFile}`, `head -n 5 ${outsideFile}`]) {
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
-    }
-    assert.equal(readScopeRun(`rg -n 'Overall' ${outsideFile} | rg -n Overall`, projectDir).exitCode, 0);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("rg-to-rg admits outside-root reads in either segment", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    for (const command of [
-      `rg --files ${outside} | rg -n Overall`,
-      `rg --files . | rg -n Overall ${outsideFile}`,
-      `rg -n 'Overall' ${outsideFile} | rg -n pass`,
-    ]) {
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
-    }
-    // The in-root control of the same exemption is still admitted, unchanged.
-    assert.equal(readScopeRun("rg --files . | rg -n verify", projectDir).exitCode, 0);
-
-    // The admitted stderr suppressor is part of the bounded shape, so the outside-root
-    // variant is the same read-scope refusal -- previously mislabelled GUARD-REDIRECT-UNAPPROVED.
-    const suppressed = readScopeRun(`rg -n 'Overall' ${outsideFile} 2>/dev/null | head -n 5`, projectDir);
-    assert.equal(suppressed.exitCode, 0);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("NVA-BL-76: nothing but the bounded diagnostic shape is reclassified", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    // Every other bound must still hold before the new code is reachable: an out-of-range
-    // head count, a non-rg producer, a writing consumer and a second real redirect all keep
-    // the code they had. A genuinely unbounded or writing outside-root command is untouched.
-    // The cat-to-head bounded pipe is a SEPARATE pipeline family whose own outside-root check
-    // (isBoundedCatPipeline / isApprovedCatPipelineReadPath) is not routed through
-    // isOutsideRootBoundedDiagnosticRead (rg-only) -- it keeps its pre-existing
-    // GUARD-OPERATOR-UNAPPROVED code, exactly as it did before this restoration.
-    for (const [command, code] of [
-      [`rg -n 'Overall' ${outsideFile} | head -n 9999`, "GUARD-OPERATOR-UNAPPROVED"],
-      [`rg -n 'Overall' ${outsideFile} | tee out.txt`, "GUARD-OPERATOR-UNAPPROVED"],
-      [`rg -n 'Overall' ${outsideFile} | xargs rm`, "GUARD-OPERATOR-UNAPPROVED"],
-      [`rg -n 'Overall' ${outsideFile} > out.txt | head -n 5`, "GUARD-REDIRECT-UNAPPROVED"],
-      [`rg -n 'Overall' ${outsideFile} | head -n 5 > ${join(outside, "captured.txt")}`, "GUARD-CROSS-REPO-MUTATION"],
-      [`cp ${outsideFile} ${join(outside, "copy.json")}`, "GUARD-CROSS-REPO-MUTATION"],
-    ]) {
-      const refused = readScopeRun(command, projectDir);
-      assert.equal(refused.exitCode, 2, command);
-      assert.match(refused.stderr, new RegExp(code, "u"), command);
-      assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u,
-        `a shape that is not the bounded read-only diagnostic was reclassified as one: ${command}`);
-    }
-    assert.equal(readScopeRun(`cat ${outsideFile} | head -n 5`, projectDir).exitCode, 0);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("outside-root read-only shapes are admitted without an override", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    // Same instrument as the NVA-BL-75 corpus: not "was it admitted" but "who, if anyone,
-    // could subsequently admit it". The PO's classification decision for this item is that a
-    // human signature CAN authorize an outside-root READ -- unlike a never-liftable
-    // cross-repository mutation, which is what the old code implied by association.
-    for (const command of [
-      `rg -n 'Overall' ${outsideFile} | head -n 5`,
-      `rg --files ${outside} | rg -n Overall`,
-      `rg -n 'Overall' ${outsideFile} 2>/dev/null | head -n 5`,
-    ]) {
-      assert.deepEqual(
-        overrideReachability(command, projectDir),
-        { code: "<admitted>", reach: "admitted" },
-      );
-    }
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("outside-root read admission does not consult HGO", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    const command = `rg -n 'Overall' ${outsideFile} | head -n 5`;
-    const hgoCalls = [];
-    const admitted = readScopeRun(command, projectDir, { hgoCalls });
-    assert.deepEqual(admitted, { exitCode: 0, stderr: "" });
-    assert.deepEqual(hgoCalls, []);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-// ---------------------------------------------------------------------------------
-// pipeline.read-scope-single-command-root-check (backlog: 2026-08-29-read-scope-guard-
-// admits-single-command-but-blocks-the-piped-form.md), restored by NVA-B-READCONTAIN-1. The
-// bounded rg-to-head/rg-to-rg pipeline was already root-checked (NVA-BL-76, above); the IDENTICAL
-// read issued as a single, un-piped command was not -- protection against reading outside the
-// project root depended on the shell shape of the command, not on the actual filesystem target
-// being read. This pins the single-command sibling of that same containment check.
-// ---------------------------------------------------------------------------------
-
-test("single un-piped reads outside the project root are admitted", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    for (const command of [`rg -n 'Overall' ${outsideFile}`, `cat ${outsideFile}`, `head -n 5 ${outsideFile}`]) {
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
-    }
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("pipeline.read-scope-single-command-root-check: an in-root single un-piped read is unaffected, and so is the piped shape", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    // The read-only working pattern most of a session's diagnostic activity depends on.
-    for (const command of ["rg -n 'Overall' verify-latest.json", "cat verify-latest.json", "head -n 5 verify-latest.json"]) {
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
-    }
-    // The piped shape (NVA-BL-76) is unaffected by this single-command sibling check.
-    assert.equal(readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir).exitCode, 0);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("pipeline.read-scope-single-command-root-check: BOUNDED_PIPELINE_ADDITIONAL_ROOTS is honoured identically by the single-command check", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    // A single un-piped read of this plugin's own installed root stays admitted, matching the
-    // piped shape's own allowance (the "bounded rg pipeline admits self-inspection reads of
-    // the plugin's own installed root" test above, single-command sibling of it).
-    const pluginFile = fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url));
-    assert.equal(readScopeRun(`cat ${pluginFile}`, projectDir).exitCode, 0);
-    assert.equal(readScopeRun(`cat ${outsideFile}`, projectDir).exitCode, 0);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("pipeline.read-scope-single-command-root-check: a shape that is not solely a root-scope issue is not reclassified as one", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    // grep --files-with-matches fails isReadOnlySimpleWords' own exclusion (checked before the
-    // new containment check, both in-root and out-of-root), so it is never the single-command
-    // read-only shape at all and isOutsideRootSingleCommandRead() must not reclassify it as a
-    // root-scope issue. It is not otherwise a recognized admission, so on a NOT-ready root it
-    // falls through to the generic not-ready refusal, never GUARD-READ-SCOPE-OUTSIDE-ROOT.
-    const refused = evaluateLifecycleReadyGuard(bash(`grep --files-with-matches Overall ${outsideFile}`), {
-      projectDir, requireProjectOnboardingReadyFn() { deny("partial"); },
-    });
-    assert.equal(refused.exitCode, 2);
-    assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
-    assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
-    // A mutating command outside root (never a read-only shape at all) keeps its own,
-    // pre-existing cross-repository-mutation classification -- untouched by this fix.
-    const mutating = readScopeRun(`cp ${outsideFile} ${join(outside, "copy.json")}`, projectDir);
-    assert.equal(mutating.exitCode, 2);
-    assert.match(mutating.stderr, /GUARD-CROSS-REPO-MUTATION/u);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-// NVA-B-DENIALCODE-1 (backlog: 2026-09-06-suppressed-and-chained-outside-root-reads-land-on-
-// the-wrong-denial-code.md). Before this fix, isOutsideRootSingleCommandRead() excluded ANY
-// command carrying a redirect, so a single, un-piped outside-root read with the one admitted
-// trailing `2>/dev/null` suppressor never reached the read-scope classifier and fell through to
-// the earlier, less-specific "this command has a redirect" branch -- GUARD-REDIRECT-UNAPPROVED,
-// a true fact about the shape but a false reason (the redirect is independently admitted; the
-// read target is what is actually refused).
-test("an outside-root read with the admitted stderr suppressor remains read-only", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    const command = `rg -n 'Overall' ${outsideFile} 2>/dev/null`;
-    assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
-    assert.equal(readScopeRun(command, projectDir).exitCode, 0);
-    // The identical in-root shape stays admitted, unchanged (isReadOnlyDiagnosticCommandWithTrailingStderrRedirect's pre-existing allowance).
-    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json 2>/dev/null", projectDir).exitCode, 0);
-    // A redirect that is NOT the admitted stderr-to-null suppressor keeps its own,
-    // pre-existing code -- this is a refinement of one exact redirect shape, not a blanket
-    // reclassification of every single-command-with-redirect denial.
-    const notAdmittedRedirect = readScopeRun(`rg -n 'Overall' ${outsideFile} 2>audit.log`, projectDir);
-    assert.equal(notAdmittedRedirect.exitCode, 2);
-    assert.match(notAdmittedRedirect.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
-    assert.doesNotMatch(notAdmittedRedirect.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
-    // Two redirects on a single command are never the admitted trailing-suppressor shape
-    // either, regardless of target -- stays on the pre-existing code.
-    const twoRedirects = readScopeRun(`rg -n 'Overall' ${outsideFile} 2>/dev/null > out.txt`, projectDir);
-    assert.equal(twoRedirects.exitCode, 2);
-    assert.match(twoRedirects.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
-    assert.doesNotMatch(twoRedirects.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-// NVA-B-DENIALCODE-1 (same backlog item, the `&&`-chain sibling shape). Before this fix, an
-// `&&`-chained outside-root read never reached "accepted" parseStatus at all (the shared
-// tokenizer denies a top-level `&&` outright), so it always printed the generic
-// GUARD-PARSE-UNSUPPORTED code, even when every segment would already be admitted by
-// isBoundedReadOnlyAndChain() except that one segment's own read target resolves outside the
-// project root.
-test("an && chain of independently read-only commands is location-independent", () => {
-  const { projectDir, outside, outsideFile } = readScopeFixture();
-  try {
-    const command = `rg -n 'Overall' ${outsideFile} && git status`;
-    assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
-    assert.equal(readScopeRun(command, projectDir).exitCode, 0);
-    // The identical in-root chain stays admitted, unchanged.
-    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json && git status", projectDir).exitCode, 0);
-    // A chain that genuinely fails for an unrelated reason (a segment that is not
-    // independently admitted at all, regardless of root) keeps its existing
-    // GUARD-PARSE-UNSUPPORTED code -- this is a refinement, not a blanket reclassification of
-    // every denied `&&`-chain.
-    const notSolelyScope = readScopeRun(`rg -n 'Overall' ${outsideFile} && touch output.txt`, projectDir);
-    assert.equal(notSolelyScope.exitCode, 2);
-    assert.match(notSolelyScope.stderr, /GUARD-PARSE-UNSUPPORTED/u);
-    assert.doesNotMatch(notSolelyScope.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
-    // A `;`-joined (not `&&`-joined) composition is a different, still-unbounded shape --
-    // untouched by this fix, stays GUARD-PARSE-UNSUPPORTED.
-    const semicolon = readScopeRun(`rg -n 'Overall' ${outsideFile} ; git status`, projectDir);
-    assert.equal(semicolon.exitCode, 2);
-    assert.match(semicolon.stderr, /GUARD-PARSE-UNSUPPORTED/u);
-    assert.doesNotMatch(semicolon.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-// ---------------------------------------------------------------------------------
-// NVA-B-TILDEFIX-1 (backlog: 2026-09-06-a-leading-tilde-path-argument-is-admitted-as-inside-
-// the-project-root.md). A leading `~` in a path-taking argument is expanded by the real shell
-// to an absolute home-directory path BEFORE the command's argv is ever assembled -- entirely
-// outside anything this guard's parser sees. Before this fix, none of the four read-scope
-// containment lanes accounted for that: each treated the literal, nonexistent `~...` string as
-// a path segment name and concluded it was safely inside the project root (single-command and
-// cat-pipeline via isRealpathedWithinBoundary's ancestor-walk climbing all the way to `root`;
-// the rg-to-rg/rg-to-head bounded pipeline via approvedReadPath's plain lexical pathInside(), no
-// ancestor-walk even needed). Confirmed live (guard verdicts only, never an executed read of a
-// real credential path): `cat ~/.ssh/id_rsa`, `rg x ~/.ssh | head -n 5`, and `cat ~root/x` were
-// all admitted. The marker paths below are synthetic -- this guard never performs real tilde
-// expansion or touches the real filesystem for the literal `~` segment either before or after
-// this fix, so no real home directory or credential path is ever read by these tests.
-// ---------------------------------------------------------------------------------
-
-const TILDE_MARKER_FORMS = ["~/nva-tildefix-marker.txt", "~nva-tildefix-user/nva-tildefix-marker.txt"];
-
-test("a leading-tilde read is admitted in the single-command lane", () => {
-  const { projectDir, outside } = readScopeFixture();
-  try {
-    for (const marker of TILDE_MARKER_FORMS) {
-      const command = `cat ${marker}`;
-      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
-    }
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("a leading-tilde read is admitted in the cat-pipeline lane", () => {
-  const { projectDir, outside } = readScopeFixture();
-  try {
-    for (const marker of TILDE_MARKER_FORMS) {
-      const command = `cat ${marker} | head -n 5`;
-      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
-      const admitted = readScopeRun(command, projectDir);
-      assert.equal(admitted.exitCode, 0, command);
-      assert.doesNotMatch(admitted.stderr, /GUARD-/u, command);
-    }
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
-});
-
-test("a leading-tilde read is admitted in the git-pipeline lane", () => {
-  const { projectDir, outside } = readScopeFixture();
-  try {
-    for (const marker of TILDE_MARKER_FORMS) {
-      const command = `git log ${marker} | head -n 5`;
-      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
-      const admitted = readScopeRun(command, projectDir);
-      assert.equal(admitted.exitCode, 0, command);
-      assert.doesNotMatch(admitted.stderr, /GUARD-/u, command);
-    }
-  } finally {
-    rmSync(projectDir, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
-  }
+test("read-boundary resolution fails closed when the filesystem cannot establish containment", () => {
+  assert.equal(
+    isRealpathedWithinBoundary("/fixture/root/child", "/fixture/root", {
+      existsSyncFn: () => true,
+      realpathSyncFn() { throw new Error("fixture realpath failure"); },
+    }),
+    false,
+  );
 });
 
 test("a leading-tilde mutation is classified as a cross-repository target in every commandPath call-site class", () => {
@@ -7074,13 +6466,13 @@ test("a leading-tilde mutation is classified as a cross-repository target in eve
   }
 });
 
-test("a leading-tilde read is admitted in the rg pipeline lane", () => {
+test("a leading-tilde read is refused in the rg pipeline lane", () => {
   const { projectDir, outside } = readScopeFixture();
   try {
-    for (const marker of TILDE_MARKER_FORMS) {
+    for (const marker of ["~", "~/.ssh/id_rsa"]) {
       const command = `rg x ${marker} | head -n 5`;
-      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), true, command);
-      assert.equal(readScopeRun(command, projectDir).exitCode, 0, command);
+      assert.equal(isReadOnlyDiagnosticCommand(command, projectDir), false, command);
+      assert.equal(readScopeRun(command, projectDir).exitCode, 2, command);
     }
   } finally {
     rmSync(projectDir, { recursive: true, force: true });

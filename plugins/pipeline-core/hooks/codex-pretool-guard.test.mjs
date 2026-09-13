@@ -1046,7 +1046,7 @@ function nonReadyLifecycleFixture() {
   return root;
 }
 
-check("Codex adapter admits a closed passive inventory pipeline against a host-readable external path", () => {
+check("Codex adapter refuses a passive inventory pipeline against an arbitrary host path", () => {
   const root = nonReadyLifecycleFixture();
   const outside = mkdtempSync(join(tmpdir(), "codex-pretool-read-outside-"));
   try {
@@ -1055,8 +1055,9 @@ check("Codex adapter admits a closed passive inventory pipeline against a host-r
       tool_name: "Bash",
       tool_input: { command: `rg --files -uu ${outside} | rg 'guard-marker'` },
     }, root);
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, "", "an admitted Codex PreToolUse call emits no denial envelope");
+    const output = decision(result);
+    assert.equal(output.permissionDecision, "deny");
+    assert.match(output.permissionDecisionReason, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
