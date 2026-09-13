@@ -12,6 +12,10 @@
     {
       "name": "report-interruptions-tests",
       "file": "plugins/pipeline-core/scripts/report-interruptions.test.mjs"
+    },
+    {
+      "name": "rigor-floor-tests",
+      "file": "plugins/pipeline-core/scripts/rigor-floor.test.mjs"
     }
   ]
 }

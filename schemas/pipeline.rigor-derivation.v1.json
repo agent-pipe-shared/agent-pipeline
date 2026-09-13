@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.rigor-derivation.v1",
+  "title": "Minimum Rigor Floor Derivation (pipeline.rigor-derivation.v1)",
+  "description": "Schema for minimum rigor floor derivation (WP-B1, Issue #105, AC-7).",
+  "type": "object",
+  "required": [
+    "schema",
+    "minProfile",
+    "requiredEvidenceClasses",
+    "escalationTriggers",
+    "derivationRevision",
+    "inputDigest",
+    "explanation"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "pipeline.rigor-derivation.v1",
+      "enum": [
+        "pipeline.rigor-derivation.v1"
+      ]
+    },
+    "minProfile": {
+      "type": "string",
+      "enum": [
+        "mini",
+        "feature",
+        "epic"
+      ]
+    },
+    "requiredEvidenceClasses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "escalationTriggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "derivationRevision": {
+      "type": [
+        "string",
+        "integer",
+        "number"
+      ]
+    },
+    "inputDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "explanation": {
+      "type": "string"
+    },
+    "disagreementLog": {
+      "type": "object",
+      "required": [
+        "selected",
+        "derived",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "selected": {
+          "type": "string"
+        },
+        "derived": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

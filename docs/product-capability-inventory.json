@@ -516,6 +516,7 @@
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
         "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",
         "verify-phase:harness/scripts/verify.mjs:review-retry-planner-tests",
+        "verify-phase:harness/scripts/verify.mjs:rigor-floor-tests",
         "verify-phase:harness/scripts/verify.mjs:rotate-handover-sections-tests",
         "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
