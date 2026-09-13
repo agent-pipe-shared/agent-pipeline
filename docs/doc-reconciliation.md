@@ -47,6 +47,41 @@ something to do here without review.
 
 ## Entries
 
+## Candidate f4b1fb1110974e58f5a2f010158e7620cc5c7497 — 2026-09-13, policy-selected bootstrap acknowledgement recovery
+
+- ADR-0003: checked, no change needed.
+- ADR-0004: checked, no change needed.
+- ADR-0005: checked, no change needed.
+- ADR-0006: checked, no change needed.
+- ADR-0009: checked, no change needed.
+- ADR-0010: checked, no change needed.
+- ADR-0014: checked, no change needed.
+- ADR-0015: checked, no change needed.
+- ADR-0018: checked, no change needed.
+- ADR-0020: checked, no change needed.
+- ADR-0023: checked, no change needed.
+- ADR-0024: checked, no change needed.
+- ADR-0026: checked, no change needed.
+- ADR-0033: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0043: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0058: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0064: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0069: checked, no change needed.
+- ADR-0072: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0076: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+
 ## Candidate 296ae11b1c0745d648aa2fba0dbbee6759600b52 — 2026-09-13, native apply-patch acknowledgement-route regression coverage
 
 - ADR-0010: checked, no change needed.
