@@ -47,6 +47,32 @@ something to do here without review.
 
 ## Entries
 
+## Candidate f60068ce6deb73f3aa3601bda737e305af6f195f — 2026-09-13, bind bootstrap acknowledgement signing to project trust
+
+- ADR-0010: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0064: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0072: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+
+The detached acknowledgement remains runner-neutral and signature-bound. A
+bootstrap-shaped request now has to derive its signed intent from the exact
+displayed action, and an attended signing action is offered only when the
+configured external key directory's public identity is already declared by
+the project's trust policy. A changed, absent, malformed, or mismatching
+directory returns the typed planner diagnostic; it never produces an action
+whose resulting proof the project must reject. Apply still verifies the proof
+against the project trust anchors and remains fail-closed for every race.
+
 ## Candidate 84f8200c7878d5f7f7ecaecc04ab0d37a670ae1d — 2026-09-13, signed bootstrap acknowledgement recovery completion
 
 - ADR-0010: checked, no change needed.
