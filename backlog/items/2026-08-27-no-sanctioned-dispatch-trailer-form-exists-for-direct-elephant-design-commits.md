@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Flagged independently by both 2026-08-27 design-review Critics (round 1A finding F1, round 1B finding F10; reports under specs/sprint-alfred-epic/evidence/critic/); scope question resolved against docs/operating-model.md §3.3 in the round-1 response."
+done_when: manual
 ---
 
 # No sanctioned `Dispatch:` trailer form exists for direct Elephant design-phase commits

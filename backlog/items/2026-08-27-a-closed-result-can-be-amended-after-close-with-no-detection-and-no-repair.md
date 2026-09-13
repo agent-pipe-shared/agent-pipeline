@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Hit live, 2026-08-27, in the Alfred clone: the sprint-nova-epic discard exposed a 2026-07-31 post-close amendment to the 0.4.7-hotfix Result that had been invisible for four weeks. Full incident narrative: scratch/incident-report.md of that session; durable facts restated here in full."
+done_when: manual
 ---
 
 # A closed Result can be amended after close; nothing detects it until an unrelated lifecycle transition, and then no bounded repair exists

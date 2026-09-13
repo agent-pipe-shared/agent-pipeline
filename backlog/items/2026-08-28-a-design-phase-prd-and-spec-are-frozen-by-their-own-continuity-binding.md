@@ -7,6 +7,7 @@ status: open
 created: 2026-08-28
 sprint: alfred
 source: "Measured live 2026-08-28 in the Alfred clone, applying the PO's own PRD-gate decisions to the PRD and Spec the gate is about."
+done_when: manual
 ---
 
 # A design-phase PRD and Spec are frozen by their own continuity binding, and the release route the refusal names is a no-op in exactly that state

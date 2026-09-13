@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Measured 2026-08-27 in the Alfred clone (fresh clone of the Nova line): each missing machine-local artifact surfaced as an isolated refusal at a different lifecycle point, none at bootstrap."
+done_when: manual
 ---
 
 # A fresh clone loses all machine-local Pipeline state, and every gate discovers it one refusal at a time

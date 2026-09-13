@@ -7,6 +7,7 @@ status: open
 created: 2026-08-28
 sprint: alfred
 source: "Measured live 2026-08-28 in the Alfred clone: two attended PO acknowledge ceremonies, the first failing its postimage readback and rolling back, the second succeeding with an explicit --runner flag."
+done_when: manual
 ---
 
 # The attended PO acknowledge gate defaults to a runner that cannot satisfy its own postimage readback

@@ -7,6 +7,7 @@ status: open
 created: 2026-08-27
 sprint: alfred
 source: "Second measured occurrence, 2026-08-27, in the Alfred clone (submit-plan refused with PLAN-SUBMIT-CONTINUITY-INVALID after a clean set-feature). First occurrence documented in specs/sprint-phoenix-epic/RECOVERY.md (2026-07, 'second integration gap')."
+done_when: manual
 ---
 
 # The sanctioned `set-feature` → `submit-plan` path is not closed: it silently requires a coordinator-only `continuity-init` in between
