@@ -774,7 +774,7 @@ export function main(args = process.argv.slice(2), {
       activate: options.activate, spawn: deps?.spawn ?? hostSpawnSync, deps,
     });
     else if (options.command === "bootstrap-acknowledge-chat-apply") output = applyOnboardingBootstrapAcknowledgement({
-      rootDir: options.root, expectedPlanSha256: options.planSha256, chatConfirmed: true,
+      rootDir: options.root, expectedPlanSha256: options.planSha256, attendedChat: true,
       activate: options.activate, spawn: deps?.spawn ?? hostSpawnSync, deps,
     });
     else {

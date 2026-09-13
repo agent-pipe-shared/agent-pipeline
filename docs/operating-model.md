@@ -215,12 +215,16 @@ normative shape is:
    Approval is recorded before the first implementation dispatch; it is never
    inferred from chat, an old plan, or an implementor's confidence. The
    marker mechanism that records it is now mechanically enforced, not
-   prose-only: `po-authority-acknowledge-apply` (the command that writes the
-   acknowledgement marker) is wired through the same attended chat-gate
-   ceremony every other human gate uses ([ADR-0021](adr/0021-prd-po-gate.md)
-   2026-08-25 addendum; [ADR-0061](adr/0061-uniform-human-approval-ceremony.md)
-   Decision 2) — an agent's own tool call cannot complete it, no signature/
-   chat mode branch exists for it, and it applies unconditionally.
+   prose-only. The bound-authority repair `po-authority-acknowledge-apply`
+   remains an attended chat-gate ceremony. The earlier staging route
+   `bootstrap-acknowledge-*` follows the committed `gates.human_approval`
+   posture: `signature` uses the shared `po-human-approval.mjs` proof
+   ceremony; `chat` uses the shared attended-TTY ceremony. Both are exact
+   PRD/spec-bound external-operator actions for every runner, so an agent's
+   own tool call cannot complete the confirming write and the PO is never
+   asked to edit a marker line manually. See
+   [ADR-0021](adr/0021-prd-po-gate.md) (2026-09-13 addendum) and
+   [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) Decision 2.
    **Post-approval continuation.** Once that required plan gate is recorded,
    internal implementation slices and packages within its approved scope
    continue autonomously. Dispatch, required evidence gates, Critic review and

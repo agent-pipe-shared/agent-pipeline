@@ -3305,7 +3305,6 @@ test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is a
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
       "bootstrap-acknowledge-plan": {},
-      "bootstrap-acknowledge-chat-apply": { "--plan-sha256": "c".repeat(64) },
       "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
     };
     assert.deepEqual(
@@ -3342,7 +3341,6 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
       "intake-generate-apply": { "--plan-sha256": "a".repeat(64) },
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
       "bootstrap-acknowledge-plan": {},
-      "bootstrap-acknowledge-chat-apply": { "--plan-sha256": "c".repeat(64) },
       "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
     };
     for (const name of Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES)) {
@@ -3350,6 +3348,15 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
       const command = `node '${ONBOARDING_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("bootstrap chat acknowledgement remains outside the non-ready agent lane", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-chat-apply --root '${path}' --plan-sha256 '${"c".repeat(64)}' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), false);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

@@ -83,6 +83,11 @@ import {
 } from "./worktree-lifecycle.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+import {
+  CHAT_GATE_CONFIRMATION_MISMATCH,
+  CHAT_GATE_NOT_ATTENDED,
+  requireAttendedChatGateConfirmation,
+} from "./chat-gate-ceremony.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { resolveRepoScopedDirectory } from "./po-key-directory.mjs";
 
@@ -6766,10 +6771,29 @@ function bootstrapAcknowledgementSignAction(plan, directory) {
   };
 }
 
-// Plan/design acknowledgement is a chat gate, not an external-effect
-// authorization. This read-only reconstruction binds the exact PRD and spec
-// bytes that the PO reviewed before the runner executes the chat-confirmed
-// apply action.
+function bootstrapAcknowledgementChatConfirmation(intentSha256) {
+  return `BOOTSTRAP-ACK-${intentSha256.slice(0, 12).toUpperCase()}`;
+}
+
+function bootstrapAcknowledgementChatAction(plan) {
+  return {
+    kind: "external-operator",
+    executionBoundary: "attended-external-tool",
+    invocation: "user-copy-only",
+    mutation: true,
+    requiresConfirmation: true,
+    executable: process.execPath,
+    argv: [DEFAULT_ONBOARDING_SCRIPT, "bootstrap-acknowledge-chat-apply", "--root", plan.root,
+      "--plan-sha256", plan.intentSha256, "--activate"],
+    expected: { schema: BOOTSTRAP_ACKNOWLEDGEMENT_APPLY_SCHEMA, statuses: ["applied"] },
+  };
+}
+
+// Chat-mode acknowledgement has the same PRD/spec and digest binding as the
+// signature route, but its human boundary is an attended terminal.  It is
+// deliberately an external-operator action: a runner seeing the challenge
+// must never be able to execute the confirming write in its own non-TTY tool
+// lane.
 export function planOnboardingBootstrapAcknowledgementChat({
   rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
 } = {}) {
@@ -6781,6 +6805,7 @@ export function planOnboardingBootstrapAcknowledgementChat({
     intentSha256: plan.intentSha256,
     prd: plan.action.prd,
     spec: plan.action.spec,
+    nextAction: bootstrapAcknowledgementChatAction(plan),
   };
 }
 
@@ -6836,7 +6861,7 @@ export function observeOnboardingBootstrapAcknowledgementSignature({
 }
 
 export function applyOnboardingBootstrapAcknowledgement({
-  rootDir, expectedPlanSha256, proofPath, chatConfirmed = false, activate = false, repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
+  rootDir, expectedPlanSha256, proofPath, attendedChat = false, activate = false, repositoryCapability = "local", spawn = defaultGitSpawn, deps = {},
 } = {}) {
   if (activate !== true) fail("BOOTSTRAP-ACK-ACTIVATION-REQUIRED", "plan acknowledgement apply requires explicit activation");
   const plan = bootstrapAcknowledgementPlan({ rootDir, repositoryCapability, spawn });
@@ -6850,7 +6875,29 @@ export function applyOnboardingBootstrapAcknowledgement({
     fail("BOOTSTRAP-ACK-PLAN-DRIFT", "the signature acknowledgement plan is no longer current");
   }
   let verified = null;
-  if (!chatConfirmed) {
+  if (attendedChat) {
+    const confirmation = requireAttendedChatGateConfirmation({
+      summaryLines: [
+        "BOOTSTRAP PLAN ACKNOWLEDGEMENT — read before you type the confirmation value:",
+        `Repository: ${plan.root}`,
+        `PRD: ${plan.action.prd.path} (sha256 ${plan.action.prd.sha256})`,
+        `Specification: ${plan.action.spec.path} (sha256 ${plan.action.spec.sha256})`,
+        `Plan digest: ${plan.intentSha256}`,
+      ],
+      expected: bootstrapAcknowledgementChatConfirmation(plan.intentSha256),
+      dependencies: deps,
+    });
+    if (!confirmation.ok) {
+      fail(
+        confirmation.code === CHAT_GATE_NOT_ATTENDED
+          ? "BOOTSTRAP-ACK-CHAT-NOT-ATTENDED"
+          : confirmation.code === CHAT_GATE_CONFIRMATION_MISMATCH
+            ? "BOOTSTRAP-ACK-CHAT-CONFIRMATION-MISMATCH"
+            : "BOOTSTRAP-ACK-CHAT-CONFIRMATION-UNAVAILABLE",
+        "chat acknowledgement must be confirmed by the PO in an attended terminal",
+      );
+    }
+  } else {
     if (proofPath !== plan.proofPath) fail("BOOTSTRAP-ACK-PROOF-PATH", "the signature acknowledgement proof path is not the plan-bound scratch path");
     if (readExactBootstrapAcknowledgementRequest(plan.root, plan).status !== "present") fail("BOOTSTRAP-ACK-REQUEST-DRIFT", "the signature acknowledgement request is absent or changed");
     const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
@@ -6915,7 +6962,7 @@ export function applyOnboardingBootstrapAcknowledgement({
     spec: plan.action.spec,
     signer: verified?.signer ?? null,
     proofSha256: verified?.proofSha256 ?? null,
-    acknowledgementMode: chatConfirmed ? "chat" : "signature",
+    acknowledgementMode: attendedChat ? "chat" : "signature",
   };
 }
 

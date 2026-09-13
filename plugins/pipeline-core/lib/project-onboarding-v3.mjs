@@ -44,6 +44,7 @@ import {
   KICKOFF_GOAL_MAX_BYTES,
   KICKOFF_PROMOTION_PLAN_SCHEMA,
   observeBootstrapBindAcknowledgement,
+  observeOnboardingBootstrapAcknowledgementSignature,
   planOnboardingBootstrapAcknowledgementChat,
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
@@ -99,7 +100,7 @@ import {
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
-import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3 } from "./critical-human-proof-policy.mjs";
+import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
 
@@ -2445,12 +2446,51 @@ function bootstrapBindPlanAction(root, runner, intent) {
   );
 }
 
-// A staging PRD authored after generation needs an explicit PO chat decision,
-// but plan/design gates never require an external signature. The returned
-// command is exact-plan bound and requires runner confirmation; Codex/Claude
-// invoke it only after the PO confirms in chat, while Antigravity can present
-// the same command to its attended user.
-function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, spawn) {
+// An authored staging PRD has one policy-selected acknowledgement boundary for
+// every runner.  Chat policy uses an attended terminal; signature policy uses
+// the existing detached proof.  Neither path asks a PO to edit a marker by
+// hand, and neither lets a non-ready agent execute the confirming write.
+function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signatureObservation, signatureMode, spawn) {
+  if (signatureMode) {
+    if (signatureObservation?.requestStatus === "present" && signatureObservation.proofVerificationStatus === "verified") {
+      return {
+        kind: "external-operator",
+        mutation: true,
+        requiresConfirmation: false,
+        executionBoundary: "attended-external-tool",
+        invocation: "user-copy-only",
+        guidance: `The reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) and specification (${spec.path}, sha256 ${spec.sha256}) have a valid plan-bound signature. Run the exact external acknowledgement action below; do not edit an acknowledgement marker manually.`,
+        action: {
+          kind: "external-operator",
+          executionBoundary: "attended-external-tool",
+          invocation: "user-copy-only",
+          mutation: true,
+          requiresConfirmation: false,
+          executable: process.execPath,
+          argv: [ONBOARDING_SCRIPT, "bootstrap-acknowledge-apply", "--root", root,
+            "--plan-sha256", signatureObservation.intentSha256, "--proof", signatureObservation.proofPath, "--activate"],
+          expected: { schema: "pipeline.bootstrap-plan-acknowledgement-apply.v1", statuses: ["applied"] },
+        },
+        expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
+      };
+    }
+    if (signatureObservation?.requestStatus === "present" && signatureObservation.signAction !== null) {
+      return {
+        kind: "external-operator",
+        mutation: false,
+        requiresConfirmation: true,
+        executionBoundary: "attended-external-tool",
+        invocation: "user-copy-only",
+        guidance: `The reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) and specification (${spec.path}, sha256 ${spec.sha256}) require the configured detached-signature acknowledgement. Run the exact host-terminal sign action below; it writes the plan-bound proof back into this repository's scratch directory. Do not edit an acknowledgement marker manually.`,
+        action: signatureObservation.signAction,
+        expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
+      };
+    }
+    return commandAction(
+      lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-plan", "--root", root, "--activate"], runner, intent),
+      true, false, "pipeline.bootstrap-plan-acknowledgement-plan.v1", ["signature-required"],
+    );
+  }
   let plan;
   try { plan = planOnboardingBootstrapAcknowledgementChat({ rootDir: root, spawn }); } catch {
     return {
@@ -2460,12 +2500,9 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, spawn)
     };
   }
   return {
-    ...commandAction(
-      lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-chat-apply", "--root", root,
-        "--plan-sha256", plan.intentSha256, "--activate"], runner, intent),
-      true, true, "pipeline.bootstrap-plan-acknowledgement-apply.v1", ["applied"],
-    ),
-    guidance: `After the PO confirms in chat that staging PRD ${prd.path} (sha256 ${prd.sha256}) is content-sound and consistent with ${spec.path} (sha256 ${spec.sha256}), run this exact bound acknowledgement action. Do not ask the PO to edit the PRD manually.`,
+    ...plan.nextAction,
+    guidance: `After the PO confirms that staging PRD ${prd.path} (sha256 ${prd.sha256}) is content-sound and consistent with ${spec.path} (sha256 ${spec.sha256}), have the PO run this exact attended-terminal acknowledgement action. Do not ask the PO to edit the PRD manually.`,
+    expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
   };
 }
 
@@ -2940,11 +2977,28 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       const needsAcknowledgement = acknowledgement !== null
         && acknowledgement.acknowledged === false
         && acknowledgement.exempt !== true;
+      let signatureObservation = null;
+      let signatureMode = false;
+      if (needsAcknowledgement) {
+        try {
+          const approval = (fs.readHumanApprovalMode ?? readHumanApprovalMode)(root, { spawn: fs.spawnSync });
+          signatureMode = approval.mode === "signature";
+          if (signatureMode) {
+            signatureObservation = (fs.observeOnboardingBootstrapAcknowledgementSignature ?? observeOnboardingBootstrapAcknowledgementSignature)({
+              rootDir: root, repositoryCapability: repository.mode, spawn: fs.spawnSync, deps: fs,
+            });
+          }
+        } catch {
+          // A missing/unreadable posture must not silently weaken the default
+          // signature boundary.  The planner below returns its typed repair.
+          signatureMode = true;
+        }
+      }
       return lifecycleResult({
         status: "bootstrap-binding-required",
         root, runner, intent, repository, runtime, continuity, appServer,
         nextAction: needsAcknowledgement
-          ? collectPrdAcknowledgementAction(root, runner, intent, acknowledgement.prd, acknowledgement.spec, fs.spawnSync)
+          ? collectPrdAcknowledgementAction(root, runner, intent, acknowledgement.prd, acknowledgement.spec, signatureObservation, signatureMode, fs.spawnSync)
           : bootstrapBindPlanAction(root, runner, intent),
         diagnostics: [lifecycleDiagnostic(
           "$.continuity",
@@ -2953,7 +3007,9 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
             ? "staging PRD/spec/design-input are generated but the PO has not yet acknowledged the staging PRD"
             : "staging PRD/spec/design-input are generated but not yet bound as authority",
           needsAcknowledgement
-            ? "ask the PO to review the staging PRD and specification, then run the exact digest-bound chat acknowledgement action after their confirmation; do not edit an acknowledgement marker manually"
+            ? (signatureMode
+              ? "ask the PO to review the staging PRD and specification, then follow the exact detached-signature acknowledgement action; do not edit an acknowledgement marker manually"
+              : "ask the PO to review the staging PRD and specification, then have them run the exact attended-terminal acknowledgement action; do not edit an acknowledgement marker manually")
             : "review the read-only bootstrap-bind-plan action, then apply it",
         )],
       });

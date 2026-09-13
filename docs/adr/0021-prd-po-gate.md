@@ -49,6 +49,30 @@ Implemented in: `plugins/pipeline-core/scripts/pipeline-state.mjs` (`po-authorit
 
 The compared value is now `PO_ACK_APPLY_CONFIRMATION_TOKEN` (`plugins/pipeline-core/scripts/pipeline-state.mjs`, literal `"CONFIRM"`) — a fixed literal baked into the code, never generated or persisted between calls, so it needs no exception to ADR-0061 Decision 1's "hash pasted from one output into another input" prohibition (nothing is pasted between calls; it is typed back within the same attended call that displays it). `--by` stays fully disclosed, unchanged, in the confirmation summary the human reads and in the durable `poGateAcknowledgement` record — only the COMPARED value changed. This converges `po-authority-acknowledge-apply` on the same short-bounded-ASCII-token shape kickoff's `--language`/`--profile` gate and `human-guard-override.mjs`'s activation gate already used, so it is no longer the odd one out among `requireAttendedChatGateConfirmation()` callers.
 
+## Addendum (2026-09-13, Nova-B8): bootstrap staging acknowledgement follows the configured human-approval posture
+
+This addendum concerns the earlier, **pre-bind** staging route only:
+`bootstrap-acknowledge-*` records review of an authored generated PRD before
+`bootstrap-bind-*` can promote it into plan authority. It does not weaken or
+replace the bound-authority repair described above.
+
+The route now selects the repository's already-configured
+`gates.human_approval` posture consistently for Claude, Codex and
+Antigravity. In `signature` posture it creates and verifies the exact
+PRD/spec-bound detached proof through the existing
+`po-human-approval.mjs` setup/sign/verify module; no second key or signature
+implementation exists. In `chat` posture it uses the existing
+`requireAttendedChatGateConfirmation()` TTY boundary and an exact
+PRD/spec-bound confirmation command. Both routes are rendered as
+`external-operator`, `attended-external-tool`, `user-copy-only` actions. A
+runner cannot execute either confirming write in its own lifecycle lane, and
+the PO is never asked to edit a marker line manually.
+
+If the PRD or spec changes before acknowledgement, its digest-bound action is
+invalidated without replacing the document. A fresh inspection returns the
+new exact action. This is deliberate recovery, not automatic rollback: the
+Pipeline may not erase an authored document merely to make a gate pass.
+
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # ADR-0021: PRD-PO-Gate vor dem ersten Implementierungs-Dispatch

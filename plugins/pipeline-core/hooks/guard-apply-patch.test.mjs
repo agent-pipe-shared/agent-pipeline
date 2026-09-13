@@ -396,17 +396,15 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     const postAuthoring = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
     assert.equal(postAuthoring.status, "bootstrap-binding-required", JSON.stringify(postAuthoring));
     assert.equal(postAuthoring.nextAction?.kind, "command", JSON.stringify(postAuthoring));
-    assert.equal(postAuthoring.nextAction.argv[1], "bootstrap-acknowledge-chat-apply");
+    assert.equal(postAuthoring.nextAction.argv[1], "bootstrap-acknowledge-plan");
     assert.deepEqual(postAuthoring.nextAction.argv.slice(2, 4), ["--root", created.root], JSON.stringify(postAuthoring));
-    assert.equal(postAuthoring.nextAction.argv[4], "--plan-sha256");
-    assert.match(postAuthoring.nextAction.argv[5], /^[a-f0-9]{64}$/u);
-    assert.deepEqual(postAuthoring.nextAction.argv.slice(6), ["--activate", "--runner", "codex"]);
-    assert.equal(postAuthoring.nextAction.requiresConfirmation, true);
-    assert.equal(postAuthoring.nextAction.expected?.schema, "pipeline.bootstrap-plan-acknowledgement-apply.v1");
-    assert.deepEqual(postAuthoring.nextAction.expected?.statuses, ["applied"]);
+    assert.deepEqual(postAuthoring.nextAction.argv.slice(4), ["--activate", "--runner", "codex"]);
+    assert.equal(postAuthoring.nextAction.requiresConfirmation, false);
+    assert.equal(postAuthoring.nextAction.expected?.schema, "pipeline.bootstrap-plan-acknowledgement-plan.v1");
+    assert.deepEqual(postAuthoring.nextAction.expected?.statuses, ["signature-required"]);
     // Bootstrap binding is deliberately earlier than plan approval. This test
-    // proves its bounded authoring window and returns the real chat-confirmed
-    // acknowledgement action; it never fabricates the marker or a binding approval.
+    // proves its bounded authoring window and returns only the signature
+    // planner; it never fabricates the marker or a binding approval.
     assert.notEqual(postAuthoring.status, "ready");
     nativeDenial(
       runNativeCodexPatchGuard(

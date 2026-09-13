@@ -65,7 +65,7 @@ import {
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import {
   applyOnboardingBootstrapBind, applyOnboardingIntakeGenerate, observeBootstrapBindAcknowledgement,
-  planOnboardingBootstrapBind, planOnboardingBootstrapAcknowledgement, applyOnboardingBootstrapAcknowledgement,
+  planOnboardingBootstrapBind, planOnboardingBootstrapAcknowledgement, planOnboardingBootstrapAcknowledgementChat, applyOnboardingBootstrapAcknowledgement,
   planOnboardingIntakeGenerate, readOnboardingIntakeCheckpoint,
   readOnboardingSessionCleanupBinding,
 } from "./onboarding-continuity.mjs";
@@ -8475,7 +8475,7 @@ test("all three runners execute the exact returned consent and design-question a
   }
 });
 
-test("bootstrap-binding-required routes a hand-authored staging PRD through the exact chat-confirmed acknowledgement and then binds", () => {
+test("bootstrap-binding-required routes a hand-authored staging PRD through its policy-selected acknowledgement and then binds", () => {
   const path = root();
   let stderr = "";
   const intakeDeps = { ...fakeDeps, spawn: fakeGit };
@@ -8532,20 +8532,27 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     const prdAbsolutePath = join(path, exemptObservation.prd.path);
     writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n`, "utf8");
 
-    // While the marker is missing and required, every approval posture returns
-    // the same chat-confirmed, digest-bound apply driver -- never an external
-    // signer ceremony and never the bind command that would fail.
+    // Chat posture is one runner-neutral attended-terminal action.  It cannot
+    // be run in the agent lane, even when a runner has just observed it.
     const before = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
     assert.equal(before.acknowledged, false);
     assert.equal(before.exempt, false, "a hand-edited draft is no longer exempt");
+    const chatDeps = {
+      ...fakeDeps,
+      spawn: fakeGit,
+      readHumanApprovalMode: () => ({ mode: "chat", source: "test", key: "gates.human_approval", scope: "global" }),
+    };
+    let chatAction = null;
     for (const runner of ["claude", "codex", "antigravity"]) {
-      const beforeAck = inspectProjectOnboardingV3({ runner, rootDir: path, deps: fakeDeps });
+      const beforeAck = inspectProjectOnboardingV3({ runner, rootDir: path, deps: chatDeps });
       assert.equal(beforeAck.status, "bootstrap-binding-required", runner);
-      assert.equal(beforeAck.nextAction.kind, "command", runner);
-      assert.equal(beforeAck.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
-      assert.equal(beforeAck.nextAction.argv.at(-1), runner, runner);
-      assert.equal(beforeAck.nextAction.argv.includes("--activate"), true, runner);
+      assert.equal(beforeAck.nextAction.kind, "external-operator", runner);
+      assert.equal(beforeAck.nextAction.executionBoundary, "attended-external-tool", runner);
+      assert.equal(beforeAck.nextAction.invocation, "user-copy-only", runner);
       assert.equal(beforeAck.nextAction.requiresConfirmation, true, runner);
+      assert.equal(beforeAck.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
+      if (chatAction === null) chatAction = beforeAck.nextAction;
+      else assert.deepEqual(beforeAck.nextAction.argv, chatAction.argv, `${runner}: identical cross-runner chat action argv`);
     }
 
     // DoD 5: bootstrap-bind-plan's own direct refusal for a caller that
@@ -8562,6 +8569,7 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     const signatureDeps = {
       ...intakeDeps,
       readMachinePlane: () => ({ status: "valid", plane: { poKeyDirectory: "/external/po-key" } }),
+      readHumanApprovalMode: () => ({ mode: "signature", source: "test", key: "gates.human_approval", scope: "global" }),
       readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256 }] }),
       readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "test-po-key", publicKeySha256 } }),
     };
@@ -8594,8 +8602,9 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
         readConfiguredPoTrustAnchor: () => ({ status: "present", anchor: { keyReference: "other-key", publicKeySha256: "b".repeat(64) } }),
       },
     }), (error) => error?.code === "BOOTSTRAP-ACK-SIGNER-TRUST-MISMATCH");
-    // Keep the legacy explicit-signature API covered independently. The
-    // inspection route below must not select it for this non-final plan gate.
+    // Signature posture uses the existing shared proof module; inspection
+    // offers its external sign action to every runner rather than a fakeable
+    // in-session acknowledgement command.
     const acknowledgementPlanRun = invoke([
       "bootstrap-acknowledge-plan", "--root", path, "--activate", "--runner", "codex",
     ], signatureDeps);
@@ -8613,11 +8622,13 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     const proofAbsolute = join(path, acknowledgementPlan.proofPath);
     for (const runner of ["claude", "codex", "antigravity"]) {
       const awaitingHuman = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
-      assert.equal(awaitingHuman.nextAction.kind, "command", runner);
-      assert.equal(awaitingHuman.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
+      assert.equal(awaitingHuman.nextAction.kind, "external-operator", runner);
+      assert.equal(awaitingHuman.nextAction.executionBoundary, "attended-external-tool", runner);
+      assert.equal(awaitingHuman.nextAction.action.argv[1], "sign-intent", runner);
       assert.equal(awaitingHuman.nextAction.requiresConfirmation, true, runner);
     }
-    // The non-final chat route does not depend on a host signing directory.
+    // Signature posture fails closed to its typed planner if the signing
+    // material is unavailable; it never silently falls back to chat.
     for (const runner of ["claude", "codex", "antigravity"]) {
       const missingSigningDirectory = inspectProjectOnboardingV3({
         runner,
@@ -8625,8 +8636,7 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
         deps: { ...signatureDeps, readMachinePlane: () => ({ status: "valid", plane: {} }) },
       });
       assert.equal(missingSigningDirectory.nextAction.kind, "command", runner);
-      assert.equal(missingSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
-      assert.equal(missingSigningDirectory.nextAction.action, undefined, runner);
+      assert.equal(missingSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
     }
     // A mismatching signing directory likewise cannot alter the chat route.
     for (const runner of ["claude", "codex", "antigravity"]) {
@@ -8639,8 +8649,7 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
         },
       });
       assert.equal(mismatchedSigningDirectory.nextAction.kind, "command", runner);
-      assert.equal(mismatchedSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
-      assert.equal(mismatchedSigningDirectory.nextAction.action, undefined, runner);
+      assert.equal(mismatchedSigningDirectory.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
     }
     // A v3 policy with no listed anchors intentionally accepts any well-formed
     // Ed25519 signer. Planning must mirror apply's unrestricted contract.
@@ -8654,8 +8663,8 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     assert.equal(unrestrictedPlan.status, "signature-required");
     for (const runner of ["claude", "codex", "antigravity"]) {
       const unrestricted = inspectProjectOnboardingV3({ runner, rootDir: path, deps: unrestrictedSignatureDeps });
-      assert.equal(unrestricted.nextAction.kind, "command", runner);
-      assert.equal(unrestricted.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
+      assert.equal(unrestricted.nextAction.kind, "external-operator", runner);
+      assert.equal(unrestricted.nextAction.action.argv[1], "sign-intent", runner);
       assert.equal(unrestricted.nextAction.requiresConfirmation, true, runner);
     }
     // A trust-policy symlink is rejected by the human signer itself. The
@@ -8676,7 +8685,7 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     for (const runner of ["claude", "codex", "antigravity"]) {
       const unsafePolicy = inspectProjectOnboardingV3({ runner, rootDir: path, deps: unsafePolicyDeps });
       assert.equal(unsafePolicy.nextAction.kind, "command", runner);
-      assert.equal(unsafePolicy.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
+      assert.equal(unsafePolicy.nextAction.argv[1], "bootstrap-acknowledge-plan", runner);
     }
     rmSync(unsafePolicyDirectory, { recursive: true, force: true });
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
@@ -8685,12 +8694,12 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     }), (error) => error?.code === "BOOTSTRAP-ACK-PLAN-DRIFT");
     const prdPreimage = readFileSync(prdAbsolutePath, "utf8");
     writeFileSync(proofAbsolute, JSON.stringify({ ...proof, signatureBase64: "AAAA" }), "utf8");
-    // A stray invalid legacy proof cannot change the non-final chat route.
-    // Every runner continues to expose the exact chat-confirmed driver.
+    // A stray invalid proof cannot manufacture acknowledgement; every runner
+    // continues to expose only the external sign action.
     for (const runner of ["claude", "codex", "antigravity"]) {
       const invalidProof = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
-      assert.equal(invalidProof.nextAction.kind, "command", runner);
-      assert.equal(invalidProof.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
+      assert.equal(invalidProof.nextAction.kind, "external-operator", runner);
+      assert.equal(invalidProof.nextAction.action.argv[1], "sign-intent", runner);
     }
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
       rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
@@ -8700,10 +8709,9 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     writeFileSync(proofAbsolute, JSON.stringify(proof), "utf8");
     for (const runner of ["claude", "codex", "antigravity"]) {
       const signed = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
-      assert.equal(signed.nextAction.kind, "command", runner);
-      assert.equal(signed.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
-      assert.equal(signed.nextAction.argv.includes(acknowledgementPlan.intentSha256), true, runner);
-      assert.equal(signed.nextAction.argv.at(-1), runner, runner);
+      assert.equal(signed.nextAction.kind, "external-operator", runner);
+      assert.equal(signed.nextAction.action.argv[1], "bootstrap-acknowledge-apply", runner);
+      assert.equal(signed.nextAction.action.argv.includes(acknowledgementPlan.intentSha256), true, runner);
     }
     const proofPolicy = {
       readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") }] }),
@@ -8735,12 +8743,13 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
     assert.equal(readFileSync(prdAbsolutePath, "utf8"), prdPreimage);
     unlinkSync(acknowledgementTemporaryPath);
     const acknowledgementApplyRun = invoke([
-      "bootstrap-acknowledge-chat-apply", "--root", path, "--plan-sha256", acknowledgementPlan.intentSha256,
-      "--activate", "--runner", "codex",
-    ], intakeDeps);
+      "bootstrap-acknowledge-apply", "--root", path, "--plan-sha256", acknowledgementPlan.intentSha256,
+      "--proof", acknowledgementPlan.proofPath, "--activate", "--runner", "codex",
+    ], signatureDeps);
     assert.equal(acknowledgementApplyRun.code, 0, stderr);
     const acknowledgementApplied = acknowledgementApplyRun.result;
     assert.equal(acknowledgementApplied.status, "applied");
+    assert.equal(acknowledgementApplied.acknowledgementMode, "signature");
     assert.equal(readFileSync(prdAbsolutePath, "utf8").includes(PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER), true);
 
     // DoD 2: once the marker is present, nextAction is bootstrap-bind-plan
@@ -8765,6 +8774,65 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       deps: { spawn: fakeGit, initializePoGateProfileReceipt: fakeDeps.initializePoGateProfileReceipt },
     });
     assert.equal(bindApplied.status, "applied");
+  } finally { dispose(path); }
+});
+
+test("chat acknowledgement requires a real attended terminal and never lets a runner forge the PRD marker", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    const intakeDeps = { ...fakeDeps, spawn: fakeGit };
+    const consent = onboardingCli([
+      "intake-consent-apply", "--root", path, "--granted", "--profile", "feature", "--language", "en", "--activate", "--runner", "codex",
+    ], { deps: intakeDeps, write: () => {}, writeError: () => {} });
+    assert.equal(consent, 0);
+    const capture = onboardingCli([
+      "intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex",
+    ], { deps: intakeDeps, write: () => {}, writeError: () => {} });
+    assert.equal(capture, 0);
+    const answers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely." }]);
+    const answer = onboardingCli([
+      "intake-design-questions-apply", "--root", path, "--answers-json", answers, "--activate", "--runner", "codex",
+    ], { deps: intakeDeps, write: () => {}, writeError: () => {} });
+    assert.equal(answer, 0);
+    const generated = planOnboardingIntakeGenerate({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    applyOnboardingIntakeGenerate({
+      rootDir: path, repositoryCapability: "local", expectedPlanSha256: generated.planSha256, activate: true, deps: { spawn: fakeGit },
+    });
+    const observation = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    const prdPath = join(path, observation.prd.path);
+    writeFileSync(prdPath, `${readFileSync(prdPath, "utf8")}\nHuman-reviewed change.\n`, "utf8");
+    const plan = planOnboardingBootstrapAcknowledgementChat({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    assert.equal(plan.nextAction.kind, "external-operator");
+    assert.equal(plan.nextAction.executionBoundary, "attended-external-tool");
+    const preimage = readFileSync(prdPath, "utf8");
+    const common = {
+      rootDir: path,
+      repositoryCapability: "local",
+      spawn: fakeGit,
+      expectedPlanSha256: plan.intentSha256,
+      attendedChat: true,
+      activate: true,
+    };
+    assert.throws(() => applyOnboardingBootstrapAcknowledgement({ ...common }),
+      (error) => error?.code === "BOOTSTRAP-ACK-CHAT-NOT-ATTENDED");
+    assert.equal(readFileSync(prdPath, "utf8"), preimage);
+    assert.throws(() => applyOnboardingBootstrapAcknowledgement({
+      ...common,
+      deps: { isattyFn: () => true, readLineFn: () => "wrong" },
+    }), (error) => error?.code === "BOOTSTRAP-ACK-CHAT-CONFIRMATION-MISMATCH");
+    assert.equal(readFileSync(prdPath, "utf8"), preimage);
+    const applied = applyOnboardingBootstrapAcknowledgement({
+      ...common,
+      deps: {
+        isattyFn: () => true,
+        readLineFn: () => `BOOTSTRAP-ACK-${plan.intentSha256.slice(0, 12).toUpperCase()}`,
+      },
+    });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.acknowledgementMode, "chat");
+    assert.equal(readFileSync(prdPath, "utf8").includes(PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER), true);
   } finally { dispose(path); }
 });
 
