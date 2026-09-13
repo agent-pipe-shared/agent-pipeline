@@ -47,6 +47,32 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 296ae11b1c0745d648aa2fba0dbbee6759600b52 — 2026-09-13, native apply-patch acknowledgement-route regression coverage
+
+- ADR-0010: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0058: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0064: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0072: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+
+The native Codex apply-patch adapter's greenfield regression now follows the
+same chat-confirmed, exact-digest acknowledgement route returned by the
+onboarding controller. It asserts the required root, plan digest, activation,
+runner, confirmation, and typed apply result while retaining the pre-plan
+authoring boundary. This is test coverage only; it does not widen the adapter
+or lifecycle admission. Final external-effect signing remains separate.
+
 ## Candidate 20114936bc21f0480407cd563b90e44b7eeb5f73 — 2026-09-13, chat-bound plan acknowledgement recovery
 
 - ADR-0010: checked, no change needed.
