@@ -2570,7 +2570,7 @@ function sameReleaseProof(receipt, proof) {
     && receipt.closeEntrySha256 === proof.closeEntrySha256;
 }
 
-function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
+export function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
   const observed = observeMachineState(rootDir, spawn);
   const { state } = observed;
   if (!isObject(state.activeFeature)

@@ -181,7 +181,7 @@
 | pipeline.delivery-is-not-always-a-git-push | open | workflow-improvement | pipeline | batman | 2026-08-28 | — | Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate |
 | pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | open | defect | pipeline | alfred | 2026-08-28 | — | — |
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
-| pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | open | defect | pipeline | alfred | 2026-08-27 | — | — |
+| pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-07-27 | — |
@@ -673,8 +673,8 @@
 
 ## Counts
 
-- open: 77
+- open: 76
 - in_progress: 1
-- closed: 573
+- closed: 574
 - rejected: 3
 - deferred: 11

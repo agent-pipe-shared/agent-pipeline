@@ -746,6 +746,7 @@ const TEST_SUITES = [
   { name: "pipeline-state-approve-announce-tests", file: join(pluginScriptsDir, "pipeline-state-approve-announce.test.mjs") },
   { name: "pipeline-state-approve-push-argv-closure-tests", file: join(pluginScriptsDir, "pipeline-state-approve-push-argv-closure.test.mjs") },
   { name: "pipeline-state-discard-feature-tests", file: join(pluginScriptsDir, "pipeline-state-discard-feature.test.mjs") },
+  { name: "pipeline-state-observer-conformance-tests", file: join(pluginScriptsDir, "pipeline-state-observer-conformance.test.mjs") },
   { name: "pipeline-state-gate-action-event-tests", file: join(pluginScriptsDir, "pipeline-state-gate-action-event.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `PSG${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "pipeline-state-inspect-tests", file: join(pluginScriptsDir, "pipeline-state-inspect.test.mjs") },
   { name: "scripts-pipeline-state-tests", file: join(pluginScriptsDir, "pipeline-state.test.mjs") },

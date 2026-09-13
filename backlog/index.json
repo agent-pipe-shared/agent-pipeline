@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c30fa3033edf800030a8f78dbbde305fe5be524f59c488ef7fe66cc5ac3f0456"
+    "transitionHead": "150163dcf773d8f4cadf47fc6aa1c794ac8ad46303f0fb8cfd62e5bf5d3313a0"
   },
   "counts": {
-    "open": 77,
+    "open": 76,
     "in_progress": 1,
-    "closed": 573,
+    "closed": 574,
     "rejected": 3,
     "deferred": 11
   },
@@ -2340,13 +2340,17 @@
     },
     {
       "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Hit live, 2026-08-27, in the Alfred clone, executing the epic switch the tool itself directs (discard-feature then set-feature). Reproduced against the source the same session; line references verified.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d590bbfdbdbc3c6e44a6ecf124d6b5015da9f481",
+      "closureEvidence": "backlog/evidence/2026-09-13-discard-feature-observer-conformance.md"
     },
     {
       "id": "pipeline.discarded-feature-dead-end",
