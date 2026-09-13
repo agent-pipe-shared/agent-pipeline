@@ -47,13 +47,26 @@ pre-existing Alfred item states that were missing from Nova's transition
 projection; current generated counts are 78 open, 1 in progress, 572 closed and
 3 rejected.
 
-The protected Verify registration check now has exactly one finding:
-`plugins/pipeline-core/scripts/observe-critic-preflight.test.mjs` is
-unregistered. It has no honoured or expired exclusion. Registration must use
-the repository's current author-repair/TP-3 route; no gate bypass or signature
-is presumed. C1 completion, diagnostics/reporting, real collection and its
-non-backdated 14-day baseline remain open. Full Verify and independent T1
-review are not yet current for this rebased candidate.
+The previously unregistered
+`plugins/pipeline-core/scripts/observe-critic-preflight.test.mjs` is now
+registered in the protected Verify suite and has exactly one matching
+`deterministic-verification` inventory surface. The change used a signed,
+time-boxed TP-3 Guard Maintenance Window: request/grant, change and revocation
+are recorded in `1d4ee3072`, `252e761c8` and `29b1d8fec` respectively. The
+window is closed. Focused host checks passed: observer suite 3/3,
+registration-check suite 42/42, and the live registration checker reports 550
+registered suites, zero exclusions and zero unregistered files. A fresh,
+diff-scoped independent Critic review of the registration and its governance
+events reported no findings.
+
+No fresh Full Verify claim exists for this candidate. `node
+harness/scripts/verify.mjs` stopped at its clean-candidate preflight because
+the already-existing tracked change to `.claude/settings.json` was preserved;
+no Verify suite ran. Before the next broad gate, preserve, commit or otherwise
+resolve that user-owned change outside this work, then run Full Verify/Security
+on an exact clean candidate. C1 diagnostics/reporting, real collection and its
+non-backdated 14-day baseline remain open. Do not reopen TP-3 unless a new
+protected registration change is genuinely required.
 
 Continue approved Alfred work locally and collect genuine PO decisions in
 `specs/sprint-alfred-epic/evidence/po-decision-queue.md`. The installed-plugin
