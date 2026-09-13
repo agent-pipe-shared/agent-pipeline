@@ -194,6 +194,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/manifest.mjs",
   "plugins/pipeline-core/lib/onboarding-continuity.mjs",
   "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+  "plugins/pipeline-core/lib/po-key-directory.mjs",
   "plugins/pipeline-core/lib/po-gate-authority.mjs",
   "plugins/pipeline-core/lib/po-gate-profile-publisher.mjs",
   "plugins/pipeline-core/lib/private-boundary.mjs",
