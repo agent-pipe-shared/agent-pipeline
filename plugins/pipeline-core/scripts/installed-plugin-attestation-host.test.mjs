@@ -296,6 +296,32 @@ check("missing receipt stays non-ready, registry host repair writes it, and rene
   assert.equal(after.installedPluginAttestation.status, "verified");
 
   const claudeRepo = fixture("claude"); t.after(claudeRepo.cleanup);
+  // NVA-B8-10: Claude may load directly from the one registered directory
+  // marketplace. That is not a source-to-copy installation: the registry's
+  // physical marketplace plugin root and the loaded plugin root are the same
+  // directory, so demanding a separate receipt would be impossible and wrong.
+  const claudeDirectMarketplace = join(claudeRepo.base, "direct-marketplace");
+  const claudeDirectPluginRoot = join(claudeDirectMarketplace, "plugins", "pipeline-core");
+  cpSync(claudeRepo.sourcePluginRoot, claudeDirectPluginRoot, { recursive: true });
+  const claudeDirectList = () => JSON.stringify([{
+    id: "pipeline-core@agent-pipeline-local", version: "1.2.3-test.1", enabled: true,
+    scope: "user", installPath: claudeDirectPluginRoot,
+  }]);
+  const claudeDirectMarketplaces = () => JSON.stringify({
+    "agent-pipeline-local": { source: { source: "directory", path: claudeDirectMarketplace } },
+  });
+  const claudeDirect = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" }, pluginList: claudeDirectList, knownMarketplaces: claudeDirectMarketplaces,
+    scriptUrl: pathToFileURL(join(claudeDirectPluginRoot, "scripts", "pipeline-start-preflight.mjs")).href,
+    cwd: claudeRepo.base, read: () => JSON.stringify({ version: "1.2.3-test.1" }),
+    verifyLocalInstalledPluginReceiptFn: () => { throw new Error("direct directory must not consume a receipt"); },
+    observePrePushHookInstallationFn: () => ({ state: "repository-unresolved" }),
+    observeUnseenPushToRemoteFn: () => ({ state: "repository-unresolved" }),
+    requireProjectOnboardingReadyFn: () => undefined,
+  });
+  assert.equal(claudeDirect.status, "ready", JSON.stringify(claudeDirect));
+  assert.equal(claudeDirect.installedPluginAttestation.status, "not-required");
+
   const claudeMarketplace = join(claudeRepo.base, "gitless-marketplace");
   cpSync(claudeRepo.sourcePluginRoot, join(claudeMarketplace, "plugins", "pipeline-core"), { recursive: true });
   assert.equal(existsSync(join(claudeMarketplace, ".git")), false);

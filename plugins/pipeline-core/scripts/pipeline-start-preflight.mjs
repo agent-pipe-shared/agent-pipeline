@@ -911,6 +911,16 @@ export function observePipelineStartPreflight({
         readPluginList: () => pluginListSnapshot, readKnownMarketplaces: knownMarketplaces,
       })
     : null;
+  // A Claude directory marketplace can load its plugin *from that exact
+  // registered directory* rather than from a copied cache. The registry
+  // binding resolves both sides through realpath and rejects symlinks before
+  // it reaches this comparison, so equality here is a narrow physical-root
+  // proof, not a trust claim about a separately copied marketplace tree.
+  // Only this topology skips the receipt: every distinct cache/copy remains
+  // subject to the existing external source-to-copy attestation below.
+  const claudeDirectDirectory = runner === "claude"
+    && claudeRegistryBinding !== null
+    && claudeRegistryBinding.installedPluginRoot === claudeRegistryBinding.marketplacePluginRoot;
   const registrySourcePluginRoot = version && installedIdentity?.source === "local-development"
     ? runner === "codex"
       ? resolveCodexRegistrySource({ plugin: { name: "pipeline-core", version }, readPluginList: () => pluginListSnapshot })
@@ -962,7 +972,8 @@ export function observePipelineStartPreflight({
   // Bootstrap only consumes its request-selected receipt and restricted
   // source locator; it never writes either authority artifact.
   const localInstalledCopy = version && !selfApplicationGit && (
-    ["codex", "claude"].includes(runner) && installedIdentity?.source === "local-development"
+    runner === "codex" && installedIdentity?.source === "local-development"
+    || runner === "claude" && installedIdentity?.source === "local-development" && !claudeDirectDirectory
     || runner === "antigravity"
   );
   const rawInstalledPluginAttestation = localInstalledCopy
