@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, openSync, renameSync, unlinkSync, writeFileSync, closeSync, readFileSync, readdirSync, mkdirSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 export const RESUME_HINT_SCHEMA = "pipeline.resume-hint.v1";
 export const RESUME_HINT_PATH = "project/resume-hint.json";
@@ -362,7 +363,7 @@ function resolvePrivateStateDir(rootDir, { spawnSyncFn = spawnSync } = {}) {
   let common = null;
   try {
     const result = spawnSyncFn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: rootDir, encoding: "utf8", shell: false, timeout: 5000 });
-    if (result && result.status === 0 && !result.error && String(result.stdout || "").trim()) common = String(result.stdout).trim();
+    if (isSuccessfulSpawn(result) && String(result.stdout || "").trim()) common = String(result.stdout).trim();
   } catch { /* fall through to the plain .git fallback below */ }
   if (!common) {
     const fallback = join(rootDir, ".git");

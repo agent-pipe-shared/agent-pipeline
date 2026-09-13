@@ -12,6 +12,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import {
   closeSync,
   constants,
@@ -180,7 +181,7 @@ function gitVersion(spawn) {
     shell: false,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  if (observed?.error || observed?.status !== 0 || typeof observed?.stdout !== "string") return null;
+  if (!isSuccessfulSpawn(observed) || typeof observed?.stdout !== "string") return null;
   const match = observed.stdout.trim().match(GIT_VERSION);
   if (!match) return null;
   const major = Number(match[1]);

@@ -46,6 +46,7 @@ import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { authorizeCriticalPushCommand, parseHumanArgs } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
@@ -75,7 +76,7 @@ export function parseArgs(argv) {
 function gitOutput(dir, args, deps) {
   const spawn = deps.spawn ?? spawnSync;
   const result = spawn("git", ["-C", dir, ...args], { encoding: "utf8" });
-  if (result.error || result.status !== 0 || typeof result.stdout !== "string") return null;
+  if (!isSuccessfulSpawn(result) || typeof result.stdout !== "string") return null;
   return result.stdout.trim();
 }
 
@@ -83,7 +84,7 @@ function gitOutput(dir, args, deps) {
 function rawGitStatus(dir, deps) {
   const spawn = deps.spawn ?? spawnSync;
   const result = spawn("git", ["-C", dir, "status", "--porcelain"], { encoding: "utf8" });
-  if (result.error || result.status !== 0 || typeof result.stdout !== "string") return null;
+  if (!isSuccessfulSpawn(result) || typeof result.stdout !== "string") return null;
   return result.stdout;
 }
 
@@ -488,7 +489,7 @@ export function foldPendingPushApprovalWrite(dir, deps = {}) {
 
   const spawn = deps.spawn ?? spawnSync;
   const add = spawn("git", ["-C", dir, "add", "--", relPath], { encoding: "utf8" });
-  if (add.error || add.status !== 0) return { folded: false, reason: "add-failed" };
+  if (!isSuccessfulSpawn(add)) return { folded: false, reason: "add-failed" };
   const message = "chore(pipeline-state): fold pending push-approval record\n\n"
     + "Auto-folded by push-prepare.mjs at the start of its own run (NVA-PUSHFOLD-1): a prior\n"
     + "approve-push run's trailing state-file write was still uncommitted when this run\n"
@@ -497,7 +498,7 @@ export function foldPendingPushApprovalWrite(dir, deps = {}) {
     + "AI-Assisted: true\n"
     + "Dispatch: stage-0 (elephant)\n";
   const commit = spawn("git", ["-C", dir, "commit", "-m", message, "--", relPath], { encoding: "utf8" });
-  if (commit.error || commit.status !== 0) return { folded: false, reason: "commit-failed" };
+  if (!isSuccessfulSpawn(commit)) return { folded: false, reason: "commit-failed" };
   return { folded: true };
 }
 

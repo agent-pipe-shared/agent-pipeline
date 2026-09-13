@@ -23,6 +23,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
 import { verifyPoApprovalProof } from "./po-approval-proof.mjs";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import { PUSH_APPROVAL_MODES } from "./runner-profiles-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 
@@ -109,7 +110,7 @@ function committedBytes(root, spawn) {
     // case was just as wrong: a sub-project that DID commit its own copy could never reach
     // `chat`, because Git looked for the blob at the top level.
     const top = spawn("git", ["-C", root, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
-    if (top.error || top.status !== 0 || typeof top.stdout !== "string") return null;
+    if (!isSuccessfulSpawn(top) || typeof top.stdout !== "string") return null;
     const repoRoot = top.stdout.trim();
     if (repoRoot === "") return null;
     // Ask for the blob at the path this file actually occupies, expressed from the top
@@ -131,7 +132,7 @@ function committedBytes(root, spawn) {
       encoding: "buffer",
       maxBuffer: 1024 * 1024,
     });
-    if (result.error || result.status !== 0 || !result.stdout) return null;
+    if (!isSuccessfulSpawn(result) || !result.stdout) return null;
     return Buffer.from(result.stdout);
   } catch {
     return null;

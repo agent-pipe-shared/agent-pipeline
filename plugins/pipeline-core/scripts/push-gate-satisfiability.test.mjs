@@ -398,6 +398,19 @@ test("resolveGitCommonDir: a directory outside any git repository resolves to nu
   assert.equal(result, null);
 });
 
+test("resolveGitCommonDir: accepts WSL EPERM only after status zero; non-zero and missing status stay unavailable", () => {
+  const eperm = Object.assign(new Error("sandbox transport completed late"), { code: "EPERM" });
+  const accepted = resolveGitCommonDir(FIXTURE_DIR, {
+    spawn: () => ({ status: 0, stdout: ".git\n", error: eperm }),
+    realpath: () => "/resolved-common-dir",
+  });
+  assert.equal(accepted, "/resolved-common-dir");
+
+  for (const result of [{ status: 1, stdout: ".git\n" }, { stdout: ".git\n" }]) {
+    assert.equal(resolveGitCommonDir(FIXTURE_DIR, { spawn: () => result, realpath: () => "/must-not-resolve" }), null);
+  }
+});
+
 test("resolveGitCommonDir: this repository resolves to a real, existing path", () => {
   const result = resolveGitCommonDir(REPO_ROOT, {});
   assert.ok(typeof result === "string" && result.length > 0);

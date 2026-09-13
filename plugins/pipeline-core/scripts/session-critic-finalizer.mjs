@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
   GOVERNANCE_REVIEW_SOURCE_SCHEMA,
   buildGovernanceReviewAction,
@@ -64,7 +65,7 @@ function exact(value, keys) {
 }
 function gitText(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5_000 });
-  if (result.error || result.status !== 0) fail("SCF-GIT");
+  if (!isSuccessfulSpawn(result)) fail("SCF-GIT");
   return String(result.stdout).trim();
 }
 function controlRootFor(repoRoot) {

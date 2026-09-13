@@ -155,6 +155,29 @@ test("drivePushInit: chains all three steps (reconciliation, gate-satisfiability
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("drivePushInit: reconciliation accepts WSL EPERM only after status zero, while non-zero and status-less results stop fail-closed", () => {
+  const eperm = Object.assign(new Error("sandbox transport completed late"), { code: "EPERM" });
+  const cases = [
+    { run: () => ({ status: 0, stdout: "pass\n", stderr: "", error: eperm }), outcome: "signature-required" },
+    { run: () => ({ status: 1, stdout: "", stderr: "failed" }), outcome: "precondition-unmet" },
+    { run: () => ({ status: 2, stdout: "ADR-0001: unreconciled\n", stderr: "findings", error: eperm }), outcome: "precondition-unmet", retainedOutput: "findings\nADR-0001: unreconciled" },
+    { run: () => ({ stdout: "", stderr: "missing status" }), outcome: "precondition-unmet" },
+  ];
+  for (const { run, outcome, retainedOutput } of cases) {
+    const root = freshFixtureRoot();
+    try {
+      mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+      writeFileSync(join(root, "harness", "scripts", "check-doc-reconciliation.mjs"), "// fixture\n");
+      const result = drivePushInit({
+        rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main", base: "HEAD~1", candidate: "HEAD",
+        run, satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
+      });
+      assert.equal(result.outcome, outcome, JSON.stringify(result));
+      if (retainedOutput) assert.equal(result.checks[0].message, retainedOutput);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
 test("drivePushInit: layer 1b is skipped, not failed, when the project has no harness/scripts/check-doc-reconciliation.mjs", () => {
   const root = freshFixtureRoot();
   try {

@@ -63,6 +63,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { runVerifyJournal, sealVerifyCleanupRegistration } from "./verify-journal.mjs";
 import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource } from "../lib/worktree-lifecycle.mjs";
@@ -96,7 +97,7 @@ function git(root, args) {
     timeout: 10_000,
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.error || result.status !== 0) fail("VEP-GIT", `Git observation failed for ${args[0]}.`);
+  if (!isSuccessfulSpawn(result)) fail("VEP-GIT", `Git observation failed for ${args[0]}.`);
   return String(result.stdout).trim();
 }
 

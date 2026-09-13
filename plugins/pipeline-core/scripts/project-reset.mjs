@@ -104,6 +104,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH } from "../lib/critical-human-proof-policy.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
   AUTHORITY_ARTIFACTS,
   LEGACY_MANIFEST,
@@ -241,7 +242,7 @@ function resolveGitCommonDir(root) {
     shell: false,
     timeout: 5000,
   });
-  if (result.error || result.status !== 0) return null;
+  if (!isSuccessfulSpawn(result)) return null;
   const raw = String(result.stdout ?? "").trim();
   if (!raw || !isAbsolute(raw)) return null;
   try { return realpathSync(raw); } catch { return null; }

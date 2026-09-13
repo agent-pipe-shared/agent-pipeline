@@ -2,15 +2,20 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { CriticDispatchPreflightError, EVIDENCE_SWEEP_SCHEMA, enumerateEvidenceArtifacts, preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
-function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
+function git(root, args) {
+  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  assert.equal(isSuccessfulSpawn(result), true, `git ${args.join(" ")}: ${String(result.stderr)}`);
+  return String(result.stdout).trim();
+}
 function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function commit(root, message) {
   git(root, ["add", "."]);
@@ -260,7 +265,9 @@ function singleCommitFixture() {
   const candidate = commit(root, "root commit");
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
-  const base = execFileSync("git", ["-C", root, "hash-object", "-t", "tree", "--stdin"], { input: "", encoding: "utf8" }).trim();
+  const emptyTree = spawnSync("git", ["-C", root, "hash-object", "-t", "tree", "--stdin"], { input: "", encoding: "utf8" });
+  assert.equal(isSuccessfulSpawn(emptyTree), true, `git hash-object: ${String(emptyTree.stderr)}`);
+  const base = String(emptyTree.stdout).trim();
   return { root, base, candidate, tree };
 }
 

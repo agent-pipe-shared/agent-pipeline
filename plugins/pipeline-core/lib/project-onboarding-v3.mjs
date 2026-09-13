@@ -31,6 +31,7 @@ import {
   RUNNERS_WITHOUT_APP_SERVER,
 } from "./codex-onboarding-app-server.mjs";
 import { isSessionCapabilityFailurePhase, observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import {
   applyOnboardingContinuityRepair,
   applyOnboardingKickoff,
@@ -871,7 +872,7 @@ function isExistingGitMetadata(entry, root, fs) {
   // preserved project metadata; malformed user bytes remain fail-closed.
   if (!/^gitdir: [^\r\n\0]+\r?\n?$/u.test(pointer)) return false;
   const probe = fs.spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: root, encoding: "utf8" });
-  return probe.status === 0 && String(probe.stdout ?? "").trim() === "true";
+  return isSuccessfulSpawn(probe) && String(probe.stdout ?? "").trim() === "true";
 }
 
 function isAdoptableUnmanagedRoot(entries, root, fs) {
@@ -1369,7 +1370,7 @@ function freshBaselines(intent, { hostManaged = false, profile = null, fs = null
 }
 function gitCapability(fs, root) {
   const observation = fs.spawnSync("git", ["--version"], { cwd: root, encoding: "utf8" });
-  if (observation.error || observation.status !== 0) return { ok: false, reason: "git --version failed" };
+  if (!isSuccessfulSpawn(observation)) return { ok: false, reason: "git --version failed" };
   const match = String(observation.stdout ?? "").match(/git version (\d+)\.(\d+)(?:\.(\d+))?/u);
   if (!match) return { ok: false, reason: "Git version is not recognizable" };
   const major = Number(match[1]); const minor = Number(match[2]);
@@ -1751,8 +1752,9 @@ function observePoAuthorityRebind(root, fs, runner) {
     env: plannerEnvironmentForRunner(runner),
     maxBuffer: 2 * 1024 * 1024,
   });
-  if (planned?.error) return unavailable("planner-execution-unavailable");
-  if (planned?.status !== 0) return unavailable("planner-rejected");
+  if (!isSuccessfulSpawn(planned)) {
+    return planned?.error ? unavailable("planner-execution-unavailable") : unavailable("planner-rejected");
+  }
   if (String(planned.stderr ?? "").trim() !== "") return unavailable("planner-protocol-violation");
   let plan;
   try {
@@ -1821,7 +1823,7 @@ function observePoAuthorityDecision(root, fs, runner) {
     env: plannerEnvironmentForRunner(runner),
     maxBuffer: 2 * 1024 * 1024,
   });
-  if (planned?.error || planned?.status !== 0 || String(planned.stderr ?? "").trim() !== "") {
+  if (!isSuccessfulSpawn(planned) || String(planned.stderr ?? "").trim() !== "") {
     return observePoProfileRepair(root, fs);
   }
   let plan;
@@ -1893,7 +1895,7 @@ function observePoProfileRepair(root, fs) {
     shell: false,
     maxBuffer: 2 * 1024 * 1024,
   });
-  if (planned?.error || planned?.status !== 0 || String(planned.stderr ?? "").trim() !== "") {
+  if (!isSuccessfulSpawn(planned) || String(planned.stderr ?? "").trim() !== "") {
     return { status: "unavailable" };
   }
   let plan;
@@ -4840,7 +4842,7 @@ function unresolvedAuthorIdentityKeys(root, hostManaged, fs) {
   const configured = (key) => {
     try {
       const probe = fs.spawnSync("git", ["config", "--get", key], { cwd: root, encoding: "utf8" });
-      return probe.status === 0 && String(probe.stdout ?? "").trim().length > 0;
+      return isSuccessfulSpawn(probe) && String(probe.stdout ?? "").trim().length > 0;
     } catch {
       return true; // Unprobeable is not "missing" -- never ask on evidence we do not have.
     }
@@ -5242,7 +5244,7 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     if (state.initializesGit) {
       gitWasExpectedAbsent = true;
       const initialized = fs.spawnSync("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8" });
-      if (initialized.error || initialized.status !== 0) throw new Error(`git init --initial-branch=main failed: ${String(initialized.stderr ?? initialized.error ?? "unknown error").trim()}`);
+      if (!isSuccessfulSpawn(initialized)) throw new Error(`git init --initial-branch=main failed: ${String(initialized.stderr ?? initialized.error ?? "unknown error").trim()}`);
       gitIdentity = directoryIdentity(fs.lstatSync(join(root, ".git")));
       if (!gitIdentity) throw new Error("created Git control directory identity is unavailable");
       gitTree = physicalTreeSnapshot(join(root, ".git"), fs);
@@ -5406,7 +5408,7 @@ function remoteAdoptionTarget(rootDir, fs) {
 
 function runRemoteGit(fs, root, args) {
   const result = fs.spawnSync("git", args, { cwd: root, encoding: "utf8" });
-  if (result?.error || result?.status !== 0) {
+  if (!isSuccessfulSpawn(result)) {
     const reason = String(result?.stderr ?? result?.error?.message ?? "Git command failed").replace(/[\r\n]+/gu, " ").trim();
     throw new Error(reason || "Git command failed");
   }

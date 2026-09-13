@@ -22,6 +22,7 @@ import {
   listActiveSessionDescriptors,
 } from "./worktree-lifecycle.mjs";
 import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
@@ -120,7 +121,7 @@ const present = (bytes) => ({ status: "present", sha256: sha(bytes), byteLength:
 function gitEvidence(root) {
   const run = (args) => {
     const value = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
-    return value.status === 0 && !value.error ? String(value.stdout).trim() : null;
+    return isSuccessfulSpawn(value) ? String(value.stdout).trim() : null;
   };
   const commit = run(["rev-parse", "HEAD"]);
   const tree = run(["rev-parse", "HEAD^{tree}"]);
@@ -128,7 +129,7 @@ function gitEvidence(root) {
   const branch = run(["branch", "--show-current"]);
   const upstream = run(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]);
   const status = spawnSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
-  return { commit, tree, branch: branch || null, upstream: upstream || null, clean: status.status === 0 && String(status.stdout).length === 0 };
+  return { commit, tree, branch: branch || null, upstream: upstream || null, clean: isSuccessfulSpawn(status) && String(status.stdout).length === 0 };
 }
 
 // Inventory only closed regular files below the loaded package.  Symlinks,
@@ -497,7 +498,7 @@ function privateAdoptionArchive(root, planSha256, targets, {
     timeout: 5000,
   });
   let common;
-  if (git.status === 0 && !git.error && String(git.stdout).trim()) common = realpathSync(String(git.stdout).trim());
+  if (isSuccessfulSpawn(git) && String(git.stdout).trim()) common = realpathSync(String(git.stdout).trim());
   else {
     const fallback = join(root, ".git");
     if (!existsSync(fallback)) throw new Error("mixed authority adoption requires a Git common directory");
@@ -1255,12 +1256,14 @@ function vendorSyncAuthenticated(plan) {
 function vendoredPackageWriteEvidence(root, spawn = spawnSync) {
   const run = (args) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
   const tracked = run(["ls-files", "--", VENDORED_PACKAGE_PATH]);
-  if (tracked.error || tracked.status !== 0) return { status: "unavailable", reason: "git tracking evidence for the vendored package path is unavailable" };
+  if (!isSuccessfulSpawn(tracked)) return { status: "unavailable", reason: "git tracking evidence for the vendored package path is unavailable" };
   if (String(tracked.stdout ?? "").trim().length > 0) return { status: "tracked", reason: `${VENDORED_PACKAGE_PATH} holds tracked project files; a sync would replace committed bytes` };
   const ignored = run(["check-ignore", "--quiet", "--", `${VENDORED_PACKAGE_PATH}/.codex-plugin/plugin.json`]);
-  if (ignored.error || ignored.status === null) return { status: "unavailable", reason: "git ignore evidence for the vendored package path is unavailable" };
-  if (ignored.status === 0) return { status: "ignored" };
-  if (ignored.status === 1) return { status: "not-ignored", reason: `add /${VENDORED_PACKAGE_PATH}/ to this project's .gitignore, then plan the sync again` };
+  if (isSuccessfulSpawn(ignored)) return { status: "ignored" };
+  if (ignored.status === 1 && (ignored.error === undefined || ignored.error === null || ignored.error?.code === "EPERM")) {
+    return { status: "not-ignored", reason: `add /${VENDORED_PACKAGE_PATH}/ to this project's .gitignore, then plan the sync again` };
+  }
+  if (ignored.error || ignored.status === null || ignored.status === undefined) return { status: "unavailable", reason: "git ignore evidence for the vendored package path is unavailable" };
   return { status: "unavailable", reason: "git ignore evidence for the vendored package path is unavailable" };
 }
 function vendoredDestination(root) {

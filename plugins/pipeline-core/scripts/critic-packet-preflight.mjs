@@ -31,6 +31,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest } from "../lib/manifest.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { deriveCriticExportView, validateCriticExportAuthorization } from "../lib/critic-export-policy.mjs";
 import {
@@ -101,7 +102,10 @@ function git(root, args, { allowNonzero = false, timeout = 5000, input = undefin
     timeout,
     input,
   });
-  if (result.error) fail("CPP-GIT", `Git failed to start: ${result.error.message}`);
+  if (result.status === null || result.status === undefined
+    || (result.status === 0 && !isSuccessfulSpawn(result))) {
+    fail("CPP-GIT", `Git failed to start: ${result.error?.message ?? "unknown error"}`);
+  }
   if (!allowNonzero && result.status !== 0) fail("CPP-GIT", `Git ${args[0]} failed.`);
   return result;
 }

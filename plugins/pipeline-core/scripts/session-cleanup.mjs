@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
 import {
   ProjectOnboardingReadyError,
@@ -157,7 +158,7 @@ function sessionPowerCommand(repo, session, operation) {
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 64 * 1024,
   });
-  if (result.error || ![0, 3].includes(result.status)) {
+  if (!hasExpectedSpawnStatus(result, [0, 3])) {
     throw new WorktreeLifecycleError("WT-SESSION-POWER", "session-power command did not return a typed result");
   }
   let output;
@@ -262,7 +263,7 @@ function observeRecoveryCandidate(repo, dependencies = {}) {
       stdio: ["ignore", "pipe", "ignore"],
     });
     const oid = String(result.stdout ?? "").trim();
-    if (result.error || result.status !== 0 || !GIT_OID.test(oid)) {
+    if (!isSuccessfulSpawn(result) || !GIT_OID.test(oid)) {
       throw new SessionCleanupRecoveryError(
         "WT-SESSION-RECOVERY-CANDIDATE",
         "recovery event requires an exact pre-action HEAD and tree",

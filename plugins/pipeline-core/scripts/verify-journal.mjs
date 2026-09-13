@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { closeSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn as spawnChildProcess, spawnSync } from "node:child_process";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
   VERIFY_PROGRESS_SCHEMA,
   digestJson,
@@ -567,6 +568,10 @@ function spawnAsync(command, argv, options = {}) {
     }
     child.once("error", (error) => {
       spawnError = spawnError ?? error;
+      // WSL can report EPERM before delivering the child's real close status.
+      // Preserve that one transport anomaly until close so status 0 remains
+      // observable; a genuine spawn error still cannot create a success path.
+      if (error?.code === "EPERM") return;
       settle({ status: null, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), caseCompletion: Buffer.concat(completionChunks), error: spawnError });
     });
     child.once("close", (code) => {
@@ -810,7 +815,8 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
     catch (error) { completionError = error; }
   }
   const diagnostics = [];
-  if (result.error) diagnostics.push(`[verify-runner-error] ${result.error.code ?? "ERROR"}`);
+  const spawnSucceeded = isSuccessfulSpawn(result);
+  if (!spawnSucceeded && result.error) diagnostics.push(`[verify-runner-error] ${result.error.code ?? "ERROR"}`);
   if (completionError) diagnostics.push(`[verify-case-completion-error] ${completionError.message}`);
   const diagnostic = diagnostics.length > 0 ? Buffer.from(`\n${diagnostics.join("\n")}\n`) : Buffer.alloc(0);
   const combined = Buffer.concat([stdout, stderr, diagnostic]);
@@ -819,7 +825,9 @@ async function executeSuite({ suite, registration, run, candidate, policySha256,
   const artifact = verifySuiteArtifactName(suite.name);
   const logPath = join(run.logsDir, `${artifact}.log`);
   writeDurable(logPath, logBytes, "wx");
-  const exitCode = truncated || completionError !== null ? 1 : (result.status ?? 1);
+  const exitCode = truncated || completionError !== null
+    ? 1
+    : (spawnSucceeded ? 0 : (typeof result.status === "number" && result.status !== 0 ? result.status : 1));
   const completedAt = now(clock);
   const receipt = sealVerifySuiteReceipt({
     runId: run.manifest.runId,

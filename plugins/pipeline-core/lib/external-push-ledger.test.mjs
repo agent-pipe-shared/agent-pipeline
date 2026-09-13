@@ -23,6 +23,7 @@ import {
   checkExternalPushLedgerConsumption,
   externalPushLedgerGate,
 } from "./external-push-ledger.mjs";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -51,7 +52,7 @@ const NOW = "2026-08-07T00:00:00.000Z";
 
 function git(cwd, args) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
-  if (result.error || result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+  if (!isSuccessfulSpawn(result)) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
   return result;
 }
 

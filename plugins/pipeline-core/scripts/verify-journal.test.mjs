@@ -64,6 +64,32 @@ test("private journal writes bounded JSON progress and keeps complete logs off t
   } finally { console.log = original; rmSync(f.root, { recursive: true, force: true }); }
 });
 
+test("WSL EPERM after a zero suite exit remains successful; other error shapes stay closed", async () => {
+  const epermFixture = fixture();
+  const eperm = Object.assign(new Error("sandbox transport completed late"), { code: "EPERM" });
+  try {
+    const result = await runVerifyJournal({
+      gitCommonDir: epermFixture.common, repoRoot: epermFixture.root, candidate, suites: epermFixture.suites,
+      policyInputs: { harness: "test" }, runId: "verify-wsl-eperm", registerRun,
+      spawn: () => ({ ...spawnPass(), error: eperm }),
+    });
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(result.steps[0].exitCode, 0);
+    assert.doesNotMatch(readFileSync(join(result.runDir, "logs", `${artifact}.log`), "utf8"), /verify-runner-error/u);
+  } finally { rmSync(epermFixture.root, { recursive: true, force: true }); }
+
+  const rejectedFixture = fixture();
+  try {
+    const result = await runVerifyJournal({
+      gitCommonDir: rejectedFixture.common, repoRoot: rejectedFixture.root, candidate, suites: rejectedFixture.suites,
+      policyInputs: { harness: "test" }, runId: "verify-wsl-non-eperm", registerRun,
+      spawn: () => ({ ...spawnPass(), error: Object.assign(new Error("real runner fault"), { code: "EIO" }) }),
+    });
+    assert.equal(result.terminal.status, "failed");
+    assert.equal(result.steps[0].exitCode, 1);
+  } finally { rmSync(rejectedFixture.root, { recursive: true, force: true }); }
+});
+
 test("a terminal matching receipt is reused and still produces complete current coverage", async () => {
   const f = fixture();
   let calls = 0;

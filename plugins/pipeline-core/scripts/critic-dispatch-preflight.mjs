@@ -17,6 +17,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
   CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
   deriveCriticPacketGovernance,
@@ -97,7 +98,7 @@ function gitOrNull(root, args) {
     timeout: 10_000,
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.error || result.status !== 0) return null;
+  if (!isSuccessfulSpawn(result)) return null;
   return String(result.stdout).trim();
 }
 
@@ -125,7 +126,7 @@ function emptyTreeOid(root) {
     timeout: 10_000,
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.error || result.status !== 0) fail("CDP-GIT", "Git observation failed for hash-object.");
+  if (!isSuccessfulSpawn(result)) fail("CDP-GIT", "Git observation failed for hash-object.");
   return String(result.stdout).trim();
 }
 
@@ -159,7 +160,7 @@ function candidateText(root, candidate, path) {
     timeout: 10_000,
     maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
   });
-  if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  if (!isSuccessfulSpawn(result)) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
   return String(result.stdout);
 }
 
@@ -171,7 +172,7 @@ function candidateBytes(root, candidate, path) {
     timeout: 10_000,
     maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
   });
-  if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  if (!isSuccessfulSpawn(result)) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
   return result.stdout;
 }
 

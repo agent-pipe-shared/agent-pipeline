@@ -573,6 +573,37 @@ test("missing and too-old Git map exactly to git-unavailable before session side
   }
 });
 
+test("a completed status-zero WSL EPERM Git version probe remains available", () => {
+  const root = makeRoot("git status-zero eperm");
+  const observed = observeCodexOnboardingCapabilities({
+    rootDir: root,
+    intent: "onboarding",
+    willInitializeGit: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (command === "git" && args.length === 1 && args[0] === "--version") {
+          return {
+            status: 0,
+            error: Object.assign(new Error("WSL sandbox false-positive"), { code: "EPERM" }),
+            stdout: "git version 2.40.1\n",
+            stderr: "",
+          };
+        }
+        return spawnSync(command, args, options);
+      },
+    },
+  });
+  assertExact(observed, {
+    status: "local-uninitialized",
+    mode: "local",
+    gitVersion: "2.40.1",
+    initializesGit: true,
+    rootWritable: "passed",
+    sessionCapability: "not-required",
+    worktreeCapability: "not-required",
+  });
+});
+
 test("treeSnapshot tolerates an entry that vanishes between readdirSync and lstatSync", () => {
   const root = makeRoot("vanishing entry");
   writeFileSync(join(root, "steady.txt"), "keep\n");

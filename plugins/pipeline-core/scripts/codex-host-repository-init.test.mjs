@@ -188,6 +188,58 @@ test("host apply initializes only Git and requires one restart", () => {
   }).status, "valid");
 });
 
+test("host apply accepts only a completed status-zero WSL EPERM for Git probe and init", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const sandboxEperm = () => Object.assign(new Error("WSL sandbox false-positive"), { code: "EPERM" });
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") {
+          return { status: 0, error: sandboxEperm(), stdout: "git version 2.40.1\n", stderr: "" };
+        }
+        completeGitInit(options.cwd);
+        return { status: 0, error: sandboxEperm(), stdout: "", stderr: "" };
+      },
+    },
+  });
+  assert.equal(result.status, "restart-required");
+  assert.equal(existsSync(join(root, ".git")), true);
+});
+
+test("host apply keeps a status-zero non-EPERM Git probe error unavailable", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync() {
+        return {
+          status: 0,
+          error: Object.assign(new Error("ordinary launch error"), { code: "EACCES" }),
+          stdout: "git version 2.40.1\n",
+          stderr: "",
+        };
+      },
+    },
+  });
+  assert.equal(result.status, "git-unavailable");
+  assert.deepEqual(result.diagnostics, [{ code: "git_2_28_required" }]);
+  assert.equal(existsSync(join(root, ".git")), false);
+});
+
 test("the bound receipt uses v2 and a pre-release unbound v1 shape is terminal invalid", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({

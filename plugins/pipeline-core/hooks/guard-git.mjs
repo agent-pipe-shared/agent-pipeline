@@ -272,6 +272,7 @@ import { fileURLToPath } from "node:url";
 
 import { commitMessageFindings, commitTypeFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
   LEGACY_GUARD_AUDIT,
   LEGACY_GUARD_CONFIG,
@@ -754,7 +755,7 @@ function overrideArmingTtlSeconds() {
 function gitObjectId(root, args) {
   try {
     const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
-    if (result.error || result.status !== 0) return null;
+    if (!isSuccessfulSpawn(result)) return null;
     const value = String(result.stdout ?? "").trim();
     return /^[0-9a-f]{40,64}$/.test(value) ? value : null;
   } catch {
@@ -951,7 +952,7 @@ function exactKeys(value, keys) { return value !== null && typeof value === "obj
 function phoenixGovernedProject() { return existsSync(join(projectDir, "governance", "events", "registry.json")); }
 function currentCandidate() {
   const invoked = spawnSync("git", ["-C", projectDir, "rev-parse", "HEAD", "HEAD^{tree}"], { encoding: "utf8", timeout: 5000 });
-  const lines = invoked.status === 0 ? invoked.stdout.trim().split("\n") : [];
+  const lines = isSuccessfulSpawn(invoked) ? invoked.stdout.trim().split("\n") : [];
   return lines.length === 2 && /^[a-f0-9]{40,64}$/u.test(lines[0]) && /^[a-f0-9]{40,64}$/u.test(lines[1]) ? { commit: lines[0], tree: lines[1] } : null;
 }
 function readPhoenixOverrideReference(reference) {
@@ -966,7 +967,7 @@ function readPhoenixOverrideReference(reference) {
 }
 function invokeGovernanceAuthority(flag, request) {
   const invoked = spawnSync(process.execPath, [GOVERNANCE_AUTHORITY_CLI, "--repo", projectDir, flag, JSON.stringify(request)], { encoding: "utf8", timeout: 5000 });
-  if (invoked.status !== 0) return null;
+  if (!isSuccessfulSpawn(invoked)) return null;
   try { return JSON.parse(invoked.stdout); } catch { return null; }
 }
 function consumePhoenixOverrideAuthority(reference, rule) {
@@ -1165,7 +1166,7 @@ let inspection;
       const commitCwd = process.cwd();
       let commitRoot = resolve(commitCwd);
       const toplevel = spawnSync("git", ["-C", commitCwd, "rev-parse", "--show-toplevel"], { encoding: "utf8", shell: false, timeout: 5000 });
-      if (!toplevel.error && toplevel.status === 0) {
+      if (isSuccessfulSpawn(toplevel)) {
         const out = String(toplevel.stdout ?? "").trim();
         if (out) commitRoot = resolve(out);
       }
@@ -1273,17 +1274,15 @@ if (inspection.message !== null) {
     const run = (args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
 
     const lastReconcileRun = run(["log", "-1", "--format=%H", "--", "backlog/transitions.ndjson"]);
-    if (lastReconcileRun.error) throw lastReconcileRun.error;
+    if (!isSuccessfulSpawn(lastReconcileRun)) throw lastReconcileRun.error ?? new Error("git log failed");
     // Bootstrap case: the ledger file has never been touched in this repository's history --
     // no-op the rule entirely until it exists once, rather than diffing against an empty ref.
-    const lastReconcile = lastReconcileRun.status === 0 ? String(lastReconcileRun.stdout ?? "").trim() : "";
+    const lastReconcile = String(lastReconcileRun.stdout ?? "").trim();
     if (lastReconcile !== "") {
       const range = `${lastReconcile}..HEAD`;
       const touchedRun = run(["diff", "--name-only", range, "--", "backlog/items/"]);
-      if (touchedRun.error) throw touchedRun.error;
-      const itemsTouchedSinceReconcile = touchedRun.status === 0
-        ? String(touchedRun.stdout ?? "").split("\n").map((line) => line.trim()).filter(Boolean)
-        : [];
+      if (!isSuccessfulSpawn(touchedRun)) throw touchedRun.error ?? new Error("git diff failed");
+      const itemsTouchedSinceReconcile = String(touchedRun.stdout ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
 
       // Mirrors the frontmatter `status:` key check-backlog-state.mjs/reconcile-backlog-ledger.mjs
       // already parse; a `-status: <old>` line paired with a differently-valued `+status: <new>`
@@ -1293,8 +1292,7 @@ if (inspection.message !== null) {
       const debtPaths = [];
       for (const path of itemsTouchedSinceReconcile) {
         const fileDiffRun = run(["diff", range, "--", path]);
-        if (fileDiffRun.error) throw fileDiffRun.error;
-        if (fileDiffRun.status !== 0) continue;
+        if (!isSuccessfulSpawn(fileDiffRun)) throw fileDiffRun.error ?? new Error("git diff failed");
         let removedStatus = null;
         let addedStatus = null;
         for (const line of String(fileDiffRun.stdout ?? "").split("\n")) {
@@ -1405,10 +1403,8 @@ if (inspection.message !== null) {
           commitPaths = explicitPathspec;
         } else {
           const stagedRun = run(["diff", "--cached", "--name-only"]);
-          if (stagedRun.error) throw stagedRun.error;
-          commitPaths = stagedRun.status === 0
-            ? String(stagedRun.stdout ?? "").split("\n").map((line) => line.trim()).filter(Boolean)
-            : [];
+          if (!isSuccessfulSpawn(stagedRun)) throw stagedRun.error ?? new Error("git diff failed");
+          commitPaths = String(stagedRun.stdout ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
         }
         const LEDGER_PATHS = new Set(["backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"]);
         // Allowed set = every backlog/items/*.md path (any item, not just debtPaths -- batched

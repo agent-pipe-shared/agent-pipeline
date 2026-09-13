@@ -4955,6 +4955,7 @@ test("the seeded security gate refuses a push with missing security evidence and
 // lib/security-evidence-evaluator.mjs, lib/security-capability-plan-builder.mjs,
 // lib/security-policy-resolver.mjs, lib/document-hooks.mjs, lib/yaml-lite.mjs,
 // lib/schema-lite.mjs, lib/worktree-lifecycle.mjs, lib/windows-private-state.mjs,
+// lib/successful-spawn.mjs,
 // lib/trusted-tool-resolution.mjs, config/security/gitleaks-default.toml,
 // config/security/license-allowlist.default.json, security/semgrep/pipeline.yml (the other two
 // plugin-shipped scanner defaults -- copied for fixture completeness even though this test's
@@ -4997,6 +4998,7 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
       ["./schema-lite.mjs", ["plugins", "pipeline-core", "lib", "schema-lite.mjs"]],
       ["./worktree-lifecycle.mjs", ["plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"]],
       ["./windows-private-state.mjs", ["plugins", "pipeline-core", "lib", "windows-private-state.mjs"]],
+      ["./successful-spawn.mjs", ["plugins", "pipeline-core", "lib", "successful-spawn.mjs"]],
       ["../config/security/gitleaks-default.toml", ["plugins", "pipeline-core", "config", "security", "gitleaks-default.toml"]],
       ["../config/security/license-allowlist.default.json", ["plugins", "pipeline-core", "config", "security", "license-allowlist.default.json"]],
       ["../security/semgrep/pipeline.yml", ["plugins", "pipeline-core", "security", "semgrep", "pipeline.yml"]],
@@ -6875,18 +6877,56 @@ test("an existing unmanaged project receives an additive adoption plan", () => {
   const path = root();
   try {
     writeFileSync(join(path, "README.md"), "existing project\n");
-    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path });
+    const epermAfterSuccessfulGit = (command, args, options) => {
+      const result = fakeGit(command, args, options);
+      if (args[0] === "--version" || (args[0] === "init" && args[1] === "--initial-branch=main")) {
+        return {
+          ...result,
+          error: Object.assign(new Error("WSL sandbox adapter reported EPERM after Git completed"), { code: "EPERM" }),
+        };
+      }
+      return result;
+    };
+    const epermDeps = { ...fakeDeps, spawnSync: epermAfterSuccessfulGit };
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: epermDeps });
     assert.equal(inspected.status, "adoption-required");
-    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: epermDeps });
     assert.equal(plan.status, "ready");
     assert.equal(plan.state, "existing-unmanaged");
     assert.equal(plan.git.initializesGit, true);
-    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: epermDeps });
     assert.equal(applied.status, "applied");
     assert.equal(readFileSync(join(path, "README.md"), "utf8"), "existing project\n");
     assert.equal(existsSync(join(path, "pipeline.user.yaml")), true);
     assert.equal(existsSync(join(path, ".git")), true);
   } finally { dispose(path); }
+});
+
+test("Git capability rejects nonzero, missing-status, and non-EPERM spawn results", () => {
+  for (const [name, versionResult] of [
+    ["nonzero", { status: 1, stdout: "git version 2.40.1\n", stderr: "refused" }],
+    ["missing-status", { stdout: "git version 2.40.1\n", stderr: "" }],
+    ["foreign-error-at-zero", {
+      status: 0,
+      stdout: "git version 2.40.1\n",
+      stderr: "",
+      error: Object.assign(new Error("EACCES"), { code: "EACCES" }),
+    }],
+  ]) {
+    const path = root();
+    try {
+      writeFileSync(join(path, "README.md"), "existing project\n");
+      const failingDeps = {
+        ...fakeDeps,
+        spawnSync(command, args, options) {
+          return args[0] === "--version" ? versionResult : fakeGit(command, args, options);
+        },
+      };
+      const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: failingDeps });
+      assert.equal(plan.status, "unsupported", name);
+      assert.equal(plan.diagnostics[0].code, "git_initial_branch_unsupported", name);
+    } finally { dispose(path); }
+  }
 });
 
 test("adoption preserves directory and linked-worktree Git metadata and blocks user-owned reserved paths", () => {

@@ -56,6 +56,7 @@
  *     rather than surfaced as a sixth "not-applicable" verdict.
  */
 import { spawnSync } from "node:child_process";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -199,13 +200,13 @@ export function defaultGitProbe({ rootDir, tempDir, now = new Date(), platform =
 function probedCandidate(rootDir) {
   const git = (args) => {
     const result = spawnSync("git", args, { cwd: rootDir, encoding: "utf8", shell: false, timeout: 5000 });
-    return result.status === 0 && !result.error ? String(result.stdout).trim() : null;
+    return isSuccessfulSpawn(result) ? String(result.stdout).trim() : null;
   };
   const commit = git(["rev-parse", "HEAD"]);
   const tree = git(["rev-parse", "HEAD^{tree}"]);
   const status = spawnSync("git", ["status", "--porcelain=v1"], { cwd: rootDir, encoding: "utf8", shell: false, timeout: 5000 });
   if (!commit || !tree || !/^[0-9a-f]{40,64}$/u.test(commit) || !/^[0-9a-f]{40,64}$/u.test(tree)) return null;
-  if (status.status !== 0 || String(status.stdout).length !== 0) return null;
+  if (!isSuccessfulSpawn(status) || String(status.stdout).length !== 0) return null;
   return { commit, tree };
 }
 

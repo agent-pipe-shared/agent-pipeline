@@ -370,6 +370,7 @@ import {
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
 import { spawnSync } from "node:child_process";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { fileURLToPath } from "node:url";
 import {
   applyCourseDecisionIntent,
@@ -2151,7 +2152,7 @@ function runFinalIntegrationTransaction(dir, existing, expectedRevision, request
 function defaultGitBinding(dir) {
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" });
   const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dir, encoding: "utf8" });
-  if (head.error || tree.error || head.status !== 0 || tree.status !== 0
+  if (!isSuccessfulSpawn(head) || !isSuccessfulSpawn(tree)
     || !/^[a-f0-9]{40}$/.test(head.stdout?.trim() ?? "") || !/^[a-f0-9]{40}$/.test(tree.stdout?.trim() ?? "")) {
     return { ok: false };
   }
@@ -2848,7 +2849,7 @@ function runContinuityCommand(sub, flags, deps) {
  * holds its lock first and persists only the returned redacted reference. */
 function defaultGitCommonDir(dir) {
   const result = spawnSync("git", ["rev-parse", "--git-common-dir"], { cwd: dir, encoding: "utf8" });
-  if (result.error || result.status !== 0 || !result.stdout?.trim()) return { ok: false, code: "PS-PUBLICATION-GIT-COMMON-DIR" };
+  if (!isSuccessfulSpawn(result) || !result.stdout?.trim()) return { ok: false, code: "PS-PUBLICATION-GIT-COMMON-DIR" };
   const raw = result.stdout.trim();
   return { ok: true, path: realpathSync(resolve(dir, raw)) };
 }
@@ -3388,9 +3389,11 @@ function projectV1LegacyApprovalForSpecBind(state, expectedPlanSha256) {
 /** Default `git rev-parse HEAD` runner; injectable for tests. Never throws. */
 function defaultGitHead(dir) {
   const res = spawnSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" });
-  if (res.error) return { ok: false, error: res.error.message };
-  if (res.status !== 0 || !res.stdout || res.stdout.trim() === "") {
-    return { ok: false, error: (res.stderr || `git rev-parse HEAD exited ${res.status}`).trim() };
+  if (!isSuccessfulSpawn(res)) {
+    return { ok: false, error: res.error?.message ?? (res.stderr || `git rev-parse HEAD exited ${res.status}`).trim() };
+  }
+  if (!res.stdout || res.stdout.trim() === "") {
+    return { ok: false, error: (res.stderr || "git rev-parse HEAD returned no output").trim() };
   }
   return { ok: true, commit: res.stdout.trim() };
 }
@@ -3399,7 +3402,7 @@ function defaultGitCandidate(dir) {
   const commit = defaultGitHead(dir);
   if (!commit.ok) return commit;
   const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dir, encoding: "utf8" });
-  if (tree.error || tree.status !== 0 || !/^[0-9a-f]{40,64}$/u.test(tree.stdout?.trim() ?? "")) {
+  if (!isSuccessfulSpawn(tree) || !/^[0-9a-f]{40,64}$/u.test(tree.stdout?.trim() ?? "")) {
     return { ok: false, error: tree.error?.message ?? (tree.stderr || "git rev-parse HEAD^{tree} failed").trim() };
   }
   return { ok: true, commit: commit.commit, tree: tree.stdout.trim() };
@@ -3519,7 +3522,7 @@ function resolveLocalGitUserName(dir, deps = {}) {
     encoding: "utf8",
     env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(dir) },
   });
-  if (!gitResult.error && gitResult.status === 0 && typeof gitResult.stdout === "string") {
+  if (isSuccessfulSpawn(gitResult) && typeof gitResult.stdout === "string") {
     const trimmed = gitResult.stdout.trim();
     if (trimmed !== "") return trimmed;
   }
@@ -3575,7 +3578,7 @@ function resolveDraftProfileReceiptAction(dir, deps = {}) {
   let planned = null;
   try {
     const result = spawn(process.execPath, [repairScript, "plan", "--root", dir], { encoding: "utf8" });
-    if (!result.error && result.status === 0 && typeof result.stdout === "string") planned = JSON.parse(result.stdout);
+    if (isSuccessfulSpawn(result) && typeof result.stdout === "string") planned = JSON.parse(result.stdout);
   } catch {
     planned = null;
   }
@@ -4008,7 +4011,7 @@ function legacyGitObservation(dir, deps = {}) {
   if (deps.legacyGitObservation) return deps.legacyGitObservation(dir);
   const runGit = (args) => {
     const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: args[0] === "ls-remote" ? 30_000 : 5_000 });
-    return r.status === 0 ? r.stdout.trim() : null;
+    return isSuccessfulSpawn(r) ? r.stdout.trim() : null;
   };
   const tagObject = runGit(["rev-parse", "v0.4.6^{tag}"]);
   const head = runGit(["rev-parse", "HEAD"]);
@@ -4021,7 +4024,7 @@ function legacyGitObservation(dir, deps = {}) {
   return { tagObject, head, commit, tree, remoteCommit: remote ? remote.split(/\s+/)[0] : null,
     remoteTagObject: remoteTag ? remoteTag.split(/\s+/)[0] : null,
     remoteTagCommit: remoteTagDeref ? remoteTagDeref.split(/\s+/)[0] : null,
-    historicalPrdSha256: historicalRaw.status === 0 ? sha256Bytes(historicalRaw.stdout) : null };
+    historicalPrdSha256: isSuccessfulSpawn(historicalRaw) ? sha256Bytes(historicalRaw.stdout) : null };
 }
 
 function validateLegacyAdoptionEnvironment(dir, state, request, deps = {}) {

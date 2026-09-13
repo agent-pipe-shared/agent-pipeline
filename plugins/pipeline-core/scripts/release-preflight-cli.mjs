@@ -49,6 +49,7 @@
  * honestly, and nothing was written.
  */
 import { spawnSync } from "node:child_process";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import { closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -120,7 +121,7 @@ const readJson = (root, relativePath, label) => {
 
 function git(root, args) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 10_000 });
-  if (result.status !== 0 || result.error) fail("RPC-GIT", `git ${args.join(" ")} failed`);
+  if (!isSuccessfulSpawn(result)) fail("RPC-GIT", `git ${args.join(" ")} failed`);
   return String(result.stdout).trim();
 }
 
@@ -129,7 +130,7 @@ function committedRegularBlob(root, commit, path, maxBytes) {
   const entry = spawnSync("git", ["ls-tree", "-l", commit, "--", path], {
     cwd: root, encoding: "utf8", shell: false, timeout: 10_000, maxBuffer: 65_536,
   });
-  if (entry.error || entry.status !== 0) fail("RPC-DOC-READER-BINDING", "could not inspect committed source reader inputs");
+  if (!isSuccessfulSpawn(entry)) fail("RPC-DOC-READER-BINDING", "could not inspect committed source reader inputs");
   if (entry.stdout === "") return null;
   const match = /^(\d+)\s+blob\s+([a-f0-9]{40}|[a-f0-9]{64})\s+(\d+)\t(.+)\n?$/u.exec(entry.stdout);
   if (!match || match[4] !== path || match[1] !== "100644") return null;
@@ -138,7 +139,7 @@ function committedRegularBlob(root, commit, path, maxBytes) {
   const blob = spawnSync("git", ["cat-file", "blob", match[2]], {
     cwd: root, encoding: "buffer", shell: false, timeout: 10_000, maxBuffer: maxBytes,
   });
-  if (blob.error || blob.status !== 0 || !Buffer.isBuffer(blob.stdout) || blob.stdout.length !== size) {
+  if (!isSuccessfulSpawn(blob) || !Buffer.isBuffer(blob.stdout) || blob.stdout.length !== size) {
     fail("RPC-DOC-READER-BINDING", "could not read committed source reader inputs");
   }
   return blob.stdout;
@@ -230,7 +231,7 @@ function requireSourceReaderBinding(root, { base, candidate, featureId }) {
   const child = spawnSync(process.execPath, [checkerPath, "--root", root, "--candidate", candidate.commit, "--feature-id", featureId], {
     cwd: root, encoding: "utf8", shell: false, timeout: 10_000, maxBuffer: SOURCE_READER_CHILD_MAX_BUFFER,
   });
-  if (child.error || child.status !== 0) fail("RPC-DOC-READER-BINDING", "the source reader binding checker did not pass");
+  if (!isSuccessfulSpawn(child)) fail("RPC-DOC-READER-BINDING", "the source reader binding checker did not pass");
   let result;
   try { result = JSON.parse(child.stdout); } catch { fail("RPC-DOC-READER-BINDING", "the source reader binding checker returned malformed output"); }
   if (!validateSourceReaderResult(result, candidate.commit, featureId)) {
@@ -243,7 +244,7 @@ function observeRepository(root) {
   const headCommit = git(root, ["rev-parse", "HEAD"]);
   const headTree = git(root, ["rev-parse", "HEAD^{tree}"]);
   const status = spawnSync("git", ["status", "--porcelain=v1"], { cwd: root, encoding: "utf8", shell: false, timeout: 10_000 });
-  if (status.status !== 0) fail("RPC-GIT", "git status failed");
+  if (!isSuccessfulSpawn(status)) fail("RPC-GIT", "git status failed");
   return { clean: String(status.stdout).length === 0, headCommit, headTree };
 }
 

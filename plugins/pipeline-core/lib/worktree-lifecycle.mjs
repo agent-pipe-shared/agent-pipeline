@@ -36,6 +36,7 @@ import {
 } from "node:path";
 import { spawnSync } from "node:child_process";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 export const WORKTREE_RECORD_SCHEMA = "pipeline.worktree-lifecycle.v1";
 export const CLEANUP_MANIFEST_SCHEMA = "pipeline.session-cleanup-manifest.v1";
@@ -136,12 +137,14 @@ export function runGit(cwd, args, options = {}) {
     // existing caller that never passed a timeout changes behavior (spawnSync's own default).
     ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
   });
-  if (result.error) fail("WT-GIT-SPAWN", `git could not start: ${result.error.message}`);
-  if (result.status !== 0 && !options.allowNonzero) {
-    const detail = String(result.stderr || result.stdout || "").trim().slice(0, 500);
-    fail("WT-GIT-FAILED", `git ${args[0] || "command"} failed (${result.status})${detail ? `: ${detail}` : ""}`);
-  }
-  return result;
+  if (isSuccessfulSpawn(result)) return result;
+  // `symbolic-ref -q HEAD` is the sole caller that expects a nonzero typed
+  // outcome: status 1 means detached HEAD. Keep that protocol narrow rather
+  // than turning every numeric Git failure into a successful observation.
+  if (options.allowNonzero && hasExpectedSpawnStatus(result, [0, 1])) return result;
+  if (result?.error) fail("WT-GIT-SPAWN", `git could not start: ${result.error.message}`);
+  const detail = String(result.stderr || result.stdout || "").trim().slice(0, 500);
+  fail("WT-GIT-FAILED", `git ${args[0] || "command"} failed (${result.status})${detail ? `: ${detail}` : ""}`);
 }
 
 function gitText(cwd, args, options = {}) {

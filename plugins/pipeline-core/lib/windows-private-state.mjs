@@ -9,6 +9,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { lstatSync } from "node:fs";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 export const WINDOWS_POWERSHELL_PATHS = Object.freeze([
   "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
@@ -105,7 +106,7 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
     windowsHide: true,
     env: { ...sanitizeChildEnvironment(environment), PIPELINE_PRIVATE_STATE_PATH: path },
   });
-  if (result?.error || result?.status !== 0) return unavailable("native Windows DACL observation failed");
+  if (!isSuccessfulSpawn(result)) return unavailable("native Windows DACL observation failed");
   return result;
 }
 

@@ -69,6 +69,19 @@ test("parseArgs: accepts a well-formed --by/--remote/--destination", () => {
   assert.deepEqual(parsed, { by: "tester", remote: "origin", destination: "refs/heads/main" });
 });
 
+test("checkWorkingTreeClean: accepts the WSL EPERM-after-status-zero shape, but not a non-zero or missing status", () => {
+  const eperm = Object.assign(new Error("sandbox transport completed late"), { code: "EPERM" });
+  const accepted = checkWorkingTreeClean(FIXTURE_DIR, {
+    spawn: () => ({ status: 0, stdout: "", error: eperm }),
+  });
+  assert.equal(accepted.ok, true);
+
+  for (const result of [{ status: 1, stdout: "" }, { stdout: "" }]) {
+    const rejected = checkWorkingTreeClean(FIXTURE_DIR, { spawn: () => result });
+    assert.equal(rejected.ok, false);
+  }
+});
+
 test("parseArgs: refuses a missing --by", () => {
   const parsed = parseArgs(["--remote", "origin", "--destination", "refs/heads/main"]);
   assert.ok(parsed.error);
@@ -976,4 +989,39 @@ test("foldPendingPushApprovalWrite (DoD c): forCommit different from HEAD -> fol
   const message = commitArgv[commitArgv.indexOf("-m") + 1];
   assert.match(message, /AI-Assisted: true/);
   assert.match(message, /Dispatch: stage-0 \(elephant\)/);
+});
+
+test("foldPendingPushApprovalWrite: accepts EPERM only after a zero status for both git writes", () => {
+  const calls = [];
+  const eperm = Object.assign(new Error("sandbox transport completed late"), { code: "EPERM" });
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: "0".repeat(40) } } }),
+    gitHead: () => HEAD,
+    writeFile: () => {},
+    spawn: (...args) => {
+      calls.push(args);
+      return calls.length === 1
+        ? { status: 0, stdout: " M project/pipeline-state.json\n", error: eperm }
+        : { status: 0, error: eperm };
+    },
+  });
+  assert.equal(result.folded, true);
+  assert.equal(calls.length, 3);
+});
+
+test("foldPendingPushApprovalWrite: non-zero or status-less git write remains fail-closed", () => {
+  for (const [result, reason] of [[{ status: 1 }, "add-failed"], [{}, "add-failed"]]) {
+    const outcome = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+      gitStatus: () => " M project/pipeline-state.json\n",
+      readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: "0".repeat(40) } } }),
+      gitHead: () => HEAD,
+      writeFile: () => {},
+      spawn: () => result,
+    });
+    assert.equal(outcome.reason, reason);
+  }
+  for (const result of [{ status: 1, stdout: "" }, { stdout: "" }]) {
+    const outcome = foldPendingPushApprovalWrite(FIXTURE_DIR, { spawn: () => result });
+    assert.equal(outcome.reason, "status-unavailable");
+  }
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { execFileSync, spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,8 +15,14 @@ import { verifySuiteArtifactName } from "./verify-journal.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { retryGovernanceVerificationAction } from "../lib/governance-verification-action.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
-function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
+function run(executable, args, options = {}) {
+  const result = spawnSync(executable, args, { encoding: "utf8", ...options });
+  assert.equal(isSuccessfulSpawn(result), true, result.stderr);
+  return String(result.stdout ?? "");
+}
+function git(root, args) { return run("git", ["-C", root, ...args]).trim(); }
 
 /** A minimal committed project: calibration naming `verify`, one commit, clean tree. */
 function fixture(verifyCommand) {
@@ -299,7 +305,7 @@ test("a bare invocation with no --out resolves to the shared VERIFY_EVIDENCE_DEF
 test("the CLI wrapper with no --out flag also resolves to the shared default path", async () => {
   await withFixture('node -e "process.exit(0)"', (root) => {
     const scriptPath = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
-    const stdout = execFileSync("node", [scriptPath, "--root", root], { encoding: "utf8" });
+    const stdout = run("node", [scriptPath, "--root", root]);
     const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
     assert.equal(parsed.status, "passed");
     assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), true);
@@ -309,7 +315,7 @@ test("the CLI wrapper with no --out flag also resolves to the shared default pat
 test("the CLI wrapper exits 0 and writes evidence for a passing run", async () => {
   await withFixture('node -e "process.exit(0)"', (root) => {
     const scriptPath = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
-    const stdout = execFileSync("node", [scriptPath, "--root", root, "--out", "evidence/verify.json"], { encoding: "utf8" });
+    const stdout = run("node", [scriptPath, "--root", root, "--out", "evidence/verify.json"]);
     const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
     assert.equal(parsed.status, "passed");
     assert.equal(existsSync(join(root, "evidence", "verify.json")), true);
@@ -319,7 +325,7 @@ test("the CLI wrapper exits 0 and writes evidence for a passing run", async () =
 test("the CLI exposes the explicit event boundary without changing the evidence default", async () => {
   await withFixture('node -e "process.exit(0)"', (root) => {
     const scriptPath = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
-    const stdout = execFileSync("node", [scriptPath, "--root", root, "--event-out", "evidence/actions/verify.json"], { encoding: "utf8" });
+    const stdout = run("node", [scriptPath, "--root", root, "--event-out", "evidence/actions/verify.json"]);
     const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
     assert.equal(parsed.status, "passed");
     assert.equal(parsed.actionEvent.reasonCode, "VERIFICATION_PASSED");
@@ -443,10 +449,10 @@ test("an external installed package works and implementation changes invalidate 
     cpSync(new URL("../", import.meta.url), installed, { recursive: true });
     await withFixture('node -e "require(\'assert\').equal(2 + 2, 4)"', (root) => {
       const entry = join(installed, "scripts/verify-evidence-producer.mjs");
-      execFileSync(process.execPath, [entry, "--root", root, "--mode", "release"]);
+      run(process.execPath, [entry, "--root", root, "--mode", "release"]);
       const dependency = join(installed, "scripts/consumer-verify-check.mjs");
       writeFileSync(dependency, `${readFileSync(dependency, "utf8")}\n// changed installed implementation\n`);
-      execFileSync(process.execPath, [entry, "--root", root, "--mode", "release", "--no-reuse"]);
+      run(process.execPath, [entry, "--root", root, "--mode", "release", "--no-reuse"]);
       const evidence = JSON.parse(readFileSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH), "utf8"));
       assert.ok(evidence.steps.every((s) => !s.reused));
       assert.equal(evidence.verifyRun.receiptReuse, "disabled");

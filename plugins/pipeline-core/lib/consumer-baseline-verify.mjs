@@ -4,13 +4,14 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 const TEXT_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".jsx", ".md", ".mjs", ".ts", ".tsx", ".yaml", ".yml"]);
 const CONFLICT_MARKER = /^(?:<{7}|={7}|>{7})(?: .*)?$/mu;
 
 function git(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024 });
-  if (result.error || result.status !== 0) throw new Error(`CONSUMER-BASELINE-GIT-${args[0]}`);
+  if (!isSuccessfulSpawn(result)) throw new Error(`CONSUMER-BASELINE-GIT-${args[0]}`);
   return result.stdout;
 }
 
@@ -36,7 +37,7 @@ export function inspectConsumerBaseline(rootDir, deps = {}) {
     }
   }
   const diffCheck = spawn("git", ["-C", root, "diff", "--check", "HEAD"], { encoding: "utf8", shell: false });
-  if (diffCheck.error || diffCheck.status !== 0) findings.push({ code: "git-diff-check", path: null });
+  if (!isSuccessfulSpawn(diffCheck)) findings.push({ code: "git-diff-check", path: null });
   return Object.freeze({
     schema: "pipeline.consumer-baseline-result.v1",
     status: findings.length === 0 ? "passed" : "failed",

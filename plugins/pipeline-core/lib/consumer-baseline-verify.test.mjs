@@ -26,4 +26,24 @@ files.set("README.md", "<<<<<<< ours\n=======\n>>>>>>> theirs\n");
 result = inspectConsumerBaseline("/tmp/example", deps);
 assert.equal(result.findings.some((finding) => finding.code === "merge-conflict-marker"), true);
 
-console.log("consumer-baseline-verify: 5 tests passed");
+files.set("README.md", "# Fine\n");
+files.set("data.json", "{\"ok\":true}\n");
+result = inspectConsumerBaseline("/tmp/example", {
+  ...deps,
+  spawn: () => ({
+    status: 0,
+    error: Object.assign(new Error("WSL sandbox adapter reported EPERM after completion"), { code: "EPERM" }),
+  }),
+});
+assert.equal(result.status, "passed", "a completed diff --check remains valid under the WSL post-completion EPERM defect");
+for (const [name, spawn] of [
+  ["nonzero", () => ({ status: 1, error: null })],
+  ["missing-status", () => ({ error: null })],
+  ["foreign-error", () => ({ status: 0, error: Object.assign(new Error("EACCES"), { code: "EACCES" }) })],
+]) {
+  result = inspectConsumerBaseline("/tmp/example", { ...deps, spawn });
+  assert.equal(result.status, "failed", name);
+  assert.equal(result.findings.some((finding) => finding.code === "git-diff-check"), true, name);
+}
+
+console.log("consumer-baseline-verify: 9 tests passed");

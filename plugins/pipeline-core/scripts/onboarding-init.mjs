@@ -101,6 +101,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
   CRITICAL_HUMAN_PROOF_POLICY_PATH,
   CRITICAL_HUMAN_PROOF_POLICY_V3,
@@ -369,7 +370,7 @@ export function applyTrustAnchorBootstrap({
   const common = runGit("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], {
     encoding: "utf8", shell: false, env: effectiveEnv,
   });
-  if (common?.status !== 0) return { ok: false, code: "TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED" };
+  if (!isSuccessfulSpawn(common)) return { ok: false, code: "TRUST-ANCHOR-REPOSITORY-POINTER-READBACK-FAILED" };
   const commonDir = resolve(root, String(common.stdout ?? "").trim());
   const repositoryPointerPath = join(commonDir, "agent-pipeline", "po-key-directory.json");
   const recoveryPath = join(commonDir, "agent-pipeline", "first-anchor-bootstrap-recovery.json");
@@ -448,7 +449,7 @@ export function applyTrustAnchorBootstrap({
       stdio: ["inherit", "ignore", "inherit"],
       env: effectiveEnv,
     });
-    if (setup?.error || setup?.status !== 0) return fail("TRUST-ANCHOR-SETUP-FAILED");
+    if (!isSuccessfulSpawn(setup)) return fail("TRUST-ANCHOR-SETUP-FAILED");
   }
 
   const authority = parseJsonFile(join(targetDirectory, "trust-policy.json"), read);
@@ -544,8 +545,10 @@ function readLocalGitConfig(root, key, env, runGit = spawnSync) {
   const result = runGit("git", ["-C", root, "config", "--local", "--get", key], {
     encoding: "utf8", shell: false, env,
   });
-  if (result?.status === 1) return { present: false, value: null };
-  if (result?.error || result?.status !== 0) return null;
+  if (result?.status === 1 && (result?.error === undefined || result?.error === null)) {
+    return { present: false, value: null };
+  }
+  if (!isSuccessfulSpawn(result)) return null;
   return { present: true, value: String(result.stdout ?? "").replace(/[\r\n]+$/u, "") };
 }
 
@@ -553,7 +556,7 @@ function writeLocalGitConfig(root, key, value, env, runGit = spawnSync) {
   const result = runGit("git", ["-C", root, "config", "--local", key, value], {
     encoding: "utf8", shell: false, env,
   });
-  return !result?.error && result?.status === 0;
+  return isSuccessfulSpawn(result);
 }
 
 function restoreLocalGitConfig(root, key, snapshot, env, runGit = spawnSync) {
@@ -561,7 +564,7 @@ function restoreLocalGitConfig(root, key, snapshot, env, runGit = spawnSync) {
   const result = runGit("git", ["-C", root, "config", "--local", "--unset-all", key], {
     encoding: "utf8", shell: false, env,
   });
-  return !result?.error && (result?.status === 0 || result?.status === 5);
+  return hasExpectedSpawnStatus(result, [0, 5]);
 }
 
 /**
@@ -733,7 +736,7 @@ function runOnboardingStep({ executable, argv, run, env = null, projectRoot = nu
     };
   }
   const result = run(executable, argv, options);
-  if (result?.error) {
+  if (result?.error && !isSuccessfulSpawn(result)) {
     return { ok: false, faultCode: "spawn-failed", exitCode: result.status ?? null, stderr: String(result.error?.message ?? "") };
   }
   const exitCode = result?.status ?? null;

@@ -110,6 +110,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
 import { pushPrepareReport as realPushPrepareReport } from "./push-prepare.mjs";
 
@@ -166,12 +167,12 @@ export function buildPushInitArgv({ root, by, remote, destination, base = null }
  */
 function runReconciliationStep({ argv, run }) {
   const result = run("node", argv, { encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024 });
-  if (result?.error) {
-    return { ok: false, exitCode: result.status ?? null, stdout: "", stderr: String(result.error?.message ?? "") };
+  const exitCode = typeof result?.status === "number" ? result.status : null;
+  if (exitCode === null) {
+    return { ok: false, exitCode: result?.status ?? null, stdout: "", stderr: String(result?.error?.message ?? "") };
   }
-  const exitCode = result?.status ?? null;
   return {
-    ok: exitCode === 0,
+    ok: isSuccessfulSpawn(result),
     exitCode,
     stdout: String(result?.stdout ?? "").slice(0, 4000),
     stderr: String(result?.stderr ?? "").slice(0, 4000),
@@ -247,7 +248,8 @@ export function drivePushInit({
       ? { id: "doc-reconciliation", ok: true, status: "reconciled", message: stepResult.stdout.trim() || "doc reconciliation check passed." }
       : {
         id: "doc-reconciliation", ok: false, status: "unreconciled",
-        message: (stepResult.stderr.trim() || stepResult.stdout.trim() || "check-doc-reconciliation.mjs exited non-zero with no output."),
+        message: [stepResult.stderr.trim(), stepResult.stdout.trim()].filter((value) => value !== "").join("\n")
+          || "check-doc-reconciliation.mjs exited non-zero with no output.",
         remedy: "resolve each finding named above (amend the ADR or record it as checked in docs/doc-reconciliation.md), then retry",
       };
   }

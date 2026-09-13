@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { consumeCandidatePacket } from "./critic-packet-preflight.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
 import {
   SESSION_CRITIC_ASSURANCE,
@@ -19,7 +20,11 @@ import {
   validateSessionCriticReceipt,
 } from "./session-critic-finalizer.mjs";
 
-function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
+function git(root, args, options = {}) {
+  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", ...options });
+  assert.equal(isSuccessfulSpawn(result), true, result.stderr);
+  return String(result.stdout ?? "").trim();
+}
 function commit(root, message) {
   git(root, ["add", "."]);
   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
@@ -36,7 +41,7 @@ function fixture({ rootCandidate = false } = {}) {
   let base;
   if (rootCandidate) {
     const candidate = commit(root, "root candidate");
-    base = execFileSync("git", ["-C", root, "hash-object", "-t", "tree", "--stdin"], { input: "", encoding: "utf8" }).trim();
+    base = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
     const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
     writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
     return { root, base, candidate, tree };

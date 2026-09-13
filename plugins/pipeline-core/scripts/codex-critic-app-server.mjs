@@ -5,6 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -74,13 +75,13 @@ function assertCommittedRuleset(files) {
     fail("Critic installed ruleset is unavailable until an installer-owned verifier is implemented");
   }
   const rootResult = gitOutput(["rev-parse", "--show-toplevel"]);
-  if (rootResult.error || rootResult.status !== 0) fail("Critic ruleset Git identity is unavailable");
+  if (!isSuccessfulSpawn(rootResult)) fail("Critic ruleset Git identity is unavailable");
   const gitRoot = realpathSync(rootResult.stdout.toString("utf8").trim());
   if (gitRoot !== realpathSync(enclosing)) fail("Critic ruleset Git root is ambiguous");
   const status = spawnSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], {
     cwd: gitRoot, encoding: "utf8", shell: false, maxBuffer: 8 * 1024 * 1024,
   });
-  if (status.status !== 0 || status.stdout.length !== 0) fail("Critic ruleset checkout is dirty");
+  if (!isSuccessfulSpawn(status) || status.stdout.length !== 0) fail("Critic ruleset checkout is dirty");
   const paths = files.map(({ path }) => path).map((path) => {
     const value = relative(gitRoot, path).split("\\").join("/");
     if (!value || value === ".." || value.startsWith("../")) fail("Critic ruleset checkout does not contain its contracts");
@@ -89,10 +90,10 @@ function assertCommittedRuleset(files) {
   for (let index = 0; index < paths.length; index += 1) {
     const committed = spawnSync("git", ["show", `HEAD:${paths[index]}`], { cwd: gitRoot, encoding: null, shell: false, maxBuffer: 8 * 1024 * 1024 });
     const observed = files[index].bytes;
-    if (committed.status !== 0 || !committed.stdout.equals(observed)) fail("Critic ruleset executable or contract differs from committed bytes");
+    if (!isSuccessfulSpawn(committed) || !committed.stdout.equals(observed)) fail("Critic ruleset executable or contract differs from committed bytes");
   }
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: gitRoot, encoding: "utf8", shell: false });
-  if (head.status !== 0 || !COMMIT_SHA.test(head.stdout.trim())) fail("Critic ruleset HEAD is unavailable");
+  if (!isSuccessfulSpawn(head) || !COMMIT_SHA.test(head.stdout.trim())) fail("Critic ruleset HEAD is unavailable");
   return { kind: "git", identity: head.stdout.trim() };
 }
 

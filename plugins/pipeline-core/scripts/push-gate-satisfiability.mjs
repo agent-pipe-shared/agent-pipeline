@@ -55,6 +55,7 @@ import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import {
   checkCriticalHumanProofPolicy,
@@ -178,7 +179,7 @@ export function checkPushThreatModelMaterialized(dir, deps = {}) {
 function gitOutput(dir, args, deps) {
   const spawn = deps.spawn ?? spawnSync;
   const result = spawn("git", ["-C", dir, ...args], { encoding: "utf8" });
-  if (result.error || result.status !== 0 || typeof result.stdout !== "string") return null;
+  if (!isSuccessfulSpawn(result) || typeof result.stdout !== "string") return null;
   return result.stdout.trim();
 }
 

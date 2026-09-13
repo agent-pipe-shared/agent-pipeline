@@ -7,6 +7,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { dispatchFindings } from "./dispatch-policy.mjs";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 export const ROLE_DISPATCH_REQUEST_SCHEMA = "pipeline.role-dispatch-request.v1";
 export const ROLE_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.role-dispatch-preflight.v1";
@@ -64,7 +65,7 @@ function git(root, args, deadlineEpochMs) {
     timeout: remainingMs,
     maxBuffer: 1024 * 1024,
   });
-  if (result.error || result.status !== 0) return null;
+  if (!isSuccessfulSpawn(result)) return null;
   return String(result.stdout).trim();
 }
 
@@ -78,7 +79,7 @@ function candidateBlobSha256(root, oid, deadlineEpochMs) {
     timeout: remainingMs,
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.error || result.status !== 0 || !Buffer.isBuffer(result.stdout)) return null;
+  if (!isSuccessfulSpawn(result) || !Buffer.isBuffer(result.stdout)) return null;
   return createHash("sha256").update(result.stdout).digest("hex");
 }
 

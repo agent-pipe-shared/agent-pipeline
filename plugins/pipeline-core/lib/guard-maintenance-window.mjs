@@ -61,6 +61,7 @@ import {
 } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { USER_SOURCE_PATH, readCriticalHumanProofPolicy, readHumanApprovalMode, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
@@ -509,7 +510,7 @@ function physicalRoot(root) {
 
 function git(root, args, spawn = spawnSync) {
   const result = spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
-  if (result?.status !== 0 || result?.error) {
+  if (!isSuccessfulSpawn(result)) {
     const operation = args.map((value) => String(value).replace(/[^A-Za-z0-9._=-]/gu, "_")).join("-").slice(0, 120);
     const outcome = result?.error?.code ?? result?.error?.name ?? result?.signal ?? `exit-${String(result?.status)}`;
     fail("GMW-GIT", `repository identity is unavailable (operation=${operation}, outcome=${outcome})`);
@@ -1111,10 +1112,10 @@ function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, curren
     const spawnGit = (args) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
 
     const ancestor = spawnGit(["merge-base", "--is-ancestor", candidateCommit, currentCommit]);
-    if (ancestor?.error || ancestor?.status !== 0) return false; // not a strict ancestor, or uncertain
+    if (!isSuccessfulSpawn(ancestor)) return false; // not a strict ancestor, or uncertain
 
     const revList = spawnGit(["rev-list", "--parents", "--reverse", `${candidateCommit}..${currentCommit}`]);
-    if (revList?.error || revList?.status !== 0) return false;
+    if (!isSuccessfulSpawn(revList)) return false;
     const lines = String(revList.stdout ?? "").split("\n").map((line) => line.trim()).filter((line) => line !== "");
     if (lines.length === 0) return false; // inconsistent with the caller's own currentCommit !== candidateCommit check
 
@@ -1139,7 +1140,7 @@ function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, curren
       if (parents.length !== 1) return false; // merge commit or root commit: fail closed
 
       const diff = spawnGit(["diff", "--name-status", "-M", parents[0], commit]);
-      if (diff?.error || diff?.status !== 0) return false;
+      if (!isSuccessfulSpawn(diff)) return false;
       const diffLines = String(diff.stdout ?? "").split("\n").map((entry) => entry.trim()).filter((entry) => entry !== "");
       if (diffLines.length === 0) return false; // empty/malformed diff: fail closed
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,6 +18,7 @@ import {
 } from "./critic-packet-preflight.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 const cases = [];
@@ -37,7 +38,9 @@ function check(name, run) {
   });
 }
 function git(root, args) {
-  return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" } }).trim();
+  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" } });
+  assert.equal(isSuccessfulSpawn(result), true, `git ${args.join(" ")}: ${String(result.stderr)}`);
+  return String(result.stdout).trim();
 }
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "cpp-test-"));

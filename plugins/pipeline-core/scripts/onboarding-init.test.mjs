@@ -420,7 +420,10 @@ test("new-key bootstrap omits an existing-key operand, requires durable pointer 
         poKeyDirectory: destination,
         updatedAt: new Date().toISOString(),
       })}\n`);
-      return { status: 0 };
+      return {
+        status: 0,
+        error: Object.assign(new Error("WSL sandbox adapter reported EPERM after setup completed"), { code: "EPERM" }),
+      };
     };
     const applied = applyTrustAnchorBootstrap({
       rootDir: root,
@@ -916,6 +919,66 @@ test("driveOnboardingInit: binds a returned root-less project action to the Driv
     assert.equal(calls, 3, "a command's own ready response requires a fresh inspect readback");
   } finally {
     dispose(root);
+  }
+});
+
+test("driveOnboardingInit: accepts a completed WSL child when EPERM accompanies its zero exit status", () => {
+  const root = freshRoot();
+  try {
+    let calls = 0;
+    const completed = (output) => ({
+      status: 0,
+      stdout: JSON.stringify(output),
+      stderr: "",
+      error: Object.assign(new Error("WSL sandbox adapter reported EPERM after completion"), { code: "EPERM" }),
+    });
+    const run = () => {
+      calls += 1;
+      if (calls === 1) {
+        return completed({
+          schema: "pipeline.synthetic.v1",
+          status: "in-progress",
+          nextAction: { kind: "command", executable: "node", argv: ["tool"] },
+        });
+      }
+      return completed({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null });
+    };
+    const result = driveOnboardingInit({ rootDir: root, run });
+    assert.equal(result.outcome, "ready", JSON.stringify(result));
+    assert.equal(calls, 3, "the completed command is followed by its mandatory fresh inspect readback");
+  } finally {
+    dispose(root);
+  }
+});
+
+test("driveOnboardingInit: nonzero, missing-status, and non-EPERM spawn results remain closed", () => {
+  for (const [name, result, faultCode, exitCode] of [
+    ["nonzero-eperm", {
+      status: 1,
+      stdout: JSON.stringify({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null }),
+      stderr: "refused",
+      error: Object.assign(new Error("EPERM"), { code: "EPERM" }),
+    }, "spawn-failed", 1],
+    ["missing-status", {
+      stdout: JSON.stringify({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null }),
+      stderr: "",
+    }, "nonzero-exit", null],
+    ["foreign-error-at-zero", {
+      status: 0,
+      stdout: JSON.stringify({ schema: "pipeline.synthetic.v1", status: "ready", nextAction: null }),
+      stderr: "",
+      error: Object.assign(new Error("EACCES"), { code: "EACCES" }),
+    }, "spawn-failed", 0],
+  ]) {
+    const root = freshRoot();
+    try {
+      const observed = driveOnboardingInit({ rootDir: root, run: () => result });
+      assert.equal(observed.outcome, "error", `${name}: ${JSON.stringify(observed)}`);
+      assert.equal(observed.error.faultCode, faultCode, name);
+      assert.equal(observed.error.exitCode, exitCode, name);
+    } finally {
+      dispose(root);
+    }
   }
 });
 

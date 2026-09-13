@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 import {
   WorktreeLifecycleError,
@@ -69,7 +70,7 @@ function git(cwd, args, { allowNonzero = false } = {}) {
     shell: false,
     env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", LC_ALL: "C" },
   });
-  if (result.error || (!allowNonzero && result.status !== 0)) {
+  if (!isSuccessfulSpawn(result) && !(allowNonzero && typeof result.status === "number" && !result.error)) {
     throw result.error || new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
   }
   return result;
@@ -105,7 +106,7 @@ function nodeCli(script, args, env = {}) {
     shell: false,
     env: { ...process.env, ...env },
   });
-  if (result.error || result.status !== 0) {
+  if (!isSuccessfulSpawn(result)) {
     throw result.error || new Error(`${script} failed (${result.status}): ${result.stderr}`);
   }
   return result;
@@ -928,6 +929,23 @@ check("D0-TO01 runGit forwards an explicit timeout to the underlying spawn call"
   };
   runGit(primary, ["rev-parse", "HEAD"], { spawn: spy, timeout: 12345 });
   assert.equal(seenOptions.timeout, 12345);
+});
+
+check("D0-WSPAWN runGit accepts WSL EPERM only after status zero and keeps non-zero or missing status closed", () => {
+  const { primary } = repoFixture();
+  const eperm = Object.assign(new Error("sandbox transport completed late"), { code: "EPERM" });
+  const accepted = { status: 0, stdout: "candidate\n", stderr: "", error: eperm };
+  assert.equal(runGit(primary, ["rev-parse", "HEAD"], { spawn: () => accepted }), accepted);
+  assertLifecycleError(() => runGit(primary, ["rev-parse", "HEAD"], { spawn: () => ({ status: 1, stdout: "", stderr: "failed" }) }), "WT-GIT-FAILED");
+  assert.equal(
+    runGit(primary, ["symbolic-ref", "-q", "HEAD"], { allowNonzero: true, spawn: () => ({ status: 1, stdout: "", stderr: "", error: eperm }) }).status,
+    1,
+  );
+  assertLifecycleError(
+    () => runGit(primary, ["symbolic-ref", "-q", "HEAD"], { allowNonzero: true, spawn: () => ({ status: 2, stdout: "", stderr: "bad", error: eperm }) }),
+    "WT-GIT-SPAWN",
+  );
+  assertLifecycleError(() => runGit(primary, ["rev-parse", "HEAD"], { spawn: () => ({ status: null, stdout: "", stderr: "", error: new Error("ENOENT") }) }), "WT-GIT-SPAWN");
 });
 
 check("D0-TO02 runGit omits timeout entirely (stays undefined, not 0/null) when the caller passes none", () => {

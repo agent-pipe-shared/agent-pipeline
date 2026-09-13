@@ -13,6 +13,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
 import {
   BACKLOG_FINDING_SEVERITY,
@@ -149,7 +150,7 @@ function trackedPaths(root, repoPaths) {
   const paths = [...new Set(repoPaths.filter((value) => typeof value === "string" && value.trim() !== ""))];
   if (paths.length === 0) return { state: "known", tracked: new Set() };
   const probe = spawnSync("git", ["ls-files", "-z", "--", ...paths], { cwd: root, encoding: "utf8" });
-  if (probe.error || probe.status !== 0) return { state: "indeterminate", tracked: new Set() };
+  if (!isSuccessfulSpawn(probe)) return { state: "indeterminate", tracked: new Set() };
   return { state: "known", tracked: new Set(probe.stdout.split("\0").filter((entry) => entry !== "")) };
 }
 
@@ -177,7 +178,7 @@ function authorityApproval() { return { ok: true, code: "AUTHORITY:VALID" }; }
 
 function gitFileBytes(root, commit, repoPath) {
   const result = spawnSync("git", ["show", `${commit}:${repoPath}`], { cwd: root, encoding: null });
-  return result.status === 0 && Buffer.isBuffer(result.stdout) ? result.stdout : null;
+  return isSuccessfulSpawn(result) && Buffer.isBuffer(result.stdout) ? result.stdout : null;
 }
 
 /**
@@ -280,7 +281,7 @@ function projectReadbackFindings(root, item) {
 
 function localCommitExists(root, oid) {
   const result = spawnSync("git", ["cat-file", "-e", `${oid}^{commit}`], { cwd: root, stdio: "ignore" });
-  return result.status === 0;
+  return isSuccessfulSpawn(result);
 }
 
 /**
@@ -453,14 +454,14 @@ export function reachabilityAmendmentFindings(root, event) {
     encoding: "utf8",
   });
   const blobOid = String(blob.stdout ?? "").trim();
-  if (blob.status !== 0 || blobOid !== event.evidence.referenceBlobOid) {
+  if (!isSuccessfulSpawn(blob) || blobOid !== event.evidence.referenceBlobOid) {
     findings.push(`${label}: referenceBlobOid does not bind the reachable commit projection`);
   }
   const historical = spawnSync("git", ["show", `${event.evidence.commit}:${reference}`], {
     cwd: root,
     encoding: null,
   });
-  const historicalSha = historical.status === 0
+  const historicalSha = isSuccessfulSpawn(historical)
     ? createHash("sha256").update(historical.stdout).digest("hex")
     : null;
   // The amendment binds the exact historical projection at evidence.commit.
@@ -486,7 +487,7 @@ export function itemHashAmendmentFindings(root, event) {
     cwd: root,
     encoding: null,
   });
-  const historicalSha = historical.status === 0
+  const historicalSha = isSuccessfulSpawn(historical)
     ? createHash("sha256").update(historical.stdout).digest("hex")
     : null;
   if (historicalSha !== event.evidence.itemSha256) {
@@ -813,7 +814,7 @@ export function planSentinelBacklogRecovery(root = DEFAULT_ROOT, { catalogPath =
   }
   const commit = evidenceCommit ?? (() => {
     const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
-    return result.status === 0 ? result.stdout.trim() : null;
+    return isSuccessfulSpawn(result) ? result.stdout.trim() : null;
   })();
   if (typeof commit !== "string" || !/^[a-f0-9]{40}$/u.test(commit) || (checkCommit && !localCommitExists(root, commit))) findings.push("Sentinel recovery requires a reachable local evidence commit");
   if (catalog) {
@@ -913,7 +914,7 @@ export function planSentinelScopeExtension(root = DEFAULT_ROOT, input, { evidenc
   const findings = [...current.findings, ...validateSentinelScopeExtension(input)];
   const commit = evidenceCommit ?? (() => {
     const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
-    return result.status === 0 ? result.stdout.trim() : null;
+    return isSuccessfulSpawn(result) ? result.stdout.trim() : null;
   })();
   if (typeof commit !== "string" || !/^[a-f0-9]{40}$/.test(commit) || (checkCommit && !localCommitExists(root, commit))) findings.push("Sentinel scope extension requires a reachable local evidence commit");
   const currentIds = new Set(current.items.map((item) => item.metadata.id));

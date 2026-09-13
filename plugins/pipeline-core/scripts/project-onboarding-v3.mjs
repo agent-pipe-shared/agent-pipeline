@@ -6,6 +6,7 @@ import { spawnSync as hostSpawnSync } from "node:child_process";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
 import { chatAttributionRecord, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
@@ -569,7 +570,10 @@ function runGitObservation(spawn, root, args) {
       timeout: 10_000,
       windowsHide: true,
     });
-    if (result?.error) return { status: null, stdout: "" };
+    if (isSuccessfulSpawn(result)) {
+      return { status: 0, stdout: String(result?.stdout ?? "").trim() };
+    }
+    if (result?.error || !Number.isInteger(result?.status)) return { status: null, stdout: "" };
     return { status: result?.status ?? null, stdout: String(result?.stdout ?? "").trim() };
   } catch {
     return { status: null, stdout: "" };

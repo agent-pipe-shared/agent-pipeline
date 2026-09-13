@@ -129,6 +129,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { parseYaml } from "./yaml-lite.mjs";
 import { USER_SOURCE_PATH } from "./critical-human-proof-policy.mjs";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 
 export const EXTERNAL_PUSH_LEDGER_SCHEMA = "pipeline.external-push-ledger.v1";
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -230,7 +231,7 @@ export function checkExternalPushLedgerConsumption({
 function committedUserYamlBytes(dir) {
   try {
     const top = spawnSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
-    if (top.error || top.status !== 0 || typeof top.stdout !== "string") return { repoFound: false };
+    if (!isSuccessfulSpawn(top) || typeof top.stdout !== "string") return { repoFound: false };
     const repoRoot = top.stdout.trim();
     if (repoRoot === "") return { repoFound: false };
     // Only the DIRECTORY is realpath-resolved -- the `pipeline.user.yaml` path component is a
@@ -244,7 +245,7 @@ function committedUserYamlBytes(dir) {
       encoding: "buffer",
       maxBuffer: 1024 * 1024,
     });
-    if (result.error || result.status !== 0 || !result.stdout) return { repoFound: true, bytes: null };
+    if (!isSuccessfulSpawn(result) || !result.stdout) return { repoFound: true, bytes: null };
     return { repoFound: true, bytes: Buffer.from(result.stdout) };
   } catch {
     return { repoFound: false };

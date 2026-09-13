@@ -25,6 +25,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {
@@ -779,7 +780,7 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
     ["init", "--initial-branch=main", `--template=${templatePath}`],
     { cwd: root, encoding: "utf8" },
   );
-  if (initializedResult.error || initializedResult.status !== 0) {
+  if (!isSuccessfulSpawn(initializedResult)) {
     return { status: "git-init-failed", gitIdentity };
   }
   if (!samePhysicalIdentity(gitPath, gitIdentity, fs)) {
@@ -1032,7 +1033,7 @@ export function applyHostRepositoryInit({
     }
     const spawn = deps.spawnSync ?? spawnSync;
     const observed = spawn("git", ["--version"], { cwd: root, encoding: "utf8" });
-    const currentGitVersion = !observed.error && observed.status === 0 ? parseGitVersion(observed.stdout) : null;
+    const currentGitVersion = isSuccessfulSpawn(observed) ? parseGitVersion(observed.stdout) : null;
     if (!currentGitVersion) {
       return { schema: APPLY_SCHEMA, status: "git-unavailable", root, diagnostics: [{ code: "git_2_28_required" }] };
     }

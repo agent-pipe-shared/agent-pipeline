@@ -17,6 +17,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import {
   closeSync,
   constants,
@@ -2523,12 +2524,12 @@ function closedReleaseProof(root, state, entry, entryIndex, spawn) {
       ["show", `${entry.forCommit}:${statePath}`],
       { cwd: root, encoding: "utf8", shell: false, maxBuffer: 2 * 1024 * 1024 },
     );
-    if (!candidate?.error && candidate?.status === 0) {
+    if (isSuccessfulSpawn(candidate)) {
       result = candidate;
       break;
     }
   }
-  if (result?.error || result?.status !== 0) return null;
+  if (!isSuccessfulSpawn(result)) return null;
   const raw = Buffer.from(String(result.stdout ?? ""), "utf8");
   let prior;
   try { prior = JSON.parse(raw); } catch { return null; }
