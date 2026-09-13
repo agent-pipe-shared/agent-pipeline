@@ -33,6 +33,43 @@ verification observes a prefix-valid 14-event Human chain ending at sequence
 No fork disposition, replacement Human event, or retained Alfred exception was
 inferred.
 
+### C1 evidence cadence — fixed 14-day release/promotion gate removed, continuous quality retained — resolved 2026-09-13
+
+The PO explicitly decided that Alfred has no fixed 14-day wait or age threshold
+as a release or promotion gate. The affected packages are C1 interruption
+receipts and their collection, correlation, storage, aggregation, and report
+evidence, plus any later B1/D2 calibration or promotion package that consumes
+them. Continuous C1 use remains mandatory: real event→correlation→storage→honest
+report evidence, explicit `unknown`/`unavailable`/limited-coverage outcomes,
+deterministic fixtures, and ongoing calibration are still required. The
+Alternatives considered were retaining the fixed 14-day gate or relaxing the
+evidence-quality requirements; both were declined. The
+recommendation/disposition is to remove only the calendar gate, preserve the
+evidence-quality contract, and leave historical candidate evidence and issue
+snapshots untouched. The living normative PRD, Spec, and Acceptance statements
+that encode the fixed window require a later sanctioned revision; this queue
+does not change their authority. Deferral would leave the stale 14-day gate
+ambiguous and could incorrectly block or falsely promote work. Durable evidence
+is this resolved entry, the C1 artifacts under `specs/sprint-alfred-epic/evidence/`
+and `telemetry/`, and the later sanctioned revision's audit trail.
+
+### Alfred release shape — one full release, no preview/interim/slice releases — resolved 2026-09-13
+
+The PO explicitly decided to target one full Alfred release, with no preview,
+interim, or slice releases. The affected package is the full
+`sprint-alfred-epic` release and its E2 integrated qualification; internal
+slices remain implementation and verification units only and must not be
+called releases. Alternatives considered were preview/interim releases or
+publishing individual slices; both are declined. The recommendation/disposition
+is one exact candidate satisfying the existing full epic completion predicate,
+all existing gates, independent reviews, documentation acceptance, and PO
+acceptance, followed only by separately authorized publication. Deferral would
+leave release terminology ambiguous and risk treating incomplete slices as
+the Alfred release. Durable evidence is this resolved entry, the existing
+completion predicate in `specs/sprint-alfred-epic/spec.md` §13 and PRD §7/E2,
+the acceptance matrix, and the eventual candidate-bound qualification and
+publication approvals.
+
 ### Event 16 deterministic scanner collision — superseded by rebase disposition
 
 The exact clean candidate is `d88b543486ddc8e6215d3944fafc1e38aa6790da`
@@ -79,7 +116,7 @@ push prerequisites before any execution; do not claim a push or signature.
 | C1 producer capture | Committed at `3e11cdadfe8c0e6ab9bd864211fc6dc6e03270dc`, tree `ab433771e3711d999d75d04fbc3f71acbeb7a845`; focused checks baseline 6/6 then 20/20, consumer 9/9, diff-check 0 | Integrate the reviewed store/observer/controller plans, then run a new candidate Full Verify; no emission or baseline claim |
 | Slice/parallel hooks | Exact hook identity, native tool coverage and live invocation evidence unmeasured | Read-only investigation, then bounded tests where admitted |
 | Existing first-core and scanner-exception review | Installed CAS-READY health and physical Critic adapter layout fix are observed; selected execution and T1 remain pending while Verify is red | Recheck the selected transport and candidate-bound review after the next green Verify |
-| Real collection baseline | Native evidence and measured 14-day window remain open | Implement/validate collection before recording a real start; never backdate |
+| Real collection baseline | Continuous C1 evidence quality remains open; no fixed 14-day release/promotion gate applies per the 2026-09-13 PO decision | Implement/validate collection and calibration with honest coverage/status evidence; do not backdate or claim release/promotion from this queue |
 | Future publication | Rebase onto Nova `d2b1dbfc…` is complete; reconciliation, Full Verify and current review/acceptance gates remain open | User performs any later terminal push against `origin/feat/sprint-alfred` only after independently checking the configured gates; agents must not push |
 | Feature acceptance | Open | Present only after the required work and evidence exist |
 
