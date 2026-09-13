@@ -1566,6 +1566,15 @@ action. This repairs the self-blocking first-run path without granting a
 general host-write, a reconstructed command, or any action from an unrelated
 preflight result.
 
+The corridor also covers exactly one runner-permission repair: when a fresh
+session observation reports `projection-drift` and publishes the
+digest-bound `settings-allowlist-merge.mjs apply-runner-permissions` action,
+the guard admits that complete action even if its independent ready readback is
+malformed. Its script, operation, physical root, `--plan-sha256`, `--activate`,
+Node executable and complete argv must equal the observed action. A planner,
+another candidate set, an altered digest, a changed root or any neighbouring
+settings command remains denied.
+
 For Codex, the registry always selects the marketplace-copy root. If that
 root is itself a valid Git source, the action omits an explicit source. A
 gitless marketplace copy receives an explicit project-checkout source only

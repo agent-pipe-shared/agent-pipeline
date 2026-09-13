@@ -541,6 +541,10 @@ of the hotfix.
   non-detached, manifest- and content-identical Git checkout proven through
   the writer's own runner-neutral observation; a gitless registry copy without
   such a source yields no host action and typed sanitized mismatch codes.
+- NVA-B8-8: When a fresh session observation publishes its digest-bound
+  `apply-runner-permissions` action, a malformed independent ready readback
+  admits only that exact action. Changed script, operation, root, digest,
+  `--activate`, executable or argv remain refused.
 
 ## Final evidence matrix
 

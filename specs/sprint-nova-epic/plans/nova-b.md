@@ -476,6 +476,10 @@ leads source selection; a gitless registry copy gains an explicit checkout
 source only after the writer's own runner-neutral observation proves that
 checkout clean, non-detached and byte-/manifest-identical. Otherwise preflight
 publishes no writer action and typed sanitized mismatch evidence.
+The same fresh-observation corridor admits only the typed, digest-bound
+runner-permission repair action when its independent ready readback is
+malformed; it never admits a planner, a different candidate set or an altered
+settings command.
 
 **Stop:** any wildcard executable trust, argument normalization, generic Git
 rollback permission, lifecycle bypass, protected-path weakening or Verify

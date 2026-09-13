@@ -1145,6 +1145,57 @@ test("NVA-B8-IPA: only the exact fresh preflight attestation writer survives an 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survives an invalid onboarding observation", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const argv = [
+      join(SCRIPTS_DIR, "settings-allowlist-merge.mjs"),
+      "apply-runner-permissions",
+      "--root", path,
+      "--plan-sha256", "a".repeat(64),
+      "--activate",
+    ];
+    const observation = {
+      schema: "pipeline.project-onboarding.v4",
+      status: "projection-drift",
+      root: path,
+      intent: "session",
+      runnerPermissions: { status: "drifted" },
+      nextAction: {
+        kind: "command",
+        executable: "node",
+        argv,
+        mutation: true,
+        requiresConfirmation: true,
+        expected: { schema: "pipeline.settings-allowlist-merge-apply.v1", statuses: ["ready", "no-op"] },
+      },
+    };
+    const invalidObservation = () => {
+      throw new ProjectOnboardingReadyError("PORG-INVALID-OBSERVATION", "invalid", { intent: "session" });
+    };
+    const run = (command, observed = observation) => evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command } },
+      { projectDir: path, requireProjectOnboardingReadyFn: invalidObservation, inspectProjectOnboardingV3Fn: () => observed },
+    );
+    assert.equal(run(`node ${argv.join(" ")}`).exitCode, 0);
+    assert.equal(run(`node ${[...argv.slice(0, 5), "b".repeat(64), ...argv.slice(6)].join(" ")}`).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, { ...observation, status: "ready" }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...observation,
+      nextAction: { ...observation.nextAction, argv: [argv[0], "plan-runner-permissions", "--root", path] },
+    }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...observation,
+      nextAction: { ...observation.nextAction, requiresConfirmation: false },
+    }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...observation,
+      nextAction: { ...observation.nextAction, expected: { schema: "pipeline.settings-allowlist-merge-apply.v1", statuses: ["ready"] } },
+    }).exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("closed command grammar preserves native Windows paths and direct node.exe identity", () => {
   const windowsRoot = "C:\\Users\\Pipeline User\\consumer";
   const script = "C:\\Pipeline Plugin\\scripts\\project-onboarding-v3.mjs";

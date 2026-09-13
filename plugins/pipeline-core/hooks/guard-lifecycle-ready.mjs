@@ -224,6 +224,7 @@ const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup
 const SESSION_CRITIC_FINALIZER_SCRIPT = fileURLToPath(new URL("../scripts/session-critic-finalizer.mjs", import.meta.url));
 const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const SETTINGS_ALLOWLIST_MERGE_SCRIPT = fileURLToPath(new URL("../scripts/settings-allowlist-merge.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const RESUME_HINT_SCRIPT = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
@@ -4175,6 +4176,54 @@ function isExactObservedInstalledPluginAttestationAction(command, root, dependen
 }
 
 /**
+ * NVA-B8-RUNNER-PERMISSIONS: a versioned local plugin may be unable to run its
+ * own next installation/recovery action until its four exact runner-permission
+ * entries have been merged. The producer already publishes one digest-bound
+ * repair action. If the guard's separate ready readback is malformed, admit
+ * only that freshly observed action; never a settings planner or a
+ * reconstructed settings write.
+ */
+function isExactObservedRunnerPermissionsRepairAction(command, root, dependencies = {}) {
+  const words = simpleWords(command, root);
+  if (!words) return false;
+  let observed;
+  try {
+    observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
+      rootDir: root,
+      intent: "session",
+      runner: dependencies.runner,
+    });
+  } catch {
+    return false;
+  }
+  const action = observed?.nextAction;
+  const expected = action?.expected;
+  const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
+  return observed?.schema === "pipeline.project-onboarding.v4"
+    && observed?.status === "projection-drift"
+    && observed?.root === root
+    && observed?.intent === "session"
+    && observed?.runnerPermissions?.status === "drifted"
+    && exactKeys(action, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && action.kind === "command" && action.executable === "node"
+    && Array.isArray(action.argv) && action.argv.length === 7 && action.argv.every((value) => typeof value === "string")
+    && action.argv[0] === SETTINGS_ALLOWLIST_MERGE_SCRIPT
+    && action.argv[1] === "apply-runner-permissions"
+    && action.argv[2] === "--root" && action.argv[3] === root
+    && action.argv[4] === "--plan-sha256" && HEX.test(action.argv[5])
+    && action.argv[6] === "--activate"
+    && action.mutation === true && action.requiresConfirmation === true
+    && exactKeys(expected, ["schema", "statuses"])
+    && expected.schema === "pipeline.settings-allowlist-merge-apply.v1"
+    && Array.isArray(expected.statuses) && expected.statuses.length === 2
+    && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op"
+    && words.length === action.argv.length + 1
+    && words[0] === action.executable
+    && action.argv.every((value, index) => words[index + 1] === value);
+}
+
+/**
  * GF-097: a bare `gh --version` and a bare `gh auth status` are GitHub CLI's own
  * documented read-only diagnostics -- the former only prints the installed CLI version
  * (`gh --help`), the latter only reports which account(s) are authenticated and to which
@@ -4830,6 +4879,12 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && toolName === "Bash"
       && isExactObservedInstalledPluginAttestationAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
     if (exactObservedInstalledPluginAttestationAction) return verdict(0);
+    const exactObservedRunnerPermissionsRepairAction = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-INVALID-OBSERVATION"
+      && error.intent === "session"
+      && toolName === "Bash"
+      && isExactObservedRunnerPermissionsRepairAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
+    if (exactObservedRunnerPermissionsRepairAction) return verdict(0);
     // NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-
     // and-tmp-fallback.md): a session stuck at `partial` has no route at all today to
     // persist a report of its own stuck state -- the in-root write is refused by this very
