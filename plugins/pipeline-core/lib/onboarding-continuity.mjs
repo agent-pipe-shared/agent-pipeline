@@ -23,7 +23,6 @@ import {
   constants,
   existsSync,
   fstatSync,
-  ftruncateSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
@@ -6756,18 +6755,42 @@ export function applyOnboardingBootstrapAcknowledgement({
   const next = appendBootstrapAcknowledgementMarker(current);
   if (next === null) fail("BOOTSTRAP-ACK-PRD-MARKER", "the staging PRD cannot safely receive one acknowledgement marker");
   let fd;
+  let temporaryRecord;
+  let committed = false;
   try {
     fd = openSync(target, constants.O_WRONLY | (constants.O_NOFOLLOW ?? 0));
     const opened = fstatSync(fd);
     const before = lstatSync(target);
     if (!opened.isFile() || before.isSymbolicLink() || opened.dev !== before.dev || opened.ino !== before.ino) fail("BOOTSTRAP-ACK-PRD-IDENTITY", "the staging PRD identity changed before acknowledgement");
-    ftruncateSync(fd, 0);
-    writeFileSync(fd, next);
-    fsyncSync(fd);
+    const suffixSource = (deps.randomUUID ?? randomUUID)();
+    if (typeof suffixSource !== "string" || !/^[a-f0-9-]{32,64}$/iu.test(suffixSource)) {
+      fail("BOOTSTRAP-ACK-RANDOM-UNAVAILABLE", "signature acknowledgement temporary-name source is invalid");
+    }
+    const temporary = join(
+      dirname(target),
+      `.${basename(target)}.bootstrap-ack-${suffixSource.replaceAll("-", "")}.tmp`,
+    );
+    // The marker is a human-authorized transition. Never truncate its signed
+    // preimage in place: a failed write must leave the original document and
+    // its plan digest retryable. The same-directory replace is atomic.
+    temporaryRecord = writeExclusiveSynced(temporary, next, opened.mode & 0o777);
+    assertPhysicalChain(plan.root, target, { leafMayBeAbsent: false });
+    if (sha256(readPhysicalFile(target, "staging PRD")) !== plan.action.prd.sha256) {
+      fail("BOOTSTRAP-ACK-PRD-DRIFT", "the staging PRD changed before acknowledgement replacement");
+    }
+    renameSync(temporary, target);
+    temporaryRecord = null;
+    committed = true;
+    fsyncDirectory(dirname(target));
   } catch (error) {
     if (error?.code?.startsWith("BOOTSTRAP-ACK-")) throw error;
     fail("BOOTSTRAP-ACK-WRITE", "the staging PRD acknowledgement could not be written safely");
-  } finally { if (fd !== undefined) closeSync(fd); }
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    if (!committed && temporaryRecord) {
+      try { unlinkOwned(temporaryRecord); } catch {}
+    }
+  }
   return {
     schema: BOOTSTRAP_ACKNOWLEDGEMENT_APPLY_SCHEMA,
     status: "applied",

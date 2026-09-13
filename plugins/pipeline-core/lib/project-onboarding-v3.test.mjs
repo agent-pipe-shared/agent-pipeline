@@ -9,7 +9,7 @@ import {
   openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -8615,6 +8615,22 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through the 
       deps: proofPolicy,
     }), (error) => error?.code === "BOOTSTRAP-ACK-PRD-DRIFT");
     writeFileSync(prdAbsolutePath, prdPreimage, "utf8");
+    // A failed replacement must not destroy the signed preimage. Force the
+    // exclusively-created sibling temporary name to collide, then prove the
+    // original PRD remains byte-identical and the legitimate apply can retry.
+    const acknowledgementTemporarySuffix = "a".repeat(32);
+    const acknowledgementTemporaryPath = join(
+      dirname(prdAbsolutePath),
+      `.${basename(prdAbsolutePath)}.bootstrap-ack-${acknowledgementTemporarySuffix}.tmp`,
+    );
+    writeFileSync(acknowledgementTemporaryPath, "occupied", "utf8");
+    assert.throws(() => applyOnboardingBootstrapAcknowledgement({
+      rootDir: path, repositoryCapability: "local", spawn: fakeGit, activate: true,
+      expectedPlanSha256: acknowledgementPlan.intentSha256, proofPath: acknowledgementPlan.proofPath,
+      deps: { ...proofPolicy, randomUUID: () => acknowledgementTemporarySuffix },
+    }), (error) => error?.code === "BOOTSTRAP-ACK-WRITE");
+    assert.equal(readFileSync(prdAbsolutePath, "utf8"), prdPreimage);
+    unlinkSync(acknowledgementTemporaryPath);
     const acknowledgementApplyRun = invoke([
       "bootstrap-acknowledge-apply", "--root", path, "--plan-sha256", acknowledgementPlan.intentSha256,
       "--proof", acknowledgementPlan.proofPath, "--activate", "--runner", "codex",
