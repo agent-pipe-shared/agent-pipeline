@@ -198,6 +198,14 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
 
 export const ALLOWLIST = Object.freeze([
   {
+    file: "plugins/pipeline-core/protected-baseline.json",
+    match: "harness/verify-suites\\\\.json|harness/scripts/check-verify-suite-registration\\\\.mjs",
+    reason:
+      "Class B: the immutable protected-surface baseline classifies this repository's own " +
+      "Verify registration assets alongside the shipped candidate-time checker. These are " +
+      "source-checkout-only policy data, not a command or path assumption a consumer executes.",
+  },
+  {
     file: "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
     match: "harness/scripts/check-observation-governance.mjs",
     reason:
