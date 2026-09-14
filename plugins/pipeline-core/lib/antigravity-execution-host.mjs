@@ -17,6 +17,7 @@ export const AGY_ERROR_TAXONOMY = {
   NONZERO_EXIT: "AGY-NONZERO-EXIT",
   OUTPUT_MALFORMED: "AGY-OUTPUT-MALFORMED",
   MODEL_MISMATCH: "AGY-MODEL-MISMATCH",
+  CANCELLED: "AGY-CANCELLED",
 };
 
 export function discoverAgyPath(env = process.env) {
@@ -54,9 +55,12 @@ export function parseAgyOutput(stdout) {
   throw error;
 }
 
-async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs = 300000, env = process.env }) {
+async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs = 300000, env = process.env, signal }) {
   if (!agyPath || !existsSync(agyPath)) {
     return { ok: false, code: AGY_ERROR_TAXONOMY.NOT_INSTALLED, message: "agy binary not found" };
+  }
+  if (signal?.aborted) {
+    return { ok: false, code: AGY_ERROR_TAXONOMY.CANCELLED, message: "Execution cancelled before launch" };
   }
 
   const args = [
@@ -69,30 +73,40 @@ async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs
 
   return new Promise((resolve) => {
     const child = spawn(agyPath, args, { cwd, env });
-    
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", cancel);
+      resolve(value);
+    };
     let stdoutData = "";
     let stderrData = "";
-    
-    let timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       child.kill();
-      resolve({ ok: false, code: AGY_ERROR_TAXONOMY.TIMEOUT, message: "Execution timed out" });
+      finish({ ok: false, code: AGY_ERROR_TAXONOMY.TIMEOUT, message: "Execution timed out" });
     }, timeoutMs);
+    const cancel = () => {
+      child.kill();
+      finish({ ok: false, code: AGY_ERROR_TAXONOMY.CANCELLED, message: "Execution cancelled" });
+    };
+    signal?.addEventListener("abort", cancel, { once: true });
 
     child.stdout.on("data", (chunk) => { stdoutData += chunk.toString("utf8"); });
     child.stderr.on("data", (chunk) => { stderrData += chunk.toString("utf8"); });
     
     child.on("error", (err) => {
-      clearTimeout(timeoutId);
-      resolve({ ok: false, code: AGY_ERROR_TAXONOMY.NONZERO_EXIT, message: err.message });
+      finish({ ok: false, code: AGY_ERROR_TAXONOMY.NONZERO_EXIT, message: err.message });
     });
 
     child.on("close", (code) => {
-      clearTimeout(timeoutId);
+      if (settled) return;
       if (code !== 0) {
         if (stderrData.toLowerCase().includes("auth") || stderrData.toLowerCase().includes("login")) {
-          resolve({ ok: false, code: AGY_ERROR_TAXONOMY.AUTH_REQUIRED, message: "Authentication required", stderr: stderrData });
+          finish({ ok: false, code: AGY_ERROR_TAXONOMY.AUTH_REQUIRED, message: "Authentication required", stderr: stderrData });
         } else {
-          resolve({ ok: false, code: AGY_ERROR_TAXONOMY.NONZERO_EXIT, message: `Exited with code ${code}`, stderr: stderrData });
+          finish({ ok: false, code: AGY_ERROR_TAXONOMY.NONZERO_EXIT, message: `Exited with code ${code}`, stderr: stderrData });
         }
         return;
       }
@@ -101,12 +115,12 @@ async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs
         const payload = parseAgyOutput(stdoutData);
         const observedModel = payload.model || payload.modelIdentity || "unknown";
         if (model && observedModel !== "unknown" && observedModel !== model) {
-          resolve({ ok: false, code: AGY_ERROR_TAXONOMY.MODEL_MISMATCH, message: `Model mismatch: requested ${model}, observed ${observedModel}` });
+          finish({ ok: false, code: AGY_ERROR_TAXONOMY.MODEL_MISMATCH, message: `Model mismatch: requested ${model}, observed ${observedModel}` });
           return;
         }
-        resolve({ ok: true, payload, stdout: stdoutData, observedModel });
+        finish({ ok: true, payload, stdout: stdoutData, observedModel });
       } catch (err) {
-        resolve({ ok: false, code: AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED, message: "Failed to parse JSON output", stdout: stdoutData });
+        finish({ ok: false, code: AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED, message: "Failed to parse JSON output", stdout: stdoutData });
       }
     });
   });
@@ -130,6 +144,7 @@ export async function invokeAgy({
   effort,
   timeoutMs = 300000,
   env = process.env,
+  signal,
 } = {}) {
   const current = preflightRoleDispatch({ root, resultRoot, packet });
   if (current.status !== "prepared") return current;
@@ -152,6 +167,7 @@ export async function invokeAgy({
     cwd: root,
     timeoutMs,
     env,
+    signal,
   });
   if (result.code === AGY_ERROR_TAXONOMY.NOT_INSTALLED) {
     return { ...result, launcherCalls: 0, modelCalls: 0 };
