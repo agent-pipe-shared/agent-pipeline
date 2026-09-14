@@ -68,6 +68,7 @@ import {
   NEUTRAL_GUARD_CONFIG,
   resolveProjectAuthorityPaths,
 } from "./project-authority.mjs";
+import { resolveProtectedBaseline } from "./protected-baseline.mjs";
 
 /** Denial code for the shell lane; the write lane keeps guard-testpath's own message shape. */
 export const TESTPATH_SHELL_DENIAL_CODE = "GUARD-TESTPATH-SHELL";
@@ -97,43 +98,14 @@ export function resolveGuardConfigPath(projectDir, { existsSyncFn = existsSync }
  */
 export function loadProtectedTestPathRules({ rootDir, readFileSyncFn = readFileSync, existsSyncFn = existsSync } = {}) {
   const configPath = resolveGuardConfigPath(rootDir, { existsSyncFn });
-  const warnings = [];
-  /** @type {Array<{id: string, re: RegExp, reason: string}>} */
-  const rules = [];
-  let rawConfig = null;
-  try {
-    rawConfig = readFileSyncFn(configPath, "utf8");
-  } catch {
-    return { rules, warnings, configPath }; // absent -> no protected paths at all (the normal case)
-  }
-  try {
-    const cfg = JSON.parse(rawConfig);
-    const list = cfg?.protectedTestPaths;
-    if (list !== undefined && !Array.isArray(list)) {
-      warnings.push('"protectedTestPaths" is not an array -> ignored');
-    }
-    for (const [i, entry] of (Array.isArray(list) ? list : []).entries()) {
-      if (typeof entry?.pattern !== "string" || entry.pattern === "") {
-        warnings.push(`protectedTestPaths[${i}]: missing/empty "pattern" -> entry skipped`);
-        continue;
-      }
-      try {
-        rules.push({
-          id: typeof entry?.id === "string" && entry.id !== "" ? entry.id : `TP-${i + 1}`,
-          re: new RegExp(entry.pattern, "i"),
-          reason:
-            typeof entry?.reason === "string" && entry.reason !== ""
-              ? entry.reason
-              : `Protected test path matched: ${entry.pattern}`,
-        });
-      } catch (e) {
-        warnings.push(`protectedTestPaths[${i}]: invalid regex (${e.message}) -> entry skipped`);
-      }
-    }
-  } catch (e) {
-    warnings.push(`unparseable JSON (${e.message}) -> no protected paths active`);
-  }
-  return { rules, warnings, configPath };
+  const baseline = resolveProtectedBaseline({ rootDir, readFileSyncFn, existsSyncFn });
+  const rules = baseline.entries.flatMap((entry) => {
+    try {
+      return [{ id: entry.id, re: new RegExp(entry.pathPattern, "i"), reason: entry.rationale }];
+    } catch { return []; }
+  });
+  const warnings = baseline.diagnostics.map((item) => `${item.code}: ${item.message}`);
+  return { rules, warnings, configPath, identity: baseline.identity, dynamic: baseline.dynamic.status };
 }
 
 /** The write-lane match: backslashes folded, rules already case-insensitive. */

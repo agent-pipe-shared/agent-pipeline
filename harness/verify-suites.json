@@ -68,6 +68,18 @@
       "nonOverlapNote": "Unique test suite for plan-authority-staging-guard.mjs"
     },
     {
+      "name": "protected-baseline-tests",
+      "file": "plugins/pipeline-core/lib/protected-baseline.test.mjs",
+      "invariantPinned": "Immutable static protected baseline, additive project configuration, physical-path safety, and dynamic continuity bindings",
+      "nonOverlapNote": "Unique fixture suite for protected-baseline.mjs"
+    },
+    {
+      "name": "protected-delta-check-tests",
+      "file": "plugins/pipeline-core/scripts/check-protected-delta.test.mjs",
+      "invariantPinned": "Candidate-bound protected-surface delta classification and baseline identity evidence",
+      "nonOverlapNote": "Unique fixture suite for check-protected-delta.mjs"
+    },
+    {
       "name": "report-interruptions-tests",
       "file": "plugins/pipeline-core/scripts/report-interruptions.test.mjs",
       "invariantPinned": "Interruption receipt aggregation, normalization, and window validation",

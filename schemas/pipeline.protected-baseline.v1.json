@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.protected-baseline.v1",
+  "title": "Protected Surface Baseline",
+  "description": "Immutable plugin-owned minimum protected surface (Sprint Alfred A3 / #101).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "baselineRevision", "entries"],
+  "properties": {
+    "schema": { "const": "pipeline.protected-baseline.v1" },
+    "baselineRevision": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "pathPattern", "class", "rationale"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "pathPattern": { "type": "string", "minLength": 1 },
+          "class": {
+            "type": "string",
+            "enum": ["config", "loader", "hook", "contract-test", "verify-registration", "sanctioned-writer"]
+          },
+          "rationale": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
