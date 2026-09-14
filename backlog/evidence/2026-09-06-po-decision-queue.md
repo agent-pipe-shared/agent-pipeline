@@ -33,12 +33,15 @@ be resolved through `--no-verify`, a hook bypass, or a broad permission change.
   Guard Override / TP-lift for each exact protected-path repair, after reviewing
   its staged diff. Each authorization is one use and binds the then-current
   candidate tree.
-- **Known repairs:** register the current observation-corpus count in
-  `harness/scripts/verify.mjs` (TP-3), and align the stale approval fixtures
-  in `harness/scripts/pipeline-state.test.mjs` (TP-5) with the now-required
+- **Current required repair:** align the stale approval fixtures in
+  `harness/scripts/pipeline-state.test.mjs` (TP-5) with the now-required
   bootstrap acknowledgement receipt. The path is intentionally exact: the
   similarly named `plugins/pipeline-core/scripts/pipeline-state.test.mjs` is
   not the protected failing suite.
+- **TP-3 disposition:** the previously observed observation-corpus-count
+  mismatch in `harness/scripts/verify.mjs` is currently green and therefore
+  is not part of the next lift. Do not authorize or edit it unless a fresh
+  Verify run reproduces that separate failure.
 - **Fresh verification, 2026-09-14:** full Verify at candidate
   `6505e62f5c2f768a74db1ec283b19317045f87fb` was 85/86 green with Security
   Scan green. The only failure was TP-5's six stale expectations:
