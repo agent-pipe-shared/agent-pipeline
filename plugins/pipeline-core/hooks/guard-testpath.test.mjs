@@ -46,7 +46,8 @@ function runGuard(toolName, filePath, projectDir, extraInput = {}, env = {}) {
   return { code: res.status, stderr: res.stderr ?? "" };
 }
 
-// Hermetic default project dir (no guard-config -> pure no-op).
+// Hermetic default project dir. A3 deliberately keeps the plugin baseline active
+// even without project configuration.
 const EMPTY_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-empty-"));
 
 let pass = 0;
@@ -108,11 +109,11 @@ check(
   },
 );
 check(
-  "TP02 allow  Edit on an unrelated file with the same config loaded",
+  "TP02 block  Edit on a shipped baseline guard hook",
   "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.mjs",
-  ALLOW,
-  { projectDir: CFG_DIR, stderrEmpty: true, extraInput: { old_string: "a", new_string: "b" } },
+  BLOCK,
+  { projectDir: CFG_DIR, stderrIncludes: ["PB-GUARD-HOOKS"], extraInput: { old_string: "a", new_string: "b" } },
 );
 check(
   "TP03 block  Write on configured protected test file (Write tool, not just Edit)",
@@ -129,25 +130,25 @@ check(
   { projectDir: CFG_DIR, stderrIncludes: ["TP-1"], extraInput: { old_string: "a", new_string: "b" } },
 );
 
-// ---- No-config case: fail-open, silent (the normal case) ------------------------------
+// ---- No-config case: immutable plugin baseline remains active ---------------------------
 check(
-  "TP05 allow  missing config is silent no-op (fail-open)",
+  "TP05 block  missing project config still keeps the shipped minimum active",
   "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs",
-  ALLOW,
-  { projectDir: EMPTY_DIR, stderrEmpty: true, extraInput: { old_string: "a", new_string: "b" } },
+  BLOCK,
+  { projectDir: EMPTY_DIR, stderrIncludes: ["PB-CONTRACT-TESTS"], extraInput: { old_string: "a", new_string: "b" } },
 );
 
-// ---- Broken config: exit 1 WARN, nothing blocked ---------------------------------------
+// ---- Broken config: baseline-only, therefore the shipped minimum still blocks -----------
 const BROKEN_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-broken-"));
 mkdirSync(join(BROKEN_DIR, ".claude"), { recursive: true });
 writeFileSync(join(BROKEN_DIR, ".claude", "guard-config.json"), '{ "protectedTestPaths": [ THIS IS NOT JSON');
 check(
-  "TP06 warn   broken JSON surfaces as exit 1 WARN, nothing blocked",
+  "TP06 block  broken JSON is baseline-only and cannot remove static protection",
   "Edit",
   "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs",
-  WARN,
-  { projectDir: BROKEN_DIR, stderrIncludes: ["WARN", "unparseable JSON"], extraInput: { old_string: "a", new_string: "b" } },
+  BLOCK,
+  { projectDir: BROKEN_DIR, stderrIncludes: ["PB-CONTRACT-TESTS"], extraInput: { old_string: "a", new_string: "b" } },
 );
 
 // ---- Non-matching tool / empty file_path stays fail-open -------------------------------

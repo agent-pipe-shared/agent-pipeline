@@ -1,0 +1,48 @@
+{
+  "schema": "pipeline.protected-baseline.v1",
+  "baselineRevision": "1",
+  "entries": [
+    {
+      "id": "PB-CONFIG",
+      "pathPattern": "(?:project|\\.claude)/guard-config\\.json$",
+      "class": "config",
+      "rationale": "The effective guard configuration must not be able to remove the immutable minimum."
+    },
+    {
+      "id": "PB-BASELINE-DATA",
+      "pathPattern": "plugins/pipeline-core/protected-baseline\\.json$",
+      "class": "loader",
+      "rationale": "The shipped baseline is self-protecting."
+    },
+    {
+      "id": "PB-BASELINE-LOADER",
+      "pathPattern": "plugins/pipeline-core/lib/protected-baseline\\.mjs$",
+      "class": "loader",
+      "rationale": "The baseline loader and merge semantics are self-protecting."
+    },
+    {
+      "id": "PB-GUARD-HOOKS",
+      "pathPattern": "plugins/pipeline-core/hooks/(?:guard-testpath|guard-git|guard-lifecycle-ready|guard-gate-strength|guard-devplan)\\.mjs$",
+      "class": "hook",
+      "rationale": "Authority-bearing guard hook implementations cannot be weakened by an unbriefed mutation route."
+    },
+    {
+      "id": "PB-CONTRACT-TESTS",
+      "pathPattern": "plugins/pipeline-core/(?:hooks|lib)/(?:guard-testpath|guard-git|protected-test-paths|guard-gate-strength|guard-devplan).*\\.test\\.mjs$",
+      "class": "contract-test",
+      "rationale": "Contract tests pin the protected-surface and guard invariants."
+    },
+    {
+      "id": "PB-VERIFY-REGISTRATION",
+      "pathPattern": "(?:harness/verify-suites\\.json|harness/scripts/check-verify-suite-registration\\.mjs|plugins/pipeline-core/scripts/check-protected-delta\\.mjs)$",
+      "class": "verify-registration",
+      "rationale": "Verify registration and this candidate-time protected-delta check are self-protecting."
+    },
+    {
+      "id": "PB-SANCTIONED-WRITER",
+      "pathPattern": "plugins/pipeline-core/scripts/pipeline-state\\.mjs$",
+      "class": "sanctioned-writer",
+      "rationale": "The sanctioned lifecycle state writer can alter protected policy bindings."
+    }
+  ]
+}
