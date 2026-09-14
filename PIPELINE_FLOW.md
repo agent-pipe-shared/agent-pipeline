@@ -78,11 +78,10 @@ flowchart TD
     V -->|green| O{Optional phase configured or triggered?}
     O -->|security| SEC[Security evidence]
     O -->|governance| GOV[Guideline or policy evaluation]
-    O -->|none| C{Critic required by risk or diff?}
+    O -->|none| C[Fresh independent Critic]
     SEC --> C
     GOV --> C
-    C -->|yes| CR[Fresh independent Critic]
-    C -->|no| CL[Close and record]
+    C --> CR[Critic result and disposition]
     CR -->|correction needed| RC
     CR -->|clear or disposition recorded| CL
     CL --> REL{Release phase declared?}
@@ -348,11 +347,10 @@ flowchart TD
     V -->|grün| O{Optionale Phase konfiguriert oder ausgelöst?}
     O -->|Security| SEC[Security-Nachweis]
     O -->|Governance| GOV[Guideline- oder Policy-Prüfung]
-    O -->|keine| C{Critic laut Risiko oder Diff nötig?}
+    O -->|keine| C[Frischer unabhängiger Critic]
     SEC --> C
     GOV --> C
-    C -->|ja| CR[Frischer unabhängiger Critic]
-    C -->|nein| CL[Abschließen und festhalten]
+    C --> CR[Critic-Ergebnis und Disposition]
     CR -->|Korrektur nötig| RC
     CR -->|klar oder Disposition festgehalten| CL
     CL --> REL{Release-Phase deklariert?}

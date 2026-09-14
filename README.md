@@ -80,9 +80,7 @@ flowchart LR
     Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
     Goldfish -->|"evidence"| Gates["Deterministic gates<br/>(tests, security, lint)"]
     Gates -.->|"fail"| Goldfish
-    Gates -->|"pass"| Review{"Critic required?"}
-    Review -->|"yes"| Critic["Critic<br/>(independent reviewer)"]
-    Review -->|"no"| Elephant
+    Gates -->|"pass"| Critic["Critic<br/>(independent reviewer)"]
     Critic -->|"findings"| Elephant
     Elephant -->|"decision"| PO
 ```
@@ -256,9 +254,7 @@ flowchart LR
     Elephant -->|"Spec + Dispatch"| Goldfish["Goldfish<br/>(frischer Kontext)"]
     Goldfish -->|"Nachweis"| Gates["Deterministische Gates<br/>(Tests, Security, Lint)"]
     Gates -.->|"fehlgeschlagen"| Goldfish
-    Gates -->|"bestanden"| Review{"Critic erforderlich?"}
-    Review -->|"ja"| Critic["Critic<br/>(unabhängiger Prüfer)"]
-    Review -->|"nein"| Elephant
+    Gates -->|"bestanden"| Critic["Critic<br/>(unabhängiger Prüfer)"]
     Critic -->|"Befunde"| Elephant
     Elephant -->|"Entscheidung"| PO
 ```

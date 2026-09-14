@@ -413,11 +413,13 @@ test("internal symlink aliases cannot bypass the excluded instruction path", () 
   assert(!reads.includes("alias/AGENTS.md"));
 });
 
-test("isExcludedRepoPath: docs/state-archive is a directory-prefix exclusion, AGENTS.md stays exact-match only", () => {
+test("isExcludedRepoPath: archived and immutable reader evidence are directory-prefix exclusions, AGENTS.md stays exact-match only", () => {
   assert.equal(isExcludedRepoPath("docs/state-archive"), true);
   assert.equal(isExcludedRepoPath("docs/state-archive/anything.md"), true);
   assert.equal(isExcludedRepoPath("docs/state-archive/nested/deep.md"), true);
   assert.equal(isExcludedRepoPath("docs/state-archive-not-really/foo.md"), false);
+  assert.equal(isExcludedRepoPath("specs/sprint-nova-epic/evidence/reader-review/phase-one/r5.md"), true);
+  assert.equal(isExcludedRepoPath("specs/sprint-nova-epic/evidence/reader-review-notes/r5.md"), false);
   assert.equal(isExcludedRepoPath("AGENTS.md"), true);
   assert.equal(isExcludedRepoPath("AGENTS.mdx"), false);
 });
@@ -439,6 +441,16 @@ test("a Markdown source under docs/state-archive/ is never scanned, even when it
   });
   assert.deepEqual(result.findings, []);
   assert(!reads.includes("docs/state-archive/2026-08-19--rotation.md"));
+});
+
+test("an immutable reader-review report is never scanned as public documentation", () => {
+  const report = "specs/sprint-nova-epic/evidence/reader-review/phase-one/r5.md";
+  const { root } = fixture({ [report]: "# Report\n\n[Local](/private/reader/path.md)\n" });
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", report],
+    markdownPaths: ["CLAUDE.md", "docs/state.md", "README.md", report],
+  });
+  assert.deepEqual(result.findings, []);
 });
 
 test("a link into a specific docs/state-archive/ file resolves via the exclusion, not the pre-existing trackedDescendant fallback", () => {

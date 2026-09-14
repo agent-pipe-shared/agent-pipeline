@@ -24,7 +24,10 @@ const EXCLUDED_PATH = "AGENTS.md";
 // only at its original location. Excluded the same way AGENTS.md is: never
 // scanned as a link source, and any link INTO it resolves without checking
 // against trackedPaths. Directory-prefix match, not a second exact constant.
-const EXCLUDED_PREFIXES = ["docs/state-archive"];
+// Reader-review reports are immutable review evidence, not public navigation.
+// Fresh reviewers may return local absolute source links; preserving the report
+// byte-for-byte must not make those links part of the public-doc contract.
+const EXCLUDED_PREFIXES = ["docs/state-archive", "specs/sprint-nova-epic/evidence/reader-review"];
 const STATEFUL_DESIGN_SURFACES = ["templates/spec.md", "roles/elephant.md"];
 const STATEFUL_DESIGN_OPERATIVE_HEADINGS = [
   "### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)",
