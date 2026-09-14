@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { MIGRATED_AGENTS_ADAPTER } from "../../setup.mjs";
+import { MIGRATED_AGENTS_ADAPTER_VERSIONS } from "../../setup.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const DECLARED_ADAPTER_PATH = "AGENTS.md";
@@ -14,8 +14,10 @@ const FORBIDDEN = [/^#{2,}\s/m, /(?:private|credential|account|session)\s*[:=]/i
 
 export function checkAgentsAdapterMigration(text) {
   if (typeof text !== "string") return { ok: false, errors: ["adapter is unreadable"] };
+  const canonical = MIGRATED_AGENTS_ADAPTER_VERSIONS.find((variant) => variant.text === text);
+  if (canonical) return { ok: true, version: canonical.version, errors: [] };
   const errors = [];
-  if (text !== MIGRATED_AGENTS_ADAPTER) errors.push("adapter is not the exact migrated pointer");
+  errors.push("adapter is not a recognized canonical migration version");
   for (const token of REQUIRED) if (!text.includes(token)) errors.push("adapter misses a required authority or runtime boundary");
   for (const pattern of FORBIDDEN) if (pattern.test(text)) errors.push("adapter contains a forbidden second-rule or private-runtime claim");
   return { ok: errors.length === 0, errors };
