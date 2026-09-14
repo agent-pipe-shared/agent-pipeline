@@ -2476,7 +2476,7 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
         requiresConfirmation: true,
         executionBoundary: "attended-external-tool",
         invocation: "user-copy-only",
-        guidance: `The reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) and specification (${spec.path}, sha256 ${spec.sha256}) require the configured detached-signature acknowledgement. Run action.copyCommand for your actual terminal (not a hand-transcribed variant); it writes the plan-bound proof back into this repository's scratch directory. Do not edit an acknowledgement marker manually.`,
+        guidance: `You are signing the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) together with its specification (${spec.path}, sha256 ${spec.sha256}). This one detached signature authorizes binding those exact design documents and the subsequent design-to-implementation transition; it does not authorize a remote push or any later scope change. Run action.copyCommand for your actual terminal (not a hand-transcribed variant); it writes the plan-bound proof back into this repository's scratch directory. Do not edit an acknowledgement marker manually.`,
         action: { ...action, command, copyCommand: boundedOpaqueCopyCommand(command) },
         expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
       };
