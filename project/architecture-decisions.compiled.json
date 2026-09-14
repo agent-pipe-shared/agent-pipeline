@@ -1,0 +1,809 @@
+{
+  "schema": "pipeline.architecture-decisions-summary.v1",
+  "compiledAt": "2026-09-14T09:58:48.343Z",
+  "count": 89,
+  "decisions": [
+    {
+      "id": "0001-distribution-plugin-marketplace",
+      "title": "ADR-0001: Distributing the Operating Model as a Plugin/Marketplace",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "33c87401ad93bc2242c4db8285b10ff674bebc2875dd357f363b295e0c7f5cc4",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0002-versioning-sha-then-semver",
+      "title": "ADR-0002: Versioning strategy — SHA phase, then SemVer",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "40ae92db0698a8cd17729fef98455cb1c16b01505342474a0fbfa8cd8122722e",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0003-role-implementation-subagents",
+      "title": "ADR-0003: Role implementation — Goldfish as subagent, Critic read-only with a `--bare` tier",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "072e901b03788037a9e003edafd8e4e5075e8a5601989ef001e7d181d73f1b8a",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0004-spec-rigor-tiers-ears",
+      "title": "ADR-0004: Three-Tier Spec Rigor + EARS Acceptance Criteria",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "3dd18b310e8cbbe05ba69be3bc006a83a670ffe8239187c5a363d9c0549a53ac",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0005-quality-gates-dod",
+      "title": "ADR-0005: Quality-Gate Chain and Two-Part Definition of Done",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "827a5128a0d6ac49a2b66bb40528b41bd89617edbb020970779ab3e1897d75ac",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0006-model-effort-policy",
+      "title": "ADR-0006: Model and Effort Policy per Role",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "404320daf309182f96573b93d57dea5e4e26450c003984baccde6a58b8a2ae31",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0007-workflows-ultracode-opt-in",
+      "title": "ADR-0007: Dynamic Workflows / Ultracode as Per-Task Opt-in with Hard Write Preconditions",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "17bb7fc9670b9d619f445fb12ca99f59456f6de3dba34849478324de4c4dbb16",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0008-permissions-worktree-policy",
+      "title": "ADR-0008: Permissions and Worktree Policy per Project",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "6ead7238a68fe839a15c97173c2104bf4cde39545a5bcc5cff1c2a32f1856c50",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0009-session-hygiene-lifecycle",
+      "title": "ADR-0009: Session Hygiene and Session Lifecycle",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "a976536902b969b6a3b154fc4f69577f12feaf98014e002fdcf64a13ef208c07",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0010-session-bootstrap",
+      "title": "ADR-0010: Session Bootstrap Mechanism",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "2d0cc807ac0d799650272b85549cbe11ccb0ccb86ed40c79c06b6d84b1cfd71b",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0011-language-policy",
+      "title": "ADR-0011: Language Policy for Public Core and Private Overlays",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "53a226881b32e96f5e96141525c3725d25fbd2140aaed7fbe81743bc14c459d5",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0012-handover-canonicalization",
+      "title": "ADR-0012: Baton Handoff — Canonicalizing the Handover Source",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "f4e5d22ecfff8c6c035f6748c7f253e25c649810e60c91ea9dea2a4faac3787d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0013-git-guard-union",
+      "title": "ADR-0013: git-guard as central union + project deny-config",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "e2e522348c788b4d65f03060132a5b477ea53642e83bc5c1ffa317077e3e7964",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0014-critic-contract",
+      "title": "ADR-0014: Critic Contract",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "a184d46c22c2e3ff5a55d2ec7e11d70a97e041490f61fd6ef785694c0b497283",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0015-self-application",
+      "title": "ADR-0015: Self-Application of the Pipeline to the Pipeline Repo",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "27007efc664d83d5d59c8abc5a96cc6d3df47637b849187073fbea2f47f6d004",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0016-git-hosting-github",
+      "title": "ADR-0016: Git hosting — stay with GitHub",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "1cf1a9fad908d14cdeb7f8c80965ce3584d3643d57e24b461297633a311e04a9",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0017-push-policy-standing-approval",
+      "title": "ADR-0017: Push Policy — Standing Approval for `main` Pushes at Work-Package Boundaries",
+      "status": "superseded",
+      "scope": "project",
+      "digest": "02eb7aee02dcdb6a061084d5477513b38500cf6fa789772d2942868598c6ea5c",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0018-retro-process-elephant-authored",
+      "title": "ADR-0018: Elephant-Authored Close Retro",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "b9b70848fa9d5b703e9d723dee2d85b4f47d6622b2fa9d434aee6867675d4169",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0019-project-scoping-one-repo-one-elephant",
+      "title": "ADR-0019: One Active Write Target per Orchestrator",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "56109437deec662fdf9b77c46c5bee641fc92b4c862d5d2de41f447b36178c13",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0020-el01-enforcement-goldfish-duty",
+      "title": "ADR-0020: Every Implementation Runs as a Bounded Executor Dispatch",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "3c45022c82919534fbd054638a431e0c9fa8388896e22d5490edf6009ef2bf0f",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0021-prd-po-gate",
+      "title": "ADR-0021: PRD-PO Gate Before the First Implementation Dispatch",
+      "status": "provisional",
+      "scope": "project",
+      "digest": "8c078fc8bb1b8e794c6aa5dfa272cf9c3113f9419ada9cbe22ddb9cebc1f989c",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0022-light-profile-xhigh-default",
+      "title": "ADR-0022: Light Dispatch Profile + Goldfish `xhigh` Default Effort",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "9b6ce061c8a6027d1b1261f0a9c9f20c2749c6069f98ff2a9c12cabf1aa2d935",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0023-elephant-context-diet",
+      "title": "ADR-0023: Orchestrator Context Diet and Latency Measure Bundle",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "94e9ed71191b0e254e689625f82863f8f83bc96045211c44df1102747c9d1b6d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0024-critic-staffing-data-based",
+      "title": "ADR-0024: Risk-Based Critic Staffing",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "c882287476423ee27626f21763cbaedd2666dff730cfbcd4a6971d81c96fe7b4",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0025-haiku-research-fetcher",
+      "title": "ADR-0025: Haiku Research Fetcher — Rescoping MP-03 for Read-Only Research",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "5b7de1f93027288d1efb8763e6288212d57a3f60c6db0d70af5efd23a9f1dd31",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0026-role-split-elephant-goldfish-critic",
+      "title": "ADR-0026: Three-Role Split and the Plan-Verifier Capability",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "9c0ac68491485880fa968867dfeb753f275bf296c26fd0a43f80855159ddbb8d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0027-gate-philosophy",
+      "title": "ADR-0027: Gate philosophy — exactly 2 blocking human gates, hook-enforced, manifest modes as calibration",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "2d043641e29d40ea8370de5acd182b4b5ef83ec585f15305aa097321defab05d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0028-manifest-approach",
+      "title": "ADR-0028: Manifest Approach — `.claude/pipeline.yaml` additive, in-house YAML parser, agents stay in the plugin",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "122bb936c5937278bd6c169591fba4d3c8c86afa3a40602f593c3096c249e9fe",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0029-file-handoffs-status",
+      "title": "ADR-0029: File Handoffs & Status — `pipeline-state.json`, Plan Artifacts, Evidence Freshness Instead of Self-Computation",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "95f4febfae49b74a2b5c14eac8742004ad9b3081dd45e1b4772826b77c0c049d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0030-governance-layer",
+      "title": "ADR-0030: Governance Layer — advisory Guidelines vs. enforcing Policies, hierarchy Repo > User > Managed",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "737cc74efda8f208b2580a2858f6e3b5d204518857de94a8c409f6cc5a7db52e",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0031-model-routing-manifest",
+      "title": "ADR-0031: One Routing Authority with Generated Runner Projections",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "a55e9a6fef7b205a1320a41d0fa412bc56b7ae367a675e677c6eec8f86514767",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0032-project-doc-structure",
+      "title": "ADR-0032: Project Documentation Structure — Release Traceability, SBOM Convention, Living Architecture Document (GREENFIELD)",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "25363237ff37a423a873815cac1d758469a3b6d263d43ec283bc7f095e276e2d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0033-release-promotion-phase",
+      "title": "ADR-0033: Release/Promotion Phase — Optional, Adapter-Based SDLC Tail Phase",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "b87d49f973e88164d34f9e43318ccb6f05bea8f011ba4bf0c3a6a33a1ef7604a",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0034-deploy-precedence-central-vs-project",
+      "title": "ADR-0034: Precedence — Central Deploy Policy vs. Project Manifest, a New Axis",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "2263281080ad3e2490a3194c41722c6221310d74f15185141ee0b2cd23c1ac1e",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0035-codex-native-normal-critic",
+      "title": "ADR-0035: Codex normal Critic through a native host boundary",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "be8106a8e630af637c6cce97e843820044f56c4979400415d57f4d4e397814b9",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0036-runner-honest-profiles-v2",
+      "title": "ADR-0036: Runner-honest profiles and usage contracts v2",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "1d7fa27a340b515ae0a5cda560a5b27f43dc195f1680d5a72c92fade46dfcc1e",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0037-batman-bounded-assurance",
+      "title": "ADR-0037: Batman bounded assurance, static Verify extension and typed delivery",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "e3103d508edfc4c614f4c834179defdf0ef6f46e7383c36e8eb8a1828fed97fd",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0038-runner-neutral-advisory-v3",
+      "title": "ADR-0038: Runner-neutral advisory duty v3",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "a0564a84965a556e7e3f207b83e06f577bf6186c26121d83839a5a6cf8badaca",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0039-hawkeye-lifecycle-boundaries",
+      "title": "ADR-0039: Hawkeye adoption, host-compatibility, and lifecycle boundaries",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "f343e03038de785fe971b09c18580e72f56c1d22f379969eb5e014bc9ac9782d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0040-advisor-consent-and-readonly-bash",
+      "title": "ADR-0040: Explicit advisor export consent and sandbox-bound Bash",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "75a21490a8f0bf4cdabdc314d3eb5e8021de2a4a6cf10b3190be0dde3a1bf26f",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0041-po-authorized-codex-functional-equivalent",
+      "title": "ADR-0041: PO-authorized Codex selected-sandbox Advisor",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "70dd500261ec4b076ad90a21838ee046d9aa790cf1503b98d4a1d42da60255ae",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0042-global-observation-and-document-governance",
+      "title": "ADR-0042: Global observation intake and document-lifecycle governance",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "64a783bbb613a172f6ecef9095245f190e271347d40a73e243175b98d0444a36",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0043-post-go-live-sprint-model",
+      "title": "ADR-0043: Post-go-live Sprint model and common-base branch rule",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "1511c61af5589293f66b895f35848a4736616ba0225f688ca6531e1de80a01fd",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0044-control-execution-boundary",
+      "title": "ADR-0044 — Provider-neutral control/execution boundary",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "c8d953059ca752ead89ecf3760f03f8bba09997ca4d0212ff10713a841fcb4d5",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0045-canonical-artifact-topology",
+      "title": "ADR-0045 — Canonical artifact topology",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "74dad6a8dd38b71f3706024b2ee10abfa5fb40767d5aced20fc699e8037fbf4c",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0046-project-authority-layering",
+      "title": "ADR-0046 — Project authority layering",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "7750c5013a4a92bf54b112504f62ea34d1577eae433a6ed741969b689c912f07",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0047-model-free-advisor-preflight-v2",
+      "title": "ADR-0047: Model-free Advisor preflight and on-demand consultation v2",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "3b74bca1ec93be23915ff3cc618e0763896953607f683a23aa5f1eb1fc378478",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0048-local-goldfish-supervisor",
+      "title": "ADR-0048 — Functional same-host Goldfish supervisor",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "2a8ff7fbd31436812e9c13f084b821c1196eb43c6b5795cbd1cc0e182774ca78",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0049-gitlab-ci-constrained-remote-executor-pilot",
+      "title": "ADR-0049 — GitLab CI constrained remote-executor pilot",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "e88ecade2a6f37ea2b3ff46871fb47d0d02a6328c3917babe1accaef074e860e",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0050-candidate-bound-verify-run-journal",
+      "title": "ADR-0050 — Candidate-bound private Verify run journal",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "268a7031d22d154dd65d431383f6e1a40084eb25ead76ff54ca6b7dcc5d8300b",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0051-dual-runner-tri-platform-development-contract",
+      "title": "ADR-0051: Dual-runner (Claude Code + Codex), tri-platform (Windows/macOS/Unix-WSL) development contract",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "6c67f23dbf023788f52ae5161c96713b793efac0ff2c9fe94b79a6d784150191",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0052-marketplace-identity-restoration-and-local-dev-separation",
+      "title": "ADR-0052: Restore the published marketplace identity and give local development its own",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "3773dedd5647e56a8609fd529d10c9eb4c7a6ad1907159bc3c11264f8395b965",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0053-setup-generator-authority-resolved-targets",
+      "title": "ADR-0053: `setup.mjs` writes to the resolved project-authority tier, not a hardcoded legacy path",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "a220c112c4a94f0b0378c086727790a86eaafbb974d0df1b6806426cf254f7b8",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0054-arbitheon-authority-directory-and-precedence-chain",
+      "title": "ADR-0054: `.arbitheon/` authority directory, three-tier precedence chain, configurable location",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "5858fe3bd7440fe1f775b805ef793985a850b7cc99f869ab277bff413c9b3493",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0055-critical-human-proof-waiver",
+      "title": "ADR-0055: the Ed25519 human hard gate gets a sanctioned off-switch",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "ee7ceb29ca57a9aa18f21a93a99951be3c38ae616adbae8fcb3ee89383d03133",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0056-push-approval-mode",
+      "title": "ADR-0056: the push gate stays; how a human clears it becomes a configured mode",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "78faa214acbd210119688e42f316cb80862e677aa6e7ce456409c84b087e2933",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0057-runner-platform-support-is-an-implementation-obligation",
+      "title": "ADR-0057: runner/platform support is an implementation obligation, not a per-cell evidence duty",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "850b2b1269444a621737b0649d59147d9b8be0b3f6e9a96965784ba222258c3c",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0058-guard-maintenance-window",
+      "title": "ADR-0058: a signed, time-boxed maintenance window lets the PO lift a narrow set of self-protecting guard rules, with no in-session activation step",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "ea7bdf215ba20d899331eb4e1419a019c6e5490c263bcf2df21a994aa9dcc44a",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0059-signed-human-guard-override",
+      "title": "ADR-0059: extend the Human Guard Override with a signed admission path, so `signature` mode is usable without one bespoke mechanism per guard",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "09ea5bd0120020a75fab9e61cab0ba45ab84fd0ef3aa02dc298b1c58ef9c5eff",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0060-handover-placement-and-rotation",
+      "title": "ADR-0060: mid-task findings go into the handover file, because a fresh context is a Goldfish — and the handover therefore needs a rotation obligation it does not yet have",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "d6ba128edb765d5c3e0468552881b8f0ffb975b76c3dc1080601ed1324231a02",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0061-uniform-human-approval-ceremony",
+      "title": "ADR-0061: every human gate is the same ceremony — one command, one word, one PIN",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "5d07396300795bd7899a35636cfb118d2dbc1d16c4e1c07a80606291510548f6",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0062-production-execution-and-selected-sandbox-launch",
+      "title": "ADR-0062: Production execution and selected-sandbox launch extend ADR-0044's frozen boundary, within its own constraints",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "8c8fba2c51a72da442e57181fa932a3fc3d6aa0318c20f8b27fc3048369974db",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0063-repository-directory-contract",
+      "title": "ADR-0063 — Repository directory contract (lean, Nightwing-pending)",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "a5ad50119e591c510399ac5419cd52f9757369eed992cbaf2016cf5d1762a574",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0064-release-preflight-consent-reuses-the-uniform-approval-ceremony",
+      "title": "ADR-0064: release-preflight consent is a fourth critical-action kind, not a fourth ceremony",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "bca334a84dfaf952a460a7676f01976c2a5552df7f7bd50fe02c1c3197a8bb0d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0065-a-voided-gate-is-re-earned-from-declared-inputs",
+      "title": "ADR-0065: a voided gate is re-earned from declared inputs, not preserved by a narrower binding",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "f5e3a505279e17c7625205de282da90f86a1b4c6a230b3debc969164f9542497",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0066-handover-rotation-extraction-archive-hard-size-gate",
+      "title": "ADR-0066: the handover rotates via extraction-then-archive, gated by a hard size cap that fires independently of block closure",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "c55174fdda2fa19b86d6cf44f2a9c1d6159b66e302320280d71e6034896ceeac",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0067-tri-runner-antigravity-integration",
+      "title": "ADR-0067: Tri-runner (Claude Code + Codex + Antigravity CLI) development contract",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "99375a37093da56869173c41f4510a2d25c31c7b891e42df3bcab8c5c5d99468",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0068-backlog-ledger-merge-semantics",
+      "title": "ADR-0068: merging two parallel sprints' backlog ledgers — one active chain, archived siblings, and status-neutral amendments bound by entry hash",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "ae3dc4d25915f482f8430310acbe72f5bf15d7da622416239b7609e168637c05",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0069-adr-numbers-are-allocated-at-acceptance",
+      "title": "ADR-0069: ADR numbers are allocated at acceptance into the trunk, never at drafting time — and carry no sprint prefix",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "38249c52399dcf074efbd16a5598031b865ca456f2d92086742c3151207a7260",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0070-local-supervisor-state-authority",
+      "title": "ADR-0070 — Local supervisor state authority and repair",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "cfe1e531880ac46d18bd8a1efe24f0d94931e8fb0b85f8e3328e63bf745b4aa1",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0071-governance-event-kernel",
+      "title": "ADR 0071: Governance event kernel uses separate immutable stream records",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "c82997ad713d1a532c526940e268b6eb218a6bb782a5839733d6db59e61db358",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0072-fork-disposition-approval-proof",
+      "title": "ADR-0072: fork disposition requires a PO approval proof, using the same signature/chat mode this repository already applies to push",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "fac482f228ff39a909b69aec597983683ccaaa5eb9c8ea3fd4629b8c5218d9d5",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0073-handover-rotation-extraction-archive-hard-size-gate",
+      "title": "ADR-0073: adopt Nova's extraction-then-archive rotation shape for Phoenix's own handover, re-derived against this repo's file — mechanism build and rotation itself are NOT done by this ADR",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "6c5cc59c5e959acadadbed94a87b833f569719bf72f37e1f6f7e792a52e1a9a1",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0074-port-authorize-critical-ceremony",
+      "title": "ADR-0074: port origin/main's `authorize-critical` single-command ceremony (ADR-0061) into Phoenix",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "f612b270742764376677bd154aac7178542bed96a9442677f57d12a402e44d17",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0075-publication-approval-time-signature-accepted-tradeoff",
+      "title": "ADR-0075: publication's approval-time-only Ed25519 signature check is an accepted, bounded tradeoff — no execution-time re-verification",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "df57d7680ea6c51d39fbedb72d513559c44921f6257650b25e73266f3899494b",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0076-global-chat-attributed-unattested-approval-mode",
+      "title": "ADR-0076: a global chat approval is deliberately attributed but unattested",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "a9b211cd826f5713116773a7703366a3e7242dee49dcf04a695bddf9e71b7ce6",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0077-push-approvals-per-destination",
+      "title": "Push approvals are stored per destination, not in a single overwritable slot",
+      "status": "change",
+      "scope": "project",
+      "digest": "9fa9bd5353b2f0c1030dcaa847cdd873ab242215822cad2180c370f76b736df7",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0078-distribution-channels-on-main",
+      "title": "`main` is the only published channel; alpha is the working channel and beta is reserved",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "3bb6867c0a2d083dd77d13ecefca718222ea4e1235e086a03154343a3befbdf2",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0079-hook-bypass-is-never-agent-overridable",
+      "title": "Hook-bypass is never agent-overridable",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "f27a851e6d541840c01755330a2d979c03dfd2a2d9e471f16b245bcefbf8f4c6",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0080-parallel-dispatch-slicing-enforcement",
+      "title": "ADR-0080: Machine-delivered default task-slicing into parallel dispatch",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "d1fde3e07119301e4b8fa8c4d7418a691b8d8dd28114a8e81024f2b2593f365e",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0081-boundary-aware-impacted-verify",
+      "title": "ADR-0081: Verify is impact-scoped at ordinary boundaries and full at release",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "092a2bef24690bfa39eb349fa95bc89383622f74fd0dc29612dac3b7a83ea103",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0082-bounded-continuity-self-repair",
+      "title": "ADR-0082: Damaged continuity has one evidence-preserving self-repair",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "719a944049e527b65efe9afa39f4ad298629978289d208b4e34639ce559f0027",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0083-governance-action-events",
+      "title": "ADR-0083: Non-dispatch governance actions use a separate closed payload in the lifecycle stream",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "9acb9941987fed233176d32364c54ba71fca0fedad338ed423f8f3154ed4718d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0084-ci-failure-reporter-public-log-boundary",
+      "title": "ADR-0084 — CI failure reporter public-log boundary",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "ae052ac9cfb14aa46168fa23cf98f97aaf527b3c0caad14ec59aca61fa7be420",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "README",
+      "title": "ADR-Index — Agent-Pipeline",
+      "status": "superseded",
+      "scope": "project",
+      "digest": "7cd6ba6271bed981d8d3eb7129ae08840420742304bd5888c42b1832b729233b",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-b1-worker-pool-superseded-by-workflow-tool",
+      "title": "ADR-{{NNNN}}: Nova B's own parallel worker-pool capability is superseded by the runner's Workflow tool",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "51569c930e8f261520a49a38438e49ca7de3736796610197b31233835e727d66",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-critic-report-durable-write-location",
+      "title": "ADR-{{NNNN}}: Where a Critic's report can durably live",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "635a996aeda6b2ccdf61476e9461ef93da88d8451d32956ea773d8863693e8aa",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-read-scope-containment-boundary",
+      "title": "ADR-{{NNNN}}: The read-scope containment boundary for Bash commands",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "b247f791c685b53366cd7a825e7fc3317b42b3576c2ea79fd6b9212085fc1e5e",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-session-cut-recommended-by-readiness",
+      "title": "ADR (draft, unnumbered) — recommend a session cut by readiness, never by token threshold",
+      "status": "draft",
+      "scope": "project",
+      "digest": "4dee8f1f599d632b3d2844af9e6e353f268dfad9ff720616dfa6f63f72d30410",
+      "supersedes": null,
+      "exception": null
+    }
+  ],
+  "activeExceptions": []
+}
