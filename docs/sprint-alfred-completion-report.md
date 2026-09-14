@@ -9,10 +9,12 @@ Dieser Bericht dokumentiert lückenlos alle im Rahmen des **Sprint Alfred** erbr
 - **Sprint-Auftrag:** Inhaltlicher und methodischer Vollabschluss aller offenen Punkte des Sprint Alfred (`/goal Inhaltlicher Abschluss aller Alfred Items`).
 - **Ergebnis:** 
   - **100% aller 25 Sprint-Alfred Backlog-Items** inhaltlich gelöst, lokal verifiziert, mit vollständiger 4-Feld-Closure (`closed_at`, `closure_repository`, `closure_commit`, `closure_evidence`) dokumentiert und im Transitions-Ledger nach dem strengen **GG-22-Protokoll** abgeglichen.
-  - **560 deterministische Testsuiten** registriert, 0 Auslassungen (`check-verify-suite-registration.mjs` grün).
+  - **564 deterministische Testsuiten** registriert, 0 Auslassungen (`check-suite-registration.mjs` grün, 529 Dateien, 564 Suiten).
+  - **Critic Skip Coverage:** 100% lückenlos abgedeckt (`check-critic-skip-coverage.mjs` mit 0 Findings: 15 evidenced, 9 skipped, 17 legacy).
   - **Backlog-Ledger & State:** Konsistent und driftfrei validiert (`check-backlog-state.mjs` grün).
   - **Track D (Agent-First Architecture Standard):** Vollständig implementiert (D1 ADR-Kontinuität, D2 Modul-Inventory & Concept Map Bundle, D3 Fitness Evaluator, D4 Adoption Demand & Repository Dogfood).
   - **Mechanische Governance & Schutzlinien (Tracks A & B):** Plan-Authority-Sealing, dynamic closed-evidence protection, attendiertes PO-Acknowledge-Routing, deklarative TP-3 Suite-Registrierung, sanktionierte Design-Trailer.
+  - **3-Runner-Parität:** Claude Code, Codex und Antigravity vollständig scharfgeschaltet und durch Hard-Enforcement-Preflight validiert.
 
 ---
 
@@ -69,6 +71,19 @@ Dieser Bericht dokumentiert lückenlos alle im Rahmen des **Sprint Alfred** erbr
 
 ---
 
+### Track E — Integration, Post-Merge Härtung & 3-Runner Parität
+
+| Thema | Problem / Anforderung | Gelieferte Lösung & Verifikation | Relevante Dateien |
+|---|---|---|---|
+| **E1** | Post-Merge Suite Registration | Registrierung aller 529 Test-Dateien und 564 Verify-Suiten über deklaratives `harness/verify-suites.json` Parsing in `check-suite-registration.mjs`. | `plugins/pipeline-core/scripts/check-suite-registration.mjs`, `check-suite-registration.test.mjs` |
+| **E1** | Consumer Safe Paths & Kernel Closure | Aufnahme von `check-clone-provisioning.mjs` in Consumer-Safe-Paths und `NEVER_LIFTABLE_KERNEL_PATHS` in `guard-maintenance-window.mjs`. | `harness/scripts/check-consumer-safe-paths.mjs`, `guard-maintenance-window.mjs`, `guard-maintenance-window-threat-model.md` |
+| **E1** | Preflight Antigravity Hard Enforcement | Integration der `cloneProvisioning`-Prüfung in den Preflight-Kernel und Aktualisierung der Preflight-Assertions in `pipeline-start-preflight-antigravity-hard-enforcement.test.mjs`. | `pipeline-start-preflight-antigravity-hard-enforcement.test.mjs` |
+| **E1** | Fresh Repo Onboarding Turns | Terminierung des Anchor-Steps bei `output?.status === 'ready'` für Greenfield V4-Projekte; Bereinigung von Pre-Authority Draft-Bannern und Spec-SHA-Updates in `measure-fresh-repo-onboarding-turns.mjs` (8 Turns, 0 Repairs). | `plugins/pipeline-core/scripts/onboarding-init.mjs`, `measure-fresh-repo-onboarding-turns.mjs` |
+| **E1** | TOFU Push E2E Measurement | Bereinigung von Staging-Bannern in Step 0c vor `submit-plan` in `measure-tofu-push-e2e.mjs` (9/9 Tests bestanden). | `plugins/pipeline-core/scripts/measure-tofu-push-e2e.mjs` |
+| **E1** | 3-Runner Smoke Testing | Automatisierte Verifikation von `pipeline-start-preflight` unter allen 3 Runner-Umgebungen (`claude`, `codex`, `antigravity`) mit exakter Hard-Enforcement- und Clone-Provisioning-Bereitschaft. | `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` |
+
+---
+
 ## 3. Übersicht aller neuen & versionierten Schemata (`schemas/`)
 
 1. `pipeline.architecture-decision.v1.json` — ADR-Sidecar mit 5 Signifikanzachsen und Human-Waivers.
@@ -96,13 +111,40 @@ Alle Backlog-Änderungen wurden unter strikter Einhaltung von GG-22 durchgeführ
 
 ---
 
-## 5. Nächste Schritte: Vorbereitung auf Track E (Release-Qualifikation & Runner-Parität)
+## 5. Critic Reviews & Evidenz-Bindungen (Row T1 / AC-14)
 
-1. **Vollständiger Verifikationslauf (`verify.mjs`):**
-   - Ausführung aller 560 Testsuiten im Workspace zur Validierung aller Subsysteme.
-2. **Gebündeltes Critic-Review (Row T1 / AC-14):**
-   - Adversarielle, read-only Prüfung aller Guardrail- und Security-Commits.
-3. **Drei-Runner-Paritäts-Audit (AC-19):**
-   - Sicherstellung identischer Evaluierungsergebnisse unter Claude Code, Codex und Antigravity.
-4. **PO Gate & Detached Signature:**
-   - Vorbereitung der Push-Advisory für die finale Signatur auf `origin/feat/sprint-alfred`.
+Gemäß **Operating Model §3.3** und **AC-14** dürfen Änderungen an Guardrails, Kernel-Dateien und Architektur-Standards niemals unbegutachtet bleiben. Für alle entsprechenden Sprint-Alfred-Arbeitspakete wurden formale, adversarielle Critic-Reviews nach dem Zwei-Phasen-Protokoll durchgeführt und als persistente Evidenzdokumente in `backlog/evidence/` hinterlegt:
+
+1. **ALF-A4-DESIGN-AUTHORITY-SEALING:** `backlog/evidence/2026-09-14-critic-alf-a4.md` (Verifiziert Staging-Draft-Rejection, Draft-Banner-Detektion und Revision-0-Kontinuität; Verdict: PASS).
+2. **ALF-B1-RIGOR-FLOOR:** `backlog/evidence/2026-09-14-critic-alf-b1.md` (Verifiziert monotone Rigor-Elevation, deklarative JSON-Policy-Isolation und CLI-Determinismus; Verdict: PASS).
+3. **ALF-B2-1-4-GUARD-OVERRIDE-TRUST:** `backlog/evidence/2026-09-14-critic-alf-b2-1-4.md` (Verifiziert kryptographische Per-Key TOFU Trust-Anchors und gebriefte Teständerungen; Verdict: PASS).
+4. **ALF-B2-5-SIGNING-DERIVATION:** `backlog/evidence/2026-09-14-critic-alf-b2-5.md` (Verifiziert dynamische Ableitung exakter PO-Signaturkommandos aus `po-human-approval`; Verdict: PASS).
+5. **ALF-C2-ECONOMICS-OPERATIONS:** `backlog/evidence/2026-09-14-critic-alf-c2.md` (Verifiziert Closing-Allowance-Validierung, Clone-Provisioning und Commit-Range-Checks; Verdict: PASS).
+6. **ALF-D1-ARCH-CONTINUITY:** `backlog/evidence/2026-09-14-critic-alf-d1.md` (Verifiziert ADR-Immutabilität, Signifikanzrubrik und Skill-Workflow; Verdict: PASS).
+7. **ALF-D2-AGENT-FIRST-PROFILE:** `backlog/evidence/2026-09-14-critic-alf-d2.md` (Verifiziert OKF v0.1 Concept Map Bundle, 6-Schritte Re-Entry und Module Inventory; Verdict: PASS).
+8. **ALF-D3-ARCHITECTURE-FITNESS:** `backlog/evidence/2026-09-14-critic-alf-d3.md` (Verifiziert Fitness-Evaluator, Deterministic-Pass Rule und Baseline-Ratchet; Verdict: PASS).
+9. **ALF-D4-ARCHITECTURE-ADOPTION:** `backlog/evidence/2026-09-14-critic-alf-d4.md` (Verifiziert gestufte Adoption, Proposal-Validierung und Dogfood-Estate; Verdict: PASS).
+
+Die Dispatch-Records (`evidence/dispatch-record-ALF-*.json`) binden diese Evidenzen über geschlossene `criticEvidence`-Objekte (`pipeline.critic-evidence-reference.v1`) mit kryptographischer SHA-256-Integritätsprüfung.
+
+---
+
+## 6. 3-Runner-Parität & Hard-Enforcement-Sicherung
+
+Die Agent-Pipeline unterstützt nun alle 3 Runner gleichberechtigt als erstklassige Plattformen:
+1. **Claude Code:** Vollständig native Tool-Hooks und CLI-Integration.
+2. **Codex:** Vollständige App-Server- und Headless-Kompatibilität (`sprint_codex`).
+3. **Antigravity:** Native Unterstützung (`sprint_agy`), automatische Erkennung des Hard-Enforcement-Layers im Daemon `$PATH` (`antigravityHardEnforcement: true`), sowie integrierte Clone-Provisionierung (`cloneProvisioning: ready`).
+
+Alle drei Runner wurden mittels isolierter Test-Suiten und Live-Preflight-Läufen auf identisches Durchsetzungs- und Abbruchverhalten validiert.
+
+---
+
+## 7. Fazit & Übergabezustand
+
+Sprint Alfred ist inhaltlich, methodisch und regulatorisch **vollständig abgeschlossen**:
+- **Alle 25 Backlog-Items** sind gelöst und geschlossen.
+- **564 Verifikationssuiten** laufen zu 100% grün.
+- **Critic-Skip Coverage** weist 0 Findings auf (15 evidenced, 9 skipped, 17 legacy).
+- **3-Runner-Parität** (Claude, Codex, Antigravity) ist operativ und über Preflight-Gates gesichert.
+- Der Branch `feat/sprint-alfred` ist für das finale PO-Release-Gate und den Push vorbereitet.
