@@ -118,7 +118,7 @@ for (let index = 0; index < lines.length; index++) {
     if (filePath === "" || filePath !== filePath.trim() || filePath.includes("\0") || normalized.endsWith("/") || normalized.includes("//") || segments.some((segment) => [".", ".."].includes(segment))) block(`empty, traversal, or ambiguous ${kind} path at line ${index + 1}.`);
     if (kind === "Move to" && operation !== "Update File") block(`Move to header without a preceding Update File at line ${index + 1}.`);
     operation = kind;
-    paths.push(filePath);
+    paths.push({ filePath, patchContainsAcknowledgementMarker: false });
     continue;
   }
   if (line.startsWith("*** ")) block(`unknown or ambiguous patch header at line ${index + 1}: ${line}`);
@@ -127,6 +127,26 @@ for (let index = 0; index < lines.length; index++) {
   }
 }
 if (beginCount !== 1 || endCount !== 1 || paths.length === 0) block("non-empty apply_patch payload contains no unambiguous file paths.");
+
+// Preserve the one security-relevant content fact that the lifecycle guard
+// needs while keeping the existing path-only translation boundary intact.
+// An apply_patch can author ordinary staging prose, but it must not smuggle
+// the PO acknowledgement marker past the attended chat/signature writer.
+let activePath = null;
+for (const line of lines) {
+  const header = line.match(/^\*\*\* (?:Add File|Update File):(.*)$/);
+  if (header) {
+    const raw = header[1];
+    activePath = raw.startsWith(" ") ? raw.slice(1) : null;
+    continue;
+  }
+  if (line.startsWith("*** ")) { activePath = null; continue; }
+  if (activePath !== null && line.startsWith("+")
+    && line.includes("<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->")) {
+    const entry = paths.find((candidate) => candidate.filePath === activePath);
+    if (entry) entry.patchContainsAcknowledgementMarker = true;
+  }
+}
 
 // ARCHITECTURAL INVARIANT, permanent (backlog:
 // raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate,
@@ -158,13 +178,13 @@ if (beginCount !== 1 || endCount !== 1 || paths.length === 0) block("non-empty a
 // apply_patch on its own -- either fact changing should make that suite
 // fail, forcing a reader to reconsider this comment rather than silently
 // drift past it.
-const jobs = paths.flatMap((filePath) => GUARDS.map((guard) => ({
+const jobs = paths.flatMap(({ filePath, patchContainsAcknowledgementMarker }) => GUARDS.map((guard) => ({
   ...guard,
   filePath,
       input: JSON.stringify({
         tool_name: "Edit",
         session_id: input.session_id ?? input.sessionId,
-        tool_input: { file_path: filePath },
+      tool_input: { file_path: filePath, patchContainsAcknowledgementMarker },
       }),
 })));
 let exitCode = 0;

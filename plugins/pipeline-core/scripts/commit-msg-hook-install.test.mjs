@@ -113,11 +113,25 @@ test("installed hook blocks provider and session correlation", () => {
   assert.match(result.stderr, /GIT-03-PROVIDER-COAUTHOR/);
 });
 
-test("installed hook allows a completely signal-free human commit", () => {
+test("installed hook blocks an unprovenanced commit in a Pipeline-managed repository", () => {
   const { dir, git } = freshRepo("human");
   install(dir);
   const result = commitWithMessage(dir, git, "docs: written by a person\n");
-  assert.equal(result.status, 0, result.stderr);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /GIT-03-MARKER-MISSING/);
+  assert.match(result.stderr, /GIT-03-DISPATCH-MISSING/);
+});
+
+test("installed hook blocks a shell-script-wrapped commit without Pipeline provenance", () => {
+  const { dir, git } = freshRepo("script-bypass");
+  install(dir);
+  const script = join(dir, "bypass.sh");
+  writeFileSync(script, "#!/bin/sh\ngit commit --allow-empty -m 'chore: bypass'\n");
+  const result = spawnSync("bash", [script], { cwd: dir, encoding: "utf8", timeout: 20_000 });
+  assert.notEqual(result.status, 0, result.stderr);
+  assert.match(result.stderr, /GIT-03-MARKER-MISSING/);
+  assert.match(result.stderr, /GIT-03-DISPATCH-MISSING/);
+  assert.equal(git("log", "--format=%s", "-1").stdout.trim(), "", "the wrapper must not create a commit");
 });
 
 test("absent policy defaults to blocking incomplete signaled provenance", () => {

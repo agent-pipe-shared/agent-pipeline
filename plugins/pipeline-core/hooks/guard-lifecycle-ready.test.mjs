@@ -922,6 +922,7 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
     for (const command of [
       "pwd -P",
       "ls -la",
+      "printf '\\n--- AGENT ---\\n'",
       "rg -n repository-control-path-invalid plugins",
       "sed -n '1,80p' pipeline.user.yaml",
       "node --check harness/scripts/verify.mjs",
@@ -951,6 +952,7 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
     }
     for (const command of [
       "printf implementation > src/output.txt",
+      "printf -v captured value",
       "sed -i 's/a/b/' pipeline.user.yaml",
       "find . -delete",
       "git branch new-branch",
@@ -1710,6 +1712,7 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
   try {
     for (const command of [
       'git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain',
+      "git status --short && printf '\\n--- AGENT ---\\n' && git log --oneline -1",
       "mkdir -p scratch/probe && ls -la scratch/probe",
       'grep -rl "pattern" backlog/items/ 2>/dev/null',
       "git status && git log -n 10 --oneline",
@@ -1743,6 +1746,10 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
     }
     assert.deepEqual(evaluateLifecycleReadyGuard(
       bash('git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain'),
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+    ), { exitCode: 0, stderr: "" });
+    assert.deepEqual(evaluateLifecycleReadyGuard(
+      bash("git status --short && printf '\\n--- AGENT ---\\n' && git log --oneline -1"),
       { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
     ), { exitCode: 0, stderr: "" });
 
@@ -4243,6 +4250,19 @@ test("NVA-BL-INTAKEBIND-1: bootstrap-binding-required admits exactly the staging
     // AC-1: both admitted staging targets, for both Edit and Write.
     for (const input of [write(prdPath), edit(prdPath), write(specPath), edit(specPath)]) {
       assert.equal(evaluateLifecycleReadyGuard(input, bindingDeps).exitCode, 0, `${input.tool_name}:${input.tool_input.file_path}`);
+    }
+
+    // The staging window permits authoring and review, not the human-owned
+    // acknowledgement transition.  Direct Edit/Write payloads carrying the
+    // marker stay blocked; apply_patch carries the same fact through its
+    // translated Edit payload (covered in guard-apply-patch.test.mjs).
+    for (const input of [
+      { ...write(prdPath), tool_input: { file_path: prdPath, content: "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->" } },
+      { ...edit(prdPath), tool_input: { file_path: prdPath, old_string: "review", new_string: "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->" } },
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, bindingDeps);
+      assert.equal(result.exitCode, 2, `marker transition:${input.tool_name}`);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
     }
 
     // AC-2: design-input.md is NEVER admitted -- it must stay an immutable verbatim capture.

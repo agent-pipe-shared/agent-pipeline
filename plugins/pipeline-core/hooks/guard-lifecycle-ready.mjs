@@ -39,7 +39,10 @@ import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabil
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
-import { isBootstrapBindingStagingAuthoringWrite } from "../lib/onboarding-staging-authoring.mjs";
+import {
+  isBootstrapAcknowledgementMarkerMutation,
+  isBootstrapBindingStagingAuthoringWrite,
+} from "../lib/onboarding-staging-authoring.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import {
   hasCodexExistingGitControlMount,
@@ -379,7 +382,7 @@ const READ_SCOPE_DENIAL_GUIDANCE = "The bounded read-only diagnostic pipeline re
 export const ADMITTED_GRAMMAR_SHAPES = [
   {
     spelling: "one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, "
-      + "file, sed [non-mutating], find [non-mutating], pwd, git [read-only subcommands], and "
+      + "file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and "
       + "a few narrow hash/check forms)",
     example: "rg -n needle probe.txt",
   },
@@ -2701,6 +2704,13 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
   const executable = basename(words[0]).toLowerCase();
   const args = words.slice(1);
   if (executable === "pwd") return args.length === 0 || (args.length === 1 && args[0] === "-P");
+  // A labelled separator is the one measured friction case for a read-only
+  // chain.  Keep it narrow: printf's assignment form, arbitrary formats, and
+  // all echo forms stay outside this diagnostic lane.  The format is data,
+  // not a shell construct, and must be exactly a visible label bracketed by
+  // literal newline escapes (for example `printf '\\n--- AGENT ---\\n'`).
+  if (executable === "printf") return args.length === 1
+    && /^\\n[^%$`\\r\\n]+\\n$/u.test(args[0]);
   if (["node", "node.exe"].includes(executable)) {
     return args.length === 2
       && args[0] === "--check"
@@ -4339,7 +4349,11 @@ function isExactObservedRunnerPermissionsRepairAction(command, root, dependencie
     && observed?.status === "projection-drift"
     && observed?.root === root
     && observed?.intent === "session"
-    && observed?.runnerPermissions?.status === "drifted"
+    // A newly initialized runner reports the same exact merge action as
+    // `pending-runtime-initialization`; a formerly initialized one reports
+    // `drifted`.  Both are producer-defined repair states, while all command
+    // bytes below remain re-observed and exact.
+    && ["drifted", "pending-runtime-initialization"].includes(observed?.runnerPermissions?.status)
     && exactKeys(action, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
     && action.kind === "command" && action.executable === "node"
     && Array.isArray(action.argv) && action.argv.length === 7 && action.argv.every((value) => typeof value === "string")
@@ -4993,7 +5007,8 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
       && error.lifecycleStatus === "bootstrap-binding-required"
-      && isBootstrapBindingStagingAuthoringWrite(input, root);
+      && isBootstrapBindingStagingAuthoringWrite(input, root)
+      && !isBootstrapAcknowledgementMarkerMutation(input);
     if (bootstrapBindingStagingAuthoringWrite) return verdict(0);
     const bootstrapBindingScratchWrite = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"

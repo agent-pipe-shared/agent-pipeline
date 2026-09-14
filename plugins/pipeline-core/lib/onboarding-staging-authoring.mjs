@@ -35,6 +35,30 @@ import {
   readOnboardingIntakeCheckpoint,
 } from "./onboarding-continuity.mjs";
 
+// The acknowledgement marker is a human-authorized state transition, not
+// staging prose.  The staging authoring window below must therefore never
+// admit a tool payload that would introduce it.  Keep the token here (next to
+// the one narrow staging-write predicate) so Edit, Write, and Codex's
+// apply_patch translation cannot disagree about what must remain writer-only.
+export const PO_PLAN_ACKNOWLEDGEMENT_MARKER = "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->";
+
+/**
+ * True only when a proposed staging-authoring payload carries the one marker
+ * reserved for the attended chat/detached-signature acknowledgement writer.
+ *
+ * Codex's apply_patch adapter preserves this fact as a boolean rather than
+ * forwarding the whole patch to every nested guard.  Native Edit and Write
+ * calls retain their provider field names.  Unknown payload shapes fail
+ * closed for the marker lane: they are still eligible for ordinary staging
+ * authoring, but cannot claim this marker admission.
+ */
+export function isBootstrapAcknowledgementMarkerMutation(input) {
+  const toolInput = input?.tool_input ?? {};
+  if (toolInput.patchContainsAcknowledgementMarker === true) return true;
+  return [toolInput.content, toolInput.new_string, toolInput.newString]
+    .some((value) => typeof value === "string" && value.includes(PO_PLAN_ACKNOWLEDGEMENT_MARKER));
+}
+
 /**
  * NVA-BL-INTAKEBIND-1 (moved verbatim from guard-lifecycle-ready.mjs). A session observed at
  * `bootstrap-binding-required` (checkpoint transactionState "generated") has a freshly

@@ -4741,7 +4741,9 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     // FIRST `commit("seeded consumer")` call below still relies on unaided.
     const commit = (message, { noVerify = false } = {}) => {
       hostGit(path, ["add", "-A"]);
-      hostGit(path, noVerify ? ["commit", "-q", "--no-verify", "-m", message] : ["commit", "-q", "-m", message]);
+      hostGit(path, noVerify
+        ? ["commit", "-q", "--no-verify", "-m", message]
+        : ["commit", "-q", "-m", message, "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
     };
 
     commit("seeded consumer");
@@ -4870,7 +4872,9 @@ test("the seeded security gate refuses a push with missing security evidence and
     // FIRST `commit("seeded consumer")` call below still relies on unaided.
     const commit = (message, { noVerify = false } = {}) => {
       hostGit(path, ["add", "-A"]);
-      hostGit(path, noVerify ? ["commit", "-q", "--no-verify", "-m", message] : ["commit", "-q", "-m", message]);
+      hostGit(path, noVerify
+        ? ["commit", "-q", "--no-verify", "-m", message]
+        : ["commit", "-q", "-m", message, "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
     };
 
     commit("seeded consumer");
@@ -5115,7 +5119,10 @@ test("onboarding materializes project/critical-human-proof.json declaring push, 
       });
       // `gates.push_approval` is read from COMMITTED bytes (ADR-0056), same as
       // PUSHSEED-2 above.
-      const commit = (message) => { hostGit(path, ["add", "-A"]); hostGit(path, ["commit", "-q", "-m", message]); };
+      const commit = (message) => {
+        hostGit(path, ["add", "-A"]);
+        hostGit(path, ["commit", "-q", "-m", message, "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
+      };
       if (mode === "chat") {
         const userPath = join(path, "pipeline.user.yaml");
         writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/human_approval: "?signature"?/u, 'human_approval: "chat"'));
@@ -5448,7 +5455,7 @@ test("the hook onboarding installs actually fires: blocks a push the gate would 
     mkdirSync(join(path, "project"), { recursive: true });
     writeFileSync(join(path, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
     hostGit(path, ["add", "-A"]);
-    hostGit(path, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "manifest"]);
+    hostGit(path, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "manifest", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
     const commit = hostGit(path, ["rev-parse", "HEAD"]);
     const stdin = `refs/heads/main ${commit} refs/heads/main ${"0".repeat(40)}\n`;
     const blocked = spawnSync(hookPath, ["origin", "https://example.invalid/repo.git"], { cwd: path, input: stdin, encoding: "utf8", timeout: 15000 });
@@ -5496,7 +5503,7 @@ test("once an owned .gitignore's ask is fulfilled with ordinary tools, the evide
     // A first commit -- the onboarding scaffold plus the now-repaired
     // .gitignore -- stands in for the candidate a push signature would bind.
     hostGit(path, ["add", "-A"]);
-    hostGit(path, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "onboarding scaffold"]);
+    hostGit(path, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "onboarding scaffold", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]);
 
     // Act two: the shipped evidence/security producers' output shape,
     // written as if that commit were already signed.

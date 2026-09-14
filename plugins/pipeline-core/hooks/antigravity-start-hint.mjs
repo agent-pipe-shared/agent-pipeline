@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sessionStartDecision } from './codex-session-start-hint.mjs';
@@ -56,8 +56,23 @@ function main() {
         : process.cwd();
     decision = sessionStartDecision(rootDir);
 
-    // Create session bootstrap lock
+    // A first-run directory is not yet a Git repository.  Never manufacture
+    // `.git/agent-pipeline/...` there: creating `.git` before `git init`
+    // turns Git's future control directory into a malformed repository and
+    // strands onboarding in repository-control-path-invalid.  A real local
+    // checkout has `.git/HEAD`; only then does this hook own its private lock.
     const sessionId = input.conversationId || input.session_id || 'default';
+    const gitHead = join(rootDir, '.git', 'HEAD');
+    if (!existsSync(gitHead)) {
+      process.stdout.write(JSON.stringify({
+        injectSteps: [
+          {
+            ephemeralMessage: `${decision.context}\nPipeline note: this directory has no initialized Git control path yet; no session bootstrap lock was created. Run pipeline-start after onboarding initializes Git.`,
+          },
+        ],
+      }) + '\n');
+      return;
+    }
     const sessionDir = join(rootDir, '.git', 'agent-pipeline', 'run', `session-${sessionId}`);
     mkdirSync(sessionDir, { recursive: true });
     // NVA-ARMEDPROOF-1: bind the lock to the exact plugin build that wrote

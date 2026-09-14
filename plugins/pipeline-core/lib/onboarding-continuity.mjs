@@ -6159,8 +6159,9 @@ function buildIntakeDesignInputContent(checkpoint, chunks) {
 // buildOnboardingIntakeGeneratePlan, which computes spec content/sha256
 // before calling this so the two never drift apart). The one marker that
 // remains a genuine judgment call -- po-plan-acknowledged -- is deliberately
-// NOT written here; see guard-lifecycle-ready.mjs's bootstrap-binding-required
-// staging-authoring admission for the sanctioned real edit path that adds it.
+// NOT written here. The policy-selected acknowledgement writer (attended chat
+// or detached signature) adds it; ordinary staging authoring is explicitly
+// forbidden from adding it by guard-lifecycle-ready.mjs.
 function buildIntakePrdContent(checkpoint, featureId, chunks, specSha256) {
   return [
     `<!-- po-language: ${checkpoint.values.language} -->`,

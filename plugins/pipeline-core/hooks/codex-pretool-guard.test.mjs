@@ -177,7 +177,7 @@ function createReadyLifecycleFixture(mode = "chat") {
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
   assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`push_approval: "${mode}"`, "u"));
   assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`human_approval: "${mode}"`, "u"));
-  for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy"]]) {
+  for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]]) {
     const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
     assert.equal(git.status, 0, git.stderr);
   }
@@ -193,6 +193,13 @@ function createReadyLifecycleFixture(mode = "chat") {
   const permissionsDrift = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
   assert.equal(permissionsDrift.status, "projection-drift");
   assert.equal(permissionsDrift.runnerPermissions.status, "pending-runtime-initialization");
+  // Exercise the native adapter, not merely the bare repair CLI.  This is the
+  // self-deadlock regression: the exact action the lifecycle producer returns
+  // must be admitted while the project is still projection-drifted.
+  const repairCommand = [permissionsDrift.nextAction.executable, ...permissionsDrift.nextAction.argv]
+    .map((value) => JSON.stringify(value)).join(" ");
+  const repairGuard = run({ tool_name: "Bash", tool_input: { command: repairCommand } }, root);
+  assert.equal(repairGuard.status, 0, `${repairGuard.stderr}\n${repairGuard.stdout}`);
   const permissionsApplied = executeFixtureAction(root, permissionsDrift.nextAction, {});
   assert.equal(permissionsApplied.status, "ready");
   assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex").status, "ready");

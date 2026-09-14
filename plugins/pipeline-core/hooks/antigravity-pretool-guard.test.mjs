@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import {
   closeSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   openSync,
@@ -25,6 +26,7 @@ import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 }
 const hookDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = join(hookDir, "..");
 const adapter = join(hookDir, "antigravity-pretool-guard.mjs");
+const startHint = join(hookDir, "antigravity-start-hint.mjs");
 const onboardingScript = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
 let passed = 0;
 
@@ -119,7 +121,7 @@ function readyLifecycleFixture(mode = "chat") {
   follow(invoke("plan", "--root", root, "--runner", "antigravity"), "apply-portable-seed");
   const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", mode], { cwd: root, env, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
-  for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy"]]) {
+  for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]]) {
     const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
     assert.equal(git.status, 0, git.stderr);
   }
@@ -138,6 +140,12 @@ function readyLifecycleFixture(mode = "chat") {
   const permissionsDrift = invoke("inspect", "--root", root, "--runner", "antigravity");
   assert.equal(permissionsDrift.status, "projection-drift");
   assert.equal(permissionsDrift.runnerPermissions.status, "pending-runtime-initialization");
+  // The adapter must admit the exact returned repair before it is applied;
+  // otherwise a fresh install loops forever at projection-drift.
+  const repairCommand = [permissionsDrift.nextAction.executable, ...permissionsDrift.nextAction.argv]
+    .map((value) => JSON.stringify(value)).join(" ");
+  const repairGuard = run({ toolCall: { name: "run_command", args: { CommandLine: repairCommand } } }, root);
+  assert.equal(repairGuard.status, 0, `${repairGuard.stderr}\n${repairGuard.stdout}`);
   const permissionsApplied = spawnSync(permissionsDrift.nextAction.executable, permissionsDrift.nextAction.argv, {
     cwd: root, env, encoding: "utf8", shell: false,
   });
@@ -978,6 +986,17 @@ check("Antigravity pretool guard allows running a node script file, not inline c
 
   assert.equal(res.decision, "allow");
   rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity start hint never creates .git before Git initialization", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-start-hint-fresh-"));
+  try {
+    const input = JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: "fresh" });
+    const result = spawnSync(process.execPath, [startHint], { cwd: root, input, encoding: "utf8", timeout: 8_000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(join(root, ".git")), false, "the pre-init hint must not manufacture a Git control directory");
+    assert.match(result.stdout, /no session bootstrap lock was created/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 // 5. Broadened inline-execution containment (D6)

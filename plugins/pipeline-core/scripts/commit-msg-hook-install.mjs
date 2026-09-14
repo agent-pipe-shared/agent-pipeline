@@ -28,7 +28,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
-export const INSTALLER_VERSION = "1";
+export const INSTALLER_VERSION = "2";
 export const MARKER_SCHEMA = "pipeline.commit-msg-hook-install.v1";
 
 const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -190,7 +190,17 @@ async function main() {
   const mode = markerPolicyMode(projectConfig);
   let result;
   try {
-    result = finishedCommitMessageFindings(message, { requireProvenanceWhenSignaled: mode !== "off" });
+    // This hook is the Git boundary that remains in force when an agent hides
+    // git commit behind a shell script. Git does not expose a trustworthy
+    // human-typed-this bit, so a Pipeline-managed repository uses its
+    // configured blocking policy for every finished commit message. The off
+    // mode remains the explicit migration escape; warn still reports but does
+    // not reject. Restricting this to already-signalled trailers left a shell
+    // script able to create an unprovenanced commit.
+    result = finishedCommitMessageFindings(message, {
+      requireMarker: mode !== "off",
+      requireDispatch: mode !== "off",
+    });
     if (!result || !Array.isArray(result.findings)) throw new TypeError("policy returned an invalid verdict");
   } catch (error) {
     block([\`the commit-message policy could not produce a verdict (\${error?.name ?? "Error"}); policy evaluation cannot continue.\`]);

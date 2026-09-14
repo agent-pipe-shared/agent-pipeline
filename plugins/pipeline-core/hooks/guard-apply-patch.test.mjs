@@ -347,7 +347,7 @@ check("architectural invariant: guard-apply-patch.mjs's spawn loop synthesizes a
   const loopBlock = source.slice(loopStart);
   assert.match(loopBlock, /tool_name:\s*"Edit"/u);
   assert.match(loopBlock, /session_id:\s*input\.session_id\s*\?\?\s*input\.sessionId/u);
-  assert.match(loopBlock, /tool_input:\s*\{\s*file_path:\s*filePath\s*\}/u);
+  assert.match(loopBlock, /tool_input:\s*\{\s*file_path:\s*filePath,\s*patchContainsAcknowledgementMarker\s*\}/u);
   assert.doesNotMatch(loopBlock, /tool_name:\s*toolName/u);
   assert.doesNotMatch(loopBlock, /tool_name:\s*"apply_patch"/u);
   assert.match(loopBlock, /session_id:\s*input\.session_id\s*\?\?\s*input\.sessionId/u);
@@ -406,6 +406,20 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     // proves its bounded authoring window and returns only the signature
     // planner; it never fabricates the marker or a binding approval.
     assert.notEqual(postAuthoring.status, "ready");
+    nativeDenial(
+      runNativeCodexPatchGuard(
+        created.root,
+        [
+          "*** Begin Patch",
+          `*** Update File: ${join(created.root, prd)}`,
+          "@@",
+          "+<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->",
+          "*** End Patch",
+        ].join("\n"),
+      ),
+      "generated checkpoint acknowledgement-marker patch",
+      "GUARD-LIFECYCLE-NOT-READY",
+    );
     nativeDenial(
       runNativeCodexPatchGuard(
         created.root,
