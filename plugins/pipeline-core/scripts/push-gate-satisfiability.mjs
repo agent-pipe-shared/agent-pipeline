@@ -40,8 +40,10 @@
  * (`checkEvidenceFreshness`, `checkCriticalHumanProofPolicy`,
  * `checkPushThreatModel`) rather than re-implementing them, and add typed
  * status classification on top. The verify-contract-configured check and the
- * signature-window check are new: neither has an equivalent in
- * `push-prepare.mjs` today.
+ * signature-window observation is retained for diagnostics, but it is not a
+ * push precondition: a human-guard-override capability belongs to a distinct
+ * one-use guard-recovery ceremony and can never authorize, consume, or block
+ * a remote-push approval.
  *
  * Usage:
  *   node push-gate-satisfiability.mjs --root <dir>
@@ -294,7 +296,9 @@ export function assessPushGateSatisfiability(argv, deps = {}) {
   }
   checks.push(checkTrustAnchorPresent(dir, deps));
   checks.push(checkPushThreatModelMaterialized(dir, deps));
-  checks.push(checkSignatureWindow(dir, deps));
+  // HGO capabilities are separate audit/recovery artifacts.  In particular,
+  // an expired historical one must not make every later push impossible.  Do
+  // not fold this observation into the push precondition report.
 
   const satisfiable = checks.every((check) => check.ok);
   return {

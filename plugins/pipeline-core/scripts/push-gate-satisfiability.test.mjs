@@ -319,7 +319,7 @@ test("assessPushGateSatisfiability: all-green case -> satisfiable:true, schema p
   assert.equal(result.ok, true);
   assert.equal(result.report.schema, SCHEMA);
   assert.equal(result.report.satisfiable, true);
-  assert.equal(result.report.checks.length, 5);
+  assert.equal(result.report.checks.length, 4);
   for (const check of result.report.checks) assert.equal(check.ok, true, `expected ${check.id} to be ok`);
 });
 
@@ -340,7 +340,7 @@ test("assessPushGateSatisfiability: each unmet precondition is named specificall
   assert.equal(failing[0].status, "absent");
 });
 
-test("assessPushGateSatisfiability: an expired-armed signature window alone flips satisfiable:false, named specifically", () => {
+test("assessPushGateSatisfiability: an expired HGO capability is unrelated to push satisfiability", () => {
   const now = Date.parse("2026-08-28T10:10:00.000Z");
   const result = assessPushGateSatisfiability(["--root", FIXTURE_DIR], greenDeps({
     resolveGitCommonDir: () => "/fake-common-dir",
@@ -354,11 +354,8 @@ test("assessPushGateSatisfiability: an expired-armed signature window alone flip
       return JSON.stringify({ exitCode: 0, commit: HEAD });
     },
   }));
-  assert.equal(result.report.satisfiable, false);
-  const failing = result.report.checks.filter((c) => !c.ok);
-  assert.equal(failing.length, 1);
-  assert.equal(failing[0].id, "signature-window");
-  assert.equal(failing[0].status, "expired-armed-capability");
+  assert.equal(result.report.satisfiable, true);
+  assert.equal(result.report.checks.some((check) => check.id === "signature-window"), false);
 });
 
 test("assessPushGateSatisfiability: usage error on a missing --root", () => {
