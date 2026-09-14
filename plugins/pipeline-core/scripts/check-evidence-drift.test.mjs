@@ -227,6 +227,7 @@ test("closed-evidence-restore restores pinned bytes from history", () => {
     const planExit = run([
       "closed-evidence-restore-plan",
       "--feature-id", "agent-pipeline-0.4.7-hotfix",
+      "--by", "PO",
       "--root", root,
     ], { dir: root });
     assert.equal(planExit, 0);
@@ -241,23 +242,36 @@ test("closed-evidence-restore restores pinned bytes from history", () => {
   assert.equal(plan.artifactPath, resultPath);
   assert.equal(plan.expectedSha256, originalSha);
   assert.equal(plan.closeCommit, closeCommit);
+  assert.equal(plan.by, "PO");
+  assert.match(plan.stateSha256, /^[a-f0-9]{64}$/u);
   assert.ok(plan.planSha256);
   assert.ok(plan.applyAction);
+
+  // An agent cannot turn a plan merely attributed to the PO into a repair by
+  // changing --by, nor can an unattended invocation consume it.
+  const restoreApplyArgs = [
+    "closed-evidence-restore-apply",
+    "--feature-id", "agent-pipeline-0.4.7-hotfix",
+    "--artifact-path", resultPath,
+    "--expected-sha256", originalSha,
+    "--close-commit", closeCommit,
+    "--plan-sha256", plan.planSha256,
+    "--by", "PO",
+    "--activate",
+    "--root", root,
+  ];
+  assert.equal(run(restoreApplyArgs, { dir: root }), 1, "unattended apply must not mutate evidence");
+  assert.equal(readFileSync(join(root, resultPath), "utf8"), "# Tampered Result\nCorrupted.\n");
+  const forgedByArgs = restoreApplyArgs.map((value) => value === "PO" ? "not-the-po" : value);
+  assert.equal(run(forgedByArgs, { dir: root, isattyFn: () => true, readLineFn: () => "CONFIRM" }), 2,
+    "a plan must be bound to its attributed PO");
+  assert.equal(readFileSync(join(root, resultPath), "utf8"), "# Tampered Result\nCorrupted.\n");
 
   // Run closed-evidence-restore-apply
   let applyOutput = "";
   try {
     console.log = (msg) => { applyOutput += msg + "\n"; };
-    const applyExit = run([
-      "closed-evidence-restore-apply",
-      "--feature-id", "agent-pipeline-0.4.7-hotfix",
-      "--artifact-path", resultPath,
-      "--expected-sha256", originalSha,
-      "--close-commit", closeCommit,
-      "--plan-sha256", plan.planSha256,
-      "--activate",
-      "--root", root,
-    ], { dir: root });
+    const applyExit = run(restoreApplyArgs, { dir: root, isattyFn: () => true, readLineFn: () => "CONFIRM" });
     assert.equal(applyExit, 0);
   } finally {
     console.log = oldLog;
@@ -359,21 +373,27 @@ test("closed-evidence-repin updates state with audit entry in evidenceRepins[]",
   assert.equal(plan.newSha256, amendedSha);
   assert.equal(plan.by, "André");
 
+  const repinApplyArgs = [
+    "closed-evidence-repin-apply",
+    "--feature-id", "agent-pipeline-0.4.7-hotfix",
+    "--artifact-path", resultPath,
+    "--old-sha256", originalSha,
+    "--new-sha256", amendedSha,
+    "--by", "André",
+    "--plan-sha256", plan.planSha256,
+    "--activate",
+    "--root", root,
+  ];
+  const forgedRepinBy = repinApplyArgs.map((value) => value === "André" ? "not-the-po" : value);
+  assert.equal(run(forgedRepinBy, { dir: root, isattyFn: () => true, readLineFn: () => "CONFIRM" }), 2,
+    "repin must reject an apply whose PO attribution differs from its CAS plan");
+  assert.equal(JSON.parse(readFileSync(statePath, "utf8")).closedFeatures[0].continuityClose.result.sha256, originalSha);
+
   // Run repin-apply
   let applyOutput = "";
   try {
     console.log = (msg) => { applyOutput += msg + "\n"; };
-    const applyExit = run([
-      "closed-evidence-repin-apply",
-      "--feature-id", "agent-pipeline-0.4.7-hotfix",
-      "--artifact-path", resultPath,
-      "--old-sha256", originalSha,
-      "--new-sha256", amendedSha,
-      "--by", "André",
-      "--plan-sha256", plan.planSha256,
-      "--activate",
-      "--root", root,
-    ], { dir: root });
+    const applyExit = run(repinApplyArgs, { dir: root, isattyFn: () => true, readLineFn: () => "CONFIRM" });
     assert.equal(applyExit, 0);
   } finally {
     console.log = oldLog;
