@@ -34,7 +34,10 @@ function run(script, args) {
 }
 
 function fixture() {
-  const root = mkdtempSync("scratch/report-interruptions-test-");
+  // C1's production store intentionally requires the Linux ext backend; /tmp
+  // is tmpfs in the host verifier. Keep disposable fixtures out of the shared
+  // repository scratch tree while preserving that real backend precondition.
+  const root = mkdtempSync(join("/var/tmp", "report-interruptions-test-"));
   for (const path of ["project", "specs/sprint-alfred-epic", ".claude", "governance/guidelines", "governance/policies", "evidence"]) {
     mkdirSync(join(root, path), { recursive: true });
   }
