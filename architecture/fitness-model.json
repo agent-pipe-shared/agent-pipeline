@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "pipeline.fitness-model.v1",
+  "profileId": "inherited-agent-first",
+  "revision": 1,
+  "title": "Machine-Readable Architecture Fitness Model for Agent-Pipeline",
+  "description": "Governed architecture fitness model referencing map bundle inventory, allowed boundary crossings, dependency directions, verification entry points, navigation artifacts, and severity/blocking rules (WP-D3, Issue #106, AC-10, AC-18, AC-21, Spec §7.3, Doctrine §2.10 & §4).",
+  "mapBundlePath": "architecture/map",
+  "modules": [
+    {
+      "id": "pipeline-core",
+      "ownedPaths": [
+        "plugins/pipeline-core/**"
+      ],
+      "allowedDependencies": [
+        "schemas"
+      ],
+      "authorityEffects": [
+        "read-write-workspace",
+        "execute-node-scripts"
+      ],
+      "verificationEntryPoints": [
+        "plugins/pipeline-core/scripts/module-inventory.test.mjs",
+        "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
+        "plugins/pipeline-core/scripts/architecture-fitness.test.mjs"
+      ]
+    },
+    {
+      "id": "harness",
+      "ownedPaths": [
+        "harness/**"
+      ],
+      "allowedDependencies": [
+        "pipeline-core",
+        "schemas"
+      ],
+      "authorityEffects": [
+        "read-workspace",
+        "execute-node-scripts"
+      ],
+      "verificationEntryPoints": [
+        "harness/scripts/check-verify-suite-registration.mjs"
+      ]
+    },
+    {
+      "id": "schemas",
+      "ownedPaths": [
+        "schemas/**"
+      ],
+      "allowedDependencies": [],
+      "authorityEffects": [
+        "schema-validation-contract"
+      ],
+      "verificationEntryPoints": [
+        "plugins/pipeline-core/scripts/module-inventory.test.mjs"
+      ]
+    },
+    {
+      "id": "backlog",
+      "ownedPaths": [
+        "backlog/**"
+      ],
+      "allowedDependencies": [],
+      "authorityEffects": [
+        "ledger-append"
+      ],
+      "verificationEntryPoints": [
+        "plugins/pipeline-core/scripts/check-backlog-state.mjs"
+      ]
+    }
+  ],
+  "allowedBoundaryCrossings": [
+    {
+      "from": "harness",
+      "to": "pipeline-core",
+      "rationale": "Test harness executes and inspects pipeline-core plugin scripts and libraries."
+    },
+    {
+      "from": "pipeline-core",
+      "to": "schemas",
+      "rationale": "Pipeline core loads and validates runtime schemas."
+    },
+    {
+      "from": "harness",
+      "to": "schemas",
+      "rationale": "Harness validates schemas and verify suite definitions."
+    }
+  ],
+  "navigationArtifacts": {
+    "entryPoint": "AGENTS.md",
+    "mapIndex": "architecture/map/index.md",
+    "readingOrder": [
+      "AGENTS.md",
+      "architecture/map/index.md",
+      "architecture/map/<module>.md",
+      "project/architecture-decisions.compiled.json",
+      "pipeline-core:pipeline-start",
+      "owned implementation surface"
+    ]
+  },
+  "parallelWorkConstraints": {
+    "disallowedConcurrentWriters": true,
+    "requireExplicitBoundarySeparation": true
+  },
+  "severityAndBlockingRules": {
+    "planning": {
+      "blockingOutcomes": [
+        "finding",
+        "blocked"
+      ],
+      "requiredProperties": [
+        "module-identity-ownership",
+        "contract-presence-freshness",
+        "dependency-direction-cycles"
+      ]
+    },
+    "candidate": {
+      "blockingOutcomes": [
+        "finding",
+        "blocked"
+      ],
+      "failClosed": true
+    },
+    "push": {
+      "candidatePublication": {
+        "blockingProperties": [
+          "navigation-currency",
+          "contract-presence-freshness"
+        ]
+      },
+      "checkpoint": {
+        "recordStalenessDebt": true,
+        "debtTypes": [
+          "architecture-map-stale",
+          "contract-stale"
+        ]
+      }
+    },
+    "ci": {
+      "blockingOutcomes": [
+        "finding",
+        "blocked"
+      ],
+      "failClosed": true
+    }
+  },
+  "antiFragmentationPolicy": {
+    "rejectTrivialFacades": true,
+    "rejectDuplicatedFacades": true,
+    "minStatementsPerModule": 3
+  }
+}

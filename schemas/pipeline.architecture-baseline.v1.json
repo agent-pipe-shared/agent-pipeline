@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.architecture-baseline.v1",
+  "title": "Architecture Baseline and Ratchet Store (pipeline.architecture-baseline.v1)",
+  "description": "Schema for architecture baseline and ratchet store inventorying accepted violations and ratchet metrics (WP-D3, Issue #106, AC-10, AC-18, Spec §7.3, Doctrine §4).",
+  "type": "object",
+  "required": [
+    "schema",
+    "baselineRevision",
+    "acceptedViolations",
+    "ratchetMetrics",
+    "lastEvaluatedAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": [
+        "pipeline.architecture-baseline.v1"
+      ]
+    },
+    "baselineRevision": {
+      "type": "number"
+    },
+    "acceptedViolations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ruleId",
+          "module",
+          "target",
+          "rationale",
+          "acceptedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ruleId": {
+            "type": "string"
+          },
+          "module": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "acceptedAt": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ratchetMetrics": {
+      "type": "object",
+      "required": [
+        "totalAcceptedViolations"
+      ],
+      "properties": {
+        "totalAcceptedViolations": {
+          "type": "number"
+        },
+        "cycleCount": {
+          "type": "number"
+        },
+        "boundaryCrossingsCount": {
+          "type": "number"
+        }
+      }
+    },
+    "lastEvaluatedAt": {
+      "type": "string"
+    },
+    "stalenessDebt": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "recordedAt"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "module": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@ nonResponsibilities:
 ownedPaths:
   - backlog/**
 publicContracts:
-  - backlog/ledger.csv
+  - backlog/transitions.ndjson
   - backlog/items/**
 allowedDependencies: []
 authorityEffects:
@@ -25,7 +25,7 @@ adrReferences:
 Sprint backlog items, evidence records, interruption baseline, and ledger history.
 
 ## Public Contracts
-- `backlog/ledger.csv`: Sprint backlog items ledger.
+- `backlog/transitions.ndjson`: Sprint backlog transitions ledger.
 - `backlog/items/**`: Detailed specification and audit files for backlog tasks.
 
 ## Verification

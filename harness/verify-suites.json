@@ -6,6 +6,10 @@
       "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs"
     },
     {
+      "name": "architecture-fitness-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs"
+    },
+    {
       "name": "architecture-remedy-tests",
       "file": "plugins/pipeline-core/scripts/architecture-remedy.test.mjs"
     },
