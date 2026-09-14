@@ -381,6 +381,9 @@ dogfood case, end to end.
   measurement rather than infer activation from `agy plugins list`. This
   package uses injected fake executables only: no authentication, provider
   request, external model call, or claim of native three-runner enforcement.
+  Its gate authority is the candidate-bound
+  `policies/alfred-e3-gate-readback.v1.json`; a shipped `unavailable` result
+  keeps the seam closed rather than standing in for runner evidence.
   A separately PO-authorized live pilot, with readback, is the only route that
   can establish live AGY hook/start behavior.
 
