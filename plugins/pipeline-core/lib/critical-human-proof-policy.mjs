@@ -196,14 +196,12 @@ export function readReconcileApprovalMode(dir, opts = {}) {
  * The one mode selector for a human gate.
  *
  * `gates.human_approval` is a deliberate, repository-wide product choice.  Once a
- * committed value is present it owns every participating human gate.  A
- * repository that has *both* committed keys but gives them different values is
- * not a valid shared-policy configuration: silently preferring global `chat`
- * would let a project whose UI and push setting say `signature` use an
- * unattested Design-to-Implementation acknowledgement.  That conflict therefore
- * resolves to the stronger signature route until an operator makes the two keys
- * agree.  A missing historical key is not a conflict, so migrations remain
- * compatible.
+ * committed value is present it wins over the older action-local settings: an
+ * operator choosing global `chat` has explicitly chosen the weaker, non-attested
+ * attribution route for every participating human gate.  We do not turn an old
+ * `push_approval: signature` default into a configuration conflict, because that
+ * would make a migrated repository unable to choose the newly-authorized global
+ * posture without an atomic edit to every historical key.
  *
  * Before the shared key exists, the old action-local contract remains intact.  A
  * caller that historically followed push mode (HGO) passes `legacyKind: "push"`;
@@ -213,19 +211,6 @@ export function readReconcileApprovalMode(dir, opts = {}) {
 export function readHumanApprovalMode(dir, { legacyKind = null, spawn = spawnSync } = {}) {
   const global = readApprovalModeKey(dir, HUMAN_APPROVAL_MODE_KEY, DEFAULT_HUMAN_APPROVAL_MODE, { spawn });
   if (global.source !== "default") {
-    const push = readGateApprovalMode(dir, "push", { spawn });
-    // Only the weak-over-strong disagreement needs a special result.  A
-    // globally selected signature remains signature even if a historical push
-    // key still says chat, so retaining its normal source metadata preserves
-    // the established diagnostic contract.
-    if (global.mode === "chat" && push.source === USER_SOURCE_PATH && push.mode === "signature") {
-      return {
-        mode: "signature",
-        source: "conflicting",
-        key: `${HUMAN_APPROVAL_MODE_KEY}+${GATE_APPROVAL_MODE_KEYS.push}`,
-        scope: "global",
-      };
-    }
     return {
       mode: global.mode,
       source: global.source,
