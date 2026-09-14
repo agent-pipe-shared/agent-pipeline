@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.control-placement.v1",
+  "title": "Control placement table",
+  "description": "A2 table declaring every hooks/hooks.json and shipped Alfred control, with an explicitly observed status for each supported runner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "revision", "controls"],
+  "properties": {
+    "schema": { "const": "pipeline.control-placement.v1" },
+    "revision": { "const": 1 },
+    "controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["controlId", "protects", "enforcedBy", "perRunnerStatus", "residualGaps"],
+        "properties": {
+          "controlId": { "type": "string", "pattern": "^(hook|alfred):[a-z0-9][a-z0-9:-]*$" },
+          "protects": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "enforcedBy": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["git-hook", "tool-scope", "runner-hook", "posthoc-verify", "prose"] } },
+          "perRunnerStatus": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["runner", "status", "detail"],
+              "properties": {
+                "runner": { "enum": ["claude", "codex", "antigravity"] },
+                "status": { "enum": ["enforced", "unavailable", "contradicted", "not-applicable"] },
+                "detail": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "residualGaps": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    }
+  }
+}
