@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fc498cee6ada9c4d7955597dc4236db0e4e0533ffb5ba2e044a569c178079d71"
+    "transitionHead": "ddc4b075c32a189d08555fb7bcc30ce05fbb614ab0acd5949315ae391604cd87"
   },
   "counts": {
-    "open": 68,
+    "open": 65,
     "in_progress": 1,
-    "closed": 582,
+    "closed": 585,
     "rejected": 3,
     "deferred": 11
   },
@@ -909,13 +909,17 @@
     },
     {
       "id": "pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Measured live 2026-08-28 in the Alfred clone: two attended PO acknowledge ceremonies, the first failing its postimage readback and rolling back, the second succeeding with an explicit --runner flag.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "7535e631f8c15a924a1c1ee426f82bbd650a1dee",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-governance-triple.md"
     },
     {
       "id": "pipeline.attestation-git-presence-gate-not-gs8-protected",
@@ -2139,14 +2143,18 @@
     },
     {
       "id": "pipeline.critic-route-pre-check-not-in-force-in-installed-plugin",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-11",
       "source": "Critic review (FAIL, F3) of NVA-BL-42 (plugins/pipeline-core/agents/critic.md, goldfish-deep.md, templates/prompts/critic-review.md, commit 08684e7874b79c04a44601c487f343be0dfaefa5), 2026-08-11.",
       "deferred": true,
       "due": "2026-08-25",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "7535e631f8c15a924a1c1ee426f82bbd650a1dee",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-governance-triple.md"
     },
     {
       "id": "pipeline.critic-skip-not-an-explicit-logged-decision",
@@ -5004,13 +5012,17 @@
     },
     {
       "id": "pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Flagged independently by both 2026-08-27 design-review Critics (round 1A finding F1, round 1B finding F10; reports under specs/sprint-alfred-epic/evidence/critic/); scope question resolved against docs/operating-model.md §3.3 in the round-1 response.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "7535e631f8c15a924a1c1ee426f82bbd650a1dee",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-governance-triple.md"
     },
     {
       "id": "pipeline.no-sanctioned-way-to-start-over",

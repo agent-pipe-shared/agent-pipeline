@@ -73,7 +73,7 @@
 | pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.atomic-prd-approval-without-mutation | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
-| pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner | open | defect | pipeline | alfred | 2026-08-28 | — | — |
+| pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
 | pipeline.attestation-git-presence-gate-not-gs8-protected | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.author-repair-route-has-no-signed-event-chain | open | requirement | pipeline | nightwing | 2026-09-12 | 2026-09-30 | — |
 | pipeline.authority-decision-apply-defaults-to-codex | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
@@ -165,7 +165,7 @@
 | pipeline.critic-md-protected-preimage-drift | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — discovered running the first full verify.mjs gate of this session (last known-green 7cc0b649, 2026-09-02). codex-isolated-critic-protected-preimage-tests fails: roles/critic.md's current content-hash no longer matches the digest pinned in plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json, a preimage snapshot used to detect drift in the Critic role contract for Codex-isolated Critic dispatches. |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | closed | defect | pipeline | — | 2026-08-18 | — | — |
-| pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | open | defect | pipeline | alfred | 2026-08-11 | 2026-08-25 | — |
+| pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | closed | defect | pipeline | alfred | 2026-08-11 | 2026-08-25 | — |
 | pipeline.critic-skip-not-an-explicit-logged-decision | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | — |
 | pipeline.critical-command-kinds-excludes-feature-package-reconcile | closed | defect | pipeline | — | 2026-08-16 | 2026-09-15 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
@@ -378,7 +378,7 @@
 | pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.no-push-preflight-before-requesting-a-signature | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking: a burned or expired signature stops the path at its last step and costs a live PO interaction to retry |
 | pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed | closed | defect | pipeline | — | 2026-08-10 | — | — |
-| pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits | open | defect | pipeline | alfred | 2026-08-27 | — | — |
+| pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.no-sanctioned-way-to-start-over | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.no-technical-gate-enforces-critic-review-before-done | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | Nova B -- PO decision 2026-08-29: real design work needed (detecting when a Critic review was DUE and never ran is not trivial), too large for this candidate. |
 | pipeline.no-test-pins-the-ungoverned-path-rule-stand-down | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -673,8 +673,8 @@
 
 ## Counts
 
-- open: 68
+- open: 65
 - in_progress: 1
-- closed: 582
+- closed: 585
 - rejected: 3
 - deferred: 11
