@@ -1350,6 +1350,35 @@ function awaitingApprovalFixture() {
   return { root, deps: { dir: root, now: () => localNow }, planPath, specPath, planSha256: state.planSubmission.planSha256, specSha256: state.planSubmission.specSha256 };
 }
 
+// A coordinator-sourced, signed acknowledgement is a single PO decision. Once
+// the exact proof survives binding, inspection must publish an agent-runnable
+// receipt consumption action and must reject an attempt to regress to --by.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  state.bootstrapAcknowledgementRequired = true;
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  const signatureDeps = {
+    ...deps,
+    readHumanApprovalMode: () => ({ mode: "signature", source: "pipeline.user.yaml", key: "human_approval", scope: "global" }),
+    observeOnboardingBootstrapPlanApproval: () => ({
+      status: "verified",
+      receiptPath: "scratch/bootstrap-plan-acknowledgement-receipt-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json",
+      signer: { keyReference: "test-po-key", publicKeySha256: "a".repeat(64) },
+    }),
+  };
+  const inspected = capturedStdout(() => run(["inspect"], signatureDeps));
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  assert.equal(action.kind, "command");
+  assert.equal(action.requiresConfirmation, false);
+  assert.deepEqual(action.argv.slice(1), [
+    "approve-plan", "--bootstrap-acknowledgement-receipt",
+    "scratch/bootstrap-plan-acknowledgement-receipt-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json",
+  ]);
+  const downgraded = capturedStderr(() => run(["approve-plan", "--by", "po-test"], signatureDeps));
+  assert.equal(downgraded.result, 2);
+}
+
 // Awaiting approval must never publish a direct runnable command: an agent
 // cannot approve the PO's plan. It may publish the PO's one typed attribution
 // field plus a nested command which remains explicitly human-confirmed.

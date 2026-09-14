@@ -2152,6 +2152,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
     const submitPlan = `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile epic`;
     const approvePlan = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by 'PO recovery'`;
+    const approvePlanReceipt = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/bootstrap-plan-acknowledgement-receipt-${"a".repeat(64)}.json`;
     const setPhase = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
     const profileRepairPlan = `node '${PO_PROFILE_REPAIR_SCRIPT}' plan --root '${path}'`;
     const profileRepairApply = `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
@@ -2169,7 +2170,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
     const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
     const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
-    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poRebindCodex, poAcknowledgePlan, poAcknowledgeApply, poAcknowledgeApplyCwd, poDecisionPlan, poDecisionSelect, poDecisionSelectClaude, poDecisionApply, poDecisionApplyAntigravity, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poRebindCodex, poAcknowledgePlan, poAcknowledgeApply, poAcknowledgeApplyCwd, poDecisionPlan, poDecisionSelect, poDecisionSelectClaude, poDecisionApply, poDecisionApplyAntigravity, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, approvePlanReceipt, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -2258,6 +2259,9 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile unsafe`,
       `${submitPlan} --bypass`,
       `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by ''`,
+      `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/bootstrap-plan-acknowledgement-receipt-${"A".repeat(64)}.json`,
+      `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/other.json`,
+      `${approvePlanReceipt} --by 'PO recovery'`,
       `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase release`,
       `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --activate`,
       `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' apply --root '${path}' --activate`,
@@ -3318,6 +3322,7 @@ test("NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is a
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
       "bootstrap-acknowledge-plan": {},
       "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
+      "bootstrap-acknowledge-chat-apply": { "--plan-sha256": "c".repeat(64) },
     };
     assert.deepEqual(
       Object.keys(sampleValues).sort(),
@@ -3354,6 +3359,7 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
       "bootstrap-bind-apply": { "--plan-sha256": "b".repeat(64) },
       "bootstrap-acknowledge-plan": {},
       "bootstrap-acknowledge-apply": { "--plan-sha256": "c".repeat(64), "--proof": "scratch/bootstrap-plan-acknowledgement-proof.json" },
+      "bootstrap-acknowledge-chat-apply": { "--plan-sha256": "c".repeat(64) },
     };
     for (const name of Object.keys(MUTATING_ONBOARDING_ARGV_SHAPES)) {
       const argv = automatedMutatingApplyArgv(name, path, sampleValues[name]).filter((token) => token !== "--activate");
@@ -3363,12 +3369,16 @@ test("NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activ
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("bootstrap chat acknowledgement remains outside the non-ready agent lane", () => {
+test("bootstrap chat acknowledgement admits only its exact digest-bound non-ready recovery action", () => {
   const path = root();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const command = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-chat-apply --root '${path}' --plan-sha256 '${"c".repeat(64)}' --activate`;
-    assert.equal(isSanctionedLifecycleCommand(command, path), false);
+    assert.equal(isSanctionedLifecycleCommand(command, path), true);
+    const missingActivation = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-chat-apply --root '${path}' --plan-sha256 '${"c".repeat(64)}'`;
+    const changedDigest = `node '${ONBOARDING_SCRIPT}' bootstrap-acknowledge-chat-apply --root '${path}' --plan-sha256 '${"d".repeat(64)}' --activate --proof scratch/unexpected.json`;
+    assert.equal(isSanctionedLifecycleCommand(missingActivation, path), false);
+    assert.equal(isSanctionedLifecycleCommand(changedDigest, path), false);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

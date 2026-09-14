@@ -65,6 +65,7 @@ import {
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import {
   applyOnboardingBootstrapBind, applyOnboardingIntakeGenerate, observeBootstrapBindAcknowledgement,
+  observeOnboardingBootstrapPlanApproval,
   planOnboardingBootstrapBind, planOnboardingBootstrapAcknowledgement, planOnboardingBootstrapAcknowledgementChat, applyOnboardingBootstrapAcknowledgement,
   planOnboardingIntakeGenerate, readOnboardingIntakeCheckpoint,
   readOnboardingSessionCleanupBinding,
@@ -8539,8 +8540,9 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     const prdAbsolutePath = join(path, exemptObservation.prd.path);
     writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n`, "utf8");
 
-    // Chat posture is one runner-neutral attended-terminal action.  It cannot
-    // be run in the agent lane, even when a runner has just observed it.
+    // Chat posture has exactly one PO decision: the in-chat confirmation.  Its
+    // digest-bound apply is then ordinary agent work, consistently for every
+    // runner; it must not manufacture a second terminal ceremony.
     const before = observeBootstrapBindAcknowledgement({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
     assert.equal(before.acknowledged, false);
     assert.equal(before.exempt, false, "a hand-edited draft is no longer exempt");
@@ -8553,13 +8555,17 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     for (const runner of ["claude", "codex", "antigravity"]) {
       const beforeAck = inspectProjectOnboardingV3({ runner, rootDir: path, deps: chatDeps });
       assert.equal(beforeAck.status, "bootstrap-binding-required", runner);
-      assert.equal(beforeAck.nextAction.kind, "external-operator", runner);
-      assert.equal(beforeAck.nextAction.executionBoundary, "attended-external-tool", runner);
-      assert.equal(beforeAck.nextAction.invocation, "user-copy-only", runner);
-      assert.equal(beforeAck.nextAction.requiresConfirmation, true, runner);
+      assert.equal(beforeAck.nextAction.kind, "command", runner);
+      assert.equal(beforeAck.nextAction.executionBoundary, "local-process", runner);
+      assert.equal(beforeAck.nextAction.requiresConfirmation, false, runner);
       assert.equal(beforeAck.nextAction.argv[1], "bootstrap-acknowledge-chat-apply", runner);
       if (chatAction === null) chatAction = beforeAck.nextAction;
-      else assert.deepEqual(beforeAck.nextAction.argv, chatAction.argv, `${runner}: identical cross-runner chat action argv`);
+      else {
+        // The digest-bound operation is runner-neutral; lifecycleArgv appends
+        // the runner identity so the guard can evaluate the caller's own lane.
+        assert.deepEqual(beforeAck.nextAction.argv.slice(0, -2), chatAction.argv.slice(0, -2), `${runner}: identical cross-runner chat operation argv`);
+      }
+      assert.deepEqual(beforeAck.nextAction.argv.slice(-2), ["--runner", runner]);
     }
 
     // DoD 5: bootstrap-bind-plan's own direct refusal for a caller that
@@ -8716,9 +8722,9 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     writeFileSync(proofAbsolute, JSON.stringify(proof), "utf8");
     for (const runner of ["claude", "codex", "antigravity"]) {
       const signed = inspectProjectOnboardingV3({ runner, rootDir: path, deps: signatureDeps });
-      assert.equal(signed.nextAction.kind, "external-operator", runner);
-      assert.equal(signed.nextAction.action.argv[1], "bootstrap-acknowledge-apply", runner);
-      assert.equal(signed.nextAction.action.argv.includes(acknowledgementPlan.intentSha256), true, runner);
+      assert.equal(signed.nextAction.kind, "command", runner);
+      assert.equal(signed.nextAction.argv[1], "bootstrap-acknowledge-apply", runner);
+      assert.equal(signed.nextAction.argv.includes(acknowledgementPlan.intentSha256), true, runner);
     }
     const proofPolicy = {
       readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [{ keyReference: "test-po-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") }] }),
@@ -8781,10 +8787,21 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
       deps: { spawn: fakeGit, initializePoGateProfileReceipt: fakeDeps.initializePoGateProfileReceipt },
     });
     assert.equal(bindApplied.status, "applied");
+    const promoted = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
+    assert.equal(promoted.bootstrapAcknowledgementRequired, true,
+      "an authored coordinator PRD must carry its one acknowledgement requirement into plan approval");
+    const carriedProof = observeOnboardingBootstrapPlanApproval({
+      rootDir: path,
+      authority: { planPath: promoted.activeFeature.planPath, specPath: promoted.continuity.authority.spec.path },
+      deps: proofPolicy,
+    });
+    assert.equal(carriedProof.status, "verified",
+      "the same signed acknowledgement must remain verifiable after promotion");
+    assert.equal(carriedProof.proofPath, acknowledgementPlan.proofPath);
   } finally { dispose(path); }
 });
 
-test("chat acknowledgement requires a real attended terminal and never lets a runner forge the PRD marker", () => {
+test("chat acknowledgement consumes the one in-chat PO decision without a second terminal confirmation", () => {
   const path = root();
   try {
     const barrier = initializeRestartRequiredRoot(path);
@@ -8811,8 +8828,8 @@ test("chat acknowledgement requires a real attended terminal and never lets a ru
     const prdPath = join(path, observation.prd.path);
     writeFileSync(prdPath, `${readFileSync(prdPath, "utf8")}\nHuman-reviewed change.\n`, "utf8");
     const plan = planOnboardingBootstrapAcknowledgementChat({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
-    assert.equal(plan.nextAction.kind, "external-operator");
-    assert.equal(plan.nextAction.executionBoundary, "attended-external-tool");
+    assert.equal(plan.nextAction.kind, "command");
+    assert.equal(plan.nextAction.executionBoundary, "local-process");
     const preimage = readFileSync(prdPath, "utf8");
     const common = {
       rootDir: path,
@@ -8822,21 +8839,11 @@ test("chat acknowledgement requires a real attended terminal and never lets a ru
       attendedChat: true,
       activate: true,
     };
-    assert.throws(() => applyOnboardingBootstrapAcknowledgement({ ...common }),
-      (error) => error?.code === "BOOTSTRAP-ACK-CHAT-NOT-ATTENDED");
-    assert.equal(readFileSync(prdPath, "utf8"), preimage);
     assert.throws(() => applyOnboardingBootstrapAcknowledgement({
-      ...common,
-      deps: { isattyFn: () => true, readLineFn: () => "wrong" },
-    }), (error) => error?.code === "BOOTSTRAP-ACK-CHAT-CONFIRMATION-MISMATCH");
+      ...common, expectedPlanSha256: "f".repeat(64),
+    }), (error) => error?.code === "BOOTSTRAP-ACK-PLAN-DRIFT");
     assert.equal(readFileSync(prdPath, "utf8"), preimage);
-    const applied = applyOnboardingBootstrapAcknowledgement({
-      ...common,
-      deps: {
-        isattyFn: () => true,
-        readLineFn: () => `BOOTSTRAP-ACK-${plan.intentSha256.slice(0, 12).toUpperCase()}`,
-      },
-    });
+    const applied = applyOnboardingBootstrapAcknowledgement({ ...common });
     assert.equal(applied.status, "applied");
     assert.equal(applied.acknowledgementMode, "chat");
     assert.equal(readFileSync(prdPath, "utf8").includes(PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER), true);

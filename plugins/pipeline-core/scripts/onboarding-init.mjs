@@ -843,7 +843,7 @@ function initialAnswersActionWithoutTrustAnchor(action) {
   return {
     ...action,
     inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
-    guidance: "collect this initial PO round: the repository-local Git author and the shared human-approval policy. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected value is written consistently as gates.human_approval and gates.push_approval. A selected \"chat\" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected \"signature\" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.",
+    guidance: "collect this initial PO round: the repository-local Git author and the shared human-approval policy. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected value is written consistently as gates.human_approval and gates.push_approval. A selected \"chat\" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected \"signature\" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.",
     applyAction: { ...action.applyAction, argv },
   };
 }

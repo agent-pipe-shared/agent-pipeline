@@ -258,6 +258,8 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
       const initialAsk = first.pendingAsks[0];
       assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "pushApprovalPreference"],
         `${runner}/${pushApproval}: initial action contains only identity and push mode`);
+      assert.match(initialAsk.guidance, /design\/plan approval as well as push approval/u,
+        `${runner}/${pushApproval}: the shared mode must never be presented as push-only`);
       const replacements = new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield Anchor PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-anchor@example.invalid"],

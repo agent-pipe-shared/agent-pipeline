@@ -2447,32 +2447,22 @@ function bootstrapBindPlanAction(root, runner, intent) {
 }
 
 // An authored staging PRD has one policy-selected acknowledgement boundary for
-// every runner.  Chat policy uses an attended terminal; signature policy uses
-// the existing detached proof.  Neither path asks a PO to edit a marker by
-// hand, and neither lets a non-ready agent execute the confirming write.
+// every runner. Chat policy consumes the explicit in-chat PO answer; signature
+// policy uses the existing detached proof. Neither path asks a PO to edit a
+// marker by hand, and neither delegates a second confirmation to the PO.
 function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signatureObservation, signatureMode, spawn) {
   if (signatureMode) {
     if (signatureObservation?.requestStatus === "present" && signatureObservation.proofVerificationStatus === "verified") {
-      return {
-        kind: "external-operator",
-        mutation: true,
-        requiresConfirmation: false,
-        executionBoundary: "attended-external-tool",
-        invocation: "user-copy-only",
-        guidance: `The reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) and specification (${spec.path}, sha256 ${spec.sha256}) have a valid plan-bound signature. Run the exact external acknowledgement action below; do not edit an acknowledgement marker manually.`,
-        action: {
-          kind: "external-operator",
-          executionBoundary: "attended-external-tool",
-          invocation: "user-copy-only",
-          mutation: true,
-          requiresConfirmation: false,
-          executable: process.execPath,
-          argv: [ONBOARDING_SCRIPT, "bootstrap-acknowledge-apply", "--root", root,
-            "--plan-sha256", signatureObservation.intentSha256, "--proof", signatureObservation.proofPath, "--activate"],
-          expected: { schema: "pipeline.bootstrap-plan-acknowledgement-apply.v1", statuses: ["applied"] },
-        },
-        expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
-      };
+      // The only attended external action in signature mode is `sign-intent`.
+      // Once its proof is present and verifies, consuming that proof and writing
+      // the marker is ordinary agent work; asking the PO for a second command
+      // created an avoidable Windows shell mismatch and violated the one-action
+      // human-approval ceremony.
+      return commandAction(
+        lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-apply", "--root", root,
+          "--plan-sha256", signatureObservation.intentSha256, "--proof", signatureObservation.proofPath, "--activate"], runner, intent),
+        true, false, "pipeline.bootstrap-plan-acknowledgement-apply.v1", ["applied"],
+      );
     }
     if (signatureObservation?.requestStatus === "present" && signatureObservation.signAction !== null) {
       return {
@@ -2501,7 +2491,8 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
   }
   return {
     ...plan.nextAction,
-    guidance: `After the PO confirms that staging PRD ${prd.path} (sha256 ${prd.sha256}) is content-sound and consistent with ${spec.path} (sha256 ${spec.sha256}), have the PO run this exact attended-terminal acknowledgement action. Do not ask the PO to edit the PRD manually.`,
+    argv: lifecycleArgv(plan.nextAction.argv, runner, intent),
+    guidance: `After the PO explicitly confirms in chat that staging PRD ${prd.path} (sha256 ${prd.sha256}) is content-sound and consistent with ${spec.path} (sha256 ${spec.sha256}), execute this exact action and read back the lifecycle. Do not ask the PO to edit the PRD or run a second terminal confirmation.`,
     expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
   };
 }
@@ -5044,10 +5035,10 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault)
     mutation: false,
     requiresConfirmation: false,
     guidance: firstAsk
-      ? "this machine has never been asked how a push approval is cleared, and every setting today resolves silently to the strictest default; ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature whose private key never leaves the PO's own terminal (recommended); \"chat\" instead records an attribution in the session -- a labelled record, not a proof. Accept exactly \"signature\" or \"chat\" as the answer, never invent one. "
+      ? "this machine has never been asked how human approvals are cleared. This ONE shared choice controls every participating human gate, including design/plan approval and remote push approval; it is not a push-only setting. Ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature whose private key never leaves the PO's own terminal (recommended); \"chat\" instead records an attribution in the session -- a labelled record, not a proof. Accept exactly \"signature\" or \"chat\" as the answer, never invent one. "
         + `If "signature": the sibling trust-anchor setup question in this same onboarding round collects whether an existing key should be reused or a new one created, its external directory, and the human attribution. Its returned applyAction is the only setup command to execute; do not reconstruct or copy a separate po-human-approval command. The suggested external directory is ${poKeyDirectoryHint ?? "a directory outside every repository"}, but the PO may choose another absolute path outside every checkout. `
-        + "This repository's gates.push_approval in pipeline.user.yaml is seeded with the answer automatically (repository plane, ADR-0056), so no further write is needed for THIS repository; also record the same answer -- plus the key directory, if \"signature\" -- in the machine-scoped configuration plane (machine-plane.mjs) so the NEXT repository on this machine starts pre-filled with it instead of asking from scratch."
-      : `this repository's gates.push_approval (pipeline.user.yaml, ADR-0056) is pre-filled from this machine's remembered preference, "${machineDefault}" (machine-plane.mjs). This is a per-repository confirmation, not a one-time machine question -- it is asked again for every new repository, seeded with the machine default so the PO can confirm in one short turn rather than re-typing it from scratch. Ask the PO to confirm "${machineDefault}" for THIS repository, or type the other value ("signature" or "chat") to override it for this repository only -- an override here does not change the machine's own remembered default in machine-plane.mjs, and pipeline.user.yaml is already seeded with the pre-filled value, so only an override needs a further edit to gates.push_approval. Accept exactly "signature" or "chat" as the answer, never invent one.`,
+        + "This repository's gates.human_approval and gates.push_approval in pipeline.user.yaml are both seeded with the answer automatically, so no further write is needed for THIS repository; also record the same answer -- plus the key directory, if \"signature\" -- in the machine-scoped configuration plane (machine-plane.mjs) so the NEXT repository on this machine starts pre-filled with it instead of asking from scratch."
+      : `this repository's shared human-approval policy (gates.human_approval and gates.push_approval in pipeline.user.yaml) is pre-filled from this machine's remembered preference, "${machineDefault}" (machine-plane.mjs). This is a per-repository confirmation, not a one-time machine question -- it is asked again for every new repository, seeded with the machine default so the PO can confirm in one short turn rather than re-typing it from scratch. Ask the PO to confirm "${machineDefault}" for THIS repository, or type the other value ("signature" or "chat") to override it for this repository only -- an override here does not change the machine's own remembered default in machine-plane.mjs, and pipeline.user.yaml is already seeded with the pre-filled value, so only an override needs a further edit to the shared policy. Accept exactly "signature" or "chat" as the answer, never invent one.`,
     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
   };
 }

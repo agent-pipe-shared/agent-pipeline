@@ -83,11 +83,6 @@ import {
 } from "./worktree-lifecycle.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
-import {
-  CHAT_GATE_CONFIRMATION_MISMATCH,
-  CHAT_GATE_NOT_ATTENDED,
-  requireAttendedChatGateConfirmation,
-} from "./chat-gate-ceremony.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { resolveRepoScopedDirectory } from "./po-key-directory.mjs";
 
@@ -120,6 +115,12 @@ export const KICKOFF_PROMOTION_CLEANUP_RECOVERY_APPLY_SCHEMA = "pipeline.kickoff
 export const BOOTSTRAP_ACKNOWLEDGEMENT_PLAN_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-plan.v1";
 export const BOOTSTRAP_ACKNOWLEDGEMENT_APPLY_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-apply.v1";
 export const BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-request.v1";
+// The acknowledgement marker is only an artefact transition.  This receipt is
+// the durable bridge from the one human decision over the staging PRD/spec to
+// the later, mechanically separate submit/present/approve-plan sequence.
+// Without it a signature-mode project either asked the PO twice or quietly
+// fell back to an unauthenticated `--by` approval.
+export const BOOTSTRAP_ACKNOWLEDGEMENT_RECEIPT_SCHEMA = "pipeline.bootstrap-plan-acknowledgement-receipt.v1";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ONBOARDING_SCRIPT = join(HERE, "..", "scripts", "project-onboarding-v3.mjs");
@@ -4771,7 +4772,9 @@ function validatePromotionPlan(plan) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion plan bindings are invalid");
   }
   const state = plan.targets.state.value;
-  if (!exactKeys(state, new Set(["schema", "activeFeature", "planApproved", "continuity"]))) {
+  const stateKeys = new Set(["schema", "activeFeature", "planApproved", "continuity"]);
+  if (state.bootstrapAcknowledgementRequired !== undefined) stateKeys.add("bootstrapAcknowledgementRequired");
+  if (!exactKeys(state, stateKeys)) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion state postimage is invalid");
   }
   if (state.schema !== "pipeline.state.v0" || state.activeFeature.id !== input.featureId
@@ -4781,6 +4784,7 @@ function validatePromotionPlan(plan) {
     || state.continuity.authority.prd.sha256 !== plan.authority.prd.sha256
     || state.continuity.authority.spec.path !== input.specPath
     || state.continuity.authority.spec.sha256 !== plan.authority.spec.sha256
+    || !(state.bootstrapAcknowledgementRequired === undefined || state.bootstrapAcknowledgementRequired === true)
     || !validateContinuityState(state.continuity, input.featureId).ok) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity postimage is invalid");
   }
@@ -4969,6 +4973,16 @@ function buildCoordinatorSourcedPromotionPlan({
     planApproved: false,
     continuity,
   };
+  // A coordinator-authored PRD which carries the acknowledgement marker is
+  // never silently downgraded to the old `--by` route after promotion. This
+  // observation also makes apply-time reconstruction byte-identical to the
+  // initial plan: it reads the current marker, not plan-time control flow.
+  const acknowledgement = observeBootstrapBindAcknowledgement({
+    rootDir: observed.root, repositoryCapability, spawn,
+  });
+  if (acknowledgement.acknowledged === true && acknowledgement.exempt !== true) {
+    next.bootstrapAcknowledgementRequired = true;
+  }
   const valid = validateContinuityState(next.continuity, featureId);
   if (!valid.ok) fail("KICKOFF-PROMOTION-PLAN", `coordinator-sourced continuity was rejected (${valid.code})`);
   const afterStateSha256 = sha256(expectedStateBytes(next));
@@ -6605,8 +6619,9 @@ function bootstrapAcknowledgementPlan({ rootDir, repositoryCapability = "local",
   const intentSha256 = canonicalSha256(action);
   const requestPath = `scratch/bootstrap-plan-acknowledgement-request-${intentSha256}.json`;
   const proofPath = `scratch/bootstrap-plan-acknowledgement-proof-${intentSha256}.json`;
+  const receiptPath = `scratch/bootstrap-plan-acknowledgement-receipt-${intentSha256}.json`;
   const request = { schema: BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA, intentSha256, action };
-  return { root: resolved.root, action, intentSha256, requestPath, proofPath, request };
+  return { root: resolved.root, action, intentSha256, requestPath, proofPath, receiptPath, request };
 }
 
 function decodeBootstrapAcknowledgementPrd(bytes) {
@@ -6669,6 +6684,42 @@ function writeBootstrapAcknowledgementRequest(root, plan) {
     return { path: target, written: true };
   } catch {
     fail("BOOTSTRAP-ACK-REQUEST-WRITE", "the signature acknowledgement request could not be written safely");
+  }
+}
+
+function bootstrapAcknowledgementReceipt(plan, verified, attendedChat) {
+  return {
+    schema: BOOTSTRAP_ACKNOWLEDGEMENT_RECEIPT_SCHEMA,
+    intentSha256: plan.intentSha256,
+    action: plan.action,
+    acknowledgementMode: attendedChat ? "chat" : "signature",
+    proofSha256: attendedChat ? null : verified?.proofSha256 ?? null,
+    signer: attendedChat ? null : verified?.signer ?? null,
+  };
+}
+
+function readExactBootstrapAcknowledgementReceipt(root, plan, receipt) {
+  const path = safeBootstrapAcknowledgementScratch(root, plan.receiptPath);
+  if (!existsSync(path)) return { status: "absent", path };
+  let value;
+  try { value = JSON.parse(readPhysicalFile(path, "bootstrap acknowledgement receipt").toString("utf8")); } catch { return { status: "invalid", path }; }
+  if (canonicalJson(value) !== canonicalJson(receipt)) return { status: "invalid", path };
+  return { status: "present", path, value };
+}
+
+function writeBootstrapAcknowledgementReceipt(root, plan, receipt) {
+  const target = safeBootstrapAcknowledgementScratch(root, plan.receiptPath);
+  if (existsSync(target)) {
+    const existing = readExactBootstrapAcknowledgementReceipt(root, plan, receipt);
+    if (existing.status !== "present") fail("BOOTSTRAP-ACK-RECEIPT-DRIFT", "an existing acknowledgement receipt differs from the signed plan");
+    return { path: target, written: false };
+  }
+  try {
+    writeExclusiveSynced(target, Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8"), 0o600);
+    fsyncDirectory(dirname(target));
+    return { path: target, written: true };
+  } catch {
+    fail("BOOTSTRAP-ACK-RECEIPT-WRITE", "the acknowledgement receipt could not be written safely");
   }
 }
 
@@ -6772,17 +6823,19 @@ function bootstrapAcknowledgementSignAction(plan, directory) {
   };
 }
 
-function bootstrapAcknowledgementChatConfirmation(intentSha256) {
-  return `BOOTSTRAP-ACK-${intentSha256.slice(0, 12).toUpperCase()}`;
-}
-
 function bootstrapAcknowledgementChatAction(plan) {
   return {
-    kind: "external-operator",
-    executionBoundary: "attended-external-tool",
-    invocation: "user-copy-only",
+    // `human_approval: chat` is explicitly the non-attested policy.  The PO's
+    // chat response is the one human decision; asking them to retype a derived
+    // token in a terminal both duplicates that decision and makes Codex, Claude
+    // and Antigravity behave differently.  The returned action is deliberately
+    // still digest-bound to the reviewed staging bytes, but is run by the agent
+    // after it receives that response.
+    kind: "command",
+    executionBoundary: "local-process",
+    invocation: "agent-tool-call",
     mutation: true,
-    requiresConfirmation: true,
+    requiresConfirmation: false,
     executable: process.execPath,
     argv: [DEFAULT_ONBOARDING_SCRIPT, "bootstrap-acknowledge-chat-apply", "--root", plan.root,
       "--plan-sha256", plan.intentSha256, "--activate"],
@@ -6791,10 +6844,9 @@ function bootstrapAcknowledgementChatAction(plan) {
 }
 
 // Chat-mode acknowledgement has the same PRD/spec and digest binding as the
-// signature route, but its human boundary is an attended terminal.  It is
-// deliberately an external-operator action: a runner seeing the challenge
-// must never be able to execute the confirming write in its own non-TTY tool
-// lane.
+// signature route.  Its boundary is the PO's explicit in-chat answer, as
+// selected by `gates.human_approval: chat`; it never creates a second terminal
+// ceremony.
 export function planOnboardingBootstrapAcknowledgementChat({
   rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
 } = {}) {
@@ -6876,29 +6928,7 @@ export function applyOnboardingBootstrapAcknowledgement({
     fail("BOOTSTRAP-ACK-PLAN-DRIFT", "the signature acknowledgement plan is no longer current");
   }
   let verified = null;
-  if (attendedChat) {
-    const confirmation = requireAttendedChatGateConfirmation({
-      summaryLines: [
-        "BOOTSTRAP PLAN ACKNOWLEDGEMENT — read before you type the confirmation value:",
-        `Repository: ${plan.root}`,
-        `PRD: ${plan.action.prd.path} (sha256 ${plan.action.prd.sha256})`,
-        `Specification: ${plan.action.spec.path} (sha256 ${plan.action.spec.sha256})`,
-        `Plan digest: ${plan.intentSha256}`,
-      ],
-      expected: bootstrapAcknowledgementChatConfirmation(plan.intentSha256),
-      dependencies: deps,
-    });
-    if (!confirmation.ok) {
-      fail(
-        confirmation.code === CHAT_GATE_NOT_ATTENDED
-          ? "BOOTSTRAP-ACK-CHAT-NOT-ATTENDED"
-          : confirmation.code === CHAT_GATE_CONFIRMATION_MISMATCH
-            ? "BOOTSTRAP-ACK-CHAT-CONFIRMATION-MISMATCH"
-            : "BOOTSTRAP-ACK-CHAT-CONFIRMATION-UNAVAILABLE",
-        "chat acknowledgement must be confirmed by the PO in an attended terminal",
-      );
-    }
-  } else {
+  if (!attendedChat) {
     if (proofPath !== plan.proofPath) fail("BOOTSTRAP-ACK-PROOF-PATH", "the signature acknowledgement proof path is not the plan-bound scratch path");
     if (readExactBootstrapAcknowledgementRequest(plan.root, plan).status !== "present") fail("BOOTSTRAP-ACK-REQUEST-DRIFT", "the signature acknowledgement request is absent or changed");
     const proof = observeOptionalProjectFile(plan.root, plan.proofPath, "signature acknowledgement proof");
@@ -6911,6 +6941,14 @@ export function applyOnboardingBootstrapAcknowledgement({
     verified = (deps.verifyAgainstTrustAnchors ?? verifyAgainstTrustAnchors)({ intent: { sha256: plan.intentSha256 }, anchors, proof: proofValue });
     if (!verified.verified) fail("BOOTSTRAP-ACK-PROOF-INVALID", "the signed acknowledgement proof does not verify for this exact plan");
   }
+  // Persist the exact human-decision evidence *before* changing the PRD.  A
+  // failed replacement can then be retried against the same receipt; a
+  // successful replacement can later carry the one proof into approve-plan.
+  // This is intentionally not an authority on its own: every later consumer
+  // rechecks the signed request, the proof and the currently authoritative
+  // PRD/spec identities.
+  const receipt = bootstrapAcknowledgementReceipt(plan, verified, attendedChat);
+  const persistedReceipt = writeBootstrapAcknowledgementReceipt(plan.root, plan, receipt);
   const target = absoluteProjectPath(plan.root, plan.action.prd.path, "staging PRD");
   assertPhysicalChain(plan.root, target, { leafMayBeAbsent: false });
   const current = readPhysicalFile(target, "staging PRD");
@@ -6941,6 +6979,14 @@ export function applyOnboardingBootstrapAcknowledgement({
     if (sha256(readPhysicalFile(target, "staging PRD")) !== plan.action.prd.sha256) {
       fail("BOOTSTRAP-ACK-PRD-DRIFT", "the staging PRD changed before acknowledgement replacement");
     }
+    // Windows cannot replace a pathname while this process still holds the
+    // target descriptor open.  The descriptor was used only for identity
+    // validation (not locking); close it after the final physical-chain and
+    // digest readback, before the same-directory atomic replacement.  Keeping
+    // it open made every otherwise valid Windows signature acknowledgement
+    // collapse into the generic BOOTSTRAP-ACK-WRITE error.
+    closeSync(fd);
+    fd = undefined;
     renameSync(temporary, target);
     temporaryRecord = null;
     committed = true;
@@ -6964,6 +7010,112 @@ export function applyOnboardingBootstrapAcknowledgement({
     signer: verified?.signer ?? null,
     proofSha256: verified?.proofSha256 ?? null,
     acknowledgementMode: attendedChat ? "chat" : "signature",
+    receiptPath: plan.receiptPath,
+    receiptWritten: persistedReceipt.written,
+  };
+}
+
+function acknowledgementReceiptCandidates(root) {
+  const scratch = absoluteProjectPath(root, "scratch", "bootstrap acknowledgement scratch directory");
+  if (!existsSync(scratch)) return [];
+  try {
+    assertPhysicalChain(root, scratch, { leafMayBeAbsent: false });
+    const names = readdirSync(scratch);
+    // A repository may retain old acknowledgements, but an unbounded directory
+    // walk is never an approval primitive.
+    if (names.length > 256) return [];
+    return names
+      .filter((name) => /^bootstrap-plan-acknowledgement-receipt-[a-f0-9]{64}\.json$/u.test(name))
+      .map((name) => {
+        const path = join(scratch, name);
+        try {
+          const stat = lstatSync(path);
+          if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 65_536) return null;
+          return { path, value: JSON.parse(readPhysicalFile(path, "bootstrap acknowledgement receipt").toString("utf8")) };
+        } catch { return null; }
+      })
+      .filter((entry) => entry !== null);
+  } catch {
+    return [];
+  }
+}
+
+function validBootstrapAcknowledgementReceipt(value, root) {
+  if (!exactKeys(value, new Set(["schema", "intentSha256", "action", "acknowledgementMode", "proofSha256", "signer"]))
+    || value.schema !== BOOTSTRAP_ACKNOWLEDGEMENT_RECEIPT_SCHEMA
+    || !SHA256_RE.test(value.intentSha256 ?? "")
+    || !isObject(value.action)
+    || canonicalSha256(value.action) !== value.intentSha256
+    || value.action.kind !== "bootstrap-plan-acknowledgement"
+    || value.action.root !== root
+    || !exactKeys(value.action, new Set(["kind", "decision", "root", "featureId", "checkpoint", "prd", "spec"]))
+    || !isObject(value.action.prd) || !isObject(value.action.spec)
+    || typeof value.action.prd.path !== "string" || !SHA256_RE.test(value.action.prd.sha256 ?? "")
+    || typeof value.action.spec.path !== "string" || !SHA256_RE.test(value.action.spec.sha256 ?? "")
+    || !new Set(["chat", "signature"]).has(value.acknowledgementMode)) return false;
+  if (value.acknowledgementMode === "chat") return value.proofSha256 === null && value.signer === null;
+  return SHA256_RE.test(value.proofSha256 ?? "")
+    && exactKeys(value.signer, new Set(["keyReference", "publicKeySha256"]))
+    && typeof value.signer.keyReference === "string" && value.signer.keyReference.length > 0
+    && SHA256_RE.test(value.signer.publicKeySha256 ?? "");
+}
+
+function acknowledgedPreimageMatches(authorityPrd, expectedSha256) {
+  const text = decodeBootstrapAcknowledgementPrd(authorityPrd);
+  if (text === null || [...text.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length !== 1) return false;
+  const suffix = `\n\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`;
+  if (!text.endsWith(suffix)) return false;
+  // appendBootstrapAcknowledgementMarker normalizes trailing line endings. The
+  // source generator writes one final newline, so these are the only two
+  // lossless candidates; the recorded SHA-256 remains the authority.
+  const prefix = text.slice(0, -suffix.length);
+  return [prefix, `${prefix}\n`].some((candidate) => sha256(Buffer.from(candidate, "utf8")) === expectedSha256);
+}
+
+/**
+ * Re-observe the one bootstrap acknowledgement after promotion.  The caller
+ * cannot nominate an arbitrary proof: only a receipt whose request, proof,
+ * current authority PRD and current authority spec all coincide is usable.
+ */
+export function observeOnboardingBootstrapPlanApproval({
+  rootDir, authority, repositoryCapability = "local", deps = {},
+} = {}) {
+  let root;
+  try { root = physicalRoot(rootDir); } catch { return { status: "unavailable" }; }
+  if (!isObject(authority) || typeof authority.planPath !== "string" || typeof authority.specPath !== "string") {
+    return { status: "unavailable" };
+  }
+  const prd = observeOptionalProjectFile(root, authority.planPath, "authoritative PRD");
+  const spec = observeOptionalProjectFile(root, authority.specPath, "authoritative specification");
+  if (prd.status !== "present" || spec.status !== "present") return { status: "unavailable" };
+  const matches = acknowledgementReceiptCandidates(root)
+    .filter(({ value }) => validBootstrapAcknowledgementReceipt(value, root));
+  const matching = matches.filter(({ value }) => value.action.prd?.path === authority.planPath
+    && value.action.spec?.path === authority.specPath
+    && value.action.spec?.sha256 === sha256(spec.raw)
+    && acknowledgedPreimageMatches(prd.raw, value.action.prd.sha256));
+  if (matching.length !== 1) return { status: matching.length === 0 ? "unavailable" : "ambiguous" };
+  const { path: receiptPath, value: receipt } = matching[0];
+  const proofPath = `scratch/bootstrap-plan-acknowledgement-proof-${receipt.intentSha256}.json`;
+  if (receipt.acknowledgementMode === "chat") {
+    return { status: "chat", receiptPath: relative(root, receiptPath).split(sep).join("/"), intentSha256: receipt.intentSha256 };
+  }
+  const proof = observeOptionalProjectFile(root, proofPath, "bootstrap acknowledgement proof");
+  if (proof.status !== "present") return { status: "unavailable" };
+  let proofValue;
+  try { proofValue = JSON.parse(proof.raw.toString("utf8")); } catch { return { status: "invalid" }; }
+  const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(root);
+  if (!policy.ok) return { status: "invalid" };
+  const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
+  const verified = (deps.verifyAgainstTrustAnchors ?? verifyAgainstTrustAnchors)({ intent: { sha256: receipt.intentSha256 }, anchors, proof: proofValue });
+  if (!verified.verified || verified.proofSha256 !== receipt.proofSha256
+    || canonicalJson(verified.signer) !== canonicalJson(receipt.signer)) return { status: "invalid" };
+  return {
+    status: "verified",
+    proofPath,
+    receiptPath: relative(root, receiptPath).split(sep).join("/"),
+    intentSha256: receipt.intentSha256,
+    signer: verified.signer,
   };
 }
 

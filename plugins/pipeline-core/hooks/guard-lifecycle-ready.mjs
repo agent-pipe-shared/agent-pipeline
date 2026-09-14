@@ -3957,7 +3957,11 @@ function sanctionedPipelineStateArgs(args, root) {
       && args.length === 5;
   }
   if (args[0] === "approve-plan") {
-    return args[1] === "--by" && validBy(args[2]) && args.length === 3;
+    const attributedLegacy = args[1] === "--by" && validBy(args[2]) && args.length === 3;
+    const bootstrapReceipt = args[1] === "--bootstrap-acknowledgement-receipt"
+      && /^scratch\/bootstrap-plan-acknowledgement-receipt-[a-f0-9]{64}\.json$/u.test(args[2] ?? "")
+      && args.length === 3;
+    return attributedLegacy || bootstrapReceipt;
   }
   if (args[0] === "set-phase") {
     const bareTransition = args[1] === "--phase"

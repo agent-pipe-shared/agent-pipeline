@@ -490,6 +490,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   nextActionSection,
   observeBootstrapBindAcknowledgement,
+  observeOnboardingBootstrapPlanApproval,
   readOnboardingIntakeCheckpoint,
   syncStateMdNextAction,
 } from "../lib/onboarding-continuity.mjs";
@@ -3691,11 +3692,49 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
       };
     }
-    // The approval remains a human decision: the action collects the PO's own
-    // name and requires confirmation. The nested action exists so a driver
-    // substitutes exactly one typed argv element and executes the already
-    // sanctioned approve-plan command instead of rebuilding shell text.
     const scriptPath = fileURLToPath(import.meta.url);
+    // New onboarding repositories carry a committed, repository-wide human
+    // approval policy.  Its bootstrap acknowledgement is the one human
+    // decision over the exact PRD/spec; do not ask the PO to approve those
+    // bytes a second time after the mechanical submit/present steps.  In
+    // signature mode the receipt re-verifies the detached proof; in chat mode
+    // it re-verifies the explicit chat-policy receipt.  A stale/missing receipt
+    // fails closed rather than silently regressing to `--by` attribution.
+    let humanMode;
+    try { humanMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn }); } catch { humanMode = null; }
+    if (state.bootstrapAcknowledgementRequired === true && humanMode?.scope === "global") {
+      let acknowledgement;
+      try {
+        acknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
+          rootDir: dir,
+          authority: {
+            planPath: submission.planPath,
+            specPath: submission.specPath,
+          },
+          deps,
+        });
+      } catch { acknowledgement = { status: "unavailable" }; }
+      const expectedStatus = humanMode.mode === "signature" ? "verified" : "chat";
+      if (acknowledgement?.status === expectedStatus && typeof acknowledgement.receiptPath === "string") {
+        return {
+          kind: "command",
+          executable: process.execPath,
+          argv: [scriptPath, "approve-plan", "--bootstrap-acknowledgement-receipt", acknowledgement.receiptPath],
+          mutation: true,
+          requiresConfirmation: false,
+          expected: { schema: INSPECT_SCHEMA, statuses: ["approved"] },
+        };
+      }
+      return {
+        kind: "collect-input",
+        mutation: false,
+        requiresConfirmation: false,
+        guidance: `the configured ${humanMode.mode} human-approval policy requires the exact bootstrap acknowledgement receipt for the submitted PRD/spec. It is ${acknowledgement?.status ?? "unavailable"}; do not replace it with --by attribution or ask the PO for a second approval. Restore the original acknowledgement evidence and rerun inspection.`,
+        expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+      };
+    }
+    // Legacy repositories without the shared policy retain their established
+    // terminal attribution route. Fresh/onboarded repositories never reach it.
     const rendered = boundedCopySafeCommand({
       executable: process.execPath,
       argv: [scriptPath, "approve-plan", "--by", placeholder(PLAN_APPROVER_NAME_PLACEHOLDER)],
@@ -8684,11 +8723,25 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "approve-plan": {
-      const by = flags.by;
-      if (isBlank(by)) {
-        console.error('Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.');
+      // `--dir` is a historical test/invocation wrapper accepted by this CLI's
+      // outer entry point. It never selects a filesystem root here (the root
+      // is already resolved before dispatch), so strip only that inert pair
+      // before applying the closed approval-argument grammar.
+      const approvalArgv = [];
+      for (let index = 0; index < rest.length; index += 1) {
+        if (rest[index] === "--dir" && typeof rest[index + 1] === "string") {
+          index += 1;
+          continue;
+        }
+        approvalArgv.push(rest[index]);
+      }
+      const parsedBy = parseExactFlags(approvalArgv, new Set(["by"]));
+      const parsedReceipt = parseExactFlags(approvalArgv, new Set(["bootstrap-acknowledgement-receipt"]));
+      if (!parsedBy.ok && !parsedReceipt.ok) {
+        console.error("Error: approve-plan accepts only --by <name> for a legacy attribution or one exact --bootstrap-acknowledgement-receipt.");
         return 2;
       }
+      const approvalFlags = parsedBy.ok ? parsedBy.value : parsedReceipt.value;
       const lifecycle = derivePlanLifecycle(base);
       if (!lifecycle.ok || lifecycle.status !== "awaiting-approval"
         || !SHA256_RE.test(lifecycle.submissionSha256 ?? "")) {
@@ -8733,6 +8786,36 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedSpecSha256 = authority.value.specSha256;
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedSubmissionSha256 = lifecycle.submissionSha256;
+      const approvalMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
+      const usesSharedPolicy = base.bootstrapAcknowledgementRequired === true && approvalMode?.scope === "global";
+      let by = approvalFlags.by;
+      const receiptFlag = approvalFlags["bootstrap-acknowledgement-receipt"];
+      if (usesSharedPolicy && (approvalMode.mode === "signature" || receiptFlag !== undefined)) {
+        if (typeof receiptFlag !== "string" || approvalFlags.by !== undefined) {
+          console.error("Error: approve-plan under the shared human-approval policy requires exactly the receipt returned by inspection; --by attribution is not a substitute for the configured human gate.");
+          return 2;
+        }
+        let acknowledgement;
+        try {
+          acknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
+            rootDir: dir,
+            authority: { planPath: authority.value.planPath, specPath: authority.value.specPath },
+            deps,
+          });
+        } catch { acknowledgement = { status: "unavailable" }; }
+        const expectedStatus = approvalMode.mode === "signature" ? "verified" : "chat";
+        if (acknowledgement?.status !== expectedStatus
+          || acknowledgement.receiptPath !== receiptFlag) {
+          console.error(`Error: approve-plan requires a current ${approvalMode.mode} bootstrap acknowledgement receipt (${acknowledgement?.status ?? "unavailable"}); a stale, foreign, or chat/signature-mismatched receipt is refused.`);
+          return 2;
+        }
+        by = approvalMode.mode === "signature"
+          ? `verified:${acknowledgement.signer.keyReference}`
+          : "PO chat acknowledgement";
+      } else if (isBlank(by) || receiptFlag !== undefined) {
+        console.error('Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.');
+        return 2;
+      }
       // `approveSubmittedPlan` deliberately validates its approval envelope with
       // an exact key set.  Keep that strong historical schema intact and carry
       // the weaker global-chat basis in an adjacent, explicit record instead.
