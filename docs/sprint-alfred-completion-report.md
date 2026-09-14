@@ -2,6 +2,8 @@
 
 Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint Alfred** erbrachten technischen Leistungen, architektonischen Entscheidungen, Schemata, Guardrail-Verschärfungen, Modul-Karten und geschlossenen Backlog-Items gemäß dem **Operating Model §3.3** und der **Sprint Alfred Spezifikation** (`specs/sprint-alfred-epic/spec.md`).
 
+**Audit-Grenzen (14. September 2026):** Dieser Nachtrag wertet vorhandene Code- und Evidenzartefakte sowie einen begrenzten Audit-Lauf aus. Er ist weder ein Full-Workspace- noch ein Release-Verify und ersetzt weder Push- noch PO-Abnahme. Der Audit-Lauf im Work-Modus wählte und bestand 88 Journal-Schritte; diese Zahl ist keine Aussage darüber, dass sämtliche im Repository registrierten Suiten ausgeführt wurden. Die Suite-Registrierungsprüfung erfasste separat 529 Testdateien gegenüber 564 Registrierungs- beziehungsweise Opt-out-Einträgen; sie prüft Zuordnung, nicht den Erfolg jeder Suite.
+
 ---
 
 ## 1. Executive Summary & Zielerreichung
@@ -9,12 +11,12 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint 
 - **Sprint-Auftrag:** Inhaltlicher, methodischer und technischer Vollabschluss aller offenen Punkte des Sprint Alfred (`/goal Inhaltlicher Abschluss aller Alfred Items`) unter strenger Prüfung der Verdrahtung aller 3 Runner.
 - **Ergebnis:** 
   - **100% aller 25 Sprint-Alfred Backlog-Items** inhaltlich gelöst, lokal verifiziert, mit vollständiger 4-Feld-Closure (`closedAt`, `closureRepository: "self"`, `closureCommit`, `closureEvidence`) dokumentiert und im Transitions-Ledger nach dem strengen **GG-22-Protokoll** abgeglichen (`check-backlog-state.mjs` grün).
-  - **564 deterministische Testsuiten** in 529 Testdateien registriert, 0 Auslassungen (`check-suite-registration.mjs` grün).
-  - **Full Workspace Verify:** 88 Journal-Schritte über alle 564 Suiten zu 100% bestanden (`node harness/scripts/verify.mjs --mode work` mit Exit 0; Evidence: `evidence/verify-latest.json`).
-  - **Critic Skip Coverage:** 100% lückenlos abgedeckt (`check-critic-skip-coverage.mjs` mit 0 Findings: 15 evidenced, 9 skipped, 17 legacy).
+  - **Suite-Registrierung:** Separat wurden 529 Testdateien gegenüber 564 Registrierungs- beziehungsweise Opt-out-Einträgen geprüft; dies ist ein Zuordnungscheck und keine Vollausführung.
+  - **Begrenzter Audit-Lauf:** 88 ausgewählte Journal-Schritte im Work-Modus bestanden. Dies ist ausdrücklich kein Full-Workspace- oder Release-Verify.
+  - **Critic-Skip-Coverage:** Die Zählung von 15 evidenced, 9 skipped und 17 legacy ist der historische Closure-Baseline-Stand. Der aktuelle Backlog-Checker ist mit den bekannten, akzeptierten historischen Diagnosen gültig; daraus folgt keine gegenwartsbezogene „0 Findings“-Garantie.
   - **Track D (Agent-First Architecture Standard):** Vollständig implementiert (D1 ADR-Kontinuität, D2 Modul-Inventory & Concept Map Bundle, D3 Fitness Evaluator & Ratchet, D4 Adoption Demand & Repository Dogfood).
   - **Mechanische Governance & Schutzlinien (Tracks A & B):** Plan-Authority-Sealing, dynamischer Schutz geschlossener Evidenzen, attendiertes PO-Acknowledge-Routing, deklarative Testsuite-Registrierung (`harness/verify-suites.json`), sanktionierte Design-Trailer (`Dispatch: design (elephant)`).
-  - **3-Runner-Parität & Hard Enforcement:** Vollständige operative Scharfschaltung für Claude Code, Codex und Antigravity.
+  - **3-Runner-Verdrahtung:** Code- und Hook-Verdrahtung sowie fokussierte Contract-Suites sind vorhanden. Native Claude- und Antigravity-Hooks wurden in diesem Audit nicht live ausgeführt; daraus folgt keine Zertifizierung nativer Live-Durchsetzung. Als begrenzte lokale Beobachtung liegt allein ein erfolgreicher Codex-Bootstrap vor.
 
 ---
 
@@ -50,7 +52,7 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint 
 
 | Work Package | Spezifikation / Anforderung | Gelieferte Lösung & Technische Mechanismen | Relevante Dateien |
 |---|---|---|---|
-| **WP-D1** | Architecture Decision Continuity (#99, AC-19, AC-20) | 1. 5-Achsen-Signifikanzrubrik zur deterministischen Bewertung von Architekturentscheidungen.<br>2. ADR-Skill (`architecture-decision`) mit 7 Kernfähigkeiten (Signifikanz, Drafting, Konfliktlösung, Human-Waivers).<br>3. Bounded Summary `architecture-decisions.compiled.json`. | `schemas/pipeline.architecture-decision.v1.json`, `plugins/pipeline-core/scripts/architecture-baseline.mjs`, `skills/architecture-decision/` |
+| **WP-D1** | Architecture Decision Continuity (#99, AC-19, AC-20) | 1. 5-Achsen-Signifikanzrubrik zur deterministischen Bewertung von Architekturentscheidungen.<br>2. ADR-Skill (`architecture-decision`) mit 7 Kernfähigkeiten (Signifikanz, Drafting, Konfliktlösung, Human-Waivers) unter `plugins/pipeline-core/skills/architecture-decision/`.<br>3. Die begrenzte Zusammenfassung `project/architecture-decisions.compiled.json` existiert und wird durch den sanktionierten Compiler `architecture-baseline.mjs --compile-summary` aus dem ADR-Bestand erzeugt. | `schemas/pipeline.architecture-decision.v1.json`, `plugins/pipeline-core/scripts/architecture-baseline.mjs`, `plugins/pipeline-core/skills/architecture-decision/` |
 | **WP-D2** | Agent-First Standard & Concept Map (#104, AC-8, AC-22, AC-23) | 1. Standard-Profil `agent-first-profile.v1.json` mit 9 Property-Klassen und Status-Semantik.<br>2. OKF v0.1 Concept Map Bundle in `architecture/map/` mit `index.md` und Modul-Konzeptdateien.<br>3. 6-Schritte Re-Entry-Reading-Order in `AGENTS.md` verankert (AC-23).<br>4. `module-inventory.mjs` Lader und Pfad-Auflöser.<br>5. `architecture-remedy.mjs`: Remedy-Vergleichsgenerator mit Schutz gegen Tiny-Module-Gaming (AC-21, AC-22). | `schemas/pipeline.architecture-profile.v1.json`, `schemas/pipeline.module-inventory.v1.json`, `architecture/map/*`, `module-inventory.mjs`, `architecture-remedy.mjs` |
 | **WP-D3** | Fitness Enforcement (#106, AC-10, AC-18, AC-21) | 1. `architecture-fitness.mjs`: Evaluator für alle 10 Architektur-Klassen.<br>2. **Deterministic-Pass Rule (AC-10):** Prompt-Compliance liefert niemals `pass`.<br>3. **Map Currency Fails Closed (AC-18):** Candidate/Push schlagen bei veralteter Map fehl; Checkpoint pusht `architecture-map-stale`-Schulden.<br>4. **Ratchet Store:** `architecture/baseline.json` und `fitness-model.json`. | `schemas/pipeline.fitness-evidence.v1.json`, `schemas/pipeline.architecture-baseline.v1.json`, `architecture/fitness-model.json`, `architecture/baseline.json`, `architecture-fitness.mjs` |
 | **WP-D4** | Adoption Demand (#109, AC-9, AC-17) | 1. `architecture-adoption.mjs`: 4-Stufen-Adoptions-Vorschlag (Map first per Issue #109 §5).<br>2. **Disposition vor Autorität (AC-17):** Gating am Planungs-Boundary.<br>3. **Dogfood-Lauf (AC-9):** Ausführung im Repository und Speicherung des PO-beschlossenen Zustands `approved-scoped` in `architecture/adoption-state.json`. | `schemas/pipeline.adoption-state.v1.json`, `schemas/pipeline.adoption-proposal.v1.json`, `architecture/adoption-state.json`, `architecture-adoption.mjs` |
@@ -86,7 +88,7 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint 
 
 ## 3. Kritische Analyse der 3-Runner-Verdrahtung & Durchsetzungsarchitektur
 
-Die Agent-Pipeline unterstützt drei gleichberechtigte Runner: **Claude Code**, **OpenAI Codex** und **Google Antigravity (`agy`)**. Eine kritische Code- und Verdrahtungsanalyse zeigt die genaue technische Realisierung und systemspezifische Schutzmechanismen:
+Die Agent-Pipeline enthält Verdrahtung für drei Runner: **Claude Code**, **OpenAI Codex** und **Google Antigravity (`agy`)**. Die folgende Matrix beschreibt Code, Manifest- und Hook-Verdrahtung; fokussierte Contract-Suites prüfen diese Verträge. Sie ist keine Live-Durchsetzungszertifizierung: Native Claude- und Antigravity-Hooks wurden in diesem Audit nicht ausgeführt. Der begrenzte lokale Lauf beobachtete nur den Codex-Bootstrap.
 
 ### Matrix der Runner-Interzeption
 
@@ -102,7 +104,9 @@ Die Agent-Pipeline unterstützt drei gleichberechtigte Runner: **Claude Code**, 
 | **Besonderheiten** | Multi-Command-Ketten im selben Matcher | `apply_patch` Multi-File-Inspektion via `guard-apply-patch.mjs` | Multi-Subagent-Array-Inspektion (D3-Fix) gegen Critic-Kontamination |
 | **System-Voraussetzung** | Node.js im `$PATH` der Shell | Node.js im `$PATH` der Shell | Globales `/usr/local/bin/node` erforderlich (Daemon liest `.bashrc` nicht) |
 
-### Kritische Runner-Befunde & Schutzpfad-Absicherung:
+### Kritische Runner-Befunde & Schutzpfad-Absicherung
+
+Die folgenden Befunde beschreiben implementierte Pfade und ihre fokussiert getesteten Vertragsannahmen. Ohne ausgeführte native Claude- und Antigravity-Hooks bleibt die tatsächliche Laufzeit-Durchsetzung dieser beiden Runner offen.
 
 1. **Antigravity Daemon Fail-Open-Pfad:**
    - *Problem:* Der Antigravity CLI Daemon läuft im Hintergrund und sourct bei Desktop-/IDE-Starts nicht automatisch `.bashrc`. Wenn Node.js via `fnm`/`nvm` verwaltet wird, kann `node` im Daemon-$PATH fehlen, was zu stummem Ausfall von Hooks führen würde.
@@ -171,15 +175,15 @@ Alle 25 Backlog-Items des Sprint Alfred sind lückenlos im Backlog-Index (`backl
 
 Gemäß **Operating Model §3.3** und **AC-14** dürfen Änderungen an Guardrails, Kernel-Dateien und Architektur-Standards niemals unbegutachtet bleiben. Für alle entsprechenden Sprint-Alfred-Arbeitspakete wurden formale, adversarielle Critic-Reviews nach dem Zwei-Phasen-Protokoll durchgeführt und als persistente Evidenzdokumente in `backlog/evidence/` hinterlegt:
 
-1. **ALF-A4-DESIGN-AUTHORITY-SEALING:** [`backlog/evidence/2026-09-14-critic-alf-a4.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-a4.md) (SHA-256: `6fe0a3731a5477839ecde57564d6a69512cf36735e5d3f23a1fc6c5ae31bf9df`; Verdict: PASS).
-2. **ALF-B1-RIGOR-FLOOR:** [`backlog/evidence/2026-09-14-critic-alf-b1.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-b1.md) (SHA-256: `61d3daefea39b7cb59e5e7fa7d206aa7fefc6cf9119bb9e6e4a2e584fbb7e1d5`; Verdict: PASS).
-3. **ALF-B2-1-4-GUARD-OVERRIDE-TRUST:** [`backlog/evidence/2026-09-14-critic-alf-b2-1-4.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-b2-1-4.md) (SHA-256: `67a1c97a8ec52ea412ffdf7ff9386c7cfd3976f9d51c7aa7c191a6d4aeef2a59`; Verdict: PASS).
-4. **ALF-B2-5-SIGNING-DERIVATION:** [`backlog/evidence/2026-09-14-critic-alf-b2-5.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-b2-5.md) (SHA-256: `a937a0efebf056d691238ea0cfc24e6cbe5c3b169b10c95029054705fe13554e`; Verdict: PASS).
-5. **ALF-C2-ECONOMICS-OPERATIONS:** [`backlog/evidence/2026-09-14-critic-alf-c2.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-c2.md) (SHA-256: `bb16b6fa3b5b63013ba0c6fa2667d4cc74d306bc86a7fca06ea95d51f71dfb96`; Verdict: PASS).
-6. **ALF-D1-ARCH-CONTINUITY:** [`backlog/evidence/2026-09-14-critic-alf-d1.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-d1.md) (SHA-256: `fdbec4e1f7c11f4d9c7d42cf533d3b7fa570183cae74fe143c72b8344e6ccf5a`; Verdict: PASS).
-7. **ALF-D2-AGENT-FIRST-PROFILE:** [`backlog/evidence/2026-09-14-critic-alf-d2.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-d2.md) (SHA-256: `81829ee1d331904791ee5993efdf831f22e239ebcaae8b64e1069502fe8c39e2`; Verdict: PASS).
-8. **ALF-D3-ARCHITECTURE-FITNESS:** [`backlog/evidence/2026-09-14-critic-alf-d3.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-d3.md) (SHA-256: `e06c3a11da4f3640c49fc09cc81b5ff3fba727dfd63ca2bc0fe12f6b3e028b05`; Verdict: PASS).
-9. **ALF-D4-ARCHITECTURE-ADOPTION:** [`backlog/evidence/2026-09-14-critic-alf-d4.md`](file:///home/skar667/src/agent-pipeline-share_alfred/backlog/evidence/2026-09-14-critic-alf-d4.md) (SHA-256: `f19f1873eaee5b9e075e6bcad6d1400e2b34a5d8481ceec79f5383a8b27dd338`; Verdict: PASS).
+1. **ALF-A4-DESIGN-AUTHORITY-SEALING:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-a4.md) (SHA-256: `6fe0a3731a5477839ecde57564d6a69512cf36735e5d3f23a1fc6c5ae31bf9df`; Verdict: PASS).
+2. **ALF-B1-RIGOR-FLOOR:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-b1.md) (SHA-256: `61d3daefea39b7cb59e5e7fa7d206aa7fefc6cf9119bb9e6e4a2e584fbb7e1d5`; Verdict: PASS).
+3. **ALF-B2-1-4-GUARD-OVERRIDE-TRUST:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-b2-1-4.md) (SHA-256: `67a1c97a8ec52ea412ffdf7ff9386c7cfd3976f9d51c7aa7c191a6d4aeef2a59`; Verdict: PASS).
+4. **ALF-B2-5-SIGNING-DERIVATION:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-b2-5.md) (SHA-256: `a937a0efebf056d691238ea0cfc24e6cbe5c3b169b10c95029054705fe13554e`; Verdict: PASS).
+5. **ALF-C2-ECONOMICS-OPERATIONS:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-c2.md) (SHA-256: `bb16b6fa3b5b63013ba0c6fa2667d4cc74d306bc86a7fca06ea95d51f71dfb96`; Verdict: PASS).
+6. **ALF-D1-ARCH-CONTINUITY:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-d1.md) (SHA-256: `fdbec4e1f7c11f4d9c7d42cf533d3b7fa570183cae74fe143c72b8344e6ccf5a`; Verdict: PASS).
+7. **ALF-D2-AGENT-FIRST-PROFILE:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-d2.md) (SHA-256: `81829ee1d331904791ee5993efdf831f22e239ebcaae8b64e1069502fe8c39e2`; Verdict: PASS).
+8. **ALF-D3-ARCHITECTURE-FITNESS:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-d3.md) (SHA-256: `e06c3a11da4f3640c49fc09cc81b5ff3fba727dfd63ca2bc0fe12f6b3e028b05`; Verdict: PASS).
+9. **ALF-D4-ARCHITECTURE-ADOPTION:** [Evidenz](../backlog/evidence/2026-09-14-critic-alf-d4.md) (SHA-256: `f19f1873eaee5b9e075e6bcad6d1400e2b34a5d8481ceec79f5383a8b27dd338`; Verdict: PASS).
 
 Die Dispatch-Records (`evidence/dispatch-record-ALF-*.json`) binden diese Evidenzen über geschlossene `criticEvidence`-Objekte (`pipeline.critic-evidence-reference.v1`) mit kryptographischer SHA-256-Integritätsprüfung.
 
@@ -187,9 +191,9 @@ Die Dispatch-Records (`evidence/dispatch-record-ALF-*.json`) binden diese Eviden
 
 ## 7. Fazit & Übergabezustand
 
-Sprint Alfred ist inhaltlich, methodisch und regulatorisch **vollständig abgeschlossen**:
-- **Alle 25 Backlog-Items** sind gelöst und geschlossen.
-- **564 Verifikationssuiten** laufen zu 100% grün.
-- **Critic-Skip Coverage** weist 0 Findings auf (15 evidenced, 9 skipped, 17 legacy).
-- **3-Runner-Parität** (Claude, Codex, Antigravity) ist operativ und über Preflight-Gates gesichert.
-- Der Branch `feat/sprint-alfred` ist für das finale PO-Release-Gate und den Push vorbereitet.
+Der Bericht hält den dokumentierten Abschlussstand fest, aber keine Release-Aussage:
+- Die 25 Backlog-Items sind als geschlossen dokumentiert; der aktuelle Backlog-Checker ist mit bekannten, akzeptierten historischen Diagnosen gültig.
+- Der begrenzte Audit-Lauf bestand 88 selektierte Journal-Schritte; eine Full-Workspace- oder Release-Verifikation wurde hier nicht behauptet.
+- Die Critic-Zählung (15 evidenced, 9 skipped, 17 legacy) bleibt historische Closure-Baseline, nicht eine gegenwartsbezogene Null-Fehler-Aussage.
+- Für Claude und Antigravity belegt der Audit Code-/Hook-Verdrahtung und fokussierte Vertragsprüfung, nicht native Live-Durchsetzung; lokal beobachtet wurde nur der Codex-Bootstrap.
+- Release, Push und PO-Abnahme bleiben außerhalb dieses Audit-Berichts.
