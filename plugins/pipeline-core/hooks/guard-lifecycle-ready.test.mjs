@@ -1241,6 +1241,27 @@ test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survive
       ...observation,
       nextAction: { ...observation.nextAction, argv: [argv[0], "plan-runner-permissions", "--root", path] },
     }).exitCode, 2);
+    const plannerArgv = [argv[0], "plan-runner-permissions", "--root", path];
+    const plannerObservation = {
+      ...observation,
+      runnerPermissions: { status: "unavailable" },
+      nextAction: {
+        kind: "command",
+        executable: "node",
+        argv: plannerArgv,
+        mutation: false,
+        requiresConfirmation: false,
+        expected: {
+          schema: "pipeline.settings-allowlist-merge-plan.v1",
+          statuses: ["ready", "no-op", "unrepairable"],
+        },
+      },
+    };
+    assert.equal(run(`node ${plannerArgv.join(" ")}`, plannerObservation).exitCode, 0,
+      "the producer's exact read-only planner remains reachable when no safe merge can be planned");
+    assert.equal(run(`node ${[...plannerArgv, "--activate"].join(" ")}`, plannerObservation).exitCode, 2);
+    assert.equal(run(`node ${plannerArgv.join(" ")}`).exitCode, 2,
+      "an unobserved planner command is never admitted");
     assert.equal(run(`node ${argv.join(" ")}`, {
       ...observation,
       nextAction: { ...observation.nextAction, requiresConfirmation: false },

@@ -4343,9 +4343,10 @@ function isExactObservedInstalledPluginAttestationAction(command, root, dependen
  * NVA-B8-RUNNER-PERMISSIONS: a versioned local plugin may be unable to run its
  * own next installation/recovery action until its four exact runner-permission
  * entries have been merged. The producer already publishes one digest-bound
- * repair action. If the guard's separate ready readback is malformed, admit
- * only that freshly observed action; never a settings planner or a
- * reconstructed settings write.
+ * repair action. If the settings merge cannot safely construct a write, the
+ * same producer instead returns its closed, read-only planner. Admit only
+ * either freshly observed action; never a reconstructed settings write or an
+ * unobserved planner invocation.
  */
 function isExactObservedRunnerPermissionsRepairAction(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
@@ -4386,6 +4387,44 @@ function isExactObservedRunnerPermissionsRepairAction(command, root, dependencie
     && expected.schema === "pipeline.settings-allowlist-merge-apply.v1"
     && Array.isArray(expected.statuses) && expected.statuses.length === 2
     && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op"
+    && words.length === action.argv.length + 1
+    && words[0] === action.executable
+    && action.argv.every((value, index) => words[index + 1] === value);
+}
+
+function isExactObservedRunnerPermissionsPlannerAction(command, root, dependencies = {}) {
+  const words = simpleWords(command, root);
+  if (!words) return false;
+  let observed;
+  try {
+    observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
+      rootDir: root,
+      intent: "session",
+      runner: dependencies.runner,
+    });
+  } catch {
+    return false;
+  }
+  const action = observed?.nextAction;
+  const expected = action?.expected;
+  const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
+  return observed?.schema === "pipeline.project-onboarding.v4"
+    && observed?.status === "projection-drift"
+    && observed?.root === root
+    && observed?.intent === "session"
+    && ["drifted", "pending-runtime-initialization", "unavailable"].includes(observed?.runnerPermissions?.status)
+    && exactKeys(action, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && action.kind === "command" && action.executable === "node"
+    && Array.isArray(action.argv) && action.argv.length === 4 && action.argv.every((value) => typeof value === "string")
+    && action.argv[0] === SETTINGS_ALLOWLIST_MERGE_SCRIPT
+    && action.argv[1] === "plan-runner-permissions"
+    && action.argv[2] === "--root" && action.argv[3] === root
+    && action.mutation === false && action.requiresConfirmation === false
+    && exactKeys(expected, ["schema", "statuses"])
+    && expected.schema === "pipeline.settings-allowlist-merge-plan.v1"
+    && Array.isArray(expected.statuses) && expected.statuses.length === 3
+    && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op" && expected.statuses[2] === "unrepairable"
     && words.length === action.argv.length + 1
     && words[0] === action.executable
     && action.argv.every((value, index) => words[index + 1] === value);
@@ -5048,7 +5087,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && toolName === "Bash"
       && isExactObservedInstalledPluginAttestationAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
     if (exactObservedInstalledPluginAttestationAction) return verdict(0);
-    const exactObservedRunnerPermissionsRepairAction = error instanceof ProjectOnboardingReadyError
+    const exactObservedRunnerPermissionsRecoveryAction = error instanceof ProjectOnboardingReadyError
       // A well-formed projection-drift observation is deliberately a non-ready
       // lifecycle state.  The old invalid-observation-only condition made the
       // exact recovery route below unreachable for the producer's normal
@@ -5060,8 +5099,9 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
         || error.code === "PORG-INVALID-OBSERVATION")
       && error.intent === "session"
       && toolName === "Bash"
-      && isExactObservedRunnerPermissionsRepairAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
-    if (exactObservedRunnerPermissionsRepairAction) return verdict(0);
+      && (isExactObservedRunnerPermissionsRepairAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)
+        || isExactObservedRunnerPermissionsPlannerAction((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies));
+    if (exactObservedRunnerPermissionsRecoveryAction) return verdict(0);
     // NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-
     // and-tmp-fallback.md): a session stuck at `partial` has no route at all today to
     // persist a report of its own stuck state -- the in-root write is refused by this very
