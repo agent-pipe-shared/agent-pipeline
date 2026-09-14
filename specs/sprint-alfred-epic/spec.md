@@ -693,6 +693,64 @@ writer/observer conformance green) + per-issue acceptance walkthrough +
 documentation acceptance; member-issue closing comments and sprint close
 per #108.
 
+### 8.1 E3 — provider-free cross-runner AGY Goldfish dispatch spike
+
+**Purpose and boundary.** E3 adds exactly one production caller, planned as
+`plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs`, between a
+runner-neutral `pipeline.role-dispatch-request.v1` Goldfish packet and
+`invokeAgy`. It is not a second dispatch protocol and it may not call a real
+provider in this package. Every test supplies a fake executable; no test or
+normal E3 invocation authenticates, reads provider credentials, or sends a
+model request.
+
+**Precondition.** A1 has a current measured Antigravity row, A2 has a
+placement row for this caller, A3's protected baseline covers the new host
+and receipt surfaces, and A5 repair verbs are actually PO-authorized and
+CAS-bound. A missing or `unknown` precondition refuses this route; an
+`agy plugins list` result is neither an input nor evidence of plugin loading.
+
+**Caller contract.** The caller accepts only a fully prepared
+`transport: "antigravity"`, `role: "pipeline-core:goldfish-*"` packet and
+passes that unchanged to the existing preflight and `invokeAgy` boundary. It
+binds the exact candidate commit/tree, required-path digests, dispatch id and
+a coordinator-owned unique result destination before its single spawn. A
+child may return bytes only to that isolated destination; duplicate,
+traversal, stale-input, candidate drift, or an occupied result path refuses
+before a spawn. Its normalized terminal receipt retains the dispatch binding,
+observed/requested model identity, launcher/model-call count, and the typed
+AGY result (`AGY-OUTPUT-MALFORMED`, `AGY-MODEL-MISMATCH`, `AGY-TIMEOUT`, or
+typed cancellation). Timeout/cancellation is recorded as an unsuccessful
+dispatch, never converted into success by a partial result; C1 consumes it as
+an interruption receipt only where the C1 emitter is available, otherwise the
+receipt says `unavailable`.
+
+**Measured repository start.** Before a fixture spawn the caller runs a
+repo-rooted discovery/probe that resolves `.agents/plugins.json`, the local
+Pipeline plugin and its Antigravity hook manifest, then captures the
+Antigravity `pipeline-start` marker/handshake emitted by the injected
+executable. The receipt carries the probe input and output digests plus a
+status of `measured | unavailable | refused`. Configuration discovery alone
+is not `measured`; the external CLI's plugin listing is expressly excluded.
+The fixture proves only that this seam observes the marker contract. The
+separate live-pilot gate below is required to assert that a real AGY process
+loaded the plugin or executed native hooks.
+
+**Postcondition.** A green E3 result proves deterministic packet-to-boundary
+behavior and its fake-executable receipt, not Antigravity enforcement,
+sandbox containment, authentication readiness, provider availability, or
+three-runner conformance. It adds no authority: A2 determines the actual
+control placement, A3/A5 protect the new records, and A1 remains the sole
+source of runner-execution truth.
+
+**Fixture floor.** Verify-registered executable fixtures cover: successful
+bound dispatch; malformed JSON; requested/observed model mismatch; timeout;
+explicit cancellation; plugin marker absent or mismatched; and result-path
+collision/traversal. Each failure records its typed code and has zero false
+success receipts. A future live pilot is a distinct PO-authorized task with
+explicit provider scope, model, sandbox expectation, time limit, no-write
+task, output redaction, and signed/read-back evidence; it is not released by
+this spike.
+
 ## 9. Schema registry (new in Alfred)
 
 | Schema id | Owner | Notes |
@@ -707,6 +765,7 @@ per #108.
 | `pipeline.verify-suite-registration.v1` | B2-ii | + invariant/non-overlap |
 | `pipeline.interruption-receipt.v1` / `-registry.v1` | C1 | #103 fields |
 | `pipeline.dispatch-closing-allowance.v1` | C2 | structured handover |
+| `pipeline.cross-runner-dispatch-receipt.v1` | E3 | planned fake-executable receipt; live-pilot evidence is separate |
 | `pipeline.architecture-decision.v1` | D1 | ADR sidecar |
 | `pipeline.architecture-profile.v1` | D2 | + OKF pin fields |
 | `pipeline.module-inventory.v1` | D2 | provisional flag |
@@ -727,6 +786,11 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
 - No secrets/private paths/transcripts in receipts, proposals, or evidence
   (each schema names its sanitization rule); public evidence sanitizes org
   coordinates (#99/#109).
+- E3 runs no live `agy` request in Alfred: the executable is injected and
+  provider-free. Its process sandbox flag and plugin discovery are evidence
+  inputs, never proofs of native containment or hook firing. Any live pilot
+  needs a separately scoped PO approval and must read back its measured start
+  and plugin evidence before it can affect A1/A2 claims.
 - The A1 probe deliberately attempts guard-refused shapes: probe fixtures
   run in disposable fixture repos, never against live protected files; the
   payload-indirection probe writes only to `scratch/`.
@@ -759,6 +823,9 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
   batches registrations per block, made predictable by B2-ii's design).
 - Fixture-driven, injectable adapters throughout (house pattern:
   `_testGitOperations`-style injection); no live-network tests.
+- E3 adds the fixture floor in §8.1 and a direct document/receipt
+  reconciliation check. Its fake executable is the only executable permitted
+  by this work package; a real AGY invocation is a failing test shape.
 - The 21-fixture list of #106, the 14-fixture list of #105, the #101/#102
   lists, **#104's and #109's own fixture lists**, and the four C1 seed
   classes are the minimum fixture inventory; `acceptance.md` maps each to its
@@ -785,6 +852,10 @@ All closed records per §2; all evidence candidate-bound per Nova §2.2.
   (PRD §9.3); E1 freeze artifact committed.
 - **Wave-complete:** each wave's WPs green in Verify + Critic-reviewed with
   documented fail-then-fix cycles; PO-visible wave summary.
+- **E3-complete:** every §8.1 fixture is green on one candidate, the receipt
+  binds the candidate/input/result/probe evidence, and the precondition
+  readback for A1/A2/A3/A5 is current. This does not certify a live runner;
+  only the separately approved pilot can make that claim.
 - **Epic-complete:** PRD §7 list; every S1–S10 evidenced on one exact
   candidate; all member issues + in-scope backlog items closed or
   re-triaged PO-visibly; sprint close comment per #108.

@@ -242,7 +242,7 @@ Goldfish/Critic sessions on any supported runner; hosted projects
   produces a typed refusal or recorded push-boundary debt, never a silent
   pass.
 
-## 4. Scope — five tracks, seventeen work packages
+## 4. Scope — five tracks, eighteen work packages
 
 Track/WP detail, mechanisms, schemas, and file paths: [`spec.md`](spec.md).
 Mapping to issues/backlog: intake docs. Summary:
@@ -372,6 +372,17 @@ dogfood case, end to end.
 - **E2 Integrated qualification.** One exact candidate qualified across all
   member issues plus the two 2026-08-27 incident classes; per-issue closing
   comments; sprint close evidence.
+- **E3 Cross-runner AGY Goldfish dispatch spike (PO-authorized scope
+  addition, provider-free).** A single production caller converts a complete
+  runner-neutral Goldfish dispatch packet into the existing `invokeAgy`
+  boundary. It retains candidate, required-input and coordinator-owned result
+  bindings; isolates each result; preserves typed AGY errors/receipts; and
+  uses an executable, repo-local Antigravity pipeline-start/plugin-discovery
+  measurement rather than infer activation from `agy plugins list`. This
+  package uses injected fake executables only: no authentication, provider
+  request, external model call, or claim of native three-runner enforcement.
+  A separately PO-authorized live pilot, with readback, is the only route that
+  can establish live AGY hook/start behavior.
 
 ### The control loop the tracks form
 
@@ -416,7 +427,9 @@ Follows #108's five stages, concretized:
 5. **Wave 4 (ratchet and blocking):** accepted baselines; net-new blocking;
    D4 adoption demand incl. this repo's dogfood decision; promotion of
    blocking behavior only after fixtures + dogfood calibration.
-6. **Wave 5:** E2 qualification, member-issue closure, sprint close.
+6. **Wave 5:** E3's provider-free dispatch seam after A1/A2/A3/A5 are
+   remedied; then E2 qualification, member-issue closure, sprint close. E3
+   cannot promote runner conformance or replace its prerequisite controls.
 
 **Declared sequencing deviation (vs. #108 stage 1):** #108 places #99's
 decision authority in stage 1 so #104/#106 consume accepted rather than
@@ -471,6 +484,13 @@ the PO's reusable dividing line — *test- and evidence-discipline is Alfred;
 product and onboarding experience is Nightwing*. Fixing the Claude Code
 subagent-hook divergence upstream is reported, not owned, here.
 
+E3 is an explicit, narrow exception to the otherwise runner-neutral scope:
+it owns the dispatch seam and fixture proof, not a runner-specific policy
+fork. It excludes a real `agy` model launch, login/authentication handling,
+provider credential use, and any assertion that `--sandbox` or a discovered
+plugin proves native guard execution. Those remain outside Alfred until the
+separately PO-authorized live pilot reads them back as measured evidence.
+
 ## 7. Acceptance requirements (PRD level)
 
 The epic is acceptable when — testable, each backed by fixtures/evidence
@@ -494,15 +514,21 @@ named in `spec.md` §12 and `acceptance.md`:
 5. Report-only phases produce at least the #103-mandated two-week dogfood
    baseline before any blocking promotion; no blocking behavior lands
    without its fixture set green.
-6. Documentation acceptance per member issue (user + reference docs verified
+6. E3 has an injected-executable suite proving a runner-neutral Goldfish
+   packet reaches the AGY boundary with candidate/input/result isolation and
+   typed success, malformed-output, model-mismatch, timeout, and cancellation
+   outcomes; it records the repo-local plugin/pipeline-start probe. This is
+   fixture evidence only, never live-provider or native-three-runner proof.
+   A live pilot needs separate PO authorization and readback.
+7. Documentation acceptance per member issue (user + reference docs verified
    against the exact accepted candidate) — carried as-is from the issues.
-7. **Architectural conformance is reviewed semantically, not clerically.**
+8. **Architectural conformance is reviewed semantically, not clerically.**
    The Critic verifies conformance to the applicable decisions and active
    exceptions rather than the presence of decision files; the fixture set
    includes a token ADR that does not match its implementation and must be
    caught (#99 §7). Material architecture changed without a decision,
    supersession, or exception fails closed before final acceptance.
-8. **The doctrine's own promises are checked.** Each of the nine declared
+9. **The doctrine's own promises are checked.** Each of the nine declared
    property classes has at least one first-increment evidence artifact, and
    the declared↔evaluated mapping table is complete in both directions — no
    declared property without an evaluation route, no evaluated class without
@@ -527,7 +553,7 @@ named in `spec.md` §12 and `acceptance.md`:
   if the sprint must close earlier, threshold-dependent D2/B1 calibration
   ships report-only with the window's completion as recorded debt — the
   #103 rule (no thresholds from a short baseline) is honored, not waived.
-- **A-5:** Epic scale. 17 WPs across 5 tracks is large; the design keeps
+- **A-5:** Epic scale. 18 WPs across 5 tracks is large; the design keeps
   C2's range-mode tail and parts of B2 explicitly droppable, and every wave
   ends PO-visible, so scope can be cut at wave boundaries without breaking
   the integrated outcome. *This is the PRD's honest statement that Alfred is
