@@ -3,14 +3,27 @@ schema: pipeline.backlog-item.v1
 id: pipeline.sed-regex-address-is-misread-as-an-absolute-path
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 0f1edf8ad859516e5abc429c7fc11c6adcb8b774
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nightwing
 source: "Live refusal in an Elephant session, 2026-08-27, isolated to a root cause by controlled probe in the same session."
 done_when: "contains plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs sed -i '/^alpha/d' scratch/sedprobe.txt"
 ---
 
 # A `sed` regex address is misread as an absolute path, refusing an in-root edit as a cross-repository mutation
+
+## Closure
+
+Closed by `0f1edf8ad859516e5abc429c7fc11c6adcb8b774`.
+`sedInPlaceFileOperands()` now excludes Sed's program operand (including an
+address beginning with `/`) before the cross-repository classifier resolves
+file targets. The regression proves both in-root variants are admitted and
+actually edit their scratch file, while an external file operand remains
+refused.
 
 ## Description
 
