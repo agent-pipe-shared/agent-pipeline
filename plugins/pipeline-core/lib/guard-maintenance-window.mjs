@@ -205,6 +205,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // because GMWKC01 is one non-decomposable transitive-closure assertion over the whole
   // array, not a per-edge-type check. Neither import is spawn-related.
   "plugins/pipeline-core/lib/protected-test-paths.mjs",
+  "plugins/pipeline-core/lib/protected-baseline.mjs",
   // publication-authority.mjs/publication-bundle.mjs/publication-bundle-v2.mjs/
   // publication-capability-preflight.mjs/review-economy.mjs below: transitive closure of
   // scripts/pipeline-state.mjs (one of the two spawn-edge additions), not spawn edges
