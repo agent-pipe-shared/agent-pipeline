@@ -192,14 +192,14 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/nova-b.md",
-      "sha256": "d46c19896b26c34e878243a155ae691a9279e09ed3c6334e579379a1ce1ff622",
+      "sha256": "25a6b32e948d7505a434bd7fa5d763d2b0db4fd14379518c779ef3dfdba08a1f",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain",
       "amendment": {
-        "at": "2026-09-13T11:53:44.032Z",
+        "at": "2026-09-14T05:36:06.973Z",
         "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
-        "previousSha256": "65de00a13ee056e8d82bcf1cb0542cc98616e59f32dfc99be2649ade4ad2f712"
+        "previousSha256": "d46c19896b26c34e878243a155ae691a9279e09ed3c6334e579379a1ce1ff622"
       }
     },
     {
