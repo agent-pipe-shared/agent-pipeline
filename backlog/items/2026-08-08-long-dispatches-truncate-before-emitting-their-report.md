@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.long-dispatches-truncate-before-emitting-their-report
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6b8bb0585d4cdfd6838b372f927e5e54394e3dec
+closure_evidence: specs/sprint-alfred-epic/evidence/c2-economics-operations.md
 sprint: alfred
 due: 2026-08-22
 source: "Three occurrences in one unattended block, 2026-08-07/08: two Goldfish dispatches and one Critic dispatch ended mid-sentence with the work done and no report."
@@ -633,3 +637,10 @@ budget to 85 and was cut off mid-sentence by the harness `maxTurns` cliff with
 no report and no closing handover. Its work was recoverable only because the
 dispatcher inspected the working tree directly. That is exactly the detection
 gap this item describes, observed rather than hypothesised.
+
+### Update, 2026-09-14 — resolved by Dispatch Economics & Operations (WP-C2)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Established closing allowance protocol (`schemas/pipeline.dispatch-closing-allowance.v1.json`) and integrated support in `plugins/pipeline-core/lib/dispatch-record.mjs` and `templates/prompts/goldfish-task.md`. Dispatches reserve budget (tokensRemaining, turnsRemaining, phase) to guarantee final reporting and terminal record emission before context exhaustion.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/c2-economics-operations.md`
+- **Date:** 2026-09-14

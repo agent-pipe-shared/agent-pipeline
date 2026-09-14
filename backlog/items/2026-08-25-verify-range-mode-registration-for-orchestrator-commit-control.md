@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-range-mode-registration-for-orchestrator-commit-control
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-25
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6b8bb0585d4cdfd6838b372f927e5e54394e3dec
+closure_evidence: specs/sprint-alfred-epic/evidence/c2-economics-operations.md
 sprint: alfred
 done_when: contains harness/scripts/verify.mjs check-commit-type-range.mjs
 source: "Split out of backlog/items/2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md at closure, 2026-08-25 -- Part B of that item's 2026-08-19 'Direction 1 design' section, fully designed but never built and never required to consider that item's own stated problem closed."
@@ -64,3 +68,10 @@ finding against a sibling item — do not repeat it here).
   top of an already-working commit-time control) — pick up when a session
   has spare bounded-dispatch capacity and a TP-3 ceremony is convenient to
   batch with other work.
+
+### Update, 2026-09-14 — resolved by Dispatch Economics & Operations (WP-C2)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Implemented `plugins/pipeline-core/scripts/check-commit-type-range.mjs` to audit Conventional Commit types over git revisions between base and HEAD. Registered in `harness/verify-suites.json` (`check-commit-type-range` and `check-commit-type-range-tests`) and product capability inventory.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/c2-economics-operations.md`
+- **Date:** 2026-09-14

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6b8bb0585d4cdfd6838b372f927e5e54394e3dec
+closure_evidence: specs/sprint-alfred-epic/evidence/c2-economics-operations.md
 sprint: alfred
 source: "Measured 2026-08-27 in the Alfred clone (fresh clone of the Nova line): each missing machine-local artifact surfaced as an isolated refusal at a different lifecycle point, none at bootstrap."
 done_when: manual
@@ -69,3 +73,10 @@ practice).
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Update, 2026-09-14 — resolved by Dispatch Economics & Operations (WP-C2)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Created clone provisioning report schema (`schemas/pipeline.clone-provisioning-report.v1.json`) and audit script `plugins/pipeline-core/scripts/check-clone-provisioning.mjs` verifying pre-push hooks, PO profile receipts, and private state directories. Integrated into `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` under `cloneProvisioning` key.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/c2-economics-operations.md`
+- **Date:** 2026-09-14
