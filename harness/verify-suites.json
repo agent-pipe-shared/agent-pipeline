@@ -2,6 +2,10 @@
   "schema": "pipeline.verify-suites.v1",
   "suites": [
     {
+      "name": "architecture-adoption-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-adoption.test.mjs"
+    },
+    {
       "name": "architecture-baseline-tests",
       "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs"
     },

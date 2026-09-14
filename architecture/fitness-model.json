@@ -22,7 +22,8 @@
       "verificationEntryPoints": [
         "plugins/pipeline-core/scripts/module-inventory.test.mjs",
         "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
-        "plugins/pipeline-core/scripts/architecture-fitness.test.mjs"
+        "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+        "plugins/pipeline-core/scripts/architecture-adoption.test.mjs"
       ]
     },
     {
