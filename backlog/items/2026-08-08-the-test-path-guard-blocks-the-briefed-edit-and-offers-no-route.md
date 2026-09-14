@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6d6f5b34c546ed7b70dddd79f27e3fcecbcbd9c5
+closure_evidence: specs/sprint-alfred-epic/evidence/b2-guard-override-trust.md
 created: 2026-08-08
 sprint: alfred
 due: 2026-08-15
@@ -131,3 +135,10 @@ amendment) — SECURITY/GUARDRAIL-class design work, matches Alfred's scope
 directly. The two same-day workarounds it produced (docs/pending-verify-
 registrations.md handovers) remain a live cost until this lands, but the
 work itself is a deliberate cross-cutting design, not a same-session patch.
+
+### Update, 2026-09-14 — resolved by WP-B2-1 (Spec §5.2 item 1, AC-11)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Implemented briefed test-change authorization (`pipeline.briefed-test-authorization.v1`) in `plugins/pipeline-core/lib/human-guard-override.mjs` binding `{ targetPath, briefingDigest, expiry }`. Wired admission into `plugins/pipeline-core/hooks/guard-testpath.mjs` matching target path and briefing digest before HGO consumption. Refusal guidance clearly distinguishes `route-available-via-briefed-authorization` for eligible test files from `no-route-for-this-target` for non-test targets. Verified by unit tests in `guard-testpath.test.mjs` (TP15..TP18) and `human-guard-override.test.mjs`.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/b2-guard-override-trust.md`
+- **Date:** 2026-09-14
