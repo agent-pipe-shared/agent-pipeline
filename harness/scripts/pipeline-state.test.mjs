@@ -854,6 +854,10 @@ function seedSubprocessPoGateAuthority(dir, planPath) {
   const runtimePath = join(dir, ".claude", "pipeline.yaml");
   if (!existsSync(sourcePath)) {
     writeFileSync(sourcePath, "schema: pipeline.user.v1\nlanguage:\n  human_facing: de\n  agent_facing: en\n");
+    const staged = spawnSync("git", ["add", "--", "pipeline.user.yaml"], { cwd: dir, encoding: "utf8" });
+    if (staged.status !== 0) throw new Error(`fixture policy staging failed: ${staged.stderr}`);
+    const committed = spawnSync("git", ["commit", "-qm", "fixture: add pipeline policy source", "--", "pipeline.user.yaml"], { cwd: dir, encoding: "utf8" });
+    if (committed.status !== 0) throw new Error(`fixture policy commit failed: ${committed.stderr}`);
   }
   if (!existsSync(runtimePath)) {
     mkdirSync(join(dir, ".claude"), { recursive: true });
