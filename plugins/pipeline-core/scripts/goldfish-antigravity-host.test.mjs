@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { AGY_ERROR_TAXONOMY } from "../lib/antigravity-execution-host.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
-import { CROSS_RUNNER_DISPATCH_RECEIPT_SCHEMA, E3_CODES, dispatchGoldfishToAntigravity } from "./goldfish-antigravity-host.mjs";
+import { CROSS_RUNNER_DISPATCH_RECEIPT_SCHEMA, E3_CODES, dispatchGoldfishToAntigravity, measureAntigravityPipelineStart } from "./goldfish-antigravity-host.mjs";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const prompt = `## Briefing
@@ -29,6 +29,26 @@ Model: gemini-3.8-flash-medium; effort medium; Ruleset-SHA: fixture.
 - **Tool budget (TB-09, hard cap, first-class field):** ≤40 tool uses.`;
 const hex = (value = "a") => value.repeat(64);
 const hostScript = fileURLToPath(new URL("./goldfish-antigravity-host.mjs", import.meta.url));
+
+function antigravityManifest() {
+  return {
+    "pipeline-core": {
+      enabled: true,
+      PreToolUse: [{
+        matcher: "run_command|write_to_file|replace_file_content|invoke_subagent",
+        hooks: [
+          { type: "command", command: "node hooks/antigravity-slicing-hint.mjs observe", timeout: 3 },
+          { type: "command", command: "node hooks/antigravity-pretool-guard.mjs", timeout: 30 },
+        ],
+      }],
+      Stop: [{ type: "command", command: "node hooks/antigravity-stop-hook.mjs", timeout: 15 }],
+      PreInvocation: [
+        { type: "command", command: "node hooks/antigravity-slicing-hint.mjs deliver", timeout: 3 },
+        { type: "command", command: "node hooks/antigravity-start-hint.mjs", timeout: 5 },
+      ],
+    },
+  };
+}
 
 const mock = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
@@ -59,7 +79,7 @@ function fixture() {
   mkdirSync(join(root, "results"));
   writeFileSync(join(root, ".agents", "plugins.json"), JSON.stringify({ entries: [{ path: "plugins/pipeline-core" }] }));
   writeFileSync(join(root, "plugins", "pipeline-core", "plugin.json"), JSON.stringify({ version: "fixture-v1" }));
-  writeFileSync(join(root, "plugins", "pipeline-core", "hooks.json"), JSON.stringify({ hooks: {} }));
+  writeFileSync(join(root, "plugins", "pipeline-core", "hooks.json"), JSON.stringify(antigravityManifest()));
   writeFileSync(join(root, "plugins", "pipeline-core", "protected-baseline.json"), JSON.stringify({ entries: [
     { pathPattern: "plugins/pipeline-core/scripts/goldfish-antigravity-host\\.mjs$" },
     { pathPattern: "schemas/pipeline\\.cross-runner-dispatch-receipt\\.v1\\.json$" },
@@ -103,6 +123,27 @@ function request(value, packetValue, extra = {}) {
   return { root: value.root, resultRoot: value.root, executable: value.executable, model: "gemini-3.8-flash-medium", effort: "medium", packet: packetValue, env: { ...process.env, E3_LOG: value.log }, timeoutMs: 500, ...extra };
 }
 function calls(value) { return existsSync(value.log) ? readFileSync(value.log, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse) : []; }
+
+await withFixture(async (value) => {
+  const result = measureAntigravityPipelineStart({ root: value.root, executable: value.executable, env: { ...process.env, E3_LOG: value.log } });
+  assert.equal(result.status, "measured");
+  assert.equal(result.code, "E3-PIPELINE-MEASURED");
+  assert.equal(calls(value).length, 1, "live Antigravity-shaped manifest is discovered before probing");
+});
+
+for (const malformedManifest of [
+  { hooks: {} },
+  { "pipeline-core": { enabled: true, PreToolUse: [], Stop: [], PreInvocation: [] } },
+]) {
+  await withFixture(async (value) => {
+    writeFileSync(join(value.root, "plugins", "pipeline-core", "hooks.json"), JSON.stringify(malformedManifest));
+    const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
+    assert.equal(result.status, "unavailable");
+    assert.equal(result.code, E3_CODES.PIPELINE_DISCOVERY);
+    assert.equal(result.modelCalls, 0);
+    assert.equal(calls(value).length, 0, "unsupported manifests fail before any probe or model call");
+  });
+}
 
 await withFixture(async (value) => {
   const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
@@ -199,4 +240,4 @@ await withFixture(async (value) => {
   assert.equal(calls(value).length, 0);
 });
 
-process.stdout.write("goldfish-antigravity-host tests: 10 passed\n");
+process.stdout.write("goldfish-antigravity-host tests: 13 passed\n");
