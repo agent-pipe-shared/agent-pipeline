@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "afb01d5f133e617bd24d4139ada3231310df92ce8164972ac1e98844be6db5d5"
+    "transitionHead": "11273dfee6f7caf022e9d79bde6cfb7aacf0c6d9bc242913cd1ea55b0231fca3"
   },
   "counts": {
-    "open": 82,
+    "open": 81,
     "in_progress": 1,
-    "closed": 572,
+    "closed": 573,
     "rejected": 3,
     "deferred": 11
   },
@@ -3113,14 +3113,18 @@
     },
     {
       "id": "pipeline.git-commit-multiple-message-trailers-are-misparsed",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-14",
       "source": "Observed while committing the cross-runner onboarding-recovery hotfix.",
       "deferred": false,
       "due": "2026-09-30",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "0605b19f7e9db2fa84ca19a6f4078c8cedd50df7",
+      "closureEvidence": "plugins/pipeline-core/lib/commit-message-policy.test.mjs"
     },
     {
       "id": "pipeline.git-identity-ask-step-unreachable-through-live-cli-path",

@@ -4,6 +4,10 @@ id: pipeline.git-commit-multiple-message-trailers-are-misparsed
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 0605b19f7e9db2fa84ca19a6f4078c8cedd50df7
+closure_evidence: plugins/pipeline-core/lib/commit-message-policy.test.mjs
 created: 2026-09-14
 due: 2026-09-30
 sprint: nova-b
