@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.adoption-state.v1",
+  "title": "Architecture Adoption State (pipeline.adoption-state.v1)",
+  "description": "Schema for architecture adoption state (architecture/adoption-state.json) capturing state, scope, review/expiry dates, rationale, coverage class, and confidence (WP-D4, Issue #109, AC-9, AC-17, Spec §7.4, Doctrine §5 & §6).",
+  "type": "object",
+  "required": [
+    "schema",
+    "state"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": [
+        "pipeline.adoption-state.v1"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "adoption-required",
+        "approved-scoped",
+        "deferred",
+        "partial"
+      ]
+    },
+    "scope": {
+      "type": [
+        "string",
+        "array",
+        "null"
+      ]
+    },
+    "decidedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expiresAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reviewDate": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "decisionRef": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "rationale": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "coverageClass": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "confidence": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

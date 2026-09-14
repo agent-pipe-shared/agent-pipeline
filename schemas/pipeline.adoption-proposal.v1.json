@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.adoption-proposal.v1",
+  "title": "Architecture Adoption Proposal (pipeline.adoption-proposal.v1)",
+  "description": "Schema for staged architecture adoption proposals capturing staged roadmap, effort, coverage class, and confidence (WP-D4, Issue #109, AC-9, Spec §7.4, Doctrine §5 & §6).",
+  "type": "object",
+  "required": [
+    "schema",
+    "generatedAt",
+    "coverageClass",
+    "confidence",
+    "inventorySummary",
+    "stages",
+    "whatIsNotProposed",
+    "deterministicPassSafe"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": [
+        "pipeline.adoption-proposal.v1"
+      ]
+    },
+    "generatedAt": {
+      "type": "string"
+    },
+    "coverageClass": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "string"
+    },
+    "inventorySummary": {
+      "type": "object",
+      "required": [
+        "moduleCount",
+        "candidateModules",
+        "coverageGaps",
+        "unknownCoverageShare"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "moduleCount": {
+          "type": "number"
+        },
+        "candidateModules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "uncoveredPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "coverageGaps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unknownCoverageShare": {
+          "type": "number"
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "stage",
+          "name",
+          "description",
+          "primaryDeliverables",
+          "effort",
+          "coverageClass",
+          "confidence"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "stage": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "primaryDeliverables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "effort": {
+            "type": "object",
+            "required": [
+              "units",
+              "status"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "units": {
+                "type": [
+                  "number",
+                  "string"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "measured",
+                  "estimated",
+                  "unavailable"
+                ]
+              }
+            }
+          },
+          "coverageClass": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "contracts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "priority",
+                "status"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "whatIsNotProposed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "estimatedTotalEffort": {
+      "type": "object",
+      "required": [
+        "units",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "units": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "decisionOptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "deterministicPassSafe": {
+      "type": "boolean"
+    }
+  }
+}

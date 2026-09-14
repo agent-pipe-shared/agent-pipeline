@@ -12,6 +12,7 @@ publicContracts:
   - plugins/pipeline-core/scripts/module-inventory.mjs
   - plugins/pipeline-core/scripts/architecture-remedy.mjs
   - plugins/pipeline-core/scripts/architecture-fitness.mjs
+  - plugins/pipeline-core/scripts/architecture-adoption.mjs
 allowedDependencies:
   - schemas
 authorityEffects:
@@ -21,6 +22,7 @@ verificationEntryPoints:
   - plugins/pipeline-core/scripts/module-inventory.test.mjs
   - plugins/pipeline-core/scripts/architecture-remedy.test.mjs
   - plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+  - plugins/pipeline-core/scripts/architecture-adoption.test.mjs
 adrReferences:
   - ADR-0063
   - ADR-0099
@@ -36,8 +38,10 @@ Core agent pipeline engine, hooks, lifecycle management, guards, and CLI scripts
 - `plugins/pipeline-core/scripts/module-inventory.mjs`: Architecture map bundle loading, validation, and module resolution.
 - `plugins/pipeline-core/scripts/architecture-remedy.mjs`: Architecture finding analysis and conformant remedy generation.
 - `plugins/pipeline-core/scripts/architecture-fitness.mjs`: Architecture fitness evaluator and baseline ratchet store.
+- `plugins/pipeline-core/scripts/architecture-adoption.mjs`: Architecture adoption demand, proposal generator, and state management.
 
 ## Verification
 - `node --test plugins/pipeline-core/scripts/module-inventory.test.mjs`
 - `node --test plugins/pipeline-core/scripts/architecture-remedy.test.mjs`
 - `node --test plugins/pipeline-core/scripts/architecture-fitness.test.mjs`
+- `node --test plugins/pipeline-core/scripts/architecture-adoption.test.mjs`

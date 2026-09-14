@@ -14,6 +14,8 @@ publicContracts:
   - schemas/pipeline.architecture-decision.v1.json
   - schemas/pipeline.fitness-evidence.v1.json
   - schemas/pipeline.architecture-baseline.v1.json
+  - schemas/pipeline.adoption-state.v1.json
+  - schemas/pipeline.adoption-proposal.v1.json
 allowedDependencies: []
 authorityEffects:
   - schema-validation-contract
@@ -36,6 +38,8 @@ Canonical JSON schemas defining contracts, profiles, state, and receipts.
 - `schemas/pipeline.architecture-decision.v1.json`: Architecture decision record schema.
 - `schemas/pipeline.fitness-evidence.v1.json`: Fitness evaluation evidence schema.
 - `schemas/pipeline.architecture-baseline.v1.json`: Architecture baseline and ratchet store schema.
+- `schemas/pipeline.adoption-state.v1.json`: Architecture adoption state schema.
+- `schemas/pipeline.adoption-proposal.v1.json`: Architecture staged adoption proposal schema.
 
 ## Verification
 - `node --test plugins/pipeline-core/scripts/module-inventory.test.mjs`

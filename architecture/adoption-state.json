@@ -1,0 +1,13 @@
+{
+  "schema": "pipeline.adoption-state.v1",
+  "state": "approved-scoped",
+  "scope": "architecture/map/",
+  "decidedAt": "2026-09-14T07:44:00.000Z",
+  "expiresAt": null,
+  "reviewDate": null,
+  "decisionRef": "PO-DECISION-ALFRED-D4",
+  "rationale": "Sprint Alfred full dogfood adoption covering core modules: pipeline-core, harness, schemas, backlog",
+  "coverageClass": "evaluated",
+  "confidence": "measured",
+  "by": "PO"
+}

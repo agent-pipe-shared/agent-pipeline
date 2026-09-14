@@ -204,6 +204,7 @@
         "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-coordinator-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-pretool-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-adoption-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-baseline-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-fitness-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-remedy-tests",
@@ -665,6 +666,7 @@
         "plugins/pipeline-core/lib/consumer-baseline-verify.mjs",
         "plugins/pipeline-core/lib/consumer-verify.mjs",
         "plugins/pipeline-core/lib/verify-selection.mjs",
+        "plugins/pipeline-core/scripts/architecture-adoption.mjs",
         "plugins/pipeline-core/scripts/architecture-fitness.mjs",
         "plugins/pipeline-core/scripts/consumer-verify-check.mjs",
         "plugins/pipeline-core/scripts/verify-evidence-producer.mjs"
@@ -695,6 +697,7 @@
         "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
         "plugins/pipeline-core/lib/threat-model.test.mjs",
         "plugins/pipeline-core/lib/verify-selection.test.mjs",
+        "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
         "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
         "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
         "plugins/pipeline-core/scripts/module-inventory.test.mjs",
