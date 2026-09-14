@@ -8,7 +8,7 @@
  * identical predicate instead of defining its own and drifting from it -- the two guards
  * previously disagreed on this exact write (guard-lifecycle-ready.mjs admitted it,
  * guard-gate-strength.mjs refused it as GS-15), deadlocking the greenfield onboarding happy
- * path: the PO's `po-plan-acknowledged` marker could never actually be written.
+ * path: an agent had no sanctioned way to author/review the staging prose.
  *
  * `isBootstrapBindingStagingAuthoringWrite` is the exact shape/tool/path predicate, moved
  * VERBATIM in behaviour from guard-lifecycle-ready.mjs.
@@ -64,8 +64,9 @@ export function isBootstrapAcknowledgementMarkerMutation(input) {
  * `bootstrap-binding-required` (checkpoint transactionState "generated") has a freshly
  * generated, explicitly unreviewed staging PRD/spec (SSa.4's own table: "staging is
  * explicitly unbound, freely regenerable") that must be authored/reviewed and marked
- * `po-plan-acknowledged` before `bootstrap-bind-apply` can bind it -- exactly the design's
- * own intended review step. Narrow by construction, exactly like every sibling admission
+ * through the dedicated acknowledgement writer before `bootstrap-bind-apply` can bind it.
+ * The authoring window itself never admits that authority marker. Narrow by construction,
+ * exactly like every sibling admission
  * this predicate was copied from: EXACTLY the two staging targets `intake-generate-apply`
  * itself writes that are meant to be hand-authored before binding -- `prd_<featureId>.md`
  * (featureId matched against INTAKE_FEATURE_ID_PATTERN, the exact shape

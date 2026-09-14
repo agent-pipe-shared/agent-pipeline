@@ -3693,16 +3693,16 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       };
     }
     const scriptPath = fileURLToPath(import.meta.url);
-    // New onboarding repositories carry a committed, repository-wide human
-    // approval policy.  Its bootstrap acknowledgement is the one human
-    // decision over the exact PRD/spec; do not ask the PO to approve those
-    // bytes a second time after the mechanical submit/present steps.  In
-    // signature mode the receipt re-verifies the detached proof; in chat mode
-    // it re-verifies the explicit chat-policy receipt.  A stale/missing receipt
-    // fails closed rather than silently regressing to `--by` attribution.
+    // A committed repository-wide human approval policy owns plan approval as
+    // well as push approval.  Its acknowledgement is the one human decision
+    // over the exact PRD/spec; in signature mode the receipt re-verifies the
+    // detached proof, and in chat mode it re-verifies the explicit chat
+    // receipt.  Do not let an older state without the historical bootstrap
+    // flag reopen `approve-plan --by`: that was the signature-mode bypass
+    // observed in a fresh Antigravity project.
     let humanMode;
     try { humanMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn }); } catch { humanMode = null; }
-    if (state.bootstrapAcknowledgementRequired === true && humanMode?.scope === "global") {
+    if (humanMode?.scope === "global") {
       let acknowledgement;
       try {
         acknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
@@ -8787,13 +8787,17 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedSubmissionSha256 = lifecycle.submissionSha256;
       const approvalMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn });
-      const usesSharedPolicy = base.bootstrapAcknowledgementRequired === true && approvalMode?.scope === "global";
+      // The global policy is authoritative even for states created before
+      // bootstrapAcknowledgementRequired existed.  Otherwise an old-shaped
+      // state in a signature repository could accept `--by` and bypass the
+      // signed PRD/Spec acknowledgement entirely.
+      const usesSharedPolicy = approvalMode?.scope === "global";
       let by = approvalFlags.by;
       const receiptFlag = approvalFlags["bootstrap-acknowledgement-receipt"];
-      // A coordinator-sourced acknowledged PRD has exactly one policy-selected
-      // human decision. This applies to global chat as well as signature:
-      // allowing chat to fall through to legacy `--by` would let an agent skip
-      // the acknowledgement receipt entirely after binding.
+      // A global human-approval policy has exactly one policy-selected human
+      // decision. This applies to global chat as well as signature: allowing
+      // either posture to fall through to legacy `--by` would let an agent
+      // skip the acknowledgement receipt entirely after binding.
       if (usesSharedPolicy) {
         if (typeof receiptFlag !== "string" || approvalFlags.by !== undefined) {
           console.error("Error: approve-plan under the shared human-approval policy requires exactly the receipt returned by inspection; --by attribution is not a substitute for the configured human gate.");

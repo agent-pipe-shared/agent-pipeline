@@ -406,7 +406,7 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     // proves its bounded authoring window and returns only the signature
     // planner; it never fabricates the marker or a binding approval.
     assert.notEqual(postAuthoring.status, "ready");
-    nativeDenial(
+    const markerDenial = nativeDenial(
       runNativeCodexPatchGuard(
         created.root,
         [
@@ -418,7 +418,12 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
         ].join("\n"),
       ),
       "generated checkpoint acknowledgement-marker patch",
-      "GUARD-LIFECYCLE-NOT-READY",
+      "GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY",
+    );
+    assert.doesNotMatch(
+      markerDenial.hookSpecificOutput?.permissionDecisionReason ?? "",
+      /Human override available/u,
+      JSON.stringify(markerDenial),
     );
     nativeDenial(
       runNativeCodexPatchGuard(
@@ -439,6 +444,7 @@ function nativeDenial(result, label, expectedCode) {
   const decision = JSON.parse(result.stdout);
   assert.equal(decision.hookSpecificOutput?.permissionDecision, "deny", `${label}: ${result.stdout}`);
   assert.match(decision.hookSpecificOutput?.permissionDecisionReason ?? "", new RegExp(expectedCode, "u"), `${label}: ${result.stdout}`);
+  return decision;
 }
 
 check("a generated checkpoint native patch cannot use a scratch alias to author product code before plan approval", () => {

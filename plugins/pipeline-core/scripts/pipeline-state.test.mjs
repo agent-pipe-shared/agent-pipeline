@@ -1084,9 +1084,9 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
     "the default signature posture must not acquire a chat-attribution record");
 }
 
-// A plan approval has no terminal prompt of its own, but it is still a human
-// gate: the committed global selection must be recorded beside its closed v2
-// approval envelope without making a cryptographic or host-attested claim.
+// A global chat selection is still a shared human gate.  It does not turn a
+// later `--by` into approval: the only admissible route is its earlier,
+// plan-bound chat acknowledgement receipt (covered below).
 {
   const featureId = "global-chat-plan-approval";
   const planPath = `specs/${featureId}/prd_${featureId}.md`;
@@ -1095,14 +1095,10 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   commitGlobalHumanApproval(root, "chat");
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
   assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps)).result, 0);
-  assert.equal(capturedStderr(() => run(["approve-plan", "--by", "PO"], deps)).result, 0);
+  assert.equal(capturedStderr(() => run(["approve-plan", "--by", "PO"], deps)).result, 2);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-  assert.equal(state.planApproved, true);
-  assert.deepEqual(state.planApprovalAttribution, {
-    mode: "chat-attributed-unattested",
-    kind: "plan",
-    by: "PO",
-  });
+  assert.equal(state.planApproved, false);
+  assert.equal(state.planApprovalAttribution, undefined);
 }
 
 // NVA-R22-PLANSHOWN Scenario 5: approve-plan refuses when present-plan was
@@ -1355,9 +1351,6 @@ function awaitingApprovalFixture() {
 // receipt consumption action and must reject an attempt to regress to --by.
 {
   const { root, deps } = awaitingApprovalFixture();
-  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-  state.bootstrapAcknowledgementRequired = true;
-  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
   const signatureDeps = {
     ...deps,
     readHumanApprovalMode: () => ({ mode: "signature", source: "pipeline.user.yaml", key: "human_approval", scope: "global" }),
@@ -1385,9 +1378,6 @@ function awaitingApprovalFixture() {
 // path after binding.
 {
   const { root, deps } = awaitingApprovalFixture();
-  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-  state.bootstrapAcknowledgementRequired = true;
-  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
   const receiptPath = "scratch/bootstrap-plan-acknowledgement-receipt-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.json";
   const chatDeps = {
     ...deps,

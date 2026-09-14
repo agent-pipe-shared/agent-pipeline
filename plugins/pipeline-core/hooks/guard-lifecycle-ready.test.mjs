@@ -377,6 +377,22 @@ test("exact session readiness allows the governed project write and threads the 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("a direct PRD acknowledgement marker write is refused even when readiness is otherwise exact", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const input of [
+      { tool_name: "Edit", tool_input: { file_path: "specs/onboarding-x/prd_onboarding-x.md", new_string: "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->" } },
+      { tool_name: "Write", tool_input: { file_path: "specs/onboarding-x/prd_onboarding-x.md", content: "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->" } },
+      { tool_name: "Edit", tool_input: { file_path: "specs/onboarding-x/prd_onboarding-x.md", patchContainsAcknowledgementMarker: true } },
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, { projectDir: path, requireProjectOnboardingReadyFn: readyStub });
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, /GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("direct State edits remain blocked even when session readiness is exact", () => {
   const path = root();
   try {
@@ -1440,6 +1456,8 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
   try {
     for (const command of [
       "rg -n -S lifecycle plugins 2>/dev/null | head -n 280",
+      "rg -n -S lifecycle plugins 2>/dev/null | tail -n 280",
+      "rg -n -S lifecycle plugins | tail -40",
       "rg --files --hidden --max-depth 3 . | head -n 500",
       "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
       "rg --files plugins/pipeline-core harness | rg 'verify|journal'",
@@ -1461,7 +1479,10 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg -n lifecycle . | head -n 0",
       "rg -n lifecycle . | head -n 050",
       "rg -n lifecycle . | head -n 501",
+      "rg -n lifecycle . | tail -n 0",
+      "rg -n lifecycle . | tail -n 501",
       "rg -n lifecycle . 2>diagnostic.log | head -n 20",
+      "rg -n lifecycle . | tail -n 20 > diagnostic.log",
       "rg -n lifecycle . | tee output",
       "rg -n lifecycle . | head -n 20 | wc -l",
       "rg --pre worker lifecycle . | rg guard",
@@ -4272,7 +4293,7 @@ test("NVA-BL-INTAKEBIND-1: bootstrap-binding-required admits exactly the staging
     ]) {
       const result = evaluateLifecycleReadyGuard(input, bindingDeps);
       assert.equal(result.exitCode, 2, `marker transition:${input.tool_name}`);
-      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+      assert.match(result.stderr, /GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY/u);
     }
 
     // AC-2: design-input.md is NEVER admitted -- it must stay an immutable verbatim capture.

@@ -11,7 +11,7 @@
  * the real nested-process apply transactions.
  */
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";
+import { createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -46,6 +46,7 @@ import { ProjectOnboardingReadyError } from "../lib/project-onboarding-ready-gat
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
+import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import {
   CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
   CODEX_HOST_REPOSITORY_INIT_INTENT,
@@ -247,11 +248,17 @@ function runOnboardingInitActionInProcess(action, path, env) {
     const value = (flag) => args[args.indexOf(flag) + 1];
     const directory = value("--directory");
     const humanName = value("--human-name");
-    const publicKeySha256 = sha256(`fixture public key:${directory}`);
+    const existingKey = value("--existing-key");
+    const publicKey = createPublicKey(readFileSync(existingKey, "utf8"))
+      .export({ format: "pem", type: "spki" });
+    const publicKeySha256 = sha256(publicKey);
     mkdirSync(directory, { recursive: true });
-    writeFileSync(join(directory, "po-public.pem"), "fixture public key\n", { mode: 0o600 });
+    writeFileSync(join(directory, "po-public.pem"), publicKey, { mode: 0o600 });
     writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({
-      keyReference: join(directory, "po-public.pem"), publicKeySha256, humanName,
+      // A keyReference is a portable opaque identifier, never a host path.
+      // The temp root deliberately contains spaces, so using its filename here
+      // would create an invalid synthetic signer rather than an E2E fixture.
+      keyReference: "fixture-po-key", publicKeySha256, humanName,
     }, null, 2)}\n`, { mode: 0o600 });
     mkdirSync(join(path, ".git", "agent-pipeline"), { recursive: true });
     writeFileSync(join(path, ".git", "agent-pipeline", "po-key-directory.json"), `${JSON.stringify({
@@ -707,21 +714,6 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
     assert.equal(normalized.status, 0, JSON.stringify({ action, argv, stderr: normalized.stderr, stdout: normalized.stdout }));
     return { argv, json: JSON.parse(normalized.stdout) };
   };
-  const invokePlainAction = (action, replacements, cwd, env) => {
-    const argv = materialize(action, replacements);
-    const result = argv[0] === onboarding
-      ? run(onboarding, argv.slice(1), cwd)
-      : typeof argv[0] === "string" && argv[0].split(/[\\/]/u).at(-1) === "pipeline-state.mjs"
-        ? publicDriverRun(cwd, [])(action.executable, argv)
-        : spawnSync(action.executable, argv, {
-          cwd, env, encoding: "utf8", shell: false, maxBuffer: 16 * 1024 * 1024,
-          timeout: 30_000,
-        });
-    const normalized = result.signal === undefined ? { ...result, signal: null } : result;
-    assert.equal(normalized.signal, null, `${cwd}: returned action timed out`);
-    assert.equal(normalized.status, 0, `${normalized.stderr}\n${normalized.stdout}`);
-    return { argv, stdout: normalized.stdout };
-  };
   const freshDriver = (cwd, runner, env) => {
     const run = publicDriverRun(cwd, []);
     let driven = driveOnboardingInit({
@@ -745,6 +737,21 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(submitted.status, 0, submitted.stderr);
       assert.equal(presented.status, 0, presented.stderr);
       const reentered = driveOnboardingInit({ rootDir: cwd, runner, run, env });
+      // In shared signature mode the signed bootstrap receipt is the one PO
+      // authorization for this transition.  The driver must consume that
+      // receipt and continue; constructing a legacy `approve-plan --by`
+      // prompt here would recreate the bypass this E2E is meant to prevent.
+      if (reentered.final?.pushApprovalMode === "signature") {
+        return {
+          ...reentered,
+          steps: [
+            ...driven.steps,
+            { executable: "node", argv: submittedArgv, exitCode: submitted.status, faultCode: null },
+            { executable: "node", argv: presentedArgv, exitCode: presented.status, faultCode: null },
+            ...reentered.steps,
+          ],
+        };
+      }
       const approvalAction = {
         kind: "command",
         executable: "node",
@@ -796,7 +803,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
       const initialAsk = first.pendingAsks[0];
       assert.equal(initialAsk.applyAction?.kind, "command");
-      assert.deepEqual(initialAsk.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "pushApprovalPreference"]);
+      assert.deepEqual(initialAsk.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode"]);
       const initial = invokeAction(initialAsk.applyAction, new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
@@ -823,6 +830,8 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         ["<absolute existing key path|none>", existingKey],
       ]), path, env);
       assert.equal(anchored.json.bootstrap?.code, "TRUST-ANCHOR-BOOTSTRAP-COMPLETE");
+      const proofPolicy = readCriticalHumanProofPolicy(path);
+      assert.equal(proofPolicy.ok, true, `${runner}: ${JSON.stringify(proofPolicy)}`);
 
       if (runner === "codex") {
         const restart = anchored.json.final?.nextAction;
@@ -867,12 +876,36 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         ["<PO_INTAKE_DESIGN_ANSWERS_JSON>", answers],
       ]), path, env);
 
+      const signatureRequest = freshDriver(path, runner, env);
+      assert.equal(signatureRequest.outcome, "external-operator", `${runner}: ${JSON.stringify(signatureRequest)}`);
+      assert.equal(signatureRequest.final.status, "signature-required");
+      assert.equal(signatureRequest.externalOperator.action.argv[1], "sign-intent");
+      assert.equal(typeof signatureRequest.externalOperator.action.copyCommand?.posix, "string");
+      assert.equal(typeof signatureRequest.externalOperator.action.copyCommand?.powershell, "string");
+      const productProbe = () => {
+        const verdict = devPlanGateVerdict({ filePath: "game.js", projectDir: path });
+        return {
+          status: verdict.verdict === "block" ? 2 : verdict.verdict === "warn" ? 1 : 0,
+          stderr: verdict.reason ?? "",
+        };
+      };
+      const signatureIntent = signatureRequest.externalOperator.expected.intentSha256;
+      const publicKeyPem = createPublicKey(privateKey).export({ format: "pem", type: "spki" });
+      writeFileSync(join(path, signatureRequest.final.proofPath), `${JSON.stringify({
+        schema: "pipeline.po-approval-proof.v1",
+        intentSha256: signatureIntent,
+        keyReference: "fixture-po-key",
+        publicKey: publicKeyPem,
+        signatureBase64: sign(null, Buffer.from(signatureIntent, "utf8"), privateKey).toString("base64"),
+      })}\n`);
+
+      // Re-enter only through the public driver. It observes the proof,
+      // executes the exact acknowledgement/bind actions, then consumes that
+      // one receipt and enters implementation without accepting --by as a
+      // substitute for the signature or asking for a second activation.
       const approval = freshDriver(path, runner, env);
-      assert.equal(approval.outcome, "collect-input", `${runner}: ${JSON.stringify(approval)}`);
-      assert.equal(approval.final.status, "awaiting-approval");
-      assert.equal(approval.collectInput.input?.name, "by");
-      assert.equal(approval.collectInput.applyAction?.kind, "command");
-      assert.equal(approval.collectInput.applyAction.argv.filter((value) => value === "<PO_PLAN_APPROVER_NAME>").length, 1);
+      assert.equal(approval.outcome, "ready", `${runner}: ${JSON.stringify(approval)}`);
+      assert.equal(approval.final.status, "ready");
       const planSteps = approval.steps.map((step) => step.argv);
       assert.ok(planSteps.some((argv) => argv[0]?.endsWith("pipeline-state.mjs") && argv[1] === "inspect"),
         `${runner}: ready must enter the returned public pipeline-state inspect driver`);
@@ -880,18 +913,13 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         `${runner}: the returned inspect chain must execute submit-plan`);
       assert.ok(planSteps.some((argv) => argv[1] === "present-plan"),
         `${runner}: the returned inspect chain must execute present-plan`);
+      assert.ok(planSteps.some((argv) => argv[1] === "approve-plan"
+        && argv.includes("--bootstrap-acknowledgement-receipt")),
+      `${runner}: approval must consume the signed acknowledgement receipt`);
+      assert.equal(planSteps.some((argv) => argv[1] === "approve-plan" && argv.includes("--by")), false,
+        `${runner}: signature mode must not regress to the legacy --by approval route`);
       const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
-      assert.equal(state.planApproved, false, `${runner}: presentation must not silently approve the plan`);
-
-      const dispatchReceipt = devPlanGateVerdict({
-        filePath: "evidence/dispatch-record-GREENFIELD-DESIGN-1.json",
-        projectDir: path,
-      });
-      assert.equal(dispatchReceipt.verdict, "allow",
-        `${runner}: a role must be able to write its opening dispatch receipt before plan approval`);
-      const unrelatedEvidence = devPlanGateVerdict({ filePath: "evidence/review.json", projectDir: path });
-      assert.equal(unrelatedEvidence.verdict, "block",
-        `${runner}: the receipt exception must not widen to ordinary evidence writes`);
+      assert.equal(state.planApproved, true, `${runner}: the receipt must complete the one approved transition`);
 
       const externalInventory = evaluateLifecycleReadyGuard({
         tool_name: "Bash",
@@ -908,27 +936,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.deepEqual(projectInventory, { exitCode: 0, stderr: "" },
         `${runner}: the identical bounded inventory remains available within the project`);
 
-      // The hook script is necessarily a nested Node process. Exercise its
-      // shared policy directly here so this runner-contract test remains
-      // in-process in a Codex sandbox; guard-devplan.test.mjs covers the
-      // stdin/exit-code wrapper separately.
-      const productProbe = () => {
-        const verdict = devPlanGateVerdict({ filePath: "game.js", projectDir: path });
-        return {
-          status: verdict.verdict === "block" ? 2 : verdict.verdict === "warn" ? 1 : 0,
-          stderr: verdict.reason ?? "",
-        };
-      };
-      const refused = productProbe();
-      assert.equal(refused.status, 2, `${runner}: product write must remain refused before the returned approval action`);
-
-      invokePlainAction(approval.collectInput.applyAction, new Map([
-        ["<PO_PLAN_APPROVER_NAME>", "Greenfield E2E PO"],
-      ]), path, env);
-
-      const handover = freshDriver(path, runner, env);
-      assert.equal(handover.outcome, "ready", `${runner}: ${JSON.stringify(handover)}`);
-      const implementing = handover;
+      const implementing = approval;
       assert.equal(implementing.outcome, "ready", `${runner}: ${JSON.stringify(implementing)}`);
       assert.equal(implementing.final.status, "ready");
       assert.equal(implementing.final.nextAction, null);

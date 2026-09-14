@@ -430,6 +430,12 @@ const grammarOnlyDenial = denials.length > 0
 const crossRepositoryOnlyDenial = denials.length > 0
   && denials.every((entry) => entry.guard === "guard-lifecycle-ready.mjs"
     && /\bGUARD-CROSS-REPO-MUTATION\b/u.test(entry.reason));
+// apply_patch supplies the same lifecycle result through its translating
+// adapter as well as through the outer lifecycle call, so do not require the
+// entry to bear one particular guard filename here.  The typed denial itself
+// is authoritative and is never liftable.
+const bootstrapAcknowledgementWriterOnlyDenial = denials.some((entry) =>
+  /\bGUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY\b/u.test(entry.reason));
 if (denials.length > 0) {
   // Closed shell-grammar refusals have no side effect to reconcile and are
   // not authority decisions. Routing them through the one-time Human-override
@@ -442,6 +448,13 @@ if (denials.length > 0) {
   // it again here would create a second competing authorization.  The outer
   // adapter only transports that authoritative refusal to Codex.
   if (crossRepositoryOnlyDenial) {
+    deny(denials.map((entry) => entry.reason).join("\n"));
+  }
+  // A PO acknowledgement marker is authority state, not a recoverable
+  // workspace edit.  The dedicated acknowledgement writer owns its exact
+  // proof/chat ceremony; an HGO here would turn a generic patch capability
+  // into an alternate authority writer and could bypass signature mode.
+  if (bootstrapAcknowledgementWriterOnlyDenial) {
     deny(denials.map((entry) => entry.reason).join("\n"));
   }
   const overrideSpawn = (executable, args, options) => boundedSpawn(

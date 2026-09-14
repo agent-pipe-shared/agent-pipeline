@@ -32,8 +32,6 @@ import { registeredCriticExportPolicy, registeredRouting } from "./runner-profil
 import { parseYaml } from "./yaml-lite.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
 import { mkdtempTestScratch as createTestScratch } from "./test-tmpdir.mjs";
-import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
-import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 import {
@@ -48,7 +46,9 @@ import {
   INTAKE_GENERATE_APPLY_SCHEMA,
   intakeDesignDirname,
   applyOnboardingBootstrapBind,
+  applyOnboardingBootstrapAcknowledgement,
   planOnboardingBootstrapBind,
+  planOnboardingBootstrapAcknowledgementChat,
   applyOnboardingContinuityRepair,
   applyOnboardingIntakeCapture,
   applyOnboardingIntakeConsent,
@@ -2732,6 +2732,23 @@ check("promotion refuses a PRD carrying more than one PO plan acknowledgement ma
     (error) => error?.code === "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING");
 });
 
+check("a generated coordinator checkpoint cannot be re-routed through a new legacy kickoff promotion", () => {
+  const coordinatorRoot = readyToGenerateRoot("legacy-promotion-bypass-source");
+  const generated = planOnboardingIntakeGenerate({ rootDir: coordinatorRoot });
+  applyOnboardingIntakeGenerate({ rootDir: coordinatorRoot, expectedPlanSha256: generated.planSha256, activate: true });
+  const coordinatorCheckpoint = JSON.parse(readFileSync(resolveIntakeCheckpointPaths({ rootDir: coordinatorRoot }).checkpoint, "utf8"));
+
+  const seed = promotionSeed("legacy-promotion-bypass-target");
+  const targetPaths = resolveIntakeCheckpointPaths({ rootDir: seed.root, create: true });
+  const { contentSha256: ignoredSourceDigest, ...unsignedCheckpoint } = coordinatorCheckpoint;
+  void ignoredSourceDigest;
+  const forgedOnlyForRouteFixture = { ...unsignedCheckpoint, root: targetPaths.root };
+  forgedOnlyForRouteFixture.contentSha256 = sha256CanonicalJson(forgedOnlyForRouteFixture);
+  writeFileSync(targetPaths.checkpoint, `${JSON.stringify(forgedOnlyForRouteFixture, null, 2)}\n`);
+
+  expectKickoffError("KICKOFF-PROMOTION-COORDINATOR-REQUIRED", () => planOnboardingKickoffPromotion(seed.request));
+});
+
 check("promotion refuses a PRD carrying no po-language marker, or one whose value is not in the supported set", () => {
   const missing = promotionSeed("language-marker-missing");
   const missingPath = promotedArtifact(missing, "prd_promoted.md");
@@ -4048,44 +4065,25 @@ for (const key of INTAKE_GENERATE_STAGING_KEYS) {
 // adapter over planOnboardingKickoffPromotion/applyOnboardingKickoffPromotion
 // via the new coordinator-sourced ("no kickoff predecessor") branch.
 // NVA-BL-INTAKEBIND-1 (AC-4): the freshly generated staging PRD already
-// carries valid po-language/technical-spec-sha256 markers (AC-1) -- the only
-// remaining marker, po-plan-acknowledged, is a genuine judgment call with no
-// automatic write. It is added here through the REAL sanctioned edit path
-// (guard-lifecycle-ready.mjs's bootstrap-binding-required staging-authoring
-// admission), proven by actually invoking the guard's own real
-// admission-decision function first and asserting it admits this exact Edit,
-// then performing the equivalent file mutation -- never a raw bypass.
+// carries valid po-language/technical-spec-sha256 markers (AC-1).  The
+// remaining acknowledgement marker is an authority record, never prose an
+// agent may hand-edit.  Build this fixture through the same dedicated writer
+// that production uses after a configured human ceremony.  This continuity
+// unit suite deliberately uses its chat-mode test receipt; the signature
+// proof selection and verification live in the dedicated onboarding and
+// pipeline-state suites.
 function bootstrapBindReadyRoot(name) {
   const root = readyToGenerateRoot(`bootstrap-bind-${name}`);
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
-  const prdAbsolute = join(root, generatePlan.targets.prd.path);
-  const admission = evaluateLifecycleReadyGuard(
-    { tool_name: "Edit", tool_input: { file_path: generatePlan.targets.prd.path } },
-    {
-      projectDir: root,
-      requireProjectOnboardingReadyFn() {
-        throw new ProjectOnboardingReadyError("PORG-NOT-READY", "raw",
-          { intent: "session", lifecycleStatus: "bootstrap-binding-required" });
-      },
-    },
-  );
-  assert.equal(admission.exitCode, 0, "the guard must actually admit this exact staging-PRD edit before we perform it");
-  // NVA-GS15-1 (AC-5): guard-gate-strength.mjs (GS-15, project/.onboarding-staging/*) must
-  // ALSO admit this identical Edit -- spawned as a real subprocess against the identical
-  // payload, never a call into internals, exactly like the guard-lifecycle-ready admission
-  // proven above. Before the fix this failed (exit 2, GS-15 refused); the two guards
-  // contradicted each other and the PO's po-plan-acknowledged marker could never be written.
-  const gateStrengthGuard = join(dirname(fileURLToPath(import.meta.url)), "..", "hooks", "guard-gate-strength.mjs");
-  const gateStrength = spawnSync(process.execPath, [gateStrengthGuard], {
-    input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: generatePlan.targets.prd.path } }),
-    encoding: "utf8",
-    cwd: root,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+  const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+  const applied = applyOnboardingBootstrapAcknowledgement({
+    rootDir: root,
+    expectedPlanSha256: acknowledgement.intentSha256,
+    attendedChat: true,
+    activate: true,
   });
-  assert.equal(gateStrength.status, 0,
-    `NVA-GS15-1: guard-gate-strength.mjs must admit this exact staging-PRD edit once the checkpoint is generated (GS-15 stand-down) -- stderr: ${gateStrength.stderr}`);
-  writeFileSync(prdAbsolute, `${readFileSync(prdAbsolute, "utf8")}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
+  assert.equal(applied.status, "applied");
   return { root, featureId: generatePlan.featureId };
 }
 
@@ -4097,21 +4095,7 @@ function bootstrapBindReadyRoot(name) {
 // landed). Proves the fix: the freshly generated PRD now already carries
 // BOTH mechanical markers with the correct values.
 //
-// NVA-R2-STAGINGACKTESTS: the final assertion below is updated, not silently
-// retuned -- documented here as the briefing for that task requires. Before
-// this task's base commit (NVA-R-STAGINGACK), the genuine judgment-call
-// marker (po-plan-acknowledged) being still missing on this EXACT fixture --
-// a fresh, unmodified, consent-recorded generator PRD -- correctly refused
-// with KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING (what this test
-// asserted until now). That base commit narrowly exempts precisely this
-// case: nobody has been asked to author a word of these bytes, so demanding
-// the PO's plan-acknowledgement marker on them would certify a judgement
-// nobody made. This fixture is now the exemption's own positive case
-// (pinned again, independently, by "the exemption fires" check below) --
-// updating the final assertion here to match is required by the base
-// commit's own design, not a weakening; the marker-content assertions above
-// are untouched and still pin the AC-1 regression fix they always did.
-check("planOnboardingBootstrapBind: a fresh, unmodified intake-generated staging PRD already carries valid po-language/technical-spec-sha256 markers -- the acknowledgement marker is exempt by design (NVA-BL-INTAKEBIND-1, NVA-R2-STAGINGACKTESTS)", () => {
+check("planOnboardingBootstrapBind: a fresh intake-generated staging PRD carries valid mechanical markers but still requires the policy-selected acknowledgement", () => {
   const root = readyToGenerateRoot("bootstrap-bind-ac1-markers");
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
@@ -4119,8 +4103,8 @@ check("planOnboardingBootstrapBind: a fresh, unmodified intake-generated staging
   assert.equal(prdText.startsWith(
     `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${generatePlan.targets.spec.afterSha256} -->\n`,
   ), true, prdText);
-  const plan = planOnboardingBootstrapBind({ rootDir: root });
-  assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
+  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    () => planOnboardingBootstrapBind({ rootDir: root }));
 });
 
 check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor", () => {
@@ -4222,50 +4206,38 @@ check("a coordinator-sourced binding satisfies the PO plan gate's current contra
 });
 
 // ---------------------------------------------------------------------------
-// NVA-R2-STAGINGACKTESTS: pins the pureGeneratorExempt exemption
-// (pureGeneratorPromotionPrdSha256, promotionArtifacts' pureGeneratorExempt
-// branch, buildCoordinatorSourcedPromotionPlan's call site -- all above) as
-// narrow by construction: it must fire for a provably-untouched staging PRD
-// with recorded consent, and it must NOT fire the instant any one of those
-// conditions stops holding. Mirrors bootstrapBindReadyRoot's own setup
-// exactly, only withholding the final marker-append step -- the marker is
-// precisely what this exemption exists to make unnecessary here.
-function bootstrapBindPureGeneratorRoot(name) {
+// A generated coordinator draft is never exempt from the configured human
+// acknowledgement.  This helper makes both states explicit: markerless stays
+// bind-blocked; acknowledged goes through the dedicated receipt writer.
+function bootstrapBindPureGeneratorRoot(name, { acknowledged = false } = {}) {
   const root = readyToGenerateRoot(`bootstrap-bind-pure-${name}`);
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  if (acknowledged) {
+    const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+    applyOnboardingBootstrapAcknowledgement({
+      rootDir: root,
+      expectedPlanSha256: acknowledgement.intentSha256,
+      attendedChat: true,
+      activate: true,
+    });
+  }
   return { root, featureId: generatePlan.featureId, generatePlan };
 }
 
-// Written first, per the task's own instruction: this is the test that makes
-// the relaxation safe. Any single hand edit to the staging PRD -- even one
-// appended line of prose nobody reviewed, the marker lines themselves left
-// untouched -- must change prd.sha256 away from the checkpoint-derived digest
-// pureGeneratorPromotionPrdSha256 recomputes, so pureGeneratorExempt goes
-// false and the ordinary refusal (unchanged since NVA-W4-2B) fires again.
-check("planOnboardingBootstrapBind: a single hand edit to the pure-generator staging PRD revokes the exemption, refused with the same missing-marker code (NVA-R2-STAGINGACKTESTS)", () => {
+check("planOnboardingBootstrapBind: a marker-less generated PRD is refused even before a hand edit", () => {
   const { root, generatePlan } = bootstrapBindPureGeneratorRoot("one-byte-edit");
   const prdAbsolute = join(root, generatePlan.targets.prd.path);
   const original = readFileSync(prdAbsolute, "utf8");
   assert.equal(original.includes("po-plan-acknowledged"), false, "fixture must start marker-less");
-  writeFileSync(prdAbsolute, `${original}\nOne extra line of prose nobody reviewed.\n`);
   expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
     () => planOnboardingBootstrapBind({ rootDir: root }));
 });
 
-// NVA-R3-STAGINGACKAPPLY: the end-to-end case, and the reason this file's
-// history shows it commented out first. NVA-R2-STAGINGACKTESTS could not write
-// it: the exemption was honoured at plan time and ignored at apply time, because
-// applyOnboardingKickoffPromotion's own re-admission call to promotionArtifacts
-// passed no options, so pureGeneratorExempt was unconditionally false there. That
-// dispatch reported the defect with its stack rather than weakening the assertion
-// to match it. The call site now re-derives the digest (freshly, so an edit between
-// plan and apply still revokes the exemption), and this is what proves the
-// relaxation actually has a path: plan AND apply, on the same marker-less bytes.
-check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: a fresh, unmodified intake-generated staging PRD with recorded consent and no acknowledgement marker binds end to end through the coordinator-sourced path (NVA-R3-STAGINGACKAPPLY)", () => {
-  const { root, featureId, generatePlan } = bootstrapBindPureGeneratorRoot("exemption-fires");
+check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: an acknowledged intake-generated staging PRD binds end to end through the coordinator-sourced path", () => {
+  const { root, featureId, generatePlan } = bootstrapBindPureGeneratorRoot("acknowledged", { acknowledged: true });
   const prdText = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
-  assert.equal(prdText.includes("po-plan-acknowledged"), false, "fixture must start marker-less");
+  assert.equal(prdText.includes("po-plan-acknowledged"), true, "fixture must carry its acknowledgement marker");
   const plan = planOnboardingBootstrapBind({ rootDir: root });
   assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
   assert.equal(plan.kickoff, null);
@@ -4282,8 +4254,8 @@ check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: a fresh, unmo
 // Recorded as the code the implementation actually produces, measured: an earlier
 // draft of this check asserted CAS-DRIFT and was corrected to what ran, rather than
 // the implementation being bent toward the guess.
-check("applyOnboardingBootstrapBind: a PRD edit made after planning is refused by the plan-digest binding, before marker admission is reached (NVA-R3-STAGINGACKAPPLY)", () => {
-  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("edit-after-plan");
+check("applyOnboardingBootstrapBind: a PRD edit made after planning is refused by the plan-digest binding", () => {
+  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("edit-after-plan", { acknowledged: true });
   const plan = planOnboardingBootstrapBind({ rootDir: root });
   assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
   const prdAbsolute = join(root, generatePlan.targets.prd.path);
@@ -4292,16 +4264,8 @@ check("applyOnboardingBootstrapBind: a PRD edit made after planning is refused b
     () => applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true }));
 });
 
-// NVA-R3-STAGINGACKAPPLY: this is the case that makes the apply-side re-derivation
-// load-bearing rather than decorative, and the reason it re-derives instead of
-// trusting a plan-carried value. The PRD's bytes are untouched, so the plan digest
-// still matches and the check above cannot fire; only the checkpoint's recorded
-// consent is withdrawn between plan and apply. pureGeneratorPromotionPrdSha256
-// returns null on `consent === null`, so the exemption evaporates at exactly the
-// point the second admission happens -- which is the whole reason the plan is not
-// allowed to be a bearer token for its own admission.
-check("applyOnboardingBootstrapBind: consent withdrawn between plan and apply revokes the exemption at apply time, with the PRD bytes untouched (NVA-R3-STAGINGACKAPPLY)", () => {
-  const { root } = bootstrapBindPureGeneratorRoot("consent-withdrawn-after-plan");
+check("applyOnboardingBootstrapBind: consent withdrawal after an acknowledged plan does not erase its bound acknowledgement", () => {
+  const { root } = bootstrapBindPureGeneratorRoot("consent-withdrawn-after-plan", { acknowledged: true });
   const plan = planOnboardingBootstrapBind({ rootDir: root });
   assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
   const paths = resolveIntakeCheckpointPaths({ rootDir: root });
@@ -4310,18 +4274,10 @@ check("applyOnboardingBootstrapBind: consent withdrawn between plan and apply re
   const { contentSha256: _stale, ...unsigned } = checkpoint;
   checkpoint.contentSha256 = sha256CanonicalJson(unsigned);
   writeFileSync(paths.checkpoint, `${JSON.stringify(checkpoint, null, 2)}\n`);
-  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
-    () => applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true }));
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
 });
 
-// Same pure-generator PRD bytes; only the checkpoint's own recorded consent
-// is hand-edited away (contentSha256 recomputed with the exact same
-// canonical-JSON algorithm onboarding-continuity.mjs's own canonicalSha256
-// uses, so the checkpoint stays well-formed rather than merely corrupt --
-// readOnboardingIntakeCheckpoint must still read it back as "present").
-// pureGeneratorPromotionPrdSha256 returns null on `consent === null` before
-// it ever re-derives a digest to compare, so this is refused for a different
-// reason than the byte-edit test above, and must be refused all the same.
 check("planOnboardingBootstrapBind: the same pure-generator staging PRD is refused when the checkpoint's recorded consent is absent (NVA-R2-STAGINGACKTESTS)", () => {
   const { root } = bootstrapBindPureGeneratorRoot("no-consent");
   const paths = resolveIntakeCheckpointPaths({ rootDir: root });
@@ -4337,13 +4293,9 @@ check("planOnboardingBootstrapBind: the same pure-generator staging PRD is refus
     () => planOnboardingBootstrapBind({ rootDir: root }));
 });
 
-// The other route is untouched: buildKickoffPromotionPlan's kickoff-sourced
-// branch (coordinatorSourced: false, planOnboardingKickoffPromotion's own
-// call site) never computes or passes pureGeneratorPrdSha256 at all -- it is
-// only ever supplied by the two coordinator-sourced call sites. A kickoff
-// promote of a marker-less PRD must therefore stay refused exactly as before
-// this feature, independent of and in addition to the pre-existing NVA-W4-2B
-// test above (which this change must leave passing unchanged).
+// The legacy kickoff route also remains marker-strict. A generated checkpoint
+// is additionally refused earlier as coordinator-only; this fixture covers a
+// genuine legacy promotion without such a checkpoint.
 check("planOnboardingKickoffPromotion: a kickoff-sourced (non-coordinator) promotion of a marker-less PRD stays refused -- the exemption is unreachable from this route (NVA-R2-STAGINGACKTESTS)", () => {
   const seed = promotionSeed("r2-stagingack-other-route-untouched");
   const path = promotedArtifact(seed, "prd_promoted.md");
@@ -4552,12 +4504,13 @@ check("applyOnboardingBootstrapBind: a PO answer of de propagates into the confi
   const prdAbsolute = join(root, generatePlan.targets.prd.path);
   const prdText = readFileSync(prdAbsolute, "utf8");
   assert.equal(prdText.startsWith("<!-- po-language: de -->"), true, prdText);
-  // validatePoGateAuthority's own acknowledgement requirement (fired below,
-  // when expectedPlanSha256/expectedSpecSha256 are passed, exactly as a real
-  // submit-plan call does) is a separate concern from the promotion-time
-  // pure-generator exemption above -- bootstrapBindReadyRoot (elsewhere in
-  // this file) adds the identical marker for the identical reason.
-  writeFileSync(prdAbsolute, `${prdText}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
+  const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+  applyOnboardingBootstrapAcknowledgement({
+    rootDir: root,
+    expectedPlanSha256: acknowledgement.intentSha256,
+    attendedChat: true,
+    activate: true,
+  });
 
   const seededSource = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
   assert.equal(seededSource.language.human_facing, "en", "fixture must start on the seeded English default before propagation");
@@ -4596,12 +4549,17 @@ check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) st
   const prdAbsolute = join(root, generatePlan.targets.prd.path);
   const original = readFileSync(prdAbsolute, "utf8");
   assert.equal(original.startsWith("<!-- po-language: en -->"), true, original);
-  // A hand edit (even just the marker) revokes the pure-generator exemption,
-  // so the acknowledgement marker is required here, exactly as the legacy
-  // "promoting a PRD whose language differs from kickoff's own answer" case
-  // (project-onboarding-v3.test.mjs) requires it.
+  // The document content may be revised during design, but the acknowledgement
+  // must bind those final revised bytes through its dedicated writer.
   const rewritten = original.replace("<!-- po-language: en -->", "<!-- po-language: fr -->");
-  writeFileSync(prdAbsolute, `${rewritten}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
+  writeFileSync(prdAbsolute, rewritten);
+  const acknowledgement = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
+  applyOnboardingBootstrapAcknowledgement({
+    rootDir: root,
+    expectedPlanSha256: acknowledgement.intentSha256,
+    attendedChat: true,
+    activate: true,
+  });
 
   const plan = planOnboardingBootstrapBind({ rootDir: root });
   const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
@@ -4638,7 +4596,7 @@ check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) st
   assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
 });
 
-assert.equal(cases.length, 280, "the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 281, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -311,14 +311,19 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
   const windows = parsed.dialect === "windows-readonly-pipeline";
   const rgName = basename(parsed.segments[0].executable).toLowerCase();
   const expectedRg = windows ? "rg.exe" : "rg";
-  const headName = basename(parsed.segments[1].executable).toLowerCase();
+  const sinkName = basename(parsed.segments[1].executable).toLowerCase();
   if (rgName !== expectedRg) return false;
-  if (headName === expectedRg) {
+  if (sinkName === expectedRg) {
     return parsed.redirects.length === 0
       && validateRg(parsed.segments[0].argv, root, windows, additionalRoots)
       && validateRg(parsed.segments[1].argv, root, windows, additionalRoots);
   }
-  if (headName !== (windows ? "head.exe" : "head")) return false;
+  // `tail` is as read-only as `head`; retain the identical, deliberately
+  // bounded 1..500 line count.  The admission stays rg-sourced only -- this
+  // is not a general pipe permission or a script-indirection exception.
+  const expectedHead = windows ? "head.exe" : "head";
+  const expectedTail = windows ? "tail.exe" : "tail";
+  if (sinkName !== expectedHead && sinkName !== expectedTail) return false;
   if (parsed.redirects.length === 1) {
     const redirect = parsed.redirects[0];
     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
@@ -328,10 +333,10 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
   // agent naturally reaches for; only the two-token `-n 40` form was ever accepted, so the
   // narrower, equally-safe combined shape was refused for no bound-related reason. Same
   // canonical numeric range both ways, checked by the identical regex.
-  const headArgs = parsed.segments[1].argv;
-  const headCount = /^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u;
-  const headOk = (headArgs.length === 2 && headArgs[0] === "-n" && headCount.test(headArgs[1]))
-    || (headArgs.length === 1 && headArgs[0].startsWith("-") && headCount.test(headArgs[0].slice(1)));
-  if (!headOk) return false;
+  const sinkArgs = parsed.segments[1].argv;
+  const lineCount = /^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u;
+  const sinkOk = (sinkArgs.length === 2 && sinkArgs[0] === "-n" && lineCount.test(sinkArgs[1]))
+    || (sinkArgs.length === 1 && sinkArgs[0].startsWith("-") && lineCount.test(sinkArgs[0].slice(1)));
+  if (!sinkOk) return false;
   return validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
 }

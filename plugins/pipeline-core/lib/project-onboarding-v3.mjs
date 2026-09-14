@@ -2465,14 +2465,19 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
       );
     }
     if (signatureObservation?.requestStatus === "present" && signatureObservation.signAction !== null) {
+      const action = signatureObservation.signAction;
+      // The operator action crosses a terminal boundary.  Preserve the exact
+      // argv machine contract and attach the one shared bounded renderer so a
+      // runner never has to transcribe a long absolute plugin/key path itself.
+      const command = [action.executable, ...action.argv].map(shellWord).join(" ");
       return {
         kind: "external-operator",
         mutation: false,
         requiresConfirmation: true,
         executionBoundary: "attended-external-tool",
         invocation: "user-copy-only",
-        guidance: `The reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) and specification (${spec.path}, sha256 ${spec.sha256}) require the configured detached-signature acknowledgement. Run the exact host-terminal sign action below; it writes the plan-bound proof back into this repository's scratch directory. Do not edit an acknowledgement marker manually.`,
-        action: signatureObservation.signAction,
+        guidance: `The reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) and specification (${spec.path}, sha256 ${spec.sha256}) require the configured detached-signature acknowledgement. Run action.copyCommand for your actual terminal (not a hand-transcribed variant); it writes the plan-bound proof back into this repository's scratch directory. Do not edit an acknowledgement marker manually.`,
+        action: { ...action, command, copyCommand: boundedOpaqueCopyCommand(command) },
         expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
       };
     }
@@ -2958,16 +2963,12 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       } catch {
         acknowledgement = null;
       }
-      // NVA-V5-ACKEXEMPTASK: ask only when the marker is BOTH absent and actually
-      // required. `exempt` is true exactly when the staging PRD's current bytes are
-      // still what the generator would produce from the recorded intake consent --
-      // the case NVA-R-STAGINGACK exempts from the marker at the bind. Asking there
-      // anyway would stop the PO to certify a judgement nobody is being asked to
-      // make, on bytes nobody authored. `exempt` is read defensively (`=== true`)
-      // so an older observation shape without the field asks exactly as before.
+      // The acknowledgement is the shared human-approval gate for the exact
+      // PRD/Spec pair that enters implementation.  A generated draft is not
+      // exempt: it may be expanded before promotion, and an exemption here
+      // previously re-opened the unauthenticated `approve-plan --by` path.
       const needsAcknowledgement = acknowledgement !== null
-        && acknowledgement.acknowledged === false
-        && acknowledgement.exempt !== true;
+        && acknowledgement.acknowledged === false;
       let signatureObservation = null;
       let signatureMode = false;
       if (needsAcknowledgement) {
@@ -4984,7 +4985,7 @@ function collectProjectIgnoreGapAction(missing) {
 
 /**
  * Ask -- for EVERY repository, pre-filled from this machine's remembered
- * preference -- how a push approval is cleared, and (only the first time a
+ * preference -- how every participating human approval is cleared, and (only the first time a
  * machine is ever asked) where the PO's signing key lives (backlog:
  * installing-consumer-is-never-asked-any-setup-decision.md; design: this
  * repository's own Nova A epic setup-bootstrap design note, SS3). Every
@@ -5024,7 +5025,12 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault)
   return {
     kind: "collect-input",
     input: {
-      name: "pushApprovalPreference",
+      // This name is intentionally user-facing.  The historical receipt and
+      // CLI option stay `pushApprovalPreference` for compatibility, but this
+      // initial question seeds both `gates.human_approval` (design/plan) and
+      // `gates.push_approval`; calling the prompt “push” caused runners to
+      // describe a narrower policy than the one they were actually setting.
+      name: "humanApprovalMode",
       encoding: "utf8",
       trim: true,
       minBytes: 1,
@@ -5960,7 +5966,10 @@ function collectInitialAnswersAction(observed) {
       "--git-author-email", INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER,
     );
   }
-  argv.push("--push-approval", INITIAL_PUSH_APPROVAL_PLACEHOLDER);
+  // `--human-approval` is the public onboarding spelling.  The CLI retains
+  // `--push-approval` as a read-compatible alias for old copied commands, but
+  // every newly rendered action names the shared policy it actually applies.
+  argv.push("--human-approval", INITIAL_PUSH_APPROVAL_PLACEHOLDER);
   if (trustSetup) {
     argv.push(
       "--trust-anchor-mode", TRUST_ANCHOR_MODE_PLACEHOLDER,
@@ -5974,7 +5983,7 @@ function collectInitialAnswersAction(observed) {
     inputs,
     mutation: false,
     requiresConfirmation: false,
-    guidance: `collect this one initial PO round, replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, applies the push-approval preference, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+    guidance: `collect this one initial PO round, replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
     applyAction: commandAction(
       argv,
       true,

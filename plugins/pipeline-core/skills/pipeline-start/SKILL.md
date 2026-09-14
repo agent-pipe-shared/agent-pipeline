@@ -182,7 +182,8 @@ recommendation.
    facts; never claim a skipped or cached check passed.
 3. **Boundary:** one simple shell command per tool call; never compose
    `&&`, `;`, redirects or pipelines except bounded, expansions-free
-   `rg … | rg …` or `rg … | head -n 1..500` diagnostics, and never a heredoc
+   `rg … | rg …`, `rg … | head -n 1..500`, or `rg … | tail -n 1..500`
+   diagnostics, and never a heredoc
    or a multi-line command. The full closed grammar, its costliest
    workarounds, and the commit-trailer rule (`AI-Assisted: true`, plus
    `Dispatch: <TASK_ID> (goldfish)` for a dispatched Goldfish, nothing else

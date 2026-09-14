@@ -256,8 +256,8 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
       assert.equal(first.outcome, "pending-asks", runner);
       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
       const initialAsk = first.pendingAsks[0];
-      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "pushApprovalPreference"],
-        `${runner}/${pushApproval}: initial action contains only identity and push mode`);
+      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode"],
+        `${runner}/${pushApproval}: initial action contains only identity and the shared approval mode`);
       assert.match(initialAsk.guidance, /design\/plan approval as well as push approval/u,
         `${runner}/${pushApproval}: the shared mode must never be presented as push-only`);
       const replacements = new Map([
@@ -304,7 +304,7 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
         ...(reentered.pendingAsks ?? []).flatMap(actionInputNames),
         ...actionInputNames(reentered.collectInput),
       ];
-      assert.equal(names.includes("pushApprovalPreference"), false, `${runner}: durable receipt prevents a repeated push-preference ask`);
+      assert.equal(names.includes("humanApprovalMode"), false, `${runner}: durable receipt prevents a repeated shared-approval ask`);
       if (pushApproval === "chat") {
         assert.equal(names.includes("trustAnchorSetupMode"), false, `${runner}: chat never asks for a signing key`);
         assert.equal(existsSync(join(root, ".git", "agent-pipeline", "po-key-directory.json")), false,
@@ -356,7 +356,7 @@ test("a failed separate signature-anchor action preserves the completed initial 
     assert.deepEqual(initialAction.inputs.map((input) => input.name), [
       "gitAuthorName",
       "gitAuthorEmail",
-      "pushApprovalPreference",
+      "humanApprovalMode",
     ]);
     const initial = spawnSync(initialAction.applyAction.executable, initialAction.applyAction.argv.map((value) => new Map([
       ["<PO_GIT_AUTHOR_NAME>", "Rollback PO"],
@@ -981,6 +981,41 @@ test("driveOnboardingInit: nonzero, missing-status, and non-EPERM spawn results 
     } finally {
       dispose(root);
     }
+  }
+});
+
+test("driveOnboardingInit: a blocked published runner-permission repair retains its exact diagnostic action", () => {
+  const root = freshRoot();
+  try {
+    let call = 0;
+    const repairArgv = ["/plugin/scripts/settings-allowlist-merge.mjs", "apply-runner-permissions", "--root", root, "--plan-sha256", "a".repeat(64), "--activate"];
+    const run = () => {
+      call += 1;
+      if (call === 1) {
+        return respond({
+          schema: "pipeline.project-onboarding.v4",
+          status: "projection-drift",
+          diagnostics: [{ path: "$.runnerPermissions", code: "runner_permissions_drift", message: "permissions are stale", guidance: "apply the digest-bound settings merge" }],
+          nextAction: {
+            kind: "command",
+            executable: "node",
+            argv: repairArgv,
+            mutation: true,
+            requiresConfirmation: true,
+            expected: { schema: "pipeline.settings-allowlist-merge-apply.v1", statuses: ["ready", "no-op"] },
+          },
+        });
+      }
+      return { status: 1, stdout: "", stderr: "runner denied the current script path" };
+    };
+    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run });
+    assert.equal(result.outcome, "error");
+    assert.deepEqual(result.blockedAction.action.argv, repairArgv);
+    assert.equal(result.blockedAction.priorStatus, "projection-drift");
+    assert.equal(result.blockedAction.diagnostics[0].code, "runner_permissions_drift");
+    assert.match(result.blockedAction.guidance, /Re-run the public inspection/u);
+  } finally {
+    dispose(root);
   }
 });
 

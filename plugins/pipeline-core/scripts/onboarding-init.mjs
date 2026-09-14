@@ -111,6 +111,8 @@ import {
 import {
   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH,
   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
+  boundedOpaqueCopyCommand,
+  shellWord,
 } from "../lib/project-onboarding-v3.mjs";
 import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
@@ -136,7 +138,7 @@ const PUSH_APPROVAL_MODES = new Set(["signature", "chat"]);
 const TRUST_ANCHOR_RECOVERY_SCHEMA = "pipeline.first-anchor-bootstrap-recovery.v1";
 
 function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --push-approval signature|chat] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
+  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --human-approval signature|chat] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
 }
 
 // The runner lane, pinned rather than inherited.
@@ -211,9 +213,9 @@ function parseArgs(argv) {
       if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--git-author-email requires a non-empty value" };
       output.gitAuthorEmail = value;
       index += 1;
-    } else if (arg === "--push-approval") {
+    } else if (arg === "--human-approval" || arg === "--push-approval") {
       const value = argv[index + 1];
-      if (!PUSH_APPROVAL_MODES.has(value)) return { error: "--push-approval requires signature or chat" };
+      if (!PUSH_APPROVAL_MODES.has(value)) return { error: "--human-approval requires signature or chat" };
       output.pushApproval = value;
       index += 1;
     } else if (arg === "--help" || arg === "-h") {
@@ -229,7 +231,7 @@ function parseArgs(argv) {
     return { error: "initial answers require both --git-author-name and --git-author-email" };
   }
   if ((identityValues.some((value) => value !== undefined) || output.pushApproval !== undefined) && !output.pushApproval) {
-    return { error: "initial answers require --push-approval" };
+    return { error: "initial answers require --human-approval" };
   }
   if (output.pushApproval !== undefined && !output.runner) return { error: "initial answers require an explicit --runner" };
   if (output.pushApproval !== undefined && output.stepCap !== undefined) return { error: "initial answers do not accept --step-cap" };
@@ -817,6 +819,34 @@ function extractPendingAsks(nextAction) {
   return { present: true, malformed: false, asks: raw };
 }
 
+// A planner may return an attended external action after the driver has
+// executed its safe, repository-local preparation step (for example, writing
+// the exact signature request).  Preserve its structured argv, but add the
+// shared bounded renderer before returning it to a runner.  Otherwise the
+// runner sees a long dynamic signing command without the copy-safe rendering
+// that the same action receives when surfaced directly by V4 inspection.
+function renderExternalOperatorAction(action) {
+  if (typeof action?.executable !== "string"
+    || !Array.isArray(action.argv)
+    || !action.argv.every((part) => typeof part === "string")) return action;
+  try {
+    const command = [action.executable, ...action.argv].map(shellWord).join(" ");
+    return {
+      ...action,
+      action: {
+        executable: action.executable,
+        argv: [...action.argv],
+        command,
+        copyCommand: boundedOpaqueCopyCommand(command),
+      },
+    };
+  } catch {
+    // The underlying external action remains authoritative.  Never substitute
+    // an invented rendering when an argv value is not safely renderable.
+    return action;
+  }
+}
+
 const TRUST_ANCHOR_BOOTSTRAP_FLAGS = new Set([
   "--trust-anchor-mode",
   "--trust-anchor-directory",
@@ -830,7 +860,7 @@ function isTrustAnchorAction(action) {
 }
 
 function initialAnswersActionWithoutTrustAnchor(action) {
-  if (!isTrustAnchorAction(action) || !action.applyAction.argv.includes("--push-approval")) return action;
+  if (!isTrustAnchorAction(action) || !action.applyAction.argv.includes("--human-approval")) return action;
   const argv = [];
   for (let index = 0; index < action.applyAction.argv.length; index += 1) {
     const part = action.applyAction.argv[index];
@@ -902,6 +932,13 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
   let lastAnchorOutput = null;
   let executedSinceAnchor = false;
   let completedMigrationActivation = false;
+  // Retain the public action that led to a child failure.  Without this, an
+  // agent only receives a generic spawn error when (for example) a newly
+  // stamped Codex script permission is missing, even though the preceding
+  // inspection published the exact digest-bound repair.  This is diagnostic
+  // evidence, not permission to replay a possibly partial mutation: callers
+  // must re-inspect and use the newly returned action.
+  let attemptedAction = null;
 
   for (let stepIndex = 0; stepIndex < stepCap; stepIndex += 1) {
     const stepResult = runOnboardingStep({ executable, argv, run, env, projectRoot: root });
@@ -941,6 +978,12 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
           exitCode: stepResult.exitCode,
           stderr: stepResult.stderr ?? null,
           stdout: stepResult.stdout ?? null,
+        },
+        blockedAction: attemptedAction === null ? null : {
+          action: attemptedAction,
+          priorStatus: typeof lastAnchorOutput?.status === "string" ? lastAnchorOutput.status : null,
+          diagnostics: Array.isArray(lastAnchorOutput?.diagnostics) ? lastAnchorOutput.diagnostics : [],
+          guidance: "The returned action could not be executed in this runner context. Re-run the public inspection; if it returns this action again, address its stated diagnostic before retrying. Do not reconstruct or blindly replay a stale mutating action.",
         },
         final: stepResult.output ?? null,
       };
@@ -1055,6 +1098,14 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
       }
       executable = nextAction.executable;
       argv = nextAction.argv;
+      attemptedAction = {
+        kind: "command",
+        executable: nextAction.executable,
+        argv: [...nextAction.argv],
+        mutation: nextAction.mutation === true,
+        requiresConfirmation: nextAction.requiresConfirmation === true,
+        expected: nextAction.expected ?? null,
+      };
       continue;
     }
 
@@ -1081,6 +1132,7 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     }
 
     if (nextAction && typeof nextAction === "object" && nextAction.kind === "external-operator") {
+      const externalOperator = renderExternalOperatorAction(nextAction);
       return {
         schema: SCHEMA,
         runner,
@@ -1089,7 +1141,7 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
         stepCap,
         stepsExecuted: steps.length,
         steps,
-        externalOperator: nextAction,
+        externalOperator,
         final: output,
       };
     }

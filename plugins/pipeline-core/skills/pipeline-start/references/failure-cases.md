@@ -36,9 +36,12 @@ repository preimage, so the guard hands back `nextAction.kind:
 "external-operator"`, `executionBoundary: "attended-host-terminal"`,
 `invocation: "user-copy-only"` and an `action.command` field carrying the
 raw shell command a human must run at that boundary — never something this
-session executes itself. That `command` is a single argv string and can be
-long: it commonly embeds a version-dependent absolute path (a plugin cache
-directory keyed by marketplace name and version/timestamp/commit-oid).
+session executes itself. When the same action has `action.copyCommand`, that
+pre-rendered field is authoritative for the human-facing instruction. Relay
+the requested shell's bounded lines verbatim; do not regenerate `command`.
+The raw command can be long: it commonly embeds a version-dependent absolute
+path (a plugin cache directory keyed by marketplace name and
+version/timestamp/commit-oid).
 
 Rendering that string as ordinary chat/terminal prose — a single line left to
 wrap wherever the display column happens to fall — is the exact failure this

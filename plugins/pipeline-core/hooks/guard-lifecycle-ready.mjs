@@ -124,7 +124,7 @@ export { machinePlaneFilePath };
 // which is out of scope for this file.
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // GF-078 bug 2 / NVA-B-READCONTAIN-1 (restoring the floor c8c7f449 removed): the one
-// additional approved root threaded into the bounded rg-to-rg/rg-to-head diagnostic pipeline
+// additional approved root threaded into the bounded rg-to-rg/rg-to-head/rg-to-tail diagnostic pipeline
 // (guard-command-grammar.mjs's isBoundedReadOnlyPipeline), alongside the project root every
 // call site already carries, and into every single, non-piped read-only command in
 // isReadOnlyDiagnosticCommand below (rg, grep, cat, head, tail, wc, stat, file) via
@@ -387,8 +387,9 @@ export const ADMITTED_GRAMMAR_SHAPES = [
     example: "rg -n needle probe.txt",
   },
   {
-    spelling: "bounded rg-to-rg or rg-to-head diagnostic pipeline: \"rg ... | rg ...\" or "
-      + "\"rg ... | head -n N\" / \"rg ... | head -N\" (N in 1..500), optionally followed by "
+    spelling: "bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: \"rg ... | rg ...\", "
+      + "\"rg ... | head -n N\" / \"rg ... | head -N\", or \"rg ... | tail -n N\" / "
+      + "\"rg ... | tail -N\" (N in 1..500), optionally followed by "
       + "\"2>/dev/null\"",
     example: "rg -n needle probe.txt | head -5",
   },
@@ -437,7 +438,7 @@ const GRAMMAR_DENIAL_REMEDY = [
 // EXECUTE the advice rather than matching its wording. This code never participates in the
 // NVA-B-DENIALTRIM short-form trim below -- it prints the same three true lines every time.
 const READ_SCOPE_DENIAL_REMEDY = [
-  "The pipeline is not the objection: the identical bounded rg-to-rg / rg-to-head pipeline is admitted when every read target resolves inside the project root.",
+  "The pipeline is not the objection: the identical bounded rg-to-rg / rg-to-head / rg-to-tail pipeline is admitted when every read target resolves inside the project root.",
   "Recomposing the same read -- splitting it, adding operators, redirects or line continuation -- cannot lift this refusal.",
   "Re-target the read inside the project root: the identical bounded pipeline AND the identical single, un-piped read are both admitted once every read target resolves inside the project root.",
 ];
@@ -906,6 +907,20 @@ function crossRepositoryMutationBlocked(overrideGuidance = "") {
       + "and plugin installation require a separate session rooted at the exact target "
       + "plus their own explicit PO authorization.\n"
       + overrideGuidance,
+  );
+}
+
+// The acknowledgement marker records a human decision and is written only by
+// `bootstrap-acknowledge-apply` after its chat/signature-specific evidence has
+// been checked.  It must stay writer-owned even if an agent deliberately
+// discards or reopens surrounding state: otherwise the agent can write the
+// marker first and route around the configured signature ceremony.
+function bootstrapAcknowledgementMarkerBlocked() {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + "GUARD-BOOTSTRAP-ACKNOWLEDGEMENT-WRITER-ONLY: the PRD acknowledgement marker is a human-approval record and may only be written by the exact bootstrap acknowledgement apply action after its configured proof is verified.\n"
+      + "Do not add, restore, or hand-edit this marker. Re-run project-onboarding-v3 inspect and follow its exact acknowledgement action.\n",
   );
 }
 
@@ -5213,6 +5228,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     return blocked();
   }
   if (!governed) return onboardingConsentBlocked(input, root) ?? verdict(0);
+  if (WRITE_TOOLS.includes(toolName) && isBootstrapAcknowledgementMarkerMutation(input)) {
+    return bootstrapAcknowledgementMarkerBlocked();
+  }
   // NVA-BOOTRECEIPT-1: a pure side effect, never a verdict of its own -- the sanctioned
   // preflight command is already admitted or refused by the unmodified logic below. This
   // only additionally records that it ran, for a resolved dispatched subagent, when the
