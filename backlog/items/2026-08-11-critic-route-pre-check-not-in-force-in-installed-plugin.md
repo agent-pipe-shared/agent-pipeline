@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critic-route-pre-check-not-in-force-in-installed-plugin
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 7535e631f8c15a924a1c1ee426f82bbd650a1dee
+closure_evidence: specs/sprint-alfred-epic/evidence/b2-governance-triple.md
 sprint: alfred
 due: 2026-08-25
 done_when: manual
@@ -102,3 +106,10 @@ This item's Alfred deferral stands unchanged; it should not be picked up
 again from a Nova session. Recorded here as a process note: the Elephant's
 own wave-composition step missed this item's sprint assignment during
 triage-of-triage vetting.
+
+### Update, 2026-09-14 — resolved by Governance Triple (WP-B2-7)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Implemented `observeDutyNotRuntimeLive()` in `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` comparing checkout plugin files against installed plugin files for agents, skills, and templates. Surfaces `dutyNotRuntimeLive: { status: "differing", diagnostic: "DUTY-NOT-RUNTIME-LIVE", differingFiles: [...] }` when repository changes are not yet runtime-live in installed plugin distribution, and `{ status: "in-force" }` when matching.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/b2-governance-triple.md`
+- **Date:** 2026-09-14
