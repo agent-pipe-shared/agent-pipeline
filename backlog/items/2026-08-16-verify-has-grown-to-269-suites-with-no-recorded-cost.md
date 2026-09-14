@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6b8bb0585d4cdfd6838b372f927e5e54394e3dec
+closure_evidence: specs/sprint-alfred-epic/evidence/c2-economics-operations.md
 sprint: alfred
 done_when: manual
 source: "PO, 2026-08-16: 'Was man hier an dem repo gut sehen kann ist, dass verify inzwischen unglaublich krass angeschwollen ist und sehr lange dauert.' Counts and the absent-duration finding were measured in the same session."
@@ -187,3 +191,10 @@ twice.
   done, parts 2-4 PO-gated). This addendum only records the relationship to
   the newer parallelization item and the fresh-run synergy.
 - **Date:** 2026-08-24
+
+### Update, 2026-09-14 — resolved by Dispatch Economics & Operations (WP-C2)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Extended `schemas/pipeline.verify-suites.v1.json` with durationMs telemetry and mandatory consolidation fields (`invariantPinned`, `nonOverlapNote`). Enforced consolidation invariants in `harness/scripts/check-verify-suite-registration.mjs` across all declarative suites in `harness/verify-suites.json`.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/c2-economics-operations.md`
+- **Date:** 2026-09-14

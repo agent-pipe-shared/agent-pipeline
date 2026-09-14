@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6b8bb0585d4cdfd6838b372f927e5e54394e3dec
+closure_evidence: specs/sprint-alfred-epic/evidence/c2-dispatch-token-breakdown.md
 sprint: alfred
 source: "PO observation, 2026-08-17, live during a session dispatching several goldfish-deep and Critic subagents back-to-back for Nova A Windows bugfix work."
 done_when: manual
@@ -86,3 +90,10 @@ non-architecture tasks).
   phase-by-phase token breakdown of one representative `goldfish-deep` and
   one `critic` dispatch) before any optimization is attempted.
 - **Date:** 2026-08-18
+
+### Update, 2026-09-14 — resolved by Dispatch Economics & Operations (WP-C2)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Conducted quantitative token economics investigation across subagent dispatches (`specs/sprint-alfred-epic/evidence/c2-dispatch-token-breakdown.md`). Proved bootstrap overhead represents ~17.2% (<40%) of tokens and is non-dominant. Dominant drivers are iterative active work (63.1%) and verification sweeps, addressed via closing allowance, range checks, and Critic scratch persistence.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/c2-dispatch-token-breakdown.md`
+- **Date:** 2026-09-14

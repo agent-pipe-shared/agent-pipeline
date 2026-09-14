@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critic-dispatches-cannot-persist-their-scratch-notes
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6b8bb0585d4cdfd6838b372f927e5e54394e3dec
+closure_evidence: specs/sprint-alfred-epic/evidence/c2-economics-operations.md
 sprint: alfred
 source: "Measured twice on 2026-08-27, independently, by both design-review Critic dispatches of the sprint-alfred-epic package (reports persisted under specs/sprint-alfred-epic/evidence/critic/)."
 done_when: manual
@@ -77,3 +81,10 @@ receipt class "dispatch truncation".
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Update, 2026-09-14 — resolved by Dispatch Economics & Operations (WP-C2)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Updated `plugins/pipeline-core/lib/guard-devplan-policy.mjs` (`isCriticScratchNotesPath`) and `guard-devplan-policy.test.mjs` to permit Critic scratch notes persistence at `scratch/dispatch/<task>/critic-notes.md` across all lifecycle phases. Updated Critic agent guidelines and review prompts.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/c2-economics-operations.md`
+- **Date:** 2026-09-14
