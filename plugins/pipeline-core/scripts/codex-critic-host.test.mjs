@@ -2228,6 +2228,7 @@ await checkAsync("codex-critic-app-server consumer accepts a complete, valid chi
     "scripts/codex-critic-app-server-child.mjs",
     "lib/codex-native-critic-tools.mjs",
     "lib/codex-native-critic-policy.mjs",
+    "lib/git-cmd.mjs",
     "hooks/guard-command-grammar.mjs",
   ].map((path) => ({ path, sha256: createHash("sha256").update(readFileSync(join(DEFAULT_PIPELINE_ROOT, "plugins/pipeline-core", path))).digest("hex") }));
   expectedBindings.childModuleGraphSha256 = createHash("sha256").update(`${JSON.stringify(graph)}\n`).digest("hex");

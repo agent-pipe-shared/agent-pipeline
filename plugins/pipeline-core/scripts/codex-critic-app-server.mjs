@@ -118,6 +118,7 @@ function snapshotRuleset(candidateRoot) {
     ["childExecutableSha256", CHILD_RELATIVE_PATH],
     [null, "lib/codex-native-critic-tools.mjs"],
     [null, "lib/codex-native-critic-policy.mjs"],
+    [null, "lib/git-cmd.mjs"],
     [null, "hooks/guard-command-grammar.mjs"],
   ];
   const files = definitions.map(([binding, relativePath]) => {
