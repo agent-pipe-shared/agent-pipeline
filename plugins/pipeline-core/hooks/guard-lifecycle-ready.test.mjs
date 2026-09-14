@@ -1483,17 +1483,11 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-// GF-078 bug 2 (root scope). Every single, non-piped read-only command
-// isReadOnlyDiagnosticCommand admits elsewhere in this file (rg, grep, cat, head, tail, wc,
-// stat, file) carries NO path restriction at all -- a single `rg pattern <plugin-install-path>`
-// self-inspection read was already unconditionally admitted before this fix. Only the
-// IDENTICAL read piped through a second rg or head was refused, purely for being a pipeline,
-// because isBoundedReadOnlyPipeline only ever knew the project root. This pins that the
-// plugin's own installed root (this file's own resolved location) is now a second approved
-// root for exactly that bounded pipeline shape -- narrower than the single-command allowance
-// above, never wider -- while the underlying grammar function's own two-argument, project-
-// root-only default stays byte-identical (asserted directly against guard-command-grammar.mjs).
-test("bounded rg pipeline admits self-inspection reads of the plugin's own installed root", () => {
+// The shared grammar module retains its project-root-only default, while this lifecycle
+// guard's read-only lane deliberately drops containment after the closed rg/head shape has
+// been validated. Both plugin self-inspection and any other external diagnostic read use the
+// same policy; location alone never creates write authority.
+test("bounded rg pipeline admits closed read-only diagnostics outside the project root", () => {
   const path = root();
   const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
   const hooksDir = join(pluginRoot, "hooks");
@@ -2414,6 +2408,80 @@ test("LND-5 admits only the canonical session Critic finalizer request under the
     rmSync(path, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
+});
+
+/**
+ * NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
+ * runnable.md). Measured before this dispatch: `onboarding-init.mjs` was refused
+ * (`GUARD-LIFECYCLE-NOT-READY`) at every one of these five statuses, so the driver's own
+ * chaining behaviour was unreachable regardless of how good it was. Both halves are pinned
+ * in the SAME governed, injected-denial fixture the OBLIGROUTE-1 test above uses -- the
+ * exact admitted shape, near-miss shapes still refused -- plus a refused control
+ * (`touch output.txt`) at every status, so a fixture that failed open by construction
+ * (no governance marker) could never pass this test the way an earlier run of the
+ * measurement harness silently did.
+ */
+test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readiness status, in its exact argv shape and no wider one", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of [
+      "portable-seed-required", "kickoff-required", "intake-required",
+      "migration-required", "partial",
+    ]) {
+      const nonReady = {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      };
+      const admit = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, `${status}: ${command}`);
+        assert.deepEqual(
+          evaluateLifecycleReadyGuard(bash(command), nonReady),
+          { exitCode: 0, stderr: "" },
+          `${status}: ${command}`,
+        );
+      };
+      const refuse = (command) => {
+        assert.equal(isSanctionedLifecycleCommand(command, path), false, `${status}: ${command}`);
+        const result = evaluateLifecycleReadyGuard(bash(command), nonReady);
+        assert.equal(result.exitCode, 2, `${status}: ${command}`);
+        assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `${status}: ${command}`);
+      };
+
+      // The exact admitted shape, and its flag-order-insensitive equivalents.
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}'`);
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner claude`);
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 10`);
+      admit(`node '${DRIVER_SCRIPT}' --step-cap 5 --root '${path}' --runner antigravity`);
+      const externalDirectory = join(tmpdir(), "guard-first-anchor-directory");
+      const externalKey = join(tmpdir(), "guard-existing-po-key.pem");
+      for (const runner of ["claude", "codex", "antigravity"]) {
+        admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner ${runner} --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
+        admit(`node '${DRIVER_SCRIPT}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none --runner ${runner} --root '${path}' --trust-anchor-directory '${externalDirectory}' --trust-anchor-mode new`);
+      }
+
+      // Near misses: no argv at all, wrong root, an out-of-set runner, a step-cap
+      // parseArgs() itself would refuse (zero, negative, non-numeric), a flag the driver's
+      // own parser does not accept at all, and a duplicated --root.
+      refuse(`node '${DRIVER_SCRIPT}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${join(path, "other")}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner human`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap 0`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap -1`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --step-cap abc`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --profile mini`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --root '${path}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --intent bootstrap`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode new --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --trust-anchor-mode new --trust-anchor-directory '${join(path, "key-dir")}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --step-cap 5 --trust-anchor-mode new --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key none`);
+
+      // The control the backlog item's own measurement insists on: a fail-open fixture
+      // (no governance marker) would have admitted this too.
+      refuse("touch output.txt");
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
 /**
@@ -5112,18 +5180,9 @@ test("NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admissio
 // the state of the boundary; they are not an endorsement of any single row.
 
 /** The exact denial reason text each refusal prints; the capability binds to it verbatim. */
-/**
- * NVA-BL-76: the exact denial reason text the read-scope refusal binds into its HGO request.
- * Kept out of HGO_GRAMMAR_REASON on purpose -- GUARD-READ-SCOPE-OUTSIDE-ROOT is not a grammar
- * code, and the grammar remedy text is precisely what it must not print.
- */
-const HGO_READ_SCOPE_REASON =
-  "GUARD-READ-SCOPE-OUTSIDE-ROOT: The bounded read-only diagnostic pipeline reads a path outside the project root.";
-
 const REACHABILITY_REASONS = {
   ...HGO_GRAMMAR_REASON,
   "GUARD-CROSS-REPO-MUTATION": XREPO_REASON,
-  "GUARD-READ-SCOPE-OUTSIDE-ROOT": HGO_READ_SCOPE_REASON,
 };
 
 /**
@@ -6721,8 +6780,6 @@ test("rg-to-rg admits outside-root reads in either segment", () => {
     // The in-root control of the same exemption is still admitted, unchanged.
     assert.equal(readScopeRun("rg --files . | rg -n verify", projectDir).exitCode, 0);
 
-    // The admitted stderr suppressor is part of the bounded shape, so the outside-root
-    // variant is the same read-scope refusal -- previously mislabelled GUARD-REDIRECT-UNAPPROVED.
     const suppressed = readScopeRun(`rg -n 'Overall' ${outsideFile} 2>/dev/null | head -n 5`, projectDir);
     assert.equal(suppressed.exitCode, 0);
   } finally {
@@ -6731,7 +6788,7 @@ test("rg-to-rg admits outside-root reads in either segment", () => {
   }
 });
 
-test("NVA-BL-76: nothing but the bounded diagnostic shape is reclassified", () => {
+test("NVA-GF-GREENFIELD-READONLY-1: removing read containment does not weaken other grammar and write refusals", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
     // Every other bound must still hold before the new code is reachable: an out-of-range
@@ -6752,8 +6809,6 @@ test("NVA-BL-76: nothing but the bounded diagnostic shape is reclassified", () =
       const refused = readScopeRun(command, projectDir);
       assert.equal(refused.exitCode, 2, command);
       assert.match(refused.stderr, new RegExp(code, "u"), command);
-      assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u,
-        `a shape that is not the bounded read-only diagnostic was reclassified as one: ${command}`);
     }
     assert.equal(readScopeRun(`cat ${outsideFile} | head -n 5`, projectDir).exitCode, 0);
   } finally {
@@ -6765,10 +6820,6 @@ test("NVA-BL-76: nothing but the bounded diagnostic shape is reclassified", () =
 test("outside-root read-only shapes are admitted without an override", () => {
   const { projectDir, outside, outsideFile } = readScopeFixture();
   try {
-    // Same instrument as the NVA-BL-75 corpus: not "was it admitted" but "who, if anyone,
-    // could subsequently admit it". The PO's classification decision for this item is that a
-    // human signature CAN authorize an outside-root READ -- unlike a never-liftable
-    // cross-repository mutation, which is what the old code implied by association.
     for (const command of [
       `rg -n 'Overall' ${outsideFile} | head -n 5`,
       `rg --files ${outside} | rg -n Overall`,

@@ -266,6 +266,70 @@ test("evaluateDispatchBudgetGuard (NVA-B-BUDGETGUARD-2): a payload without agent
   assert.deepEqual(counterFiles, [], "no per-agent counter file is written for a payload with no agent_id");
 });
 
+// pipeline.identity-attestation-fail-closed-fallback (2026-08-29): a
+// transcript_path that IS present but not a usable absolute path must never
+// share "unresolved"'s ambiguous, fail-open-tolerant kind -- it is never a
+// legitimate orchestrator shape, unlike a genuinely missing field.
+test("subagentIdentity: a present but relative transcript_path is a distinct kind, never merged into 'unresolved'", () => {
+  const identity = subagentIdentity({ transcript_path: "relative/session/subagents/agent-x.jsonl" }, {});
+  assert.notEqual(identity.kind, "unresolved");
+  assert.notEqual(identity.kind, "orchestrator");
+  assert.equal(identity.kind, "invalid-identity");
+  assert.equal(identity.reason, "transcript-path-present-but-not-absolute");
+});
+
+test("subagentIdentity: a present but non-string, non-null transcript_path is invalid-identity, not unresolved", () => {
+  assert.equal(subagentIdentity({ transcript_path: 12345 }, {}).kind, "invalid-identity");
+});
+
+// NVA-CF-NULLTID (2026-08-29): a JSON-serialized `transcript_path: null` (a
+// host that emits null rather than omitting the key) is a legitimate
+// "absent" encoding -- it must route the same as undefined/blank-string
+// into the fail-OPEN "unresolved" lane, never the fail-CLOSED
+// "invalid-identity" lane. Before this fix it landed in "invalid-identity"
+// with the fixed sentinel agentId, which guard-lifecycle-ready.mjs's
+// bootstrap-receipt gate can never clear (no receipt is ever written for a
+// non-"subagent" kind), permanently blocking every Edit/Write/NotebookEdit
+// for that session with no recovery route.
+test("subagentIdentity: a null transcript_path is unresolved (treated as absent), not invalid-identity", () => {
+  const identity = subagentIdentity({ transcript_path: null }, {});
+  assert.equal(identity.kind, "unresolved");
+  assert.equal(identity.reason, "transcript-path-missing-or-relative");
+});
+
+test("evaluateDispatchBudgetGuard: an invalid-identity (present-but-relative transcript_path) call still fails open here, unaffected -- this guard's own documented fail-open-but-visible posture is unchanged by the new kind", () => {
+  const store = makeStore();
+  const input = { transcript_path: "relative/session/subagents/agent-x.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } };
+  const result = evaluateDispatchBudgetGuard(input, baseOptions(store));
+  assert.equal(result.exitCode, 0);
+});
+
+// pipeline.dispatch-budget-invalid-identity-fails-closed (2026-08-29,
+// NVA-R7-INVALIDIDENTITY): the call itself still admits (exitCode 0,
+// unchanged -- see the neighboring "still fails open" test above and this
+// guard's own documented Fail-open-but-visible posture: a rate-limiting
+// budget gate blocking every tool call outright on an unreadable identity is
+// a much heavier act than refusing a write). What must change is the
+// RECORD: an invalid-identity call must be recorded under its own distinct
+// branch and its TRUE reason, never silently merged into -- or made to look
+// like -- a resolved-but-undefined agent type's "max-turns-unresolvable"
+// shape, which is what it fell through to before this fix and which
+// actively discarded the distinction the F02 sentinel exists to preserve.
+test("evaluateDispatchBudgetGuard: an invalid-identity call is recorded under its own distinct branch and TRUE reason, never the misleading max-turns-unresolvable shape", () => {
+  const store = makeStore();
+  const input = { transcript_path: "relative/session/subagents/agent-x.jsonl", tool_name: "Read", tool_input: { file_path: "/x" } };
+  const result = evaluateDispatchBudgetGuard(input, baseOptions(store));
+  assert.equal(result.exitCode, 0);
+  const unresolvedRaw = store.files.get(`${COMMON_DIR}/agent-pipeline/dispatch-budget/unresolved.jsonl`);
+  assert.ok(unresolvedRaw, "an invalid-identity call must still be recorded for visibility");
+  const record = JSON.parse(unresolvedRaw.trim());
+  assert.equal(record.kind, "invalid-identity");
+  assert.equal(record.branch, "invalid-identity");
+  assert.equal(record.reason, "transcript-path-present-but-not-absolute");
+  assert.notEqual(record.reason, "max-turns-unresolvable");
+  assert.notEqual(record.branch, "max-turns-unresolved");
+});
+
 test("subagentIdentity: missing sibling meta.json is unresolved", () => {
   const { results } = run({ steps: [{ op: "identity", input: { transcript_path: SUBAGENT_TRANSCRIPT } }] });
   assert.equal(results[0].kind, "unresolved");

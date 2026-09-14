@@ -4702,6 +4702,12 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     const produceSecurityEvidence = () => spawnSync(process.execPath, [securityScanScript, "--root", path], {
       cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
     });
+    // NVA-R33-SECGATEON: the second, independent bucket the seeded gate chapter now
+    // also demands -- see SECGATE-1 below for its own dedicated satisfying-path proof.
+    const securityScanScript = fileURLToPath(new URL("../scripts/security-scan.mjs", import.meta.url));
+    const produceSecurityEvidence = () => spawnSync(process.execPath, [securityScanScript, "--root", path], {
+      cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+    });
     // `approve-push`'s chat-mode challenge is written with `console.error`
     // directly (not the `writeError` dep), so this has to intercept the real
     // console method to see it -- same shape as `capturedStderr` in

@@ -1,0 +1,147 @@
+PASS  gitleaks isInstalled: env override to existing fixture
+PASS  gitleaks ignore: Nova A1 entries are exact, rebase-stable content authorities
+PASS  gitleaks ignore: Nova A1 no longer carries commit-bound legacy fingerprints
+PASS  gitleaks ignore: stale fixture fingerprints are replaced by content authorities
+PASS  gitleaks isInstalled: env override to nonexistent path -> not installed
+PASS  gitleaks isInstalled: no override, empty PATH -> not installed
+PASS  gitleaks run: clean fixture -> PASS, 0 findings
+PASS  gitleaks run: candidate-tree scan disables Git history
+PASS  gitleaks run: candidate-tree scan keeps repository-relative fingerprints
+PASS  gitleaks run: candidate tree uses its verified physical root
+PASS  gitleaks run: candidate tree source resolves from candidate cwd
+PASS  gitleaks run: candidate tree no-git invocation remains shell-free
+PASS  gitleaks run: candidate tree no-git fixture -> PASS
+PASS  gitleaks run: findings fixture -> FINDINGS status
+PASS  gitleaks run: findings normalized shape
+PASS  gitleaks run: exact content authority ignores only one matching historical fixture
+PASS  gitleaks run: exact content authority binds the physical ignore bytes
+PASS  gitleaks run: secret-value drift at an otherwise identical path/rule/line remains blocking
+PASS  gitleaks run: malformed content authority fails closed before scanner execution
+PASS  gitleaks run: non-regular content authority fails closed
+PASS  gitleaks run: crash (nonzero exit) -> ERROR
+PASS  gitleaks run: crash reason mentions exit code
+PASS  gitleaks run: garbage report JSON -> ERROR
+PASS  gitleaks run: garbage reason mentions unparseable
+PASS  gitleaks run: valid JSON object report -> scanner_error
+PASS  gitleaks run: not installed -> SKIPPED
+PASS  gitleaks run: not installed -> binary_missing classification
+PASS  gitleaks run: SKIPPED carries a reason
+PASS  gitleaks run: EPERM -> execution_environment (not missing/finding)
+PASS  gitleaks run: EACCES -> execution_environment (not missing/finding)
+PASS  osv-scanner isInstalled: not installed (no override, empty PATH)
+PASS  osv-scanner run: clean fixture -> PASS
+PASS  osv-scanner run: exit-code-1-with-findings is a valid run -> FINDINGS (not ERROR)
+PASS  osv-scanner run: severity mapping (db_specific CRITICAL / numeric CVSS 7.8 / fallback)
+PASS  osv-scanner run: rule ids preserved
+PASS  osv-scanner run: garbage output + exit code 2 -> ERROR
+PASS  osv-scanner run: valid JSON without top-level results[] -> scanner_error
+PASS  osv-scanner run: v2 result with packages object (not array) -> scanner_error
+PASS  osv-scanner run: malformed packages failure names results[0].packages
+PASS  osv-scanner run: v2 package without groups[] -> scanner_error
+PASS  osv-scanner run: missing groups failure names results[0].packages[0].groups
+PASS  osv-scanner run: v2 vulnerability with non-string id -> scanner_error
+PASS  osv-scanner run: malformed vulnerability failure names id
+PASS  osv-scanner run: exit 128 + 'No package sources found' -> SKIPPED (F2 fix)
+PASS  osv-scanner run: SKIPPED reason mentions no package sources
+PASS  osv-scanner run: exit 128 with DIFFERENT output -> still ERROR (fail-closed)
+PASS  osv-scanner run: exit-128-other reason mentions exit code
+PASS  osv-scanner run: major v1 -> incompatible_major before scan
+PASS  osv-scanner run: incompatible major names v2 requirement
+PASS  osv-scanner run: EPERM version probe -> execution_environment
+PASS  osv-scanner run: EACCES version probe -> execution_environment
+PASS  semgrep isInstalled: not installed (no override, empty PATH)
+PASS  semgrep run: clean fixture -> PASS
+PASS  semgrep run: findings fixture -> FINDINGS
+PASS  semgrep run: severity mapping ERROR/WARNING/INFO -> high/medium/info
+PASS  semgrep run: garbage output -> ERROR
+PASS  semgrep run: nonzero exit with clean-looking results[] -> scanner_error
+PASS  semgrep run: JSON error payload with empty results[] -> scanner_error
+PASS  semgrep run: valid JSON without results[] -> scanner_error
+PASS  semgrep run: EPERM -> execution_environment (not missing/finding)
+PASS  semgrep run: EACCES -> execution_environment (not missing/finding)
+PASS  license-check isInstalled: always true (no binary)
+PASS  license-check run: all-allowed -> PASS
+PASS  license-check run: allowlist violation -> FINDINGS (denied + not-allowed)
+PASS  license-check run: denied-license finding message
+PASS  license-check run: not-in-allowlist finding message
+PASS  license-check run: findings severity fixed high
+PASS  license-check run: missing declared file -> SKIPPED
+PASS  license-check run: missing declared file -> classification success (not configured, not a scanner error)
+PASS  license-check run: missing declared file reason names the missing file
+PASS  license-check run: missing allowlist file -> SKIPPED
+PASS  license-check run: missing allowlist file -> classification success (not configured, not a scanner error)
+PASS  license-check run: missing allowlist reason reads as not-configured
+PASS  license-check run: malformed allowlist JSON -> ERROR
+PASS  license-check run: valid JSON allowlist without deny[] -> scanner_error
+PASS  license-check run: valid JSON declaration without dependencies[] -> scanner_error
+PASS  runner: manifest absent -> exit 0 (nothing installed/configured, nothing blocking)
+PASS  runner: manifest absent -> all 4 scanners attempted (defaults enabled) and SKIPPED
+PASS  runner: manifest absent -> default thresholds
+PASS  runner: manifest absent -> binary-backed SKIPPED entries classify binary_missing
+PASS  runner: manifest absent (no governance/ dir, fresh-consumer shape) -> license-check entry is a clean skip, not scanner_error
+PASS  runner: manifest absent -> child-process preflight succeeds
+PASS  runner: evidence file written (manifest-absent path)
+PASS  runner: evidence file content matches returned evidence
+PASS  runner: mixed statuses -> [FINDINGS, PASS, ERROR, PASS]
+PASS  runner: mixed statuses -> exit 2 (ERROR + high findings, mode blocking)
+PASS  runner: mixed statuses -> findings array carries the 2 gitleaks findings
+PASS  runner: evidence full schema field set
+PASS  runner: evidence.schema
+PASS  runner: non-Git fixture records unavailable candidate binding
+PASS  runner: evidence.command
+PASS  runner: evidence.commit is a non-empty string
+PASS  runner: evidence.project is a non-empty string
+PASS  runner: evidence file written on a blocking-exit path
+PASS  runner: exact Gitleaks content authority is visible without hiding an unmatched secret
+PASS  runner: security policy binds the exact Gitleaks ignore authority bytes
+PASS  runner: neutral authority selects its enabled license policy without legacy fallback
+PASS  runner: neutral authority evidence binds exact non-null manifest and license-policy digests
+PASS  runner: neutral policy evidence does not bind legacy or mixed authority bytes
+PASS  runner: mixed authority is fail-closed instead of falling back to legacy
+PASS  runner: mixed authority evidence binds no legacy manifest
+PASS  runner: child preflight EPERM is execution_environment
+PASS  runner: child preflight EPERM preempts all binary scanners without missing/finding classification
+PASS  runner: child preflight EPERM is fail-closed
+PASS  runner: child preflight EACCES is execution_environment
+PASS  runner: child preflight EACCES preempts binary scanners
+PASS  runner: child preflight EACCES is fail-closed
+PASS  runner: threshold filtering -> only semgrep ran
+PASS  runner: threshold filtering -> semgrep FINDINGS (1 medium)
+PASS  runner: threshold filtering -> medium below block_on -> exit 0 (no block)
+PASS  runner: mode warn -> exit 1 (not 2) for a blocking-class finding
+PASS  runner: ERROR + zero findings -> findings array empty
+PASS  runner: ERROR + zero findings -> still blocking-class -> exit 2
+PASS  runner: absent gates.security key -> ERROR still blocking-class -> exit 2 (mode resolved to "blocking")
+PASS  resolveSecurityGateMode: absent gates.security key on a manifest object shaped like the fixture above also resolves to "blocking"
+PASS  runner: all scanners disabled -> empty scanners[] and findings[]
+PASS  runner: all scanners disabled -> exit 0
+PASS  runner: semgrep rules_dir escaping rootDir -> ERROR/manifest_config_invalid, adapter never invoked (N3)
+PASS  runner: rules_dir escape reason names the offending manifest value
+PASS  runner: rules_dir escape reason states it resolves outside rootDir
+PASS  runner: rules_dir escape forces blocking-class -> exit 2
+PASS  runner: ordinary in-tree semgrep rules_dir is unaffected by the N3 containment guard -> PASS
+PASS  runner: in-tree rules_dir -> exit 0 (clean)
+PASS  runner: clean Git candidate is scanned from a verified detached worktree
+PASS  runner: detached snapshot policy digests are bound before snapshot cleanup
+PASS  runner: detached snapshot project identity is bound before snapshot cleanup
+PASS  runner: exact candidate omits private worktree path
+PASS  runner: dirty Git candidate is rejected before a mutable scan
+PASS  runner: scanner mutation invalidates an otherwise clean candidate
+PASS  runner: standard user-local Semgrep is discovered outside arbitrary PATH
+PASS  runner: standard user-local Semgrep keeps a clean scan non-blocking
+PASS  fresh consumer (no catalog): v1 exit 0 -- missing scanners are SKIPPED, never ERROR
+PASS  fresh consumer (no catalog): v2 envelope emitted
+PASS  fresh consumer (no catalog): v2 required-capability plan is empty (catalog-unavailable)
+PASS  fresh consumer (no catalog): v2 verdict is non-blocking
+PASS  fresh consumer (no catalog): every attempted scanner reads tool-unavailable/not-configured, never an unlabeled success
+PASS  fresh consumer (no catalog): checkSecurityCompleteness (the ACTUAL guard-push v2 gate) passes with zero failures
+PASS  reportStatus: passed / findings / error / not-configured are each distinguishable
+PASS  reportStatus: osv-scanner with no package sources reads not-applicable, not tool-unavailable
+PASS  CLI: bare rootDir -> exit 0
+PASS  CLI: stdout contains verdict line
+PASS  CLI: stdout reports evidence path
+PASS  CLI: evidence file actually created
+
+143/143 cases passed.
+
+exit:0

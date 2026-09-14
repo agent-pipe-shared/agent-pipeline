@@ -2194,7 +2194,7 @@ function isApprovedCatPipelineReadPath(value, root, extraRoots = []) {
 
 // cat's argv, source side: zero or more CAT_PIPELINE_DISPLAY_FLAGS entries (an optional `--`
 // ends flag parsing, matching ordinary shell convention), then one or more read paths, each
-// approved by isApprovedCatPipelineReadPath above. At least one path is required -- a `cat`
+// validated by isValidCatPipelineReadPath above. At least one path is required -- a `cat`
 // with no path argument reads stdin only, which is not a file read this pipeline family
 // exists to admit.
 function isValidCatPipelineSourceArgs(argv, root, extraRoots = []) {
@@ -2584,8 +2584,8 @@ function isApprovedSingleCommandReadArg(arg, root, extraRoots) {
  * Keep fail-closed lifecycle states diagnosable without turning arbitrary
  * shell syntax into a write bypass.  Only one simple command is accepted; the
  * parser already rejects control operators, redirections and command
- * substitution. The bounded rg and grep pipeline families (above) are the
- * only two-segment exceptions.
+ * substitution. The bounded diagnostic pipeline families above are the only
+ * two-segment exceptions.
  *
  * Shared tail logic, factored out of isReadOnlyDiagnosticCommand so the trailing-redirect
  * exception above can validate an already-tokenized `[executable, ...argv]` shape without
@@ -3141,7 +3141,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
     if (poArgs.length === 1 && ["--help", "--version"].includes(poArgs[0])) return false;
     return true;
   }
-  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
+  if (isBoundedReadOnlyPipeline(parsed, root, diagnosticReadArgumentRoots(parsed, root))) return false;
   if (isBoundedGrepPipeline(parsed, root)) return false;
   if (isBoundedCatPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;

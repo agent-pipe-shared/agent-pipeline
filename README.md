@@ -27,6 +27,16 @@ inspect later.
 > observations, not an onboarding estimate or a promise for your project.
 > Consumer administration overhead has not yet been measured across runners.
 
+> **Choose approval strength honestly.** `gates.human_approval: "chat"` is for
+> a PO-classified low-consequence repository only. It lets the agent record an
+> explicit chat answer without a key, trust anchor, terminal command, or
+> UI/host/TTY attestation. Its durable basis is
+> `chat-attributed-unattested`: attribution, not proof that a human/account/device
+> approved. `signature` remains the default and the only strong attested option.
+> Existing installations may still use ADR-0056's action-local approval keys;
+> do not assume a global selector works until the installed runtime recognizes
+> it. See [ADR-0076](docs/adr/0076-global-chat-attributed-unattested-approval-mode.md).
+
 ## The problem
 
 Teams with audit obligations often need more than a chat transcript or a claim
@@ -226,6 +236,43 @@ dauerhaften, später einsehbaren Nachweis.
 > historische vollständige Verify-Beispiele, darunter zwei rote Receipts. Das
 > sind Beobachtungen, keine Onboarding-Schätzung oder Zusage für dein Projekt.
 > Consumer-Verwaltungsaufwand über Runner hinweg ist noch nicht gemessen.
+
+> **Aktueller Kandidat: `0.6.0` — noch nicht veröffentlicht.** Der lokale
+> Source und die Plugin-Manifeste tragen bereits `0.6.0`, aber das ist ein
+> Release-Kandidat und weder Installationsempfehlung noch Produktiv-Release.
+> **Phoenix ist die abgeschlossene, integrierte Produktgrundlage:** dauerhafte
+> Delivery-Governance, explizite kandidatengebundene Evidenz und Freigaben,
+> unabhängige Prüfung sowie sichere Grenzen für externe Aktionen. Fehlende,
+> veraltete, fehlerhafte oder nicht passende Nachweise bleiben typisierte
+> Nicht-Erfolge.
+>
+> **Nova bleibt aktiv.** Dieser Kandidat enthält dessen nutzbaren,
+> runner-bewussten Schritt: Ein öffentlicher Driver führt ein leeres Verzeichnis
+> über geführtes Onboarding, einen vorhandenen oder neuen ersten Trust Anchor,
+> wiederaufnehmbaren Intake, Planfreigabe, ein echtes Verify-Setup und den Start
+> der ersten Implementierung. Claude, Codex und Antigravity folgen dabei
+> demselben Vertrag strukturierter Aktionen; ein Runner füllt nur die
+> ausgewiesenen menschlichen Platzhalter statt interne Befehle zu erraten. Nova B
+> und runnerspezifische Evidenz bleiben Folgearbeit, nicht die Behauptung, Nova
+> sei abgeschlossen.
+>
+> Die Veröffentlichung bleibt bewusst getrennt. Der finale Kandidat braucht seine
+> vollständige eigene Verify-, Security-, unabhängige Review-, Freigabe- und
+> Remote-Readback-Evidenz; kein älteres Ergebnis wird still auf einen veränderten
+> Tree übertragen. Umfang und bewusste Nicht-Claims stehen unter [Neu in
+> 0.6.0](docs/whats-new-0.6.0.md); den vollständigen Ablauf beschreibt der
+> [Consumer-Onboarding-Guide](docs/v3-consumer-onboarding.md).
+
+> **Freigabestärke ehrlich wählen.** `gates.human_approval: "chat"` ist nur
+> für ein vom PO ausdrücklich als folgenarm eingestuftes Repository gedacht.
+> Der Agent darf dann eine explizite Chat-Antwort ohne Schlüssel, Trust Anchor,
+> Terminalbefehl oder UI-/Host-/TTY-Attestierung festhalten. Die dauerhafte
+> Grundlage heißt `chat-attributed-unattested`: Zuschreibung, nicht der Beweis,
+> dass ein Mensch, Account oder Gerät freigegeben hat. `signature` bleibt Default
+> und die einzige starke attestierte Option. Bestehende Installationen können
+> noch ADR-0056s aktionslokale Schlüssel verwenden; einen globalen Selektor erst
+> nach Runtime-Readback als wirksam annehmen. Siehe
+> [ADR-0076](docs/adr/0076-global-chat-attributed-unattested-approval-mode.md).
 
 ## Das Problem
 
