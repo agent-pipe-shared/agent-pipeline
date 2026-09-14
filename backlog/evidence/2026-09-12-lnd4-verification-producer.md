@@ -1,6 +1,6 @@
 # LND-4 verification producer
 
-Date: 2026-09-12  
+Date: 2026-09-12
 Scope: ADR-0083 LND-4, aggregate verification action producer
 
 Implementation commits `bf2a0956` through `720d1785` add the shared closed

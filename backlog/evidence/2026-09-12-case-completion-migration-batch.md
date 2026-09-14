@@ -1,6 +1,6 @@
 # Case-completion migration batch
 
-Date: 2026-09-12  
+Date: 2026-09-12
 Scope: Nova B, runner-neutral Verify evidence
 
 Three further legacy process-only suites now declare their complete case corpus

@@ -1,6 +1,6 @@
 # Agent-binding OS-boundary disposition
 
-Date: 2026-09-11  
+Date: 2026-09-11
 Backlog item: `pipeline.agent-binding-guards-are-not-os-level-sandboxing`
 
 ## Decision proved

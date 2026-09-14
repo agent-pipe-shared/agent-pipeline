@@ -1,7 +1,7 @@
 # Critic disposition path-binding correction
 
-Date: 2026-09-12  
-Candidate: `0b34dbc111f98dd4b3b6d1408ef012a924cd9d63`  
+Date: 2026-09-12
+Candidate: `0b34dbc111f98dd4b3b6d1408ef012a924cd9d63`
 Tree: `ec7e4e0e4ff3a24a9c9bd7e86054c2223089c20f`
 
 The first independent Critic review of the v3 dispatch-disposition package

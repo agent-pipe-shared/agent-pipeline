@@ -1,7 +1,7 @@
 # NVA-B-BUDGET-PARTIAL-CLOSURE-1 — dispatch-budget partial closure
 
-Date: 2026-09-12  
-Inspected repository commit: `40a2339e397b0fbaa0929425d8407539fc4ca2c2`  
+Date: 2026-09-12
+Inspected repository commit: `40a2339e397b0fbaa0929425d8407539fc4ca2c2`
 Scope: committed, runner-neutral budget policy, shipped agent limits and
 briefing contracts. Native Codex Sandbox/App Server behavior under WSL is
 deferred and is neither acceptance evidence nor a blocker for this audit.

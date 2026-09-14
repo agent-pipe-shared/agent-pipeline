@@ -19,4 +19,3 @@ for commit `0adb9659f04d6b27bfa7b0674aa77b883926854f`, tree
 also passed the full 520/520 Verify run
 `verify-1789112505043-51f3869a4ac19a99` before the documentation-only
 corrections.
-

@@ -1,6 +1,6 @@
 # Boundary-aware Verify closure evidence
 
-Date: 2026-09-11  
+Date: 2026-09-11
 Item: `pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it`
 
 ## Decision and implementation

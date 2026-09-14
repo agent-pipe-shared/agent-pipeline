@@ -1,6 +1,6 @@
 # LND-3 mixed-stream replay and viewer
 
-Date: 2026-09-12  
+Date: 2026-09-12
 Scope: ADR-0083 LND-3, runner-neutral offline reader
 
 Implementation commit `9bdd94c2a5b9d6ede5f587a218e4d4b5df2b26d5`

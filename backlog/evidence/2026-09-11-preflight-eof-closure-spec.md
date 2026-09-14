@@ -103,4 +103,3 @@ independent: this item is about making the isolated lane work; the fallback is
 about what happens when it does not.
 
 <!-- SPEC-REFERENCE-STRIPPED-TRIAGE: this section of the original backlog item has been removed for dispatch citation. It recorded a prior human or Critic verdict about this item -- never spec/reference content -- and would otherwise contaminate an independent downstream review or implementation. See the item's own file for the full history. Convention: backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md. -->
-

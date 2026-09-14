@@ -1,7 +1,7 @@
 # Shared Verify evidence slot — final ordering repair and Critic PASS
 
-Date: 2026-09-11  
-Implementation candidate: `9364887d6b29ff9ef846741a118357bec8e38ab1`  
+Date: 2026-09-11
+Implementation candidate: `9364887d6b29ff9ef846741a118357bec8e38ab1`
 Tree: `76a4a29695cd951662108467a5a17a40175cf52710`
 
 ## Result

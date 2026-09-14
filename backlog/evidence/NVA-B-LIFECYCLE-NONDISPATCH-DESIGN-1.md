@@ -2,8 +2,8 @@
 
 ## Decision brief
 
-Date: 2026-09-12  
-Inspected commit: `21cf930cacebf26b3d2ceb8c6ebe55ed787c017e`  
+Date: 2026-09-12
+Inspected commit: `21cf930cacebf26b3d2ceb8c6ebe55ed787c017e`
 Scope: runner-neutral schema and repository integration only. Native Codex
 Sandbox/App Server behavior under WSL is deferred and is not evidence for this
 decision.

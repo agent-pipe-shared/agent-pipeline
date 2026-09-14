@@ -1,6 +1,6 @@
 # Case-completion migration batch 2
 
-Date: 2026-09-12  
+Date: 2026-09-12
 Scope: Nova B, runner-neutral Verify evidence
 
 Commit `53fc71d3` migrated three additional suites to the bounded completion

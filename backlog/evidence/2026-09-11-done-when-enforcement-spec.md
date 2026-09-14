@@ -15,4 +15,3 @@ Review the fixed candidate against these criteria:
 
 Rollback is a normal revert of the implementation commit. It restores advisory
 reporting for open undeclared items and requires no data or ledger migration.
-

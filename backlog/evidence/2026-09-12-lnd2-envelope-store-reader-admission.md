@@ -1,6 +1,6 @@
 # LND-2 envelope/store reader admission
 
-Date: 2026-09-12  
+Date: 2026-09-12
 Scope: ADR-0083 LND-2, runner-neutral governance storage
 
 The foundation commit `12a304ce` admits

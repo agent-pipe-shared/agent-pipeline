@@ -1,6 +1,6 @@
 # Module-cluster reachability instrument
 
-Date: 2026-09-12  
+Date: 2026-09-12
 Scope: Nova B, runner-neutral static analysis
 
 The earlier scratch audit is now reproduced by a versioned instrument at

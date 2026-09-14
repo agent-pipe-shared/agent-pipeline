@@ -26,4 +26,3 @@ This is round two. QG-13 permits no third automatic Critic loop. The code
 trajectory is therefore disposed by the focused green checks and the Critic's
 explicit no-code-finding result; no PASS is claimed. Final detached threat-model
 approval remains bound to the frozen final candidate and its push boundary.
-

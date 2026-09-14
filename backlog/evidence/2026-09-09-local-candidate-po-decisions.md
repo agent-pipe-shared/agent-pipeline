@@ -65,4 +65,3 @@ In commit `4950d24addeac9a93df61826d4a9f4a044753480`:
 - Bounded `cat`-pipeline (`isBoundedCatPipeline`) accepts and threads session-derived extra roots (session transcript file and session memory directory).
 - `dispatch-authorship-verify.mjs` and `goldfish-task.md` briefing template support `orchestratorAddedFiles`, resolving discrepancies where an orchestrator legitimately adds registry or evidence files to a dispatch commit.
 - Verified by unit tests in `guard-lifecycle-ready.test.mjs` and `dispatch-authorship-verify.test.mjs`.
-

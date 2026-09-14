@@ -1,9 +1,9 @@
 # Codex preflight EOF focused correction — Critic PASS
 
-Date: 2026-09-11  
-Reviewed candidate: `3c1dbb7930b167de786a63859fc65f34d2316e1d`  
-Reviewed tree: `6941890035c5a529bca61cce7a88d80be6f6b0a8`  
-Exact Verify: `evidence/verify-1789109817924-398dc3bbfe448fb8.json`  
+Date: 2026-09-11
+Reviewed candidate: `3c1dbb7930b167de786a63859fc65f34d2316e1d`
+Reviewed tree: `6941890035c5a529bca61cce7a88d80be6f6b0a8`
+Exact Verify: `evidence/verify-1789109817924-398dc3bbfe448fb8.json`
 Assurance: functional-equivalent-read-only; OS isolation not asserted.
 
 The fresh correction Critic reported **PASS with no findings**.
