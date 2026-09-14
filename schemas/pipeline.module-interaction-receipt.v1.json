@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.module-interaction-receipt.v1",
+  "title": "Module Interaction Receipt (pipeline.module-interaction-receipt.v1)",
+  "description": "Schema for module interaction receipts capturing task metrics and candidate bindings (WP-D2, Issue #104, Spec §7.2, Doctrine §2.1).",
+  "type": "object",
+  "required": [
+    "schema",
+    "taskId",
+    "featureId",
+    "candidateCommit",
+    "touchedModules",
+    "metrics"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": [
+        "pipeline.module-interaction-receipt.v1"
+      ]
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "featureId": {
+      "type": "string"
+    },
+    "candidateCommit": {
+      "type": "string"
+    },
+    "touchedModules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "contextLocality",
+        "changeLocality",
+        "contractSufficiency"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "contextLocality": {
+          "type": "object",
+          "required": [
+            "value",
+            "status"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": [
+                "number",
+                "string",
+                "object",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "unknown"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "changeLocality": {
+          "type": "object",
+          "required": [
+            "value",
+            "status"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": [
+                "number",
+                "string",
+                "object",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "unknown"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "contractSufficiency": {
+          "type": "object",
+          "required": [
+            "value",
+            "status"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": [
+                "number",
+                "string",
+                "object",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "measured",
+                "estimated",
+                "unavailable",
+                "unknown"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}
