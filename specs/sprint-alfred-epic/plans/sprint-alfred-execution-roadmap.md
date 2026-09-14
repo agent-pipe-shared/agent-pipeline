@@ -60,6 +60,17 @@ Sprint Alfred delivers mechanical governance, control integrity, measurable rigo
 
 ### Track E — Integration & Release Qualification
 - **E1 Contract Freeze:** Already established in `specs/sprint-alfred-epic/design/contract-freeze.json`.
+- **E3 Provider-Free Cross-Runner AGY Goldfish Dispatch Spike:** Planned
+  `goldfish-antigravity-host.mjs` accepts only a complete runner-neutral
+  Goldfish packet and invokes `invokeAgy` through an injected executable.
+  It binds candidate/input/result/probe evidence, isolates results, preserves
+  typed malformed/model-mismatch/timeout/cancellation errors, and measures
+  repo-local `.agents/plugins.json`/Pipeline plugin/pipeline-start marker
+  discovery. `agy plugins list` is not proof. **Hard preconditions:** current
+  A1 measurement, A2 placement, A3 protection and actually PO-gated A5
+  repair. **Non-goal:** no login, provider call, external model invocation or
+  native-three-runner claim. A live pilot is a separately PO-authorized,
+  read-back-gated follow-up.
 - **E2 Qualification:** End-to-end qualification matrix covering PRD §7, full clean Verify run, independent Critic review, and PO terminal delivery sign-off.
 
 ---
@@ -81,4 +92,7 @@ Sprint Alfred delivers mechanical governance, control integrity, measurable rigo
    - Dispatch economics and closing allowance (C2).
 5. **Batch 4 (C1 Live Emitters & Integration Qualification):**
    - C1 Slice 3 live observer wiring.
+   - E3 after A1/A2/A3/A5 precondition readback: fake-executable
+     cross-runner AGY Goldfish caller, isolated receipt and repository-local
+     pipeline-start/plugin marker measurement; no real AGY/provider launch.
    - Full integrated qualification (E2), comprehensive Verify, Critic review, and release readiness.

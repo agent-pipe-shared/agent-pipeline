@@ -9,7 +9,7 @@ criterion 2; the intake's argued deviations are the starting set). This file
 adds the epic-level and incident-derived criteria and the fixture inventory
 floor. Criterion ids are `AC-*` (epic) and `IR-*` (incident-derived) —
 deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
-`D1`–`D4`, `E1`/`E2`), which the Evidence column references freely.
+`D1`–`D4`, `E1`–`E3`), which the Evidence column references freely.
 
 ## A. Epic-level criteria
 
@@ -38,6 +38,7 @@ deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
 | AC-21 | **Anti-fragmentation:** a change that improves a metric by shredding topology into tiny modules is rejected rather than rewarded | #104 "misleading tiny-module optimization" fixture |
 | AC-22 | **Active optimization exists at planning:** a finding at the planning boundary carries proposed conformant remedy options with their comparison, not only the violation | D2 remedy-comparison generator fixture |
 | AC-23 | **AGENTS.md linkage:** a governed repository's AGENTS.md references the map bundle entry point, and the declared re-entry reading order resolves end to end from it | D2 estate fixture; re-entry walkthrough evidence |
+| AC-24 | **Provider-free AGY dispatch seam:** a complete runner-neutral Goldfish packet reaches `invokeAgy` through one production caller with candidate/input/result isolation and a typed receipt. Fake executable cases prove success, malformed output, model mismatch, timeout and cancellation; a missing/mismatched repo-local plugin/pipeline-start marker refuses or remains unavailable. `agy plugins list`, a sandbox flag, and fixture success do not count as native guard or three-runner proof. | E3 Verify suite; `pipeline.cross-runner-dispatch-receipt.v1` fixture receipt; A1/A2/A3/A5 precondition readback |
 
 ## B. Incident-derived regression criteria (live-measured classes)
 
@@ -56,6 +57,12 @@ determinism + lineage + privacy set; #104's 10; #105's 14; #106's 21; #109's
 enumeration; B2's per-route sets; C1's four seeds. `verify-suite-registration`
 entries for each carry `invariantPinned` (C2 consolidation rule) — a fixture
 that cannot name its invariant does not register.
+
+E3 contributes successful bound dispatch, malformed output, observed-model
+mismatch, timeout, cancellation, missing/mismatched start marker, and result
+collision/traversal fixtures. They inject a fake executable and assert zero
+provider/authentication calls. The later live-pilot evidence is not part of
+this inventory and cannot be substituted for it.
 
 ## D. Review-lens rule (PO-accepted 2026-08-28 — PRD §9 decision 2)
 
