@@ -141,7 +141,7 @@
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | rejected | requirement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.commandpath-sibling-tilde-gap-and-test-pins | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — T1 Critic review of NVA-B-TILDEFIX-1 (PASS, 4 minor findings). F3: commandPath() in guard-lifecycle-ready.mjs still builds resolve(root, value) with no tilde reject, so a leading-~ argument still resolves as inside root wherever a caller trusts that result directly (named call sites: lines 2783, 2956, 2979, 2987) -- not proven exploitable, disclosed as such. F1: the cat-pipeline and git-pipeline lane tests added by NVA-B-TILDEFIX-1 assert only exitCode 2, not the specific denial code, unlike their single-command/rg siblings, so a future refactor could silently change which code those two lanes report with the suite still green. |
-| pipeline.commit-guards-reject-safe-literal-multiline-messages | open | defect | pipeline | nova-b | 2026-09-13 | 2026-09-30 | — |
+| pipeline.commit-guards-reject-safe-literal-multiline-messages | closed | defect | pipeline | nova-b | 2026-09-13 | 2026-09-30 | — |
 | pipeline.commit-trailer-authoring-needs-a-typed-single-command-route | open | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — newline-free shell grammar makes ordinary multi-paragraph git commit commands expensive; retain strict trailer validation while removing scratch-file choreography from the normal path. |
 | pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -677,8 +677,8 @@
 
 ## Counts
 
-- open: 81
+- open: 80
 - in_progress: 1
-- closed: 573
+- closed: 574
 - rejected: 3
 - deferred: 11

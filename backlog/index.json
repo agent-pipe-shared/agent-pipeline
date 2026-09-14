@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "11273dfee6f7caf022e9d79bde6cfb7aacf0c6d9bc242913cd1ea55b0231fca3"
+    "transitionHead": "1e42ceb39be230a44cca380a438198c19d1c69176baf169f431edf8d5c669290"
   },
   "counts": {
-    "open": 81,
+    "open": 80,
     "in_progress": 1,
-    "closed": 573,
+    "closed": 574,
     "rejected": 3,
     "deferred": 11
   },
@@ -1814,14 +1814,18 @@
     },
     {
       "id": "pipeline.commit-guards-reject-safe-literal-multiline-messages",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "Direct Nova release-path observation, 2026-09-13: a conventional Git commit with a literal multiline final trailer block was refused by the lifecycle grammar and the Git trailer guard, even though the equivalent repo-internal -F message file was accepted.",
       "deferred": false,
       "due": "2026-09-30",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6852a7abfaea7058bb4aefc7b6409e2ce5b143e9",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.commit-trailer-authoring-needs-a-typed-single-command-route",
