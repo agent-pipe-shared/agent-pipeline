@@ -8745,6 +8745,19 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
       assert.match(awaitingHuman.nextAction.guidance, /without printing its private path/u, runner);
       assert.match(awaitingHuman.nextAction.guidance, /only human command/u, runner);
     }
+    // Before a signature request exists, the returned driver instruction must
+    // prevent the historical shortcut of signing generated scaffolding. The
+    // runner has to finish and internally review the complete PRD/Spec package
+    // first; that one proof then owns the later approval transition.
+    const beforeRequest = inspectProjectOnboardingV3({
+      runner: "codex",
+      rootDir: path,
+      deps: { ...signatureDeps, observeOnboardingBootstrapAcknowledgementSignature: () => ({ requestStatus: "absent" }) },
+    });
+    assert.equal(beforeRequest.nextAction.argv[1], "bootstrap-acknowledge-plan");
+    assert.match(beforeRequest.nextAction.guidance, /completed and internally reviewed the full design package/u);
+    assert.match(beforeRequest.nextAction.guidance, /sole approval for the later design-to-implementation transition/u);
+    assert.match(beforeRequest.nextAction.guidance, /not a request to sign an unfinished scaffold/u);
     // Signature posture fails closed to its typed planner if the signing
     // material is unavailable; it never silently falls back to chat.
     for (const runner of ["claude", "codex", "antigravity"]) {

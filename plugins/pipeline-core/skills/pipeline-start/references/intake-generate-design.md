@@ -114,10 +114,18 @@ reviewed before binding — this is the design's own intended review step, and
 the guard (`hooks/guard-lifecycle-ready.mjs`, NVA-BL-INTAKEBIND-1) grants a
 narrowly-scoped Edit/Write admission for exactly these two paths while the
 session is observed at `bootstrap-binding-required`. `design-input.md` is
-deliberately never admitted there — it stays immutable. The PRD also needs a
-`po-plan-acknowledged` marker added as part of that review before
-`bootstrap-bind-apply` can pass its plan gate (same guard admission covers
-that edit).
+deliberately never admitted there — it stays immutable.
+
+In a shared `human_approval: signature` policy, do all authoring and internal
+review first. Present the completed PRD and Spec together, explain that their
+exact bytes are being approved for the design-to-implementation transition,
+and request the one returned `sign-intent` command. That proof writes the
+acknowledgement marker and becomes the receipt consumed for plan approval;
+there is no chat `approved`, manual marker edit, or second PO terminal command
+after the signature. A changed PRD or Spec invalidates the proof and returns
+the package to this same completed-design-before-signing boundary. Chat policy
+uses its policy-selected acknowledgement instead; it must likewise never ask
+the PO to edit a marker manually.
 
 `specs/<featureId>/` is not gitignored and its content is used downstream by
 other tooling (backlog:

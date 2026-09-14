@@ -2588,10 +2588,13 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
         expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
       };
     }
-    return commandAction(
-      lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-plan", "--root", root, "--activate"], runner, intent),
-      true, false, "pipeline.bootstrap-plan-acknowledgement-plan.v1", ["signature-required"],
-    );
+    return {
+      ...commandAction(
+        lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-acknowledge-plan", "--root", root, "--activate"], runner, intent),
+        true, false, "pipeline.bootstrap-plan-acknowledgement-plan.v1", ["signature-required"],
+      ),
+      guidance: `Do not create the signature request until the agent has completed and internally reviewed the full design package: author the staging PRD (${prd.path}) and specification (${spec.path}) from their generated drafts, keep design-input immutable, and reconcile their exact cross-reference digest. Then present that completed package together as the one PO decision. The resulting detached signature binds those exact PRD/spec bytes and is also the sole approval for the later design-to-implementation transition; it is not a request to sign an unfinished scaffold, a remote push, or a later scope change.`,
+    };
   }
   let plan;
   try { plan = planOnboardingBootstrapAcknowledgementChat({ rootDir: root, spawn }); } catch {

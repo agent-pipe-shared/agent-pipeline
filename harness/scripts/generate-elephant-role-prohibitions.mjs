@@ -41,7 +41,7 @@
  *     turns an EL-01 breach (implementing without a PRD release) into an
  *     unrecoverable one. This also matches the confirmation line's existing,
  *     unrelated-to-this-generator hand-maintained tail clause ("PRD gate:
- *     present readably + wait for 'approved'"), which is meaningless without
+ *     policy-selected single PO approval ceremony"), which is meaningless without
  *     EL-19 present in the id list above it.
  *
  * EXCLUDED -- every OTHER id in the file carrying a MUST/MUST-NOT rule (or,
@@ -144,7 +144,7 @@ export const EXCLUDED_EL_IDS = Object.freeze({
 // generator cannot detect; grep for "Role prohibitions loaded" before
 // touching it.
 const CONFIRMATION_TAIL =
-  " — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'";
+  " — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony";
 
 const HEADING3_RE = /^### (EL-\d+[a-z]?) \((MUST(?: NOT)?)\)\s*(?:—|-)\s*(.+)$/u;
 const HEADING2_RE = /^## \d+[a-zA-Z]?\.\s*.*\((EL-\d+[a-z]?)\)\s*$/u;

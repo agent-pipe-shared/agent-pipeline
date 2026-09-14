@@ -350,7 +350,7 @@ bypassing, skipping, or abandoning that step · EL-35 Reaching a push gate under
 to `chat`, or to suggest the PO push the commit themselves instead of walking
 the signing ceremony. Print verbatim under the Model/Effort line:
 
-> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony
 <!-- END GENERATED: role-prohibitions block -->
 
 ### Kickoff intake, durable design package, and document quality

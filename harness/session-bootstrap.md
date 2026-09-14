@@ -163,7 +163,7 @@ continues to govern consent and tool/export boundaries.
 
 This step ends in a **third mandatory confirmation line** (printed directly under the model/effort line; literally checked like line 1 — format → §6.1):
 
-> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony"
 
 ### Step 2 — Staleness check against the marketplace remote
 
@@ -311,7 +311,7 @@ All mandatory steps including **1b** (set and verify model/effort per model-poli
 
 Directly below that, per **1d**, a **third line**:
 
-> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony"
 
 The Elephant must additionally be able to speak to the session-lifecycle policy (Elephant retention at full context, Goldfish cadence — a mandatory part of the operating model, → `docs/operating-model.md`); the bootstrap loads no extra files for this, the policy ships with the ruleset.
 

@@ -1372,6 +1372,25 @@ function awaitingApprovalFixture() {
   assert.equal(downgraded.result, 2);
 }
 
+// Absence of the shared key means the fail-closed default signature policy;
+// it is not a legacy terminal-attribution opt-out. A signed bootstrap receipt
+// must therefore be consumed mechanically rather than reopening --by.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const receiptPath = "scratch/bootstrap-plan-acknowledgement-receipt-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.json";
+  const defaultSignatureDeps = {
+    ...deps,
+    readHumanApprovalMode: () => ({ mode: "signature", source: "default", key: "human_approval", scope: "default" }),
+    observeOnboardingBootstrapPlanApproval: () => ({ status: "verified", receiptPath }),
+  };
+  const inspected = capturedStdout(() => run(["inspect"], defaultSignatureDeps));
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  assert.deepEqual(action.argv.slice(1), ["approve-plan", "--bootstrap-acknowledgement-receipt", receiptPath]);
+  const downgraded = capturedStderr(() => run(["approve-plan", "--by", "po-test"], defaultSignatureDeps));
+  assert.equal(downgraded.result, 2, "default signature must not regress to --by attribution");
+  void root;
+}
+
 // The receipt rule protects a coordinator-sourced acknowledgement under the
 // explicit chat policy too. Chat supplies the one in-session PO decision at
 // acknowledgement time; it must not reopen the old terminal `--by` approval

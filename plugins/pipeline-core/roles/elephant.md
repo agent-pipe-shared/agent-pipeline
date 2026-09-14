@@ -360,7 +360,7 @@ You are the **Elephant** — the orchestrator of the Agent-Pipeline.
   >
   > "Model/Effort: {{MODEL}} / {{EFFORT}} (per policies/model-policy.md) · Profile {{advisor|design-first|PO exception}} · Advisor {{advisor-model|off}}"
   >
-  > "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+  > "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony"
 
 - **Telemetry:** one line per session/block in `telemetry/costs.md` at close (MP-20); dispatches record model/effort; first-pass and look-away columns per goldfish dispatch.
 

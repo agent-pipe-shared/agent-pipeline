@@ -3702,7 +3702,13 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     // observed in a fresh Antigravity project.
     let humanMode;
     try { humanMode = (deps.readHumanApprovalMode ?? readHumanApprovalMode)(dir, { spawn: deps.spawn }); } catch { humanMode = null; }
-    if (humanMode?.scope === "global") {
+    // A committed repository-wide policy always owns plan approval. A default
+    // signature policy owns it too *once* a bootstrap receipt proves that the
+    // project actually took the signed onboarding route. That distinction
+    // preserves legacy projects with no shared-policy key and no receipt,
+    // while closing the bypass where a fresh default-signature project had a
+    // valid proof but inspection reopened `approve-plan --by`.
+    if (humanMode !== null && (humanMode?.scope === "global" || humanMode?.scope === "default")) {
       let acknowledgement;
       try {
         acknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
@@ -3725,13 +3731,15 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
           expected: { schema: INSPECT_SCHEMA, statuses: ["approved"] },
         };
       }
-      return {
-        kind: "collect-input",
-        mutation: false,
-        requiresConfirmation: false,
-        guidance: `the configured ${humanMode.mode} human-approval policy requires the exact bootstrap acknowledgement receipt for the submitted PRD/spec. It is ${acknowledgement?.status ?? "unavailable"}; do not replace it with --by attribution or ask the PO for a second approval. Restore the original acknowledgement evidence and rerun inspection.`,
-        expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
-      };
+      if (humanMode.scope === "global") {
+        return {
+          kind: "collect-input",
+          mutation: false,
+          requiresConfirmation: false,
+          guidance: `the configured ${humanMode.mode} human-approval policy requires the exact bootstrap acknowledgement receipt for the submitted PRD/spec. It is ${acknowledgement?.status ?? "unavailable"}; do not replace it with --by attribution or ask the PO for a second approval. Restore the original acknowledgement evidence and rerun inspection.`,
+          expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+        };
+      }
     }
     // Legacy repositories without the shared policy retain their established
     // terminal attribution route. Fresh/onboarded repositories never reach it.
