@@ -9,6 +9,24 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { commitTypeFindingsForRange } from "../lib/commit-message-policy.mjs";
 
+// These two commits are a single, inseparable Git-generated revert/reapply pair
+// imported by the Alfred feature-branch merge.  GIT-01 intentionally does not
+// admit `Revert` or `Reapply` as general commit types.  Rewriting published
+// history solely to change their subjects would invalidate the signed backlog
+// evidence that pair restores, so range audit records this exact historical
+// exception instead.  Both full OID and complete subject must match: another
+// revert, reapply, changed subject, or abbreviated OID remains a finding.
+const EXACT_HISTORICAL_SUBJECT_EXCEPTIONS = new Map([
+  ["09a3e6e5dcbeb8250cf8c5c2ad638cf18154239a", 'Reapply "docs(backlog): close blind push driver gap"'],
+  ["9843cb192b35a3b45b52c0522c83a0389d2c5600", 'Revert "docs(backlog): close blind push driver gap"'],
+]);
+
+function isExactHistoricalSubjectException({ sha, subject }) {
+  return typeof sha === "string"
+    && typeof subject === "string"
+    && EXACT_HISTORICAL_SUBJECT_EXCEPTIONS.get(sha) === subject;
+}
+
 export function auditCommitTypeRange({ root = process.cwd(), base, head, gitOperations } = {}) {
   const runGit = gitOperations?.runGit ?? ((args) => {
     return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -60,12 +78,14 @@ export function auditCommitTypeRange({ root = process.cwd(), base, head, gitOper
   }
 
   const assessed = commitTypeFindingsForRange(commits);
-  const findings = assessed.filter((entry) => entry.findings.length > 0);
+  const acceptedHistoricalExceptions = assessed.filter((entry) => entry.findings.length > 0 && isExactHistoricalSubjectException(entry));
+  const findings = assessed.filter((entry) => entry.findings.length > 0 && !isExactHistoricalSubjectException(entry));
 
   return {
     ok: findings.length === 0,
     findings,
     commitsChecked: commits.length,
+    acceptedHistoricalExceptions: acceptedHistoricalExceptions.length,
     base: resolvedBase,
     head: resolvedHead,
   };
