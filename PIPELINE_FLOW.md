@@ -163,12 +163,10 @@ flowchart LR
     TD -->|no| G[Goldfish implementor]
     T --> G
     G --> VE[One configured verify command]
-    VE -->|green evidence| CR{Critic trigger}
+    VE -->|green evidence| CR[Fresh read-only Critic]
     VE -->|red evidence| RE[Classified recovery]
-    CR -->|required| CI[Fresh read-only Critic]
-    CR -->|not required| CO[Close]
-    CI -->|clear / disposition| CO
-    CI -->|correction| RE
+    CR -->|clear / disposition| CO[Close]
+    CR -->|correction| RE
     RE -->|allowed correction| PF
 ```
 
@@ -180,12 +178,12 @@ flowchart LR
 | Test author — optional | A separately briefed test-author duty. | Use it when the test or gate contract itself must change. | The implementor does not weaken or rewrite the tests that judge its own implementation. Its output is separately reviewable. |
 | Implement | Goldfish. | One fresh-context, self-contained implementation package. Independent packages may run in parallel when files and data do not overlap. | A six-field briefing supplies goal, context, Definition of Done, prohibitions, stop conditions, and dispatch metadata. |
 | Verify — mandatory | Goldfish runs the configured project gate. | The one project command runs the deterministic chain that applies to that project. | Green means an exact machine-written evidence artifact exists. Red is evidence of failure, not partial success. |
-| Critic — conditional | Fresh read-only Critic; Elephant owns disposition. | The Critic receives references to candidate, Spec, guardrails, and evidence — not implementation chat or rationale. | It runs after deterministic checks. Findings need evidence, a rule/criterion, and a consequence. A correction gets a fresh delta re-gate. |
+| Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | The Critic receives references to candidate, Spec, guardrails, and evidence — not implementation chat or rationale. | It runs after deterministic checks. Findings need evidence, a rule/criterion, and a consequence. A correction gets a fresh delta re-gate. Goldfish delivery stays review-pending until independent Critic evidence exists. |
 
-In this repository the configured full gate is
-`node harness/scripts/verify.mjs`. Adopting projects use the one `verify` command
-named by their own calibration; do not substitute a convenient partial command and
-call it equivalent.
+Each project uses the one `verify` command named by its own calibration; do not
+substitute a convenient partial command and call it equivalent. Maintainers can
+find this source checkout's release procedure in
+[push and release flow](docs/push-release-flow.md).
 
 ## 4. Optional branches are explicit, not implied
 
@@ -417,12 +415,10 @@ flowchart LR
     TD -->|nein| G[Goldfish implementiert]
     T --> G
     G --> VE[Ein konfigurierter Verify-Befehl]
-    VE -->|grüner Nachweis| CR{Critic-Auslöser}
+    VE -->|grüner Nachweis| CR[Frischer lesender Critic]
     VE -->|roter Nachweis| RE[Eingeordnete Recovery]
-    CR -->|erforderlich| CI[Frischer lesender Critic]
-    CR -->|nicht erforderlich| CO[Close]
-    CI -->|klar / Disposition| CO
-    CI -->|Korrektur| RE
+    CR -->|klar / Disposition| CO[Close]
+    CR -->|Korrektur| RE
     RE -->|zulässige Korrektur| PF
 ```
 
@@ -434,12 +430,12 @@ flowchart LR
 | Test-Autor — optional | Eine separat gebriefte Test-Autoren-Duty. | Nutze sie, wenn sich Test- oder Gate-Vertrag selbst ändern muss. | Der Implementierende schwächt oder schreibt die Tests nicht um, die seine Umsetzung bewerten. Sein Ergebnis ist separat prüfbar. |
 | Implementieren | Goldfish. | Ein frisches, eigenständiges Implementierungspaket. Unabhängige Pakete dürfen parallel laufen, wenn Dateien und Daten nicht überlappen. | Ein Sechs-Felder-Briefing liefert Ziel, Kontext, Definition of Done, Verbote, Stopp-Bedingungen und Dispatch-Metadaten. |
 | Verify — Pflicht | Goldfish fährt das konfigurierte Projekt-Gate. | Der eine Projektbefehl fährt die deterministische Kette, die für dieses Projekt gilt. | Grün heißt: Ein exaktes maschinell geschriebenes Nachweis-Artefakt existiert. Rot ist Fehlernachweis, kein Teilerfolg. |
-| Critic — bedingt | Frischer lesender Critic; Elephant besitzt die Disposition. | Der Critic bekommt Verweise auf Kandidat, Spec, Guardrails und Nachweis — nicht den Implementierungschat oder dessen Begründung. | Er läuft nach deterministischen Checks. Befunde brauchen Nachweis, Regel/Kriterium und Konsequenz. Eine Korrektur erhält ein frisches Delta-Re-Gate. |
+| Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Der Critic bekommt Verweise auf Kandidat, Spec, Guardrails und Nachweis — nicht den Implementierungschat oder dessen Begründung. | Er läuft nach deterministischen Checks. Befunde brauchen Nachweis, Regel/Kriterium und Konsequenz. Eine Korrektur erhält ein frisches Delta-Re-Gate. Die Goldfish-Lieferung bleibt ohne unabhängigen Critic-Nachweis als Review-ausstehend markiert. |
 
-In diesem Repository ist das konfigurierte volle Gate
-`node harness/scripts/verify.mjs`. Übernehmende Projekte verwenden den einen
-`verify`-Befehl ihrer Kalibrierung; ersetze ihn nicht durch einen bequemen
-Teilbefehl und nenne ihn gleichwertig.
+Jedes Projekt verwendet den einen `verify`-Befehl seiner Kalibrierung; ersetze
+ihn nicht durch einen bequemen Teilbefehl und nenne ihn gleichwertig.
+Maintainer finden den Release-Ablauf dieses Source-Checkouts im
+[Push- und Release-Ablauf](docs/push-release-flow.md).
 
 ## 4. Optionale Zweige sind explizit, nicht implizit
 

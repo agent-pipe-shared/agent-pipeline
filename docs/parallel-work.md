@@ -20,39 +20,12 @@ This can shorten independent review, documentation, or implementation work.
 It adds coordination cost, so small, overlapping, or dependent work is often
 better kept sequential.
 
-## Native runner surfaces
+## Runner boundary
 
-The configured Claude adapter observes `Task`, `Agent`, `Workflow`, and
-`TodoWrite`. A Workflow can fan out `agent()` calls; `Task` and `Agent` are
-the corresponding native dispatch surfaces. The Codex adapter observes
-`spawn_agent` and `update_plan`, and also receives `SubagentStart` and
-`SubagentStop` lifecycle events. The Antigravity adapter observes native
-`invoke_subagent` calls and uses its preceding `PreInvocation` event to
-deliver a due advisory.
-
-These are the runner contracts represented in the shipped hook configuration
-and adapters. They do not imply a portable workflow command, a new workflow
-engine, or an obligation to use the same mechanism on every runner.
-
-## What the advisory observes
-
-The native advisory uses a threshold of three. Codex deduplicates exact
-`spawn_agent` call identities and plan batches, and resets a serial run while
-child lifecycle overlap is active. Antigravity deduplicates retry steps,
-groups observations by invocation, and treats a multi-child native call as
-fan-out. The Claude adapter similarly rate-limits its plan and serial-work
-signals. A malformed event or unavailable local state silently produces no
-advisory; none of these adapters denies a tool call, escalates permission, or
-launches a child on its own.
-
-There are several different facts here. A runner may expose a native execution
-surface; a hook may be registered for it; a lifecycle event may be observed;
-and an adapter may emit `additionalContext` or an Antigravity ephemeral
-message. None of those facts alone proves that the model received or acted on
-the message. Fixture tests validate source behavior and registration shapes;
-they are not evidence of live delivery on every runner.
-
-For source details, see the configured Claude
-[`Task|Agent|Workflow|TodoWrite` hook](../plugins/pipeline-core/hooks/hooks.json),
-the Codex [native hook configuration](../plugins/pipeline-core/hooks/codex-hooks.json),
-and the Antigravity [native hook configuration](../plugins/pipeline-core/hooks.json).
+Parallelism uses each runner's native subagent surface; it does not create a
+portable workflow command or require the same mechanism on every host. A
+registered hook or observed lifecycle event is not proof that a model received
+or acted on an advisory, and no advisory launches children or changes
+permissions by itself. Read [runner support](runner-support.md) and the
+[runtime boundary](runtime-boundary.md) for supported surfaces, assurance, and
+host-specific limits.

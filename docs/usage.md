@@ -133,6 +133,8 @@ installed version supports it. See
 [ADR-0076](adr/0076-global-chat-attributed-unattested-approval-mode.md) for the
 full decision and migration boundary.
 
+## Private review export
+
 Private review export can reuse one repository-scoped consent decision while
 keeping secrets, credentials, caches, transcripts, and unrelated projects out
 of scope. The exact provider, service, paths, digests, revocation behavior, and
