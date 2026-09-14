@@ -123,7 +123,7 @@ function commitGlobalHumanApproval(root, mode) {
   assert.equal(committed.status, 0, committed.stderr);
 }
 
-test("project-onboarding-v3 CLI: the intake -> generate -> bootstrap-bind chain works end to end through main()", () => {
+test("project-onboarding-v3 CLI: generated intake cannot bypass its acknowledgement before bootstrap binding", () => {
   const dir = neutralGitFixture("bootstrap-bind-e2e");
   try {
     let result = invoke(["intake-consent-apply", "--root", dir, "--granted",
@@ -146,30 +146,9 @@ test("project-onboarding-v3 CLI: the intake -> generate -> bootstrap-bind chain 
     result = invoke(["intake-generate-apply", "--root", dir, "--plan-sha256", generatePlan.planSha256, "--activate"]);
     assert.equal(result.status, 0, result.output);
 
-    // An untouched generated draft is exempt from acknowledgement. This
-    // closure test deliberately exercises that normal bind path; an authored
-    // draft follows the separate detached-signature ceremony below instead
-    // of a fixture (or PO) editing an acknowledgement comment by hand.
-
     result = invoke(["bootstrap-bind-plan", "--root", dir]);
-    assert.equal(result.status, 0, result.output);
-    const bindPlan = JSON.parse(result.output);
-    assert.equal(bindPlan.kickoff, null, "the coordinator-sourced branch, not a lookalike kickoff-sourced plan");
-
-    result = invoke(["bootstrap-bind-apply", "--root", dir, "--plan-sha256", bindPlan.planSha256, "--activate"]);
-    assert.equal(result.status, 0, result.output);
-    const applied = JSON.parse(result.output);
-    assert.equal(applied.status, "applied");
-    assert.equal(applied.mutated, true);
-
-    // A replay against the same plan digest, through the CLI, stays a byte-null success (exit 0) --
-    // exercising the exit-status wiring this dispatch added (KICKOFF_PROMOTION_APPLY_SCHEMA), not
-    // only the mutating first apply.
-    result = invoke(["bootstrap-bind-apply", "--root", dir, "--plan-sha256", bindPlan.planSha256, "--activate"]);
-    assert.equal(result.status, 0, result.output);
-    const replayed = JSON.parse(result.output);
-    assert.equal(replayed.status, "replayed");
-    assert.equal(replayed.mutated, false);
+    assert.equal(result.status, 2, result.output);
+    assert.match(result.output, /KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING/u);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

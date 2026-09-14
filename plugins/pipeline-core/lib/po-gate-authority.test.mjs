@@ -702,7 +702,7 @@ function submitFixturePlan(primary, authority, profile) {
   assert.equal(presented, 0);
 }
 
-check("approve-plan binds the validated PO authority and revalidates it inside the writer lock", () => {
+check("approve-plan rejects bare attribution when the shared human-approval receipt is required", () => {
   withFixture({}, ({ primary, validate, validateProfile }) => {
     const authority = validate();
     assert.equal(authority.ok, true);
@@ -719,21 +719,11 @@ check("approve-plan binds the validated PO authority and revalidates it inside t
         return authority;
       },
     });
-    assert.equal(status, 0);
-    assert.deepEqual(calls, [
-      { repoRoot: primary },
-      { repoRoot: primary, expectedPlanSha256: authority.value.planSha256, expectedSpecSha256: authority.value.specSha256 },
-    ]);
+    assert.equal(status, 2);
+    assert.deepEqual(calls, [{ repoRoot: primary }]);
     const observed = JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
-    assert.equal(observed.planApproved, true);
-    assert.equal(observed.planSubmission.schema, "pipeline.plan-submission.v1");
-    assert.equal(observed.planApproval.schema, "pipeline.plan-approval.v4");
-    assert.equal(observed.planApproval.approvedBy, "Product Owner");
-    assert.equal(observed.planApproval.approvedAt, NOW);
-    assert.match(observed.planApproval.submissionSha256, /^[a-f0-9]{64}$/u);
-    assert.equal(observed.planApproval.profileSha256, observed.planSubmission.profileSha256);
-    assert.equal(observed.planApproval.priorInvalidationSha256, null);
-    assert.deepEqual(observed.planApproval.poGateAuthority, authority.value);
+    assert.equal(observed.planApproved, false);
+    assert.equal(observed.planApproval, undefined);
   });
 });
 

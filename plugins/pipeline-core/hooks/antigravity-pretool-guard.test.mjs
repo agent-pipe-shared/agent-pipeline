@@ -119,7 +119,10 @@ function readyLifecycleFixture(mode = "chat") {
     return invoke(...result.nextAction.argv.slice(1));
   };
   follow(invoke("plan", "--root", root, "--runner", "antigravity"), "apply-portable-seed");
-  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", mode], { cwd: root, env, encoding: "utf8", shell: false });
+  // Build the shared lifecycle through its explicit chat-only fixture route.
+  // Individual guard cases select the policy under test after this fixture is
+  // ready, so this helper does not duplicate the detached-proof E2E ceremony.
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat"], { cwd: root, env, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
   for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]]) {
     const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
@@ -135,6 +138,9 @@ function readyLifecycleFixture(mode = "chat") {
   collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "AGY fixture." }]) });
   const generated = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "intake-generate-plan");
   invoke("intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "antigravity");
+  // Generated staging artifacts are always acknowledged by their sole writer
+  // before a bind is eligible, even in this test-only chat setup.
+  follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "bootstrap-acknowledge-chat-apply");
   const bind = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "bootstrap-bind-plan");
   follow(bind, "bootstrap-bind-apply");
   const permissionsDrift = invoke("inspect", "--root", root, "--runner", "antigravity");
@@ -152,6 +158,13 @@ function readyLifecycleFixture(mode = "chat") {
   assert.equal(permissionsApplied.status, 0, `${permissionsApplied.stderr}\n${permissionsApplied.stdout}`);
   assert.equal(JSON.parse(permissionsApplied.stdout).status, "ready");
   assert.equal(invoke("inspect", "--root", root, "--runner", "antigravity").status, "ready");
+  if (mode === "signature") {
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const signatureSource = readFileSync(sourcePath, "utf8")
+      .replace('push_approval: "chat"', 'push_approval: "signature"')
+      .replace('human_approval: "chat"', 'human_approval: "signature"');
+    writeFileSync(sourcePath, signatureSource);
+  }
   return root;
 }
 

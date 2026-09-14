@@ -131,8 +131,30 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   const dir = resolve(rootDir);
   const steps = [];
 
+  // The shared signature policy now protects the design acknowledgement too,
+  // so the disposable operator key must exist before onboarding begins.  The
+  // Driver returns its one sign-intent action; the measurement executes only
+  // that returned action and lets the Driver consume the proof.
+  let setup;
+  try {
+    setup = runHumanApproval(["setup",
+      "--repo-root", dir, "--directory", keyDir, "--human-name", "Turn Measurement"],
+      { spawn: fakeSetupSpawn });
+  } catch (error) {
+    steps.push({ step: "setup", ok: false, error: error?.message ?? String(error) });
+    return { schema: SCHEMA, outcome: "setup-failed", steps };
+  }
+  steps.push({ step: "setup", ok: setup?.ok === true, code: setup?.code });
+  if (setup?.ok !== true) return { schema: SCHEMA, outcome: "setup-failed", steps };
+
+  const trustPolicyPath = join(keyDir, "trust-policy.json");
+  if (!existsSync(trustPolicyPath)) return { schema: SCHEMA, outcome: "setup-no-trust-policy", steps };
+
   // Step 0: onboard the fresh repository to "ready" -- the sibling script's own walk.
-  const onboarding = measureFreshRepoOnboardingTurns({ rootDir: dir, runner: "claude", env });
+  const onboarding = measureFreshRepoOnboardingTurns({
+    rootDir: dir, runner: "claude", env,
+    externalOperator: (action) => run([action.executable, ...action.argv], dir, env, "approve\n"),
+  });
   steps.push({ step: "onboarding", outcome: onboarding.outcome, turns: onboarding.turns });
   if (onboarding.outcome !== "ready") {
     return { schema: SCHEMA, outcome: "onboarding-not-ready", steps, onboarding };
@@ -210,30 +232,6 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
     steps.push({ step: "approve-plan", exitCode: approvePlan.status, stderr: approvePlan.stderr?.slice(0, 2000) });
     if (approvePlan.status !== 0) return { schema: SCHEMA, outcome: "approve-plan-failed", steps };
   }
-
-  // Step 1: the real PO key ceremony -- driven IN-PROCESS via `runHumanApproval`'s own
-  // `dependencies.spawn` injection seam (NVA-CF-BL16-PRECISEFIX; the same seam
-  // `po-human-approval.test.mjs` already uses), never an external subprocess. A real,
-  // interactive `openssl genpkey -aes-256-cbc` cannot be driven reliably through piped
-  // stdin from an unrelated grandparent process -- two prior attempts at this exact
-  // measurement burned their full budget on that dead end. `fakeSetupSpawn` intercepts
-  // only the two `openssl` calls fresh-key creation makes, producing a real, unencrypted
-  // (test-appropriate, disposable) Ed25519 key; every other step below stays a real
-  // external subprocess against the installed CLI surface, unchanged.
-  let setup;
-  try {
-    setup = runHumanApproval(["setup",
-      "--repo-root", dir, "--directory", keyDir, "--human-name", "Turn Measurement"],
-      { spawn: fakeSetupSpawn });
-  } catch (error) {
-    steps.push({ step: "setup", ok: false, error: error?.message ?? String(error) });
-    return { schema: SCHEMA, outcome: "setup-failed", steps };
-  }
-  steps.push({ step: "setup", ok: setup?.ok === true, code: setup?.code });
-  if (setup?.ok !== true) return { schema: SCHEMA, outcome: "setup-failed", steps };
-
-  const trustPolicyPath = join(keyDir, "trust-policy.json");
-  if (!existsSync(trustPolicyPath)) return { schema: SCHEMA, outcome: "setup-no-trust-policy", steps };
 
   // Step 2: materialize the push threat-model artifact -- a precondition for both
   // prepare-push-subject and approve-push's own policy check.

@@ -233,7 +233,7 @@ function chainPastPendingAsks(dir, runner, env, startObserved) {
  * end), counting one "turn" per round documented above. Never throws: every stop this
  * function cannot resolve is reported in the returned `outcome`, not thrown past.
  */
-export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", env = null, maxTurns = 20 } = {}) {
+export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", env = null, maxTurns = 20, externalOperator = null } = {}) {
   const dir = resolve(rootDir);
   const rounds = [];
   let turns = 0;
@@ -254,6 +254,25 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
         schema: SCHEMA, root: dir, runner, outcome: "ready",
         turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final,
       };
+    }
+
+    // Signature-mode acknowledgement is the one attended operation in the
+    // current flow.  A measurement never invents argv: its caller may execute
+    // only the Driver-provided external action, then re-enter the Driver which
+    // consumes the proof and performs the in-repository bind itself.
+    if (result.outcome === "external-operator") {
+      turns += 1;
+      const action = result.externalOperator?.action;
+      if (typeof externalOperator !== "function" || typeof action?.executable !== "string" || !Array.isArray(action.argv)) {
+        rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "external-operator-unavailable" });
+        return { schema: SCHEMA, root: dir, runner, outcome: "external-operator-unavailable", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final };
+      }
+      const applied = externalOperator(action);
+      rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "executed-driver-provided-external-action", appliedExitCode: applied?.status ?? null });
+      if (applied?.status !== 0) {
+        return { schema: SCHEMA, root: dir, runner, outcome: "external-operator-failed", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final, error: { stderr: applied?.stderr ?? "", stdout: applied?.stdout ?? "" } };
+      }
+      continue;
     }
 
     if (result.outcome === "pending-asks") {

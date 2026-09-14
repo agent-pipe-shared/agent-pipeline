@@ -126,8 +126,10 @@ test("full TOFU measurement follows Driver-provided design answers through to a 
   assert.equal(status, 0, stdout);
   const result = JSON.parse(stdout);
   assert.equal(result.outcome, "signed-push-recorded", stdout);
-  assert.equal(result.steps[0]?.step, "onboarding");
-  assert.equal(result.steps[0]?.outcome, "ready", stdout);
+  assert.equal(result.steps[0]?.step, "setup");
+  assert.equal(result.steps[0]?.ok, true, stdout);
+  assert.equal(result.steps[1]?.step, "onboarding");
+  assert.equal(result.steps[1]?.outcome, "ready", stdout);
   assert.ok(result.steps.some((step) => step.step === "approve-push" && step.exitCode === 0), stdout);
   // This measurement deliberately ends at approve-push.  The already accepted
   // separate TOFU boundary is the real git-push guard interception, where a
