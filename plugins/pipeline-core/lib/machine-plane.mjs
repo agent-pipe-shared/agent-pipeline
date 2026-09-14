@@ -157,6 +157,21 @@ export function readMachinePlane(dependencies = {}) {
   return { status: "valid", plane: parsed };
 }
 
+/**
+ * The one public, non-secret view of a configured PO signing directory.  A
+ * caller may render this path for an attended operator, but never reads key
+ * material through this helper.  Invalid/absent machine planes deliberately
+ * stay indistinguishable from an unconfigured directory so callers retain
+ * their existing fail-closed placeholder path.
+ */
+export function configuredMachinePoKeyDirectory(dependencies = {}) {
+  const observed = readMachinePlane(dependencies);
+  const directory = observed?.status === "valid" ? observed.plane?.poKeyDirectory : null;
+  return typeof directory === "string" && directory.length > 0 && !/[\r\n\0]/u.test(directory)
+    ? directory
+    : null;
+}
+
 /** Shape check only, NOT a proof: looks for a PEM block marker or the substring
  * "PRIVATE KEY" in any string value, recursively. It cannot detect key material that
  * does not look like key material; it exists to catch an accidental paste, not to

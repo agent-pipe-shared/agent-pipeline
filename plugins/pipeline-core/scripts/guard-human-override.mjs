@@ -30,7 +30,7 @@ import {
 // renderer now used in the default hook hand-off.
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
-import { readMachinePlane } from "../lib/machine-plane.mjs";
+import { configuredMachinePoKeyDirectory } from "../lib/machine-plane.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
@@ -122,14 +122,6 @@ function copySafeActionText(label, action, placeholderValues = [], variableBindi
   }).text;
 }
 
-function configuredPoKeyDirectory(reader) {
-  const observed = reader();
-  const directory = observed?.status === "valid" ? observed.plane?.poKeyDirectory : null;
-  return typeof directory === "string" && directory.length > 0 && !/[\r\n\0]/u.test(directory)
-    ? directory
-    : null;
-}
-
 /**
  * Backward-compatible `render-copy-safe` entry point. Default hook denials now
  * use the same shared argv-native renderer directly; this read-only command
@@ -139,7 +131,7 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
   const write = io.write ?? process.stdout.write.bind(process.stdout);
   const writeError = io.writeError ?? process.stderr.write.bind(process.stderr);
   const platform = options.platform ?? process.platform;
-  const machinePlaneReader = options.readMachinePlane ?? readMachinePlane;
+  const keyDirectoryReader = options.configuredMachinePoKeyDirectory ?? configuredMachinePoKeyDirectory;
   const governanceHgo = {
     observe: observeHumanGuardOverrideGovernanceConsumption,
     preflight: preflightGovernanceActionOutput,
@@ -417,7 +409,10 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         humanApprovalScriptPath: PO_HUMAN_APPROVAL_SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
       });
-      const keyDirectory = configuredPoKeyDirectory(machinePlaneReader);
+      const configuredDirectory = keyDirectoryReader();
+      const keyDirectory = typeof configuredDirectory === "string" && configuredDirectory.length > 0
+        ? configuredDirectory
+        : null;
       const signIntentCommand = keyDirectory === null
         ? prepared.signIntentCommand
         : {

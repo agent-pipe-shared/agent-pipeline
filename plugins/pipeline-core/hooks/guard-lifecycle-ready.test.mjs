@@ -4968,6 +4968,25 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
+test("signature-mode HGO guidance uses the configured key directory rather than a manual placeholder", () => {
+  const projectRoot = hgoGitFixture("signature");
+  try {
+    const directory = "/mnt/c/Users/Andre/OneDrive/Documents/06_Dev/agent-pipeline-key";
+    const result = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), {
+      projectDir: projectRoot,
+      ...hgoReadyDeps(),
+      configuredMachinePoKeyDirectoryFn: () => directory,
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /KEY_DIR=/u);
+    assert.match(result.stderr, /\$KEY_DIR/u);
+    assert.match(result.stderr, /KEY_DIR='\/mnt\/c\/Users\/Andre\/OneDrive\/Documents\/06_Dev\/'/u);
+    assert.match(result.stderr, /KEY_DIR=\$\{KEY_DIR\}'agent-pipeline-key'/u);
+    assert.match(result.stderr, /\$KEY_DIR \+= 'agent-pipeline-key'/u);
+    assert.doesNotMatch(result.stderr, /external-po-material-directory/u);
+  } finally { rmSync(projectRoot, { recursive: true, force: true }); }
+});
+
 // NVA-B-DENIALBOILER-1: this test used to assert POSIX+PowerShell unconditionally for BOTH
 // modes. That was the pre-existing shape, not a deliberate "every step needs every platform"
 // requirement -- scratch/strip-boilerplate.md measured it as pure duplication cost. The code
@@ -4995,7 +5014,8 @@ test("NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determin
         assert.match(result.stderr, /Step: sign-intent\nPOSIX:/u);
         assert.match(result.stderr, /Step: authorize-by-signature\nPOSIX:/u);
         assert.match(result.stderr, /PowerShell:/u);
-        assert.match(result.stderr, /Invoke-Expression \$CMD/u);
+        assert.match(result.stderr, /\$ARGS = @\(/u);
+        assert.match(result.stderr, /& \$NODE_BIN @ARGS/u);
         const authorizeBlock = result.stderr.slice(result.stderr.indexOf("Step: authorize-by-signature"));
         assert.doesNotMatch(authorizeBlock, /PowerShell:|Invoke-Expression \$CMD/u,
           "local proof verification must use the current session's determined shell only");

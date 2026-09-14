@@ -714,7 +714,7 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
 
     const first = io();
     const status = main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], first, {
-      readMachinePlane: () => ({ status: "absent", plane: null }),
+      configuredMachinePoKeyDirectory: () => null,
     });
     assert.equal(status, 0, first.stderr);
     const value = JSON.parse(first.stdout);
@@ -770,7 +770,7 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
     // (design doc §1.4 step 1/§3.4) and must reproduce the identical digests.
     const second = io();
     assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], second, {
-      readMachinePlane: () => ({ status: "absent", plane: null }),
+      configuredMachinePoKeyDirectory: () => null,
     }), 0, second.stderr);
     const repeat = JSON.parse(second.stdout);
     assert.equal(repeat.planSha256, value.planSha256);
@@ -792,7 +792,7 @@ test("prepare-for-signature replaces its material-directory placeholder with the
     const captured = io();
     const keyDirectory = "/mnt/c/Users/Andre/OneDrive/Documents/06_Dev/agent-pipeline-key";
     assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, {
-      readMachinePlane: () => ({ status: "valid", plane: { poKeyDirectory: keyDirectory } }),
+      configuredMachinePoKeyDirectory: () => keyDirectory,
     }), 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
     assert.equal(value.signIntentCommand.argv[5], keyDirectory);

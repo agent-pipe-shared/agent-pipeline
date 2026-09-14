@@ -60,7 +60,7 @@ import {
   humanGuardRouteUnavailableReason,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
-import { machinePlaneFilePath } from "../lib/machine-plane.mjs";
+import { configuredMachinePoKeyDirectory, machinePlaneFilePath } from "../lib/machine-plane.mjs";
 import {
   DEVPLAN_SHELL_DENIAL_CODE,
   devPlanGateVerdict,
@@ -721,15 +721,26 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
         const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", inSessionPlatform, "--plan-sha256", placeholder("<plan-sha256>"));
         // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand;
         // this is the only step that crosses into the attended private-key boundary.
+        const signingDirectory = (dependencies.configuredMachinePoKeyDirectoryFn
+          ?? configuredMachinePoKeyDirectory)();
         const signIntent = renderHumanCopySafeCommand({
           label: "sign-intent",
           executable: process.execPath,
           argv: [
             placeholder(JSON.stringify(PO_HUMAN_APPROVAL_SCRIPT)), "sign-intent",
             "--repo-root", placeholder(JSON.stringify(root)),
-            "--directory", placeholder("<external-po-material-directory>"),
+            "--directory", signingDirectory ?? placeholder("<external-po-material-directory>"),
             "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
           ],
+          ...(signingDirectory === null ? {} : {
+            variableBindings: {
+              bindings: [
+                { index: 0, name: "PIPELINE_SCRIPT" },
+                { index: 3, name: "REPO_ROOT" },
+                { index: 5, name: "KEY_DIR" },
+              ],
+            },
+          }),
         });
         const authorizeBySignature = ceremonyCommand(
           "authorize-by-signature", "authorize-by-signature", inSessionPlatform,
