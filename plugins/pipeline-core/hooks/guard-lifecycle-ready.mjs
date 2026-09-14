@@ -3141,7 +3141,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
     if (poArgs.length === 1 && ["--help", "--version"].includes(poArgs[0])) return false;
     return true;
   }
-  if (isBoundedReadOnlyPipeline(parsed, root, diagnosticReadArgumentRoots(parsed, root))) return false;
+  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedGrepPipeline(parsed, root)) return false;
   if (isBoundedCatPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (isBoundedGitPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
