@@ -39,7 +39,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -181,8 +181,18 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
       return { schema: SCHEMA, outcome: "no-active-feature-plan-path", steps, state: earlyState };
     }
     const planAbsPath = join(dir, earlyPlanPath);
-    const planText = readFileSync(planAbsPath, "utf8");
-    writeFileSync(planAbsPath, `${planText.replace(/\n+$/u, "")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
+    let planText = readFileSync(planAbsPath, "utf8");
+    const specAbsPath = join(dir, dirname(earlyPlanPath), "spec.md");
+    const BANNER_REGEX = /<!--(?:(?!-->)[\s\S])*?this staging file is NOT yet bound as project authority[\s\S]*?-->\n?/gu;
+    if (existsSync(specAbsPath)) {
+      let specText = readFileSync(specAbsPath, "utf8");
+      specText = specText.replace(BANNER_REGEX, "").replace(/ \(staging draft\)/gu, "");
+      writeFileSync(specAbsPath, specText);
+      const specHash = createHash("sha256").update(specText).digest("hex");
+      planText = planText.replace(/<!-- technical-spec-sha256: [a-f0-9]+ -->/, `<!-- technical-spec-sha256: ${specHash} -->`);
+    }
+    planText = planText.replace(BANNER_REGEX, "").replace(/ \(staging draft\)/gu, "");
+    writeFileSync(planAbsPath, `${planText.replace(/\n+$/u, "")}\n\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
     const addAck = run(["git", "add", "-A"], dir, env);
     steps.push({ step: "commit-plan-acknowledgement", subStep: "add", exitCode: addAck.status, stderr: addAck.stderr?.slice(0, 2000) });
     if (addAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };

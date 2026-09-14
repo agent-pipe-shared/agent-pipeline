@@ -18,6 +18,7 @@ import test from "node:test";
 import {
   compareSuiteRegistration,
   normalizeRepoRelativePath,
+  parseDeclarativeSuiteFiles,
   parseAllRegisteredSuiteFiles,
   parseRegisteredSuiteFiles,
   parseScopedVerifySuiteFiles,
@@ -354,4 +355,24 @@ test("compareSuiteRegistration: a file registered only via SCOPED_VERIFY_SUITES 
   });
   assert.equal(result.ok, false);
   assert.deepEqual(result.unaccounted, ["plugins/pipeline-core/lib/rogue.test.mjs"], "only the genuinely-unregistered file must be reported");
+});
+
+test("parseDeclarativeSuiteFiles: extracts and normalizes suite files from declarative JSON", () => {
+  const json = JSON.stringify({
+    schema: "pipeline.verify-suites.v1",
+    suites: [
+      { name: "test-a", file: "plugins/pipeline-core/scripts/a.test.mjs" },
+      { name: "test-b", file: "./plugins/pipeline-core/scripts/b.test.mjs" },
+    ],
+  });
+  const files = parseDeclarativeSuiteFiles(json);
+  assert.deepEqual(files, [
+    "plugins/pipeline-core/scripts/a.test.mjs",
+    "plugins/pipeline-core/scripts/b.test.mjs",
+  ]);
+});
+
+test("parseDeclarativeSuiteFiles: returns empty array for null/empty input", () => {
+  assert.deepEqual(parseDeclarativeSuiteFiles(null), []);
+  assert.deepEqual(parseDeclarativeSuiteFiles(""), []);
 });

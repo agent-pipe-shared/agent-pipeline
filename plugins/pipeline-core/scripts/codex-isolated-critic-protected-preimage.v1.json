@@ -8,7 +8,7 @@
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
-      "rawSha256": "8268e63bec0603bcb847fa2e2c088ad886988a4b88ce460a25d9d5daaff5da3a"
+      "rawSha256": "4e7981c2bb55f1121687e880addbfc48ced7f60cef395cf62b65f2f60d5bb02e"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",

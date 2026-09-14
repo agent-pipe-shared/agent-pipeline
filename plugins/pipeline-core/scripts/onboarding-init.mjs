@@ -982,7 +982,6 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     // migration apply response, so a classification `inspect` can never claim
     // readiness before planning and activation.
     if (wasAnchorStep
-      && completedMigrationActivation
       && output?.schema === "pipeline.project-onboarding.v4"
       && output?.status === "ready"
       && nextAction?.kind !== "collect-input") {

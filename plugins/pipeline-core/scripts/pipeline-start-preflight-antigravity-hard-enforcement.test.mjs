@@ -464,7 +464,7 @@ test("Codex preflight output keys and status are unchanged by this addition (byt
     observe: readyObservation,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "bootstrapPayload", "concurrentSessionWarning", "executionBoundary", "handoff", "installedPluginAttestation", "installedSource",
+    "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "executionBoundary", "handoff", "installedPluginAttestation", "installedSource",
     "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
     "version",
   ]);

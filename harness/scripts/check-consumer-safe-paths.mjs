@@ -348,6 +348,10 @@ export const ALLOWLIST = Object.freeze([
     reason: "Class B: a literal Nova-sprint-specific evidence path, this repository's own release data.",
   },
   {
+    filePattern: /^plugins\/pipeline-core\/scripts\/check-clone-provisioning\.mjs$/u,
+    reason: "Class B: clone provisioning readback check names setup.mjs --publish-po-profile repair action for canonical primary checkout profile publication (WP-C2 / Issue 2026-08-27).",
+  },
+  {
     filePattern: /^plugins\/pipeline-core\/scripts\/check-state-budgets\.mjs$/u,
     reason: "Class B: a protected-paths list for this repository's own internal state-budget validation, self-application-only.",
   },

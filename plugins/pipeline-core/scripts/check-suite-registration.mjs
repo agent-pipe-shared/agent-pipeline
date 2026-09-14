@@ -93,6 +93,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 export const VERIFY_SCRIPT_PATH = join(REPO_ROOT, "harness", "scripts", "verify.mjs");
+export const VERIFY_SUITES_JSON_PATH = join(REPO_ROOT, "harness", "verify-suites.json");
 export const ENUMERATION_ROOTS = Object.freeze([join(REPO_ROOT, "plugins", "pipeline-core"), join(REPO_ROOT, "harness")]);
 
 /**
@@ -497,8 +498,28 @@ export function parseWindowsAssuranceVerifySuiteFiles(sourceText) {
  * array's own distinguishable error code -- never silently treated as "this array registers
  * nothing".
  */
-export function parseAllRegisteredSuiteFiles(sourceText) {
-  return [...parseRegisteredSuiteFiles(sourceText), ...parseScopedVerifySuiteFiles(sourceText), ...parseWindowsAssuranceVerifySuiteFiles(sourceText)];
+/** Parse declarative suite files from harness/verify-suites.json. */
+export function parseDeclarativeSuiteFiles(declarativeSource) {
+  if (!declarativeSource) return [];
+  const parsed = typeof declarativeSource === "string" ? JSON.parse(declarativeSource) : declarativeSource;
+  const files = [];
+  if (Array.isArray(parsed?.suites)) {
+    for (const suite of parsed.suites) {
+      if (typeof suite?.file === "string") {
+        files.push(normalizeRepoRelativePath(suite.file));
+      }
+    }
+  }
+  return files;
+}
+
+export function parseAllRegisteredSuiteFiles(sourceText, declarativeSource = null) {
+  return [
+    ...parseRegisteredSuiteFiles(sourceText),
+    ...parseScopedVerifySuiteFiles(sourceText),
+    ...parseWindowsAssuranceVerifySuiteFiles(sourceText),
+    ...parseDeclarativeSuiteFiles(declarativeSource),
+  ];
 }
 
 /**
@@ -578,9 +599,18 @@ function main(argv) {
     process.stderr.write(`CHECK-SUITE-REGISTRATION-VERIFY-UNREADABLE: ${error.message}\n`);
     return 3;
   }
+  let declarativeSource = null;
+  try {
+    declarativeSource = readFileSync(VERIFY_SUITES_JSON_PATH, "utf8");
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      process.stderr.write(`CHECK-SUITE-REGISTRATION-DECLARATIVE-UNREADABLE: ${error.message}\n`);
+      return 3;
+    }
+  }
   let registeredPaths;
   try {
-    registeredPaths = parseAllRegisteredSuiteFiles(source);
+    registeredPaths = parseAllRegisteredSuiteFiles(source, declarativeSource);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     return 3;

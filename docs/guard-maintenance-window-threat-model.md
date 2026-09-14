@@ -148,6 +148,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/provenance-envelope.mjs`; the original group continues with
   `lib/trusted-tool-resolution.mjs`,
   `lib/verify-selection.mjs`, `scripts/pipeline-start-preflight.mjs`,
+  `scripts/check-clone-provisioning.mjs`,
   followed in that same refresh by
   `scripts/installed-plugin-attestation-host.mjs`; then
   `scripts/pipeline-update-channel.mjs`, `scripts/po-approval-request.mjs`,

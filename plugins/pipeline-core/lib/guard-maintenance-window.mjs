@@ -336,6 +336,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
   "plugins/pipeline-core/lib/verify-selection.mjs",
   "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+  "plugins/pipeline-core/scripts/check-clone-provisioning.mjs",
   "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
   "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
   "plugins/pipeline-core/scripts/po-approval-request.mjs",

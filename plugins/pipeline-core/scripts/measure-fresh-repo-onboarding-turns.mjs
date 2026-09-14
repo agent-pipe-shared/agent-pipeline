@@ -43,7 +43,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -182,8 +183,18 @@ function acknowledgePrd(dir, guidance) {
   const match = /staging PRD at (\S+\.md)/u.exec(String(guidance));
   if (match === null) return { ok: false, reason: "the guidance did not name a staging PRD path" };
   const prdPath = join(dir, match[1]);
-  const before = readFileSync(prdPath, "utf8");
-  writeFileSync(prdPath, `${before.replace(/\n+$/u, "")}\n\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n`);
+  let prd = readFileSync(prdPath, "utf8");
+  const specPath = join(dir, `${match[1].replace(/\/prd\.md$/, "")}/spec.md`);
+  const BANNER_REGEX = /<!--(?:(?!-->)[\s\S])*?this staging file is NOT yet bound as project authority[\s\S]*?-->\n?/gu;
+  if (existsSync(specPath)) {
+    let spec = readFileSync(specPath, "utf8");
+    spec = spec.replace(BANNER_REGEX, "").replace(/ \(staging draft\)/gu, "");
+    writeFileSync(specPath, spec);
+    const specHash = createHash("sha256").update(spec).digest("hex");
+    prd = prd.replace(/<!-- technical-spec-sha256: [a-f0-9]+ -->/, `<!-- technical-spec-sha256: ${specHash} -->`);
+  }
+  prd = prd.replace(BANNER_REGEX, "").replace(/ \(staging draft\)/gu, "");
+  writeFileSync(prdPath, `${prd.replace(/\n+$/u, "")}\n\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n`);
   return { ok: true, path: match[1] };
 }
 
@@ -257,6 +268,41 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
     }
 
     if (result.outcome === "pending-asks") {
+      const initialAsk = (result.pendingAsks ?? []).find(
+        (a) => a.applyAction?.argv?.includes("<signature|chat>") || a.applyAction?.argv?.includes("<PO_GIT_AUTHOR_NAME>")
+      );
+      if (initialAsk && initialAsk.applyAction?.kind === "command") {
+        const replacements = new Map([
+          ["<PO_GIT_AUTHOR_NAME>", DEFAULT_ANSWERS.gitAuthorName],
+          ["<PO_GIT_AUTHOR_EMAIL>", DEFAULT_ANSWERS.gitAuthorEmail],
+          ["<signature|chat>", "signature"],
+        ]);
+        const argv = initialAsk.applyAction.argv.map((v) => replacements.get(v) ?? v);
+        const applied = run([initialAsk.applyAction.executable ?? process.execPath, ...argv], dir, env);
+        turns += 1;
+        rounds.push({
+          turn,
+          outcome: result.outcome,
+          driverStepsThisRound: executed.length,
+          resolved: "answered-initial-answers",
+          appliedExitCode: applied.status,
+        });
+        if (applied.status !== 0) {
+          return {
+            schema: SCHEMA,
+            root: dir,
+            runner,
+            outcome: "initial-answers-failed",
+            turns: rounds.length,
+            driverStepsChained,
+            repairSubcommands,
+            rounds,
+            final: result.final,
+            error: { stderr: applied.stderr, stdout: applied.stdout },
+          };
+        }
+        continue;
+      }
       const primary = result.final?.nextAction;
       const argvValid = primary && typeof primary.executable === "string" && Array.isArray(primary.argv);
       if (!argvValid) {
@@ -328,7 +374,7 @@ export function main(args = process.argv.slice(2), {
   const scratchDir = join(REPO_ROOT, "scratch");
   const fixtureHome = mkdtempSync(join(scratchDir, "measure-onboarding-home-"));
   const dir = mkdtempSync(join(scratchDir, "measure-onboarding-fresh-"));
-  const env = { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: fixtureHome };
+  const env = { ...process.env, HOME: fixtureHome, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: fixtureHome };
   try {
     run(["git", "init", "--quiet", dir], scratchDir, env);
     run(["git", "-C", dir, "config", "user.name", DEFAULT_ANSWERS.gitAuthorName], scratchDir, env);
