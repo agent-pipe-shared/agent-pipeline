@@ -732,7 +732,7 @@ const TEST_SUITES = [
   { name: "test-tmpdir-tests", file: join(libDir, "test-tmpdir.test.mjs") },
   { name: "transfer-classification-tests", file: join(libDir, "transfer-classification.test.mjs") },
   { name: "antigravity-execution-host-tests", file: join(libDir, "antigravity-execution-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 18 }, (_, index) => `EPH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
-  { name: "goldfish-antigravity-host-tests", file: join(pluginScriptsDir, "goldfish-antigravity-host.test.mjs") },
+  { name: "goldfish-antigravity-host-tests", file: join(pluginScriptsDir, "goldfish-antigravity-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 13 }, (_, index) => `E3H${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "antigravity-native-dispatch-coordinator-tests", file: join(libDir, "antigravity-native-dispatch-coordinator.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 20 }, (_, index) => `ANDC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "antigravity-native-dispatch-pretool-tests", file: join(hooksDir, "antigravity-native-dispatch-pretool.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `ANDP${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "backlog-item-strip-for-dispatch-tests", file: join(pluginScriptsDir, "backlog-item-strip-for-dispatch.test.mjs") },

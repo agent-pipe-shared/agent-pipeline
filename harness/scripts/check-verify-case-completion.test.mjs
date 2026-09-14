@@ -105,8 +105,8 @@ function git(root, args) {
 check("VCR01", "the repository registry covers all arrays and pins the observed required-descriptor counts", () => {
   const result = checkVerifyCaseCompletion({ root: REPO_ROOT });
   assert.equal(result.ok, true, result.findings.join("\n"));
-  assert.equal(result.vulnerableCount, 184);
-  assert.equal(result.registryCount, 190);
+  assert.equal(result.vulnerableCount, 186);
+  assert.equal(result.registryCount, 191);
 });
 
 check("VCR02", "the closed classifier distinguishes vulnerable and separately registered cases", () => {
