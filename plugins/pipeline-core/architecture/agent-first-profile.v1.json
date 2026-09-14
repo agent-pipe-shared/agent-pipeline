@@ -1,0 +1,94 @@
+{
+  "schema": "pipeline.architecture-profile.v1",
+  "profileId": "inherited-agent-first",
+  "source": "inherited-agent-first",
+  "revision": 1,
+  "title": "Agent-First Architecture Standard Profile (WP-D2)",
+  "description": "Shipped standard profile defining the 9 agent-first properties with honest status declarations for agent-pipeline.",
+  "mapBundlePath": "architecture/map",
+  "specDigest": "eb013e58c6e71806b2f69d87ffb25db8ddb128566349d28af6c02d929783f511",
+  "properties": [
+    {
+      "propertyId": "context-locality",
+      "class": 1,
+      "form": "signal",
+      "signal": "unavailable-on-antigravity",
+      "measurementStatus": "unavailable",
+      "blocking": "advisory-first",
+      "description": "Receipts from briefing surface, candidate diff, transcript tool logs where exposed; unavailable on runners without subagent telemetry."
+    },
+    {
+      "propertyId": "contract-sufficiency",
+      "class": 2,
+      "form": "check",
+      "check": "contract-presence-and-freshness",
+      "measurementStatus": "measured",
+      "blocking": "advisory-first",
+      "description": "Contract exists, digest matches inventory revision, plus eleven contract-sufficiency signals."
+    },
+    {
+      "propertyId": "change-locality",
+      "class": 3,
+      "form": "check",
+      "check": "diff-vs-planned-surface",
+      "measurementStatus": "measured",
+      "blocking": "advisory-first",
+      "description": "Candidate diff compared against planned/authorized boundary set."
+    },
+    {
+      "propertyId": "dependency-legibility",
+      "class": 4,
+      "form": "check",
+      "check": "import-graph-adapter",
+      "measurementStatus": "measured",
+      "blocking": "advisory-first",
+      "description": "Language-scoped import-graph adapter with explicit unsupported for uncovered languages."
+    },
+    {
+      "propertyId": "authority-effect-locality",
+      "class": 5,
+      "form": "declaration",
+      "declaration": "ownership-rows-in-contracts",
+      "check": "protected-effect-resolution",
+      "measurementStatus": "measured",
+      "blocking": "advisory-first",
+      "description": "Ownership rows in contracts/inventory + mechanical check for protected effects."
+    },
+    {
+      "propertyId": "verification-locality",
+      "class": 6,
+      "form": "check",
+      "check": "module-verification-entry-points",
+      "measurementStatus": "measured",
+      "blocking": "advisory-first",
+      "description": "Declared verification entry points exist per module; candidate records required affected-integration checks."
+    },
+    {
+      "propertyId": "session-reentry-stability",
+      "class": 7,
+      "form": "check",
+      "check": "map-currency-and-reading-order",
+      "measurementStatus": "measured",
+      "blocking": "advisory-first",
+      "description": "Map currency for candidate, navigation bundle, and 6-step re-entry reading order."
+    },
+    {
+      "propertyId": "parallel-work-safety",
+      "class": 8,
+      "form": "check",
+      "check": "write-surface-intersection",
+      "measurementStatus": "measured",
+      "blocking": "advisory-first",
+      "description": "Write-surface intersection across concurrently dispatched packages."
+    },
+    {
+      "propertyId": "refactorability-without-churn",
+      "class": 9,
+      "form": "check",
+      "check": "identity-stability-and-anti-fragmentation",
+      "measurementStatus": "measured",
+      "blocking": "advisory-first",
+      "description": "Accepted identities change only through D1 decision; anti-fragmentation penalizes topology shredding."
+    }
+  ]
+}

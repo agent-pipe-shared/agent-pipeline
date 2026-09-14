@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.module-inventory.v1",
+  "title": "Governed Module Inventory Row (pipeline.module-inventory.v1)",
+  "description": "Schema for governed module inventory rows and concept file frontmatter (WP-D2, Issue #104, AC-8, Spec §7.2, Doctrine §3).",
+  "type": "object",
+  "required": [
+    "id",
+    "responsibility",
+    "nonResponsibilities",
+    "ownedPaths",
+    "publicContracts",
+    "allowedDependencies",
+    "authorityEffects",
+    "verificationEntryPoints",
+    "adrReferences"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "responsibility": {
+      "type": "string"
+    },
+    "nonResponsibilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ownedPaths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "publicContracts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowedDependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "authorityEffects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verificationEntryPoints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "adrReferences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "profileSource": {
+      "type": "string"
+    },
+    "provisional": {
+      "type": "boolean"
+    },
+    "candidateBinding": {
+      "type": "object",
+      "properties": {
+        "commit": {
+          "type": "string"
+        },
+        "tree": {
+          "type": "string"
+        },
+        "artifactDigests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
