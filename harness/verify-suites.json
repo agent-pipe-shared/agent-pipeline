@@ -6,6 +6,10 @@
       "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs"
     },
     {
+      "name": "check-evidence-drift-tests",
+      "file": "plugins/pipeline-core/scripts/check-evidence-drift.test.mjs"
+    },
+    {
       "name": "plan-authority-staging-guard-tests",
       "file": "plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs"
     },
