@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1e42ceb39be230a44cca380a438198c19d1c69176baf169f431edf8d5c669290"
+    "transitionHead": "f4d6a34ba1ffd7432749386449f0e60e0a271eb3a3f9eba53e5e788933159f78"
   },
   "counts": {
-    "open": 80,
+    "open": 79,
     "in_progress": 1,
-    "closed": 574,
+    "closed": 575,
     "rejected": 3,
     "deferred": 11
   },
@@ -3987,13 +3987,17 @@
     },
     {
       "id": "pipeline.heredoc-refusal-teaches-no-substitute",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "PO question, 2026-08-28: 'wäre es nicht sinnvoll heredoc gehärtet zuzulassen?' — asked after the Elephant hit the heredoc refusal twice in one session (a `cat >> … << 'CLOSURE'` append and a multi-line commit message), each time paying a detour through a scratch file or the Edit tool. Measured against guard-lifecycle-ready.mjs the same day.",
       "deferred": false,
-      "sprint": "nightwing"
+      "sprint": "nightwing",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "015f8a772d66b51ec5b312fb4c5f86e4744a73d6",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store",
