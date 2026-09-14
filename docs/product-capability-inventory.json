@@ -236,6 +236,7 @@
         "verify-phase:harness/scripts/verify.mjs:check-critic-contract-citations-tests",
         "verify-phase:harness/scripts/verify.mjs:check-critic-skip-coverage-tests",
         "verify-phase:harness/scripts/verify.mjs:check-directory-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-evidence-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:check-gitignore-anchoring-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:check-protected-path-integrity-tests",

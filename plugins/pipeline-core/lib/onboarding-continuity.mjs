@@ -304,6 +304,9 @@ function validStateRepairRecord(record) {
 }
 
 function validStateRepairRecords(state) {
+  if (state.evidenceRepins !== undefined) {
+    if (!Array.isArray(state.evidenceRepins) || !state.evidenceRepins.every(validEvidenceRepinEntry)) return false;
+  }
   if (state.stateRepairs === undefined) return true;
   if (!Array.isArray(state.stateRepairs) || !state.stateRepairs.every(validStateRepairRecord)) return false;
   if (state.stateRepairs.length === 0) return true;
@@ -1005,6 +1008,7 @@ function observeDetailed({
       fail("KICKOFF-READ-MALFORMED", "Pipeline machine state schema is malformed");
     }
     const projected = projectReadContinuityStatus({ status: "ok", state });
+    const drifts = detectClosedEvidenceDrift(root, state);
     let status;
     if (!validStateRepairRecords(state)) {
       status = "damaged";
@@ -1012,7 +1016,7 @@ function observeDetailed({
       status = "valid";
     } else if (projected.code === "CS-STATUS-INACTIVE"
       && (validClosedTransitionState(root, state) || validDiscardedTransitionState(root, state))) {
-      status = "valid";
+      status = drifts.length > 0 ? "damaged" : "valid";
     } else if (projected.code === "CS-STATUS-ACTIVE-NO-CONTINUITY" && validDesignTransitionState(state)) {
       status = "valid";
     } else if (new Set([
@@ -1030,7 +1034,12 @@ function observeDetailed({
       ? diagnoseSharedCloseEvidencePath(root, state)
       : null;
     return {
-      continuity: { status, ...hashes, ...(diagnosis === null ? {} : { diagnosis }) },
+      continuity: {
+        status,
+        ...hashes,
+        ...(diagnosis === null ? {} : { diagnosis }),
+        ...(drifts.length > 0 ? { diagnostics: drifts } : {}),
+      },
       root,
       repositoryCapability,
       calibration,
@@ -2489,6 +2498,68 @@ export function applyOnboardingSessionCleanupPrivatization({
   } finally {
     releaseLock(lock);
   }
+}
+
+
+function validEvidenceRepinEntry(entry) {
+  return isObject(entry)
+    && typeof entry.featureId === "string" && entry.featureId.length > 0
+    && typeof entry.artifactPath === "string" && entry.artifactPath.length > 0
+    && SHA256_RE.test(entry.oldSha256 ?? "")
+    && SHA256_RE.test(entry.newSha256 ?? "")
+    && canonicalIsoTimestamp(entry.repinnedAt)
+    && typeof entry.by === "string" && entry.by.length > 0;
+}
+
+export function detectClosedEvidenceDrift(root, state) {
+  if (!isObject(state) || !Array.isArray(state.closedFeatures)) return [];
+  const drifts = [];
+  for (let index = 0; index < state.closedFeatures.length; index += 1) {
+    const entry = state.closedFeatures[index];
+    if (!isObject(entry) || entry.continuityClose === undefined) continue;
+    const close = entry.continuityClose;
+    if (isObject(close.result) && typeof close.result.path === "string") {
+      let observed;
+      try {
+        observed = observeOptionalProjectFile(root, close.result.path, "closed continuity artifact");
+      } catch {
+        observed = { status: "missing", sha256: null };
+      }
+      if (observed.status !== "present" || observed.sha256 !== close.result.sha256) {
+        drifts.push({
+          code: "CLOSED-EVIDENCE-DRIFT",
+          featureId: entry.id,
+          artifact: close.result.path,
+          path: close.result.path,
+          artifactKind: "result",
+          expectedSha256: close.result.sha256,
+          observedSha256: observed.status === "present" ? observed.sha256 : null,
+          status: observed.status === "present" ? "modified" : "missing",
+        });
+      }
+    }
+    if (isObject(close.closeEvidence) && typeof close.closeEvidence.path === "string") {
+      let observed;
+      try {
+        observed = observeOptionalProjectFile(root, close.closeEvidence.path, "closed continuity evidence");
+      } catch {
+        observed = { status: "missing", sha256: null };
+      }
+      if (observed.status !== "present" || observed.sha256 !== close.closeEvidence.sha256) {
+        drifts.push({
+          code: "CLOSED-EVIDENCE-DRIFT",
+          featureId: entry.id,
+          artifact: close.closeEvidence.path,
+          path: close.closeEvidence.path,
+          artifactKind: "closeEvidence",
+          expectedSha256: close.closeEvidence.sha256,
+          observedSha256: observed.status === "present" ? observed.sha256 : null,
+          status: observed.status === "present" ? "modified" : "missing",
+        });
+      }
+    }
+  }
+  return drifts;
 }
 
 function validateClosedArtifact(root, binding) {

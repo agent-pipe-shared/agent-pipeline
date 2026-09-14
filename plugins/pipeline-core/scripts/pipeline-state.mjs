@@ -681,6 +681,8 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "publication-approve", "publication-authorize", "publication-reconcile", "publication-observe",
   "publication-start-readback", "publication-close", "publication-rearm", "publication-block",
   "feature-package-inspect", "feature-package-status", "feature-package-plan", "feature-package-apply",
+  "closed-evidence-restore-plan", "closed-evidence-restore-apply",
+  "closed-evidence-repin-plan", "closed-evidence-repin-apply",
   "feature-package-reconcile", "feature-package-recover", "feature-package-rebind-mutable",
 ]);
 const PUSH_THREAT_MODEL_DEFAULT_PATH = "project/push-threat-model.md";
@@ -732,6 +734,7 @@ const PUBLICATION_AUTHORIZATION_SCHEMA = "pipeline.publication-authorization.v1"
 const LOCK_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/;
 const LEGACY_WRITER_LOCK_TOKEN = "pipeline-legacy-writer-v0";
+export const CLOSED_EVIDENCE_REPAIR_SCHEMA = "pipeline.closed-evidence-repair.v1";
 const RESULT_CLOSE_PLAN_SCHEMA = "pipeline.continuity-result-close-plan.v1";
 const RESULT_CLOSE_APPLY_SCHEMA = "pipeline.continuity-result-close-apply.v1";
 const RESULT_CLOSE_LOCK_TOKEN = "pipeline-result-close-v1";
@@ -8187,12 +8190,600 @@ function exactGeneratorAcknowledgementExemption({ dir, authority, deps }) {
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
  * touching the real filesystem/clock/git/environment.
  */
+
+function parseClosedEvidenceRestorePlan(argv) {
+  let featureId = null;
+  let artifactPath = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--feature-id" && i + 1 < argv.length) {
+      featureId = argv[++i];
+    } else if (argv[i] === "--artifact-path" && i + 1 < argv.length) {
+      artifactPath = argv[++i];
+    }
+  }
+  if (!featureId) return null;
+  return { featureId, artifactPath };
+}
+
+function parseClosedEvidenceRestoreApply(argv) {
+  let featureId = null;
+  let artifactPath = null;
+  let expectedSha256 = null;
+  let closeCommit = null;
+  let planSha256 = null;
+  let activate = false;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--feature-id" && i + 1 < argv.length) {
+      featureId = argv[++i];
+    } else if (argv[i] === "--artifact-path" && i + 1 < argv.length) {
+      artifactPath = argv[++i];
+    } else if (argv[i] === "--expected-sha256" && i + 1 < argv.length) {
+      expectedSha256 = argv[++i];
+    } else if (argv[i] === "--close-commit" && i + 1 < argv.length) {
+      closeCommit = argv[++i];
+    } else if (argv[i] === "--plan-sha256" && i + 1 < argv.length) {
+      planSha256 = argv[++i];
+    } else if (argv[i] === "--activate") {
+      activate = true;
+    }
+  }
+  if (!featureId || !artifactPath || !expectedSha256 || !closeCommit || !activate) return null;
+  return { featureId, artifactPath, expectedSha256, closeCommit, planSha256, activate };
+}
+
+function runClosedEvidenceRestoreCommand(sub, rest, deps) {
+  const dir = deps.dir ?? projectDir();
+  const spawn = deps.spawn ?? spawnSync;
+
+  if (sub === "closed-evidence-restore-plan") {
+    const parsed = parseClosedEvidenceRestorePlan(rest);
+    if (!parsed) {
+      console.error("Error: closed-evidence-restore-plan requires --feature-id <id> [--artifact-path <path>].");
+      return 2;
+    }
+    const current = readState(dir);
+    if (current.status !== "ok") {
+      console.error("Error: pipeline-state is missing or malformed; zero mutation.");
+      return 2;
+    }
+    const state = current.state;
+    const entry = (state.closedFeatures ?? []).find((f) => f?.id === parsed.featureId);
+    if (!entry) {
+      console.error(`Error: feature "${parsed.featureId}" not found in closedFeatures.`);
+      return 2;
+    }
+    if (!entry.continuityClose) {
+      console.error(`Error: feature "${parsed.featureId}" has no continuityClose record.`);
+      return 2;
+    }
+    const close = entry.continuityClose;
+    let targetBinding = null;
+    if (parsed.artifactPath) {
+      if (close.result?.path === parsed.artifactPath) targetBinding = close.result;
+      else if (close.closeEvidence?.path === parsed.artifactPath) targetBinding = close.closeEvidence;
+      else {
+        console.error(`Error: artifact path "${parsed.artifactPath}" not bound in continuityClose.`);
+        return 2;
+      }
+    } else {
+      const fullResult = resolve(dir, close.result.path);
+      const resultDrifted = !existsSync(fullResult) || sha256Bytes(readFileSync(fullResult)) !== close.result.sha256;
+      const fullEvidence = close.closeEvidence ? resolve(dir, close.closeEvidence.path) : null;
+      const evidenceDrifted = fullEvidence && (!existsSync(fullEvidence) || sha256Bytes(readFileSync(fullEvidence)) !== close.closeEvidence.sha256);
+      if (resultDrifted) targetBinding = close.result;
+      else if (evidenceDrifted) targetBinding = close.closeEvidence;
+      else targetBinding = close.result;
+    }
+
+    const artifactPath = targetBinding.path;
+    const expectedSha256 = targetBinding.sha256;
+    const closeCommit = entry.forCommit;
+    if (!closeCommit) {
+      console.error(`Error: closed feature "${parsed.featureId}" has no forCommit.`);
+      return 2;
+    }
+
+    const gitShow = spawn("git", ["show", `${closeCommit}:${artifactPath}`], { cwd: dir, encoding: "buffer" });
+    if (gitShow.status !== 0) {
+      console.error(`Error: failed to retrieve ${artifactPath} at commit ${closeCommit} via git show.`);
+      return 2;
+    }
+    const gitBytes = gitShow.stdout;
+    const gitSha = sha256Bytes(gitBytes);
+    if (gitSha !== expectedSha256) {
+      console.error(`Error: retrieved git bytes sha256 (${gitSha}) does not match pinned sha256 (${expectedSha256}).`);
+      return 2;
+    }
+
+    let currentSha256 = null;
+    const fullPath = resolve(dir, artifactPath);
+    if (existsSync(fullPath)) {
+      currentSha256 = sha256Bytes(readFileSync(fullPath));
+    }
+
+    const payload = {
+      schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+      action: "restore",
+      featureId: entry.id,
+      artifactPath,
+      closeCommit,
+      expectedSha256,
+      currentSha256,
+      root: dir,
+    };
+    const planSha256 = sha256CanonicalJson(payload);
+    const writer = fileURLToPath(import.meta.url);
+    const applyAction = {
+      executable: process.execPath,
+      argv: [
+        writer,
+        "closed-evidence-restore-apply",
+        "--feature-id", entry.id,
+        "--artifact-path", artifactPath,
+        "--expected-sha256", expectedSha256,
+        "--close-commit", closeCommit,
+        "--plan-sha256", planSha256,
+        "--activate",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary: "host-authorized-wsl",
+      expected: { schema: CLOSED_EVIDENCE_REPAIR_SCHEMA, statuses: ["applied", "replayed"] },
+    };
+    console.log(JSON.stringify({ ...payload, planSha256, applyAction }, null, 2));
+    return 0;
+  }
+
+  // apply
+  const apply = parseClosedEvidenceRestoreApply(rest);
+  if (!apply) {
+    console.error("Error: closed-evidence-restore-apply requires --feature-id, --artifact-path, --expected-sha256, --close-commit, and --activate.");
+    return 2;
+  }
+
+  const gitShow = spawn("git", ["show", `${apply.closeCommit}:${apply.artifactPath}`], { cwd: dir, encoding: "buffer" });
+  if (gitShow.status !== 0) {
+    console.error(`Error: failed to retrieve ${apply.artifactPath} at commit ${apply.closeCommit} via git show.`);
+    return 2;
+  }
+  const gitBytes = gitShow.stdout;
+  const gitSha = sha256Bytes(gitBytes);
+  if (gitSha !== apply.expectedSha256) {
+    console.error(`Error: retrieved git bytes sha256 (${gitSha}) does not match expected (${apply.expectedSha256}).`);
+    return 2;
+  }
+
+  const fullPath = resolve(dir, apply.artifactPath);
+  const alreadyMatches = existsSync(fullPath) && sha256Bytes(readFileSync(fullPath)) === apply.expectedSha256;
+  if (alreadyMatches) {
+    console.log(JSON.stringify({
+      schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+      status: "replayed",
+      action: "restore",
+      featureId: apply.featureId,
+      artifactPath: apply.artifactPath,
+      restoredSha256: apply.expectedSha256,
+      mutated: false,
+    }, null, 2));
+    return 0;
+  }
+
+  mkdirSync(dirname(fullPath), { recursive: true });
+  writeFileSync(fullPath, gitBytes);
+
+  console.log(JSON.stringify({
+    schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+    status: "applied",
+    action: "restore",
+    featureId: apply.featureId,
+    artifactPath: apply.artifactPath,
+    restoredSha256: apply.expectedSha256,
+    mutated: true,
+  }, null, 2));
+  return 0;
+}
+
+function parseClosedEvidenceRepinPlan(argv) {
+  let featureId = null;
+  let artifactPath = null;
+  let by = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--feature-id" && i + 1 < argv.length) {
+      featureId = argv[++i];
+    } else if (argv[i] === "--artifact-path" && i + 1 < argv.length) {
+      artifactPath = argv[++i];
+    } else if (argv[i] === "--by" && i + 1 < argv.length) {
+      by = argv[++i];
+    }
+  }
+  if (!featureId || !by) return null;
+  return { featureId, artifactPath, by };
+}
+
+function parseClosedEvidenceRepinApply(argv) {
+  let featureId = null;
+  let artifactPath = null;
+  let oldSha256 = null;
+  let newSha256 = null;
+  let by = null;
+  let planSha256 = null;
+  let activate = false;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--feature-id" && i + 1 < argv.length) {
+      featureId = argv[++i];
+    } else if (argv[i] === "--artifact-path" && i + 1 < argv.length) {
+      artifactPath = argv[++i];
+    } else if (argv[i] === "--old-sha256" && i + 1 < argv.length) {
+      oldSha256 = argv[++i];
+    } else if (argv[i] === "--new-sha256" && i + 1 < argv.length) {
+      newSha256 = argv[++i];
+    } else if (argv[i] === "--by" && i + 1 < argv.length) {
+      by = argv[++i];
+    } else if (argv[i] === "--plan-sha256" && i + 1 < argv.length) {
+      planSha256 = argv[++i];
+    } else if (argv[i] === "--activate") {
+      activate = true;
+    }
+  }
+  if (!featureId || !artifactPath || !oldSha256 || !newSha256 || !by || !activate) return null;
+  return { featureId, artifactPath, oldSha256, newSha256, by, planSha256, activate };
+}
+
+function runClosedEvidenceRepinCommand(sub, rest, deps) {
+  const dir = deps.dir ?? projectDir();
+  const now = deps.now ?? (() => new Date().toISOString());
+
+  if (sub === "closed-evidence-repin-plan") {
+    const parsed = parseClosedEvidenceRepinPlan(rest);
+    if (!parsed) {
+      console.error("Error: closed-evidence-repin-plan requires --feature-id <id> --by <poName> [--artifact-path <path>].");
+      return 2;
+    }
+    const current = readState(dir);
+    if (current.status !== "ok") {
+      console.error("Error: pipeline-state is missing or malformed; zero mutation.");
+      return 2;
+    }
+    const state = current.state;
+    const entry = (state.closedFeatures ?? []).find((f) => f?.id === parsed.featureId);
+    if (!entry) {
+      console.error(`Error: feature "${parsed.featureId}" not found in closedFeatures.`);
+      return 2;
+    }
+    if (!entry.continuityClose) {
+      console.error(`Error: feature "${parsed.featureId}" has no continuityClose record.`);
+      return 2;
+    }
+    const close = entry.continuityClose;
+    let targetBinding = null;
+    if (parsed.artifactPath) {
+      if (close.result?.path === parsed.artifactPath) targetBinding = close.result;
+      else if (close.closeEvidence?.path === parsed.artifactPath) targetBinding = close.closeEvidence;
+      else {
+        console.error(`Error: artifact path "${parsed.artifactPath}" not bound in continuityClose.`);
+        return 2;
+      }
+    } else {
+      const fullResult = resolve(dir, close.result.path);
+      const resultDrifted = !existsSync(fullResult) || sha256Bytes(readFileSync(fullResult)) !== close.result.sha256;
+      const fullEvidence = close.closeEvidence ? resolve(dir, close.closeEvidence.path) : null;
+      const evidenceDrifted = fullEvidence && (!existsSync(fullEvidence) || sha256Bytes(readFileSync(fullEvidence)) !== close.closeEvidence.sha256);
+      if (resultDrifted) targetBinding = close.result;
+      else if (evidenceDrifted) targetBinding = close.closeEvidence;
+      else targetBinding = close.result;
+    }
+
+    const artifactPath = targetBinding.path;
+    const oldSha256 = targetBinding.sha256;
+    const fullPath = resolve(dir, artifactPath);
+    if (!existsSync(fullPath)) {
+      console.error(`Error: worktree file "${artifactPath}" is missing; cannot repin missing artifact.`);
+      return 2;
+    }
+    const newSha256 = sha256Bytes(readFileSync(fullPath));
+
+    const payload = {
+      schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+      action: "repin",
+      featureId: entry.id,
+      artifactPath,
+      oldSha256,
+      newSha256,
+      by: parsed.by,
+      root: dir,
+    };
+    const planSha256 = sha256CanonicalJson(payload);
+    const writer = fileURLToPath(import.meta.url);
+    const applyAction = {
+      executable: process.execPath,
+      argv: [
+        writer,
+        "closed-evidence-repin-apply",
+        "--feature-id", entry.id,
+        "--artifact-path", artifactPath,
+        "--old-sha256", oldSha256,
+        "--new-sha256", newSha256,
+        "--by", parsed.by,
+        "--plan-sha256", planSha256,
+        "--activate",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary: "host-authorized-wsl",
+      expected: { schema: CLOSED_EVIDENCE_REPAIR_SCHEMA, statuses: ["applied", "replayed"] },
+    };
+    console.log(JSON.stringify({ ...payload, planSha256, applyAction }, null, 2));
+    return 0;
+  }
+
+  // apply
+  const apply = parseClosedEvidenceRepinApply(rest);
+  if (!apply) {
+    console.error("Error: closed-evidence-repin-apply requires --feature-id, --artifact-path, --old-sha256, --new-sha256, --by, and --activate.");
+    return 2;
+  }
+
+  const lock = acquireContinuityLock(dir, "closed-evidence-repin", deps);
+  if (!lock.ok) {
+    console.error(`Error: closed-evidence-repin refused (${lock.code}); zero mutation.`);
+    return 2;
+  }
+  try {
+    const current = readState(dir);
+    if (current.status !== "ok") {
+      console.error("Error: pipeline-state is missing or malformed; zero mutation.");
+      return 2;
+    }
+    const base = current.state;
+    const state = JSON.parse(JSON.stringify(base));
+    const entry = (state.closedFeatures ?? []).find((f) => f?.id === apply.featureId);
+    if (!entry || !entry.continuityClose) {
+      console.error(`Error: closed feature "${apply.featureId}" not found or has no continuityClose.`);
+      return 2;
+    }
+    const close = entry.continuityClose;
+    let targetBinding = null;
+    if (close.result?.path === apply.artifactPath) targetBinding = close.result;
+    else if (close.closeEvidence?.path === apply.artifactPath) targetBinding = close.closeEvidence;
+    else {
+      console.error(`Error: artifact path "${apply.artifactPath}" not bound in continuityClose.`);
+      return 2;
+    }
+
+    const fullPath = resolve(dir, apply.artifactPath);
+    if (!existsSync(fullPath)) {
+      console.error(`Error: worktree file "${apply.artifactPath}" is missing.`);
+      return 2;
+    }
+    const actualWorktreeSha = sha256Bytes(readFileSync(fullPath));
+    if (actualWorktreeSha !== apply.newSha256) {
+      console.error(`Error: worktree sha256 (${actualWorktreeSha}) does not match expected new sha256 (${apply.newSha256}).`);
+      return 2;
+    }
+
+    if (targetBinding.sha256 === apply.newSha256 && (state.evidenceRepins ?? []).some((r) => r.featureId === apply.featureId && r.artifactPath === apply.artifactPath && r.newSha256 === apply.newSha256)) {
+      console.log(JSON.stringify({
+        schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+        status: "replayed",
+        action: "repin",
+        featureId: apply.featureId,
+        artifactPath: apply.artifactPath,
+        oldSha256: apply.oldSha256,
+        newSha256: apply.newSha256,
+        by: apply.by,
+        mutated: false,
+      }, null, 2));
+      return 0;
+    }
+
+    if (targetBinding.sha256 !== apply.oldSha256) {
+      console.error(`Error: current pinned sha256 (${targetBinding.sha256}) does not match expected old sha256 (${apply.oldSha256}).`);
+      return 2;
+    }
+
+    targetBinding.sha256 = apply.newSha256;
+    if (!Array.isArray(state.evidenceRepins)) {
+      state.evidenceRepins = [];
+    }
+    const repinnedAt = now();
+    const auditEntry = {
+      featureId: apply.featureId,
+      artifactPath: apply.artifactPath,
+      oldSha256: apply.oldSha256,
+      newSha256: apply.newSha256,
+      repinnedAt,
+      by: apply.by,
+    };
+    state.evidenceRepins.push(auditEntry);
+    state.updatedAt = repinnedAt;
+
+    const written = writeState(dir, state, base, { reuseLock: lock });
+    if (!stateWriteSucceeded(written)) {
+      console.error("Error: failed to write updated state during repin.");
+      return 2;
+    }
+
+    console.log(JSON.stringify({
+      schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+      status: "applied",
+      action: "repin",
+      featureId: apply.featureId,
+      artifactPath: apply.artifactPath,
+      oldSha256: apply.oldSha256,
+      newSha256: apply.newSha256,
+      repinnedAt,
+      by: apply.by,
+      mutated: true,
+    }, null, 2));
+    return 0;
+  } finally {
+    releaseContinuityLock(lock);
+  }
+}
+
+/**
+ * Authority gate worktree/HEAD divergence checking (WP-A5-iii, Issue #106, AC-5, IR-1).
+ *
+ * Compares each authority path's worktree bytes against HEAD (`git show HEAD:<path>`).
+ * Pre-commit checking is the gate's purpose, so worktree/HEAD divergence is emitted
+ * as a warning/diagnostic rather than a hard refusal.
+ * The PRD-cardinality check runs against both views and reports per view.
+ */
+export function checkPoGateAuthority(request = {}, deps = {}) {
+  const dir = request.repoRoot ?? deps.dir ?? projectDir();
+  const baseResult = (deps.validateAuthority ?? validatePoGateAuthorityForRepository)({ ...request, repoRoot: dir }, deps);
+
+  const spawn = deps.spawn ?? spawnSync;
+  const divergences = [];
+  let prdCardinality = {
+    worktree: { count: 0, paths: [], ok: false },
+    head: { count: 0, paths: [], ok: false },
+  };
+
+  try {
+    let featureDir = null;
+    let planPath = baseResult.value?.planPath ?? null;
+    let specPath = baseResult.value?.specPath ?? null;
+
+    if (planPath) {
+      featureDir = dirname(planPath).split(sep).join("/");
+    } else {
+      const state = readState(dir);
+      if (state.status === "ok" && state.state.activeFeature?.planPath) {
+        planPath = state.state.activeFeature.planPath;
+        featureDir = dirname(planPath).split(sep).join("/");
+        specPath = `${featureDir}/spec.md`;
+      }
+    }
+
+    if (featureDir) {
+      const resolvedFeatureDir = resolve(dir, featureDir);
+      let worktreePrds = [];
+      if (existsSync(resolvedFeatureDir)) {
+        try {
+          const files = readdirSync(resolvedFeatureDir);
+          worktreePrds = files
+            .filter((name) => /^prd_[^/\\]+\.md$/u.test(name))
+            .map((name) => `${featureDir}/${name}`)
+            .sort();
+        } catch {}
+      }
+      prdCardinality.worktree = {
+        count: worktreePrds.length,
+        paths: worktreePrds,
+        ok: worktreePrds.length === 1,
+      };
+
+      let headPrds = [];
+      const gitLs = spawn("git", ["ls-tree", "-r", "--name-only", "HEAD", featureDir], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+      if (gitLs.status === 0 && typeof gitLs.stdout === "string") {
+        const lines = gitLs.stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+        headPrds = lines
+          .filter((p) => /^prd_[^/\\]+\.md$/u.test(basename(p)))
+          .sort();
+      }
+      prdCardinality.head = {
+        count: headPrds.length,
+        paths: headPrds,
+        ok: headPrds.length === 1,
+      };
+
+      if (headPrds.length !== 1) {
+        divergences.push({
+          code: "AUTHORITY-WORKTREE-HEAD-DIVERGENCE",
+          path: featureDir,
+          divergence: "prd-cardinality-divergence",
+          message: `PRD cardinality in HEAD is ${headPrds.length}, expected 1.`,
+          headPrds,
+          worktreePrds,
+        });
+      }
+
+      const allAuthorityPaths = new Set([
+        ...(planPath ? [planPath] : []),
+        ...(specPath ? [specPath] : []),
+        ...worktreePrds,
+        ...headPrds,
+      ]);
+
+      for (const authPath of allAuthorityPaths) {
+        const fullWorktree = resolve(dir, authPath);
+        const existsInWorktree = existsSync(fullWorktree);
+        let worktreeSha256 = null;
+        if (existsInWorktree) {
+          try {
+            worktreeSha256 = sha256Bytes(readFileSync(fullWorktree));
+          } catch {}
+        }
+
+        const gitShow = spawn("git", ["show", `HEAD:${authPath}`], {
+          cwd: dir,
+          encoding: "buffer",
+        });
+        const existsInHead = gitShow.status === 0;
+        let headSha256 = null;
+        if (existsInHead) {
+          headSha256 = sha256Bytes(gitShow.stdout);
+        }
+
+        if (existsInWorktree && !existsInHead) {
+          divergences.push({
+            code: "AUTHORITY-WORKTREE-HEAD-DIVERGENCE",
+            path: authPath,
+            divergence: "missing-in-head",
+            message: `Authority path "${authPath}" exists in worktree but is untracked/unstaged in HEAD.`,
+            worktreeSha256,
+            headSha256: null,
+          });
+        } else if (!existsInWorktree && existsInHead) {
+          divergences.push({
+            code: "AUTHORITY-WORKTREE-HEAD-DIVERGENCE",
+            path: authPath,
+            divergence: "missing-in-worktree",
+            message: `Authority path "${authPath}" exists in HEAD but is missing in worktree.`,
+            worktreeSha256: null,
+            headSha256,
+          });
+        } else if (existsInWorktree && existsInHead && worktreeSha256 !== headSha256) {
+          divergences.push({
+            code: "AUTHORITY-WORKTREE-HEAD-DIVERGENCE",
+            path: authPath,
+            divergence: "differs",
+            message: `Authority path "${authPath}" differs between worktree and HEAD.`,
+            worktreeSha256,
+            headSha256,
+          });
+        }
+      }
+    }
+  } catch {
+    // Non-fatal git errors
+  }
+
+  return {
+    ...baseResult,
+    divergences,
+    prdCardinality,
+    warnings: [
+      ...(baseResult.warnings ?? []),
+      ...divergences,
+    ],
+    diagnostics: [
+      ...(baseResult.diagnostics ?? []),
+      ...divergences,
+    ],
+  };
+}
+
 export function run(argv = process.argv.slice(2), deps = {}) {
   const dir = deps.dir ?? projectDir();
   const now = deps.now ?? (() => new Date().toISOString());
   const gitHead = deps.gitHead ?? defaultGitHead;
   const gitCandidate = deps.gitCandidate ?? defaultGitCandidate;
-  const poGateAuthority = deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request));
+  const poGateAuthority = deps.poGateAuthority ?? ((request) => checkPoGateAuthority(request, deps));
 
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
@@ -8238,6 +8829,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   }
   if (sub === "continuity-result-case-migration-plan" || sub === "continuity-result-case-migration-apply") {
     return runResultCaseMigrationCommand(sub, rest, { ...deps, dir, now });
+  }
+  if (sub === "closed-evidence-restore-plan" || sub === "closed-evidence-restore-apply") {
+    return runClosedEvidenceRestoreCommand(sub, rest, { ...deps, dir, now });
+  }
+  if (sub === "closed-evidence-repin-plan" || sub === "closed-evidence-repin-apply") {
+    return runClosedEvidenceRepinCommand(sub, rest, { ...deps, dir, now });
   }
   if (AUTHORITY_REVISION_SUBCOMMANDS.has(sub)) {
     return runAuthorityRevisionCommand(sub, rest, { ...deps, dir, now, gitCandidate });
