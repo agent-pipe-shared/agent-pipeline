@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.authority-gate-verdict-need-not-survive-checkout
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 16d153da22cc12056e5a1d2534f5201547ca60ca
+closure_evidence: specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md
 sprint: alfred
 due: 2026-08-22
 source: "Observed by the Phoenix session of 2026-08-08, which caught it in its own work; generalised and verified against the source here."
@@ -85,3 +89,10 @@ of the authority directory. Runner-independent and platform-independent.
   all, name the divergence, document the semantics) rather than a quick fix.
 - **Assignment (if accepted):** next available Alfred slot.
 - **Date:** 2026-08-17
+
+### Update, 2026-09-14 — resolved by WP-A5-iii (Spec §4.5 item 3, AC-5)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Implemented `checkPoGateAuthority` in `plugins/pipeline-core/scripts/pipeline-state.mjs` to compare worktree bytes vs HEAD for all authority paths and emit diagnostic warning `AUTHORITY-WORKTREE-HEAD-DIVERGENCE` on discrepancies. Evaluates and reports PRD cardinality independently per view (`worktree` and `head`), detecting partial staging and uncommitted PRD additions or deletions before gates finalize.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md`
+- **Date:** 2026-09-14

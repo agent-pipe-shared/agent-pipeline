@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 16d153da22cc12056e5a1d2534f5201547ca60ca
+closure_evidence: specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md
 sprint: alfred
 source: "Hit live, 2026-08-27, in the Alfred clone: the sprint-nova-epic discard exposed a 2026-07-31 post-close amendment to the 0.4.7-hotfix Result that had been invisible for four weeks. Full incident narrative: scratch/incident-report.md of that session; durable facts restated here in full."
 done_when: manual
@@ -92,3 +96,10 @@ Not designed here; direction constraints from the incident:
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### Update, 2026-09-14 — resolved by WP-A5-i (Spec §4.5 item 1, AC-5, IR-1)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Implemented closed-evidence integrity checking across all branches reading state (`detectClosedEvidenceDrift` in `plugins/pipeline-core/lib/onboarding-continuity.mjs`), emitting `CLOSED-EVIDENCE-DRIFT` diagnostic on active branches while preserving readiness, and failing closed as `damaged` on inactive branches. Added PO-gated `closed-evidence-restore-plan/apply` and `closed-evidence-repin-plan/apply` (with `state.evidenceRepins[]` audit trail) under schema `pipeline.closed-evidence-repair.v1` in `pipeline-state.mjs`, plus `check-evidence-drift.mjs` CLI.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md`
+- **Date:** 2026-09-14
