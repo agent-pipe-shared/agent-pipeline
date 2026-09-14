@@ -277,15 +277,6 @@
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs"
     },
     {
-      "id": "pipeline.a-registered-but-abandoned-worktree-is-never-retired",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-28",
-      "source": "NVA-VTPGATE-1 stopped on it live, 2026-08-28",
-      "deferred": false
-    },
-    {
       "id": "pipeline.a-runner-improvised-the-po-signature-instructions",
       "status": "open",
       "type": "defect",
@@ -304,19 +295,6 @@
       "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F27 of scratch/greenfield-triage-2026-08-29.md).",
       "deferred": false,
       "sprint": "nova",
-      "closedAt": "2026-08-29",
-      "closureRepository": "self",
-      "closureCommit": "1a1de6ef4545ed8fcce812434f1edc02cfb9f26b",
-      "closureEvidence": "backlog/items/2026-08-29-a-runner-proposed-abandoning-pipeline-setup-as-too-laborious.md"
-    },
-    {
-      "id": "pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious",
-      "status": "closed",
-      "type": "workflow-improvement",
-      "owner": "pipeline",
-      "created": "2026-08-29",
-      "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F27 of scratch/greenfield-triage-2026-08-29.md).",
-      "deferred": false,
       "closedAt": "2026-08-29",
       "closureRepository": "self",
       "closureCommit": "1a1de6ef4545ed8fcce812434f1edc02cfb9f26b",
@@ -414,24 +392,6 @@
       "closureRepository": "self",
       "closureCommit": "ae8da7b8913bccfc34497aeb6dce3013c4204903",
       "closureEvidence": "plugins/pipeline-core/lib/codex-onboarding-capabilities.test.mjs"
-    },
-    {
-      "id": "pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-09-02",
-      "source": "Reported by the NVA-B-ROUNDN-FIX dispatch while binding the adjacent delete sites to content; seen in plugins/pipeline-core/lib/project-onboarding-v3.mjs's V3 manifest-repair transaction, not measured.",
-      "deferred": false
-    },
-    {
-      "id": "pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-09-02",
-      "source": "Measured live 2026-09-02 during a human-guard-override ceremony for a TP-3 edit: sign-intent succeeded, authorize-by-signature failed with HGO-AUDIT, and verify-audit fails identically with no ceremony in flight.",
-      "deferred": false
     },
     {
       "id": "pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question",
@@ -733,20 +693,6 @@
       "closureEvidence": "backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signature-instead-of-walking-it.md"
     },
     {
-      "id": "pipeline.agents-talk-the-po-out-of-the-signature",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-28",
-      "source": "PO report 2026-08-28: 'aktuell jeder agent mich als PO erstmal zu überreden lieber selber zu pushen oder die config auf chat zu ändern weil signature zu kompliziert ist - und so ist das ja nicht gedacht'. Clarified by the PO: the agent is not able to change the setting, and that is not the problem -- it simply does not want to walk the path.",
-      "deferred": false,
-      "tracking": "NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident.",
-      "closedAt": "2026-08-29",
-      "closureRepository": "self",
-      "closureCommit": "955f5ebe58b46a3e26f0b5352a417dc5ec49db08",
-      "closureEvidence": "backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signature-instead-of-walking-it.md"
-    },
-    {
       "id": "pipeline.all-three-runners-should-install-against-the-stable-branch",
       "status": "open",
       "type": "requirement",
@@ -828,59 +774,6 @@
       "source": "Dispatch NVA-BLDECL-4, 2026-08-29: two of fifteen first-draft predicates contained a comma or brace, were silently dropped by the frontmatter parser, and were reported as UNDECLARED rather than MALFORMED. Confirmed against the source by the dispatcher.",
       "deferred": false,
       "sprint": "nova",
-      "closedAt": "2026-08-29",
-      "closureRepository": "self",
-      "closureCommit": "8230cd8efb998d527a84c220044be18145862fb0",
-      "closureEvidence": "plugins/pipeline-core/scripts/check-backlog-done-predicate.test.mjs"
-    },
-    {
-      "id": "pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-09-01",
-      "source": "PO handover received in session on 2026-09-01, transcribed faithfully from the live reproduction on the agent-pipeline-shared_alfred checkout.",
-      "deferred": false
-    },
-    {
-      "id": "pipeline.an-expired-override-is-armed-instead-of-refused",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-28",
-      "source": "Hit live, 2026-08-28, consuming a PO signature for a TP-3 guard override; then located in plugins/pipeline-core/lib/human-guard-override.mjs by reading the arming and consuming paths against each other.",
-      "deferred": false,
-      "closedAt": "2026-08-29",
-      "closureRepository": "self",
-      "closureCommit": "621a19c68649787b20886bbcfd998a7516afb75f",
-      "closureEvidence": "backlog/items/2026-08-28-an-expired-override-is-armed-instead-of-refused.md"
-    },
-    {
-      "id": "pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-09-01",
-      "source": "Hypothesis raised in scratch/critic-contract-round-H.md, D-2 (an unrelated pre-existing security-scan.mjs subprocess failure with exit code 2, observed during unrelated work, established not to be caused by that diff). Investigated live 2026-09-01 against plugins/pipeline-core/lib/project-onboarding-v3.test.mjs and plugins/pipeline-core/scripts/security-scan.mjs; refuted by direct measurement.",
-      "deferred": false
-    },
-    {
-      "id": "pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-28",
-      "source": "Re-Critic vtpgate2-368458af finding F2; incident during NVA-VTPGATE-2, 2026-08-28",
-      "deferred": false
-    },
-    {
-      "id": "pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-29",
-      "source": "Dispatch NVA-BLDECL-4, 2026-08-29: two of fifteen first-draft predicates contained a comma or brace, were silently dropped by the frontmatter parser, and were reported as UNDECLARED rather than MALFORMED. Confirmed against the source by the dispatcher.",
-      "deferred": false,
       "closedAt": "2026-08-29",
       "closureRepository": "self",
       "closureCommit": "8230cd8efb998d527a84c220044be18145862fb0",
@@ -972,19 +865,6 @@
       "source": "Found by NVA-R31-STATEPHASEDRIFT while verifying unrelated work (2026-08-29), independently re-confirmed by the Elephant. Not caused by that dispatch or by any 2026-08-29 change.",
       "deferred": false,
       "sprint": "nova",
-      "closedAt": "2026-08-29",
-      "closureRepository": "self",
-      "closureCommit": "dc53bd7922bf0492d1710fa812fcaa5e5c5b4a62",
-      "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs"
-    },
-    {
-      "id": "pipeline.approve-announce-test-fixture-missing-present-plan-step",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-29",
-      "source": "Found by NVA-R31-STATEPHASEDRIFT while verifying unrelated work (2026-08-29), independently re-confirmed by the Elephant. Not caused by that dispatch or by any 2026-08-29 change.",
-      "deferred": false,
       "closedAt": "2026-08-29",
       "closureRepository": "self",
       "closureCommit": "dc53bd7922bf0492d1710fa812fcaa5e5c5b4a62",
@@ -1376,19 +1256,6 @@
       "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F26 of scratch/greenfield-triage-2026-08-29.md).",
       "deferred": false,
       "sprint": "nova",
-      "closedAt": "2026-08-29",
-      "closureRepository": "self",
-      "closureCommit": "7a0702dd6b31d61f110c29dacd8fbf52df50a5f9",
-      "closureEvidence": "backlog/items/2026-08-29-bootstrap-po-questions-asked-sequentially-instead-of-in-one-block.md"
-    },
-    {
-      "id": "pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block",
-      "status": "closed",
-      "type": "workflow-improvement",
-      "owner": "pipeline",
-      "created": "2026-08-29",
-      "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F26 of scratch/greenfield-triage-2026-08-29.md).",
-      "deferred": false,
       "closedAt": "2026-08-29",
       "closureRepository": "self",
       "closureCommit": "7a0702dd6b31d61f110c29dacd8fbf52df50a5f9",
@@ -2312,15 +2179,6 @@
       "closureEvidence": "backlog/evidence/2026-09-12-critic-disposition-path-bound-correction.md"
     },
     {
-      "id": "pipeline.critic-skip-not-an-explicit-logged-decision",
-      "status": "open",
-      "type": "workflow-improvement",
-      "owner": "pipeline",
-      "created": "2026-08-29",
-      "source": "Claude/Windows self-audit report (docs/pipeline-audit-claude-session.md §3.1, §10.6), cited by scratch/greenfield-triage-2026-08-29.md finding F16, observed during the 2026-08-29 three-runner greenfield test.",
-      "deferred": false
-    },
-    {
       "id": "pipeline.critical-command-kinds-excludes-feature-package-reconcile",
       "status": "closed",
       "type": "defect",
@@ -2926,24 +2784,6 @@
       "closureRepository": "self",
       "closureCommit": "306f85603be8256397338a3588c2b29db8d46010",
       "closureEvidence": "backlog/evidence/2026-09-11-commit-message-hook-correction-critic-pass.md"
-    },
-    {
-      "id": "pipeline.every-small-correction-costs-a-new-human-interaction",
-      "status": "open",
-      "type": "idea",
-      "owner": "pipeline",
-      "created": "2026-08-28",
-      "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
-      "deferred": false
-    },
-    {
-      "id": "pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-09-01",
-      "source": "Critic round J, finding F-1, 2026-09-01, reviewing commits ccc7df84 and 25c51c90. Verified independently by the Elephant against git's own trailer parser before filing.",
-      "deferred": false
     },
     {
       "id": "pipeline.evidence-bound-review-retry-economics",
@@ -3680,15 +3520,6 @@
       "closureRepository": "self",
       "closureCommit": "6bfb9c3e1a8d96648e35365fb316ee73b2dd51b9",
       "closureEvidence": "backlog/evidence/2026-09-04-nova-b-batch-3-closure-verification.md"
-    },
-    {
-      "id": "pipeline.guard-denial-messages-repeat-70-lines-of-boilerplate",
-      "status": "open",
-      "type": "workflow-improvement",
-      "owner": "pipeline",
-      "created": "2026-08-29",
-      "source": "Claude/Windows self-audit section 5.8 from the 2026-08-29 three-runner greenfield test (finding F25 of scratch/greenfield-triage-2026-08-29.md); reproduced live in this dispatch by an accidental piped Bash command against a gate-strength-protected path.",
-      "deferred": false
     },
     {
       "id": "pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane",
@@ -5848,19 +5679,6 @@
       "closureEvidence": "harness/scripts/pipeline-state.test.mjs"
     },
     {
-      "id": "pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-29",
-      "source": "PO observation during the 2026-08-29 three-runner greenfield test (finding F28 of scratch/greenfield-triage-2026-08-29.md), Antigravity/WSL run.",
-      "deferred": false,
-      "closedAt": "2026-08-29",
-      "closureRepository": "self",
-      "closureCommit": "19937961b68c5387fd4d32dd80e03f37bdd7513b",
-      "closureEvidence": "harness/scripts/pipeline-state.test.mjs"
-    },
-    {
       "id": "pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags",
       "status": "closed",
       "type": "defect",
@@ -7118,15 +6936,6 @@
       "closureEvidence": "backlog/evidence/2026-09-11-done-when-enforcement-evidence.md"
     },
     {
-      "id": "pipeline.resolved-backlog-items-can-keep-status-open-indefinitely",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-27",
-      "source": "NVA-BLRECONCILE-1, 2026-08-27 — process-defect finding from the briefing that reported two same-day dispatches briefed against already-finished work",
-      "deferred": false
-    },
-    {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
       "status": "closed",
       "type": "defect",
@@ -7340,30 +7149,6 @@
       "deferred": false,
       "tracking": "NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks.",
       "sprint": "nova",
-      "closedAt": "2026-08-29",
-      "closureRepository": "self",
-      "closureCommit": "193e4dc062763832b5d0d2aad00462ddc8b5cbea",
-      "closureEvidence": "plugins/pipeline-core/scripts/security-scan.test.mjs"
-    },
-    {
-      "id": "pipeline.scratch-cleanup-mechanism-not-wired-to-any-event",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-28",
-      "source": "Consumer project HA, incident report S56 side finding (2026-08-28). Observed, not diagnosed: neither the consumer nor this item has established which value is correct.",
-      "deferred": false,
-      "tracking": "Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report"
-    },
-    {
-      "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-28",
-      "source": "Codex/WSL greenfield run, 2026-08-28 (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own observation that this runner needed three sessions and the most detours.",
-      "deferred": false,
-      "tracking": "NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks.",
       "closedAt": "2026-08-29",
       "closureRepository": "self",
       "closureCommit": "193e4dc062763832b5d0d2aad00462ddc8b5cbea",
@@ -7717,20 +7502,6 @@
       "deferred": false,
       "tracking": "NOW / Nova A — PO decision 2026-08-28: admit `&&`, and secure it. This item is the prerequisite half; the admission is unsafe until the parser stops reading quoted content as syntax.",
       "sprint": "nova",
-      "closedAt": "2026-08-28",
-      "closureRepository": "self",
-      "closureCommit": "c702d3ff76816e1961d09fa418d114f6fc342a2e",
-      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
-    },
-    {
-      "id": "pipeline.shell-grammar-reads-quoted-content-as-shell-syntax",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-27",
-      "source": "Three live refusals in one Elephant session, 2026-08-27, each on a read-only command whose only offending characters sat inside a quoted argument. Reproduced twice more on 2026-08-28, and independently by a dispatched Goldfish which overran its tool budget for this reason and said so in its own report.",
-      "deferred": false,
-      "tracking": "NOW / Nova A — PO decision 2026-08-28: admit `&&`, and secure it. This item is the prerequisite half; the admission is unsafe until the parser stops reading quoted content as syntax.",
       "closedAt": "2026-08-28",
       "closureRepository": "self",
       "closureCommit": "c702d3ff76816e1961d09fa418d114f6fc342a2e",
@@ -8217,24 +7988,6 @@
       "closureRepository": "self",
       "closureCommit": "e52e5373d81afde912ff35df043aade44ee7c073",
       "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md"
-    },
-    {
-      "id": "pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-09-01",
-      "source": "PO observation during the 0.6.0 release push, 2026-09-01: the AGY-MKTATTEST-1 push-time check fired on eight unrelated files immediately after `approve-push` signature consumption, forcing a manual external-marketplace sync inside the one window the documented ordering rule forbids any other change.",
-      "deferred": false
-    },
-    {
-      "id": "pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-09-02",
-      "source": "Round-L Critic finding F3, observed first-hand by the reviewing dispatch when its own scratch-note write was refused, and anchored to plugins/pipeline-core/lib/protected-test-paths.mjs's opaque-interpreter-code lane.",
-      "deferred": false
     },
     {
       "id": "pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers",

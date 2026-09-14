@@ -197,8 +197,14 @@ content-v1:081327d87b1ab19f416c119d3504a9c913f2247cc95b810870c60f24d012f680:gove
 # its structured idempotency key; this exact content fingerprint was generated
 # from the raw finding with gitleaksContentAuthorityLine().
 content-v1:90d2c785141be4f2159703a252dfa0020556b321d8c510484411ec301246efcf:governance/events/human/14-evt-gmw-revoke-593e132e33447e2b0299b238f5fa6841-0.json:generic-api-key:1:1024
+# Public deterministic GMW revoke ID; PO-approved 2026-09-06.
+# Exact content/path/rule/position-bound exception.
+content-v1:88cc8879a89d4c3eec339244937908aee063293e59485562fd4a688130cc5944:governance/events/human/14-evt-gmw-revoke-3de0bdca05a90ca795ac7696f4717abe-0.json:generic-api-key:1:1030
+# Alfred Event 16: deterministic public decision ID; PO-approved permanently 2026-09-09.
+# No expiry. Exact content, path, rule and position binding.
+# Evidence: specs/sprint-alfred-epic/evidence/event16-permanent-scanner-exception-2026-09-09.md
+content-v1:3e768b0197a72c030671700e14cbc6e2d6b73681ad69309533a6aefe54265d7b:governance/events/human/16-evt-hgo-deny-cc612114562e4c5069cb6c66c06dda55-0.json:generic-api-key:1:987
 # ALF-C1-TP3-REGISTRATION-REVOKE (2026-09-13): signed maintenance-window revoke
 # envelope for Alfred C1 registration ceremony. Structured idempotency key matched
 # by gitleaks generic-api-key rule; content fingerprint generated with gitleaksContentAuthorityLine().
 content-v1:6fb3561586bd0d5f22b4308b41b55cc34ad4d903d589a9cb9317ffc3b3bd6a5c:governance/events/human/17-evt-gmw-revoke-3ae6fd1f24a73aa7eb8b6e69b91b5f53-0.json:generic-api-key:1:1030
-

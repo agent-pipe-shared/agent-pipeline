@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "d7f362fd97e0f8b8cdc3081fb6bcabf94aa8abe3",
-    "tree": "bc43c79d2736c02325f3c01a6d592f556b5a7fe4"
+    "commit": "35a05f91172e43c5d41578750ab0add30a5f7449",
+    "tree": "2fe5d9513208cd9572c72cb73c6e035dc72a8337"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -32,7 +32,6 @@
         "guard:plugins/pipeline-core/hooks/guard-worktree-isolation.mjs:guard-worktree-isolation",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
@@ -248,7 +247,6 @@
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:check-protected-path-integrity-tests",
         "verify-phase:harness/scripts/verify.mjs:check-release-state-consistency-tests",
-        "verify-phase:harness/scripts/verify.mjs:check-resume-consumption-tests",
         "verify-phase:harness/scripts/verify.mjs:check-review-retry-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:check-session-bootstrap-directory-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:check-state-phase-consistency-tests",
