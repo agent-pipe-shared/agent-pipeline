@@ -45,10 +45,9 @@ import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
-import { authorizeCriticalPushCommand, parseHumanArgs } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
@@ -385,23 +384,15 @@ function resolveGitCommonDirPath(dir, deps = {}) {
 }
 
 /**
- * Reproduces the exact filenames `po-human-approval.mjs` (`runHumanApproval`)
- * gives the request/proof artifacts for a `kind: push` critical approval --
- * `request-<fingerprint>-critical-push.json` / `proof-<fingerprint>-critical-push.json`,
- * `trust-policy.json` unsuffixed -- by calling the SAME exported
- * `derivePoGateRepositoryFingerprint()` that script imports, never a second
- * fingerprint scheme.
+ * The agent-side push command consumes only the repo-local mirror written by
+ * `authorize-critical`; it never names the external directory holding the PO
+ * key material. Delegating to the producer's exported builder keeps the
+ * hand-off paths one contract.
  */
-export function criticalArtifactPaths(dir, directory, deps = {}) {
+export function criticalArtifactPaths(dir, deps = {}) {
   const gitCommonDir = resolveGitCommonDirPath(dir, deps);
-  const deriveFingerprint = deps.derivePoGateRepositoryFingerprint ?? derivePoGateRepositoryFingerprint;
-  const fingerprint = deriveFingerprint({ gitCommonDir, primaryRoot: dir }).slice(0, 12);
-  const suffix = `-${fingerprint}-critical-push`;
-  return {
-    request: join(directory, `request${suffix}.json`),
-    proof: join(directory, `proof${suffix}.json`),
-    authority: join(directory, "trust-policy.json"),
-  };
+  const build = deps.criticalPushScratchArtifactPaths ?? criticalPushScratchArtifactPaths;
+  return build(dir, gitCommonDir);
 }
 
 /**
@@ -619,7 +610,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     argv: authorize.argv,
   });
 
-  const artifacts = criticalArtifactPaths(dir, directory, deps);
+  const artifacts = criticalArtifactPaths(dir, deps);
   const approveArgv = [
     PIPELINE_STATE_SCRIPT_PATH, "approve-push",
     "--by", by, "--remote", remote, "--destination", destination,

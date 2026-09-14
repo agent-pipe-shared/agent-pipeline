@@ -354,6 +354,46 @@ function artifactPath(directory, name) {
 }
 
 /**
+ * The agent-side half of a push approval must never need to name the human's
+ * external key directory. `authorize-critical` mirrors the public request,
+ * proof, and authority it has just produced into the repository's scratch
+ * directory; push preparation consumes these exact names.
+ */
+export function criticalPushScratchArtifactPaths(repository, gitCommonDir = repository) {
+  const root = resolve(repository);
+  const fingerprint = derivePoGateRepositoryFingerprint({
+    gitCommonDir: gitCommonDir ?? root,
+    primaryRoot: root,
+  }).slice(0, 12);
+  const scratch = join(root, "scratch");
+  return {
+    request: join(scratch, `critical-push-request-${fingerprint}.json`),
+    proof: join(scratch, `critical-push-proof-${fingerprint}.json`),
+    authority: join(scratch, `critical-push-authority-${fingerprint}.json`),
+    signer: join(scratch, `critical-push-signer-${fingerprint}.json`),
+  };
+}
+
+function mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, paths, io) {
+  const artifacts = criticalPushScratchArtifactPaths(repository, gitCommonDir);
+  const scratch = dirname(artifacts.request);
+  mkdirSync(scratch, { recursive: true, mode: 0o700 });
+  const scratchMetadata = lstatSync(scratch);
+  if (!scratchMetadata.isDirectory() || scratchMetadata.isSymbolicLink()) {
+    fail("critical push scratch artifacts require a real scratch directory inside the repository");
+  }
+  const writeMirror = (path, data) => {
+    assertUnlinkedRegularFileOrAbsent(path, "critical push scratch artifacts must be unlinked regular files inside this repository's own scratch/ directory");
+    io.write(path, data, { mode: 0o600 });
+  };
+  writeMirror(artifacts.request, `${JSON.stringify(request, null, 2)}\n`);
+  writeMirror(artifacts.proof, `${JSON.stringify(signed.proof, null, 2)}\n`);
+  writeMirror(artifacts.authority, io.read(paths.authority, "utf8"));
+  writeMirror(artifacts.signer, `${JSON.stringify(signed.signer, null, 2)}\n`);
+  return artifacts;
+}
+
+/**
  * The three fork-disposition commands (ADR-0072). They are a sibling of the
  * `-critical` trio, not a fourth `--kind` for it: a fork disposition's subject
  * is DERIVED from the fork that actually exists, so the parameters that locate
@@ -1291,9 +1331,13 @@ function executeHumanApproval(args, dependencies = {}) {
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
     ], dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
-    // NVA-CLI-FEEDBACK-1: state the paths this call just wrote (request/proof/
-    // signer survive; intent/signature are removed by signIntentIntoProof).
-    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: { request: paths.request, proof: paths.proof, signer: paths.signer } };
+    // The human terminal owns durable external artifacts. For pushes, the next
+    // agent-side `approve-push` consumes a repository-local mirror instead, so
+    // its rendered command cannot disclose this host's private key location.
+    const resultPaths = args.kind === "push"
+      ? mirrorCriticalPushArtifacts(repository, gitCommonDir, request, signed, paths, { write, read })
+      : { request: paths.request, proof: paths.proof, signer: paths.signer };
+    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: resultPaths };
   }
   if (args.command === "prepare" || args.command === "prepare-critical") {
     if (critical) {

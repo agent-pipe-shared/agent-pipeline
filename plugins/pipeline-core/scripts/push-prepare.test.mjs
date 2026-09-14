@@ -452,14 +452,19 @@ test("resolveFeatureContext: no active feature -> ok:false", () => {
   assert.equal(result.ok, false);
 });
 
-test("criticalArtifactPaths: request/proof share a fingerprint suffix; authority is unsuffixed", () => {
-  const paths = criticalArtifactPaths(FIXTURE_DIR, "/external/po-dir", {
+test("criticalArtifactPaths: agent-side push artifacts stay in repository scratch", () => {
+  const paths = criticalArtifactPaths(FIXTURE_DIR, {
     gitCommonDir: () => "/external/po-dir/.fake-common",
-    derivePoGateRepositoryFingerprint: () => "0123456789ab",
+    criticalPushScratchArtifactPaths: () => ({
+      request: `${FIXTURE_DIR}/scratch/critical-push-request-0123456789ab.json`,
+      proof: `${FIXTURE_DIR}/scratch/critical-push-proof-0123456789ab.json`,
+      authority: `${FIXTURE_DIR}/scratch/critical-push-authority-0123456789ab.json`,
+      signer: `${FIXTURE_DIR}/scratch/critical-push-signer-0123456789ab.json`,
+    }),
   });
-  assert.equal(paths.request, "/external/po-dir/request-0123456789ab-critical-push.json");
-  assert.equal(paths.proof, "/external/po-dir/proof-0123456789ab-critical-push.json");
-  assert.equal(paths.authority, "/external/po-dir/trust-policy.json");
+  assert.equal(paths.request, `${FIXTURE_DIR}/scratch/critical-push-request-0123456789ab.json`);
+  assert.equal(paths.proof, `${FIXTURE_DIR}/scratch/critical-push-proof-0123456789ab.json`);
+  assert.equal(paths.authority, `${FIXTURE_DIR}/scratch/critical-push-authority-0123456789ab.json`);
 });
 
 // ---------------------------------------------------------------------------
@@ -523,7 +528,7 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.match(humanText, /Step: agent approve-push\nPOSIX:/u);
   assert.match(humanText, /Step: agent push\nPOSIX:/u);
   assert.match(humanText, /PowerShell:/u);
-  assert.doesNotMatch(result.lines.authorize.join("\n"), /--directory/u);
+  assert.doesNotMatch(humanText, /--directory|\/external\/po-dir/u);
   assert.match(PIPELINE_STATE_SCRIPT_PATH, /^\/.*\/plugins\/pipeline-core\/scripts\/pipeline-state\.mjs$/u);
   const source = readFileSync(fileURLToPath(new URL("./push-prepare.mjs", import.meta.url)), "utf8");
   assert.match(source, /PIPELINE_STATE_SCRIPT_PATH, "approve-push"/u);

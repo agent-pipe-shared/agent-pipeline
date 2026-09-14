@@ -1737,13 +1737,14 @@ test("authorize-critical prepares and signs in ONE invocation, and the proof is 
     assert.deepEqual(result.candidate, { ...CANDIDATE });
     assert.deepEqual(result.action, action);
 
-    // Binding by construction: the three writes of this invocation, in order, are the
-    // request, the exact digest bytes handed to OpenSSL, and the proof. The digest that
-    // was signed is read from the request THIS invocation wrote -- no second file, no
-    // second digest computation, no window between the two steps.
+    // Binding by construction: the first four writes are the durable external
+    // request, exact digest, proof, and signer. The remaining four are public
+    // mirrors for the following agent-side push approval; none names the
+    // external key directory in that agent-facing command.
     const fp = repositoryFingerprintFor(dirs.repoRoot);
     assert.deepEqual(writes.map((entry) => basename(entry.path)), [
       `request-${fp}-critical-push.json`, `intent-${fp}-critical-push.txt`, `proof-${fp}-critical-push.json`, `signer-${fp}-critical-push.json`,
+      `critical-push-request-${fp}.json`, `critical-push-proof-${fp}.json`, `critical-push-authority-${fp}.json`, `critical-push-signer-${fp}.json`,
     ]);
     const request = JSON.parse(writes[0].data);
     assert.equal(writes[1].data, request.approvalIntent.sha256, "the bytes signed by OpenSSL must be this invocation's own intent digest");
@@ -1775,9 +1776,18 @@ test("authorize-critical prepares and signs in ONE invocation, and the proof is 
     assert.equal(verified.verified, true);
     assert.equal(verified.code, "CRITICAL-ACTION-PROOF-VERIFIED");
 
-    // NVA-CLI-FEEDBACK-1: the success result states the absolute paths it just
-    // wrote, so an operator/agent never has to guess or poll for them.
-    assert.deepEqual(result.paths, { request: paths.request, proof: paths.proof, signer: paths.signer });
+    // Agent-side approval consumes the exact repo-local mirror, never a path
+    // in the human's external key directory.
+    const scratchPaths = {
+      request: join(dirs.repoRoot, "scratch", `critical-push-request-${fp}.json`),
+      proof: join(dirs.repoRoot, "scratch", `critical-push-proof-${fp}.json`),
+      authority: join(dirs.repoRoot, "scratch", `critical-push-authority-${fp}.json`),
+      signer: join(dirs.repoRoot, "scratch", `critical-push-signer-${fp}.json`),
+    };
+    assert.deepEqual(result.paths, scratchPaths);
+    assert.deepEqual(JSON.parse(readFileSync(scratchPaths.request, "utf8")), request);
+    assert.deepEqual(JSON.parse(readFileSync(scratchPaths.proof, "utf8")), proof);
+    assert.equal(readFileSync(scratchPaths.authority, "utf8"), readFileSync(join(dirs.directory, "trust-policy.json"), "utf8"));
 
     // Temporary signing material is gone; only request + proof remain.
     assert.equal(existsSync(paths.intent), false);
