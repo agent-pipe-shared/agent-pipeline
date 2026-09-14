@@ -27,13 +27,14 @@ function fixture(config, state = undefined) {
   return root;
 }
 
-test("A3 keeps the shipped static minimum when project config is absent", () => {
+test("A3 treats an absent lifecycle state as an empty dynamic protected class", () => {
   const baseline = resolveProtectedBaseline({ rootDir: fixture() });
   assert.equal(baseline.status, "ready");
   assert.ok(baseline.entries.length >= 6);
   assert.ok(protectedBaselineRuleFor(baseline.entries, "plugins/pipeline-core/lib/protected-baseline.mjs"));
   assert.ok(baseline.identity.baselineDigest);
-  assert.ok(baseline.diagnostics.some((item) => item.code === PB_DYNAMIC_UNAVAILABLE));
+  assert.equal(baseline.dynamic.status, "absent");
+  assert.equal(baseline.diagnostics.some((item) => item.code === PB_DYNAMIC_UNAVAILABLE), false);
 });
 
 test("A3 accepts valid project additions without changing the immutable baseline identity", () => {
@@ -74,4 +75,12 @@ test("A3 reads continuity-close bindings as a dynamic protected class", () => {
   assert.equal(baseline.dynamic.status, "available");
   assert.ok(protectedBaselineRuleFor(baseline.entries, "evidence/closed-result.md")?.dynamic);
   assert.ok(protectedBaselineRuleFor(baseline.entries, "evidence/close.md")?.dynamic);
+});
+
+test("A3 keeps an unreadable lifecycle state fail-closed", () => {
+  const root = fixture({}, "not-an-object");
+  writeFileSync(join(root, "project/pipeline-state.json"), "{");
+  const baseline = resolveProtectedBaseline({ rootDir: root });
+  assert.equal(baseline.dynamic.status, "unavailable");
+  assert.ok(baseline.diagnostics.some((item) => item.code === PB_DYNAMIC_UNAVAILABLE));
 });
