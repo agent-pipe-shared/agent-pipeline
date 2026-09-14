@@ -171,7 +171,7 @@
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | closed | defect | pipeline | — | 2026-08-05 | 2026-09-05 | — |
 | pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization | closed | defect | pipeline | — | 2026-08-18 | — | — |
-| pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | alfred | 2026-08-09 | — | — |
+| pipeline.critical-human-proof-policy-seeded-without-trust-anchor | closed | idea | pipeline | alfred | 2026-08-09 | — | — |
 | pipeline.critical-push-signing-ceremony-gives-no-path-feedback | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.cross-repository-override-ledger-binding | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-09-08 | — |
@@ -582,7 +582,7 @@
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | closed | workflow-improvement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.template-scripts-for-human-terminal-actions | open | idea | pipeline | nova-b | 2026-08-29 | — | Nova B -- runner-neutral design reviewed; catalog, POSIX runner, and first producer adoption implemented; native Windows launcher hardening is deferred. |
-| pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | alfred | 2026-08-08 | 2026-08-15 | — |
+| pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-15 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
 | pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | nova-b | 2026-08-28 | — | Scheduled for Nova B (PO decision 2026-08-28) |
 | pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink | closed | defect | pipeline | nova-b | 2026-09-07 | — | — |
@@ -673,8 +673,8 @@
 
 ## Counts
 
-- open: 72
+- open: 70
 - in_progress: 1
-- closed: 578
+- closed: 580
 - rejected: 3
 - deferred: 11

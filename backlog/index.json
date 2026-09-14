@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d72085924ea83e6c6d1894f296e9b56712ea960c5b3984d3362dcfe7c9ab7163"
+    "transitionHead": "1c31cf22b3ed98dced6cdbf332894f12a8af7e105efbb628b035538b479090b1"
   },
   "counts": {
-    "open": 72,
+    "open": 70,
     "in_progress": 1,
-    "closed": 578,
+    "closed": 580,
     "rejected": 3,
     "deferred": 11
   },
@@ -2211,13 +2211,17 @@
     },
     {
       "id": "pipeline.critical-human-proof-policy-seeded-without-trust-anchor",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff.",
       "deferred": true,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6d6f5b34c546ed7b70dddd79f27e3fcecbcbd9c5",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-guard-override-trust.md"
     },
     {
       "id": "pipeline.critical-push-signing-ceremony-gives-no-path-feedback",
@@ -7770,14 +7774,18 @@
     },
     {
       "id": "pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Elephant, 2026-08-08, GF-057. Third confirmed instance across two blocks; each one verified at a line before filing. The first (GF-056) was walked around with a shell write, the second and third were reported and stopped.",
       "deferred": true,
       "due": "2026-08-15",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6d6f5b34c546ed7b70dddd79f27e3fcecbcbd9c5",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-guard-override-trust.md"
     },
     {
       "id": "pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention",
