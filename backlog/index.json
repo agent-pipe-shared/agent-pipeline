@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1c31cf22b3ed98dced6cdbf332894f12a8af7e105efbb628b035538b479090b1"
+    "transitionHead": "fc498cee6ada9c4d7955597dc4236db0e4e0533ffb5ba2e044a569c178079d71"
   },
   "counts": {
-    "open": 70,
+    "open": 68,
     "in_progress": 1,
-    "closed": 580,
+    "closed": 582,
     "rejected": 3,
     "deferred": 11
   },
@@ -67,13 +67,17 @@
     },
     {
       "id": "pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Hit live, 2026-08-27, in the Alfred clone: the sprint-nova-epic discard exposed a 2026-07-31 post-close amendment to the 0.4.7-hotfix Result that had been invisible for four weeks. Full incident narrative: scratch/incident-report.md of that session; durable facts restated here in full.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "16d153da22cc12056e5a1d2534f5201547ca60ca",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md"
     },
     {
       "id": "pipeline.a-critic-has-no-writable-location-for-its-own-report",
@@ -979,14 +983,18 @@
     },
     {
       "id": "pipeline.authority-gate-verdict-need-not-survive-checkout",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed by the Phoenix session of 2026-08-08, which caught it in its own work; generalised and verified against the source here.",
       "deferred": true,
       "due": "2026-08-22",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "16d153da22cc12056e5a1d2534f5201547ca60ca",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md"
     },
     {
       "id": "pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had",

@@ -9,7 +9,7 @@
 | pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
-| pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair | open | defect | pipeline | alfred | 2026-08-27 | — | — |
+| pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.a-critic-has-no-writable-location-for-its-own-report | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs | closed | requirement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
@@ -79,7 +79,7 @@
 | pipeline.authority-decision-apply-defaults-to-codex | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | nightwing | 2026-08-08 | 2026-08-22 | — |
 | pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
-| pipeline.authority-gate-verdict-need-not-survive-checkout | open | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
+| pipeline.authority-gate-verdict-need-not-survive-checkout | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
 | pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps | closed | defect | pipeline | — | 2026-08-11 | 2026-09-10 | — |
 | pipeline.authority-signing-terminal-contract | closed | workflow-improvement | pipeline | — | 2026-08-06 | — | — |
@@ -673,8 +673,8 @@
 
 ## Counts
 
-- open: 70
+- open: 68
 - in_progress: 1
-- closed: 580
+- closed: 582
 - rejected: 3
 - deferred: 11
