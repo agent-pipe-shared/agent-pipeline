@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 7535e631f8c15a924a1c1ee426f82bbd650a1dee
+closure_evidence: specs/sprint-alfred-epic/evidence/b2-governance-triple.md
 sprint: alfred
 source: "Measured live 2026-08-28 in the Alfred clone: two attended PO acknowledge ceremonies, the first failing its postimage readback and rolling back, the second succeeding with an explicit --runner flag."
 done_when: manual
@@ -96,3 +100,10 @@ Not decided here; each is small and independently viable.
 
 - [[2026-08-28-a-design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding]]
   — the same ceremony chain; this item is the step immediately after it.
+
+### Update, 2026-09-14 — resolved by Governance Triple
+
+- **Decision:** closed, resolved.
+- **Rationale:** In `plugins/pipeline-core/scripts/pipeline-state.mjs`, `buildPoAuthorityAcknowledgePlan()` records the resolved runner in the plan payload. In `runPoAuthorityAcknowledgeCommand()` (`po-authority-acknowledge-apply`), if `--runner` is omitted in an attended terminal, the command extracts `runner = testPlan.payload.runner` from the matching plan payload before falling back to `PO-REBIND-RUNNER-UNKNOWN`. Postimage failures clearly render failing predicate summaries (`${predicateSummary}`) to stderr.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/b2-governance-triple.md`
+- **Date:** 2026-09-14

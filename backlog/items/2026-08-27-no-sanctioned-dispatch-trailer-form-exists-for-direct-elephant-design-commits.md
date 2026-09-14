@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 7535e631f8c15a924a1c1ee426f82bbd650a1dee
+closure_evidence: specs/sprint-alfred-epic/evidence/b2-governance-triple.md
 sprint: alfred
 source: "Flagged independently by both 2026-08-27 design-review Critics (round 1A finding F1, round 1B finding F10; reports under specs/sprint-alfred-epic/evidence/critic/); scope question resolved against docs/operating-model.md §3.3 in the round-1 response."
 done_when: manual
@@ -59,7 +63,7 @@ authoring-record sidecar.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed, resolved.
+- **Rationale:** Added sanctioned `Dispatch: design (elephant)` trailer form to agent obligations §6 (`harness/scripts/generate-agent-obligations.mjs` and generated documents). Updated `plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs` to export `ELEPHANT_DESIGN_ID = "design"` and verify that all changed paths reside under design prefixes (`docs/`, `specs/`, `plans/`, `backlog/`, `evidence/`, `.claude/`, `scratch/`, `README.md`, `AGENTS.md`, `GEMINI.md`), returning PASS on design paths and UNVERIFIABLE on non-design paths.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/b2-governance-triple.md`
+- **Date:** 2026-09-14
