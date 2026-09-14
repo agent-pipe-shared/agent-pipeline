@@ -4271,6 +4271,27 @@ function isExactObservedInstalledPluginAttestationAction(command, root, dependen
   const expected = action?.expected;
   const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
     && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
+  const argv = action?.argv;
+  // This is deliberately stronger than equality with a freshly observed
+  // action.  The emergency lane exists only for Codex's registry-selected
+  // receipt writer; a matching preflight that named the generic writer would
+  // otherwise turn exact-observation equality into a generic host-write lane.
+  // The optional source root remains data for the writer to compare against
+  // the registry, but its flag position and the installed root are closed
+  // here before the host command can run.
+  const codexWriterArgv = Array.isArray(argv)
+    && argv[0] === resolve(observed?.pluginRoot ?? "", "scripts", "installed-plugin-attestation-host.mjs")
+    && argv[1] === "write-local-from-codex-registry"
+    && argv[2] === "--version"
+    && argv[3] === observed?.version
+    && typeof argv[3] === "string" && argv[3] !== ""
+    && (() => {
+      const sourceOffset = argv[4] === "--source-plugin-root" ? 2 : 0;
+      return (sourceOffset === 0 || (typeof argv[5] === "string" && isAbsolute(argv[5])))
+        && argv.length === 6 + sourceOffset
+        && argv[4 + sourceOffset] === "--installed-plugin-root"
+        && argv[5 + sourceOffset] === observed.pluginRoot;
+    })();
   return observed?.schema === "pipeline.start-preflight.v1"
     && observed?.status === "plugin-attestation-required"
     && typeof observed?.pluginRoot === "string" && isAbsolute(observed.pluginRoot)
@@ -4278,8 +4299,8 @@ function isExactObservedInstalledPluginAttestationAction(command, root, dependen
     && action.schema === "pipeline.installed-plugin-attestation-setup-action.v1"
     && action.kind === "host-postinstall"
     && action.executable === "node"
-    && Array.isArray(action.argv) && action.argv.length >= 6 && action.argv.every((value) => typeof value === "string")
-    && action.argv[0] === resolve(observed.pluginRoot, "scripts", "installed-plugin-attestation-host.mjs")
+    && Array.isArray(action.argv) && action.argv.every((value) => typeof value === "string")
+    && codexWriterArgv
     && action.mutation === true && action.requiresPoApproval === false && action.executionBoundary === "host"
     && exactKeys(expected, ["schema", "status"])
     && expected.schema === "pipeline.installed-plugin-attestation-host-result.v1"

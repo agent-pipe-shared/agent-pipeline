@@ -1105,6 +1105,7 @@ test("NVA-B8-IPA: only the exact fresh preflight attestation writer survives an 
       schema: "pipeline.start-preflight.v1",
       status: "plugin-attestation-required",
       pluginRoot,
+      version: "0.6.2+test",
       nextAction: {
         schema: "pipeline.installed-plugin-attestation-setup-action.v1",
         kind: "host-postinstall",
@@ -1135,6 +1136,20 @@ test("NVA-B8-IPA: only the exact fresh preflight attestation writer survives an 
       nextAction: { ...preflight.nextAction, argv: [
         ...argv.slice(0, 1), "write-local", ...argv.slice(2),
       ] },
+    }).exitCode, 2);
+    // Matching a hostile observation and command must not turn the generic
+    // writer into a host recovery lane.  This is distinct from merely
+    // changing the observation while leaving the original command intact.
+    const genericArgv = [...argv.slice(0, 1), "write-local", ...argv.slice(2)];
+    assert.equal(run(`node ${genericArgv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, argv: genericArgv },
+    }).exitCode, 2);
+    const wrongVersionArgv = [...argv];
+    wrongVersionArgv[3] = "0.6.2+other";
+    assert.equal(run(`node ${wrongVersionArgv.join(" ")}`, {
+      ...preflight,
+      nextAction: { ...preflight.nextAction, argv: wrongVersionArgv },
     }).exitCode, 2);
     assert.equal(run(`node ${argv.join(" ")}`, {
       ...preflight,

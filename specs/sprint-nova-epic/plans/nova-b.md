@@ -547,5 +547,16 @@ plugin manifests are represented together.
 rollback permission, lifecycle bypass, protected-path weakening or Verify
 registration change.
 
+**Rollback:** revert the complete B8 change set as one unit; the recovery
+producer, its closed guard admission, and their regression tests must never be
+split across versions.  Restore the preceding three-manifest local candidate
+through the ordinary marketplace/cache refresh, then rerun preflight.  Do not
+delete or rewrite an attestation receipt by hand: receipts remain
+version/content-bound and an older installed candidate either verifies its own
+receipt or returns its own typed recovery state.  Before an external delivery,
+prepare the detached approval request against the final candidate and bind its
+current B8 trust-boundary model; any code, plan, model, or policy change
+invalidates that request and restarts the final review sequence.
+
 Nova/Cyborg reconciliation is not part of this close. It is a separate
 post-Sprint integration lifecycle after both independently accepted Results.
