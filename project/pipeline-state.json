@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-09-13T10:01:47.623Z",
+  "updatedAt": "2026-09-14T06:31:35.165Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -121,14 +121,22 @@
       {
         "phase": "implementation",
         "at": "2026-09-13T10:01:47.622Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-14T06:27:56.301Z"
+      },
+      {
+        "phase": "implementation",
+        "at": "2026-09-14T06:31:35.165Z"
       }
     ]
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v4",
-    "approvedBy": "André",
-    "approvedAt": "2026-09-13T10:01:44.130Z",
-    "submissionSha256": "5917510ad0186d5e3ceac1f02f0d060699c413540ce5875617824dd7df41f79f",
+    "approvedBy": "The Agent-Pipeline Contributors",
+    "approvedAt": "2026-09-14T06:31:13.819Z",
+    "submissionSha256": "23106db01a56ff405604b71d675695afa40601262a76f3d2bdfce609299e6c1d",
     "profileSha256": "e3f62cf8685063aa2297b2766e858e2a0ef1bdcfe9e426d32193b4057af61d79",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
@@ -138,16 +146,16 @@
       "receiptSha256": "d4c8445ea2e1c847caa8cc298cf4d2f4fedda59b6bd270d30e5b0cb43c16c56e",
       "repositoryFingerprint": "5172c023ad31e8e1c82402e4d0a657cc6db16c0ba5538a432d48e8d477f2b16d",
       "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "9a90912aa050acf1b34a9086d8aba95f11132a1932fba3bd92d79bd242033aab",
+      "planSha256": "8cc1819150a3170d2178868fcd00eae9260b87b1727b6d84fccd4c5a5e061f56",
       "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "80a394a3b48bdd2d16a75d66b33f3e474aaeb4eb8327b13d6d20013f73331bc6"
+      "specSha256": "f03d588ea670495bc473111c14087e2ec0ae31a7e4bc57b20ec6efb991272015"
     },
-    "priorInvalidationSha256": "4819c84038a3f47cca139b565f6265cbe740314cd65280d3b8c0d1adadd4f234"
+    "priorInvalidationSha256": "6a894210d16143e1ee520e58f83de5ee92791be567baaed3ec93c21a50f2072b"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-nova-epic",
-    "revision": 35,
+    "revision": 37,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Elephant",
@@ -156,11 +164,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-        "sha256": "9a90912aa050acf1b34a9086d8aba95f11132a1932fba3bd92d79bd242033aab"
+        "sha256": "8cc1819150a3170d2178868fcd00eae9260b87b1727b6d84fccd4c5a5e061f56"
       },
       "spec": {
         "path": "specs/sprint-nova-epic/spec.md",
-        "sha256": "80a394a3b48bdd2d16a75d66b33f3e474aaeb4eb8327b13d6d20013f73331bc6"
+        "sha256": "f03d588ea670495bc473111c14087e2ec0ae31a7e4bc57b20ec6efb991272015"
       },
       "result": null
     },
@@ -176,7 +184,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 35,
+      "sourceRevision": 37,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -194,21 +202,21 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "planSha256": "9a90912aa050acf1b34a9086d8aba95f11132a1932fba3bd92d79bd242033aab",
+    "planSha256": "8cc1819150a3170d2178868fcd00eae9260b87b1727b6d84fccd4c5a5e061f56",
     "specPath": "specs/sprint-nova-epic/spec.md",
-    "specSha256": "80a394a3b48bdd2d16a75d66b33f3e474aaeb4eb8327b13d6d20013f73331bc6",
+    "specSha256": "f03d588ea670495bc473111c14087e2ec0ae31a7e4bc57b20ec6efb991272015",
     "profile": "epic",
     "profileSha256": "e3f62cf8685063aa2297b2766e858e2a0ef1bdcfe9e426d32193b4057af61d79",
-    "submittedBy": "André",
-    "submittedAt": "2026-09-13T10:01:00.173Z"
+    "submittedBy": "The Agent-Pipeline Contributors",
+    "submittedAt": "2026-09-14T06:29:59.708Z"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-nova-epic",
-    "invalidatedSubmissionSha256": "938469537d045ffe2f3c18ae062454bc72da60361be579468390767d25412a4d",
-    "invalidatedApprovalSha256": "bf6110599297783beb58effa78e0ec98ab1699b07e7780e0ed1d849e8e41d32f",
-    "invalidatedBy": "André",
-    "invalidatedAt": "2026-09-13T10:00:56.668Z",
+    "invalidatedSubmissionSha256": "5917510ad0186d5e3ceac1f02f0d060699c413540ce5875617824dd7df41f79f",
+    "invalidatedApprovalSha256": "b55f09ddf769730a6e5b41bb7c5b055196a9775f5fcd2eff0964a9e5f62d0a64",
+    "invalidatedBy": "PO",
+    "invalidatedAt": "2026-09-14T06:27:56.301Z",
     "reason": "reopen-design"
   },
   "pushApproval": {
@@ -535,14 +543,14 @@
     "scope": {
       "featureId": "sprint-nova-epic",
       "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "9a90912aa050acf1b34a9086d8aba95f11132a1932fba3bd92d79bd242033aab",
+      "planSha256": "8cc1819150a3170d2178868fcd00eae9260b87b1727b6d84fccd4c5a5e061f56",
       "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "80a394a3b48bdd2d16a75d66b33f3e474aaeb4eb8327b13d6d20013f73331bc6",
+      "specSha256": "f03d588ea670495bc473111c14087e2ec0ae31a7e4bc57b20ec6efb991272015",
       "profile": "epic"
     },
     "change": {
-      "kind": "identical-binding",
-      "previousApprovalSha256": "bf6110599297783beb58effa78e0ec98ab1699b07e7780e0ed1d849e8e41d32f"
+      "kind": "plan-and-spec-changed",
+      "previousApprovalSha256": "b55f09ddf769730a6e5b41bb7c5b055196a9775f5fcd2eff0964a9e5f62d0a64"
     },
     "authorizes": [
       "design-to-implementation-transition"
@@ -556,8 +564,8 @@
   },
   "planPresentation": {
     "schema": "pipeline.plan-presentation.v1",
-    "submissionSha256": "5917510ad0186d5e3ceac1f02f0d060699c413540ce5875617824dd7df41f79f",
-    "presentedBy": "André",
-    "presentedAt": "2026-09-13T10:01:04.940Z"
+    "submissionSha256": "23106db01a56ff405604b71d675695afa40601262a76f3d2bdfce609299e6c1d",
+    "presentedBy": "The Agent-Pipeline Contributors",
+    "presentedAt": "2026-09-14T06:30:56.579Z"
   }
 }
