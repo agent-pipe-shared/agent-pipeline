@@ -43,6 +43,16 @@ function matches(pattern, path) {
   return path === pattern;
 }
 
+// A narrower matched path owns that path's test selection.  This lets a
+// policy retain one conservative catch-all implementation area while naming a
+// reviewed, smaller area for a well-understood recovery corridor.  Equal
+// specificity remains additive: two equally specific contracts may both be
+// required, but a catch-all never silently turns a classified local change
+// back into a full run.
+function specificity(pattern) {
+  return pattern.replaceAll("**", "").replaceAll("*", "").length;
+}
+
 function normalizePolicy(policy, registeredIds) {
   if (!policy || typeof policy !== "object" || Array.isArray(policy) || policy.schema !== VERIFY_SELECTION_SCHEMA) {
     throw new TypeError("VERIFY-SELECTION-POLICY");
@@ -87,7 +97,10 @@ export function planVerifySelection({ mode, baseCommit = null, candidateCommit, 
     for (const path of normalizedChanges) {
       const matchesForPath = normalizedPolicy.areas.filter((area) => area.paths.some((pattern) => matches(pattern, path)));
       if (matchesForPath.length === 0) unmatchedPaths.push(path);
-      for (const area of matchesForPath) {
+      const strongest = Math.max(...matchesForPath.flatMap((area) => area.paths
+        .filter((pattern) => matches(pattern, path)).map(specificity)));
+      for (const area of matchesForPath.filter((area) => area.paths
+        .filter((pattern) => matches(pattern, path)).some((pattern) => specificity(pattern) === strongest))) {
         matchedAreas.add(area.id);
         area.suites.forEach((id) => selected.add(id));
       }

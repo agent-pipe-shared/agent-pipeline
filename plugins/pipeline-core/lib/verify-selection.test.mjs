@@ -22,6 +22,26 @@ assert.equal(impacted.fallbackReason, null);
 assert.equal(validateVerifySelection(impacted), true);
 assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: impacted }, "critic"), true);
 
+const specificRecovery = planVerifySelection({
+  mode: "critic",
+  baseCommit: "a",
+  candidateCommit: "b",
+  changedPaths: ["plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"],
+  registeredSuiteIds: ["baseline", "broad-implementation", "lifecycle-recovery"],
+  policy: {
+    schema: "pipeline.verify-selection.v1",
+    baseline: ["baseline"],
+    areas: [
+      { id: "implementation", paths: ["plugins/**"], suites: ["broad-implementation"] },
+      { id: "lifecycle-recovery", paths: ["plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"], suites: ["lifecycle-recovery"] },
+    ],
+  },
+});
+assert.equal(specificRecovery.execution, "impacted");
+assert.deepEqual(specificRecovery.matchedAreaIds, ["lifecycle-recovery"]);
+assert.deepEqual(specificRecovery.selectedSuiteIds, ["baseline", "lifecycle-recovery"]);
+assert.deepEqual(specificRecovery.omittedSuiteIds, ["broad-implementation"]);
+
 for (const [label, input, reason] of [
   ["release is always full", { ...common, mode: "release", changedPaths: ["src/a.mjs"] }, "full-boundary"],
   ["missing base is full", { ...common, mode: "work", baseCommit: null, changedPaths: ["src/a.mjs"] }, "missing-binding"],
@@ -52,4 +72,4 @@ assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selecti
 assert.equal(validateVerifySelection({ ...impacted, omittedSuiteIds: [] }), false);
 assert.equal(validateVerifySelection({ ...impacted, selectionSha256: "0".repeat(64) }), false);
 
-console.log("verify-selection: 15 tests passed");
+console.log("verify-selection: 19 tests passed");
