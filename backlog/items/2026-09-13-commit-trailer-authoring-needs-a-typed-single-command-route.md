@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.commit-trailer-authoring-needs-a-typed-single-command-route
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 0605b19f7e9db2fa84ca19a6f4078c8cedd50df7
+closure_evidence: plugins/pipeline-core/lib/commit-message-policy.test.mjs
 done_when: manual
 created: 2026-09-13
 sprint: nova-b
@@ -31,3 +35,13 @@ result.  It must not make arbitrary multiline shell grammar admissible.
 - A valid structured message commits without a user-created scratch file.
 - Invalid/missing required trailers remain refused before Git is invoked.
 - The emitted command and error recovery are copy-safe on POSIX and Windows.
+
+## Closure
+
+Closed as superseded by `0605b19f7e9db2fa84ca19a6f4078c8cedd50df7`
+(`fix(git): parse copy-safe multi-message trailers`). That fix reconstructs
+Git's repeated-`-m` semantics for the pre-tool check and provides the
+copy-safe `git commit --trailer` form for new guidance. The final `commit-msg`
+hook remains the unchanged authoritative trailer validator; malformed, split,
+or missing provenance trailers are still rejected there and in the earlier
+guard.

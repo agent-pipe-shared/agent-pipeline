@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3493d177e342d5b77b8149dc6a95d927564c822cd1d4e984ede03c794961cf32"
+    "transitionHead": "2f3584154cc9439fdfb1430398a0c2b56d9542381561d17ce6f51eaaf1f8527f"
   },
   "counts": {
-    "open": 78,
+    "open": 77,
     "in_progress": 1,
-    "closed": 576,
+    "closed": 577,
     "rejected": 3,
     "deferred": 11
   },
@@ -1829,14 +1829,18 @@
     },
     {
       "id": "pipeline.commit-trailer-authoring-needs-a-typed-single-command-route",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-agy-062-103.md §§42–55, 125–134; evidence/pipeline-retrospective-2026-09-13.md §§55–88.",
       "deferred": false,
       "tracking": "Nova B — newline-free shell grammar makes ordinary multi-paragraph git commit commands expensive; retain strict trailer validation while removing scratch-file choreography from the normal path.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "0605b19f7e9db2fa84ca19a6f4078c8cedd50df7",
+      "closureEvidence": "plugins/pipeline-core/lib/commit-message-policy.test.mjs"
     },
     {
       "id": "pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty",
