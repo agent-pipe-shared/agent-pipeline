@@ -4512,8 +4512,9 @@ function recognisedKickoff(observed, spawn = defaultGitSpawn) {
 
 function promotionInput({ profile, featureId, planPath, prdPath, specPath, designInputPath }) {
   if (!PROMOTION_PROFILES.has(profile)) fail("KICKOFF-PROMOTION-INPUT", "promotion profile is invalid");
-  if (!SAFE_FEATURE_ID.test(featureId ?? "") || featureId.startsWith("kickoff-")) {
-    fail("KICKOFF-PROMOTION-INPUT", "promotion feature id is invalid");
+  if (!SAFE_FEATURE_ID.test(featureId ?? "")) fail("KICKOFF-PROMOTION-INPUT", "promotion feature id is invalid");
+  if (featureId.startsWith("kickoff-")) {
+    fail("KICKOFF-PROMOTION-INPUT", "promotion feature id must not start with reserved prefix \"kickoff-\"; choose a new lowercase feature slug");
   }
   if (!PROMOTION_FEATURE_ID_DOWNSTREAM.test(featureId)) {
     fail("KICKOFF-PROMOTION-INPUT", "promotion feature id must be lowercase alphanumeric with hyphens, starting with a letter, max 64 characters -- it will later be rejected at push-approval otherwise");

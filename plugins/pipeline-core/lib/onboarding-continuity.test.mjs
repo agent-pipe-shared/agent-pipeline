@@ -2656,14 +2656,16 @@ check("promotion refuses a feature id that would later fail push-approval's stri
         && error.message.includes("push-approval"),
       `expected featureId ${JSON.stringify(featureId)} to be refused with the stricter downstream message`);
   }
-  // The kickoff- prefix rejection is a distinct reason and must still fire
-  // unchanged, before the new stricter check ever gets to run its own message.
+  // The kickoff- prefix is a distinct, actionable reason: that prefix names
+  // provisional onboarding anchors, not promotable feature identities.
   expectKickoffError("KICKOFF-PROMOTION-INPUT", () => planOnboardingKickoffPromotion({
     ...seed.request, featureId: "kickoff-still-rejected",
   }));
   assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, featureId: "kickoff-still-rejected" }),
-    (error) => error?.code === "KICKOFF-PROMOTION-INPUT" && error.message === "promotion feature id is invalid",
-    "the kickoff- prefix rejection must keep its own undifferentiated message, not the new stricter one");
+    (error) => error?.code === "KICKOFF-PROMOTION-INPUT"
+      && error.message.includes('must not start with reserved prefix "kickoff-"')
+      && error.message.includes("lowercase feature slug"),
+    "the reserved kickoff- prefix must explain why a new feature slug is required");
   // An ordinary lowercase-hyphenated feature id under 64 chars is unaffected --
   // no regression for the common case (this is exactly what promotionSeed's
   // own `feature-${name}` ids already are, exercised by every other check
