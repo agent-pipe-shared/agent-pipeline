@@ -5,9 +5,9 @@
  * Verifies:
  * 1. Staging directory refusal: submit-plan and approve-plan refuse planPath or
  *    specPath resolving inside project/.onboarding-staging/.
- * 2. Pre-authority banner refusal: submit-plan and approve-plan refuse files
- *    carrying the generated pre-authority banner even if copied outside staging.
- * 3. Promoted clean documents pass.
+ * 2. Canonical compatibility: an old pre-authority banner in specs/<feature>/
+ *    is not staging evidence once the caller has established valid authority.
+ * 3. Legacy staging paths remain refused regardless of their content.
  * 4. Standard refusal code PLAN-BINDS-PRE-AUTHORITY-DRAFT and backwards-compat aliases.
  * 5. Refusal message names the promotion action and CLI invocation.
  * 6. set-feature in phase "design" initializes revision-0 continuity so submit-plan
@@ -188,7 +188,7 @@ test("refusePlanAuthorityStagingPath refuses staging directory paths", () => {
   }
 });
 
-test("refusePlanAuthorityStagingPath refuses banner line even outside staging", () => {
+test("refusePlanAuthorityStagingPath does not treat a legacy banner in canonical specs as staging evidence", () => {
   const root = tempProjectDir();
   try {
     const bannerContent = `# My PRD\n\n${PRE_AUTHORITY_BANNER_LINE}\n\nRequirements.\n`;
@@ -200,10 +200,7 @@ test("refusePlanAuthorityStagingPath refuses banner line even outside staging", 
       specPath: "specs/feat/spec.md",
       readFileFn: (path) => path.includes("prd.md") ? bannerContent : cleanSpecContent,
     });
-    assert.equal(result.ok, false);
-    assert.equal(result.code, PLAN_BINDS_PRE_AUTHORITY_DRAFT);
-    assert.ok(result.message.includes("plan file carries a pre-authority staging banner"));
-    assert.ok(result.message.includes(PLAN_AUTHORITY_PROMOTION_CLI_INVOCATION));
+    assert.equal(result.ok, true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -224,7 +221,7 @@ test("refusePlanAuthorityStagingPath passes for clean promoted files", () => {
   }
 });
 
-test("submit-plan refuses pre-authority drafts with PLAN-BINDS-PRE-AUTHORITY-DRAFT", () => {
+test("submit-plan refuses legacy staging drafts and admits canonical legacy-banner compatibility with valid authority", () => {
   // Scenario 1: in staging directory
   {
     const featureId = "staging-sub";
@@ -241,7 +238,8 @@ test("submit-plan refuses pre-authority drafts with PLAN-BINDS-PRE-AUTHORITY-DRA
     }
   }
 
-  // Scenario 2: outside staging but carries pre-authority banner
+  // Scenario 2: a canonical path retaining an old banner is admitted only
+  // after the fixture's active feature and PO-gate authority agree exactly.
   {
     const featureId = "banner-sub";
     const planPath = `specs/${featureId}/prd_${featureId}.md`;
@@ -250,16 +248,15 @@ test("submit-plan refuses pre-authority drafts with PLAN-BINDS-PRE-AUTHORITY-DRA
     const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, planContent });
     try {
       const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
-      assert.equal(attempt.result, 2);
-      assert.ok(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)));
-      assert.ok(attempt.lines.some((l) => l.includes("pre-authority staging banner")));
+      assert.equal(attempt.result, 0);
+      assert.equal(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)), false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   }
 });
 
-test("approve-plan independently refuses pre-authority drafts", () => {
+test("approve-plan independently refuses legacy staging drafts and does not misclassify canonical legacy-banner compatibility", () => {
   // Scenario 1: in staging directory
   {
     const featureId = "staging-appr";
@@ -283,7 +280,7 @@ test("approve-plan independently refuses pre-authority drafts", () => {
     }
   }
 
-  // Scenario 2: outside staging but carries banner
+  // Scenario 2: outside legacy staging but carries a historical banner.
   {
     const featureId = "banner-appr";
     const planPath = `specs/${featureId}/prd_${featureId}.md`;
@@ -299,9 +296,11 @@ test("approve-plan independently refuses pre-authority drafts", () => {
         submittedBy: "coordinator", submittedAt: "2026-08-27T10:01:00.000Z",
       };
       writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+      const presented = run(["present-plan", "--by", "coordinator"], deps);
+      assert.equal(presented, 0, "canonical authority must still require a real presentation before approval");
       const attempt = capturedStderr(() => run(["approve-plan", "--by", "po-test"], deps));
-      assert.equal(attempt.result, 2);
-      assert.ok(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)));
+      assert.equal(attempt.result, 2, "the fixture has no human approval signature, but must pass the staging check");
+      assert.equal(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)), false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

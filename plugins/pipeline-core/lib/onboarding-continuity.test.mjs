@@ -3792,6 +3792,8 @@ check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path 
     assert.equal(existsSync(absolute), true);
     assert.equal(digest(readFileSync(absolute, "utf8")), plan.targets[key].afterSha256);
     assert.equal(applied.targets[key].wrote, true);
+    assert.equal(readFileSync(absolute, "utf8").includes("this staging file is NOT yet bound as project authority"), false,
+      `${key}: canonical generated artifacts must not claim they are pre-authority staging files`);
   }
 });
 
