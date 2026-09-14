@@ -62,6 +62,19 @@ recovers) to proactive (never hits the wall).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+### Implementation progress — 2026-09-14
+
+Direction 1 is complete in `00503e0e527ad9ef10d03fa584826f2394a98163`: the
+promotion validator now distinguishes the reserved provisional-anchor prefix from a malformed feature
+identifier. `kickoff-…` is still refused before promotion, but the error tells
+the caller that the prefix is reserved and asks for a new lowercase feature
+slug. The regression pins both the stable refusal code and the actionable
+message; ordinary valid slugs remain covered by the existing positive case.
+
+Direction 2 remains open. An automatic session-capability recheck before the
+first external command after a commit needs an explicit event source and route
+ownership; it is not implied by this messaging-only correction.
+
 - **Decision:** deferred — owned by Sprint Nightwing ("Product experience:
   onboarding, configuration, documentation and low-friction adoption" —
   ADR-0043's 2026-08-17 amendment). Both findings are proactive-check
