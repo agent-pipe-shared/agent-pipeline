@@ -20,7 +20,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { boundedOpaqueCopyCommand as libBoundedOpaqueCopyCommand, renderProjectOnboardingAction } from "./project-onboarding-v3.mjs";
+import { boundedOpaqueCopyCommand as libBoundedOpaqueCopyCommand, renderProjectOnboardingAction, variableBoundCopyCommand } from "./project-onboarding-v3.mjs";
 import {
   boundedCopySafeCommand,
   boundedOpaqueCopyCommand,
@@ -31,6 +31,49 @@ import {
 
 test("boundedOpaqueCopyCommand is re-exported unchanged -- the same function object project-onboarding-v3.mjs already exported, not a reimplementation", () => {
   assert.strictEqual(boundedOpaqueCopyCommand, libBoundedOpaqueCopyCommand);
+});
+
+test("signing commands use bounded named variables and preserve their exact POSIX argv", () => {
+  const executable = "node";
+  const argv = [
+    "/very long/pipeline root/scripts/po-human-approval.mjs",
+    "sign-intent",
+    "--repo-root", "/repo root with spaces",
+    "--directory", "/mnt/c/Users/Andre/OneDrive/Documents/06_Dev/agent-pipeline-key",
+    "--intent-sha256", "a".repeat(64),
+  ];
+  const rendered = variableBoundCopyCommand({
+    executable,
+    argv,
+    bindings: [
+      { index: 0, name: "PIPELINE_SCRIPT" },
+      { index: 3, name: "REPO_ROOT" },
+      { index: 5, name: "KEY_DIR" },
+      { index: 7, name: "INTENT_SHA256" },
+    ],
+  });
+  assert.match(rendered.copyCommand.posix, /^NODE_BIN=/u);
+  assert.match(rendered.copyCommand.posix, /KEY_DIR=/u);
+  assert.match(rendered.copyCommand.posix, /"\$\{KEY_DIR\}"/u);
+  assert.match(rendered.copyCommand.powershell, /^\$NODE_BIN = /u);
+  assert.match(rendered.copyCommand.powershell, /\$KEY_DIR/u);
+  assert.equal(rendered.copyCommand.cmd, null);
+  for (const block of [rendered.copyCommand.posix, rendered.copyCommand.powershell]) {
+    assert.equal(block.split("\n").every((line) => line.length <= rendered.copyCommand.maxColumns), true, block);
+  }
+  if (process.platform === "win32") return;
+  const probe = spawnSync("bash", ["-c", `node() { printf '%s\\0' "$@"; }\n${rendered.copyCommand.posix}`], { encoding: "utf8" });
+  assert.equal(probe.status, 0, probe.stderr);
+  const tokens = probe.stdout.split("\0");
+  assert.equal(tokens.pop(), "");
+  assert.deepEqual(tokens, argv);
+});
+
+test("named-variable copy rendering rejects duplicate, invalid, and unbound shapes", () => {
+  assert.throws(() => variableBoundCopyCommand({ executable: "node", argv: ["script"], bindings: [] }), /bindings/u);
+  assert.throws(() => variableBoundCopyCommand({ executable: "node", argv: ["script"], bindings: [{ index: 1, name: "SCRIPT" }] }), /binding/u);
+  assert.throws(() => variableBoundCopyCommand({ executable: "node", argv: ["script"], bindings: [{ index: 0, name: "bad" }] }), /binding/u);
+  assert.throws(() => variableBoundCopyCommand({ executable: "node", argv: ["script"], bindings: [{ index: 0, name: "NODE_BIN" }] }), /binding/u);
 });
 
 /**

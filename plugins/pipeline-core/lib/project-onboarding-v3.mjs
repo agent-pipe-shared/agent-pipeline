@@ -2282,6 +2282,89 @@ export function boundedOpaqueCopyCommand(command) {
   };
 }
 
+/**
+ * Render one exact external command through named shell variables.  This is a
+ * deliberately narrow companion to boundedOpaqueCopyCommand(): it exists for
+ * attended signing ceremonies, where a human must be able to see (and copy as
+ * one block) the key directory, repository and signed digest without
+ * transcribing a long path.  `bindings` identifies only argv entries the
+ * caller has already classified as literal values; it never parses a command
+ * string or accepts shell fragments.
+ *
+ * cmd.exe is intentionally omitted.  Its expansion rules make a general
+ * variable rendering unsafe for arbitrary configured paths; the PO-facing
+ * ceremonies always provide the POSIX and PowerShell variants that preserve
+ * their exact argv.
+ */
+export function variableBoundCopyCommand({ executable, argv, bindings, executableName = "NODE_BIN" } = {}) {
+  if (typeof executable !== "string" || executable.length === 0 || /[\r\n\0]/u.test(executable)) {
+    throw new TypeError("variable copy command executable is invalid");
+  }
+  if (!Array.isArray(argv) || !argv.every((value) => typeof value === "string" && value.length > 0 && !/[\r\n\0]/u.test(value))) {
+    throw new TypeError("variable copy command argv is invalid");
+  }
+  if (!/^[A-Z][A-Z0-9_]*$/u.test(executableName)) {
+    throw new TypeError("variable copy command executableName is invalid");
+  }
+  if (!Array.isArray(bindings) || bindings.length === 0) {
+    throw new TypeError("variable copy command bindings are required");
+  }
+  const byIndex = new Map();
+  for (const binding of bindings) {
+    if (!binding || !Number.isInteger(binding.index) || binding.index < 0 || binding.index >= argv.length
+      || typeof binding.name !== "string" || !/^[A-Z][A-Z0-9_]*$/u.test(binding.name)
+      || byIndex.has(binding.index) || binding.name === executableName
+      || [...byIndex.values()].some((entry) => entry.name === binding.name)) {
+      throw new TypeError("variable copy command binding is invalid");
+    }
+    byIndex.set(binding.index, { name: binding.name, value: argv[binding.index] });
+  }
+  const values = [{ name: executableName, value: executable }, ...[...byIndex.values()]];
+  const posixWord = (value, index) => byIndex.has(index) ? `"\${${byIndex.get(index).name}}"` : shellWord(value);
+  const posixTokens = [`"\${${executableName}}"`, ...argv.map(posixWord)];
+  const posixInvocation = [];
+  let current = "";
+  for (const token of posixTokens) {
+    const proposed = current === "" ? token : `${current} ${token}`;
+    if (proposed.length <= COPY_COMMAND_MAX_COLUMNS) {
+      current = proposed;
+      continue;
+    }
+    if (current === "" || current.length + 2 > COPY_COMMAND_MAX_COLUMNS || token.length + 2 > COPY_COMMAND_MAX_COLUMNS) {
+      throw new TypeError("variable copy command invocation cannot be bounded");
+    }
+    posixInvocation.push(`${current} \\`);
+    current = `  ${token}`;
+  }
+  if (current !== "") posixInvocation.push(current);
+  const posix = [
+    ...values.flatMap(({ name, value }) => boundedAssignmentLines(name, value)),
+    ...posixInvocation,
+  ];
+  const powershell = [
+    ...values.flatMap(({ name, value }) => boundedAssignmentLines(`$${name}`, value, "powershell")),
+    "$ARGS = @("
+  ];
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = byIndex.has(index) ? `$${byIndex.get(index).name}` : singleQuoted(argv[index], true);
+    if (`  ${token}`.length > COPY_COMMAND_MAX_COLUMNS) throw new TypeError("variable copy command PowerShell argument cannot be bounded");
+    powershell.push(`  ${token}`);
+  }
+  powershell.push(")", `& $${executableName} @ARGS`);
+  if (![...posix, ...powershell].every((line) => line.length <= COPY_COMMAND_MAX_COLUMNS)) {
+    throw new TypeError("variable copy command line exceeds its bound");
+  }
+  return {
+    command: [executable, ...argv].map(shellWord).join(" "),
+    copyCommand: {
+      maxColumns: COPY_COMMAND_MAX_COLUMNS,
+      posix: posix.join("\n"),
+      powershell: powershell.join("\n"),
+      cmd: null,
+    },
+  };
+}
+
 function continuityRepairPlanAction(root, runner, intent) {
   return commandAction(
     lifecycleArgv([ONBOARDING_SCRIPT, "plan-repair", "--root", root], runner, intent),
@@ -2485,15 +2568,24 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
       // The operator action crosses a terminal boundary.  Preserve the exact
       // argv machine contract and attach the one shared bounded renderer so a
       // runner never has to transcribe a long absolute plugin/key path itself.
-      const command = [action.executable, ...action.argv].map(shellWord).join(" ");
+      const rendered = variableBoundCopyCommand({
+        executable: action.executable,
+        argv: action.argv,
+        bindings: [
+          { index: 0, name: "PIPELINE_SCRIPT" },
+          { index: 3, name: "REPO_ROOT" },
+          { index: 5, name: "KEY_DIR" },
+          { index: 7, name: "REQUEST_PATH" },
+        ],
+      });
       return {
         kind: "external-operator",
         mutation: false,
         requiresConfirmation: true,
         executionBoundary: "attended-external-tool",
         invocation: "user-copy-only",
-        guidance: `You are signing the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) together with its specification (${spec.path}, sha256 ${spec.sha256}). This one detached signature authorizes binding those exact design documents and the subsequent design-to-implementation transition; it does not authorize a remote push or any later scope change. Run action.copyCommand for your actual terminal (not a hand-transcribed variant); it writes the plan-bound proof back into this repository's scratch directory. Do not edit an acknowledgement marker manually.`,
-        action: { ...action, command, copyCommand: boundedOpaqueCopyCommand(command) },
+        guidance: `You are signing the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) together with its specification (${spec.path}, sha256 ${spec.sha256}). This one detached signature authorizes binding those exact design documents and the subsequent design-to-implementation transition; it does not authorize a remote push or any later scope change. action.copyCommand already uses the configured machine key directory and is the only human command: after its proof is written, the agent performs the binding readback. Run that copy-safe command in your actual terminal, not a hand-transcribed variant. Do not edit an acknowledgement marker manually.`,
+        action: { ...action, command: rendered.command, copyCommand: rendered.copyCommand },
         expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
       };
     }

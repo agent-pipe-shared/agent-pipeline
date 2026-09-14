@@ -518,9 +518,14 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   assert.ok(result.lines.approvePush.length > 0);
   const humanText = [result.lines.authorize.join("\n"), result.lines.approvePush.join("\n"), result.lines.gitPush].join("\n");
   assert.match(humanText, /Step: human authorize-critical\nPOSIX:/u);
+  assert.match(humanText, /authorizes only this prepared remote push/u);
+  assert.match(humanText, /configured key directory is used automatically/u);
   assert.match(humanText, /Step: agent approve-push\nPOSIX:/u);
   assert.match(humanText, /Step: agent push\nPOSIX:/u);
   assert.match(humanText, /PowerShell:/u);
+  assert.match(result.lines.authorize.join("\n"), /KEY_DIR=/u);
+  assert.match(result.lines.authorize.join("\n"), /\$KEY_DIR/u);
+  assert.doesNotMatch(result.lines.authorize.join("\n"), /cmd\.exe:/u);
   assert.match(PIPELINE_STATE_SCRIPT_PATH, /^\/.*\/plugins\/pipeline-core\/scripts\/pipeline-state\.mjs$/u);
   const source = readFileSync(fileURLToPath(new URL("./push-prepare.mjs", import.meta.url)), "utf8");
   assert.match(source, /PIPELINE_STATE_SCRIPT_PATH, "approve-push"/u);

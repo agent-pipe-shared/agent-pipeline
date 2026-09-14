@@ -8735,10 +8735,15 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
       assert.equal(typeof awaitingHuman.nextAction.action.copyCommand?.posix, "string", runner);
       assert.equal(typeof awaitingHuman.nextAction.action.copyCommand?.powershell, "string", runner);
       assert.equal(awaitingHuman.nextAction.action.copyCommand.maxColumns, 72, runner);
+      assert.match(awaitingHuman.nextAction.action.copyCommand.posix, /KEY_DIR=/u, runner);
+      assert.match(awaitingHuman.nextAction.action.copyCommand.powershell, /\$KEY_DIR/u, runner);
+      assert.equal(awaitingHuman.nextAction.action.copyCommand.cmd, null, runner);
       assert.match(awaitingHuman.nextAction.guidance, /signing the reviewed staging PRD/u, runner);
       assert.match(awaitingHuman.nextAction.guidance, /specification/u, runner);
       assert.match(awaitingHuman.nextAction.guidance, /design-to-implementation transition/u, runner);
       assert.match(awaitingHuman.nextAction.guidance, /does not authorize a remote push/u, runner);
+      assert.match(awaitingHuman.nextAction.guidance, /configured machine key directory/u, runner);
+      assert.match(awaitingHuman.nextAction.guidance, /only human command/u, runner);
     }
     // Signature posture fails closed to its typed planner if the signing
     // material is unavailable; it never silently falls back to chat.

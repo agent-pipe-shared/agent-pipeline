@@ -30,6 +30,7 @@ import {
 // renderer now used in the default hook hand-off.
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { readMachinePlane } from "../lib/machine-plane.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
@@ -111,13 +112,22 @@ function exactFlagSet(value, required, optional = []) {
   return Object.keys(value).every((key) => allowed.has(key));
 }
 
-function copySafeActionText(label, action, placeholderValues = []) {
+function copySafeActionText(label, action, placeholderValues = [], variableBindings = undefined) {
   const placeholders = new Set(placeholderValues);
   return renderHumanCopySafeCommand({
     label,
     executable: action.executable,
     argv: action.argv.map((value) => placeholders.has(value) ? placeholder(value) : value),
+    variableBindings,
   }).text;
+}
+
+function configuredPoKeyDirectory(reader) {
+  const observed = reader();
+  const directory = observed?.status === "valid" ? observed.plane?.poKeyDirectory : null;
+  return typeof directory === "string" && directory.length > 0 && !/[\r\n\0]/u.test(directory)
+    ? directory
+    : null;
 }
 
 /**
@@ -129,6 +139,7 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
   const write = io.write ?? process.stdout.write.bind(process.stdout);
   const writeError = io.writeError ?? process.stderr.write.bind(process.stderr);
   const platform = options.platform ?? process.platform;
+  const machinePlaneReader = options.readMachinePlane ?? readMachinePlane;
   const governanceHgo = {
     observe: observeHumanGuardOverrideGovernanceConsumption,
     preflight: preflightGovernanceActionOutput,
@@ -406,17 +417,33 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         humanApprovalScriptPath: PO_HUMAN_APPROVAL_SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
       });
+      const keyDirectory = configuredPoKeyDirectory(machinePlaneReader);
+      const signIntentCommand = keyDirectory === null
+        ? prepared.signIntentCommand
+        : {
+          ...prepared.signIntentCommand,
+          argv: prepared.signIntentCommand.argv.map((value) => value === "<external-po-material-directory>" ? keyDirectory : value),
+        };
+      const output = { ...prepared, signIntentCommand };
       const signIntent = copySafeActionText(
         "sign-intent",
-        prepared.signIntentCommand,
-        ["<external-po-material-directory>"],
+        signIntentCommand,
+        keyDirectory === null ? ["<external-po-material-directory>"] : [],
+        keyDirectory === null ? undefined : {
+          bindings: [
+            { index: 0, name: "PIPELINE_SCRIPT" },
+            { index: 3, name: "REPO_ROOT" },
+            { index: 5, name: "KEY_DIR" },
+            { index: 7, name: "INTENT_SHA256" },
+          ],
+        },
       );
       const authorizeBySignature = copySafeActionText(
         "authorize-by-signature",
         prepared.authorizeBySignatureCommand,
         ["<external-proof.json>"],
       );
-      write(`${JSON.stringify(prepared, null, 2)}\n`);
+      write(`${JSON.stringify(output, null, 2)}\n`);
       writeError(`${signIntent}\n\n${authorizeBySignature}\n`);
       return 0;
     }

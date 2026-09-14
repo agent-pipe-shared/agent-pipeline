@@ -30,7 +30,7 @@
  * its one definition in project-onboarding-v3.mjs, this file never duplicates
  * it.
  */
-import { boundedOpaqueCopyCommand, renderProjectOnboardingAction, shellWord } from "./project-onboarding-v3.mjs";
+import { boundedOpaqueCopyCommand, renderProjectOnboardingAction, shellWord, variableBoundCopyCommand } from "./project-onboarding-v3.mjs";
 
 export { boundedOpaqueCopyCommand };
 
@@ -327,7 +327,7 @@ export function boundedCopySafeCommand({ executable, argv, forceCopyCommand = fa
  * observes) -- the caller decides which case it is in per command, this function never
  * guesses.
  */
-export function renderHumanCopySafeCommand({ label, executable, argv, platform } = {}) {
+export function renderHumanCopySafeCommand({ label, executable, argv, platform, variableBindings } = {}) {
   if (typeof label !== "string" || label.length === 0 || /[\r\n]/u.test(label)) {
     throw new TypeError("renderHumanCopySafeCommand requires a non-empty single-line label");
   }
@@ -335,7 +335,10 @@ export function renderHumanCopySafeCommand({ label, executable, argv, platform }
     throw new TypeError('renderHumanCopySafeCommand platform must be "posix", "powershell", or omitted');
   }
   const built = boundedCopySafeCommand({ executable, argv, forceCopyCommand: true });
-  const { copyCommand } = built;
+  const variableRendered = variableBindings === undefined
+    ? null
+    : variableBoundCopyCommand({ executable, argv: built.argv, ...variableBindings });
+  const copyCommand = variableRendered?.copyCommand ?? built.copyCommand;
   const heading = `Step: ${label}`;
   if (heading.length > copyCommand.maxColumns) {
     throw new TypeError("copy-safe command label exceeds the shared column bound");

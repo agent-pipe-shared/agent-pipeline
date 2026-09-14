@@ -713,7 +713,9 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
     assert.equal(recorded.status, "planned");
 
     const first = io();
-    const status = main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], first);
+    const status = main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], first, {
+      readMachinePlane: () => ({ status: "absent", plane: null }),
+    });
     assert.equal(status, 0, first.stderr);
     const value = JSON.parse(first.stdout);
 
@@ -767,11 +769,36 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
     // authorSourceRoot) pair reads the same persisted plan back unchanged
     // (design doc §1.4 step 1/§3.4) and must reproduce the identical digests.
     const second = io();
-    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], second), 0, second.stderr);
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], second, {
+      readMachinePlane: () => ({ status: "absent", plane: null }),
+    }), 0, second.stderr);
     const repeat = JSON.parse(second.stdout);
     assert.equal(repeat.planSha256, value.planSha256);
     assert.equal(repeat.selectionSha256, value.selectionSha256);
     assert.equal(repeat.intentSha256, value.intentSha256);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("prepare-for-signature replaces its material-directory placeholder with the configured machine key directory", () => {
+  const root = fixture();
+  try {
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "configured key directory" },
+      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+    });
+    const captured = io();
+    const keyDirectory = "/mnt/c/Users/Andre/OneDrive/Documents/06_Dev/agent-pipeline-key";
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, {
+      readMachinePlane: () => ({ status: "valid", plane: { poKeyDirectory: keyDirectory } }),
+    }), 0, captured.stderr);
+    const value = JSON.parse(captured.stdout);
+    assert.equal(value.signIntentCommand.argv[5], keyDirectory);
+    assert.match(captured.stderr, /KEY_DIR=/u);
+    assert.match(captured.stderr, /\$KEY_DIR/u);
+    assert.doesNotMatch(captured.stderr, /external-po-material-directory/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

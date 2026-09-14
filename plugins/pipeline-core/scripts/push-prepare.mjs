@@ -504,6 +504,31 @@ export function foldPendingPushApprovalWrite(dir, deps = {}) {
   return { folded: true };
 }
 
+// Only the closed authorize-critical push argv earns the named-variable
+// rendering.  Test seams and future builders may return a narrower action;
+// those retain the ordinary generic copy-safe renderer instead of letting a
+// display aid make an otherwise valid preparation fail.
+function authorizeCriticalPushVariableBindings(argv) {
+  const expected = [
+    [1, "authorize-critical"], [2, "--repo-root"], [4, "--directory"],
+    [6, "--feature-id"], [8, "--plan"], [10, "--spec"], [12, "--kind"],
+    [13, "push"], [14, "--subject-sha256"], [16, "--expires-at"],
+  ];
+  if (!Array.isArray(argv) || argv.length !== 18 || !expected.every(([index, value]) => argv[index] === value)) return undefined;
+  return {
+    bindings: [
+      { index: 0, name: "PIPELINE_SCRIPT" },
+      { index: 3, name: "REPO_ROOT" },
+      { index: 5, name: "KEY_DIR" },
+      { index: 7, name: "FEATURE_ID" },
+      { index: 9, name: "PLAN_PATH" },
+      { index: 11, name: "SPEC_PATH" },
+      { index: 15, name: "SUBJECT_SHA256" },
+      { index: 17, name: "EXPIRES_AT" },
+    ],
+  };
+}
+
 export function pushPrepareReport(argv, deps = {}, options = {}) {
   const dir = deps.dir ?? projectDir();
   const parsed = parseArgs(argv);
@@ -617,6 +642,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     label: "human authorize-critical",
     executable: authorize.executable,
     argv: authorize.argv,
+    variableBindings: authorizeCriticalPushVariableBindings(authorize.argv),
   });
 
   const artifacts = criticalArtifactPaths(dir, directory, deps);
@@ -641,7 +667,11 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
     ok: true,
     report,
     lines: {
-      authorize: authorizeCommand.text.split("\n"),
+      authorize: [
+        "Human signature: authorizes only this prepared remote push.",
+        "The configured key directory is used automatically; no second apply.",
+        ...authorizeCommand.text.split("\n"),
+      ],
       approvePush: approveCommand.text.split("\n"),
       gitPush: gitPushCommand.text,
     },
