@@ -106,6 +106,11 @@ write, while a protected destination remains blocked. `mv` deliberately keeps
 both source and destination as candidates because moving a protected source
 removes it. Direct extractor and full lifecycle-guard integration suites pass.
 
+The common display-only chain `rg … | sort` is also resolved by
+`0be90b61c431bba82a25e39b194c8e74289d024e`: only a contained, validated
+`rg` source and an argument-free `sort` sink are accepted. Any `sort` operand,
+file-output flag, redirect, or extra pipe segment remains refused.
+
 The opaque-interpreter retry-route direction remains open; this correction
 does not loosen its fail-closed conservative fallback.
 
