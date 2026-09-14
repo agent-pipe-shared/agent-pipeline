@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.cross-runner-dispatch-receipt.v1",
+  "type": "object",
+  "required": ["schema", "status", "code", "binding", "requestedModel", "observedModel", "gate", "probe", "launcherCalls", "modelCalls", "probeCalls", "interruption"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "pipeline.cross-runner-dispatch-receipt.v1" },
+    "status": { "enum": ["succeeded", "failed", "unavailable", "refused"] },
+    "code": { "type": "string", "minLength": 1 },
+    "binding": {
+      "type": "object",
+      "required": ["candidate", "dispatchId", "requiredPathSha256", "resultPath"],
+      "additionalProperties": false,
+      "properties": {
+        "candidate": { "type": "object" },
+        "dispatchId": { "type": "string" },
+        "requiredPathSha256": { "type": "object" },
+        "resultPath": { "type": "string" }
+      }
+    },
+    "requestedModel": { "type": "string", "minLength": 1 },
+    "observedModel": { "type": ["string", "null"] },
+    "gate": {
+      "type": "object",
+      "required": ["status", "readbackSha256", "gates"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "current" },
+        "readbackSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "gates": {
+          "type": "object",
+          "required": ["a1", "a2", "a3", "a5"],
+          "additionalProperties": false,
+          "properties": {
+            "a1": { "type": "object" },
+            "a2": { "type": "object" },
+            "a3": { "type": "object" },
+            "a5": { "type": "object" }
+          }
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "required": ["status", "code", "inputSha256", "outputSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["measured", "unavailable", "refused"] },
+        "code": { "type": "string" },
+        "inputSha256": { "type": ["string", "null"] },
+        "outputSha256": { "type": ["string", "null"] }
+      }
+    },
+    "launcherCalls": { "type": "number", "minimum": 0, "multipleOf": 1 },
+    "modelCalls": { "type": "number", "minimum": 0, "multipleOf": 1 },
+    "probeCalls": { "type": "number", "minimum": 0, "multipleOf": 1 },
+    "interruption": { "type": ["object", "null"] },
+    "persisted": { "type": "boolean" }
+  }
+}
