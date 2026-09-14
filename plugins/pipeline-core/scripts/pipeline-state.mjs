@@ -8888,7 +8888,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: set-feature requires --id <id> and --plan-path <path> (both non-empty).');
         return 2;
       }
-      if (base.continuity !== undefined) {
+      const hasActiveContinuity = base.continuity !== undefined
+        && !(base.continuity.revision === 0
+          && (base.activeFeature?.phase === "design" || base.activeFeature?.phase === undefined)
+          && base.continuity.authority?.result === null
+          && (base.continuity.queueHead?.dispatch === null || base.continuity.queueHead === null));
+      if (hasActiveContinuity) {
         console.error("Error: set-feature cannot replace an active continuity feature; close it through the revision/evidence-bound close gate first.");
         return 2;
       }
@@ -10117,7 +10122,13 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         };
       }
       let continuityClose;
-      if (base.continuity !== undefined) {
+      const requiresContinuityClose = base.continuity !== undefined
+        && (flags["continuity-close-request"] !== undefined
+          || base.continuity.authority?.result !== null
+          || (base.activeFeature?.phase !== "design" && base.activeFeature?.phase !== undefined)
+          || base.continuity.revision > 0
+          || base.continuity.queueHead?.nextAction === "close");
+      if (requiresContinuityClose) {
         const closeRequest = readContinuityRequest(dir, flags["continuity-close-request"]);
         if (!closeRequest.ok || !validateContinuityCloseRequest(dir, base, closeRequest.value)) {
           console.error("Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence.");

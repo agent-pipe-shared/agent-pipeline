@@ -185,6 +185,18 @@ function verifyMembers(source) {
   if (names.length === 0 || new Set(names).size !== names.length) {
     throw new Error("harness/scripts/verify.mjs TEST_SUITES names are missing or duplicate");
   }
+  if (source.exists("harness/verify-suites.json")) {
+    try {
+      const declarative = JSON.parse(source.read("harness/verify-suites.json"));
+      if (Array.isArray(declarative?.suites)) {
+        for (const suite of declarative.suites) {
+          if (typeof suite?.name === "string" && !names.includes(suite.name)) {
+            names.push(suite.name);
+          }
+        }
+      }
+    } catch {}
+  }
   // These are the two manifest-gated phases registered directly below TEST_SUITES.
   return [...names, "security-scan", "validate-manifest"].sort(utf8Compare);
 }

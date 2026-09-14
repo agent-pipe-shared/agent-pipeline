@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "252e761c853db3d2548fb7342bdc643ac762fbdd",
-    "tree": "46e241da4e72880da52f28e53e17debfbde115cb"
+    "commit": "3d9879b4c45b4dda4d35520003a6b61f8b66e896",
+    "tree": "c2abebba3a78db2d0bc8decf353f8772f2afcb7d"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -1076,6 +1076,7 @@
       "status": "shipped",
       "surfaceIds": [
         "skill:plugins/pipeline-core/skills/advisor-consult/SKILL.md:advisor-consult",
+        "skill:plugins/pipeline-core/skills/architecture-decision/SKILL.md:architecture-decision",
         "skill:plugins/pipeline-core/skills/capture-observation/SKILL.md:capture-observation",
         "skill:plugins/pipeline-core/skills/close-block/SKILL.md:close-block",
         "skill:plugins/pipeline-core/skills/close-feature/SKILL.md:close-feature",
@@ -1118,6 +1119,7 @@
       ],
       "productionEvidence": [
         "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+        "plugins/pipeline-core/skills/architecture-decision/SKILL.md",
         "plugins/pipeline-core/skills/capture-observation/SKILL.md",
         "plugins/pipeline-core/skills/close-block/SKILL.md",
         "plugins/pipeline-core/skills/close-feature/SKILL.md",
@@ -1129,6 +1131,7 @@
       ],
       "testEvidence": [
         "harness/scripts/check-doc-contracts.test.mjs",
+        "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
         "plugins/pipeline-core/scripts/github-issue-operations.test.mjs",
         "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
         "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs"

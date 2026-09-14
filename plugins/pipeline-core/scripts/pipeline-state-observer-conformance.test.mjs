@@ -113,7 +113,7 @@ function initContinuity(root, featureId, planPath, specPath, deps) {
   writeFileSync(join(root, reqPath), JSON.stringify(continuityPayload, null, 2));
 
   const exit = run(
-    ["continuity-init", "--expected-revision", "absent", "--request-file", reqPath, "--lock-token", "tok-test-12345678"],
+    ["continuity-init", "--expected-revision", "absent", "--request-file", reqPath, "--lock-token", "lock-token-test-123"],
     deps
   );
   assert.equal(exit, 0, "continuity-init must succeed");

@@ -17,7 +17,7 @@ enforcement.
 
 ## Architecture Map & Navigation Bundle (AC-23)
 
-The architecture of this repository is navigated through the machine-readable OKF v0.1 map bundle at [architecture/map/index.md](architecture/map/index.md).
+The architecture of this repository is navigated through the machine-readable OKF v0.1 map bundle at [architecture/map/index.md](../../../architecture/map/index.md).
 
 Fresh sessions and task briefings follow the strict 6-step re-entry reading order (Doctrine §3.2):
 1. `AGENTS.md` — entry point, conventions, and architecture map pointer
