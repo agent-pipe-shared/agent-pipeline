@@ -56,22 +56,18 @@ function check(name, tool, filePath, expectExit, extra = {}) {
 }
 
 try {
-  // ---- F4 (ADR-0058): a real armed GMW window lifts a matching TP-* rule -----------------
+  // ---- F4 (ADR-0058): a real armed GMW window lifts a matching additive rule ------------
   const GMW_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-gmw-"));
   dirs.push(GMW_DIR);
   mkdirSync(join(GMW_DIR, ".claude"), { recursive: true });
   mkdirSync(join(GMW_DIR, "project"), { recursive: true });
   writeFileSync(join(GMW_DIR, ".claude", "guard-config.json"), JSON.stringify({
-    protectedTestPaths: [
+    protectedSurfaceAdditions: [
       {
-        pattern: "plugins/pipeline-core/hooks/guard-git\\.test\\.mjs$",
-        reason: "The git-guard union test suite is the implementation contract for guard-git.mjs.",
-        id: "TP-1",
-      },
-      {
-        pattern: "plugins/pipeline-core/hooks/hooks\\.json$",
-        reason: "hooks.json wires the guard family itself.",
-        id: "TP-1",
+        pathPattern: "fixtures/gmw-protected\\.test\\.mjs$",
+        rationale: "Fixture-owned additive protected test path for the GMW contract.",
+        class: "contract-test",
+        id: "TP-99",
       },
     ],
   }));
@@ -90,11 +86,11 @@ try {
   execFileSync("git", ["add", "-A"], { cwd: GMW_DIR });
   execFileSync("git", ["commit", "-q", "-m", "gmw-fixture"], { cwd: GMW_DIR });
 
-  check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit",
-    "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs", 0, (() => {
+  check("TP09 real armed GMW window scoped to an additive rule lifts the matching Edit", "Edit",
+    join(GMW_DIR, "fixtures/gmw-protected.test.mjs"), 0, (() => {
       const livePluginRoot = livePluginRoots()[0];
       const { intent, request } = prepareGuardMaintenanceWindowRequest({
-        rootDir: GMW_DIR, scopeRuleIds: ["TP-1"], ttlSeconds: 300, reason: "TP09",
+        rootDir: GMW_DIR, scopeRuleIds: ["TP-99"], ttlSeconds: 300, reason: "TP09",
         featureId: "tp-gmw-e2e", planSha256: createHash("sha256").update("plan\n").digest("hex"),
         specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "tp-gmw-e2e-v1", livePluginRoot,
         authorshipMode: "goldfish-dispatch",
@@ -106,12 +102,12 @@ try {
       installGuardMaintenanceWindow({
         rootDir: GMW_DIR, request, anchors: [{ keyReference: "tp-e2e", publicKeySha256: gmwPublicKeySha256 }], proof, livePluginRoot,
       });
-      return { projectDir: GMW_DIR, stderrIncludes: ["pipeline-guard-maintenance-window", "TP-1 lifted"] };
+      return { projectDir: GMW_DIR, stderrIncludes: ["pipeline-guard-maintenance-window", "TP-99 lifted"] };
     })());
-  check("TP09 kernel precedence: the same TP-1 window cannot lift hooks.json", "Edit",
-    join(GMW_DIR, "plugins/pipeline-core/hooks/hooks.json"), 2, {
+  check("TP09 kernel precedence: an additive window cannot lift a shipped kernel path", "Edit",
+    join(GMW_DIR, "plugins/pipeline-core/hooks/guard-testpath.mjs"), 2, {
       projectDir: GMW_DIR,
-      stderrIncludes: ["BLOCKED (guard-testpath", "hooks.json wires the guard family itself"],
+      stderrIncludes: ["BLOCKED (guard-testpath", "Authority-bearing guard hook implementations"],
     });
   closeGuardMaintenanceWindow({ rootDir: GMW_DIR });
 

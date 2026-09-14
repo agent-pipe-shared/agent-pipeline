@@ -118,9 +118,12 @@ function validateAdditions(rootDir, additions, baseline, adapters) {
   return diagnostics.length ? { entries: [], diagnostics } : { entries: additions.map(Object.freeze), diagnostics };
 }
 function dynamicContinuityEntries(rootDir, adapters) {
+  const state = resolveAuthorityArtifactPath("state", { rootDir });
   try {
-    const state = resolveAuthorityArtifactPath("state", { rootDir });
-    if (!adapters.existsSyncFn(state.path)) throw new Error("lifecycle state is absent");
+    // A lifecycle file is only created once a project has entered the Pipeline
+    // lifecycle. Its absence is therefore a normal empty dynamic class, not a
+    // failed authority read. Keep every present-but-bad state fail-closed below.
+    if (!adapters.existsSyncFn(state.path)) return { status: "absent", entries: [], diagnostics: [] };
     const parsed = JSON.parse(adapters.readFileSyncFn(state.path, "utf8"));
     if (!Array.isArray(parsed?.closedFeatures)) throw new Error("closedFeatures is not an array");
     const entries = [];
