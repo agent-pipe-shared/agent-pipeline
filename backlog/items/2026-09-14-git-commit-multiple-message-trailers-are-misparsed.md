@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.git-commit-multiple-message-trailers-are-misparsed
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-14
 due: 2026-09-30
 sprint: nova-b
@@ -43,3 +43,10 @@ and makes normal, line-break-safe commit guidance unreliable.
 This changes only the command-time message interpretation used for GIT-03. It
 does not weaken the final Git commit-msg hook, alter provenance requirements,
 or add a hook-bypass route.
+
+## Resolution
+
+Closed by the shared argv tokenizer's Bash ANSI-C quote handling and the
+copy-safe `--trailer` commit form. Focused coverage verifies POSIX repeated
+`-m`, Windows `git.exe` trailer switches, malformed final blocks, the existing
+Git-guard suite, and the generated cross-runner obligations prompt.

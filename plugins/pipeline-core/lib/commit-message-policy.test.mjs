@@ -63,6 +63,34 @@ check("CMP3a Git trailers form one inspectable final provenance block", () => {
   assert.match(result.message, /\n\nAI-Assisted: true\nDispatch: stage-0 \(elephant\)$/u);
 });
 
+// The shell hands Git the decoded argv bytes for Bash's $'...' form.  PreTool
+// receives the raw spelling, so the shared tokenizer must reconstruct that
+// same final paragraph rather than reporting the two trailers as missing.
+check("CMP3b a POSIX ANSI-C quoted final -m trailer block is accepted", () => {
+  const result = run(String.raw`git commit -m "fix(y): tidy up" -m $'Why it matters.\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)'`, {
+    requireMarker: true,
+    requireDispatch: true,
+  });
+  assert.deepEqual(codes(result), []);
+  assert.match(result.message, /\n\nAI-Assisted: true\nDispatch: stage-0 \(elephant\)$/u);
+});
+
+check("CMP3c a Windows git.exe command stays copy-safe with native trailer switches", () => {
+  const result = run('git.exe commit -m "fix(y): tidy up" -m "Why it matters." --trailer "AI-Assisted: true" --trailer "Dispatch: stage-0 (elephant)"', {
+    requireMarker: true,
+    requireDispatch: true,
+  });
+  assert.deepEqual(codes(result), []);
+});
+
+check("CMP3d a split final repeated -m block remains refused", () => {
+  const result = run(String.raw`git commit -m "fix(y): tidy up" -m $'AI-Assisted: true\n\nDispatch: stage-0 (elephant)'`, {
+    requireMarker: true,
+    requireDispatch: true,
+  });
+  assert.deepEqual(codes(result), ["GIT-03-MARKER-MISSING"]);
+});
+
 // CMP4 -- a HUMAN co-author is legitimate and common. A rule that refused all co-authorship
 // would be switched off by its users, so the pattern keys on the vendor token.
 check("CMP4 a human co-author is not a violation", () => {

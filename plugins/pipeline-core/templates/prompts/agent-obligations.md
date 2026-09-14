@@ -30,10 +30,11 @@ admitted composition.
 
 The two workarounds that cost the most time before they were written down:
 
-- **A multi-line commit message.** A `-m` value containing a newline is
-  refused. Write the message to a file and use
-  `git commit -F <msgfile> -- <paths>`. A finished dispatch once lost its own
-  commit to this, with its files staged and its suites green.
+- **A provenance-bearing commit.** Prefer one copy-safe command: use `-m` for
+  a one-line subject/body and Git's own repeated `--trailer` switches for
+  `AI-Assisted: true` and the one required `Dispatch:` value. This avoids
+  newline-sensitive shell quoting on Bash, PowerShell and Antigravity. Use
+  `-F <msgfile>` only when the body genuinely needs multiple paragraphs.
 - **Capturing output to a file.** `>`, `2>&1` and `| tee` are all refused.
   Write the file from Node instead.
 
@@ -148,7 +149,7 @@ deliberately carries no static copy of that; a second copy is the drift.
 <!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index
      race), not values any guard exports, so no generator can derive them. -->
 
-- `git add -- <exact paths>` then `git commit -F <msgfile> -- <same paths>`, as
+- `git add -- <exact paths>` then `git commit -m "<subject>" --trailer "AI-Assisted: true" --trailer "Dispatch: <binding>" -- <same paths>`, as
   two consecutive calls. Never `git add -A`, never `git add .`, never a bare
   `git commit` — in a shared working tree a wildcard add lets another agent's
   files ride along on your commit.

@@ -137,10 +137,11 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put();
   put("The two workarounds that cost the most time before they were written down:");
   put();
-  put("- **A multi-line commit message.** A `-m` value containing a newline is");
-  put("  refused. Write the message to a file and use");
-  put("  `git commit -F <msgfile> -- <paths>`. A finished dispatch once lost its own");
-  put("  commit to this, with its files staged and its suites green.");
+  put("- **A provenance-bearing commit.** Prefer one copy-safe command: use `-m` for");
+  put("  a one-line subject/body and Git's own repeated `--trailer` switches for");
+  put("  `AI-Assisted: true` and the one required `Dispatch:` value. This avoids");
+  put("  newline-sensitive shell quoting on Bash, PowerShell and Antigravity. Use");
+  put("  `-F <msgfile>` only when the body genuinely needs multiple paragraphs.");
   put("- **Capturing output to a file.** `>`, `2>&1` and `| tee` are all refused.");
   put("  Write the file from Node instead.");
   put();
@@ -239,7 +240,7 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("<!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index");
   put("     race), not values any guard exports, so no generator can derive them. -->");
   put();
-  put("- `git add -- <exact paths>` then `git commit -F <msgfile> -- <same paths>`, as");
+  put("- `git add -- <exact paths>` then `git commit -m \"<subject>\" --trailer \"AI-Assisted: true\" --trailer \"Dispatch: <binding>\" -- <same paths>`, as");
   put("  two consecutive calls. Never `git add -A`, never `git add .`, never a bare");
   put("  `git commit` — in a shared working tree a wildcard add lets another agent's");
   put("  files ride along on your commit.");

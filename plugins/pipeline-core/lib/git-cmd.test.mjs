@@ -173,6 +173,17 @@ function record(id, ok, detail) {
     `out=${JSON.stringify(out)}`,
   );
 }
+{
+  const out = tokenizeArgv(String.raw`git commit -m "subject" -m $'body\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)'`);
+  record(
+    "TOKENIZE ANSI-C quote  Bash $'...' escapes become the argv bytes Git receives",
+    JSON.stringify(out) === JSON.stringify([
+      "git", "commit", "-m", "subject", "-m",
+      "body\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)",
+    ]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
 
 // ---- refMatchesPattern -----------------------------------------------------------------
 {
