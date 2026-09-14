@@ -3,39 +3,81 @@
   "suites": [
     {
       "name": "architecture-adoption-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-adoption.test.mjs"
+      "file": "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
+      "invariantPinned": "Adoption demand policy and transition mechanics for architecture governance",
+      "nonOverlapNote": "Unique test suite for architecture-adoption.mjs"
     },
     {
       "name": "architecture-baseline-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs"
+      "file": "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
+      "invariantPinned": "Baseline ratchet and drift detection for repository architecture assets",
+      "nonOverlapNote": "Unique test suite for architecture-baseline.mjs"
     },
     {
       "name": "architecture-fitness-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs"
+      "file": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
+      "invariantPinned": "Architecture fitness functions evaluation and threshold adherence",
+      "nonOverlapNote": "Unique test suite for architecture-fitness.mjs"
     },
     {
       "name": "architecture-remedy-tests",
-      "file": "plugins/pipeline-core/scripts/architecture-remedy.test.mjs"
+      "file": "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
+      "invariantPinned": "Architecture remedy generation and plan application integrity",
+      "nonOverlapNote": "Unique test suite for architecture-remedy.mjs"
+    },
+    {
+      "name": "check-clone-provisioning-tests",
+      "file": "plugins/pipeline-core/scripts/check-clone-provisioning.test.mjs",
+      "invariantPinned": "Fresh clone machine-local provisioning readback verification",
+      "nonOverlapNote": "Unique test suite for check-clone-provisioning.mjs"
+    },
+    {
+      "name": "check-commit-type-range",
+      "file": "plugins/pipeline-core/scripts/check-commit-type-range.mjs",
+      "invariantPinned": "Conventional commit type compliance across git commit ranges",
+      "nonOverlapNote": "Range-mode commit type audit checker distinct from staged-only hooks"
+    },
+    {
+      "name": "check-commit-type-range-tests",
+      "file": "plugins/pipeline-core/scripts/check-commit-type-range.test.mjs",
+      "invariantPinned": "Unit test suite verifying commit type range auditing behavior",
+      "nonOverlapNote": "Unique test suite for check-commit-type-range.mjs"
     },
     {
       "name": "check-evidence-drift-tests",
-      "file": "plugins/pipeline-core/scripts/check-evidence-drift.test.mjs"
+      "file": "plugins/pipeline-core/scripts/check-evidence-drift.test.mjs",
+      "invariantPinned": "Evidence drift detection across active lifecycle transitions",
+      "nonOverlapNote": "Unique test suite for check-evidence-drift.mjs"
+    },
+    {
+      "name": "guard-devplan-policy-tests",
+      "file": "plugins/pipeline-core/lib/guard-devplan-policy.test.mjs",
+      "invariantPinned": "Critic scratch notes and scratch dispatch admission across lifecycles",
+      "nonOverlapNote": "Unique test suite for guard-devplan-policy.mjs scratch persistence"
     },
     {
       "name": "module-inventory-tests",
-      "file": "plugins/pipeline-core/scripts/module-inventory.test.mjs"
+      "file": "plugins/pipeline-core/scripts/module-inventory.test.mjs",
+      "invariantPinned": "Module inventory discovery, taxonomy, and dependency validation",
+      "nonOverlapNote": "Unique test suite for module-inventory.mjs"
     },
     {
       "name": "plan-authority-staging-guard-tests",
-      "file": "plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs"
+      "file": "plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs",
+      "invariantPinned": "Pre-authority staging draft refusal and boundary isolation",
+      "nonOverlapNote": "Unique test suite for plan-authority-staging-guard.mjs"
     },
     {
       "name": "report-interruptions-tests",
-      "file": "plugins/pipeline-core/scripts/report-interruptions.test.mjs"
+      "file": "plugins/pipeline-core/scripts/report-interruptions.test.mjs",
+      "invariantPinned": "Interruption receipt aggregation, normalization, and window validation",
+      "nonOverlapNote": "Unique test suite for report-interruptions.mjs"
     },
     {
       "name": "rigor-floor-tests",
-      "file": "plugins/pipeline-core/scripts/rigor-floor.test.mjs"
+      "file": "plugins/pipeline-core/scripts/rigor-floor.test.mjs",
+      "invariantPinned": "Deterministic derivation of minimum rigor profile from mechanical inputs",
+      "nonOverlapNote": "Unique test suite for rigor-floor.mjs"
     }
   ]
 }

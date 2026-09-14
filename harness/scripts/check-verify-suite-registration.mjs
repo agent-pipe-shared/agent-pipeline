@@ -316,7 +316,7 @@ export function validateDeclarativeVerifySuites(data) {
     if (!suite || typeof suite !== "object" || Array.isArray(suite)) {
       return { ok: false, error: `suites[${i}] must be an object` };
     }
-    const allowedKeys = new Set(["name", "file", "caseCompletion"]);
+    const allowedKeys = new Set(["name", "file", "caseCompletion", "durationMs", "invariantPinned", "nonOverlapNote"]);
     for (const key of Object.keys(suite)) {
       if (!allowedKeys.has(key)) {
         return { ok: false, error: `suites[${i}] has unexpected property "${key}"` };
@@ -327,6 +327,15 @@ export function validateDeclarativeVerifySuites(data) {
     }
     if (typeof suite.file !== "string" || suite.file.length === 0) {
       return { ok: false, error: `suites[${i}].file must be a non-empty string` };
+    }
+        if (suite.durationMs !== undefined && typeof suite.durationMs !== "number") {
+      return { ok: false, error: `suites[${i}].durationMs must be a number` };
+    }
+    if (suite.invariantPinned !== undefined && (typeof suite.invariantPinned !== "string" || suite.invariantPinned.trim().length === 0)) {
+      return { ok: false, error: `suites[${i}].invariantPinned must be a non-empty string` };
+    }
+    if (suite.nonOverlapNote !== undefined && (typeof suite.nonOverlapNote !== "string" || suite.nonOverlapNote.trim().length === 0)) {
+      return { ok: false, error: `suites[${i}].nonOverlapNote must be a non-empty string` };
     }
     if (suite.caseCompletion !== undefined) {
       const cc = suite.caseCompletion;
@@ -456,11 +465,20 @@ export function checkVerifySuiteRegistration({
       findings.push(`${declarativeResult.errorType}: ${declarativeResult.error}`);
     } else {
       for (const suite of declarativeResult.suites) {
+        if (typeof suite.invariantPinned !== "string" || suite.invariantPinned.trim().length === 0) {
+          findings.push(`CONSOLIDATION-RULE "${suite.name}": declarative verify suite entry must carry non-empty invariantPinned`);
+        }
+        if (typeof suite.nonOverlapNote !== "string" || suite.nonOverlapNote.trim().length === 0) {
+          findings.push(`CONSOLIDATION-RULE "${suite.name}": declarative verify suite entry must carry non-empty nonOverlapNote`);
+        }
         entries.push({
           name: suite.name,
           arrayName: "TEST_SUITES",
           resolvedPath: join(repoRoot, suite.file),
           ...(suite.caseCompletion ? { caseCompletion: suite.caseCompletion } : {}),
+          ...(suite.durationMs !== undefined ? { durationMs: suite.durationMs } : {}),
+          ...(suite.invariantPinned ? { invariantPinned: suite.invariantPinned } : {}),
+          ...(suite.nonOverlapNote ? { nonOverlapNote: suite.nonOverlapNote } : {}),
         });
       }
     }

@@ -20,6 +20,18 @@ check("opening and terminal records share the strict closed contract", () => {
   assert.deepEqual(validateDispatchRecord(opening()), opening());
   assert.deepEqual(validateDispatchRecord(terminal()), terminal());
   assert.match(dispatchRecordSha256(terminal()), /^[a-f0-9]{64}$/u);
+  const withAllowance = {
+    ...terminal(),
+    closingAllowance: {
+      schema: "pipeline.dispatch-closing-allowance.v1",
+      taskId: terminal().taskId,
+      committed: ["b".repeat(40)],
+      verifiedGreen: [{ name: "test-suite", exitCode: 0 }],
+      remainsUndone: ["remaining-check"],
+      nextBriefingAdjustments: ["increase budget by 10"],
+    },
+  };
+  assert.deepEqual(validateDispatchRecord(withAllowance), withAllowance);
 });
 check("v2 is explicit read-only legacy evidence while v3 requires exactly one Critic disposition", () => {
   const legacy = { ...opening(), schema: "pipeline.dispatch-record.v2" };

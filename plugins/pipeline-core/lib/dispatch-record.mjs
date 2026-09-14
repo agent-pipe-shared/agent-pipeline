@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { CRITIC_EVIDENCE_SCHEMA, CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, validateCriticDecision } from "./critic-skip-decision.mjs";
 
 export const DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v3";
+export const CLOSING_ALLOWANCE_SCHEMA = "pipeline.dispatch-closing-allowance.v1";
 export const LEGACY_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v2";
 export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
 export const SAFE_TASK_ID = /^[A-Za-z0-9._-]+$/u;
@@ -11,7 +12,7 @@ const SAFE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,255}$/u;
 const PRIVATE_ABSOLUTE_PATH = /(?<![A-Za-z0-9_%])(?:\/(?:home|Users|mnt\/[A-Za-z]|tmp|var\/tmp|root|private\/var)(?:\/[^\s"'`<>]*)?(?=$|[\s"'`<>,;:)\]])|[A-Za-z]:[\\/][^\s"'`<>]+|\\\\[^\s"'`<>]+)/iu;
 const TOP_LEVEL_KEYS = Object.freeze([
   "schema", "taskId", "agentType", "model", "effort", "rulesetSha", "dispatcher", "candidateCommit",
-  "resultSha256", "outcome", "commits", "log", "report", "modelOverride", "criticSkip", "criticRequired", "criticEvidence", "orchestratorAddedFiles",
+  "resultSha256", "outcome", "commits", "log", "report", "modelOverride", "criticSkip", "criticRequired", "criticEvidence", "orchestratorAddedFiles", "closingAllowance",
 ]);
 
 function fail(code, message) {
@@ -152,6 +153,17 @@ function validateRecord(record, { legacy }) {
     if (Object.hasOwn(record.report, "orchestratorAddedFiles")) strictPathList(record.report.orchestratorAddedFiles, "report.orchestratorAddedFiles");
   } else if (isTerminalOutcome(record.outcome)) fail("record-report", "terminal dispatch record requires report");
   if (Object.hasOwn(record, "orchestratorAddedFiles")) strictPathList(record.orchestratorAddedFiles, "orchestratorAddedFiles");
+  if (Object.hasOwn(record, "closingAllowance")) {
+    if (legacy) fail("record-shape", "legacy dispatch record does not support closingAllowance");
+    const ca = record.closingAllowance;
+    exactKeys(ca, ["schema", "taskId", "committed", "verifiedGreen", "remainsUndone", "nextBriefingAdjustments"], "closingAllowance");
+    if (ca.schema !== CLOSING_ALLOWANCE_SCHEMA) fail("record-field", "closingAllowance schema is invalid");
+    if (ca.taskId !== record.taskId) fail("record-field", "closingAllowance taskId must match dispatch record taskId");
+    if (!Array.isArray(ca.committed) || ca.committed.some((c) => typeof c !== "string")) fail("record-field", "closingAllowance.committed must be an array of strings");
+    if (!Array.isArray(ca.verifiedGreen) || ca.verifiedGreen.some((v) => !v || typeof v !== "object" || Array.isArray(v))) fail("record-field", "closingAllowance.verifiedGreen must be an array of objects");
+    if (!Array.isArray(ca.remainsUndone) || ca.remainsUndone.some((r) => typeof r !== "string")) fail("record-field", "closingAllowance.remainsUndone must be an array of strings");
+    if (!Array.isArray(ca.nextBriefingAdjustments) || ca.nextBriefingAdjustments.some((a) => typeof a !== "string")) fail("record-field", "closingAllowance.nextBriefingAdjustments must be an array of strings");
+  }
   if (Object.hasOwn(record, "modelOverride")) {
     exactKeys(record.modelOverride, ["model", "effort", "rationale"], "modelOverride");
     nonempty(record.modelOverride.model, "modelOverride.model"); nonempty(record.modelOverride.effort, "modelOverride.effort"); durableText(record.modelOverride.rationale, "modelOverride.rationale");

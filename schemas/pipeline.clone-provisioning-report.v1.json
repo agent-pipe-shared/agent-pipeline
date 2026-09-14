@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.clone-provisioning-report.v1",
+  "title": "Clone provisioning report (pipeline.clone-provisioning-report.v1)",
+  "description": "Readback of machine-local artifacts in a cloned repository.",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "checks"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "pipeline.clone-provisioning-report.v1",
+      "enum": [
+        "pipeline.clone-provisioning-report.v1"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "provisioning-required"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "path",
+          "repairAction"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "present",
+              "absent",
+              "stale",
+              "invalid"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "repairAction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

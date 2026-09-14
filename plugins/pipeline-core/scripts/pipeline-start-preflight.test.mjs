@@ -154,7 +154,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "bootstrapPayload", "concurrentSessionWarning", "executionBoundary", "handoff", "installedPluginAttestation",
+    "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "executionBoundary", "handoff", "installedPluginAttestation",
     "installedSource", "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
     "version",
   ]);
@@ -168,6 +168,8 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   assert.equal(result.installedPluginAttestation.status, "not-required");
   assert.equal(result.executionBoundary, "default");
   assert.equal(result.handoff, "none");
+  assert.ok(result.cloneProvisioning);
+  assert.equal(result.cloneProvisioning.schema, "pipeline.clone-provisioning-report.v1");
   assert.equal(result.bootstrapPayload.schema, "pipeline.bootstrap-payload-receipt.v1");
   assert.equal(result.bootstrapPayload.mode, "normal");
   assert.deepEqual(result.bootstrapPayload.retainedChecks, [
