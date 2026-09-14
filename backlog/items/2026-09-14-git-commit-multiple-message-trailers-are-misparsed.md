@@ -7,7 +7,7 @@ status: open
 created: 2026-09-14
 due: 2026-09-30
 sprint: nova-b
-done_when: automated
+done_when: manual
 source: "Observed while committing the cross-runner onboarding-recovery hotfix."
 ---
 
