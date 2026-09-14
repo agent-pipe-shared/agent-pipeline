@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-28
 closed_at: 2026-09-14
 closure_repository: self
-closure_commit: 015f8a777c2e56dc46e6770a820c9dac565a48ea
+closure_commit: 015f8a772d66b51ec5b312fb4c5f86e4744a73d6
 closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nightwing
 done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs heredocFileRemediation
@@ -121,7 +121,7 @@ rather than inventing a mechanism:
 
 ## Closure, 2026-09-14
 
-Closed by `015f8a777c2e56dc46e6770a820c9dac565a48ea` (`HEREDOCHINT-1`). The
+Closed by `015f8a772d66b51ec5b312fb4c5f86e4744a73d6` (`HEREDOCHINT-1`). The
 closed grammar still rejects an actual quoted-delimiter heredoc with
 `GUARD-PARSE-UNSUPPORTED`; the denial now explains the safe `Write`/`Edit`
 route for repository content and retains an empty typed retry envelope. The
