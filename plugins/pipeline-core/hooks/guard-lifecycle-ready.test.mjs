@@ -2181,6 +2181,25 @@ test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and stat
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("HEREDOCHINT-1: a refused real heredoc teaches the Write/Edit route without admitting it", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = "cat >> notes.md <<'EOF'\ncontent\nEOF";
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(result.stderr, /here-documents are not admitted/u);
+    assert.match(result.stderr, /use Write for a new file or Edit for an existing file/u);
+    assert.deepEqual(retryActionsForDeniedCommand(command, path), []);
+
+    // Quoted data resembling a heredoc never gets the mutation-oriented hint.
+    const quoted = evaluateLifecycleReadyGuard(bash("printf '<<EOF\\n'"), { projectDir: path });
+    assert.equal(quoted.exitCode, 2);
+    assert.doesNotMatch(String(quoted.stderr ?? ""), /here-documents are not admitted/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("GRAMMARHINT-1 AC-4: GUARD-OPERATOR-UNAPPROVED and GUARD-PARSE-UNSUPPORTED stay distinct, own codes never conflated", () => {
   const path = hgoGitFixture("chat");
   try {

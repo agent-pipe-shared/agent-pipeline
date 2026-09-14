@@ -2863,6 +2863,66 @@ function commitMessageFileRemediation(command) {
 }
 
 /**
+ * Recognises an actual, unquoted here-document introducer without trying to admit or fully
+ * parse heredocs. This deliberately understands only the small syntax needed to avoid a
+ * misleading help line for quoted text such as `printf '<<EOF'`: outside quotes, `<<` (or
+ * `<<-`) must be followed by one conservative delimiter token and a later line break.
+ *
+ * A false negative leaves today's refusal unchanged. A false positive would suggest Write/Edit
+ * for ordinary quoted content, so this scanner is intentionally narrower than shell heredoc
+ * syntax (which the closed grammar continues to reject in all forms).
+ */
+function hasHeredocIntroducer(command) {
+  if (typeof command !== "string" || !/[\r\n]/u.test(command)) return false;
+  let quote = null;
+  let escaped = false;
+  for (let index = 0; index < command.length - 1; index += 1) {
+    const char = command[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+    if (char !== "<" || command[index + 1] !== "<") continue;
+
+    let cursor = index + 2;
+    if (command[cursor] === "-") cursor += 1;
+    while (command[cursor] === " " || command[cursor] === "\t") cursor += 1;
+    const delimiterStart = command[cursor];
+    if (delimiterStart === "'" || delimiterStart === '"') {
+      const delimiterEnd = command.indexOf(delimiterStart, cursor + 1);
+      if (delimiterEnd > cursor + 1 && /[\r\n]/u.test(command.slice(delimiterEnd + 1))) return true;
+      continue;
+    }
+    const delimiter = command.slice(cursor).match(/^[A-Za-z_][A-Za-z0-9_]*\b/u);
+    if (delimiter !== null && /[\r\n]/u.test(command.slice(cursor + delimiter[0].length))) return true;
+  }
+  return false;
+}
+
+function heredocFileRemediation(command) {
+  if (!hasHeredocIntroducer(command)) return null;
+  return "Remediation: here-documents are not admitted by the closed shell grammar. "
+    + "If the here-document was creating repository content, use Write for a new file or Edit for an existing file instead; "
+    + "keep any resulting command as a separate tool call.";
+}
+
+function grammarRemediation(command) {
+  return commitMessageFileRemediation(command) ?? heredocFileRemediation(command);
+}
+
+/**
  * Recover only independent semicolon- or physical-newline-separated
  * diagnostics. This is a correction hint, never an execution bypass: each
  * returned argv must pass the same closed single-command read-only policy on
@@ -5483,7 +5543,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
           retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots),
           route.overrideGuidance,
           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
-          commitMessageFileRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
+          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
           null,
           false,
           firstOccurrence,
@@ -5525,7 +5585,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
         return withLifts(lifts, blocked(
           code, null, [], route.overrideGuidance, rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
-          null, null, false, firstOccurrence,
+          grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)), null, false, firstOccurrence,
         ));
       }
       lifts.push(route.admitted);
