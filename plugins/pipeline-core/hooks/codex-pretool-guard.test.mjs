@@ -173,10 +173,16 @@ function createReadyLifecycleFixture(mode = "chat") {
   // verifies its ticket and digests before the native adapter probes it.
   const root = mkdtempSync(join(tmpdir(), "codex-ready-hgo-"));
   const portable = followLifecycleAction(root, lifecycleCommand(root, "plan", "--root", root, "--runner", "codex"), "apply-portable-seed");
-  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "codex", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--push-approval", mode], { cwd: root, encoding: "utf8", shell: false });
+  // The lifecycle setup itself uses the explicit legacy chat fixture route;
+  // the HGO test below changes the final policy only after the project is
+  // ready.  The uncommitted signature setting deliberately resolves
+  // fail-closed to signature, which keeps this fixture focused on HGO's two policy
+  // continuations instead of duplicating the full detached-proof ceremony
+  // covered by project-onboarding-e2e.test.mjs.
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "codex", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat"], { cwd: root, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
-  assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`push_approval: "${mode}"`, "u"));
-  assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`human_approval: "${mode}"`, "u"));
+  assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /push_approval: "chat"/u);
+  assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_approval: "chat"/u);
   for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]]) {
     const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
     assert.equal(git.status, 0, git.stderr);
@@ -188,6 +194,9 @@ function createReadyLifecycleFixture(mode = "chat") {
   collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "HGO fixture." }]) });
   const generated = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "intake-generate-plan");
   lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "codex");
+  // Even this chat-mode fixture must use the dedicated acknowledgement
+  // writer.  A generated draft is never permitted to skip directly to bind.
+  followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-acknowledge-chat-apply");
   const bind = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-bind-plan");
   followLifecycleAction(root, bind, "bootstrap-bind-apply");
   const permissionsDrift = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
@@ -203,6 +212,13 @@ function createReadyLifecycleFixture(mode = "chat") {
   const permissionsApplied = executeFixtureAction(root, permissionsDrift.nextAction, {});
   assert.equal(permissionsApplied.status, "ready");
   assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex").status, "ready");
+  if (mode === "signature") {
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const signatureSource = readFileSync(sourcePath, "utf8")
+      .replace('push_approval: "chat"', 'push_approval: "signature"')
+      .replace('human_approval: "chat"', 'human_approval: "signature"');
+    writeFileSync(sourcePath, signatureSource);
+  }
   return root;
 }
 
@@ -625,9 +641,10 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
   // committed, not to the loop variable that produced it.
   for (const mode of ["chat", "signature"]) {
     const root = readyLifecycleFixture(mode);
-    // Read back what the repository carries. readPushApprovalMode() honours the COMMITTED
-    // bytes and nothing else, so this -- not the loop variable -- is the live configuration
-    // the printed command has to agree with.
+    // Read back what the repository carries.  The signature variant is
+    // deliberately uncommitted and therefore resolves fail-closed; this --
+    // not the loop variable -- is the live configuration the printed command
+    // has to agree with.
     const committed = readFileSync(join(root, "pipeline.user.yaml"), "utf8")
       .match(/human_approval:\s*"([a-z]+)"/u)?.[1];
     assert.equal(committed, mode, "fixture did not commit the mode it claims");
