@@ -8538,7 +8538,10 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     // longer the generator's own playback, so there IS now a human judgement to
     // certify, and every original DoD of this test applies again from here.
     const prdAbsolutePath = join(path, exemptObservation.prd.path);
-    writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n`, "utf8");
+    // More than one final newline is legitimate authored content. The signed
+    // acknowledgement receipt must survive binding without normalizing that
+    // preimage away.
+    writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n\n\n`, "utf8");
 
     // Chat posture has exactly one PO decision: the in-chat confirmation.  Its
     // digest-bound apply is then ordinary agent work, consistently for every

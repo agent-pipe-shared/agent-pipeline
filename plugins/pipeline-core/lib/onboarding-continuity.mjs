@@ -6631,7 +6631,11 @@ function decodeBootstrapAcknowledgementPrd(bytes) {
 function appendBootstrapAcknowledgementMarker(bytes) {
   const current = decodeBootstrapAcknowledgementPrd(bytes);
   if (current === null || [...current.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length !== 0) return null;
-  return Buffer.from(`${current.replace(/\n+$/u, "")}\n\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`, "utf8");
+  // The signed preimage is the exact staging PRD, including every terminal
+  // newline. Preserve it verbatim so receipt readback can reconstruct its
+  // digest after binding; normalizing `\n+` here made valid acknowledgements
+  // with two or more final newlines permanently unrecoverable.
+  return Buffer.from(`${current}\n\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`, "utf8");
 }
 
 function safeBootstrapAcknowledgementScratch(root, relativePath) {
@@ -7065,11 +7069,11 @@ function acknowledgedPreimageMatches(authorityPrd, expectedSha256) {
   if (text === null || [...text.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length !== 1) return false;
   const suffix = `\n\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`;
   if (!text.endsWith(suffix)) return false;
-  // appendBootstrapAcknowledgementMarker normalizes trailing line endings. The
-  // source generator writes one final newline, so these are the only two
-  // lossless candidates; the recorded SHA-256 remains the authority.
+  // appendBootstrapAcknowledgementMarker preserves the staging preimage byte
+  // for byte. Removing its fixed suffix therefore recovers every valid source
+  // shape, including one with any number of terminal newlines.
   const prefix = text.slice(0, -suffix.length);
-  return [prefix, `${prefix}\n`].some((candidate) => sha256(Buffer.from(candidate, "utf8")) === expectedSha256);
+  return sha256(Buffer.from(prefix, "utf8")) === expectedSha256;
 }
 
 /**

@@ -8790,7 +8790,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const usesSharedPolicy = base.bootstrapAcknowledgementRequired === true && approvalMode?.scope === "global";
       let by = approvalFlags.by;
       const receiptFlag = approvalFlags["bootstrap-acknowledgement-receipt"];
-      if (usesSharedPolicy && (approvalMode.mode === "signature" || receiptFlag !== undefined)) {
+      // A coordinator-sourced acknowledged PRD has exactly one policy-selected
+      // human decision. This applies to global chat as well as signature:
+      // allowing chat to fall through to legacy `--by` would let an agent skip
+      // the acknowledgement receipt entirely after binding.
+      if (usesSharedPolicy) {
         if (typeof receiptFlag !== "string" || approvalFlags.by !== undefined) {
           console.error("Error: approve-plan under the shared human-approval policy requires exactly the receipt returned by inspection; --by attribution is not a substitute for the configured human gate.");
           return 2;

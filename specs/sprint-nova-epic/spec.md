@@ -1593,6 +1593,27 @@ fail-closed. Contract tests exercise producer output against the real guard,
 including a different absolute Node executable, exact near misses, mutation
 constraints and revision/pathspec counterexamples.
 
+### 7.2.2 B8.3 uniform signed onboarding acknowledgement
+
+For a repository configured with shared `human_approval: signature`, the
+Design-to-Implementation transition has one and only one attended PO action:
+the exact detached `sign-intent` command for the reviewed staging PRD and
+specification. Once that proof verifies, every runner applies the marker,
+binds the authority and consumes the same receipt for `approve-plan`; neither
+chat acknowledgement nor `approve-plan --by` is an alternative. A missing,
+stale, malformed or proof-mismatched receipt fails closed with a typed recovery
+state. The corresponding chat policy remains its separately selected,
+terminal-free one-decision route and must not be silently reinterpreted as
+signature.
+
+The acknowledgement transformation preserves the exact PRD preimage,
+including any count of trailing newlines, so a valid receipt remains readable
+after authority binding. The lifecycle guard admits only the exact
+receipt-bound `approve-plan` argv published by inspection. For commit
+provenance, Git's own `--trailer` arguments are recognized as the final
+contiguous trailer block; arbitrary shell pipelines remain outside the
+admitted mutation grammar.
+
 ### 7.3 Exact implementation paths
 
 Every slice may modify only the listed paths. A new need returns to the Spec
@@ -1624,6 +1645,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | B5 / #49 narrowed | `plugins/pipeline-core/lib/macos-acceptance.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/macos-acceptance.schema.json`; exact synthetic fixtures `plugins/pipeline-core/scripts/fixtures/nova-macos/filesystem.json`, `unicode.json`, `case-folding.json`, `symlink.json`, `permissions.json`, `durability.json`, `process.json`, `tool-resolution.json`; candidate boundary evidence `specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json`, `evidence-manifest.json`, `macos-acceptance.json`, `verify.json`, `security.json`, `critic.json`, `increment-receipt.json`, `increment-readback.json`, `po-close.json` | `harness/scripts/verify.mjs`; `docs/product-capability-inventory.json` only for the explicitly synthetic/non-native Verify disposition; `specs/sprint-nova-epic/design/backlog-spec-bindings.json` for retained B49-5/B49-7/B49-8 bindings; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md`; native Apple-Silicon execution and evidence are exclusively #72 (`sprint:NONE`) |
 
 | B8 / recovery reachability | none | `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/protected-test-paths.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/guard-lifecycle-recovery-contract.test.mjs`; the exact release manifests `plugins/pipeline-core/.codex-plugin/plugin.json`, `plugins/pipeline-core/.claude-plugin/plugin.json` and `plugins/pipeline-core/plugin.json`, only for atomic local-candidate version stamping required by B8.2; this Spec; `acceptance.md`; `plans/nova-b.md`; `lifecycle.json`; append-only `result.md`; no generic bypass, hook weakening or `harness/scripts/verify.mjs` edit |
+| B8.3 / uniform signed onboarding acknowledgement | `plugins/pipeline-core/lib/onboarding-continuity.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/onboarding-argv-shapes.mjs`; `plugins/pipeline-core/lib/project-onboarding-v3.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/pipeline-state.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/onboarding-init.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/commit-message-policy.mjs`, matching `.test.mjs` | `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, matching `.test.mjs`, only for the exact receipt-bound `approve-plan` recovery argv; this Spec; `acceptance.md`; `plans/nova-b.md`; `lifecycle.json`; append-only `result.md`; no general shell-operator admission, no generic bypass, no weakening of signature verification or of final Git-trailer validation |
 
 The remaining deliberately deferred Nova manifests are B2-I and live B4
 integration. Direct B3-I work is outside Nova under #69. B1-I is resolved by

@@ -1379,6 +1379,28 @@ function awaitingApprovalFixture() {
   assert.equal(downgraded.result, 2);
 }
 
+// The receipt rule protects a coordinator-sourced acknowledgement under the
+// explicit chat policy too. Chat supplies the one in-session PO decision at
+// acknowledgement time; it must not reopen the old terminal `--by` approval
+// path after binding.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  state.bootstrapAcknowledgementRequired = true;
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  const receiptPath = "scratch/bootstrap-plan-acknowledgement-receipt-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.json";
+  const chatDeps = {
+    ...deps,
+    readHumanApprovalMode: () => ({ mode: "chat", source: "pipeline.user.yaml", key: "human_approval", scope: "global" }),
+    observeOnboardingBootstrapPlanApproval: () => ({ status: "chat", receiptPath }),
+  };
+  const inspected = capturedStdout(() => run(["inspect"], chatDeps));
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  assert.deepEqual(action.argv.slice(1), ["approve-plan", "--bootstrap-acknowledgement-receipt", receiptPath]);
+  const downgraded = capturedStderr(() => run(["approve-plan", "--by", "po-test"], chatDeps));
+  assert.equal(downgraded.result, 2, "chat must not bypass its acknowledgement receipt with --by");
+}
+
 // Awaiting approval must never publish a direct runnable command: an agent
 // cannot approve the PO's plan. It may publish the PO's one typed attribution
 // field plus a nested command which remains explicitly human-confirmed.
