@@ -299,7 +299,7 @@ const TEST_SUITES = [
   { name: "project-onboarding-ready-gate-tests", file: join(libDir, "project-onboarding-ready-gate.test.mjs") },
   { name: "codex-onboarding-runtime-tests", file: join(libDir, "codex-onboarding-runtime.test.mjs") },
   { name: "codex-onboarding-capabilities-tests", file: join(libDir, "codex-onboarding-capabilities.test.mjs") },
-  { name: "onboarding-continuity-tests", file: join(libDir, "onboarding-continuity.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 280 }, (_, index) => `OBC${String(index + 1).padStart(3, "0")}`), maxBytes: 65_536 } },
+  { name: "onboarding-continuity-tests", file: join(libDir, "onboarding-continuity.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 281 }, (_, index) => `OBC${String(index + 1).padStart(3, "0")}`), maxBytes: 65_536 } },
   { name: "codex-onboarding-app-server-tests", file: join(libDir, "codex-onboarding-app-server.test.mjs") },
   { name: "v3-bootstrap-authority-tests", file: join(pluginScriptsDir, "v3-bootstrap-authority.test.mjs") },
   { name: "project-onboarding-e2e-tests", file: join(pluginScriptsDir, "project-onboarding-e2e.test.mjs") },
