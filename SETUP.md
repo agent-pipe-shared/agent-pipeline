@@ -88,17 +88,6 @@ prerequisites, and manual responsibilities.
 
 <a id="consumer-onboarding-details"></a>
 
-Repeat this section for every application or service repository you want to
-govern. A governed project does not inherit your local account or credentials;
-it commits only its portable calibration and its project rules.
-
-For a fresh or adopting project, the normal route is the guided Greenfield
-onboarding Driver, exercised across Claude, Codex, and Antigravity: it
-inspects the directory and returns the next structured action, and it owns
-the sequence. Follow the returned action as given and replace only its named
-human-input placeholders instead of reconstructing a private sequence of
-onboarding commands.
-
 ### 0. Bind the supported runner integration and fully restart its host
 
 Bind the integration for the runner that will govern the project. After the
@@ -384,6 +373,28 @@ explicit activation, rerun `pipeline-core:pipeline-start`; project calibration,
 handover, Verify, and feature-state checks remain separate and may still fail
 closed even when the overlay bridge is activated.
 
+## Troubleshooting: Codex local agent activity
+
+If Codex agent threads no longer appear after adoption, inspect its persistent
+local app-server daemon before changing a plan or treating the incident as a
+repository failure. Replace `<absolute-plugin-root>` with the installed
+Pipeline plugin directory and run from the governed project root:
+
+```sh
+node "<absolute-plugin-root>/scripts/codex-app-server-health.mjs"
+```
+
+`CAS-READY` is a current daemon-version observation. It does not prove a model
+child launched or a host background wakeup. For another `CAS-*` result, the
+bounded attended recovery is:
+
+```sh
+node "<absolute-plugin-root>/scripts/codex-app-server-health.mjs" --recover
+```
+
+It never loops or changes repository state. If it fails, run `codex doctor` in
+an attended local Codex session and retain the result in the handover.
+
 ## B. Maintain a shared pipeline source (occasional)
 
 <!-- capability:setup-and-runtime-projection -->
@@ -463,28 +474,6 @@ recovery; do not delete a pending transaction directory or repair its files by
 hand. This is not a general revert: change completed authority in a reviewed
 working copy, then run a new inspect → plan → explicit activation cycle and
 read it back with `node setup.mjs`.
-
-## Troubleshooting: Codex local agent activity
-
-If Codex agent threads no longer appear after adoption, inspect its persistent
-local app-server daemon before changing a plan or treating the incident as a
-repository failure. Replace `<absolute-plugin-root>` with the installed
-Pipeline plugin directory and run from the governed project root:
-
-```sh
-node "<absolute-plugin-root>/scripts/codex-app-server-health.mjs"
-```
-
-`CAS-READY` is a current daemon-version observation. It does not prove a model
-child launched or a host background wakeup. For another `CAS-*` result, the
-bounded attended recovery is:
-
-```sh
-node "<absolute-plugin-root>/scripts/codex-app-server-health.mjs" --recover
-```
-
-It never loops or changes repository state. If it fails, run `codex doctor` in
-an attended local Codex session and retain the result in the handover.
 
 ## Where to go next
 

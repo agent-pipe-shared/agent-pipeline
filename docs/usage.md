@@ -142,10 +142,9 @@ boundary requires an amended decision.
 
 ## Know the boundary
 
-`0.6.2` names the next release's documented scope; it is not a tag,
-installation recommendation, or availability claim. The three-runner
-Greenfield Driver contract is covered for Claude, Codex, and Antigravity, but
-coverage is not a claim of identical native enforcement across hosts.
+The three-runner Greenfield Driver contract is covered for Claude, Codex, and
+Antigravity, but coverage is not a claim of identical native enforcement across
+hosts.
 Publication still needs its own Verify, security, independent review,
 approval, and remote readback. Nova B remains open for further runner and
 workflow refinements.

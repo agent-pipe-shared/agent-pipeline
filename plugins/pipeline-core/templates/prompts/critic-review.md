@@ -21,7 +21,8 @@ USAGE (Elephant)
    that does not know the grammar spends its budget being refused instead of
    reading code. Do not retype the rules here — a hand-copied second list
    drifts from the guard that owns it.
-1. Model per MP-07, TIERED (harness/review-protocol.md §2.1 T0/T3/T4):
+1. **Root-commit range is ordinary, never a recovery incident.** When the candidate has no parent, use the canonical empty-tree range `4b825dc642cb6eb9a060e54bf8d69288fbee4904..HEAD` and run `scripts/critic-dispatch-preflight.mjs` directly. Do not create a temporary branch, synthetic parent, or rewritten history. The preflight and packet paths support this exact range; only a real, typed preflight refusal is a blocker.
+2. Model per MP-07, TIERED (harness/review-protocol.md §2.1 T0/T3/T4):
    mechanical/deterministic diffs (lockfiles, generated artifacts, pure
    formatting, zero semantic delta) auto-pass — no critic dispatch. Class-mittel
    diffs dispatch the review-tier model FIRST, escalating to a higher-capability
@@ -39,7 +40,7 @@ USAGE (Elephant)
    explicit escalation. If this contractual lane is unavailable, report a typed
    runtime failure rather than creating a PO gate. Record the applied matrix row (incl. cascade stage, if
    any) and assurance in your gate decision.
-2. Fill ONLY paths and identifiers below. Pass NO reasoning, NO summaries of
+3. Fill ONLY paths and identifiers below. Pass NO reasoning, NO summaries of
    the implementation, NO chat history — the Critic constructs its own input
    from the paths (the PO's rule: Elephant hands over paths, never
    justifications). If you feel the urge to "explain the change": stop — that
@@ -101,12 +102,12 @@ USAGE (Elephant)
    stopped.` Do not read the prohibited content, search for a substitute,
    consume a narrative, continue the review, or issue a substantive pass/fail
    judgment.
-3. Standard level: dispatch as read-only session subagent (tools:
+4. Standard level: dispatch as read-only session subagent (tools:
    Read/Grep/Glob + git diff/log via Bash; no memory, no write tools). T1 uses
    the same fresh session lane on the higher-capability tier.
    `claude -p --bare` and corresponding runner-native launchers are optional
    explicit escalations, not cross-runner defaults or PO gates.
-4. Phase-2.6 bounded re-review: the initial architecture/security review is
+5. Phase-2.6 bounded re-review: the initial architecture/security review is
    `full`. Every follow-up examines only the exact immediately previous reviewed
    commit through the new correction candidate, its fixes and direct
    regressions. Read unchanged direct contracts only to understand the change;

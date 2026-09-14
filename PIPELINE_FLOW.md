@@ -250,9 +250,6 @@ not turn a repository rule into host-wide enforcement, a governance path into IA
 a requested route into observed model identity, or a machine gate into proof of
 every semantic property.
 
-`0.6.2` names the next release's documented source and plugin scope. It is not
-a tag, installation recommendation, or availability claim:
-
 - The completed Phoenix product strand is integrated as the delivery-governance
   foundation: candidate-bound evidence and approvals, deterministic checks
   before independent review, recoverable operational records, and typed

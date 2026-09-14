@@ -5,10 +5,6 @@ The canonical reader path is the top-level [README](../README.md),
 [`usage.md`](usage.md). Use the rest of this map as
 reference; `overview.md` is a short companion, not a competing front door.
 
-`0.6.2` names the next release's documented scope. It is not a tag,
-installation recommendation, production-availability claim, or proof that a
-local candidate has passed release gates.
-
 ## Adoption
 
 - [`../SETUP.md`](../SETUP.md) — routine consumer adoption, prerequisites, and
