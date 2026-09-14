@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.fitness-evidence.v1",
+  "title": "Architecture Fitness Evidence (pipeline.fitness-evidence.v1)",
+  "description": "Schema for fitness evaluation evidence across planning, candidate, push, and CI boundaries (WP-D3, Issue #106, AC-10, AC-18, AC-21, Spec §7.3, Doctrine §2.10 & §4).",
+  "type": "object",
+  "required": [
+    "schema",
+    "evaluationMode",
+    "outcomes",
+    "overallStatus",
+    "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": [
+        "pipeline.fitness-evidence.v1"
+      ]
+    },
+    "evaluationMode": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "dispatch",
+        "candidate",
+        "pre-close",
+        "push",
+        "ci"
+      ]
+    },
+    "profileSource": {
+      "type": "string"
+    },
+    "profileRevision": {
+      "type": "number"
+    },
+    "profileDigest": {
+      "type": "string"
+    },
+    "baselineRevision": {
+      "type": "number"
+    },
+    "candidateBinding": {
+      "type": "object",
+      "properties": {
+        "commit": {
+          "type": "string"
+        },
+        "tree": {
+          "type": "string"
+        },
+        "artifactDigests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "classId",
+          "propertyId",
+          "outcome",
+          "details"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "classId": {
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "className": {
+            "type": "string"
+          },
+          "propertyId": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "finding",
+              "unavailable",
+              "unsupported",
+              "unknown",
+              "excepted"
+            ]
+          },
+          "details": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": [
+              "object",
+              "array",
+              "string",
+              "null"
+            ]
+          },
+          "evaluatorType": {
+            "type": "string"
+          },
+          "violations": {
+            "type": "array"
+          },
+          "stalenessDebt": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    "overallStatus": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "finding",
+        "blocked",
+        "warning",
+        "excepted",
+        "unavailable",
+        "unsupported",
+        "unknown"
+      ]
+    },
+    "summary": {
+      "type": [
+        "object",
+        "string"
+      ]
+    },
+    "stalenessDebt": {
+      "type": "array"
+    },
+    "reducedBaseline": {
+      "type": "object"
+    },
+    "timestamp": {
+      "type": "string"
+    }
+  }
+}
