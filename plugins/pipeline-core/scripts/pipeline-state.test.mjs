@@ -698,6 +698,7 @@ function acknowledgedApplyArgs(plan) {
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   assert.equal(plan.schema, "pipeline.po-authority-acknowledge-plan.v1");
+  assert.equal(plan.runner, "codex", "plan payload must include resolved runner");
   // AGY-PRDGATE-1/AGY-CF-BL15: apply is gated by requireAttendedChatGateConfirmation();
   // a genuinely attended confirming call (simulated via the injectable seam)
   // must retype the fixed PO_ACK_APPLY_CONFIRMATION_TOKEN to succeed -- never
@@ -1715,3 +1716,24 @@ function closeCollidePriorEntry(overrides = {}) {
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
+
+// NVA-ALF-B2-7: po-authority-acknowledge-apply resolves runner from matching plan payload
+// when --runner is omitted and environment has no runner marker.
+{
+  const { root, deps, planPath } = acknowledgeFixture("apply-resolves-runner-from-plan");
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "claude", "--by", "PO"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  assert.equal(plan.runner, "claude");
+
+  // Strip --runner from apply args
+  const applyArgsWithoutRunner = acknowledgedApplyArgs(plan).filter((arg, i, arr) => arg !== "--runner" && arr[i - 1] !== "--runner");
+  const attendedDeps = {
+    ...deps,
+    env: {}, // empty env - no CLAUDECODE / ANTIGRAVITY_AGENT
+    isattyFn: () => true,
+    readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN,
+  };
+  const applied = invokeCaptured(applyArgsWithoutRunner, attendedDeps);
+  assert.equal(applied.status, 0, applied.err);
+}

@@ -6376,6 +6376,7 @@ function appendAcknowledgementMarker(prdBytes) {
 function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.now?.() ?? new Date().toISOString()) {
   const by = deps.acknowledgeBy;
   if (isBlank(by)) return { ok: false, code: "PO-ACK-BY-REQUIRED" };
+  const runnerResolved = resolvePoRebindRunner(deps.acknowledgeRunner ?? deps.runner, deps.env ?? process.env);
   if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-ACK-STATE" };
   const state = existing.state;
   if (state.schema !== SCHEMA_ID || !state.activeFeature || typeof state.activeFeature.planPath !== "string"
@@ -6443,6 +6444,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
     schema: PO_ACK_PLAN_SCHEMA,
     root: realpathSync(resolve(dir)),
     by,
+    ...(runnerResolved.ok ? { runner: runnerResolved.runner } : {}),
     plannedAt,
     preimage: {
       state: { sha256: sha256Bytes(existing.raw), identity: stateFile.identity, updatedAt: state.updatedAt ?? null, continuityRevision: continuity.revision },
@@ -6528,13 +6530,29 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
         return 1;
       }
     }
-    const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
-    if (!runnerResolved.ok) {
-      console.error(`Error: po-authority-acknowledge-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
+    let runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    let runner = runnerResolved.ok ? runnerResolved.runner : null;
+    if (!runner && apply.runner === undefined) {
+      const existing = readStateRaw(deps.dir);
+      for (const candidateRunner of ["claude", "codex", "antigravity"]) {
+        const candidateDeps = {
+          ...deps,
+          acknowledgeBy: apply.by,
+          acknowledgeGlobalHumanApproval: globalChat,
+          acknowledgeRunner: candidateRunner,
+        };
+        const testPlan = buildPoAuthorityAcknowledgePlan(deps.dir, candidateDeps, existing, apply.plannedAt);
+        if (testPlan.ok && testPlan.planSha256 === apply.planSha256) {
+          runner = testPlan.payload.runner ?? candidateRunner;
+          break;
+        }
+      }
+    }
+    if (!runner) {
+      console.error(`Error: po-authority-acknowledge-apply refused (${runnerResolved.code ?? "PO-REBIND-RUNNER-UNKNOWN"}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
       return 2;
     }
-    const runner = runnerResolved.runner;
-    const ackDeps = { ...deps, acknowledgeBy: apply.by, acknowledgeGlobalHumanApproval: globalChat };
+    const ackDeps = { ...deps, acknowledgeBy: apply.by, acknowledgeGlobalHumanApproval: globalChat, acknowledgeRunner: runner };
     const lock = acquireContinuityLock(ackDeps.dir, PO_REBIND_LOCK_TOKEN, ackDeps);
     if (!lock.ok) { console.error(`Error: PO authority acknowledge refused (${lock.code}); zero mutation.`); return 2; }
     try {
@@ -6561,6 +6579,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     ...deps,
     acknowledgeBy: planBy,
     acknowledgeGlobalHumanApproval: committedGlobalChatHumanApproval(deps.dir, deps),
+    acknowledgeRunner: runnerResolved.runner,
   };
   const planned = buildPoAuthorityAcknowledgePlan(ackDeps.dir, ackDeps, existing);
   if (!planned.ok) {

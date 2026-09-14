@@ -14,6 +14,7 @@ import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { applyInstall } from "./pre-push-hook-install.mjs";
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
+  observeDutyNotRuntimeLive,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
   STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner, resolveCodexAttestationSourceForPreflight,
   resolvePluginManifestVersion,
@@ -1468,4 +1469,47 @@ test("PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degr
   });
   assert.equal(result.concurrentSessionWarning, null);
   assert.equal(result.status, "ready");
+});
+test("observeDutyNotRuntimeLive reports in-force when roots are identical or match", () => {
+  const base = mkdtempSync(join(tmpdir(), "duty-live-test-"));
+  try {
+    const rootA = join(base, "a");
+    const rootB = join(base, "b");
+    mkdirSync(join(rootA, "agents"), { recursive: true });
+    mkdirSync(join(rootB, "agents"), { recursive: true });
+    writeFileSync(join(rootA, "agents", "critic.md"), "# Critic\n");
+    writeFileSync(join(rootB, "agents", "critic.md"), "# Critic\n");
+
+    const same = observeDutyNotRuntimeLive({ checkoutPluginRoot: rootA, installedPluginRoot: rootA });
+    assert.equal(same.status, "in-force");
+
+    const matching = observeDutyNotRuntimeLive({ checkoutPluginRoot: rootA, installedPluginRoot: rootB });
+    assert.equal(matching.status, "in-force");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("observeDutyNotRuntimeLive reports differing and lists differing files when modified", () => {
+  const base = mkdtempSync(join(tmpdir(), "duty-live-diff-"));
+  try {
+    const checkoutRoot = join(base, "checkout");
+    const installedRoot = join(base, "installed");
+    mkdirSync(join(checkoutRoot, "agents"), { recursive: true });
+    mkdirSync(join(installedRoot, "agents"), { recursive: true });
+    writeFileSync(join(checkoutRoot, "agents", "critic.md"), "# Critic with route precheck\n");
+    writeFileSync(join(installedRoot, "agents", "critic.md"), "# Old critic\n");
+
+    const diff = observeDutyNotRuntimeLive({ checkoutPluginRoot: checkoutRoot, installedPluginRoot: installedRoot });
+    assert.equal(diff.status, "differing");
+    assert.equal(diff.diagnostic, "DUTY-NOT-RUNTIME-LIVE");
+    assert.deepEqual(diff.differingFiles, ["agents/critic.md"]);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("observeDutyNotRuntimeLive reports not-applicable when roots are missing or null", () => {
+  assert.equal(observeDutyNotRuntimeLive({ checkoutPluginRoot: null, installedPluginRoot: null }).status, "not-applicable");
+  assert.equal(observeDutyNotRuntimeLive({ checkoutPluginRoot: "/non/existent/a", installedPluginRoot: "/non/existent/b" }).status, "not-applicable");
 });

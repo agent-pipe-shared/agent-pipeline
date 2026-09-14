@@ -49,6 +49,76 @@ import {
   verifyLocalDevelopmentInstalledPluginReceipt,
 } from "./installed-plugin-attestation-host.mjs";
 
+function collectRelativeFiles(rootDir, subdirs = ["agents", "skills", "templates"]) {
+  const files = [];
+  for (const subdir of subdirs) {
+    const dir = resolve(rootDir, subdir);
+    if (!existsSync(dir)) continue;
+    const walk = (current, rel) => {
+      let entries;
+      try {
+        entries = readdirSync(current, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
+        const full = resolve(current, entry.name);
+        if (entry.isDirectory()) {
+          walk(full, entryRel);
+        } else if (entry.isFile()) {
+          files.push(`${subdir}/${entryRel}`);
+        }
+      }
+    };
+    walk(dir, "");
+  }
+  return files;
+}
+
+export function observeDutyNotRuntimeLive({ checkoutPluginRoot, installedPluginRoot, read = readFileSync }) {
+  if (!checkoutPluginRoot || !installedPluginRoot) {
+    return { status: "not-applicable" };
+  }
+  try {
+    if (realpathSync(resolve(checkoutPluginRoot)) === realpathSync(resolve(installedPluginRoot))) {
+      return { status: "in-force" };
+    }
+  } catch {
+    if (resolve(checkoutPluginRoot) === resolve(installedPluginRoot)) {
+      return { status: "in-force" };
+    }
+  }
+  if (!existsSync(checkoutPluginRoot) || !existsSync(installedPluginRoot)) {
+    return { status: "not-applicable" };
+  }
+  const checkoutFiles = collectRelativeFiles(checkoutPluginRoot);
+  const installedFiles = collectRelativeFiles(installedPluginRoot);
+  const allFiles = [...new Set([...checkoutFiles, ...installedFiles])].sort();
+  const differingFiles = [];
+  for (const file of allFiles) {
+    const checkoutPath = resolve(checkoutPluginRoot, file);
+    const installedPath = resolve(installedPluginRoot, file);
+    if (!existsSync(checkoutPath) || !existsSync(installedPath)) {
+      differingFiles.push(file);
+      continue;
+    }
+    try {
+      const b1 = read(checkoutPath);
+      const b2 = read(installedPath);
+      if (Buffer.compare(Buffer.from(b1), Buffer.from(b2)) !== 0) {
+        differingFiles.push(file);
+      }
+    } catch {
+      differingFiles.push(file);
+    }
+  }
+  if (differingFiles.length > 0) {
+    return { status: "differing", diagnostic: "DUTY-NOT-RUNTIME-LIVE", differingFiles };
+  }
+  return { status: "in-force" };
+}
+
 export const SCHEMA = "pipeline.start-preflight.v1";
 /**
  * What `status` ranges over -- declared, not implied (SETUPSTATUS-1). This preflight resolves
@@ -1146,6 +1216,32 @@ export function observePipelineStartPreflight({
   // (observeConcurrentSessionWarning never throws) and never influences
   // `status`/`nextAction`/any other field above -- see that function's own
   // docstring for the exact false-positive-avoidance contract.
+  const candidateCheckoutRoot = resolve(cwd, "plugins", "pipeline-core");
+  const checkoutPluginRoot = pluginRootHasSelfApplicationGit(pluginRoot)
+    ? pluginRoot
+    : existsSync(candidateCheckoutRoot)
+      ? candidateCheckoutRoot
+      : null;
+  let candidateInstalledRoot = null;
+  if (!pluginRootHasSelfApplicationGit(pluginRoot)) {
+    candidateInstalledRoot = pluginRoot;
+  } else if (runner === "claude") {
+    candidateInstalledRoot = claudeRegistryBinding?.installedPluginRoot ?? null;
+    if (!candidateInstalledRoot && Array.isArray(pluginListSnapshot)) {
+      const entry = pluginListSnapshot.find((e) => [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(e?.id));
+      candidateInstalledRoot = entry?.installPath ?? entry?.installedPath ?? null;
+    }
+  } else if (runner === "codex") {
+    candidateInstalledRoot = registrySourcePluginRoot ?? null;
+    if (!candidateInstalledRoot && Array.isArray(pluginListSnapshot?.installed)) {
+      const entry = pluginListSnapshot.installed.find((e) => [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(e?.pluginId));
+      candidateInstalledRoot = entry?.source?.path ?? null;
+    }
+  } else if (runner === "antigravity") {
+    candidateInstalledRoot = registryInstalledPluginRoot ?? null;
+  }
+  const installedPluginRoot = candidateInstalledRoot ? resolve(candidateInstalledRoot) : null;
+  const dutyNotRuntimeLive = observeDutyNotRuntimeLive({ checkoutPluginRoot, installedPluginRoot, read });
   const concurrentSessionWarning = observeConcurrentSessionWarning({ startPath: cwd, currentSessionId });
   // NVA-K-DRIVERREACH: only asked when `status` (the PLUGIN/bootstrap-distribution
   // question above) is already "ready" -- this is exactly the branch that used to
@@ -1179,6 +1275,7 @@ export function observePipelineStartPreflight({
     rulesetSource,
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
     concurrentSessionWarning,
+    ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
     nextAction: status === "plugin-attestation-required"
       ? installedPluginAttestation.setupAction ?? null
       : status === "ready"

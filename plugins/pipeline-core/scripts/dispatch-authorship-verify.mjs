@@ -134,8 +134,26 @@ export const DEFAULT_EVIDENCE_DIR = join(REPO_ROOT, "evidence");
  */
 export const VERDICT = Object.freeze({ pass: "PASS", fail: "FAIL", unverifiable: "UNVERIFIABLE" });
 
-/** The one sanctioned Elephant-direct form (`agent-obligations.md` §6). */
+/** The sanctioned Elephant-direct forms (`agent-obligations.md` §6). */
 export const ELEPHANT_STAGE0_ID = "stage-0";
+export const ELEPHANT_DESIGN_ID = "design";
+
+export const ELEPHANT_DESIGN_PREFIXES = Object.freeze([
+  "docs/",
+  "specs/",
+  "plans/",
+  "backlog/",
+  "evidence/",
+  ".claude/",
+  "scratch/",
+  "README.md",
+  "AGENTS.md",
+  "GEMINI.md",
+]);
+
+export function isElephantDesignPath(path) {
+  return ELEPHANT_DESIGN_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix));
+}
 
 /**
  * The coarse "small" bound for a stage-0 Elephant commit. A convention of this script, not a
@@ -335,36 +353,61 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.fail, "trailer-malformed", `\`Dispatch: ${dispatch.raw}\` does not match \`<ID> (<role>)\``);
   }
   if (dispatch.role === "elephant") {
-    if (dispatch.id !== ELEPHANT_STAGE0_ID) {
+    if (dispatch.id === ELEPHANT_STAGE0_ID) {
+      let elephantPaths;
+      try {
+        elephantPaths = readChangedPaths(sha);
+      } catch (error) {
+        return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId: dispatch.id });
+      }
+      if (elephantPaths.length > ELEPHANT_STAGE0_MAX_PATHS) {
+        return result(
+          sha,
+          VERDICT.unverifiable,
+          "elephant-direct-oversized",
+          `declared Elephant-direct but touches ${elephantPaths.length} path(s), over the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; "small" is the one stage-0 condition this script can check and it does not hold`,
+          { taskId: dispatch.id, pathCount: elephantPaths.length },
+        );
+      }
       return result(
         sha,
-        VERDICT.unverifiable,
-        "elephant-direct-nonstandard-id",
-        `role \`elephant\` with id \`${dispatch.id}\`; the only sanctioned Elephant form is \`${ELEPHANT_STAGE0_ID} (elephant)\`, and no record is looked up for any other id`,
-        { taskId: dispatch.id },
+        VERDICT.pass,
+        "elephant-direct-declared",
+        `declared Elephant-direct (\`${dispatch.raw}\`) in the sanctioned form, ${elephantPaths.length} path(s), within the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; no dispatch record expected. "Disclosed" and "judgment-light" stay unchecked`,
+        { taskId: dispatch.id, pathCount: elephantPaths.length },
       );
     }
-    let elephantPaths;
-    try {
-      elephantPaths = readChangedPaths(sha);
-    } catch (error) {
-      return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId: dispatch.id });
-    }
-    if (elephantPaths.length > ELEPHANT_STAGE0_MAX_PATHS) {
+    if (dispatch.id === ELEPHANT_DESIGN_ID) {
+      let elephantPaths;
+      try {
+        elephantPaths = readChangedPaths(sha);
+      } catch (error) {
+        return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId: dispatch.id });
+      }
+      const nonDesignPaths = elephantPaths.filter((path) => !isElephantDesignPath(path));
+      if (nonDesignPaths.length > 0) {
+        return result(
+          sha,
+          VERDICT.unverifiable,
+          "elephant-design-non-design-path",
+          `declared Elephant design (\`${dispatch.raw}\`) but touches non-design path(s): ${nonDesignPaths.join(", ")}`,
+          { taskId: dispatch.id },
+        );
+      }
       return result(
         sha,
-        VERDICT.unverifiable,
-        "elephant-direct-oversized",
-        `declared Elephant-direct but touches ${elephantPaths.length} path(s), over the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; "small" is the one stage-0 condition this script can check and it does not hold`,
+        VERDICT.pass,
+        "elephant-design-declared",
+        `declared Elephant design (\`${dispatch.raw}\`) in the sanctioned form, ${elephantPaths.length} design path(s); no dispatch record expected`,
         { taskId: dispatch.id, pathCount: elephantPaths.length },
       );
     }
     return result(
       sha,
-      VERDICT.pass,
-      "elephant-direct-declared",
-      `declared Elephant-direct (\`${dispatch.raw}\`) in the sanctioned form, ${elephantPaths.length} path(s), within the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; no dispatch record expected. "Disclosed" and "judgment-light" stay unchecked`,
-      { taskId: dispatch.id, pathCount: elephantPaths.length },
+      VERDICT.unverifiable,
+      "elephant-direct-nonstandard-id",
+      `role \`elephant\` with id \`${dispatch.id}\`; the only sanctioned Elephant forms are \`${ELEPHANT_STAGE0_ID} (elephant)\` and \`${ELEPHANT_DESIGN_ID} (elephant)\`, and no record is looked up for any other id`,
+      { taskId: dispatch.id },
     );
   }
   if (dispatch.role === "elephant-generated") {
