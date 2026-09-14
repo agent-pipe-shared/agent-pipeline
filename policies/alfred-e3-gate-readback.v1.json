@@ -1,0 +1,55 @@
+{
+  "schema": "pipeline.alfred-e3-gate-readback.v1",
+  "status": "unavailable",
+  "candidate": {
+    "commit": null,
+    "tree": null
+  },
+  "gates": {
+    "a1": {
+      "status": "unavailable",
+      "reasonCode": "E3-A1-MEASUREMENT-UNAVAILABLE",
+      "artifacts": [
+        {
+          "path": "policies/enforcement-conformance.antigravity.json",
+          "sha256": null
+        }
+      ]
+    },
+    "a2": {
+      "status": "unavailable",
+      "reasonCode": "E3-A2-PLACEMENT-UNAVAILABLE",
+      "artifacts": [
+        {
+          "path": "policies/control-placement.v1.json",
+          "sha256": null
+        }
+      ]
+    },
+    "a3": {
+      "status": "unavailable",
+      "reasonCode": "E3-A3-PROTECTION-UNAVAILABLE",
+      "artifacts": [
+        {
+          "path": "plugins/pipeline-core/protected-baseline.json",
+          "sha256": null
+        }
+      ]
+    },
+    "a5": {
+      "status": "unavailable",
+      "reasonCode": "E3-A5-REPAIR-AUTHORITY-UNAVAILABLE",
+      "artifacts": [
+        {
+          "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+          "sha256": null
+        },
+        {
+          "path": "project/pipeline-state.json",
+          "sha256": null
+        }
+      ]
+    }
+  },
+  "currentReadbackRule": "A current readback replaces every null candidate and artifact digest with the exact candidate-bound values, records A1 as a current measured Antigravity runner-hook record, records A2 E3 placement, proves A3 covers the host and receipt surfaces, and carries the PO-authorized CAS-bound A5 repair evidence. Any missing, stale, unknown, or malformed input leaves status unavailable."
+}

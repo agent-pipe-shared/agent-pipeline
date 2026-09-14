@@ -1,6 +1,6 @@
 {
   "schema": "pipeline.alfred-contract-freeze.v1",
-  "freezeRevision": 2,
+  "freezeRevision": 3,
   "digestRule": {
     "algorithm": "SHA-256",
     "encoding": "lowercase hexadecimal",
@@ -14,7 +14,7 @@
     "contracts": "spec.md section 3 table order",
     "identifiers": "design/issue-intake.md shared-identifier order",
     "schemaId": "source order, left to right",
-    "consumers": "work-package order A1-A5, B1-B3, C1-C3, D1-D4, E1-E2, with duplicates removed",
+    "consumers": "work-package order A1-A5, B1-B3, C1-C3, D1-D4, E1-E3, with duplicates removed",
     "contractFamilies": "contracts[] order, with duplicates removed"
   },
   "contracts": [
@@ -191,6 +191,19 @@
         "E1",
         "E2"
       ]
+    },
+    {
+      "family": "Cross-runner dispatch receipt",
+      "schemaId": [
+        "pipeline.cross-runner-dispatch-receipt.v1"
+      ],
+      "revision": 1,
+      "digest": "2f73865e66e829a000ddf87e844a0cf399dc2d6f4ea1aa5fdb85e10f94f7f62e",
+      "owner": "E3",
+      "consumers": [
+        "C1",
+        "E2"
+      ]
     }
   ],
   "identifiers": [
@@ -291,8 +304,8 @@
     },
     {
       "family": "candidate binding",
-      "revision": 1,
-      "definitionDigest": "6b6df2f984e3e50aa5e95947fef1b1aa0be6b0808b3a4bfc396d28d4b1766fb6",
+      "revision": 2,
+      "definitionDigest": "a09b7f64e781b68187a95107fd6f54118502d4000c47a52949a5b41d45aaee42",
       "shape": {
         "kind": "record",
         "fields": [
@@ -321,7 +334,8 @@
         "D3",
         "D4",
         "E1",
-        "E2"
+        "E2",
+        "E3"
       ],
       "contractFamilies": [
         "Enforcement conformance record",
@@ -334,7 +348,8 @@
         "Module/contract receipt",
         "Rigor derivation",
         "Adoption state + proposal",
-        "Verify-suite registration"
+        "Verify-suite registration",
+        "Cross-runner dispatch receipt"
       ]
     },
     {
@@ -449,6 +464,27 @@
       "landedRevision": 2,
       "landedDigest": "c3dd914f491b6dfd3eadfee5d05ad5e7143036b80af3048eb8903c2b5bd432c4",
       "summary": "Landed plural probe-surface and correlated-observation contract revision for A1."
+    },
+    {
+      "sequence": 4,
+      "status": "landed",
+      "kind": "contract-addition",
+      "freezeRevision": 3,
+      "contractFamily": "Cross-runner dispatch receipt",
+      "landedRevision": 1,
+      "landedDigest": "2f73865e66e829a000ddf87e844a0cf399dc2d6f4ea1aa5fdb85e10f94f7f62e",
+      "summary": "PO-approved E3 design amendment adds the provider-free cross-runner dispatch receipt family; it neither certifies a native runner nor enables a live provider call."
+    },
+    {
+      "sequence": 5,
+      "status": "landed",
+      "kind": "identifier-revision",
+      "freezeRevision": 3,
+      "identifierFamily": "candidate binding",
+      "priorRevision": 1,
+      "landedRevision": 2,
+      "landedDigest": "a09b7f64e781b68187a95107fd6f54118502d4000c47a52949a5b41d45aaee42",
+      "summary": "PO-approved E3 design amendment pins the existing candidate-binding family for the new receipt and its C1/E2 consumers."
     }
   ]
 }

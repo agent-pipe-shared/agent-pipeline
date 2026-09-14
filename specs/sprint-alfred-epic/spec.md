@@ -68,6 +68,7 @@ Frozen families (shapes in §9):
 | Rigor derivation | `pipeline.rigor-derivation.v1` | B1 | E2 |
 | Adoption state + proposal | `pipeline.adoption-state.v1` / `-proposal.v1` | D4 | B1, E2 |
 | Verify-suite registration | `pipeline.verify-suite-registration.v1` | B2-ii | every WP (§12 registration duty), C2, D3 |
+| Cross-runner dispatch receipt | `pipeline.cross-runner-dispatch-receipt.v1` | E3 | C1, E2 |
 
 Freeze rules: a revision bump after freeze is a PO-visible decision recorded
 in the freeze artifact's own append-only `revisions[]`; consumers pin the
@@ -708,6 +709,12 @@ placement row for this caller, A3's protected baseline covers the new host
 and receipt surfaces, and A5 repair verbs are actually PO-authorized and
 CAS-bound. A missing or `unknown` precondition refuses this route; an
 `agy plugins list` result is neither an input nor evidence of plugin loading.
+The canonical readback is
+`policies/alfred-e3-gate-readback.v1.json`: it names the A1 record, A2 table,
+A3 baseline, and A5 authority/write surface together with their candidate
+bindings. Its shipped `unavailable` state is a refusal, not a pending green
+or a native-runner claim; only a later candidate-bound current readback may
+open the fixture seam.
 
 **Caller contract.** The caller accepts only a fully prepared
 `transport: "antigravity"`, `role: "pipeline-core:goldfish-*"` packet and
