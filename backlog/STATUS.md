@@ -543,7 +543,7 @@
 | pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | — | 2026-07-25 | — | — |
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
-| pipeline.sed-regex-address-is-misread-as-an-absolute-path | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
+| pipeline.sed-regex-address-is-misread-as-an-absolute-path | closed | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.seed-security-gate-on | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28 stands, but BLOCKED: the measurement below was taken in this repository's own checkout, the one place the consumer-side defect does not fire. See 'Correction' before implementing. |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.selected-critic-lane-contracts-unpinned | open | defect | pipeline | none | 2026-09-06 | — | Future native-Windows Codex sandbox package -- the selected-Codex-Critic lane (codex-critic-app-server.mjs) resolves roles/critic.md, templates/prompts/critic-review.md and the verdict schema against the live checkout with only an lstat, hands their paths into the child's prompt, and binds no digest of the briefed bytes into either receipt it constructs. The sibling native lane in codex-critic-host.mjs enforces pipelineRoot !== repoRoot, refuses a dirty ruleset checkout, and binds roleContractSha256/promptContractSha256/verdictSchemaSha256 into the prepared packet and the receipt. Under SEC-10's threat model an agent can edit roles/critic.md in the working tree, dispatch its own reviewer through the selected lane, and the tamper-evident execution receipt cannot show it. |
@@ -677,8 +677,8 @@
 
 ## Counts
 
-- open: 79
+- open: 78
 - in_progress: 1
-- closed: 575
+- closed: 576
 - rejected: 3
 - deferred: 11

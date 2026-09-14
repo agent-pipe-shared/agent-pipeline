@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f4d6a34ba1ffd7432749386449f0e60e0a271eb3a3f9eba53e5e788933159f78"
+    "transitionHead": "3493d177e342d5b77b8149dc6a95d927564c822cd1d4e984ede03c794961cf32"
   },
   "counts": {
-    "open": 79,
+    "open": 78,
     "in_progress": 1,
-    "closed": 575,
+    "closed": 576,
     "rejected": 3,
     "deferred": 11
   },
@@ -7232,13 +7232,17 @@
     },
     {
       "id": "pipeline.sed-regex-address-is-misread-as-an-absolute-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Live refusal in an Elephant session, 2026-08-27, isolated to a root cause by controlled probe in the same session.",
       "deferred": false,
-      "sprint": "nightwing"
+      "sprint": "nightwing",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "0f1edf8ad859516e5abc429c7fc11c6adcb8b774",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.seed-security-gate-on",
