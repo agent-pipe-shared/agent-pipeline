@@ -34,9 +34,18 @@ be resolved through `--no-verify`, a hook bypass, or a broad permission change.
   its staged diff. Each authorization is one use and binds the then-current
   candidate tree.
 - **Known repairs:** register the current observation-corpus count in
-  `harness/scripts/verify.mjs` (TP-3), and align the stale
-  `pipeline-state.test.mjs` approval fixtures with the now-required bootstrap
-  acknowledgement receipt (TP-5).
+  `harness/scripts/verify.mjs` (TP-3), and align the stale approval fixtures
+  in `harness/scripts/pipeline-state.test.mjs` (TP-5) with the now-required
+  bootstrap acknowledgement receipt. The path is intentionally exact: the
+  similarly named `plugins/pipeline-core/scripts/pipeline-state.test.mjs` is
+  not the protected failing suite.
+- **Fresh verification, 2026-09-14:** full Verify at candidate
+  `6505e62f5c2f768a74db1ec283b19317045f87fb` was 85/86 green with Security
+  Scan green. The only failure was TP-5's six stale expectations:
+  `PS12b`, `PS12d`, `PS14b`, `PS14c`, `PS14f`, and `PS14h`. They still invoke
+  attribution-only `approve-plan --by`; the writer correctly requires the
+  current shared-human-approval receipt. This is fixture migration only, not a
+  reason to weaken the signature policy or approval writer.
 - **Scope boundary:** this permits only the listed test or verifier projection
   updates; it does not authorize a hook bypass, a guard-policy relaxation, a
   production behaviour change, or a push/release.
