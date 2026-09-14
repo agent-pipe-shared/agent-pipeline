@@ -1292,7 +1292,23 @@ function withRunnerPermissionsReadback(result, fs) {
     ...result,
     runnerPermissions,
   };
-  if (result.status !== "ready" || runnerPermissions.status === "current"
+  // A PO-authority *decision* is deliberately transactional: its apply path
+  // verifies bootstrap, session, and dispatch all reach `ready` before it
+  // persists the selected authority.  Surfacing that decision while the
+  // runner's own command allowlist is stale therefore creates an impossible
+  // order: the decision cannot commit until the allowlist is repaired, while
+  // the only observation shown to the caller offers the decision first.
+  //
+  // This is intentionally narrower than "all partial states".  Only the
+  // neutral authority-selection branch has that ready-readback invariant;
+  // every other partial lifecycle state retains its original precedence and
+  // diagnostics.  The repair action remains the existing digest-bound
+  // settings merge, never an inferred write or a bypass of the PO decision.
+  const runnerPermissionsPrecedeAuthorityDecision = result.status === "partial"
+    && Array.isArray(result.diagnostics)
+    && result.diagnostics.some((entry) => entry?.code === "po_authority_decision_required");
+  if ((result.status !== "ready" && !runnerPermissionsPrecedeAuthorityDecision)
+    || runnerPermissions.status === "current"
     || runnerPermissions.status === "not-applicable") return observed;
   const plan = planSettingsAllowlistMerge({
     rootDir: result.root,

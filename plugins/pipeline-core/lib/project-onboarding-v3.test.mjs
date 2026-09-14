@@ -49,6 +49,7 @@ import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-mig
 import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
 import { applyInstall as applyPreCommitHookInstall, planInstall as planPreCommitHookInstall } from "../scripts/pre-commit-hook-install.mjs";
 import { planInstall as planCommitMsgHookInstall } from "../scripts/commit-msg-hook-install.mjs";
+import { applySettingsAllowlistMerge } from "../scripts/settings-allowlist-merge.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -1471,6 +1472,83 @@ test("general PRD/Spec drift exposes the same neutral read-only decision plan fo
         },
       });
     }
+  } finally { dispose(path); }
+});
+
+test("runner-permission drift is repaired before a neutral PO authority decision, then exposes that decision again", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Recover permissions before authority selection", fakeDeps, "ready", "codex");
+    const writer = PLUGIN_PIPELINE_STATE_SCRIPT;
+    const planSha256 = "7".repeat(64);
+    const plannedAt = "2026-09-14T11:00:00.000Z";
+    const selectionArgv = [
+      writer, "po-authority-decision-select", "--plan-sha256", planSha256,
+      "--planned-at", plannedAt, "--selection", "spec", "--runner", "codex",
+    ];
+    const exactEntries = expectedPipelineScriptsRunnerAllowlistEntries();
+    writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify({
+      permissions: { allow: [exactEntries[0]] },
+    }, null, 2)}\n`);
+    const deps = {
+      ...fakeDeps,
+      validatePoGateAuthorityForRepository() {
+        return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+      },
+      spawnSync(command, args, options) {
+        if (command === process.execPath
+          && JSON.stringify(args) === JSON.stringify([writer, "po-authority-rebind-plan"])) {
+          return { status: 2, stderr: "narrow shape unavailable", stdout: "" };
+        }
+        if (command === process.execPath
+          && JSON.stringify(args) === JSON.stringify([writer, "po-authority-decision-plan"])) {
+          assert.equal(options.cwd, path);
+          return {
+            status: 0,
+            stderr: "",
+            stdout: JSON.stringify({
+              schema: "pipeline.po-authority-decision-plan.v1",
+              status: "planned",
+              root: path,
+              plannedAt,
+              planSha256,
+              candidates: [
+                { id: "prd", role: "product-requirements", path: "specs/prd.md", sha256: "d".repeat(64) },
+                { id: "spec", role: "technical-specification", path: "specs/spec.md", sha256: "e".repeat(64) },
+              ],
+              selectionActions: [
+                { selectedCandidate: "prd", status: "unavailable", code: "PO-DECISION-REFERENCED-SPEC-BYTES-UNAVAILABLE", mutation: false },
+                {
+                  selectedCandidate: "spec", status: "available", executable: process.execPath,
+                  argv: selectionArgv, mutation: false, requiresConfirmation: true,
+                },
+              ],
+            }),
+          };
+        }
+        return fakeGit(command, args, options);
+      },
+    };
+
+    const drifted = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
+    assert.equal(drifted.status, "projection-drift");
+    assertDiagnostic(drifted, "runner_permissions_drift");
+    assert.equal(drifted.nextAction.argv[1], "apply-runner-permissions");
+    const planDigest = drifted.nextAction.argv.at(-2);
+    const merged = applySettingsAllowlistMerge({
+      rootDir: path,
+      candidateSet: "runner-permissions",
+      planSha256: planDigest,
+      activate: true,
+    });
+    assert.equal(merged.status, "ready", JSON.stringify(merged));
+
+    const afterRepair = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
+    assert.equal(afterRepair.status, "partial");
+    assertDiagnostic(afterRepair, "po_authority_decision_required");
+    assert.deepEqual(afterRepair.nextAction?.argv, [writer, "po-authority-decision-plan"]);
   } finally { dispose(path); }
 });
 
