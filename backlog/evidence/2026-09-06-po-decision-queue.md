@@ -1,5 +1,48 @@
 # PO decision queue — collected 2026-09-06
 
+## GG-22 backlog-closure recovery — signature deferred 2026-09-14
+
+The ordinary close-and-reconcile sequence has a recovery gap: after a backlog
+item's `status: closed` lands without its four closure fields, the official
+reconciliation driver can generate the correct transition chain, but GG-22
+still refuses the one local commit that would persist those projections. No
+source, policy, release, or remote state has been weakened or bypassed.
+
+- **PO action later:** approve one narrowly bound Human Guard Override for the
+  local commit containing only the closure metadata and the generated
+  `backlog/STATUS.md`, `backlog/index.json`, and
+  `backlog/transitions.ndjson` projections. A fresh plan and signature digest
+  must be generated immediately before signing because they bind HEAD/tree.
+- **Follow-up implementation:** make this valid repair route reachable without
+  an override (either prevent incomplete closure frontmatter before the status
+  changes, or accept the driver-generated reconciliation as the exact GG-22
+  recovery sequence).
+- **Blocking status:** this blocks committing the current candidate branch,
+  not isolated source investigation or future PO decisions.
+- **Evidence:** local closure fix `0605b19f7e9db2fa84ca19a6f4078c8cedd50df7`;
+  the driver generated ledger transitions 1867–1868 before the commit guard
+  refused their persistence.
+
+## Protected-testpath lifts — signature deferred 2026-09-14
+
+Several candidate blockers are mechanically localized to protected test and
+verification registrations, not to product or guard-policy code. They must not
+be resolved through `--no-verify`, a hook bypass, or a broad permission change.
+
+- **PO action later:** authorize the separately prepared, digest-bound Human
+  Guard Override / TP-lift for each exact protected-path repair, after reviewing
+  its staged diff. Each authorization is one use and binds the then-current
+  candidate tree.
+- **Known repairs:** register the current observation-corpus count in
+  `harness/scripts/verify.mjs` (TP-3), and align the stale
+  `pipeline-state.test.mjs` approval fixtures with the now-required bootstrap
+  acknowledgement receipt (TP-5).
+- **Scope boundary:** this permits only the listed test or verifier projection
+  updates; it does not authorize a hook bypass, a guard-policy relaxation, a
+  production behaviour change, or a push/release.
+- **Blocking status:** these are full-Verify and candidate-stamp blockers. Work
+  in isolated branches may continue while the signature is unavailable.
+
 ## Stable Nova-B candidate — threat-model signature at freeze
 
 ADR-0083 LND-2 changes the repository-public governance-event validation
