@@ -23,8 +23,11 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_EVIDENCE_DIR,
+  ELEPHANT_DESIGN_ID,
+  ELEPHANT_DESIGN_PREFIXES,
   ELEPHANT_GENERATOR_ALLOWLIST,
   ELEPHANT_STAGE0_MAX_PATHS,
+  isElephantDesignPath,
   VERDICT,
   coveringPath,
   declaredCommits,
@@ -115,6 +118,33 @@ test("(d) no Dispatch trailer -> classified Elephant-direct, UNVERIFIABLE, never
   assert.notEqual(verdict.verdict, VERDICT.fail, "an undeclared Elephant commit is not an authorship failure");
   assert.notEqual(verdict.verdict, VERDICT.pass, "silence must not mint a PASS -- that is failure shape 1 of the item");
   assert.match(verdict.reason, /stage-0 \(elephant\)/u);
+});
+
+test("Dispatch: design (elephant) PASSes for design-phase document paths with no record", () => {
+  const verdict = verifyCommit(
+    "d00d999",
+    commit({
+      message: "docs(plan): update design\n\nDispatch: design (elephant)\nAI-Assisted: true\n",
+      paths: ["docs/state.md", "specs/sprint-alfred-epic/spec.md", "backlog/STATUS.md"],
+    }),
+  );
+  assert.equal(verdict.verdict, VERDICT.pass);
+  assert.equal(verdict.classification, "elephant-design-declared");
+  assert.equal(verdict.taskId, "design");
+  assert.equal(verdict.pathCount, 3);
+});
+
+test("Dispatch: design (elephant) is UNVERIFIABLE if any non-design path is touched", () => {
+  const verdict = verifyCommit(
+    "d00d888",
+    commit({
+      message: "feat(core): sneaky code edit\n\nDispatch: design (elephant)\nAI-Assisted: true\n",
+      paths: ["docs/state.md", "plugins/pipeline-core/scripts/something.mjs"],
+    }),
+  );
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "elephant-design-non-design-path");
+  assert.match(verdict.reason, /touches non-design path\(s\)/u);
 });
 
 test("(e) the new declared Elephant form PASSes without any record", () => {
