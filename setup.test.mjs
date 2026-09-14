@@ -55,6 +55,9 @@ import {
   migrateAgentsAdapter,
   validateAgentsAdapterMigrationAuthority,
   LEGACY_AGENTS_ADAPTER,
+  CURRENT_MIGRATED_AGENTS_ADAPTER,
+  CURRENT_MIGRATED_AGENTS_ADAPTER_BLOB,
+  CURRENT_MIGRATED_AGENTS_DIRTY_TRANSITION,
   MIGRATED_AGENTS_ADAPTER,
   MIGRATED_AGENTS_ADAPTER_BLOB,
   MIGRATED_AGENTS_DIRTY_TRANSITION,
@@ -1274,6 +1277,16 @@ ok("parseArgv: advisor export configuration is explicit and standalone", parseAr
     classifyAgentsAdapter({ exists: true, isFile: true, byteLength: migratedBytes, gitBlob: MIGRATED_AGENTS_ADAPTER_BLOB, isClean: true }).status === "migrated",
   );
   ok(
+    "classifyAgentsAdapter: current map-enabled adapter is a recognized v2 migration",
+    classifyAgentsAdapter({
+      exists: true,
+      isFile: true,
+      byteLength: Buffer.byteLength(CURRENT_MIGRATED_AGENTS_ADAPTER),
+      gitBlob: CURRENT_MIGRATED_AGENTS_ADAPTER_BLOB,
+      isClean: true,
+    }).version === "v2-architecture-map",
+  );
+  ok(
     "classifyAgentsAdapter: exact legacy-index dirty pointer transition is idempotently migrated",
     classifyAgentsAdapter({
       exists: true,
@@ -1337,7 +1350,7 @@ ok("parseArgv: advisor export configuration is explicit and standalone", parseAr
     ...common,
     agentsAdapterState: { status: "known-legacy", mutable: true },
   });
-  ok("AGENTS adapter migration: known legacy writes the thin pointer exactly once", known.ok && known.status === "migrated" && writes === 1 && written === MIGRATED_AGENTS_ADAPTER);
+  ok("AGENTS adapter migration: known legacy writes the current canonical adapter exactly once", known.ok && known.status === "migrated" && writes === 1 && written === CURRENT_MIGRATED_AGENTS_ADAPTER);
   for (const state of ["absent", "migrated", "manual-po-gate"]) {
     writes = 0;
     const result = migrateAgentsAdapter("/synthetic", { ...common, agentsAdapterState: { status: state, mutable: false } });
@@ -1362,15 +1375,15 @@ ok("parseArgv: advisor export configuration is explicit and standalone", parseAr
     existsSync: () => true,
     lstatSync: () => ({
       isFile: () => true,
-      size: phase === "legacy" ? LEGACY_AGENTS_ADAPTER.byteLength : Buffer.byteLength(MIGRATED_AGENTS_ADAPTER),
+      size: phase === "legacy" ? LEGACY_AGENTS_ADAPTER.byteLength : Buffer.byteLength(CURRENT_MIGRATED_AGENTS_ADAPTER),
     }),
     agentsAdapterGitState: () => phase === "legacy"
       ? { gitBlob: LEGACY_AGENTS_ADAPTER.gitBlob, isClean: true }
       : {
           gitBlob: LEGACY_AGENTS_ADAPTER.gitBlob,
           isClean: false,
-          worktreeBlob: MIGRATED_AGENTS_ADAPTER_BLOB,
-          ...MIGRATED_AGENTS_DIRTY_TRANSITION,
+          worktreeBlob: CURRENT_MIGRATED_AGENTS_ADAPTER_BLOB,
+          ...CURRENT_MIGRATED_AGENTS_DIRTY_TRANSITION,
         },
     writeAgentsAdapter: () => { writes += 1; phase = "pointer-written"; },
   };

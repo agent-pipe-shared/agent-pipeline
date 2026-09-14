@@ -461,6 +461,41 @@ export const PIPELINE_START_AUTHORITY = Object.freeze({
 });
 export const MIGRATED_AGENTS_DIRTY_TRANSITION = Object.freeze({ additions: 9, deletions: 62 });
 
+// Adapter v2 extends the v1 runtime pointer with the AC-23 navigation entrypoint.
+// Keep v1 exported and recognized: consumer projects may have completed the documented
+// v1 migration before the architecture-map bundle was introduced.
+export const CURRENT_MIGRATED_AGENTS_ADAPTER = `${MIGRATED_AGENTS_ADAPTER}
+## Architecture Map & Navigation Bundle (AC-23)
+
+The architecture of this repository is navigated through the machine-readable OKF v0.1 map bundle at [architecture/map/index.md](architecture/map/index.md).
+
+Fresh sessions and task briefings follow the strict 6-step re-entry reading order (Doctrine §3.2):
+1. \`AGENTS.md\` — entry point, conventions, and architecture map pointer
+2. \`architecture/map/index.md\` — root map and inventory index
+3. Concept files of the modules touched by the task (\`architecture/map/<module>.md\`)
+4. Compiled decision summary (\`project/architecture-decisions.compiled.json\` or ADRs)
+5. Lifecycle state / bootstrap (\`pipeline-core:pipeline-start\`)
+6. Owned implementation surface
+`;
+export const CURRENT_MIGRATED_AGENTS_ADAPTER_BLOB = "5228bd1a4fb718c259a75e39631b779af9e68bf6";
+export const CURRENT_MIGRATED_AGENTS_DIRTY_TRANSITION = Object.freeze({ additions: 21, deletions: 59 });
+export const MIGRATED_AGENTS_ADAPTER_VERSIONS = Object.freeze([
+  Object.freeze({
+    version: "v1-runtime-pointer",
+    text: MIGRATED_AGENTS_ADAPTER,
+    byteLength: Buffer.byteLength(MIGRATED_AGENTS_ADAPTER),
+    gitBlob: MIGRATED_AGENTS_ADAPTER_BLOB,
+    dirtyTransition: MIGRATED_AGENTS_DIRTY_TRANSITION,
+  }),
+  Object.freeze({
+    version: "v2-architecture-map",
+    text: CURRENT_MIGRATED_AGENTS_ADAPTER,
+    byteLength: Buffer.byteLength(CURRENT_MIGRATED_AGENTS_ADAPTER),
+    gitBlob: CURRENT_MIGRATED_AGENTS_ADAPTER_BLOB,
+    dirtyTransition: CURRENT_MIGRATED_AGENTS_DIRTY_TRANSITION,
+  }),
+]);
+
 // ---- legacy v1 default answers (migration/test compatibility only) ----------------------------
 export function buildDefaultAnswers() {
   const directRouting = projectDirectRoutingDefaults();
@@ -498,19 +533,21 @@ export function classifyAgentsAdapter({ exists, isFile = false, byteLength, gitB
   if (isClean && byteLength === LEGACY_AGENTS_ADAPTER.byteLength && gitBlob === LEGACY_AGENTS_ADAPTER.gitBlob) {
     return { status: "known-legacy", mutable: true };
   }
-  if (isClean && byteLength === Buffer.byteLength(MIGRATED_AGENTS_ADAPTER) && gitBlob === MIGRATED_AGENTS_ADAPTER_BLOB) {
-    return { status: "migrated", mutable: false };
-  }
-  // A successful write is intentionally not staged by setup.  Recognize only that exact
-  // one-step legacy→pointer transition; no other dirty state is admissible.
-  if (
-    !isClean &&
-    byteLength === Buffer.byteLength(MIGRATED_AGENTS_ADAPTER) &&
-    gitBlob === LEGACY_AGENTS_ADAPTER.gitBlob &&
-    worktreeBlob === MIGRATED_AGENTS_ADAPTER_BLOB &&
-    additions === MIGRATED_AGENTS_DIRTY_TRANSITION.additions &&
-    deletions === MIGRATED_AGENTS_DIRTY_TRANSITION.deletions
-  ) return { status: "migrated", mutable: false };
+  const canonical = MIGRATED_AGENTS_ADAPTER_VERSIONS.find((variant) => (
+    byteLength === variant.byteLength && gitBlob === variant.gitBlob
+  ));
+  if (isClean && canonical) return { status: "migrated", mutable: false, version: canonical.version };
+  // A successful write is intentionally not staged by setup.  Recognize only a
+  // documented legacy→canonical-version transition; no other dirty state is admissible.
+  const inFlight = !isClean && gitBlob === LEGACY_AGENTS_ADAPTER.gitBlob
+    ? MIGRATED_AGENTS_ADAPTER_VERSIONS.find((variant) => (
+      byteLength === variant.byteLength &&
+      worktreeBlob === variant.gitBlob &&
+      additions === variant.dirtyTransition.additions &&
+      deletions === variant.dirtyTransition.deletions
+    ))
+    : null;
+  if (inFlight) return { status: "migrated", mutable: false, version: inFlight.version };
   return { status: "manual-po-gate", mutable: false };
 }
 
@@ -528,7 +565,7 @@ export function inspectAgentsAdapter(rootDir, deps = {}) {
   const byteLength = stat.size;
   // Do not invoke any content helper. A known public Git blob plus clean working-tree
   // metadata is the fixed integrity proof; every other same-size file is manual/PO-only.
-  if (![LEGACY_AGENTS_ADAPTER.byteLength, Buffer.byteLength(MIGRATED_AGENTS_ADAPTER)].includes(byteLength)) {
+  if (![LEGACY_AGENTS_ADAPTER.byteLength, ...MIGRATED_AGENTS_ADAPTER_VERSIONS.map((variant) => variant.byteLength)].includes(byteLength)) {
     return classifyAgentsAdapter({ exists: true, isFile: true, byteLength });
   }
   const gitState = deps.agentsAdapterGitState
@@ -539,10 +576,15 @@ export function inspectAgentsAdapter(rootDir, deps = {}) {
         const blob = /^100\d+\s+([0-9a-f]{40})\s+\d+\tAGENTS\.md$/i.exec(index)?.[1] ?? null;
         let isClean = false;
         try { isClean = spawn("git", ["diff", "--quiet", "--", "AGENTS.md"], { cwd: rootDir }).status === 0; } catch { /* manual gate below */ }
-        if (isClean || blob !== LEGACY_AGENTS_ADAPTER.gitBlob || byteLength !== Buffer.byteLength(MIGRATED_AGENTS_ADAPTER)) return { gitBlob: blob, isClean };
+        if (isClean || blob !== LEGACY_AGENTS_ADAPTER.gitBlob) return { gitBlob: blob, isClean };
         const numstat = safeSpawn(spawn, "git", ["diff", "--numstat", "--", "AGENTS.md"], { cwd: rootDir }).stdout.trim();
         const diff = /^(\d+)\t(\d+)\tAGENTS\.md$/.exec(numstat);
-        if (!diff || Number(diff[1]) !== MIGRATED_AGENTS_DIRTY_TRANSITION.additions || Number(diff[2]) !== MIGRATED_AGENTS_DIRTY_TRANSITION.deletions) return { gitBlob: blob, isClean };
+        const dirtyTransition = diff && MIGRATED_AGENTS_ADAPTER_VERSIONS.find((variant) => (
+          byteLength === variant.byteLength &&
+          Number(diff[1]) === variant.dirtyTransition.additions &&
+          Number(diff[2]) === variant.dirtyTransition.deletions
+        ));
+        if (!dirtyTransition) return { gitBlob: blob, isClean };
         const worktreeBlob = safeSpawn(spawn, "git", ["hash-object", "--", "AGENTS.md"], { cwd: rootDir }).stdout.trim();
         return { gitBlob: blob, isClean, worktreeBlob, additions: Number(diff[1]), deletions: Number(diff[2]) };
       })();
@@ -604,7 +646,7 @@ export function migrateAgentsAdapter(rootDir = ROOT_DIR, deps = {}) {
 
   const adapter = deps.agentsAdapterState ?? inspectAgentsAdapter(rootDir, deps);
   if (adapter.status === "known-legacy") {
-    (deps.writeAgentsAdapter ?? writeFileSync)(join(rootDir, "AGENTS.md"), MIGRATED_AGENTS_ADAPTER);
+    (deps.writeAgentsAdapter ?? writeFileSync)(join(rootDir, "AGENTS.md"), CURRENT_MIGRATED_AGENTS_ADAPTER);
     return { ok: true, status: "migrated", writes: 1 };
   }
   if (adapter.status === "absent" || adapter.status === "migrated") return { ok: true, status: adapter.status, writes: 0 };
