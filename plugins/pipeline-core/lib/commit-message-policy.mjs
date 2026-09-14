@@ -244,6 +244,7 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
   if (!isGitCommit(tokens)) return { inspected: false, sources: [], findings: [], message: null };
 
   const parts = [];
+  const trailers = [];
   const sources = [];
   const unreadable = [];
   const readMessageFile = (path) => {
@@ -266,6 +267,10 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
       if (path !== undefined && path !== "-") { readMessageFile(path); i += 1; }
     } else if (token.startsWith("--file=")) {
       readMessageFile(token.slice("--file=".length));
+    } else if (token === "--trailer") {
+      if (tokens[i + 1] !== undefined) { trailers.push(tokens[i + 1]); sources.push("--trailer"); i += 1; }
+    } else if (token.startsWith("--trailer=")) {
+      trailers.push(token.slice("--trailer=".length)); sources.push("--trailer=");
     }
   }
   for (const body of heredocBodies(cmd)) { parts.push(body); sources.push("heredoc"); }
@@ -273,12 +278,16 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
   // No inspectable message and no named-but-unreadable source: an editor commit. The caller
   // must not treat this as clean -- it is "not looked at", which is a different thing and is
   // reported as such.
-  if (parts.length === 0 && unreadable.length === 0) return { inspected: false, sources: [], findings: [], message: null };
+  if (parts.length === 0 && trailers.length === 0 && unreadable.length === 0) return { inspected: false, sources: [], findings: [], message: null };
 
   // Repeated `-m` values are paragraphs in the message Git creates, so keep
   // the required blank separator rather than concatenating them as adjacent
   // lines. A single `-F` or heredoc body is unchanged.
-  const message = parts.join("\n\n");
+  // `git commit --trailer` appends every supplied entry as one contiguous
+  // final trailer block.  Reconstruct precisely that shape so the pre-tool
+  // inspection agrees with Git's finished commit and an agent need not pipe a
+  // hand-built multi-line message through the shell just to satisfy GIT-03.
+  const message = `${parts.join("\n\n")}${trailers.length > 0 ? `${parts.length > 0 ? "\n\n" : ""}${trailers.join("\n")}` : ""}`;
   const findings = finishedCommitMessageFindings(message, { requireMarker, requireDispatch }).findings;
 
   for (const { path, reason } of unreadable) {
@@ -292,7 +301,7 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false, re
     inspected: true,
     sources: [...sources, ...unreadable.map((entry) => entry.path)],
     findings,
-    message: parts.length > 0 ? message : null,
+    message: parts.length > 0 || trailers.length > 0 ? message : null,
   };
 }
 

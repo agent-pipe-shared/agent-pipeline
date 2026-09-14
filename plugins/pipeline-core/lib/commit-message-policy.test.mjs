@@ -50,6 +50,19 @@ check("CMP3 a clean inline message passes", () => {
   assert.deepEqual(codes(run('git commit -m "fix(y): tidy up" -m "AI-Assisted: true"')), []);
 });
 
+// A direct `--trailer` form is Git's own safe alternative to composing a
+// multiline message through a shell pipeline.  The pre-tool inspection must
+// reconstruct Git's final contiguous block, or GIT-03 itself forces needless
+// scratch files and shell-grammar failures.
+check("CMP3a Git trailers form one inspectable final provenance block", () => {
+  const result = run('git commit -m "fix(y): tidy up" --trailer "AI-Assisted: true" --trailer "Dispatch: stage-0 (elephant)"', {
+    requireMarker: true,
+    requireDispatch: true,
+  });
+  assert.deepEqual(codes(result), []);
+  assert.match(result.message, /\n\nAI-Assisted: true\nDispatch: stage-0 \(elephant\)$/u);
+});
+
 // CMP4 -- a HUMAN co-author is legitimate and common. A rule that refused all co-authorship
 // would be switched off by its users, so the pattern keys on the vendor token.
 check("CMP4 a human co-author is not a violation", () => {
