@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.commit-guards-reject-safe-literal-multiline-messages
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-13
 due: 2026-09-30
 sprint: nova-b
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6852a7abfaea7058bb4aefc7b6409e2ce5b143e9
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 done_when: manual
 source: "Direct Nova release-path observation, 2026-09-13: a conventional Git commit with a literal multiline final trailer block was refused by the lifecycle grammar and the Git trailer guard, even though the equivalent repo-internal -F message file was accepted."
 ---
@@ -64,3 +68,11 @@ boundary agree with Git's normal `-m` semantics:
 - **Rationale:** This is a repeatable release/commit-path friction point, not
   a request to weaken provenance or shell safety. The current `-F` route is a
   safe workaround, so it does not block the 0.6.2 push candidate.
+
+## Resolution
+
+The lifecycle grammar now shares the Git argv decoder for Bash ANSI-C strings,
+but accepts a decoded newline only in a direct POSIX `git commit` `-m` or
+`--message` value. All other executable, argument, composition, redirect, and
+native-Windows forms remain rejected. The focused regression and the full
+lifecycle suite passed before closure.
