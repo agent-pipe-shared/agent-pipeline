@@ -131,10 +131,10 @@ test("full TOFU measurement follows Driver-provided design answers through to a 
   assert.equal(result.steps[1]?.step, "onboarding");
   assert.equal(result.steps[1]?.outcome, "ready", stdout);
   assert.ok(result.steps.some((step) => step.step === "approve-push" && step.exitCode === 0), stdout);
-  // This measurement deliberately ends at approve-push.  The already accepted
-  // separate TOFU boundary is the real git-push guard interception, where a
-  // v1 policy would be upgraded and pinned; do not claim that unexecuted hook
-  // path as evidence here.
+  // The local mirror is accepted only after its authority matches the
+  // repository-private key-directory pointer established by setup. This
+  // measurement ends at approve-push; the separate push-guard boundary owns
+  // any later TOFU policy upgrade.
   assert.equal(result.trustAnchorPinned, false, stdout);
   assert.equal(result.policy?.schema, "pipeline.critical-human-proof-policy.v1", stdout);
 });

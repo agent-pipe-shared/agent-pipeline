@@ -60,6 +60,27 @@ function run(argv, cwd, env, input) {
   return spawnSync(argv[0], argv.slice(1), { cwd, encoding: "utf8", timeout: 180000, env, input });
 }
 
+// The setup fixture invokes the library entrypoint directly so it can substitute
+// the disposable unencrypted test key generator.  Mirror the child-process home
+// override for that one synchronous call too: otherwise setup writes the real
+// host machine-plane while every later CLI subprocess correctly reads the
+// disposable plane, producing a false "local anchor unavailable" measurement.
+function withProcessEnvironment(overrides, fn) {
+  const before = new Map(Object.keys(overrides).map((key) => [key, process.env[key]]));
+  try {
+    for (const [key, value] of Object.entries(overrides)) {
+      if (typeof value === "string") process.env[key] = value;
+      else delete process.env[key];
+    }
+    return fn();
+  } finally {
+    for (const [key, value] of before) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
 // `authorize-critical` (unlike `prepare-push-subject`) prints its human-readable
 // confirmation prompt to the SAME stdout stream as its trailing JSON result, with no
 // separating newline before the JSON's opening brace -- a bare `JSON.parse(stdout)`
@@ -137,9 +158,15 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   // that returned action and lets the Driver consume the proof.
   let setup;
   try {
-    setup = runHumanApproval(["setup",
+    setup = withProcessEnvironment({
+      HOME: env?.HOME,
+      PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: env?.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE,
+    }, () => runHumanApproval(["setup",
       "--repo-root", dir, "--directory", keyDir, "--human-name", "Turn Measurement"],
-      { spawn: fakeSetupSpawn });
+    {
+      spawn: fakeSetupSpawn,
+      homedirFn: () => env.HOME,
+    }));
   } catch (error) {
     steps.push({ step: "setup", ok: false, error: error?.message ?? String(error) });
     return { schema: SCHEMA, outcome: "setup-failed", steps };
@@ -305,7 +332,10 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   if (!authorizeParsed.ok || !authorizeParsed.value?.paths) {
     return { schema: SCHEMA, outcome: "authorize-critical-unparseable", steps, raw: authorize.stdout?.slice(0, 4000) };
   }
-  const { request: requestPath, proof: proofPath } = authorizeParsed.value.paths;
+  const { request: requestPath, authority: authorityPath, proof: proofPath } = authorizeParsed.value.paths;
+  if (typeof authorityPath !== "string") {
+    return { schema: SCHEMA, outcome: "authorize-critical-no-mirrored-authority", steps };
+  }
 
   // Step 5: the real push approval -- verifies the proof against the project's policy
   // file. On a genuinely anchor-less policy this is the moment `pinTrustAnchorOnFirstUse`
@@ -313,7 +343,7 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   // has passed).
   const approve = run([process.execPath, PIPELINE_STATE_SCRIPT, "approve-push",
     "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main",
-    "--proof-request", requestPath, "--proof-authority", trustPolicyPath, "--proof", proofPath,
+    "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath,
   ], dir, env);
   steps.push({ step: "approve-push", exitCode: approve.status, stderr: approve.stderr?.slice(0, 2000) });
   if (approve.status !== 0) {

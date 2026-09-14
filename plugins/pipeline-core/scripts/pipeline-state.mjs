@@ -481,7 +481,9 @@ import {
   readCriticalHumanProofPolicy,
   readHumanApprovalMode,
 } from "../lib/critical-human-proof-policy.mjs";
+import { readRepoKeyDirectory } from "../lib/po-key-directory.mjs";
 import { chatAttributionRecord, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
+import { criticalPushScratchArtifactPaths } from "./po-human-approval.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -3931,6 +3933,60 @@ function externalPublicJson(dir, value) {
   } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" }; }
 }
 
+// A signed push is the one critical-proof route whose human command deliberately
+// mirrors its *public* request/proof/authority into this repository's scratch/
+// directory.  The agent must not need the PO's private external key directory
+// merely to consume that proof.  This reader admits only that exact four-name
+// mirror, rejects symlinks and hard links, and pins its authority to this
+// repository's private key-directory pointer before cryptographic verification.
+// It is therefore not a general
+// in-repository-proof escape hatch, and non-push kinds remain external-only.
+function localPushScratchJson(dir, value, expectedPath) {
+  if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== resolve(expectedPath)) {
+    return { ok: false, code: "CRITICAL-PROOF-SCRATCH-PATH" };
+  }
+  try {
+    const root = realpathSync(resolve(dir));
+    const path = realpathSync(expectedPath);
+    if (externalPathIsOutsideRoot(root, path)) return { ok: false, code: "CRITICAL-PROOF-SCRATCH-PATH" };
+    const stat = lstatSync(expectedPath);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES) {
+      return { ok: false, code: "CRITICAL-PROOF-SCRATCH-FILE" };
+    }
+    return { ok: true, value: JSON.parse(readFileSync(expectedPath, "utf8")) };
+  } catch { return { ok: false, code: "CRITICAL-PROOF-SCRATCH-FILE" }; }
+}
+
+function repoScopedPushKeyAnchor(gitCommonDir) {
+  const pointer = readRepoKeyDirectory(gitCommonDir);
+  if (pointer.status !== "valid") return null;
+  try {
+    const authority = JSON.parse(readFileSync(join(pointer.directory, "trust-policy.json"), "utf8"));
+    if (typeof authority?.keyReference !== "string" || authority.keyReference.length === 0
+      || typeof authority?.publicKeySha256 !== "string" || !/^[a-f0-9]{64}$/u.test(authority.publicKeySha256)) return null;
+    return { keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 };
+  } catch { return null; }
+}
+
+function localPushScratchArtifacts(dir, flags) {
+  const common = defaultGitCommonDir(dir);
+  if (!common.ok) return null;
+  const expected = criticalPushScratchArtifactPaths(dir, common.path);
+  if (flags["proof-request"] !== expected.request
+    || flags["proof-authority"] !== expected.authority
+    || flags.proof !== expected.proof) return null;
+  const anchor = repoScopedPushKeyAnchor(common.path);
+  if (anchor === null) return { ok: false, code: "CRITICAL-PROOF-LOCAL-ANCHOR-UNAVAILABLE" };
+  const request = localPushScratchJson(dir, flags["proof-request"], expected.request);
+  const authority = localPushScratchJson(dir, flags["proof-authority"], expected.authority);
+  const proof = localPushScratchJson(dir, flags.proof, expected.proof);
+  if (!request.ok || !authority.ok || !proof.ok) return { ok: false, code: request.code ?? authority.code ?? proof.code };
+  if (authority.value?.keyReference !== anchor.keyReference || authority.value?.publicKeySha256 !== anchor.publicKeySha256) {
+    return { ok: false, code: "CRITICAL-PROOF-LOCAL-ANCHOR-MISMATCH" };
+  }
+  return { ok: true, request, authority, proof, anchor };
+}
+
 /**
  * Kinds whose gate is always active, regardless of what `project/critical-human-proof.json`'s
  * `requiredKinds` list happens to say (PHX-WP-PAC08-RECONCILE-APPROVAL; ADR-0056's
@@ -3977,9 +4033,11 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   if (!policy.requiredKinds.has(kind) && !ALWAYS_REQUIRED_KINDS.has(kind)) {
     return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
   }
-  const request = externalPublicJson(dir, flags["proof-request"]);
-  const authority = externalPublicJson(dir, flags["proof-authority"]);
-  const proof = externalPublicJson(dir, flags["proof"]);
+  const local = kind === "push" ? localPushScratchArtifacts(dir, flags) : null;
+  if (local !== null && !local.ok) return local;
+  const request = local?.request ?? externalPublicJson(dir, flags["proof-request"]);
+  const authority = local?.authority ?? externalPublicJson(dir, flags["proof-authority"]);
+  const proof = local?.proof ?? externalPublicJson(dir, flags["proof"]);
   if (!request.ok || !authority.ok || !proof.ok) return { ok: false, code: request.code ?? authority.code ?? proof.code };
   // When the project has committed a trust anchor, the external authority handed in here
   // must BE that key. Checked at approval time rather than only at consumption time:

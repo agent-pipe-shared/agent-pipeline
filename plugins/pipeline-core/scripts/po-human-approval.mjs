@@ -203,6 +203,14 @@ function persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, de
     write(gitCommonDir, { schema: REPO_KEY_DIRECTORY_SCHEMA, poKeyDirectory: directory, updatedAt: new Date().toISOString() }, dependencies);
   } catch { /* best-effort: never fails setup itself */ }
 }
+
+// A repository-private pointer is the authority boundary for this checkout.
+// The machine plane remains an independent fallback for repositories that have
+// no private pointer yet; setup must not make one repository's explicit choice
+// silently govern another repository.
+function persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies) {
+  persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
+}
 // Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
 // (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
 // parseGateArgs() return value with assert.deepStrictEqual, which considers only own
@@ -1230,7 +1238,7 @@ function executeHumanApproval(args, dependencies = {}) {
       command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
-      persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
+      persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
       return {
         ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, imported: true,
         paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority },
@@ -1242,7 +1250,7 @@ function executeHumanApproval(args, dependencies = {}) {
       if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
-      persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
+      persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
       // NVA-CLI-FEEDBACK-1: state where the key material and authority record
       // actually live -- an operator/agent that needs to hand a generated file
       // to another process must not have to already know the fixed path
@@ -1270,7 +1278,7 @@ function executeHumanApproval(args, dependencies = {}) {
         }
         const upgraded = localAuthority(publicKey, authority.keyReference, args.humanName);
         write(paths.authority, `${JSON.stringify(upgraded, null, 2)}\n`, { mode: 0o600 });
-        persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
+        persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
         // NVA-CLI-FEEDBACK-1: see the recovery branch above for rationale.
         return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority: upgraded, recovered: true, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
       }
@@ -1286,7 +1294,7 @@ function executeHumanApproval(args, dependencies = {}) {
       if (humanNameMismatch || keyReferenceMismatch) {
         fail("a PO authority record already exists under a different name/key-reference than supplied; changing an established identity is not something setup does silently -- rerun without --human-name/--key-reference to keep the existing record, or remove the existing authority files first if a deliberate rebind is intended.");
       }
-      persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
+      persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
       // NVA-CLI-FEEDBACK-1: idempotent re-run -- nothing new was written this call,
       // but the operator/agent still needs to know where the existing key material
       // and authority record live, so the paths are reported here too.
@@ -1306,7 +1314,7 @@ function executeHumanApproval(args, dependencies = {}) {
     if (args.keyReference !== "local-po-key") {
       process.stdout.write(`NOTE: --key-reference "${args.keyReference}" may uniquely identify you as a natural person; consider a less individually-attributable value (H-AC-11 O-4).\n`);
     }
-    persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
+    persistExplicitDirectoryPointers(args, directory, gitCommonDir, dependencies);
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
   }
   if (args.command === "authorize-critical") {
