@@ -99,7 +99,7 @@ export function resolveSelfVerifySelection({ repoRoot, candidateCommit, register
           ],
           suites: [
             "guard-lifecycle-ready-tests",
-            "guard-lifecycle-recovery-contract-tests",
+            "lifecycle-recovery-contract-tests",
             "installed-plugin-attestation-host-tests",
             "lifecycle-gate-satisfiability-tests",
             "lifecycle-ready-enforcement-tests",

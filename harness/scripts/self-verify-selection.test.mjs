@@ -23,7 +23,7 @@ assert.equal(buildSelfVerifyGovernanceSource({ evidence: terminalEvidence, start
 const suites = [
   { name: "doc-contract-tests", file: "/repo/doc.test.mjs" },
   { name: "guard-lifecycle-ready-tests", file: "/repo/lifecycle.test.mjs" },
-  { name: "guard-lifecycle-recovery-contract-tests", file: "/repo/lifecycle-contract.test.mjs" },
+  { name: "lifecycle-recovery-contract-tests", file: "/repo/lifecycle-contract.test.mjs" },
   { name: "installed-plugin-attestation-host-tests", file: "/repo/attestation.test.mjs" },
   { name: "lifecycle-gate-satisfiability-tests", file: "/repo/lifecycle-gate.test.mjs" },
   { name: "lifecycle-ready-enforcement-tests", file: "/repo/lifecycle-enforcement.test.mjs" },
@@ -55,7 +55,7 @@ assert.deepEqual(lifecycle.selection.matchedAreaIds, ["lifecycle-recovery"]);
 assert.deepEqual(lifecycle.suites.map((suite) => suite.name), [
   "doc-contract-tests",
   "guard-lifecycle-ready-tests",
-  "guard-lifecycle-recovery-contract-tests",
+  "lifecycle-recovery-contract-tests",
   "installed-plugin-attestation-host-tests",
   "lifecycle-gate-satisfiability-tests",
   "lifecycle-ready-enforcement-tests",
