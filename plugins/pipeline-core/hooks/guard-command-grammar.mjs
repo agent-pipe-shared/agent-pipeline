@@ -388,6 +388,16 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
       && validateRg(parsed.segments[0].argv, root, windows, additionalRoots)
       && validateRg(parsed.segments[1].argv, root, windows, additionalRoots);
   }
+  // A bare `sort` consumes only the already-contained stdout of the same
+  // validated `rg` source.  Keep this deliberately narrower than a general
+  // sort permission: no sort flags, operands, redirects, or extra pipeline
+  // stages are accepted, so `sort -o <file>` cannot gain a write route.
+  const expectedSort = windows ? "sort.exe" : "sort";
+  if (sinkName === expectedSort) {
+    return parsed.redirects.length === 0
+      && parsed.segments[1].argv.length === 0
+      && validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
+  }
   // `tail` is as read-only as `head`; retain the identical, deliberately
   // bounded 1..500 line count.  The admission stays rg-sourced only -- this
   // is not a general pipe permission or a script-indirection exception.

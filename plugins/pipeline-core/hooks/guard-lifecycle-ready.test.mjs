@@ -1558,6 +1558,7 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg --files plugins/pipeline-core harness | rg 'verify|journal'",
       "rg --files -uu . | rg 'guard|deny|permission|settings'",
       "rg -n -S lifecycle plugins | rg guard",
+      "rg -l '^status: open' backlog/items | sort",
     ]) {
       const parsed = parseGuardCommand(command, path);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
@@ -1570,6 +1571,9 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
     const windowsSearch = "rg.exe --files . | rg.exe lifecycle";
     const parsedWindowsSearch = parseGuardCommand(windowsSearch, path, { platform: "win32" });
     assert.equal(isBoundedReadOnlyPipeline(parsedWindowsSearch, path), true);
+    const windowsSortedSearch = "rg.exe -l lifecycle . | sort.exe";
+    const parsedWindowsSortedSearch = parseGuardCommand(windowsSortedSearch, path, { platform: "win32" });
+    assert.equal(isBoundedReadOnlyPipeline(parsedWindowsSortedSearch, path), true);
     for (const command of [
       "rg -n lifecycle . | head -n 0",
       "rg -n lifecycle . | head -n 050",
@@ -1579,6 +1583,9 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
       "rg -n lifecycle . 2>diagnostic.log | head -n 20",
       "rg -n lifecycle . | tail -n 20 > diagnostic.log",
       "rg -n lifecycle . | tee output",
+      "rg -n lifecycle . | sort -o scratch/output.txt",
+      "rg -n lifecycle . | sort scratch/output.txt",
+      "rg -n lifecycle . | sort | head -n 20",
       "rg -n lifecycle . | head -n 20 | wc -l",
       "rg --pre worker lifecycle . | rg guard",
       "rg -n lifecycle . 2>diagnostic.log | rg guard",
