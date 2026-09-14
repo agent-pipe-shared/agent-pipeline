@@ -976,12 +976,16 @@ export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_
     // A V4 `ready` readback after the exact migration activation completes the
     // migration route. It may additionally advertise an optional Pipeline-State
     // handover command, which belongs after this migration and must not obscure
-    // its terminal receipt. A required collect-input action is different: it
-    // remains on the sanctioned generic path below, as do genuine pending asks
-    // attached to that optional command. The flag is set only from the actual
-    // migration apply response, so a classification `inspect` can never claim
-    // readiness before planning and activation.
-    if (wasAnchorStep
+    // its terminal receipt. This exception is intentionally limited to that
+    // completed migration route: a greenfield V4 `ready` response still follows
+    // every published command nextAction through the generic path below. A
+    // required collect-input action is different: it remains on that generic
+    // path, as do genuine pending asks attached to the optional command. The
+    // flag is set only from the actual migration apply response, so a
+    // classification `inspect` can never claim readiness before planning and
+    // activation.
+    if (completedMigrationActivation
+      && wasAnchorStep
       && output?.schema === "pipeline.project-onboarding.v4"
       && output?.status === "ready"
       && nextAction?.kind !== "collect-input") {

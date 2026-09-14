@@ -1230,6 +1230,45 @@ test("driveOnboardingInit: a migration-ready V4 response keeps required asks whi
   }
 });
 
+test("driveOnboardingInit: a greenfield V4-ready command nextAction executes before reaching PO input", () => {
+  const root = freshRoot();
+  try {
+    let call = 0;
+    const run = (_executable, argv) => {
+      call += 1;
+      if (call === 1) {
+        assert.equal(argv.includes("inspect"), true, "the driver starts from its public inspect anchor");
+        return respond({
+          schema: "pipeline.project-onboarding.v4",
+          status: "ready",
+          nextAction: {
+            kind: "command",
+            executable: "node",
+            argv: ["/plugin/pipeline-state.mjs", "inspect"],
+          },
+        });
+      }
+      if (call === 2) {
+        assert.deepEqual(argv, ["/plugin/pipeline-state.mjs", "inspect"], "a greenfield command must not be treated as a migration handover");
+        return respond({
+          schema: "pipeline.project-onboarding.v4",
+          status: "awaiting-po-input",
+          nextAction: { kind: "collect-input", input: { name: "profile" } },
+        });
+      }
+      throw new Error(`Unexpected call ${call}`);
+    };
+
+    const result = driveOnboardingInit({ rootDir: root, runner: "codex", run });
+    assert.equal(result.outcome, "collect-input", JSON.stringify(result));
+    assert.equal(result.collectInput.input.name, "profile");
+    assert.equal(result.stepsExecuted, 2, "the greenfield command must run before the PO boundary");
+    assert.equal(call, 2);
+  } finally {
+    dispose(root);
+  }
+});
+
 test("driveOnboardingInit: an unapplied migration plan missing its apply action fails closed instead of claiming ready", () => {
   const root = freshRoot();
   try {
