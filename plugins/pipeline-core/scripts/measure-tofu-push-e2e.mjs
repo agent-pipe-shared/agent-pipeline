@@ -148,7 +148,12 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   const add = run(["git", "add", "-A"], dir, env);
   steps.push({ step: "commit-onboarding-output", subStep: "add", exitCode: add.status, stderr: add.stderr?.slice(0, 2000) });
   if (add.status !== 0) return { schema: SCHEMA, outcome: "commit-onboarding-output-failed", steps };
-  const commit = run(["git", "commit", "--quiet", "-m", "chore: onboard fresh repository (tofu-push-e2e measurement fixture)"], dir, env);
+  const commit = run([
+    "git", "commit", "--quiet",
+    "-m", "chore: onboard fresh repository (tofu-push-e2e measurement fixture)",
+    "--trailer", "Dispatch: stage-0 (elephant)",
+    "--trailer", "AI-Assisted: true",
+  ], dir, env);
   steps.push({ step: "commit-onboarding-output", subStep: "commit", exitCode: commit.status, stderr: commit.stderr?.slice(0, 2000) });
   if (commit.status !== 0) return { schema: SCHEMA, outcome: "commit-onboarding-output-failed", steps };
 
@@ -186,7 +191,12 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
     const addAck = run(["git", "add", "-A"], dir, env);
     steps.push({ step: "commit-plan-acknowledgement", subStep: "add", exitCode: addAck.status, stderr: addAck.stderr?.slice(0, 2000) });
     if (addAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
-    const commitAck = run(["git", "commit", "--quiet", "-m", "chore: record PO plan acknowledgement (tofu-push-e2e measurement fixture)"], dir, env);
+    const commitAck = run([
+      "git", "commit", "--quiet",
+      "-m", "chore: record PO plan acknowledgement (tofu-push-e2e measurement fixture)",
+      "--trailer", "Dispatch: stage-0 (elephant)",
+      "--trailer", "AI-Assisted: true",
+    ], dir, env);
     steps.push({ step: "commit-plan-acknowledgement", subStep: "commit", exitCode: commitAck.status, stderr: commitAck.stderr?.slice(0, 2000) });
     if (commitAck.status !== 0) return { schema: SCHEMA, outcome: "commit-plan-acknowledgement-failed", steps };
 
@@ -240,7 +250,12 @@ export function measureTofuPushEndToEnd({ rootDir, keyDir, env } = {}) {
   const addThreatModel = run(["git", "add", "-A"], dir, env);
   steps.push({ step: "commit-threat-model", subStep: "add", exitCode: addThreatModel.status, stderr: addThreatModel.stderr?.slice(0, 2000) });
   if (addThreatModel.status !== 0) return { schema: SCHEMA, outcome: "commit-threat-model-failed", steps };
-  const commitThreatModel = run(["git", "commit", "--quiet", "-m", "chore: materialize push threat-model artifact (tofu-push-e2e measurement fixture)"], dir, env);
+  const commitThreatModel = run([
+    "git", "commit", "--quiet",
+    "-m", "chore: materialize push threat-model artifact (tofu-push-e2e measurement fixture)",
+    "--trailer", "Dispatch: stage-0 (elephant)",
+    "--trailer", "AI-Assisted: true",
+  ], dir, env);
   steps.push({ step: "commit-threat-model", subStep: "commit", exitCode: commitThreatModel.status, stderr: commitThreatModel.stderr?.slice(0, 2000) });
   if (commitThreatModel.status !== 0) return { schema: SCHEMA, outcome: "commit-threat-model-failed", steps };
 
