@@ -155,6 +155,38 @@ function fixtureExecutable(root, executable) {
   } catch { return null; }
 }
 
+function isCommandHook(hook) {
+  return exactKeys(hook, ["command", "timeout", "type"])
+    && hook.type === "command"
+    && typeof hook.command === "string"
+    && hook.command.length > 0
+    && Number.isSafeInteger(hook.timeout)
+    && hook.timeout > 0;
+}
+
+/**
+ * Antigravity owns a namespaced manifest, unlike Claude's { hooks: ... }
+ * layout. Keep this deliberately exact so a merely parseable JSON object
+ * cannot establish the E3 pipeline-start precondition.
+ */
+function isSupportedAntigravityManifest(hooks) {
+  if (!exactKeys(hooks, ["pipeline-core"])) return false;
+  const pipelineCore = hooks["pipeline-core"];
+  return exactKeys(pipelineCore, ["PreInvocation", "PreToolUse", "Stop", "enabled"])
+    && pipelineCore.enabled === true
+    && Array.isArray(pipelineCore.PreToolUse)
+    && pipelineCore.PreToolUse.length > 0
+    && pipelineCore.PreToolUse.every((entry) => exactKeys(entry, ["hooks", "matcher"])
+      && typeof entry.matcher === "string"
+      && entry.matcher.length > 0
+      && Array.isArray(entry.hooks)
+      && entry.hooks.length > 0
+      && entry.hooks.every(isCommandHook))
+    && [pipelineCore.Stop, pipelineCore.PreInvocation].every((entries) => Array.isArray(entries)
+      && entries.length > 0
+      && entries.every(isCommandHook));
+}
+
 function discovery(root) {
   try {
     const configBytes = readFileSync(join(root, PLUGIN_CONFIG_PATH));
@@ -167,7 +199,7 @@ function discovery(root) {
     const plugin = JSON.parse(pluginBytes.toString("utf8"));
     const hooksBytes = readFileSync(join(root, PIPELINE_PLUGIN_PATH, "hooks.json"));
     const hooks = JSON.parse(hooksBytes.toString("utf8"));
-    if (!isPlainObject(plugin) || typeof plugin.version !== "string" || plugin.version.length === 0 || !isPlainObject(hooks.hooks)) {
+    if (!isPlainObject(plugin) || typeof plugin.version !== "string" || plugin.version.length === 0 || !isSupportedAntigravityManifest(hooks)) {
       throw new Error("pipeline plugin manifest is invalid");
     }
     return {
