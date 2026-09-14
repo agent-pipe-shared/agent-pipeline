@@ -49,7 +49,7 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] [--existing-key <path-to-an-already-existing-private-key-pem>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> --directory <external-dir> (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] [--existing-key <path-to-an-already-existing-private-key-pem>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> [--directory <external-dir>] (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
 // PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
 // PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
@@ -882,23 +882,28 @@ function releasePreflightConfirmationLines(kind, subjectPreimage) {
  * `featureId`/`kind` checks in `runHumanApproval` above already own that).
  */
 export function authorizeCriticalPushCommand({
-  repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt,
+  repoRoot, directory = null, featureId, plan, spec, subjectSha256, expiresAt,
   launcher = fileURLToPath(import.meta.url),
 } = {}) {
-  for (const [name, value] of Object.entries({ launcher, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt })) {
+  for (const [name, value] of Object.entries({ launcher, repoRoot, featureId, plan, spec, subjectSha256, expiresAt })) {
     if (typeof value !== "string" || value.length === 0) throw new TypeError(`authorizeCriticalPushCommand requires a non-empty ${name}`);
+  }
+  if (directory !== null && (typeof directory !== "string" || directory.length === 0)) {
+    throw new TypeError("authorizeCriticalPushCommand requires directory to be null or a non-empty string");
   }
   const argv = [
     launcher, "authorize-critical",
     "--repo-root", repoRoot,
-    "--directory", directory,
+  ];
+  if (directory !== null) argv.push("--directory", directory);
+  argv.push(
     "--feature-id", featureId,
     "--plan", plan,
     "--spec", spec,
     "--kind", "push",
     "--subject-sha256", subjectSha256,
     "--expires-at", expiresAt,
-  ];
+  );
   return boundedCopySafeCommand({ executable: "node", argv });
 }
 

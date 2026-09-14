@@ -2574,8 +2574,7 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
         bindings: [
           { index: 0, name: "PIPELINE_SCRIPT" },
           { index: 3, name: "REPO_ROOT" },
-          { index: 5, name: "KEY_DIR" },
-          { index: 7, name: "REQUEST_PATH" },
+          { index: 5, name: "REQUEST_PATH" },
         ],
       });
       return {
@@ -2584,7 +2583,7 @@ function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signat
         requiresConfirmation: true,
         executionBoundary: "attended-external-tool",
         invocation: "user-copy-only",
-        guidance: `You are signing the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) together with its specification (${spec.path}, sha256 ${spec.sha256}). This one detached signature authorizes binding those exact design documents and the subsequent design-to-implementation transition; it does not authorize a remote push or any later scope change. action.copyCommand already uses the configured machine key directory and is the only human command: after its proof is written, the agent performs the binding readback. Run that copy-safe command in your actual terminal, not a hand-transcribed variant. Do not edit an acknowledgement marker manually.`,
+        guidance: `You are signing the reviewed staging PRD (${prd.path}, sha256 ${prd.sha256}) together with its specification (${spec.path}, sha256 ${spec.sha256}). This one detached signature authorizes binding those exact design documents and the subsequent design-to-implementation transition; it does not authorize a remote push or any later scope change. action.copyCommand resolves the configured local approval directory itself without printing its private path and is the only human command: after its proof is written, the agent performs the binding readback. Run that copy-safe command in your actual terminal, not a hand-transcribed variant. Do not edit an acknowledgement marker manually.`,
         action: { ...action, command: rendered.command, copyCommand: rendered.copyCommand },
         expected: { schema: SCHEMA, statuses: ["bootstrap-binding-required"] },
       };

@@ -496,11 +496,11 @@ function readyDeps(overrides = {}) {
       }));
       return 0;
     },
-    authorizeCriticalPushCommand: ({ repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt }) => ({
+    authorizeCriticalPushCommand: ({ repoRoot, featureId, plan, spec, subjectSha256, expiresAt }) => ({
       executable: "node",
       argv: [
         "/plugin-root/scripts/po-human-approval.mjs", "authorize-critical",
-        "--repo-root", repoRoot, "--directory", directory, "--feature-id", featureId,
+        "--repo-root", repoRoot, "--feature-id", featureId,
         "--plan", plan, "--spec", spec, "--kind", "push",
         "--subject-sha256", subjectSha256, "--expires-at", expiresAt,
       ],
@@ -519,13 +519,11 @@ test("pushPrepareReport: all preconditions met -> ready:true, all three commands
   const humanText = [result.lines.authorize.join("\n"), result.lines.approvePush.join("\n"), result.lines.gitPush].join("\n");
   assert.match(humanText, /Step: human authorize-critical\nPOSIX:/u);
   assert.match(humanText, /authorizes only this prepared remote push/u);
-  assert.match(humanText, /configured key directory is used automatically/u);
+  assert.match(humanText, /configured approval directory is resolved automatically/u);
   assert.match(humanText, /Step: agent approve-push\nPOSIX:/u);
   assert.match(humanText, /Step: agent push\nPOSIX:/u);
   assert.match(humanText, /PowerShell:/u);
-  assert.match(result.lines.authorize.join("\n"), /KEY_DIR=/u);
-  assert.match(result.lines.authorize.join("\n"), /\$KEY_DIR/u);
-  assert.doesNotMatch(result.lines.authorize.join("\n"), /cmd\.exe:/u);
+  assert.doesNotMatch(result.lines.authorize.join("\n"), /--directory/u);
   assert.match(PIPELINE_STATE_SCRIPT_PATH, /^\/.*\/plugins\/pipeline-core\/scripts\/pipeline-state\.mjs$/u);
   const source = readFileSync(fileURLToPath(new URL("./push-prepare.mjs", import.meta.url)), "utf8");
   assert.match(source, /PIPELINE_STATE_SCRIPT_PATH, "approve-push"/u);
@@ -598,21 +596,19 @@ test("printReport keeps stdout machine-readable and sends the bounded human comm
   assert.doesNotMatch(stdout, /Step:|POSIX:|PowerShell:/u);
 });
 
-test("pushPrepareReport: v1/v2 trust-on-first-use carries the registered machine key directory through command rendering", () => {
+test("pushPrepareReport: v1/v2 trust-on-first-use uses the registered machine key directory without exposing it in command rendering", () => {
   const machine = machinePlaneFixture();
-  let renderedDirectory = null;
   const result = pushPrepareReport(
     ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
     readyDeps({
       ...machine,
       readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
-      authorizeCriticalPushCommand: ({ directory }) => {
-        renderedDirectory = directory;
+      authorizeCriticalPushCommand: () => {
         return {
           executable: "node",
           argv: [
             "/plugin-root/scripts/po-human-approval.mjs", "authorize-critical",
-            "--repo-root", FIXTURE_DIR, "--directory", directory,
+            "--repo-root", FIXTURE_DIR,
           ],
         };
       },
@@ -622,8 +618,9 @@ test("pushPrepareReport: v1/v2 trust-on-first-use carries the registered machine
   assert.equal(result.ok, true);
   assert.equal(result.report.ready, true, JSON.stringify(result.report.checks));
   assert.equal(result.report.checks.some((check) => check.id === "approval-directory"), false);
-  assert.equal(renderedDirectory, machine.keyDirectory);
   assert.ok(result.lines.authorize.length > 0);
+  assert.doesNotMatch(result.lines.authorize.join("\n"), new RegExp(machine.keyDirectory.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  assert.doesNotMatch(result.lines.authorize.join("\n"), /--directory/u);
   assert.ok(result.lines.approvePush.length > 0);
   assert.match(result.lines.gitPush, /^Step: agent push\nPOSIX:/u);
 });

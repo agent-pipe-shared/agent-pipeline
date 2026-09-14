@@ -736,7 +736,6 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
         join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
         "sign-intent",
         "--repo-root", root,
-        "--directory", "<external-po-material-directory>",
         "--intent-sha256", value.intentSha256,
       ],
       mutation: false,
@@ -769,9 +768,7 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
     // authorSourceRoot) pair reads the same persisted plan back unchanged
     // (design doc §1.4 step 1/§3.4) and must reproduce the identical digests.
     const second = io();
-    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], second, {
-      configuredMachinePoKeyDirectory: () => null,
-    }), 0, second.stderr);
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], second), 0, second.stderr);
     const repeat = JSON.parse(second.stdout);
     assert.equal(repeat.planSha256, value.planSha256);
     assert.equal(repeat.selectionSha256, value.selectionSha256);
@@ -781,7 +778,7 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
   }
 });
 
-test("prepare-for-signature replaces its material-directory placeholder with the configured machine key directory", () => {
+test("prepare-for-signature resolves the configured machine key directory without printing its private path", () => {
   const root = fixture();
   try {
     const recorded = recordHumanGuardDenial({
@@ -791,13 +788,11 @@ test("prepare-for-signature replaces its material-directory placeholder with the
     });
     const captured = io();
     const keyDirectory = "/mnt/c/Users/Andre/OneDrive/Documents/06_Dev/agent-pipeline-key";
-    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, {
-      configuredMachinePoKeyDirectory: () => keyDirectory,
-    }), 0, captured.stderr);
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured), 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
-    assert.equal(value.signIntentCommand.argv[5], keyDirectory);
-    assert.match(captured.stderr, /KEY_DIR=/u);
-    assert.match(captured.stderr, /\$KEY_DIR/u);
+    assert.ok(!value.signIntentCommand.argv.includes("--directory"));
+    assert.match(captured.stderr, /Step: sign-intent/u);
+    assert.doesNotMatch(captured.stderr, new RegExp(keyDirectory.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
     assert.doesNotMatch(captured.stderr, /external-po-material-directory/u);
   } finally {
     rmSync(root, { recursive: true, force: true });

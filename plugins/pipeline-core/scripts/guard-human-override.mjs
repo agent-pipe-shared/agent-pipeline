@@ -30,7 +30,6 @@ import {
 // renderer now used in the default hook hand-off.
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
-import { configuredMachinePoKeyDirectory } from "../lib/machine-plane.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
@@ -131,7 +130,6 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
   const write = io.write ?? process.stdout.write.bind(process.stdout);
   const writeError = io.writeError ?? process.stderr.write.bind(process.stderr);
   const platform = options.platform ?? process.platform;
-  const keyDirectoryReader = options.configuredMachinePoKeyDirectory ?? configuredMachinePoKeyDirectory;
   const governanceHgo = {
     observe: observeHumanGuardOverrideGovernanceConsumption,
     preflight: preflightGovernanceActionOutput,
@@ -409,29 +407,10 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         humanApprovalScriptPath: PO_HUMAN_APPROVAL_SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
       });
-      const configuredDirectory = keyDirectoryReader();
-      const keyDirectory = typeof configuredDirectory === "string" && configuredDirectory.length > 0
-        ? configuredDirectory
-        : null;
-      const signIntentCommand = keyDirectory === null
-        ? prepared.signIntentCommand
-        : {
-          ...prepared.signIntentCommand,
-          argv: prepared.signIntentCommand.argv.map((value) => value === "<external-po-material-directory>" ? keyDirectory : value),
-        };
-      const output = { ...prepared, signIntentCommand };
+      const output = prepared;
       const signIntent = copySafeActionText(
         "sign-intent",
-        signIntentCommand,
-        keyDirectory === null ? ["<external-po-material-directory>"] : [],
-        keyDirectory === null ? undefined : {
-          bindings: [
-            { index: 0, name: "PIPELINE_SCRIPT" },
-            { index: 3, name: "REPO_ROOT" },
-            { index: 5, name: "KEY_DIR" },
-            { index: 7, name: "INTENT_SHA256" },
-          ],
-        },
+        prepared.signIntentCommand,
       );
       const authorizeBySignature = copySafeActionText(
         "authorize-by-signature",

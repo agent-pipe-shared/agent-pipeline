@@ -6766,7 +6766,7 @@ function observeBootstrapAcknowledgementProofVerification(plan, deps = {}) {
   }
 }
 
-function bootstrapAcknowledgementSignAction(plan, directory) {
+function bootstrapAcknowledgementSignAction(plan) {
   return {
     kind: "external-operator",
     executionBoundary: "attended-external-tool",
@@ -6774,7 +6774,7 @@ function bootstrapAcknowledgementSignAction(plan, directory) {
     mutation: true,
     requiresConfirmation: true,
     executable: process.execPath,
-    argv: [join(dirname(DEFAULT_ONBOARDING_SCRIPT), "po-human-approval.mjs"), "sign-intent", "--repo-root", plan.root, "--directory", directory, "--request", plan.requestPath],
+    argv: [join(dirname(DEFAULT_ONBOARDING_SCRIPT), "po-human-approval.mjs"), "sign-intent", "--repo-root", plan.root, "--request", plan.requestPath],
     expected: { schema: "pipeline.po-approval-proof.v1", intentSha256: plan.intentSha256 },
   };
 }
@@ -6842,7 +6842,7 @@ export function planOnboardingBootstrapAcknowledgement({
     requestPath: plan.requestPath,
     proofPath: plan.proofPath,
     requestWritten: request.written,
-    nextAction: bootstrapAcknowledgementSignAction(plan, directory),
+    nextAction: bootstrapAcknowledgementSignAction(plan),
   };
 }
 
@@ -6864,7 +6864,7 @@ export function observeOnboardingBootstrapAcknowledgementSignature({
     proofStatus: proofVerification.proof.status,
     proofVerificationStatus: proofVerification.status,
     signAction: request.status === "present" && configuredDirectory.status === "present" && signer.status === "matched"
-      ? bootstrapAcknowledgementSignAction(plan, directory)
+      ? bootstrapAcknowledgementSignAction(plan)
       : null,
   };
 }

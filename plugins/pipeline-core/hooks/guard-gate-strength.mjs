@@ -714,13 +714,12 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
               ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>")),
               // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand;
               // only this command enters the attended private-key boundary.
-              "Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above. This writes proof-manual.json and signer-manual.json under the selected external material directory:",
+              "Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above. sign-intent resolves the configured local approval directory itself, so this one command prints no private path and needs no second apply step:",
               boundedCopySafeCommand({
                 executable: process.execPath,
                 argv: [
                   placeholder(JSON.stringify(PO_HUMAN_APPROVAL_SCRIPT)), "sign-intent",
                   "--repo-root", placeholder(JSON.stringify(projectDir)),
-                  "--directory", placeholder("<external-po-material-directory>"),
                   "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
                 ],
               }).command,

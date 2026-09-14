@@ -554,10 +554,9 @@ if (denials.length > 0) {
             // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand: the
             // intent digest is the exact emitted value, and only this command crosses
             // into the attended terminal that holds the PO/operator's private key.
-            `Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above (gates.human_approval is "${approvalMode}"). This writes proof-manual.json and signer-manual.json under the selected external material directory:`,
+            `Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above (gates.human_approval is "${approvalMode}"). sign-intent resolves the configured local approval directory itself, so this one command prints no private path and needs no second apply step:`,
             renderOverrideCommand(PO_HUMAN_APPROVAL_SCRIPT, [
               "sign-intent", "--repo-root", forcedQuote(overrideRepo),
-              "--directory", placeholder("<external-po-material-directory>"),
               "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
             ]),
             "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",

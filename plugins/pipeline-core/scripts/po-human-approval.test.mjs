@@ -3227,7 +3227,7 @@ const OWN_SCRIPT_PATH = fileURLToPath(new URL("./po-human-approval.mjs", import.
 function pushCommandFixture(overrides = {}) {
   return {
     repoRoot: "/repo root",
-    directory: "/ext/dir üöä",
+    directory: null,
     featureId: "cyb-6",
     plan: "specs/x y/prd.md",
     spec: "specs/x/spec.md",
@@ -3237,7 +3237,7 @@ function pushCommandFixture(overrides = {}) {
   };
 }
 
-test("GF-105: authorizeCriticalPushCommand assembles the exact authorize-critical argv, defaulting launcher to this script's own resolved path", () => {
+test("GF-105: authorizeCriticalPushCommand omits the configured private directory and assembles the exact authorize-critical argv", () => {
   const built = authorizeCriticalPushCommand(pushCommandFixture());
   assert.equal(built.executable, "node");
   assert.equal(built.argv[0], OWN_SCRIPT_PATH,
@@ -3245,7 +3245,6 @@ test("GF-105: authorizeCriticalPushCommand assembles the exact authorize-critica
   assert.deepEqual(built.argv.slice(1), [
     "authorize-critical",
     "--repo-root", "/repo root",
-    "--directory", "/ext/dir üöä",
     "--feature-id", "cyb-6",
     "--plan", "specs/x y/prd.md",
     "--spec", "specs/x/spec.md",
@@ -3257,14 +3256,18 @@ test("GF-105: authorizeCriticalPushCommand assembles the exact authorize-critica
   assert.ok(built.copyCommand);
 });
 
-test("GF-105: authorizeCriticalPushCommand refuses a missing/empty named value instead of silently rendering a broken command", () => {
-  for (const field of ["launcher", "repoRoot", "directory", "featureId", "plan", "spec", "subjectSha256", "expiresAt"]) {
+test("GF-105: authorizeCriticalPushCommand refuses a missing/empty required value and only accepts null or a non-empty explicit directory", () => {
+  for (const field of ["launcher", "repoRoot", "featureId", "plan", "spec", "subjectSha256", "expiresAt"]) {
     assert.throws(
       () => authorizeCriticalPushCommand(pushCommandFixture({ [field]: "" })),
       new RegExp(`requires a non-empty ${field}`),
       field,
     );
   }
+  assert.throws(
+    () => authorizeCriticalPushCommand(pushCommandFixture({ directory: "" })),
+    /directory to be null or a non-empty string/u,
+  );
 });
 
 test("GF-105: the copyCommand rendering is bounded on every shell, and the posix rendering round-trips through a real bash eval to the exact intended argv -- including a value with a space and a value with non-ASCII characters", () => {

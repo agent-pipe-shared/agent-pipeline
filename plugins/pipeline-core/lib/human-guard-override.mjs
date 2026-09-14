@@ -3409,8 +3409,6 @@ export function prepareHumanGuardOverrideForSignature({
         "sign-intent",
         "--repo-root",
         planned.root,
-        "--directory",
-        "<external-po-material-directory>",
         "--intent-sha256",
         intent.sha256,
       ],

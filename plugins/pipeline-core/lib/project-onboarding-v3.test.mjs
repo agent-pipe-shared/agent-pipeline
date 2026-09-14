@@ -8691,7 +8691,8 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
       rootDir: path, repositoryCapability: "local", spawn: fakeGit,
       deps: { ...signatureDeps, gitCommonDirFn: () => repoCommonDir },
     });
-    assert.equal(repoScopedPlan.nextAction.argv.includes(repoScopedDirectory), true);
+    assert.equal(repoScopedPlan.nextAction.argv.includes("--directory"), false);
+    assert.equal(repoScopedPlan.nextAction.argv.includes(repoScopedDirectory), false);
     assert.equal(repoScopedPlan.nextAction.argv.includes("/external/po-key"), false);
     // The planner must refuse before writing a request or offering an attended
     // terminal action when the machine-selected signing directory cannot prove
@@ -8735,14 +8736,13 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
       assert.equal(typeof awaitingHuman.nextAction.action.copyCommand?.posix, "string", runner);
       assert.equal(typeof awaitingHuman.nextAction.action.copyCommand?.powershell, "string", runner);
       assert.equal(awaitingHuman.nextAction.action.copyCommand.maxColumns, 72, runner);
-      assert.match(awaitingHuman.nextAction.action.copyCommand.posix, /KEY_DIR=/u, runner);
-      assert.match(awaitingHuman.nextAction.action.copyCommand.powershell, /\$KEY_DIR/u, runner);
-      assert.equal(awaitingHuman.nextAction.action.copyCommand.cmd, null, runner);
+      assert.ok(!awaitingHuman.nextAction.action.argv.includes("--directory"), runner);
       assert.match(awaitingHuman.nextAction.guidance, /signing the reviewed staging PRD/u, runner);
       assert.match(awaitingHuman.nextAction.guidance, /specification/u, runner);
       assert.match(awaitingHuman.nextAction.guidance, /design-to-implementation transition/u, runner);
       assert.match(awaitingHuman.nextAction.guidance, /does not authorize a remote push/u, runner);
-      assert.match(awaitingHuman.nextAction.guidance, /configured machine key directory/u, runner);
+      assert.match(awaitingHuman.nextAction.guidance, /configured local approval directory/u, runner);
+      assert.match(awaitingHuman.nextAction.guidance, /without printing its private path/u, runner);
       assert.match(awaitingHuman.nextAction.guidance, /only human command/u, runner);
     }
     // Signature posture fails closed to its typed planner if the signing

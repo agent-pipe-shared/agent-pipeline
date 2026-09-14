@@ -21,7 +21,6 @@ import {
   MACHINE_PLANE_SCHEMA,
   machinePlaneFilePath,
   readMachinePlane,
-  configuredMachinePoKeyDirectory,
   resolveLocalOperatorKeyAnchor,
   validateMachinePlane,
   writeMachinePlane,
@@ -322,19 +321,6 @@ test("resolveLocalOperatorKeyAnchor: no plane at all resolves to null", () => {
     assert.equal(resolveLocalOperatorKeyAnchor({ homedirFn: () => home }), null);
   } finally {
     rmSync(home, { recursive: true, force: true });
-  }
-});
-
-test("configuredMachinePoKeyDirectory exposes only a validated configured directory", () => {
-  const { home } = homeFixture();
-  const directory = mkdtempSync(join(SCRATCH_ROOT, "machine-plane-display-key-"));
-  try {
-    assert.equal(configuredMachinePoKeyDirectory({ homedirFn: () => home }), null);
-    writeMachinePlane(validPlane({ poKeyDirectory: directory }), { homedirFn: () => home });
-    assert.equal(configuredMachinePoKeyDirectory({ homedirFn: () => home }), directory);
-  } finally {
-    rmSync(home, { recursive: true, force: true });
-    rmSync(directory, { recursive: true, force: true });
   }
 });
 
