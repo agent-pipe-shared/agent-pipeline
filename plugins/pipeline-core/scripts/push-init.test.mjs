@@ -368,7 +368,7 @@ test("drivePushInit: one run returns failures from satisfiability and push-prepa
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("drivePushInit: an onboarding-set machine-plane anchor carries the unpinned TOFU posture through to signature-required", () => {
+test("drivePushInit: an onboarding-set machine-plane anchor resolves the key directory without disclosing it in the signature instructions", () => {
   const root = freshFixtureRoot();
   try {
     let satisfiabilityAnchorReads = 0;
@@ -402,7 +402,9 @@ test("drivePushInit: an onboarding-set machine-plane anchor carries the unpinned
     assert.equal(satisfiabilityAnchorReads, 1, "the cheap preflight must resolve the onboarding-set operator anchor");
     assert.equal(prepareAnchorReads, 1, "push-prepare must independently resolve the same operator anchor");
     assert.equal(result.signatureCommand.executedByDriver, false);
-    assert.ok(result.signatureCommand.lines.join("\n").includes("/external/po-dir"), JSON.stringify(result.signatureCommand));
+    const instructions = result.signatureCommand.lines.join("\n");
+    assert.ok(instructions.includes("The configured approval directory is resolved automatically."), JSON.stringify(result.signatureCommand));
+    assert.equal(instructions.includes("/external/po-dir"), false, JSON.stringify(result.signatureCommand));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
