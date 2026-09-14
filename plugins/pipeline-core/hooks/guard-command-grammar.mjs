@@ -9,6 +9,7 @@
  */
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { decodeBashAnsiCEscape } from "../lib/git-cmd.mjs";
 
 const CONTROL = new Set([";", "&&", "||", "&", "(", ")"]);
 const SEARCH_BOOLEAN = new Set([
@@ -73,10 +74,13 @@ function finishToken(tokens, state, root) {
     if (state.value === "$PWD" || state.value === "${PWD}") state.value = root;
     else return false;
   }
+  if (state.value.includes("\0")) return false;
   tokens.push(state.value);
+  if (state.usedAnsiC) state.ansiCTokenIndexes.push(tokens.length - 1);
   state.value = "";
   state.started = false;
   state.expansion = false;
+  state.usedAnsiC = false;
   return true;
 }
 
@@ -85,12 +89,27 @@ function tokenize(command, root, dialect) {
   const operators = [];
   const redirects = [];
   const windows = dialect === "windows-direct";
-  const state = { value: "", started: false, expansion: false };
+  const state = { value: "", started: false, expansion: false, usedAnsiC: false, ansiCTokenIndexes: [] };
   let quote = null;
+  let ansiC = false;
   let segment = 0;
 
   for (let index = 0; index < command.length; index += 1) {
     const char = command[index];
+    if (ansiC) {
+      if (char === "'") {
+        ansiC = false;
+      } else if (char === "\\") {
+        const decoded = decodeBashAnsiCEscape(command, index);
+        if (decoded.value.includes("\0")) return null;
+        state.value += decoded.value;
+        index = decoded.end;
+      } else {
+        state.value += char;
+      }
+      state.started = true;
+      continue;
+    }
     if (quote !== null) {
       if (char === quote) {
         quote = null;
@@ -112,6 +131,13 @@ function tokenize(command, root, dialect) {
     if (char === "'" || char === "\"") {
       quote = char;
       state.started = true;
+      continue;
+    }
+    if (!windows && char === "$" && command[index + 1] === "'") {
+      ansiC = true;
+      state.usedAnsiC = true;
+      state.started = true;
+      index += 1;
       continue;
     }
     if (char === "\0" || char === "\r" || char === "\n" || char === "`") return null;
@@ -162,8 +188,8 @@ function tokenize(command, root, dialect) {
     state.value += char;
     state.started = true;
   }
-  if (quote !== null || !finishToken(tokens, state, root)) return null;
-  return { tokens, operators, redirects };
+  if (quote !== null || ansiC || !finishToken(tokens, state, root)) return null;
+  return { tokens, operators, redirects, ansiCTokenIndexes: state.ansiCTokenIndexes };
 }
 
 function segmentsFromTokens(tokens) {
@@ -179,6 +205,10 @@ function segmentsFromTokens(tokens) {
 export function parseGuardCommand(command, root, { platform = process.platform } = {}) {
   if (typeof command !== "string" || command.trim() === "" || /[\0\r\n]/u.test(command)) return denied();
   const dialect = dialectFor(command, platform);
+  // `$'...'` is Bash-specific syntax. A native Windows command line must not
+  // reinterpret it as a partly quoted argument and thereby bypass the narrow
+  // POSIX-only multiline-message rule below.
+  if (dialect === "windows-direct" && command.includes("$'")) return denied();
   if (dialect === "powershell-fixed-read") {
     const parsed = tokenize(command.trim(), root, "windows-direct");
     if (!parsed || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return denied();
@@ -190,6 +220,26 @@ export function parseGuardCommand(command, root, { platform = process.platform }
   if (!parsed) return denied();
   const segments = segmentsFromTokens(parsed.tokens);
   if (!segments) return denied();
+  // A Bash ANSI-C token can contain a decoded newline even though the command
+  // text itself has none. It is admitted only when it is exactly a `git
+  // commit` message value: the narrow ergonomic form that needs multiline
+  // provenance trailers. It remains unavailable to every other executable,
+  // option, path argument, composition form, and Windows shell dialect.
+  if (parsed.ansiCTokenIndexes.length > 0) {
+    if (dialect !== "posix-simple" || segments.length !== 1
+      || !["git", "git.exe"].includes(basename(segments[0].executable).toLowerCase())
+      || segments[0].argv[0] !== "commit") return denied();
+    const messageValueIndexes = new Set();
+    const argv = segments[0].argv;
+    for (let index = 1; index < argv.length - 1; index += 1) {
+      if (argv[index] === "-m" || argv[index] === "--message") messageValueIndexes.add(index + 1);
+    }
+    const ansiCArgIndexes = parsed.ansiCTokenIndexes.map((index) => index - 1);
+    if (ansiCArgIndexes.length === 0
+      || !ansiCArgIndexes.every((index) => messageValueIndexes.has(index)
+        && /[\r\n]/u.test(argv[index])
+        && !/[\0-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(argv[index]))) return denied();
+  }
   const pipeline = parsed.operators.length > 0;
   const finalDialect = pipeline
     ? (dialect === "windows-direct" ? "windows-readonly-pipeline" : "posix-readonly-pipeline")

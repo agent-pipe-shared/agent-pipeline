@@ -69,6 +69,42 @@ export function normalizeGlobalGitOptions(str) {
 // ---- quote-aware argv tokenizer + ref-glob matcher ------------------------------------
 
 /**
+ * Decode one escape after a backslash in Bash's ANSI-C `$'...'` string form.
+ *
+ * The command-time Git policy and the lifecycle grammar must observe the same
+ * argv that Bash passes to Git. Keep the decoder here, as the dependency-free
+ * owner of the Git argv representation, rather than letting either caller
+ * implement a subtly different escape dialect.
+ */
+export function decodeBashAnsiCEscape(source, index) {
+  const next = source[index + 1];
+  const simple = Object.freeze({
+    a: "\u0007", b: "\b", e: "\u001b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v",
+    "\\": "\\", "'": "'", '"': '"', "?": "?",
+  });
+  if (next === undefined) return { value: "\\", end: index };
+  if (Object.hasOwn(simple, next)) return { value: simple[next], end: index + 1 };
+  if (/[0-7]/u.test(next)) {
+    let digits = next;
+    let end = index + 1;
+    while (digits.length < 3 && /[0-7]/u.test(source[end + 1] ?? "")) {
+      end += 1;
+      digits += source[end];
+    }
+    return { value: String.fromCodePoint(Number.parseInt(digits, 8)), end };
+  }
+  const hexLength = next === "u" ? 4 : next === "U" ? 8 : next === "x" ? 2 : 0;
+  if (hexLength > 0) {
+    const digits = source.slice(index + 2, index + 2 + hexLength);
+    if (digits.length === hexLength && /^[0-9a-f]+$/iu.test(digits)) {
+      const codePoint = Number.parseInt(digits, 16);
+      if (codePoint <= 0x10ffff) return { value: String.fromCodePoint(codePoint), end: index + 1 + hexLength };
+    }
+  }
+  return { value: `\\${next}`, end: index + 1 };
+}
+
+/**
  * tokenizeArgv(cmd) -- quote-aware argv tokenizer for push refspec EXTRACTION.
  *
  * Distinct from `stripQuotedSegments` (above): that helper DESTROYS quoted content
@@ -97,47 +133,12 @@ export function tokenizeArgv(cmd) {
   let inAnsiC = false;
   let sawAnyChar = false; // distinguishes an empty quoted token (`''`) from no token at all
 
-  // Bash's $'...' form is not a cosmetic alternative to single quotes: the
-  // shell turns its recognised backslash escapes into the actual argv bytes
-  // before Git sees them.  Keep this small decoder here (rather than making
-  // GIT-03 guess from raw command text) so the command-time guard observes the
-  // same repeated `-m` message Git receives.  Unknown escapes remain literal,
-  // matching Bash's non-recognised-escape behaviour closely enough for this
-  // deliberately lightweight tokenizer.
-  const decodeAnsiCEscape = (source, index) => {
-    const next = source[index + 1];
-    const simple = Object.freeze({
-      a: "\u0007", b: "\b", e: "\u001b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v",
-      "\\": "\\", "'": "'", '"': '"', "?": "?",
-    });
-    if (next === undefined) return { value: "\\", end: index };
-    if (Object.hasOwn(simple, next)) return { value: simple[next], end: index + 1 };
-    if (/[0-7]/u.test(next)) {
-      let digits = next;
-      let end = index + 1;
-      while (digits.length < 3 && /[0-7]/u.test(source[end + 1] ?? "")) {
-        end += 1;
-        digits += source[end];
-      }
-      return { value: String.fromCodePoint(Number.parseInt(digits, 8)), end };
-    }
-    const hexLength = next === "u" ? 4 : next === "U" ? 8 : next === "x" ? 2 : 0;
-    if (hexLength > 0) {
-      const digits = source.slice(index + 2, index + 2 + hexLength);
-      if (digits.length === hexLength && /^[0-9a-f]+$/iu.test(digits)) {
-        const codePoint = Number.parseInt(digits, 16);
-        if (codePoint <= 0x10ffff) return { value: String.fromCodePoint(codePoint), end: index + 1 + hexLength };
-      }
-    }
-    return { value: `\\${next}`, end: index + 1 };
-  };
-
   for (let i = 0; i < cmd.length; i++) {
     const ch = cmd[i];
     if (inAnsiC) {
       if (ch === "'") inAnsiC = false;
       else if (ch === "\\") {
-        const decoded = decodeAnsiCEscape(cmd, i);
+        const decoded = decodeBashAnsiCEscape(cmd, i);
         current += decoded.value;
         i = decoded.end;
       } else current += ch;

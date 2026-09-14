@@ -1306,6 +1306,45 @@ test("closed command grammar preserves native Windows paths and direct node.exe 
   ), true);
 });
 
+test("literal ANSI-C multiline commit messages are admitted only as git commit message argv", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = String.raw`git commit -m subject -m $'body\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)' --trailer "Reviewed-by: PO"`;
+    const parsed = parseGuardCommand(command, path, { platform: "linux" });
+    assert.equal(parsed.parseStatus, "accepted");
+    assert.deepEqual(parsed.segments, [{
+      executable: "git",
+      argv: [
+        "commit", "-m", "subject", "-m", "body\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)",
+        "--trailer", "Reviewed-by: PO",
+      ],
+    }]);
+    const lifecycle = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {},
+    });
+    // This minimal fixture has no complete V4 onboarding projection, so the
+    // normal readiness gate still stops it. The important boundary here is
+    // that the command reaches that later gate rather than failing closed at
+    // command grammar before Git's own policy can inspect the same argv.
+    assert.equal(lifecycle.exitCode, 2);
+    assert.match(lifecycle.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(lifecycle.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+
+    // ANSI-C syntax is not a generic shell escape hatch. It may carry only
+    // newline-bearing values following -m/--message on a direct POSIX git
+    // commit; executables, path arguments, composition, and Windows dialects
+    // all remain refused by the common parser.
+    for (const rejected of [
+      String.raw`touch $'untrusted\npath'`,
+      String.raw`git commit -m subject $'untrusted\npath'`,
+      String.raw`git commit -m $'body\nmessage' && touch bypass`,
+    ]) assert.equal(parseGuardCommand(rejected, path, { platform: "linux" }).parseStatus, "denied", rejected);
+    assert.equal(parseGuardCommand(command, path, { platform: "win32" }).parseStatus, "denied");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // backlog: 2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-
 // tool-shell.md. Claude's Bash tool always runs through Git-Bash/POSIX, never natively
 // through cmd.exe/PowerShell, even on a Windows host -- so guard-lifecycle-ready.mjs's own
