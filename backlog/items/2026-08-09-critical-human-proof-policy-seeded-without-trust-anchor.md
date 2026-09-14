@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critical-human-proof-policy-seeded-without-trust-anchor
 type: idea
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 6d6f5b34c546ed7b70dddd79f27e3fcecbcbd9c5
+closure_evidence: specs/sprint-alfred-epic/evidence/b2-guard-override-trust.md
 done_when: contains plugins/pipeline-core/lib/human-guard-override.mjs HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED
 created: 2026-08-09
 sprint: alfred
@@ -118,3 +122,10 @@ than one ceremony, and a concrete argument for including an early,
 bootstrap-time "signature mode configured but no anchor present" surfaced
 check as part of whatever Alfred slot picks this up, rather than only fixing
 the `approve-push`-specific path.
+
+### Update, 2026-09-14 — resolved by WP-B2-4 (Spec §5.2 item 4)
+
+- **Decision:** closed, resolved.
+- **Rationale:** Implemented per-key trust-on-first-use (TOFU) trust anchors. When in signature mode, an unrecognized well-formed Ed25519 key signing an override proof emits `HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED` in `authorizeHumanGuardOverrideBySignature` (`plugins/pipeline-core/lib/human-guard-override.mjs`), requiring explicit human confirmation before first use instead of blindly failing or accepting. Added `confirmTrustAnchorKey`, `storeConfirmedTrustAnchor`, and `isRecognizedTrustAnchorKey` in `plugins/pipeline-core/lib/critical-human-proof-policy.mjs` storing confirmed keys in `trustAnchors[]` in `project/critical-human-proof.json`. Verified in `human-guard-override.test.mjs`.
+- **Evidence:** `specs/sprint-alfred-epic/evidence/b2-guard-override-trust.md`
+- **Date:** 2026-09-14
