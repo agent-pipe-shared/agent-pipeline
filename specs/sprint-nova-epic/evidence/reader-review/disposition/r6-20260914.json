@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "r6-20260914",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "p1",
+      "class": "fileline",
+      "status": "no-change",
+      "resolutionCommit": null
+    },
+    {
+      "id": "p2",
+      "class": "fileline",
+      "status": "no-change",
+      "resolutionCommit": null
+    },
+    {
+      "id": "p3",
+      "class": "reordering",
+      "status": "no-change",
+      "resolutionCommit": null
+    }
+  ]
+}
