@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ddc4b075c32a189d08555fb7bcc30ce05fbb614ab0acd5949315ae391604cd87"
+    "transitionHead": "382e85b363fbf0e5708252371322bff79b18d0640d525e0fb22d6026e73d4899"
   },
   "counts": {
-    "open": 65,
+    "open": 59,
     "in_progress": 1,
-    "closed": 585,
+    "closed": 591,
     "rejected": 3,
     "deferred": 11
   },
@@ -177,13 +177,17 @@
     },
     {
       "id": "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Measured 2026-08-27 in the Alfred clone (fresh clone of the Nova line): each missing machine-local artifact surfaced as an isolated refusal at a different lifecycle point, none at bootstrap.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path",
@@ -2091,13 +2095,17 @@
     },
     {
       "id": "pipeline.critic-dispatches-cannot-persist-their-scratch-notes",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Measured twice on 2026-08-27, independently, by both design-review Critic dispatches of the sprint-alfred-epic package (reports persisted under specs/sprint-alfred-epic/evidence/critic/).",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.critic-md-protected-preimage-drift",
@@ -3307,13 +3315,17 @@
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-17",
       "source": "PO observation, 2026-08-17, live during a session dispatching several goldfish-deep and Critic subagents back-to-back for Nova A Windows bugfix work.",
       "deferred": true,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-dispatch-token-breakdown.md"
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
@@ -4598,14 +4610,18 @@
     },
     {
       "id": "pipeline.long-dispatches-truncate-before-emitting-their-report",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Three occurrences in one unattended block, 2026-08-07/08: two Goldfish dispatches and one Critic dispatch ended mid-sentence with the work done and no report.",
       "deferred": false,
       "due": "2026-08-22",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.lossless-pre-restart-checkpoint",
@@ -8624,13 +8640,17 @@
     },
     {
       "id": "pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "PO, 2026-08-16: 'Was man hier an dem repo gut sehen kann ist, dass verify inzwischen unglaublich krass angeschwollen ist und sehr lange dauert.' Counts and the absent-duration finding were measured in the same session.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.verify-marketplace-attestation-blocks-normal-active-development",
@@ -8676,13 +8696,17 @@
     },
     {
       "id": "pipeline.verify-range-mode-registration-for-orchestrator-commit-control",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-25",
       "source": "Split out of backlog/items/2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md at closure, 2026-08-25 -- Part B of that item's 2026-08-19 'Direction 1 design' section, fully designed but never built and never required to consider that item's own stated problem closed.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.verify-registration-check-fixtures-lack-real-git-topology",

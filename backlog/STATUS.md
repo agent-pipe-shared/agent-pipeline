@@ -17,7 +17,7 @@
 | pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it. |
 | pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the dispatch record is the only artifact that binds a commit to its work package, so a Critic needs it; it also carries the implementor's narrative, which the Critic contract forbids as input. There is no way to hand over one without the other. |
 | pipeline.a-doc-edit-silently-obligates-its-vendored-copy | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
-| pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback | open | defect | pipeline | alfred | 2026-08-27 | — | — |
+| pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path | open | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand. |
 | pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | nova | 2026-08-29 | — | — |
@@ -161,7 +161,7 @@
 | pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock | closed | defect | pipeline | nova-b | 2026-09-12 | 2026-09-30 | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | closed | workflow-improvement | pipeline | alfred | 2026-08-24 | 2026-08-31 | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-07-27 | — |
-| pipeline.critic-dispatches-cannot-persist-their-scratch-notes | open | defect | pipeline | alfred | 2026-08-27 | — | — |
+| pipeline.critic-dispatches-cannot-persist-their-scratch-notes | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.critic-md-protected-preimage-drift | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — discovered running the first full verify.mjs gate of this session (last known-green 7cc0b649, 2026-09-02). codex-isolated-critic-protected-preimage-tests fails: roles/critic.md's current content-hash no longer matches the digest pinned in plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json, a preimage snapshot used to detect drift in the Critic role contract for Codex-isolated Critic dispatches. |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | closed | defect | pipeline | — | 2026-08-18 | — | — |
@@ -251,7 +251,7 @@
 | pipeline.gmw-precommit-kernel-precedence-diverges | closed | defect | pipeline | nova-b | 2026-09-12 | — | — |
 | pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | closed | workflow-improvement | pipeline | — | 2026-08-16 | — | — |
-| pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | open | workflow-improvement | pipeline | alfred | 2026-08-17 | — | — |
+| pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | closed | workflow-improvement | pipeline | alfred | 2026-08-17 | — | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
@@ -347,7 +347,7 @@
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
-| pipeline.long-dispatches-truncate-before-emitting-their-report | open | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
+| pipeline.long-dispatches-truncate-before-emitting-their-report | closed | defect | pipeline | alfred | 2026-08-08 | 2026-08-22 | — |
 | pipeline.lossless-pre-restart-checkpoint | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.maintenance-window-selectivity-is-untested-at-both-levels | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.maintenance-window-signature-voided-by-unrelated-write | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
@@ -645,11 +645,11 @@
 | pipeline.verify-gate-scoped-registration | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
 | pipeline.verify-gate-unreachable-without-a-session-cleanup-binding | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
-| pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost | open | workflow-improvement | pipeline | alfred | 2026-08-16 | — | — |
+| pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost | closed | workflow-improvement | pipeline | alfred | 2026-08-16 | — | — |
 | pipeline.verify-marketplace-attestation-blocks-normal-active-development | closed | defect | pipeline | — | 2026-08-24 | 2026-08-31 | — |
 | pipeline.verify-mjs-runs-385-suites-strictly-sequentially | closed | workflow-improvement | pipeline | — | 2026-08-24 | 2026-08-31 | — |
 | pipeline.verify-placeholder-manual-check-required-accepted-by-gate | closed | defect | pipeline | nova | 2026-08-29 | — | — |
-| pipeline.verify-range-mode-registration-for-orchestrator-commit-control | open | idea | pipeline | alfred | 2026-08-25 | — | — |
+| pipeline.verify-range-mode-registration-for-orchestrator-commit-control | closed | idea | pipeline | alfred | 2026-08-25 | — | — |
 | pipeline.verify-registration-check-fixtures-lack-real-git-topology | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.verify-runtime-concentrated-in-ten-suites | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — the parallelized verify has regressed from 419s to 571s in one week, and the single suite named as its next lever grew 35% in the same period. Also supplies the all-fresh full-run artifact two older items were blocked on. |
 | pipeline.verify-suite-reads-real-machine-state | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — a suite about to enter the verify gate whose outcome depends on unrelated per-machine state; found while diagnosing a one-off failure of exactly that suite |
@@ -673,8 +673,8 @@
 
 ## Counts
 
-- open: 65
+- open: 59
 - in_progress: 1
-- closed: 585
+- closed: 591
 - rejected: 3
 - deferred: 11
