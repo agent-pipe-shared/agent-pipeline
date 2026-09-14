@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "3d9879b4c45b4dda4d35520003a6b61f8b66e896",
-    "tree": "c2abebba3a78db2d0bc8decf353f8772f2afcb7d"
+    "commit": "d7f362fd97e0f8b8cdc3081fb6bcabf94aa8abe3",
+    "tree": "bc43c79d2736c02325f3c01a6d592f556b5a7fe4"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -482,8 +482,6 @@
         "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
-        "verify-phase:harness/scripts/verify.mjs:protected-baseline-tests",
-        "verify-phase:harness/scripts/verify.mjs:protected-delta-check-tests",
         "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
         "verify-phase:harness/scripts/verify.mjs:project-authority-migration-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
@@ -494,6 +492,8 @@
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-unborn-head-tests",
         "verify-phase:harness/scripts/verify.mjs:project-reset-tests",
+        "verify-phase:harness/scripts/verify.mjs:protected-baseline-tests",
+        "verify-phase:harness/scripts/verify.mjs:protected-delta-check-tests",
         "verify-phase:harness/scripts/verify.mjs:protected-test-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:public-baseline-diagnose-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
