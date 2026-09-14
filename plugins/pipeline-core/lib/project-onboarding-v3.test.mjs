@@ -6593,11 +6593,7 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
     });
     assert.equal(design.status, "ready");
     assert.equal(design.continuity.status, "valid");
-    assert.deepEqual(startWithoutDescriptor(), {
-      ok: true,
-      code: "WT-SESSION-NOT-REQUIRED",
-      bindingStatus: "design-unbound",
-    });
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: path, spawn: fakeGit }).status, "unbound");
   } finally {
     dispose(path);
   }
