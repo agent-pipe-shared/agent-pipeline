@@ -202,6 +202,23 @@ function segmentsFromTokens(tokens) {
   return segments.map(([executable, ...argv]) => ({ executable, argv }));
 }
 
+// An ANSI-C token is normally unavailable to the lifecycle grammar because it
+// can decode control bytes that are not visible in the shell source. There
+// are two deliberately tiny exceptions: a git commit message (below), and a
+// display-only separator inside an otherwise read-only diagnostic chain. The
+// latter is the exact argv of `printf $'\\n--- LABEL ---\\n'`: one argument,
+// no format directives or shell-significant characters, and only its two
+// boundary newlines as control bytes. It cannot select a path, redirect data,
+// or cause a write.
+function isAnsiCReadOnlyPrintfLabel(segment, ansiCTokenIndexes) {
+  if (segment === undefined
+    || basename(segment.executable).toLowerCase() !== "printf"
+    || segment.argv.length !== 1
+    || ansiCTokenIndexes.length !== 1
+    || ansiCTokenIndexes[0] !== 1) return false;
+  return /^\n[^%$`\\\r\n\0-\x08\x0b\x0c\x0e-\x1f\x7f]+\n$/u.test(segment.argv[0]);
+}
+
 export function parseGuardCommand(command, root, { platform = process.platform } = {}) {
   if (typeof command !== "string" || command.trim() === "" || /[\0\r\n]/u.test(command)) return denied();
   const dialect = dialectFor(command, platform);
@@ -226,8 +243,11 @@ export function parseGuardCommand(command, root, { platform = process.platform }
   // provenance trailers. It remains unavailable to every other executable,
   // option, path argument, composition form, and Windows shell dialect.
   if (parsed.ansiCTokenIndexes.length > 0) {
-    if (dialect !== "posix-simple" || segments.length !== 1
-      || !["git", "git.exe"].includes(basename(segments[0].executable).toLowerCase())
+    if (dialect !== "posix-simple" || segments.length !== 1) return denied();
+    if (isAnsiCReadOnlyPrintfLabel(segments[0], parsed.ansiCTokenIndexes)) {
+      return accepted(dialect, segments, parsed.operators, parsed.redirects);
+    }
+    if (!["git", "git.exe"].includes(basename(segments[0].executable).toLowerCase())
       || segments[0].argv[0] !== "commit") return denied();
     const messageValueIndexes = new Set();
     const argv = segments[0].argv;

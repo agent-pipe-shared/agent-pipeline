@@ -1794,6 +1794,7 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
     for (const command of [
       'git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain',
       "git status --short && printf '\\n--- AGENT ---\\n' && git log --oneline -1",
+      "git status --short && printf $'\\n--- AGENT ---\\n' && git log --oneline -1",
       "mkdir -p scratch/probe && ls -la scratch/probe",
       'grep -rl "pattern" backlog/items/ 2>/dev/null',
       "git status && git log -n 10 --oneline",
@@ -1833,6 +1834,10 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
       bash("git status --short && printf '\\n--- AGENT ---\\n' && git log --oneline -1"),
       { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
     ), { exitCode: 0, stderr: "" });
+    assert.deepEqual(evaluateLifecycleReadyGuard(
+      bash("git status --short && printf $'\\n--- AGENT ---\\n' && git log --oneline -1"),
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+    ), { exitCode: 0, stderr: "" });
 
     for (const command of [
       // (a) an allowlisted command name chained with a mutating/cross-reaching one.
@@ -1846,6 +1851,7 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
       "echo 1 && echo 2 && echo 3 && echo 4 && echo 5 && echo 6 && echo 7",
       "git status ; git log",
       "git status || git log",
+      "git status && printf $'format %s\\n' && git log",
       // Trailing pipe where sink is neither grep nor head fails closed
       'git rev-parse HEAD && grep -rl "pattern" backlog/items/ | cat',
       // Disclosed exclusion: a git global -c flag is never a subcommand match, so the

@@ -2725,7 +2725,8 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
   // not a shell construct, and must be exactly a visible label bracketed by
   // literal newline escapes (for example `printf '\\n--- AGENT ---\\n'`).
   if (executable === "printf") return args.length === 1
-    && /^\\n[^%$`\\r\\n]+\\n$/u.test(args[0]);
+    && (/^\\n[^%$`\\r\\n]+\\n$/u.test(args[0])
+      || /^\n[^%$`\\\r\n\0-\x08\x0b\x0c\x0e-\x1f\x7f]+\n$/u.test(args[0]));
   if (["node", "node.exe"].includes(executable)) {
     return args.length === 2
       && args[0] === "--check"
