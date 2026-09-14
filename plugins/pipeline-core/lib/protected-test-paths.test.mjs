@@ -48,6 +48,14 @@ test("extractShellWriteTargets: write-capable executables yield their non-flag o
   }
 });
 
+test("extractShellWriteTargets: copy-like writers inspect only their destination, while move keeps its destructive source", () => {
+  const scratchDestination = "scratch/probe-copy.test.mjs";
+  assert.deepEqual(candidates(`cp ${TARGET} ${scratchDestination}`), [scratchDestination]);
+  assert.deepEqual(candidates(`install ${TARGET} ${scratchDestination}`), [scratchDestination]);
+  assert.deepEqual(candidates(`ln ${TARGET} ${scratchDestination}`), [scratchDestination]);
+  assert.deepEqual(candidates(`mv ${TARGET} ${scratchDestination}`), [TARGET, scratchDestination]);
+});
+
 test("extractShellWriteTargets: sed/perl/ruby only contribute a candidate when an in-place flag is present", () => {
   assert.ok(candidates(`sed -i s/a/b/ ${TARGET}`).includes(TARGET));
   assert.deepEqual(candidates(`sed s/a/b/ ${TARGET}`), [], "no in-place flag -> no candidate");

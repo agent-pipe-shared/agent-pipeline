@@ -434,6 +434,23 @@ function operands(argv) {
 }
 
 /**
+ * File operands a non-Git writer can actually modify.
+ *
+ * A generic non-flag walk is deliberately conservative for unknown writers,
+ * but `cp`, `install`, and `ln` have a simple, stable exception: their final
+ * operand is the destination and their earlier operands are read-only sources.
+ * Treating every operand as a target made a copy of a protected suite INTO an
+ * in-root scratch file look like a rewrite of that suite. `mv` is excluded on
+ * purpose: moving a protected source removes it, so both source and
+ * destination remain protected write candidates there.
+ */
+function writeTargetOperands(executable, argv) {
+  const values = operands(argv);
+  if (["cp", "install", "ln"].includes(executable)) return values.length === 0 ? [] : [values.at(-1)];
+  return values;
+}
+
+/**
  * Real write-target operands for a git subcommand's OWN argv (the tokens after the
  * subcommand), per-subcommand rather than generic -- Requirement 3 of the backlog item named
  * on `GIT_NO_PATHSPEC_VERBS`/`GIT_TREEISH_PATHSPEC_VERBS` above. `verb` is never itself a
@@ -819,7 +836,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       // gitWriteTargetOperands()); the prior whole-argv `operands()` walk stays exactly as
       // before for every non-git writer.
       const postVerbArgv = gitWrite ? argv.slice(verbIndex + 1) : [];
-      const targetOperands = gitWrite ? gitWriteTargetOperands(verb, postVerbArgv) : operands(argv);
+      const targetOperands = gitWrite ? gitWriteTargetOperands(verb, postVerbArgv) : writeTargetOperands(executable, argv);
       for (const operand of targetOperands) {
         targets.push({ candidate: operand, lane: gitWrite ? "git-working-tree-write" : "write-command" });
       }
