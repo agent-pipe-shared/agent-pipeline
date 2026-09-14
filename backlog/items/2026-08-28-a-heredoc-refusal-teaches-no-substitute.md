@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.heredoc-refusal-teaches-no-substitute
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
+closed_at: 2026-09-14
+closure_repository: self
+closure_commit: 015f8a777c2e56dc46e6770a820c9dac565a48ea
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 sprint: nightwing
 done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs heredocFileRemediation
 source: "PO question, 2026-08-28: 'wäre es nicht sinnvoll heredoc gehärtet zuzulassen?' — asked after the Elephant hit the heredoc refusal twice in one session (a `cat >> … << 'CLOSURE'` append and a multi-line commit message), each time paying a detour through a scratch file or the Edit tool. Measured against guard-lifecycle-ready.mjs the same day."
@@ -114,3 +118,13 @@ rather than inventing a mechanism:
   the same grammar-precision family, both `nightwing`, both open. Those two are
   false positives on safe commands; this one is a correct refusal that teaches
   nothing. Related in area, distinct in kind.
+
+## Closure, 2026-09-14
+
+Closed by `015f8a777c2e56dc46e6770a820c9dac565a48ea` (`HEREDOCHINT-1`). The
+closed grammar still rejects an actual quoted-delimiter heredoc with
+`GUARD-PARSE-UNSUPPORTED`; the denial now explains the safe `Write`/`Edit`
+route for repository content and retains an empty typed retry envelope. The
+new regression also proves that quoted data merely containing `<<EOF` does not
+receive this mutation-oriented advice. Full `guard-lifecycle-ready.test.mjs`
+passes 242/242.
