@@ -49,6 +49,18 @@ be resolved through `--no-verify`, a hook bypass, or a broad permission change.
   attribution-only `approve-plan --by`; the writer correctly requires the
   current shared-human-approval receipt. This is fixture migration only, not a
   reason to weaken the signature policy or approval writer.
+- **Prepared TP-5 patch, 2026-09-14:** the two failing subprocess fixtures
+  create `pipeline.user.yaml` only after their initial fixture commit. The
+  policy reader correctly classifies that uncommitted source as global
+  signature mode, even though it contains no `gates.human_approval` key;
+  their intended legacy-attribution assertion can therefore never pass. The
+  exact pending edit is confined to `seedSubprocessPoGateAuthority()`: stage
+  and commit its key-less fixture `pipeline.user.yaml` before the
+  submit/present/approve subprocesses. A committed source with no global key
+  resolves to `scope: "default"`, preserving the test's deliberately legacy
+  `approve-plan --by` coverage. It does not change the production writer,
+  test a signature bypass, or alter any human-approval policy. A direct edit
+  was correctly refused by TP-5 and remains pending the later signed lift.
 - **Scope boundary:** this permits only the listed test or verifier projection
   updates; it does not authorize a hook bypass, a guard-policy relaxation, a
   production behaviour change, or a push/release.
