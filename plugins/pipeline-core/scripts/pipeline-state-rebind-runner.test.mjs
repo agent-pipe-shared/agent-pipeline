@@ -156,20 +156,15 @@ test("acknowledge plan rejects absent and invalid runner without mutation", () =
   }
 });
 
-test("markerless external acknowledge apply succeeds only with the plan-returned runner tail", () => {
+test("markerless external acknowledge apply recovers runner from plan when runner tail is omitted", () => {
   const f = acknowledgeFixture("external-tail");
   const plan = planAcknowledge(f, "codex");
-  const before = readFileSync(statePath(f.dir), "utf8");
   const attended = {
     ...f.deps, env: {}, isattyFn: () => true, readLineFn: () => "CONFIRM",
     v4Inspection: () => ({ status: "ready" }),
   };
-  const rejected = invoke(withoutRunnerTail(plan.applyAction.argv).slice(1), attended);
-  assert.equal(rejected.status, 2);
-  assert.match(rejected.err, /PO-REBIND-RUNNER-UNKNOWN/u);
-  assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
-  const applied = invoke(plan.applyAction.argv.slice(1), attended);
-  assert.equal(applied.status, 0, applied.err);
+  const appliedWithoutTail = invoke(withoutRunnerTail(plan.applyAction.argv).slice(1), attended);
+  assert.equal(appliedWithoutTail.status, 0, appliedWithoutTail.err);
 });
 
 function generatorSubmitFixture(name, { exempt }) {
