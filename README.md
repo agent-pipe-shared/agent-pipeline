@@ -72,17 +72,6 @@ Around those roles:
   remain with the human where the project calibration and action require them;
   evidence never creates that authority.
 
-## Quick start
-
-For a project that will consume the pipeline, go to
-[Activate the pipeline in one project repository](SETUP.md#a-activate-the-pipeline-in-one-project-repository).
-It starts with prerequisites and the runner's
-public onboarding path; it does not ask a consumer to run this repository's
-source-maintainer setup. Continue with [PIPELINE_FLOW](PIPELINE_FLOW.md) to
-choose the delivery route, then use [Usage](docs/usage.md), and consult
-[the documentation map](docs/README.md) for evidence, security, cost, and
-runtime-boundary reference.
-
 ## How it works
 
 ```mermaid
@@ -146,27 +135,11 @@ that:
   phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
   bootstrap and consultation is on demand)
 
-## Why this holds up at enterprise scale
-
-What comes together here is more than an agent setup: a repeatable architecture
-through the governance layer, machine-checkable gates instead of promises,
-mandatory documentation artifacts instead of word-of-mouth knowledge, an
-independent review kept separate from the executing context, and a model/cost
-policy that scales effort to risk. The reasoning behind it: attention is the
-scarcest resource — so strictness gets invested where mistakes are expensive,
-and consciously spared elsewhere. The final judgment still always stays with the
-human.
-
 ## Source-maintainer reference
 
 Source maintainers can find the checkout commands and V3 authority sequence in
-[Maintain a shared pipeline source](SETUP.md).
-Routine adopters should follow the consumer path above.
-
-Before your first big feature, a quick look at
-[`docs/design/README.md`](docs/design/README.md) pays off — a self-service
-guide for brainstorming a solid requirement before it enters the pipeline
-(optional, recommended).
+[Maintain a shared pipeline source](SETUP.md). Routine adopters should follow
+the consumer path above.
 
 ## Runtime
 
@@ -275,16 +248,6 @@ Ergänzend dazu:
   bleiben dort beim Menschen, wo Projektkalibrierung und Aktion dies verlangen;
   Evidenz erzeugt diese Autorität nicht.
 
-## Schnellstart
-
-Für ein Consumer-Projekt folge in [SETUP dem Abschnitt „Activate the pipeline
-in one project repository“](SETUP.md#a-activate-the-pipeline-in-one-project-repository).
-Dieser Weg beginnt mit Voraussetzungen und dem öffentlichen
-Onboarding-Pfad des Runners; er verlangt nicht die source-maintainer-`setup.mjs`.
-Danach erklärt [PIPELINE_FLOW](PIPELINE_FLOW.md) die Lieferroute; anschließend
-folgt [Usage](docs/usage.md), und die [Dokumentationskarte](docs/README.md) verweist auf
-Evidenz, Security, Kosten und Runner-Grenzen.
-
 ## Wie es funktioniert
 
 ```mermaid
@@ -350,27 +313,11 @@ unabhängige Regler stellen das ein:
   Phase/Runner in `pipeline.user.yaml`; Advisor-Capability ist im Bootstrap
   modellfrei und Consultation läuft on demand)
 
-## Warum das auch im Unternehmenskontext trägt
-
-Was hier zusammenkommt, ist mehr als ein Agent-Setup: eine wiederholbare
-Architektur durch die Governance-Schicht, maschinell prüfbare Gates statt
-Versprechen, Pflicht-Dokumentationsartefakte statt Zuruf-Wissen, ein
-unabhängiges Review getrennt vom ausführenden Kontext und eine
-Modell-/Kosten-Policy, die Aufwand nach Risiko staffelt. Der Grund dahinter:
-Aufmerksamkeit ist die knappste Ressource — Strenge wird also dort
-investiert, wo Fehler teuer sind, und woanders bewusst gespart. Das letzte
-Urteil bleibt trotzdem immer beim Menschen.
-
 ## Source-Maintainer-Referenz
 
 Source-Maintainer finden die Checkout-Befehle und die V3-Autoritätsreihenfolge
-unter [Maintain a shared pipeline source](SETUP.md).
-Normale Consumer-Übernahmen folgen dem oben beschriebenen Consumer-Pfad.
-
-Vor dem ersten großen Feature lohnt ein kurzer Blick in
-[`docs/design/README.md`](docs/design/README.md) — der Selbstbedienungs-Guide
-zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
-(optional, empfohlen).
+unter [Maintain a shared pipeline source](SETUP.md). Normale
+Consumer-Übernahmen folgen dem oben beschriebenen Consumer-Pfad.
 
 ## Laufzeitumgebung
 
