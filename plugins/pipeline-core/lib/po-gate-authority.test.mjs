@@ -727,7 +727,7 @@ check("approve-plan rejects bare attribution when the shared human-approval rece
   });
 });
 
-check("approve-plan leaves state unchanged when the plan digest becomes stale before commit", () => {
+check("approve-plan rejects bare attribution before a stale revalidation can reach the writer", () => {
   withFixture({}, ({ primary, validate, validateProfile }) => {
     const authority = validate();
     assert.equal(authority.ok, true);
@@ -749,7 +749,10 @@ check("approve-plan leaves state unchanged when the plan digest becomes stale be
       },
     });
     assert.equal(status, 2);
-    assert.equal(calls, 2);
+    // A signature-mode repository rejects the retired bare-attribution route
+    // before the writer's second authority read.  The important invariant is
+    // that an old command cannot reach a state-changing path at all.
+    assert.equal(calls, 1);
     assert.equal(readFileSync(statePath, "utf8"), before);
   });
 });
