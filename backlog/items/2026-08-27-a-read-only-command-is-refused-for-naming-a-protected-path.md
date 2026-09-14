@@ -96,6 +96,19 @@ without weakening the write boundary at all.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+### Implementation progress — 2026-09-14
+
+The independently measured `cp` source-operand case is resolved by
+`e01695adff84694ed10d12dac0e82707cdb0ad84`: the shared shell target extractor now
+uses destination-only semantics for `cp`, `install`, and `ln`. A protected
+source copied into `scratch/` is consequently not classified as a protected
+write, while a protected destination remains blocked. `mv` deliberately keeps
+both source and destination as candidates because moving a protected source
+removes it. Direct extractor and full lifecycle-guard integration suites pass.
+
+The opaque-interpreter retry-route direction remains open; this correction
+does not loosen its fail-closed conservative fallback.
+
 - **Decision:** accepted, option 2 (a read-only typed retry action instead of a
   signature ceremony), with option 1 explicitly NOT taken
 - **Rationale:** Option 1 would narrow the write detector, which trades away
