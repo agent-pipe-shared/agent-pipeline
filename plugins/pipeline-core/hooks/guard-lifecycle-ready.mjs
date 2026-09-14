@@ -3316,6 +3316,57 @@ function isHumanPoSigningCommand(command, root) {
 }
 
 /**
+ * Return just the mutating file operands of an in-place sed invocation.
+ *
+ * Sed's first non-option operand is its program unless an earlier -e/-f
+ * supplied one.  It is therefore not a pathname, even when a perfectly
+ * ordinary address begins with `/` (for example `/^alpha/d`).  Treating every
+ * argv item as a file made that program look like an external absolute path
+ * and incorrectly routed an in-root scratch edit through the cross-repository
+ * denial.  Keep this parser deliberately small: it recognises only sed's
+ * program-bearing options and returns the remaining non-option operands as
+ * files.  Unknown options stay options rather than becoming paths.
+ */
+function sedInPlaceFileOperands(args) {
+  const files = [];
+  let programSupplied = false;
+  let awaitingProgramOption = null;
+  let optionsEnded = false;
+
+  for (const arg of args) {
+    if (awaitingProgramOption !== null) {
+      programSupplied = true;
+      awaitingProgramOption = null;
+      continue;
+    }
+    if (!optionsEnded && arg === "--") {
+      optionsEnded = true;
+      continue;
+    }
+    if (!optionsEnded && arg.startsWith("--")) {
+      if (arg === "--expression" || arg === "--file") awaitingProgramOption = arg;
+      else if (arg.startsWith("--expression=") || arg.startsWith("--file=")) programSupplied = true;
+      continue;
+    }
+    if (!optionsEnded && arg.startsWith("-") && arg !== "-") {
+      const shortOptions = arg.slice(1);
+      const programOptionIndex = shortOptions.search(/[ef]/u);
+      if (programOptionIndex >= 0) {
+        if (programOptionIndex === shortOptions.length - 1) awaitingProgramOption = shortOptions[programOptionIndex];
+        else programSupplied = true;
+      }
+      continue;
+    }
+    if (!programSupplied) {
+      programSupplied = true;
+      continue;
+    }
+    files.push(arg);
+  }
+  return files;
+}
+
+/**
  * Identify the concrete cross-repository mutation patterns involved in local
  * plugin development. Read-only commands remain handled by the diagnostic
  * allowlist; unknown commands do not gain mutation authority from this helper.
@@ -3392,7 +3443,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
     });
   }
   if (executable === "sed" && args.some((arg) => /^-[^-]*i/u.test(arg) || /^--in-place(?:=|$)/u.test(arg))) {
-    return args.some((arg) => {
+    return sedInPlaceFileOperands(args).some((arg) => {
       const target = commandPath(arg, root);
       return target !== null && isShellExternalPathToken(arg) && !pathInside(root, target);
     });

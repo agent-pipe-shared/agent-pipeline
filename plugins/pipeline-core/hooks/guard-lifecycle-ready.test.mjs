@@ -661,6 +661,41 @@ test("consumer sessions cannot mutate Pipeline sources, cachebusters or plugin i
   }
 });
 
+test("in-place sed distinguishes its program from its file operands before cross-repository classification", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-sed-outside-"));
+  try {
+    mkdirSync(join(path, "scratch"), { recursive: true });
+    const inRootFile = join(path, "scratch", "sedprobe.txt");
+    writeFileSync(inRootFile, "alpha\nbeta\n");
+    const inRootAddress = "sed -i '/^alpha/d' scratch/sedprobe.txt";
+    const inRootLine = "sed -i '1d' scratch/sedprobe.txt";
+    const externalFile = `sed -i '/^alpha/d' ${join(outside, "outside.txt")}`;
+    const ready = {
+      schema: "pipeline.project-onboarding-ready-gate.v1",
+      status: "ready",
+      intent: "session",
+    };
+    assert.equal(isForbiddenCrossRepositoryMutation(inRootAddress, path), false, inRootAddress);
+    assert.equal(isForbiddenCrossRepositoryMutation(inRootLine, path), false, inRootLine);
+    assert.equal(isForbiddenCrossRepositoryMutation(externalFile, path), true, externalFile);
+    for (const command of [inRootAddress, inRootLine]) {
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return ready; },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    assert.equal(spawnSync("sed", ["-i", "/^alpha/d", inRootFile], { encoding: "utf8" }).status, 0);
+    assert.equal(readFileSync(inRootFile, "utf8"), "beta\n");
+    writeFileSync(inRootFile, "alpha\nbeta\n");
+    assert.equal(spawnSync("sed", ["-i", "1d", inRootFile], { encoding: "utf8" }).status, 0);
+    assert.equal(readFileSync(inRootFile, "utf8"), "beta\n");
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test("agents prepare and verify only public PO artifacts while human signing stays external", () => {
   const path = root();
   const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-po-public-"));
