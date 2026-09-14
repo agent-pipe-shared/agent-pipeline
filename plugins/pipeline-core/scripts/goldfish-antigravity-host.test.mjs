@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { AGY_ERROR_TAXONOMY } from "../lib/antigravity-execution-host.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { CROSS_RUNNER_DISPATCH_RECEIPT_SCHEMA, E3_CODES, dispatchGoldfishToAntigravity, measureAntigravityPipelineStart } from "./goldfish-antigravity-host.mjs";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
@@ -124,17 +125,34 @@ function request(value, packetValue, extra = {}) {
 }
 function calls(value) { return existsSync(value.log) ? readFileSync(value.log, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse) : []; }
 
-await withFixture(async (value) => {
+const cases = [];
+const injectedFailure = process.env.PIPELINE_E3_AGY_HOST_TEST_INJECT_FAILURE ?? "";
+function check(name, run) {
+  const id = `E3H${String(cases.length + 1).padStart(2, "0")}`;
+  cases.push({
+    id,
+    name,
+    async run() {
+      if (injectedFailure === id) assert.fail("intentional E3 Antigravity host case-completion failure");
+      await run();
+    },
+  });
+}
+
+check("measures the live Antigravity-shaped pipeline manifest before probing", async () => {
+  await withFixture(async (value) => {
   const result = measureAntigravityPipelineStart({ root: value.root, executable: value.executable, env: { ...process.env, E3_LOG: value.log } });
   assert.equal(result.status, "measured");
   assert.equal(result.code, "E3-PIPELINE-MEASURED");
   assert.equal(calls(value).length, 1, "live Antigravity-shaped manifest is discovered before probing");
+  });
 });
 
-for (const malformedManifest of [
-  { hooks: {} },
-  { "pipeline-core": { enabled: true, PreToolUse: [], Stop: [], PreInvocation: [] } },
+for (const [name, malformedManifest] of [
+  ["rejects a hooks-only Antigravity manifest before probing or model execution", { hooks: {} }],
+  ["rejects an incomplete namespaced Antigravity manifest before probing or model execution", { "pipeline-core": { enabled: true, PreToolUse: [], Stop: [], PreInvocation: [] } }],
 ]) {
+  check(name, async () => {
   await withFixture(async (value) => {
     writeFileSync(join(value.root, "plugins", "pipeline-core", "hooks.json"), JSON.stringify(malformedManifest));
     const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
@@ -143,9 +161,11 @@ for (const malformedManifest of [
     assert.equal(result.modelCalls, 0);
     assert.equal(calls(value).length, 0, "unsupported manifests fail before any probe or model call");
   });
+  });
 }
 
-await withFixture(async (value) => {
+check("dispatches a valid request and persists the schema-valid receipt", async () => {
+  await withFixture(async (value) => {
   const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
   assert.equal(result.schema, CROSS_RUNNER_DISPATCH_RECEIPT_SCHEMA, JSON.stringify(result));
   assert.equal(result.status, "succeeded");
@@ -159,34 +179,45 @@ await withFixture(async (value) => {
   const receiptSchema = JSON.parse(readFileSync(new URL("../../../schemas/pipeline.cross-runner-dispatch-receipt.v1.json", import.meta.url), "utf8"));
   assert.equal(validateAgainstSchema(persistedReceipt, receiptSchema).valid, true);
   assert.equal(calls(value).length, 2, "one probe plus one injected model boundary");
+  });
 });
 
-for (const [suffix, expected] of [["--malformed", AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED], ["--wrong-model", AGY_ERROR_TAXONOMY.MODEL_MISMATCH]]) {
+check("classifies malformed and wrong-model Antigravity results", async () => {
+  for (const [suffix, expected] of [["--malformed", AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED], ["--wrong-model", AGY_ERROR_TAXONOMY.MODEL_MISMATCH]]) {
   await withFixture(async (value) => {
     const result = await dispatchGoldfishToAntigravity(request(value, packet(value, suffix)));
     assert.equal(result.status, "failed");
     assert.equal(result.code, expected);
     assert.equal(result.persisted, true);
   });
-}
+  }
+});
 
-await withFixture(async (value) => {
+check("records a timeout as an unavailable interruption", async () => {
+  await withFixture(async (value) => {
   const result = await dispatchGoldfishToAntigravity(request(value, packet(value, "--slow"), { timeoutMs: 50 }));
   assert.equal(result.status, "failed");
   assert.equal(result.code, AGY_ERROR_TAXONOMY.TIMEOUT);
   assert.deepEqual(result.interruption, { status: "unavailable", code: AGY_ERROR_TAXONOMY.TIMEOUT });
+  });
 });
 
-await withFixture(async (value) => {
+check("records cancellation as an unavailable interruption", async () => {
+  await withFixture(async (value) => {
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 25);
   const result = await dispatchGoldfishToAntigravity(request(value, packet(value, "--slow"), { signal: controller.signal, timeoutMs: 2_000 }));
   assert.equal(result.status, "failed");
   assert.equal(result.code, AGY_ERROR_TAXONOMY.CANCELLED);
   assert.deepEqual(result.interruption, { status: "unavailable", code: AGY_ERROR_TAXONOMY.CANCELLED });
+  });
 });
 
-for (const [marker, code] of [["missing", E3_CODES.PIPELINE_MARKER_MISSING], ["mismatch", E3_CODES.PIPELINE_MARKER_MISMATCH]]) {
+for (const [marker, code, name] of [
+  ["missing", E3_CODES.PIPELINE_MARKER_MISSING, "refuses a missing pipeline-start marker before model execution"],
+  ["mismatch", E3_CODES.PIPELINE_MARKER_MISMATCH, "refuses a mismatched pipeline-start marker before model execution"],
+]) {
+  check(name, async () => {
   await withFixture(async (value) => {
     const result = await dispatchGoldfishToAntigravity(request(value, packet(value), { env: { ...process.env, E3_LOG: value.log, E3_MARKER: marker } }));
     assert.equal(result.status, "refused");
@@ -197,18 +228,22 @@ for (const [marker, code] of [["missing", E3_CODES.PIPELINE_MARKER_MISSING], ["m
     assert.equal(existsSync(join(value.root, "results/receipt.json")), false);
     assert.equal(calls(value).length, 1, "probe only");
   });
+  });
 }
 
-await withFixture(async (value) => {
+check("supports the sealed CLI request path and receipt persistence", async () => {
+  await withFixture(async (value) => {
   const requestPath = join(value.root, "sealed-request.json");
   writeFileSync(requestPath, JSON.stringify({ root: value.root, resultRoot: value.root, executable: value.executable, model: "gemini-3.8-flash-medium", effort: "medium", packet: packet(value), timeoutMs: 500 }));
   const output = execFileSync(process.execPath, [hostScript, "--request", requestPath], { cwd: value.root, env: { ...process.env, E3_LOG: value.log }, encoding: "utf8" });
   const result = JSON.parse(output);
   assert.equal(result.status, "succeeded");
   assert.equal(result.persisted, true);
+  });
 });
 
-await withFixture(async (value) => {
+check("refuses forged unavailable precondition readback without executing a model", async () => {
+  await withFixture(async (value) => {
   const gatePath = join(value.root, "policies", "alfred-e3-gate-readback.v1.json");
   const forged = JSON.parse(readFileSync(gatePath, "utf8"));
   forged.status = "unavailable";
@@ -223,21 +258,33 @@ await withFixture(async (value) => {
   assert.equal(result.code, E3_CODES.PRECONDITION);
   assert.equal(result.modelCalls, 0);
   assert.equal(calls(value).length, 0);
+  });
 });
 
-await withFixture(async (value) => {
+check("refuses an occupied result destination before executing a model", async () => {
+  await withFixture(async (value) => {
   writeFileSync(join(value.root, "results", "receipt.json"), "occupied\n");
   const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
   assert.equal(result.code, "RDP-RESULT-DESTINATION");
   assert.equal(result.modelCalls, 0);
   assert.equal(calls(value).length, 0);
+  });
 });
 
-await withFixture(async (value) => {
+check("refuses an escaping result destination before executing a model", async () => {
+  await withFixture(async (value) => {
   const result = await dispatchGoldfishToAntigravity(request(value, packet(value, "", "../receipt.json")));
   assert.equal(result.code, "RDP-RESULT-PATH");
   assert.equal(result.modelCalls, 0);
   assert.equal(calls(value).length, 0);
+  });
 });
 
-process.stdout.write("goldfish-antigravity-host tests: 13 passed\n");
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({
+  cases: cases,
+  fd: completionFd,
+  maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536"),
+});

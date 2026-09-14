@@ -360,6 +360,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "goldfish-antigravity-host-tests",
+      "path": "plugins/pipeline-core/scripts/goldfish-antigravity-host.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "governance-action-artifact-tests",
       "path": "plugins/pipeline-core/lib/governance-action-artifact.test.mjs",
       "disposition": "required"
