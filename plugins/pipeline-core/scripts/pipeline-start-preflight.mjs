@@ -38,6 +38,7 @@ import {
   listActiveSessionDescriptors,
 } from "../lib/worktree-lifecycle.mjs";
 import { planInstall } from "./pre-push-hook-install.mjs";
+import { checkCloneProvisioning } from "./check-clone-provisioning.mjs";
 import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 import {
   DEFAULT_INSTALLED_PLUGIN_PROTECTED_PATHS,
@@ -1362,8 +1363,10 @@ export function observePipelineStartPreflight({
     // `status` or the exit code.
     ...(prePushHookObservation.state !== "repository-unresolved" ? { prePushHookUnseenRemotePush: unseenRemotePush } : {}),
   };
+  const cloneProvisioning = checkCloneProvisioning(cwd);
   return {
     ...result,
+    cloneProvisioning,
     // This measures the exact normal-bootstrap envelope emitted before the
     // self-describing receipt. The receipt is retained in the same typed
     // preflight readback; no cached or static skill-size surrogate is used.

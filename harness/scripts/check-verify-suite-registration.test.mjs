@@ -740,7 +740,7 @@ check("declarative verify suites from harness/verify-suites.json are loaded and 
     JSON.stringify({
       schema: "pipeline.verify-suites.v1",
       suites: [
-        { name: "decl-one-tests", file: "plugins/pipeline-core/scripts/decl-one.test.mjs" },
+        { name: "decl-one-tests", file: "plugins/pipeline-core/scripts/decl-one.test.mjs", invariantPinned: "decl invariant", nonOverlapNote: "isolated check" },
       ],
     }, null, 2),
   );
@@ -763,7 +763,7 @@ check("declarative suite with duplicate name across verify.mjs and verify-suites
     JSON.stringify({
       schema: "pipeline.verify-suites.v1",
       suites: [
-        { name: "shared-name-tests", file: "plugins/pipeline-core/lib/dup-test.test.mjs" },
+        { name: "shared-name-tests", file: "plugins/pipeline-core/lib/dup-test.test.mjs", invariantPinned: "dup invariant", nonOverlapNote: "isolated check" },
       ],
     }, null, 2),
   );
@@ -786,7 +786,7 @@ check("declarative verify suites file with invalid schema produces a schema find
     JSON.stringify({
       schema: "invalid.schema.version",
       suites: [
-        { name: "foo-tests", file: "plugins/pipeline-core/lib/foo.test.mjs" },
+        { name: "foo-tests", file: "plugins/pipeline-core/lib/foo.test.mjs", invariantPinned: "foo invariant", nonOverlapNote: "isolated check" },
       ],
     }, null, 2),
   );
@@ -818,6 +818,27 @@ check("declarative verify suites missing required properties produces a schema f
     result.findings.some((line) => line.includes("SCHEMA-ERROR")),
     `expected schema finding, got: ${result.findings.join(" | ")}`,
   );
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("declarative verify suites missing invariantPinned or nonOverlapNote produces consolidation finding", () => {
+  const root = buildRoot();
+  writeFile(root, "plugins/pipeline-core/scripts/decl-unpinned.test.mjs");
+  writeVerifyFixture(root, {});
+  writeFile(
+    root,
+    "harness/verify-suites.json",
+    JSON.stringify({
+      schema: "pipeline.verify-suites.v1",
+      suites: [
+        { name: "decl-unpinned-tests", file: "plugins/pipeline-core/scripts/decl-unpinned.test.mjs" },
+      ],
+    }, null, 2),
+  );
+  const result = checkVerifySuiteRegistration({ verifyPath: verifyPathFor(root), exclusions: {} });
+  assert.equal(result.ok, false);
+  assert.ok(result.findings.some((line) => line.startsWith("CONSOLIDATION-RULE") && line.includes("invariantPinned")));
+  assert.ok(result.findings.some((line) => line.startsWith("CONSOLIDATION-RULE") && line.includes("nonOverlapNote")));
   rmSync(root, { recursive: true, force: true });
 });
 

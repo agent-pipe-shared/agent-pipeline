@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.dispatch-closing-allowance.v1",
+  "title": "Dispatch closing allowance record (pipeline.dispatch-closing-allowance.v1)",
+  "description": "Captured structured handover when a goldfish dispatch reaches its tool budget.",
+  "type": "object",
+  "required": [
+    "schema",
+    "taskId",
+    "committed",
+    "verifiedGreen",
+    "remainsUndone",
+    "nextBriefingAdjustments"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "pipeline.dispatch-closing-allowance.v1",
+      "enum": [
+        "pipeline.dispatch-closing-allowance.v1"
+      ]
+    },
+    "taskId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "committed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verifiedGreen": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "remainsUndone": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "nextBriefingAdjustments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

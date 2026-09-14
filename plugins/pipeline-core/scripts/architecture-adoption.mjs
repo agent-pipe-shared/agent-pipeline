@@ -197,7 +197,7 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
       description: "Enforce architecture properties at planning, candidate, push, and CI boundaries, recording module interaction receipts.",
       primaryDeliverables: [
         "hooks/guard-push.mjs",
-        "harness/scripts/verify.mjs",
+        ".github/workflows/verify.yml",
         "schemas/pipeline.module-interaction-receipt.v1.json"
       ],
       effort: stage4Effort,

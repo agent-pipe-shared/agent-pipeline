@@ -76,6 +76,13 @@ export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claud
 // canonical receipt filename is admitted before plan approval.
 const DISPATCH_RECORD_PATH = /^evidence\/dispatch-record-[A-Za-z0-9][A-Za-z0-9._-]*\.json$/u;
 
+export function isCriticScratchNotesPath(normalizedPath) {
+  if (typeof normalizedPath !== "string") return false;
+  return normalizedPath.startsWith("scratch/dispatch/")
+    || /(?:^|\/)scratch\/.*critic-notes\.md$/u.test(normalizedPath)
+    || normalizedPath.endsWith("/critic-notes.md");
+}
+
 export function isDispatchRecordCoordinationPath(normalizedPath) {
   return typeof normalizedPath === "string" && DISPATCH_RECORD_PATH.test(normalizedPath);
 }
@@ -148,7 +155,7 @@ export function devPlanGateVerdict({ filePath, projectDir }) {
   const normalizedPath = normalize(relPath);
 
   // ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
-  if (normalizedPath.startsWith("scratch/")) return { verdict: "allow" };
+  if (normalizedPath.startsWith("scratch/") || isCriticScratchNotesPath(normalizedPath)) return { verdict: "allow" };
   if (isDispatchRecordCoordinationPath(normalizedPath)) return { verdict: "allow" };
 
   // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
