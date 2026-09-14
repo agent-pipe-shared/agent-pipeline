@@ -221,6 +221,7 @@
 | pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
+| pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy | open | requirement | pipeline | alfred | 2026-09-14 | — | — |
 | pipeline.first-verify-run-is-red-with-four-failures | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | closed | defect | pipeline | — | 2026-08-12 | — | — |
 | pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -673,7 +674,7 @@
 
 ## Counts
 
-- open: 59
+- open: 60
 - in_progress: 1
 - closed: 591
 - rejected: 3

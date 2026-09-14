@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "382e85b363fbf0e5708252371322bff79b18d0640d525e0fb22d6026e73d4899"
+    "transitionHead": "895d82d90b0b2b919741c3677476470fc8739ba1df209ab34596d1de8d5e92e8"
   },
   "counts": {
-    "open": 59,
+    "open": 60,
     "in_progress": 1,
     "closed": 591,
     "rejected": 3,
@@ -2905,6 +2905,16 @@
       "closureRepository": "self",
       "closureCommit": "0d018453700bc7b5e08eac99d6b37ee428f31f60",
       "closureEvidence": "backlog/items/2026-08-09-external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system.md"
+    },
+    {
+      "id": "pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-14",
+      "source": "PO requirement, 2026-09-14, after an Alfred-sprint feature-branch checkpoint push was blocked by release-grade marketplace attestation and push-authority prerequisites while the active external marketplace could not safely be replaced.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.first-verify-run-is-red-with-four-failures",
