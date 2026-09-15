@@ -368,6 +368,14 @@ const UNREACHABLE_COMMIT_FINDING = /^ledger event (\d+): evidence\.commit is not
 const INVALID_COMMIT_FORMAT_FINDING = /^ledger event (\d+): evidence\.commit must be a full lowercase Git commit OID$/u;
 const CLOSURE_COMMIT_DRIFT_FINDING = /^items: (.+) closure_commit must equal its final ledger evidence\.commit$/u;
 const ACCEPTED_LEDGER_EVENT_403_REASON = "accepted-ledger-event-403-abbreviated-oid";
+const ACCEPTED_LOST_RECONCILIATION_BATCH_REASON = "accepted-po-2026-09-15-lost-reconciliation-batch";
+const ACCEPTED_LOST_RECONCILIATION_BATCH = Object.freeze({
+  firstSequence: 1855,
+  lastSequence: 1862,
+  commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f",
+  actor: "backlog-reconciliation",
+  evidenceKind: "item-file-reconciliation",
+});
 const ACCEPTED_LEDGER_EVENT_403 = Object.freeze({
   sequence: 403,
   id: "pipeline.codex-read-only-steps-escalate-individually-instead-of-once",
@@ -400,6 +408,25 @@ function isKnownHistoricalUnreachableFinding(finding, events) {
   return KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS.some((known) => event?.actor === known.actor
     && event?.evidence?.kind === known.kind
     && event?.evidence?.commit === known.commit);
+}
+
+/**
+ * Bind the 2026-09-15 PO disposition to exactly the lost reconciliation
+ * batch.  The sequence range, actor, evidence kind, and missing commit must
+ * all match; a later lookalike remains an integrity finding above the cutoff.
+ */
+function isAcceptedLostReconciliationFinding(finding, events) {
+  const match = UNREACHABLE_COMMIT_FINDING.exec(finding);
+  if (!match) return false;
+  const physicalIndex = Number(match[1]) - 1;
+  const event = events[physicalIndex];
+  const accepted = ACCEPTED_LOST_RECONCILIATION_BATCH;
+  return event?.sequence === physicalIndex + 1
+    && event.sequence >= accepted.firstSequence
+    && event.sequence <= accepted.lastSequence
+    && event.actor === accepted.actor
+    && event.evidence?.kind === accepted.evidenceKind
+    && event.evidence?.commit === accepted.commit;
 }
 
 function isAcceptedLedgerEvent403(event, physicalIndex) {
@@ -727,11 +754,14 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
     .filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.DRIFT)
     .map((entry) => {
       const knownHistoricalBatch = isKnownHistoricalUnreachableFinding(entry.finding, ledger.events);
+      const poAcceptedLostReconciliationBatch = isAcceptedLostReconciliationFinding(entry.finding, ledger.events);
       return {
         finding: entry.finding,
         knownHistoricalBatch,
         acceptedReason: knownHistoricalBatch
           ? "accepted-2026-07-19-through-2026-07-22-unreachable-commit-batch"
+          : poAcceptedLostReconciliationBatch
+            ? ACCEPTED_LOST_RECONCILIATION_BATCH_REASON
           : knownAcceptedBacklogDrift(entry.finding, ledger.events),
       };
     });
@@ -1273,6 +1303,8 @@ function cli() {
       ? "known accepted 2026-07-19..2026-07-22 historical batch"
       : entry.acceptedReason === ACCEPTED_LEDGER_EVENT_403_REASON
         ? "known accepted ledger event 403 abbreviated OID"
+        : entry.acceptedReason === ACCEPTED_LOST_RECONCILIATION_BATCH_REASON
+          ? "PO accepted 2026-09-15 lost reconciliation batch"
         : null;
     console.error(`DRIFT backlog state: ${entry.finding}${disposition ? ` (${disposition})` : ""}`);
   }
