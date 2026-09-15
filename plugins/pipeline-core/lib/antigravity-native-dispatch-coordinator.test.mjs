@@ -169,7 +169,9 @@ test("repository and batch-preflight Git probes share one five-second preparatio
   rmSync(fakeBin, { recursive: true, force: true });
   assert.equal(result.code, "RDB-PREPARATION-FAILED");
   assert.equal(result.preparation.preparations[0].code, "RDP-DEADLINE");
-  assert.ok(batchProbes.length >= 3, `expected the timeout inside batch preflight, saw ${batchProbes.length} Git probes`);
+  // Two delayed batch probes exhaust the shared 4.5 s preparation budget;
+  // a third probe is therefore neither required nor guaranteed to start.
+  assert.ok(batchProbes.length >= 2, `expected the timeout inside batch preflight, saw ${batchProbes.length} Git probes`);
   assert.equal(nativeCalls, 0);
   assert.equal(result.modelCalls, 0);
   assert.equal(result.launcherCalls, 0);
