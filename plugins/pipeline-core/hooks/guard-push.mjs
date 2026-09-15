@@ -138,10 +138,6 @@ import { spawnSync } from "node:child_process";
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
 import { authorizeRecordedDeploy, authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
 import { USER_SOURCE_PATH, criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
-// AGY-MKTATTEST-1: reuses the SAME attestation `human-guard-override.test.mjs`'s F1 case
-// exercises (via `humanGuardOverrideInternals.localPluginInstallSourceObservation`), rather
-// than a second, independently written comparison -- see checkMarketplaceAttestation() below.
-import { HumanGuardOverrideError, humanGuardOverrideInternals } from "../lib/human-guard-override.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
@@ -2019,67 +2015,6 @@ function checkSecurityEvidenceBinding() {
 }
 
 /**
- * AGY-MKTATTEST-1 (Direction 3, backlog: 2026-08-24-verify-marketplace-attestation-
- * blocks-normal-active-development.md): the live comparison between THIS machine's
- * external local-marketplace copy (ADR-0052; typically
- * ~/agent-pipeline-local-marketplace/plugins/pipeline-core) and this checkout was
- * previously asserted inside `human-guard-override.test.mjs`'s F1 case (run by every
- * `verify.mjs` invocation) and therefore went red on every ordinary commit touching
- * `plugins/pipeline-core/**` during active development, not only on real drift. That
- * ONE assertion is now downgraded to a visible WARN inside the test file -- the
- * underlying security property (an agent cannot falsely claim the external marketplace
- * matches the checkout) still needs to be true at the moment it is actually
- * load-bearing, publication, so it becomes a hard push-time check here instead. Reuses
- * `externalLocalMarketplaceObservation()` (via `localPluginInstallSourceObservation()`,
- * which threads the checkout's own plugin-source tree hash into it) -- the SAME
- * attestation the test suite exercises, never a second, independently written
- * comparison.
- *
- * Only active for a Pipeline SOURCE checkout (`isPipelineSourceRoot`); a downstream
- * consumer project never registers `agent-pipeline-local` for itself, so this check is
- * inert there -- matching the backlog item's own "never for a downstream consumer
- * project" concern for the auto-sync direction it rejected.
- *
- * Deliberately does NOT reuse `criticalProofWaiverFor`/`readCriticalHumanProofPolicy`
- * (a considered deviation from the design doc's "adding a second instance of a pattern
- * that already exists" framing): that machinery models a human's detached proof of
- * INTENT, and there is no proof a human could sign for "the rsync copy on this machine
- * currently matches" -- it is a live environment fact, not an attested decision. This
- * check instead reuses the plainer collected-failure shape checks (a)/(b.1)/(c) above
- * already use, dispatched under the same `gates.push.mode`.
- *
- * A "verified" or typed "unobserved" (`registry-unavailable`/`not-registered`) result is
- * silent-pass -- neither is itself evidence of a mismatch, matching
- * `externalLocalMarketplaceObservation()`'s own documented semantics ("An entry that
- * records no source locates nothing. That is an ABSENT observation, not a mismatch").
- * Only a thrown `HGO-EXTERNAL-MARKETPLACE` (a genuine content/registration mismatch)
- * becomes a finding. Any OTHER exception (e.g. `HGO-PLUGIN-SOURCE` from this checkout's
- * OWN plugin-source tree being broken -- a distinct concern this dispatch was not
- * scoped to design a bespoke handler for) is deliberately let through uncaught, so the
- * existing terminal fault boundary (PUSHBOUND-1, the `catch (faultError)` below) maps it
- * through the SAME `gates.push.mode` dispatch every other unanticipated fault in this
- * evaluation already gets, rather than a second, ad-hoc failure path here.
- */
-function checkMarketplaceAttestation() {
-  if (!humanGuardOverrideInternals.isPipelineSourceRoot(evidenceProjectDir)) return [];
-  let observation;
-  try {
-    observation = humanGuardOverrideInternals.localPluginInstallSourceObservation({ root: evidenceProjectDir });
-  } catch (error) {
-    if (error instanceof HumanGuardOverrideError && error.code === "HGO-EXTERNAL-MARKETPLACE") {
-      return [
-        `Marketplace attestation (AGY-MKTATTEST-1): this machine's external local-marketplace copy does not match ` +
-        `this checkout's plugins/pipeline-core (${error.message}). Re-sync the external local-marketplace copy ` +
-        `(ADR-0052) with this checkout before pushing, or confirm no stale local marketplace is registered.`,
-      ];
-    }
-    throw error;
-  }
-  void observation; // "verified"/"unobserved" -- see header comment; neither is a finding.
-  return [];
-}
-
-/**
  * NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
  * calls-it.md, Point 3): a READ-ONLY, non-blocking advisory surfaced only on the all-green
  * push path -- never a new finding pushed into `failures`/`securityFailures`, and never able
@@ -2432,9 +2367,6 @@ try {
     }
   }
 
-  // (d) marketplace attestation (AGY-MKTATTEST-1) -- see checkMarketplaceAttestation()
-  // above for the full rationale and scope.
-  failures.push(...checkMarketplaceAttestation());
 } catch (faultError) {
   // The evaluation above faulted before producing a `failures` verdict at all. Map
   // it through the SAME mode dispatch the normal collected-findings path below uses

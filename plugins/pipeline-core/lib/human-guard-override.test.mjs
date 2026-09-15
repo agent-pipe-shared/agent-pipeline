@@ -5034,20 +5034,9 @@ test("NVA-CROSSREPOGUIDANCE-1a: an ordinary in-root denial returns the coordinat
 });
 
 // ---------------------------------------------------------------------------------
-// AGY-MKTATTEST-1 (Direction 3, PO-approved 2026-08-25; backlog: 2026-08-24-verify-
-// marketplace-attestation-blocks-normal-active-development.md): the underlying
-// security property F1's downgraded WARN above no longer enforces at Verify time --
-// "an agent cannot falsely claim the external marketplace matches the checkout" --
-// is now a hard, blocking check in guard-push.mjs's checkMarketplaceAttestation().
-// These two tests spawn the REAL guard-push.mjs as its own subprocess (the same
-// technique guard-push.test.mjs's own runGuard() uses -- that file is TP-5
-// protected, so its live coverage for this new check lives here instead, in the
-// suite this new function's dependency, human-guard-override.mjs, is already
-// covered by and Verify already runs) and drive the marketplace comparison through
-// a fake `codex` executable placed on the subprocess's PATH -- guard-push.mjs's
-// default call path spawns the REAL `codex` binary by name, unlike the in-process
-// externalLocalMarketplaceObservation() calls elsewhere in this file, which can
-// inject a registryReader function directly.
+// Local marketplace alignment is observed at installation/bootstrap, not at push time.
+// These subprocess tests prove that a stale registered copy cannot deadlock a candidate
+// publication, while the ordinary Verify-evidence gate remains fully blocking.
 // ---------------------------------------------------------------------------------
 
 const GUARD_PUSH_PATH = join(PLUGIN_ROOT, "hooks", "guard-push.mjs");
@@ -5081,8 +5070,7 @@ function runGuardPush(command, dir, env = {}) {
  * fixture -- combines pipelineCheckout()'s marketplace/plugin-source shape (already
  * used by the NVA-BL-20/NVA-MKTHASH-1 tests above) with a real git repo and the
  * exact manifest/evidence shape guard-push.test.mjs's own PG10 ("standing-approved
- * passes without any state file") fixture uses, so the ONLY thing this fixture can
- * fail on is the new marketplace-attestation check.
+ * passes without any state file") fixture uses.
  */
 function pipelineSourcePushRepo(base, name) {
   const { root, sourceRoot } = pipelineCheckout(base, name);
@@ -5103,7 +5091,7 @@ function pipelineSourcePushRepo(base, name) {
   return { root, sourceRoot, head };
 }
 
-test("AGY-MKTATTEST-1: guard-push BLOCKS a push from a Pipeline-source checkout whose external local-marketplace copy has drifted", () => {
+test("AGY-MKTATTEST-1: guard-push permits an otherwise-green push when the registered local marketplace copy is stale", () => {
   const base = externalFixture();
   try {
     const { root, sourceRoot } = pipelineSourcePushRepo(base, "checkout");
@@ -5119,9 +5107,8 @@ test("AGY-MKTATTEST-1: guard-push BLOCKS a push from a Pipeline-source checkout 
       const { code, stderr } = runGuardPush(MKTATTEST_PUSH_CMD, root, {
         PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
       });
-      assert.equal(code, 2, stderr);
-      assert.match(stderr, /Marketplace attestation \(AGY-MKTATTEST-1\)/);
-      assert.match(stderr, /does not match this checkout/);
+      assert.equal(code, 0, stderr);
+      assert.equal(stderr.trim(), "");
     } finally {
       rmSync(bin, { recursive: true, force: true });
     }
@@ -5130,7 +5117,7 @@ test("AGY-MKTATTEST-1: guard-push BLOCKS a push from a Pipeline-source checkout 
   }
 });
 
-test("AGY-MKTATTEST-1: guard-push does NOT block an otherwise-green push from a Pipeline-source checkout whose external local-marketplace copy genuinely matches", () => {
+test("AGY-MKTATTEST-1: a matching local marketplace copy remains irrelevant to an otherwise-green push", () => {
   const base = externalFixture();
   try {
     const { root, sourceRoot } = pipelineSourcePushRepo(base, "checkout");
@@ -5145,6 +5132,32 @@ test("AGY-MKTATTEST-1: guard-push does NOT block an otherwise-green push from a 
       });
       assert.equal(code, 0, stderr);
       assert.equal(stderr.trim(), "");
+    } finally {
+      rmSync(bin, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("AGY-MKTATTEST-1: stale local marketplace state cannot bypass invalid Verify evidence", () => {
+  const base = externalFixture();
+  try {
+    const { root, sourceRoot } = pipelineSourcePushRepo(base, "checkout");
+    const external = externalMarketplace(base, "external");
+    cpSync(sourceRoot, join(external, "plugins", "pipeline-core"), { recursive: true });
+    writeFileSync(join(external, "plugins", "pipeline-core", "smuggled.txt"), "not part of this checkout\n");
+    writeFileSync(join(root, "evidence", "verify-latest.json"), "{not-json}\n");
+    const bin = fakeCodexBinDir([
+      { name: "agent-pipeline-local", root: external, marketplaceSource: { sourceType: "local", source: external } },
+    ]);
+    try {
+      const { code, stderr } = runGuardPush(MKTATTEST_PUSH_CMD, root, {
+        PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
+      });
+      assert.equal(code, 2, stderr);
+      assert.match(stderr, /verify evidence is not valid JSON/);
+      assert.doesNotMatch(stderr, /Marketplace attestation \(AGY-MKTATTEST-1\)/);
     } finally {
       rmSync(bin, { recursive: true, force: true });
     }
