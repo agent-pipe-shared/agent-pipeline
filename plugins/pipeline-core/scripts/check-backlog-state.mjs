@@ -19,6 +19,7 @@ import {
   INDEX_SCHEMA,
   ITEM_HASH_AMENDMENT_KIND,
   ITEM_HASH_AMENDMENT_TARGETS,
+  isPoAcceptedLostReconciliationEvent,
   ITEM_SCHEMA,
   PRE_PUBLIC_CORE_REACHABILITY_KIND,
   PRE_PUBLIC_CORE_REACHABILITY_TARGETS,
@@ -369,13 +370,6 @@ const INVALID_COMMIT_FORMAT_FINDING = /^ledger event (\d+): evidence\.commit mus
 const CLOSURE_COMMIT_DRIFT_FINDING = /^items: (.+) closure_commit must equal its final ledger evidence\.commit$/u;
 const ACCEPTED_LEDGER_EVENT_403_REASON = "accepted-ledger-event-403-abbreviated-oid";
 const ACCEPTED_LOST_RECONCILIATION_BATCH_REASON = "accepted-po-2026-09-15-lost-reconciliation-batch";
-const ACCEPTED_LOST_RECONCILIATION_BATCH = Object.freeze({
-  firstSequence: 1855,
-  lastSequence: 1862,
-  commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f",
-  actor: "backlog-reconciliation",
-  evidenceKind: "item-file-reconciliation",
-});
 const ACCEPTED_LEDGER_EVENT_403 = Object.freeze({
   sequence: 403,
   id: "pipeline.codex-read-only-steps-escalate-individually-instead-of-once",
@@ -410,23 +404,11 @@ function isKnownHistoricalUnreachableFinding(finding, events) {
     && event?.evidence?.commit === known.commit);
 }
 
-/**
- * Bind the 2026-09-15 PO disposition to exactly the lost reconciliation
- * batch.  The sequence range, actor, evidence kind, and missing commit must
- * all match; a later lookalike remains an integrity finding above the cutoff.
- */
 function isAcceptedLostReconciliationFinding(finding, events) {
   const match = UNREACHABLE_COMMIT_FINDING.exec(finding);
   if (!match) return false;
   const physicalIndex = Number(match[1]) - 1;
-  const event = events[physicalIndex];
-  const accepted = ACCEPTED_LOST_RECONCILIATION_BATCH;
-  return event?.sequence === physicalIndex + 1
-    && event.sequence >= accepted.firstSequence
-    && event.sequence <= accepted.lastSequence
-    && event.actor === accepted.actor
-    && event.evidence?.kind === accepted.evidenceKind
-    && event.evidence?.commit === accepted.commit;
+  return isPoAcceptedLostReconciliationEvent(events[physicalIndex], physicalIndex);
 }
 
 function isAcceptedLedgerEvent403(event, physicalIndex) {
