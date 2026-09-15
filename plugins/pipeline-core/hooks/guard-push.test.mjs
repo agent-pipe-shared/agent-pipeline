@@ -149,6 +149,7 @@ function runGuard(command, dir, { cwd = dir, projectDir = dir, env = {} } = {}) 
     encoding: "utf8",
     cwd,
     env: { ...process.env, ...env, CLAUDE_PROJECT_DIR: projectDir },
+    stdio: ["pipe", "pipe", "pipe"],
     timeout: 10000,
   });
   return { code: res.status, stderr: res.stderr ?? "" };
