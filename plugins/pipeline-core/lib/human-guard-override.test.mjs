@@ -5156,7 +5156,7 @@ test("AGY-MKTATTEST-1: stale local marketplace state cannot bypass invalid Verif
         PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
       });
       assert.equal(code, 2, stderr);
-      assert.match(stderr, /verify evidence is not valid JSON/);
+      assert.match(stderr, /evidence\/verify-latest\.json is corrupted \(invalid JSON:/);
       assert.doesNotMatch(stderr, /Marketplace attestation \(AGY-MKTATTEST-1\)/);
     } finally {
       rmSync(bin, { recursive: true, force: true });

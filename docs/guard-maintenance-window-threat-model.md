@@ -159,8 +159,9 @@ below assumes it holds and is written to catch a change that would break it.
   seventh gap (NVA-V25-DRIVERKERNEL, 2026-08-29) is a different shape than the
   six above: the closure walk only follows edges FROM a kernel file outward,
   so a module that instead IMPORTS a kernel module is structurally invisible
-  to it. `scripts/push-init.mjs` imports `scripts/push-gate-satisfiability.mjs`
-  and `scripts/push-prepare.mjs` (both already kernel) directly, and its own
+  to it. `scripts/push-init.mjs` imports `scripts/push-gate-satisfiability.mjs`,
+  `scripts/push-prepare.mjs`, and `lib/push-destination-policy.mjs` (all kernel)
+  directly, and its own
   code constructs the `signatureCommand` object handed to the PO as the exact
   text of the human-attended push-authorization signature command — the same
   class of artifact `scripts/po-human-approval.mjs` produces. An eighth gap

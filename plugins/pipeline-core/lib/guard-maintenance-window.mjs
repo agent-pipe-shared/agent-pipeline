@@ -366,6 +366,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // rather than constructing any of the content itself, so it never sits upstream of a
   // human-signed approval ceremony the way push-init.mjs does.
   "plugins/pipeline-core/scripts/push-init.mjs",
+  "plugins/pipeline-core/lib/push-destination-policy.mjs",
   // NVA-V26-SIGNINGIMPORTERS (2026-08-29): an eighth gap, the same shape as the seventh
   // (importer, not import target -- the closure walk only follows edges FROM a kernel
   // file outward, so a module that instead IMPORTS a kernel module is structurally

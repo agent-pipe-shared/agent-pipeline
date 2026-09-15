@@ -252,7 +252,10 @@ for (const source of PUSH_INIT_DOC_SOURCES) {
       // parser -- catches a renamed/removed flag even when it happens to still be a substring of
       // usage() (e.g. a typo that still matches `--[a-z-]+`).
       const argv = [];
-      for (const flag of flags) argv.push(flag, `test-value-${flag.replace(/^--/, "")}`);
+      for (const flag of flags) {
+        argv.push(flag);
+        if (flag !== "--checkpoint") argv.push(`test-value-${flag.replace(/^--/, "")}`);
+      }
       const parsed = parsePushInitArgs(argv);
       assert.equal(parsed.error, undefined, `${source.label}'s documented argv was rejected by the real parser: ${parsed.error} (line: ${line})`);
     }

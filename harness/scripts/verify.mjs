@@ -282,6 +282,7 @@ const TEST_SUITES = [
   { name: "guard-push-tests", file: join(hooksDir, "guard-push.test.mjs") },
   { name: "guard-push-v2-tests", file: join(hooksDir, "guard-push-v2.test.mjs") },
   { name: "guard-push-attestation-diagnostics-tests", file: join(hooksDir, "guard-push-attestation-diagnostics.test.mjs") },
+  { name: "push-destination-policy-tests", file: join(libDir, "push-destination-policy.test.mjs") },
   { name: "stop-suggest-tests", file: join(hooksDir, "stop-suggest.test.mjs") },
   { name: "close-coordinator-tests", file: join(pluginScriptsDir, "close-coordinator.test.mjs") },
   { name: "post-compact-reground-tests", file: join(hooksDir, "post-compact-reground.test.mjs") },
@@ -796,6 +797,7 @@ const TEST_SUITES = [
   // push-path driver; semgrep-default-rules.test.mjs covers the shipped default
   // rule set. check-suite-registration.mjs named exactly these two.
   { name: "push-init-tests", file: join(pluginScriptsDir, "push-init.test.mjs") },
+  { name: "runner-transcript-recovery-tests", file: join(pluginScriptsDir, "runner-transcript-recovery.test.mjs") },
   { name: "semgrep-default-rules-tests", file: join(repoRoot, "plugins", "pipeline-core", "config", "security", "semgrep-default-rules.test.mjs") },
   // NVA-DONEWHEN-1: the done_when predicate checker's own suite. It passed
   // standalone since the day it was written but never ran in the gate, which is
