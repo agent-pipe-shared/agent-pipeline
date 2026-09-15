@@ -137,6 +137,29 @@ Verification in `architecture-adoption.test.mjs` confirms:
 3. **Deferred Disposition**: Returns `ok: true`, disposition `deferred`. Validates that deferral satisfies authority disposition until expiry.
 4. **Expired Deferral**: Automatically re-raises `adoption-required` with `expired: true` and fails planning checks (`disposition: "expired-deferral"`).
 
+### 3.1 Runtime authority binding (2026-09-15)
+
+The disposition is now consumed on the runner path that grants implementation
+authority, rather than remaining a standalone CLI check. `guard-lifecycle-ready`
+recognizes only the already closed, sanctioned `pipeline-state.mjs set-phase
+--phase implementation` argv shape. After exact session readiness, it reads the
+writer-owned active feature plan path and invokes
+`checkPlanningAdoptionDisposition` for that scope. A missing, expired, or
+out-of-scope decision refuses the transition with
+`GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED`; only an in-scope approved, deferred,
+or partial disposition is admitted.
+
+The focused guard regression covers all three real resolver outcomes — missing
+decision, matching scoped decision, and a decision for a different scope:
+
+```text
+node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+```
+
+This is runner-hook enforcement for supported hook runtimes. The decision
+writer's PO ceremony and the remaining D3 boundary integrations remain separate
+acceptance obligations; this record does not claim that those are complete.
+
 ---
 
 ## 4. Backfill Safety & Deterministic-Pass Rule (#109 §5, Spec §7.4)

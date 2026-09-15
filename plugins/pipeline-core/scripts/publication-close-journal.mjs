@@ -20,6 +20,13 @@ export const JOURNAL_PHASES = Object.freeze(["pending", "implementation-result-b
 // machine and never create a parallel lifecycle.
 export const COORDINATOR_SCHEMA = "pipeline.close-coordinator.v1";
 export const COORDINATOR_PHASES = Object.freeze(["active", "checkpointed", "feature-close-prepared", "tracked-close-finalized", "candidate-frozen", "final-verify-green", "publication-authorized", "published", "readback-confirmed", "cleanup-complete", "closed-local", "delivered", "release-eligible", "promoted"]);
+export const ARCHITECTURE_IMPACTS = Object.freeze([
+  "architecture-conforms",
+  "architecture-decision-added",
+  "architecture-decision-superseded",
+  "architecture-summary-updated",
+  "no-architecture-impact",
+]);
 const COORDINATOR_NEXT = Object.freeze({
   active: ["checkpointed"], checkpointed: ["feature-close-prepared"],
   "feature-close-prepared": ["tracked-close-finalized"],
@@ -155,11 +162,18 @@ function validateCoordinatorPublicationAuthorization(value, phase) {
 }
 
 export function validateCloseCoordinator(state) {
-  assertKeys(state, ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "featureId", "activeFeature", "authority", "candidateOid", "candidateTree", "effects", "publicationAuthorization", "publication", "cleanup"], "close coordinator");
+  assertKeys(state, ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "featureId", "activeFeature", "authority", "architectureImpact", "candidateOid", "candidateTree", "effects", "publicationAuthorization", "publication", "cleanup"], "close coordinator");
   if (state.schema !== COORDINATOR_SCHEMA || !COORDINATOR_PHASES.includes(state.phase) || !Number.isInteger(state.revision) || state.revision < 0) throw new Error("close coordinator invalid");
   assertId(state.lifecycleId, "lifecycleId"); assertId(state.featureId, "featureId");
   validateCoordinatorActiveFeature(state.activeFeature, state.featureId);
   validateCoordinatorAuthority(state.authority);
+  if (state.architectureImpact !== null && !ARCHITECTURE_IMPACTS.includes(state.architectureImpact)) {
+    throw new Error("coordinator architecture impact invalid");
+  }
+  if (COORDINATOR_PHASES.indexOf(state.phase) >= COORDINATOR_PHASES.indexOf("feature-close-prepared")
+    && state.architectureImpact === null) {
+    throw new Error("coordinator architecture impact missing");
+  }
   if (state.revision === 0 ? state.priorStateSha256 !== null : !HEX64.test(state.priorStateSha256 ?? "")) throw new Error("coordinator prior digest invalid");
   for (const key of ["candidateOid", "candidateTree"]) if (state[key] !== null) assertHex(state[key], `coordinator.${key}`);
   if (!Array.isArray(state.effects) || state.effects.length !== state.revision) throw new Error("coordinator effects/revision mismatch");
@@ -189,7 +203,7 @@ export function validateCloseCoordinator(state) {
 
 export function createCloseCoordinator(input) {
   if (!input || typeof input !== "object") throw new Error("create coordinator input invalid");
-  const state = { schema: COORDINATOR_SCHEMA, lifecycleId: input.lifecycleId, revision: 0, priorStateSha256: null, phase: "active", featureId: input.featureId ?? input.lifecycleId, activeFeature: structuredClone(input.activeFeature ?? null), authority: structuredClone(input.authority ?? {}), candidateOid: input.candidateOid ?? null, candidateTree: input.candidateTree ?? null, effects: [], publicationAuthorization: null, publication: null, cleanup: { status: "not-started", evidenceDigest: null } };
+  const state = { schema: COORDINATOR_SCHEMA, lifecycleId: input.lifecycleId, revision: 0, priorStateSha256: null, phase: "active", featureId: input.featureId ?? input.lifecycleId, activeFeature: structuredClone(input.activeFeature ?? null), authority: structuredClone(input.authority ?? {}), architectureImpact: null, candidateOid: input.candidateOid ?? null, candidateTree: input.candidateTree ?? null, effects: [], publicationAuthorization: null, publication: null, cleanup: { status: "not-started", evidenceDigest: null } };
   validateCloseCoordinator(state); return state;
 }
 
@@ -198,7 +212,7 @@ export function advanceCloseCoordinator(state, args) {
   if (!args || typeof args !== "object") throw new Error("coordinator advance arguments invalid");
   const required = ["expectedRevision", "expectedStateSha256", "phase", "inputDigest", "observedDigest", "operationSha256"];
   for (const key of required) if (!(key in args)) throw new Error(`coordinator advance argument ${key} missing`);
-  const allowed = new Set([...required, "candidateOid", "candidateTree", "authorization", "publicationAuthorization", "publication", "cleanupStatus", "cleanupEvidenceDigest", "authority"]);
+  const allowed = new Set([...required, "candidateOid", "candidateTree", "authorization", "publicationAuthorization", "publication", "cleanupStatus", "cleanupEvidenceDigest", "authority", "architectureImpact"]);
   if (Object.keys(args).some((key) => !allowed.has(key))) throw new Error("coordinator advance arguments invalid");
   assertCas(state, args.expectedRevision, args.expectedStateSha256, "coordinator");
   assertHex(args.inputDigest, "inputDigest", true); assertHex(args.observedDigest, "observedDigest", true);
@@ -222,6 +236,11 @@ export function advanceCloseCoordinator(state, args) {
     throw new Error("conflicting coordinator replay");
   }
   if (!COORDINATOR_NEXT[state.phase]?.includes(args.phase)) throw new Error("coordinator transition invalid");
+  if (args.phase === "feature-close-prepared") {
+    if (!ARCHITECTURE_IMPACTS.includes(args.architectureImpact)) throw new Error("feature close requires architecture impact");
+  } else if (args.architectureImpact !== undefined) {
+    throw new Error("coordinator architecture impact phase invalid");
+  }
   let authority = state.authority;
   if (args.authority !== undefined) {
     if (args.phase !== "feature-close-prepared" || state.phase !== "checkpointed") throw new Error("coordinator authority update phase invalid");
@@ -280,6 +299,7 @@ export function advanceCloseCoordinator(state, args) {
     priorStateSha256: args.expectedStateSha256,
     phase: args.phase,
     authority,
+    architectureImpact: args.phase === "feature-close-prepared" ? args.architectureImpact : state.architectureImpact,
     candidateOid,
     candidateTree,
     publicationAuthorization: args.publicationAuthorization ?? state.publicationAuthorization,
@@ -557,6 +577,11 @@ export function storeCloseCoordinator({ gitCommonDir, coordinator, expectedRawSh
         || coordinator.lifecycleId !== current.value.lifecycleId
         || coordinator.featureId !== current.value.featureId
         || canonical(coordinator.activeFeature) !== canonical(current.value.activeFeature)
+        || (coordinator.architectureImpact !== current.value.architectureImpact
+          && !(current.value.phase === "checkpointed"
+            && coordinator.phase === "feature-close-prepared"
+            && current.value.architectureImpact === null
+            && ARCHITECTURE_IMPACTS.includes(coordinator.architectureImpact)))
         || (canonical(coordinator.authority) !== canonical(current.value.authority)
           && !(current.value.phase === "checkpointed"
             && coordinator.phase === "feature-close-prepared"

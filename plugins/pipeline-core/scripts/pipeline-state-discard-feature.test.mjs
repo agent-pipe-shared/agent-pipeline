@@ -75,7 +75,7 @@ test("AC-2: discard-feature refuses when no continuity gates the feature -- clos
     assert.equal(run(["discard-feature", "--by", "PO", "--reason", "changed mind"], { dir: root, now: () => "2026-08-08T10:00:00.000Z" }), 2);
     assert.equal(readFileSync(statePath, "utf8"), before);
     // Prove the boundary: close-feature IS satisfiable in exactly this state.
-    assert.equal(run(["close-feature", "--by", "PO"], { dir: root, now: () => "2026-08-08T10:01:00.000Z" }), 0);
+    assert.equal(run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], { dir: root, now: () => "2026-08-08T10:01:00.000Z" }), 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -98,7 +98,7 @@ test("AC-2: close-feature is structurally unsatisfiable in the stuck state (Resu
   const { root, statePath } = fixture(stuckState());
   try {
     const before = readFileSync(statePath, "utf8");
-    assert.equal(run(["close-feature", "--by", "PO"], { dir: root, now: () => "2026-08-08T10:00:00.000Z" }), 2);
+    assert.equal(run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], { dir: root, now: () => "2026-08-08T10:00:00.000Z" }), 2);
     assert.equal(readFileSync(statePath, "utf8"), before);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -133,7 +133,7 @@ test("AC-3/AC-4: discard-feature appends an honest record to discardedFeatures (
   const { root, statePath } = fixture(stuckState());
   try {
     // Reach the stuck state: close-feature is structurally unsatisfiable.
-    assert.equal(run(["close-feature", "--by", "PO"], { dir: root, now: () => "2026-08-08T10:00:00.000Z" }), 2);
+    assert.equal(run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], { dir: root, now: () => "2026-08-08T10:00:00.000Z" }), 2);
 
     // Discard it, honestly.
     assert.equal(

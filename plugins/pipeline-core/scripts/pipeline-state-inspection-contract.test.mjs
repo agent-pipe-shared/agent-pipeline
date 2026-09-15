@@ -71,7 +71,7 @@ check("close-feature leaves a state the inspection classifies valid", () => {
     run(["set-feature", "--id", "feature-two", "--plan-path", "specs/feature-two/prd.md"], { dir: root }),
     0,
   );
-  const exit = run(["close-feature", "--by", "PO"], { dir: root });
+  const exit = run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], { dir: root });
   assert.equal(exit, 0);
   assertValid(root, "close-feature");
 });
