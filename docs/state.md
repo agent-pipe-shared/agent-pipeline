@@ -28,6 +28,14 @@
 
 **Lifecycle phase:** feature `sprint-alfred-epic` · phase `implementation`
 
+**2026-09-15 — Nova backlog handover:** The open
+[feature-branch checkpoint push policy item](../backlog/items/2026-09-14-feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy.md)
+is reassigned from Alfred to Nova by PO direction. It remains an open Nova
+requirement: define a fail-closed, configuration-driven feature-checkpoint
+lane without relaxing the protected-publication lane. This is a backlog-scope
+transfer only; do not treat it as a rejection, an implementation result, or a
+change to the active Alfred feature.
+
 `feat/sprint-alfred` has been rebased onto Nova commit
 `d2b1dbfc9f70d1ae45ba036b65968c1d9302e5e4`. The Nova target is an ancestor
 of the rebased branch with zero commits on the Nova-only side. The user's

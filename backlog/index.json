@@ -2914,7 +2914,7 @@
       "created": "2026-09-14",
       "source": "PO requirement, 2026-09-14, after an Alfred-sprint feature-branch checkpoint push was blocked by release-grade marketplace attestation and push-authority prerequisites while the active external marketplace could not safely be replaced.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "nova"
     },
     {
       "id": "pipeline.first-verify-run-is-red-with-four-failures",
