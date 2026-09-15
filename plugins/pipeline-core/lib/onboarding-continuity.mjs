@@ -409,12 +409,20 @@ function validDiscardedTransitionState(root, state) {
 function closedEntryStaticShape(entry) {
   const baseKeys = new Set(["id", "planPath", "phaseAtClose", "closedAt", "closedBy", "forCommit"]);
   const expectedKeys = new Set(baseKeys);
+  if (entry?.architectureImpact !== undefined) expectedKeys.add("architectureImpact");
   if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
   if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
   if (!exactKeys(entry, expectedKeys)
     || typeof entry.id !== "string" || entry.id.length === 0
     || typeof entry.planPath !== "string" || entry.planPath.length === 0
     || !(entry.phaseAtClose === null || typeof entry.phaseAtClose === "string")
+    || !(entry.architectureImpact === undefined || [
+      "architecture-conforms",
+      "architecture-decision-added",
+      "architecture-decision-superseded",
+      "architecture-summary-updated",
+      "no-architecture-impact",
+    ].includes(entry.architectureImpact))
     || !canonicalIsoTimestamp(entry.closedAt)
     || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
     || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;

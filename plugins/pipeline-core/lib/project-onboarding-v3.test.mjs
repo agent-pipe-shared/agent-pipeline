@@ -6565,7 +6565,7 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
     assert.equal(designBeforeClose.status, "ready");
     assert.equal(designBeforeClose.continuity.status, "valid");
 
-    const closedByWriter = runStateCommand("close-feature", "--by", "PO");
+    const closedByWriter = runStateCommand("close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact");
     assert.equal(closedByWriter.status, 0, closedByWriter.stderr);
     const closed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,

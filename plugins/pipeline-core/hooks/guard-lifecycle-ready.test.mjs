@@ -432,6 +432,71 @@ function readyStub() {
   return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
 }
 
+test("D4 / AC-17: the implementation-authority transition consumes the active plan's scoped adoption decision", () => {
+  const path = root();
+  const planPath = "specs/d4-authority/prd.md";
+  const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(join(path, "project"), { recursive: true });
+    writeFileSync(join(path, "project", "pipeline-state.json"), JSON.stringify({
+      schema: "pipeline.state.v0",
+      activeFeature: { id: "d4-authority", planPath, phase: "design" },
+      planApproved: true,
+    }) + "\n");
+
+    const noDecision = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(noDecision.exitCode, 2, noDecision.stderr);
+    assert.match(noDecision.stderr, /GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED/u);
+    assert.match(noDecision.stderr, /adoption-required/u);
+
+    mkdirSync(join(path, "architecture"), { recursive: true });
+    writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
+      schema: "pipeline.adoption-state.v1",
+      state: "approved-scoped",
+      scope: "specs/d4-authority/",
+      decidedAt: "2026-09-15T00:00:00.000Z",
+      expiresAt: null,
+      reviewDate: null,
+      decisionRef: "PO-TEST-D4",
+      rationale: "Test-only scoped adoption decision",
+      coverageClass: "evaluated",
+      confidence: "measured",
+      by: "PO",
+    }) + "\n");
+    const allowed = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.deepEqual(allowed, { exitCode: 0, stderr: "" });
+
+    writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
+      schema: "pipeline.adoption-state.v1",
+      state: "approved-scoped",
+      scope: "specs/other-work-package/",
+      decidedAt: "2026-09-15T00:00:00.000Z",
+      expiresAt: null,
+      reviewDate: null,
+      decisionRef: "PO-TEST-D4-OTHER",
+      rationale: "Deliberately different scope",
+      coverageClass: "evaluated",
+      confidence: "measured",
+      by: "PO",
+    }) + "\n");
+    const wrongScope = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(wrongScope.exitCode, 2, wrongScope.stderr);
+    assert.match(wrongScope.stderr, /outside approved architecture adoption scope/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
 test("writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route", () => {
   const path = root();
   try {

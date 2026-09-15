@@ -1658,7 +1658,7 @@ function closeCollidePriorEntry(overrides = {}) {
   const fx = closeCollideFixture({ closeEvidencePath: "evidence/close.json", priorClosedFeatures: [closeCollidePriorEntry()] });
   const before = readFileSync(statePath(fx.dir), "utf8");
   const refusal = capturedStderr(() => run(
-    ["close-feature", "--by", "po-test", "--continuity-close-request", fx.closeRequestFile],
+    ["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", fx.closeRequestFile],
     closeCollideDeps(fx.dir),
   ));
   assert.equal(refusal.result, 2, "a colliding close-evidence path must be refused (exit 2)");
@@ -1671,7 +1671,7 @@ function closeCollidePriorEntry(overrides = {}) {
 
   const noActiveFeatureDir = mkdtempSync(join(tmpdir(), "closecollide-noactive-"));
   mkdirSync(join(noActiveFeatureDir, "project"), { recursive: true });
-  const noActiveFeature = run(["close-feature", "--by", "po-test"], { dir: noActiveFeatureDir, now: () => "2026-02-02T00:00:00.000Z" });
+  const noActiveFeature = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir: noActiveFeatureDir, now: () => "2026-02-02T00:00:00.000Z" });
   assert.equal(noActiveFeature, 2, "sanity: the pre-existing no-activeFeature close-feature refusal is exit 2");
   assert.equal(refusal.result, noActiveFeature,
     "the new collision refusal must use the same exit code as an existing close-feature refusal");
@@ -1682,7 +1682,7 @@ function closeCollidePriorEntry(overrides = {}) {
 {
   const fx = closeCollideFixture({ closeEvidencePath: "evidence/close-distinct.json", priorClosedFeatures: [closeCollidePriorEntry()] });
   const accepted = run(
-    ["close-feature", "--by", "po-test", "--continuity-close-request", fx.closeRequestFile],
+    ["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", fx.closeRequestFile],
     closeCollideDeps(fx.dir),
   );
   assert.equal(accepted, 0, "a distinct close-evidence path must still succeed");
@@ -1706,13 +1706,35 @@ function closeCollidePriorEntry(overrides = {}) {
   };
   const fx = closeCollideFixture({ closeEvidencePath: "evidence/close.json", priorClosedFeatures: [priorNoEvidence] });
   const accepted = run(
-    ["close-feature", "--by", "po-test", "--continuity-close-request", fx.closeRequestFile],
+    ["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", fx.closeRequestFile],
     closeCollideDeps(fx.dir),
   );
   assert.equal(accepted, 0, "an earlier entry with no recorded close-evidence path must never collide");
   const finalState = JSON.parse(readFileSync(statePath(fx.dir), "utf8"));
   assert.equal(finalState.closedFeatures.length, 2, "the new entry must join the prior evidence-less one");
   assert.equal(finalState.closedFeatures.at(-1).continuityClose.closeEvidence.path, "evidence/close.json");
+}
+
+// D1: an architecture classification is a mandatory, typed close record. A
+// missing classification must be zero-mutation; a selected value is retained
+// in the append-only entry so later readers need not reconstruct it from chat.
+{
+  const fx = closeCollideFixture({ closeEvidencePath: "evidence/architecture-impact.json" });
+  const before = readFileSync(statePath(fx.dir), "utf8");
+  const missing = capturedStderr(() => run(
+    ["close-feature", "--by", "po-test", "--continuity-close-request", fx.closeRequestFile],
+    closeCollideDeps(fx.dir),
+  ));
+  assert.equal(missing.result, 2, "an unclassified architecture close must be refused");
+  assert.equal(readFileSync(statePath(fx.dir), "utf8"), before,
+    "a missing architecture classification must leave State byte-identical");
+  assert.ok(missing.lines.some((line) => line.includes("--architecture-impact")));
+  assert.equal(run(
+    ["close-feature", "--by", "po-test", "--architecture-impact", "architecture-summary-updated", "--continuity-close-request", fx.closeRequestFile],
+    closeCollideDeps(fx.dir),
+  ), 0);
+  const finalState = JSON.parse(readFileSync(statePath(fx.dir), "utf8"));
+  assert.equal(finalState.closedFeatures.at(-1).architectureImpact, "architecture-summary-updated");
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");

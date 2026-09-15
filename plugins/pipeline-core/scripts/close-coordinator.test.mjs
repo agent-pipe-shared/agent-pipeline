@@ -95,6 +95,7 @@ function step(s, phase, extra = {}) {
     inputDigest: h("a"),
     observedDigest: h("b"),
     operationSha256: h("f"),
+    ...(phase === "feature-close-prepared" ? { architectureImpact: "architecture-conforms" } : {}),
     ...candidate,
     ...completionAuthority,
     ...extra,
@@ -158,6 +159,29 @@ test("authority and active-feature identities are closed", () => {
   assert.throws(() => createCloseCoordinator({ lifecycleId: "x", featureId: "feature", activeFeature: { id: "feature", planPath: "../escape", phase: "implementation" }, authority: authority() }), /activeFeature/);
   assert.throws(() => createCloseCoordinator({ lifecycleId: "x", featureId: "feature", activeFeature: { id: "feature", planPath: "plan.md", phase: "implementation" }, authority: {} }), /authority/);
 });
+test("architecture impact is required at feature-close preparation and remains durable", () => {
+  let state = step(fresh(), "checkpointed");
+  assert.throws(() => advanceCloseCoordinator(state, {
+    expectedRevision: state.revision,
+    expectedStateSha256: lifecycleDigest(state),
+    phase: "feature-close-prepared",
+    inputDigest: h("a"),
+    observedDigest: h("b"),
+    operationSha256: h("f"),
+    authority: { ...state.authority, implementationResultSha256: h("9"), pipelineStateSha256: h("8") },
+  }), /architecture impact/);
+  state = step(state, "feature-close-prepared");
+  assert.equal(state.architectureImpact, "architecture-conforms");
+  assert.throws(() => advanceCloseCoordinator(state, {
+    expectedRevision: state.revision,
+    expectedStateSha256: lifecycleDigest(state),
+    phase: "tracked-close-finalized",
+    inputDigest: h("a"),
+    observedDigest: h("b"),
+    operationSha256: h("f"),
+    architectureImpact: "no-architecture-impact",
+  }), /architecture impact phase invalid/);
+});
 test("published close-coordinator schema tracks the executable phase contract", () => {
   const schema = JSON.parse(readFileSync(
     new URL("./close-coordinator.schema.json", import.meta.url),
@@ -170,7 +194,7 @@ test("published close-coordinator schema tracks the executable phase contract", 
   );
   assert.deepEqual(schema.required, [
     "schema", "lifecycleId", "revision", "priorStateSha256", "phase",
-    "featureId", "activeFeature", "authority", "candidateOid", "candidateTree",
+    "featureId", "activeFeature", "authority", "architectureImpact", "candidateOid", "candidateTree",
     "effects", "publicationAuthorization", "publication", "cleanup",
   ]);
   assert.deepEqual(schema.properties.effects.items.required, [
@@ -317,7 +341,11 @@ function processFixture(name) {
   function transition(phase, extra = []) {
     const planned = invoke([
       "plan-transition", "--root", root, "--lifecycle", lifecycle,
-      "--actor", "PO", "--phase", phase, ...extra,
+      "--actor", "PO", "--phase", phase,
+      ...(phase === "feature-close-prepared"
+        ? ["--architecture-impact", "architecture-conforms"]
+        : []),
+      ...extra,
     ]);
     const applied = invokeAction(planned.nextAction);
     return { planned, applied };
@@ -341,6 +369,7 @@ function processFixture(name) {
     prepared.applied.nextAction.argv.slice(-2),
     ["--continuity-close-request", paths.closeRequest],
   );
+  assert.ok(prepared.applied.nextAction.argv.includes("architecture-conforms"));
 
   const coordinatorSha256 = prepared.applied.stateSha256;
   const closedState = {
@@ -350,6 +379,7 @@ function processFixture(name) {
       id: activeFeature.id,
       planPath: activeFeature.planPath,
       phaseAtClose: activeFeature.phase,
+      architectureImpact: "architecture-conforms",
       closedAt: "2026-07-29T12:00:00.000Z",
       closedBy: "PO",
       forCommit: git(root, ["rev-parse", "HEAD"]),

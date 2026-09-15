@@ -50,6 +50,7 @@ it is present in the returned argv):
 
 ```
 node plugins/pipeline-core/scripts/pipeline-state.mjs close-feature --by "<name>" \
+  --architecture-impact "<architecture-conforms|architecture-decision-added|architecture-decision-superseded|architecture-summary-updated|no-architecture-impact>" \
   --coordinator-lifecycle "<lifecycle-id>" \
   --coordinator-sha256 "<exact-state-sha256>" \
   --continuity-close-request "<exact-repo-relative-request>"

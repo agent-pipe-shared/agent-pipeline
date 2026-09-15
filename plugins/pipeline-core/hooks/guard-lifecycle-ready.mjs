@@ -32,6 +32,7 @@ import {
   inspectProjectOnboardingV3,
 } from "../lib/project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../scripts/pipeline-start-preflight.mjs";
+import { checkPlanningAdoptionDisposition } from "../scripts/architecture-adoption.mjs";
 import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabilities.mjs";
 // NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: the shared argv-native renderer builds
 // every human ceremony step below. The default denial is therefore bounded
@@ -301,6 +302,7 @@ const REBASE_READINESS_LIFECYCLE_STATUSES = new Set([
 const CONTROLLING_NON_READY_STATUSES = new Set(
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
 );
+const ARCHITECTURE_ADOPTION_DENIAL_CODE = "GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED";
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
@@ -328,6 +330,73 @@ function exactReadyReceipt(value) {
     && value.schema === "pipeline.project-onboarding-ready-gate.v1"
     && value.status === "ready"
     && value.intent === "session";
+}
+
+/**
+ * The implementation transition is the lifecycle's authority boundary: a
+ * submitted and PO-approved plan may still not authorize implementation until
+ * the architecture adoption disposition for that plan's governed scope is
+ * resolved. Keep this recognition closed over the same parsed argv that the
+ * lifecycle-command admission already uses; a substring check would make an
+ * unrelated shell command look like an authority transition.
+ */
+function isImplementationAuthorityTransition(command, root, dependencies = {}) {
+  const invocation = resolveSanctionedScriptInvocation(command, root, dependencies);
+  if (invocation === null || invocation.script !== PIPELINE_STATE_SCRIPT) return false;
+  const { args } = invocation;
+  return args[0] === "set-phase"
+    && args[1] === "--phase"
+    && args[2] === "implementation"
+    && (args.length === 3
+      || (args.length === 5 && args[3] === "--verify-command" && classifyVerifyCommand(args[4]) === "configured"));
+}
+
+/**
+ * Reads only the active feature's already writer-owned plan path. It is the
+ * authority artifact that identifies the work package at the instant
+ * implementation authority is requested; accepting a caller-supplied path
+ * here would let a command select an unrelated approved scope.
+ */
+function activeFeaturePlanningScope(root, dependencies = {}) {
+  try {
+    const source = (dependencies.readFileSyncFn ?? readFileSync)(join(root, "project", "pipeline-state.json"), "utf8");
+    const state = JSON.parse(source);
+    const planPath = state?.activeFeature?.planPath;
+    return typeof planPath === "string" && planPath.trim() !== "" && !planPath.includes("\0")
+      ? planPath
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function architectureAdoptionAuthorityVerdict(root, command, dependencies = {}) {
+  if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
+  const scope = (dependencies.activeFeaturePlanningScopeFn ?? activeFeaturePlanningScope)(root, dependencies);
+  if (scope === null) {
+    return verdict(
+      2,
+      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+        + `${ARCHITECTURE_ADOPTION_DENIAL_CODE}: the active feature has no valid plan path to bind an architecture adoption disposition.\n`
+        + "Repair the writer-owned lifecycle state, then record the PO's scoped architecture adoption decision before requesting implementation authority.\n",
+    );
+  }
+  let disposition;
+  try {
+    disposition = (dependencies.checkPlanningAdoptionDispositionFn ?? checkPlanningAdoptionDisposition)(root, scope);
+  } catch {
+    disposition = null;
+  }
+  if (disposition?.ok === true) return null;
+  const detail = typeof disposition?.error === "string" && disposition.error.trim() !== ""
+    ? disposition.error
+    : "Architecture adoption disposition could not be resolved.";
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${ARCHITECTURE_ADOPTION_DENIAL_CODE}: ${detail}\n`
+      + "Record one PO-owned approved-scoped, deferred, or partial adoption decision for the active plan scope before requesting implementation authority.\n",
+  );
 }
 
 // Hoisted to module scope so grammarOverrideRoute() can build the identical, exact
@@ -4989,7 +5058,20 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
         sessionCapabilityFailurePhase,
       );
   }
-  return exactReadyReceipt(receipt) ? verdict(0) : blocked();
+  if (!exactReadyReceipt(receipt)) return blocked();
+  // D4 / AC-17: readiness proves the session can act, but not that the active
+  // work package has a resolved architecture adoption disposition. Enforce at
+  // the one command that grants implementation authority, after readiness so
+  // an unready session retains its established recovery routes.
+  if (toolName === "Bash") {
+    const adoptionVerdict = architectureAdoptionAuthorityVerdict(
+      root,
+      input.tool_input.command ?? input.tool_input.CommandLine,
+      dependencies,
+    );
+    if (adoptionVerdict !== null) return adoptionVerdict;
+  }
+  return verdict(0);
 }
 
 /**

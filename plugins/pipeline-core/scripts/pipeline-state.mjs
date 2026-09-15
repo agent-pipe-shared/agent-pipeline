@@ -44,6 +44,7 @@
  *     } | absent,
  *     "closedFeatures": [
  *       { "id": "<string>", "planPath": "<string>", "phaseAtClose": "<string>|null",
+ *         "architectureImpact": "architecture-conforms|architecture-decision-added|architecture-decision-superseded|architecture-summary-updated|no-architecture-impact",
  *         "closedAt": "<ISO-8601>", "closedBy": "<string>", "forCommit": "<sha>|null" }
  *     ] | absent,
  *     "deployApprovals": [
@@ -174,9 +175,11 @@
  *                                                 where forCommit is the CURRENT HEAD
  *                                                 (`git rev-parse HEAD`, spawned in the
  *                                                 target project dir).
- *   close-feature --by <name>                     Closes the current activeFeature:
+ *   close-feature --by <name> --architecture-impact <typed-value>
+ *                                                 Closes the current activeFeature:
  *                                                 appends {id, planPath, phaseAtClose,
- *                                                 closedAt, closedBy, forCommit} to
+ *                                                 architectureImpact, closedAt, closedBy,
+ *                                                 forCommit} to
  *                                                 closedFeatures (existing entries kept,
  *                                                 append-only), deletes activeFeature,
  *                                                 sets planApproved=false, clears
@@ -498,6 +501,13 @@ import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-gu
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
+export const ARCHITECTURE_IMPACT_VALUES = Object.freeze([
+  "architecture-conforms",
+  "architecture-decision-added",
+  "architecture-decision-superseded",
+  "architecture-summary-updated",
+  "no-architecture-impact",
+]);
 
 // Restored verbatim from 5f8bf1d:harness/scripts/pipeline-state.mjs (the pre-merge
 // home of this module), dropped by merge 75b8361 when the second-parent side of
@@ -10224,8 +10234,13 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     case "close-feature": {
       const by = flags.by;
+      const architectureImpact = flags["architecture-impact"];
       if (isBlank(by)) {
         console.error('Error: close-feature requires --by <name> (non-empty) -- an unattributed close is refused.');
+        return 2;
+      }
+      if (!ARCHITECTURE_IMPACT_VALUES.includes(architectureImpact)) {
+        console.error(`Error: close-feature requires --architecture-impact <${ARCHITECTURE_IMPACT_VALUES.join("|")}>; an unclassified architecture close is refused.`);
         return 2;
       }
       const activeFeature = base.activeFeature;
@@ -10267,6 +10282,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           || coordinator.featureId !== activeFeature.id
           || coordinator.activeFeature?.id !== activeFeature.id
           || coordinator.activeFeature?.planPath !== activeFeature.planPath
+          || coordinator.architectureImpact !== architectureImpact
           || coordinator.authority?.pipelineStateSha256
             !== sha256Bytes(readFileSync(statePath(dir)))
           || closeCoordinatorDigest(coordinator) !== coordinatorSha256) {
@@ -10341,6 +10357,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         id: activeFeature.id,
         planPath: activeFeature.planPath,
         phaseAtClose: activeFeature.phase ?? null,
+        architectureImpact,
         closedAt,
         closedBy: by,
         forCommit,

@@ -3,7 +3,7 @@
   "$id": "pipeline.close-coordinator.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "featureId", "activeFeature", "authority", "candidateOid", "candidateTree", "effects", "publicationAuthorization", "publication", "cleanup"],
+  "required": ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "featureId", "activeFeature", "authority", "architectureImpact", "candidateOid", "candidateTree", "effects", "publicationAuthorization", "publication", "cleanup"],
   "properties": {
     "schema": { "const": "pipeline.close-coordinator.v1" },
     "lifecycleId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$" },
@@ -32,6 +32,10 @@
         "prdSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "specSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       }
+    },
+    "architectureImpact": {
+      "type": ["string", "null"],
+      "enum": ["architecture-conforms", "architecture-decision-added", "architecture-decision-superseded", "architecture-summary-updated", "no-architecture-impact", null]
     },
     "candidateOid": { "type": ["string", "null"], "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
     "candidateTree": { "type": ["string", "null"], "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },

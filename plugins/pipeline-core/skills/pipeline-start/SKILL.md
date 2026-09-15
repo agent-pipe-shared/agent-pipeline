@@ -228,7 +228,26 @@ recommendation.
    source checkout runs `node harness/scripts/check-observation-governance.mjs`,
    and a `failed` one is case **F6** → `references/failure-cases.md`.
 
-6. **Restart hint for material session input:** before a first kickoff **and
+6. **Architecture orientation, never a bootstrap prerequisite:** after a
+   ready readback, first check whether the repository has both
+   `architecture/map/index.md` and
+   `project/architecture-decisions.compiled.json`. When present, read them in
+   the declared AGENTS re-entry order, then only the concept files for the
+   module(s) the task touches. When either artifact is absent, do **not**
+   invent, generate, or require architecture documentation merely to finish
+   bootstrap. Instead run the read-only command
+   `node "${PIPELINE_PLUGIN_ROOT}/scripts/architecture-adoption.mjs" status --root "$PWD" --json`.
+   Surface its typed state to the user: `adoption-required` means the session
+   should next obtain the read-only, staged proposal with
+   `architecture-adoption.mjs propose --root "$PWD" --json`; an approved,
+   deferred, or partial decision names the scope to respect. The proposal and
+   its missing-map result are orientation, not authority to write a map or a
+   PO decision. A fresh session therefore receives a concrete architecture
+   route even in a brownfield repository with no architecture estate. The
+   later implementation-authority boundary, not bootstrap, refuses an
+   unresolved or out-of-scope adoption disposition.
+
+7. **Restart hint for material session input:** before a first kickoff **and
    before proposing, displaying, or performing any restart, session cut or
    Compact after kickoff**, the agent MUST determine whether the user supplied
    material design input, scope, constraints, or open questions since the last

@@ -290,7 +290,7 @@ test("conformance: close-feature verb (design close) produces state accepted by 
 
     assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
 
-    const exit = run(["close-feature", "--by", "PO"], deps);
+    const exit = run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], deps);
     assert.equal(exit, 0);
 
     const { classification, cleanupState } = assertObserverConformance(root, "close-feature (design)");
@@ -360,7 +360,7 @@ test("conformance: close-feature verb (continuity close request) produces state 
     const reqPath = "continuity-close-req.json";
     writeFileSync(join(root, reqPath), JSON.stringify(closeRequest, null, 2));
 
-    const exit = run(["close-feature", "--by", "PO", "--continuity-close-request", reqPath], deps);
+    const exit = run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", reqPath], deps);
     assert.equal(exit, 0);
 
     const { classification, cleanupState } = assertObserverConformance(root, "close-feature (continuity close)");
@@ -454,7 +454,7 @@ test("conformance: discard-feature with prior closed feature produces state acce
 
     // 1. Close first feature
     assert.equal(run(["set-feature", "--id", firstFeatureId, "--plan-path", firstPlanPath], deps), 0);
-    assert.equal(run(["close-feature", "--by", "PO"], deps), 0);
+    assert.equal(run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], deps), 0);
     assertObserverConformance(root, "first feature closed");
 
     // 2. Open second feature
@@ -557,7 +557,7 @@ test("conformance: complete end-to-end lifecycle progression through all transit
     assertObserverConformance(root, "e2e: set-feature (followup)");
 
     // Verb 7: close-feature
-    assert.equal(run(["close-feature", "--by", "PO"], nextDeps), 0);
+    assert.equal(run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], nextDeps), 0);
     assertObserverConformance(root, "e2e: close-feature");
   } finally {
     rmSync(root, { recursive: true, force: true });

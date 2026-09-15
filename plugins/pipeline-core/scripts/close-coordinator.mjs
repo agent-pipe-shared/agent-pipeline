@@ -44,6 +44,13 @@ const SHA256 = /^[0-9a-f]{64}$/u;
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const ID = /^[A-Za-z0-9._-]{1,100}$/u;
 const CLOSE_INTENTS = new Set(["durable-stop", "runtime-transfer"]);
+const ARCHITECTURE_IMPACTS = new Set([
+  "architecture-conforms",
+  "architecture-decision-added",
+  "architecture-decision-superseded",
+  "architecture-summary-updated",
+  "no-architecture-impact",
+]);
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 
 const canonical = (value) => {
@@ -200,6 +207,7 @@ function action(command, values, planSha256) {
   ];
   if (values.closeIntent) argv.push("--close-intent", values.closeIntent);
   if (values.phase) argv.push("--phase", values.phase);
+  if (values.architectureImpact) argv.push("--architecture-impact", values.architectureImpact);
   if (values.evidence) argv.push("--evidence", values.evidence);
   if (values.publication) argv.push("--publication", values.publication);
   if (values.continuityCloseRequest) {
@@ -328,6 +336,12 @@ function transitionPlan(values) {
   const root = physicalRoot(values.root);
   if (!ID.test(values.lifecycle ?? "") || !COORDINATOR_PHASES.includes(values.phase)
     || typeof values.actor !== "string" || values.actor.trim() === "") fail("CLOSE-ARGS", "transition identity is invalid");
+  if (values.phase === "feature-close-prepared" && !ARCHITECTURE_IMPACTS.has(values.architectureImpact)) {
+    fail("CLOSE-ARCHITECTURE-IMPACT", "feature close preparation requires one typed architecture impact");
+  }
+  if (values.phase !== "feature-close-prepared" && values.architectureImpact !== undefined) {
+    fail("CLOSE-ARCHITECTURE-IMPACT", "architecture impact is accepted only for feature-close-prepared");
+  }
   const common = gitCommonDir(root);
   const stored = readCloseCoordinator(common, values.lifecycle);
   if (!coordinatorNextPhases(stored.coordinator.phase).includes(values.phase)
@@ -369,6 +383,7 @@ function transitionPlan(values) {
     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
     advance.authority = observed.authority;
+    advance.architectureImpact = values.architectureImpact;
     advance.inputDigest = sha256(canonical({
       pipelineStateSha256: snapshot.sha256,
       continuityCloseRequestSha256: closeRequest?.sha256 ?? null,
@@ -518,6 +533,7 @@ function transitionPlan(values) {
     expectedStateSha256: lifecycleDigest(stored.coordinator),
     expectedRawSha256: stored.rawDigest,
     phase: values.phase,
+    architectureImpact: values.architectureImpact ?? null,
     evidenceSha256: boundEvidenceSha256,
     advance,
   };
@@ -613,6 +629,7 @@ function applyTransition(values, suppliedDigest) {
         STATE_WRITER,
         "close-feature",
         "--by", plan.actor,
+        "--architecture-impact", next.architectureImpact,
         "--coordinator-lifecycle", next.lifecycleId,
         "--coordinator-sha256", lifecycleDigest(next),
       ],
@@ -672,7 +689,7 @@ try {
   } else if (command === "plan-transition" || command === "apply-transition") {
     const parsed = exactArgs(argv, new Set([
       "root", "lifecycle", "actor", "phase", "evidence", "publication",
-      "continuity-close-request", "plan-sha256",
+      "continuity-close-request", "architecture-impact", "plan-sha256",
     ]), new Set(["activate", "authorized"]));
     if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor || !parsed.values.phase) fail("CLOSE-ARGS", `${command} arguments invalid`);
     const values = {
@@ -680,6 +697,7 @@ try {
       lifecycle: parsed.values.lifecycle,
       actor: parsed.values.actor,
       phase: parsed.values.phase,
+      architectureImpact: parsed.values["architecture-impact"],
       evidence: parsed.values.evidence,
       publication: parsed.values.publication,
       continuityCloseRequest: parsed.values["continuity-close-request"],

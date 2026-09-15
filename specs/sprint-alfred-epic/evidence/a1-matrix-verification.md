@@ -57,11 +57,30 @@ measure the actual runner version and capture emit/check to fresh paths,
 passing the fresh emitted record to `--record`. Preserve these historical logs
 and keep HEAD and the implementation sources unchanged between emit and check.
 
-## Remaining work
+## PO-accepted live Antigravity evidence (2026-09-15)
 
-Native runner bridges and live measurements remain pending. The later PO TP-3
-act must register both the suite and its derived capability surface together;
-[registration preparation](a1-registration-preparation.md) is still preparation
-only. Full Verify, independent T1 Critic review, and PO acceptance remain open.
-The TP-4 `hooks.json` courtesy comment replacement remains a separate PO act;
-it is non-load-bearing. Offline CLI evidence does not complete those duties.
+The PO accepted A1 as complete on the basis of a real Antigravity session in a
+user repository. The evidence was supplied as four sanitized JSONL events; no
+full transcript, prompt text, account or machine data, absolute paths, or
+session identifiers are retained here.
+
+| Observed boundary | Sanitized result |
+| --- | --- |
+| Parent dispatch request | `invoke_subagent` requested `goldfish-implementor` with inherited model. |
+| Parent PreToolUse | `guard-dispatch` rejected the deliberately incomplete packet with `DBB-BASE-CAP-MISSING`, `DISPATCH-INCOMPLETE-BRIEFING`, and `DISPATCH-NO-MODEL`. |
+| Child process startup | The system injected the Agent Pipeline bootstrap directive before project work. |
+| Child PreToolUse | `guard-lifecycle-ready` refused the bootstrap attempt with `GUARD-LIFECYCLE-NOT-READY` and `bootstrap-binding-required`. |
+
+The tested repository was an uncommitted initial checkout (`HEAD: unborn`;
+empty-tree OID `4b825dc642cb6eb9a060e54bf8d69288fbee4904`). It therefore proves
+live parent/child hook operation but cannot be represented honestly as a
+candidate-bound record for this repository's commit. The PO explicitly
+accepted this live user-repository evidence as the A1 completion basis despite
+that limitation. This acceptance supersedes the former A1-open status in this
+checkpoint; it does not relabel the historical offline record as native or
+candidate-bound evidence.
+
+The later PO TP-3 act may still register the suite and derived capability
+surface together. That follow-up is registration hygiene, not an outstanding
+A1 acceptance condition. The TP-4 `hooks.json` courtesy comment replacement
+remains separately non-load-bearing.
