@@ -37,7 +37,8 @@ const GOVERNANCE_MARKERS = [
  * this reads its result, never its absence or staleness, into a decision; a status other than
  * `available` adds no lines, exactly mirroring "no hint state can alter lifecycle readiness."
  */
-// Selection is implemented by the dedicated reader, not by host-path instructions in this hook.
+// pipeline.deterministic-transcript-selection: project identity is checked by the dedicated
+// reader before recency; this hook never receives a raw host transcript path.
 const TRANSCRIPT_RECOVERY_SCRIPT = fileURLToPath(new URL("../scripts/runner-transcript-recovery.mjs", import.meta.url));
 
 function priorTranscriptRecoveryLine(root, sessionId, runner) {
