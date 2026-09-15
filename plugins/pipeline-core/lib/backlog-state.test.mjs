@@ -1352,6 +1352,29 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
 }
 
 {
+  const evidence = {
+    kind: "item-file-reconciliation",
+    commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f",
+  };
+  const authorizedEvents = Array(1855);
+  authorizedEvents[1854] = { id: "pipeline.example", sequence: 1855, actor: "backlog-reconciliation", evidence };
+  const lookalikeEvents = Array(1001);
+  lookalikeEvents[1000] = { id: "pipeline.example", sequence: 1001, actor: "backlog-reconciliation", evidence };
+  const authorized = classifyBacklogFindings(
+    ["ledger event 1855: evidence.commit is not a reachable local Git commit"],
+    { events: authorizedEvents },
+  );
+  const lookalike = classifyBacklogFindings(
+    ["ledger event 1001: evidence.commit is not a reachable local Git commit"],
+    { events: lookalikeEvents },
+  );
+  check("BS38 the PO-approved reconciliation batch is exact while an in-range tuple lookalike remains INTEGRITY",
+    authorized[0].severity === BACKLOG_FINDING_SEVERITY.DRIFT
+      && lookalike[0].severity === BACKLOG_FINDING_SEVERITY.INTEGRITY,
+    JSON.stringify({ authorized, lookalike }));
+}
+
+{
   // NVA-W3-R4F: planBacklogItemHashRescopeAmendment used to push
   // validateTransitionLedger's RAW (unclassified) output straight into its
   // own blocking errors, so a tolerated pre-existing DRIFT finding elsewhere

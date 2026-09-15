@@ -1102,21 +1102,40 @@ const DRIFT_LEDGER_COMMIT_FINDING = /^ledger event \d+: evidence\.commit (?:is n
 const CLOSURE_COMMIT_CROSSCHECK_FINDING = /^items: (.+) closure_commit must equal its final ledger evidence\.commit$/u;
 
 // Fixed once, at the highest sequence number present in
-// backlog/transitions.ndjson when NVA-LEDGERCUTOFF-2 landed (2026-08-16). It
-// was advanced once, to the exact last event of the lost reconciliation batch
-// (1855..1862), after explicit PO authorization on 2026-09-15. A
-// DRIFT_LEDGER_COMMIT_FINDING on a ledger event at or below this sequence keeps
-// its DRIFT verdict — the historical admission this table exists for. The
-// identical finding shape on any event ABOVE the cutoff classifies INTEGRITY
-// instead: "reject the past" already moved to "reject bad writes" for events
-// appended going forward, not only for the ones the candidate-event validator
-// in reconcile-backlog-ledger.mjs happens to see. It lives here (the checking
-// code), not in the ledger data, precisely so a future writer or rebuild
-// cannot silently move it forward to re-admit a new integrity violation as
-// DRIFT. See
+// backlog/transitions.ndjson when NVA-LEDGERCUTOFF-2 landed (2026-08-16), and
+// never moved afterward. A DRIFT_LEDGER_COMMIT_FINDING on a ledger event at or
+// below this sequence keeps its DRIFT verdict — the historical admission this
+// table exists for. The identical finding shape on any event ABOVE the cutoff
+// classifies INTEGRITY instead: "reject the past" already moved to "reject bad
+// writes" for events appended going forward, not only for the ones the
+// candidate-event validator in reconcile-backlog-ledger.mjs happens to see. It
+// lives here (the checking code), not in the ledger data, precisely so a
+// future writer or rebuild cannot silently move it forward to re-admit a new
+// integrity violation as DRIFT. See
 // backlog/items/2026-08-16-ledger-drift-classification-has-no-reachability-cutoff.md
 // (Triage: cutoff lives in the checking script).
-export const LEDGER_DRIFT_CUTOFF_SEQUENCE = 1862;
+export const LEDGER_DRIFT_CUTOFF_SEQUENCE = 1000;
+
+// The 2026-09-15 PO disposition admits only this missing reconciliation
+// batch. Keeping it beside the severity decision, rather than moving the
+// cutoff, preserves the fail-closed rule for every lookalike event.
+export const PO_ACCEPTED_LOST_RECONCILIATION_BATCH = Object.freeze({
+  firstSequence: 1855,
+  lastSequence: 1862,
+  commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f",
+  actor: "backlog-reconciliation",
+  evidenceKind: "item-file-reconciliation",
+});
+
+export function isPoAcceptedLostReconciliationEvent(event, physicalIndex) {
+  const accepted = PO_ACCEPTED_LOST_RECONCILIATION_BATCH;
+  return event?.sequence === physicalIndex + 1
+    && event.sequence >= accepted.firstSequence
+    && event.sequence <= accepted.lastSequence
+    && event.actor === accepted.actor
+    && event.evidence?.kind === accepted.evidenceKind
+    && event.evidence?.commit === accepted.commit;
+}
 
 function classifyBacklogFinding(finding) {
   return DRIFT_LEDGER_COMMIT_FINDING.test(finding) ? BACKLOG_FINDING_SEVERITY.DRIFT : BACKLOG_FINDING_SEVERITY.INTEGRITY;
@@ -1140,7 +1159,8 @@ export function classifyBacklogFindings(findings, { events = [] } = {}) {
       const physicalIndex = sequenceMatch ? Number(sequenceMatch[1]) - 1 : -1;
       const eventSequence = events[physicalIndex]?.sequence;
       const sequence = Number.isSafeInteger(eventSequence) ? eventSequence : Number(sequenceMatch?.[1]);
-      if (Number.isSafeInteger(sequence) && sequence > LEDGER_DRIFT_CUTOFF_SEQUENCE) {
+      if (Number.isSafeInteger(sequence) && sequence > LEDGER_DRIFT_CUTOFF_SEQUENCE
+        && !isPoAcceptedLostReconciliationEvent(events[physicalIndex], physicalIndex)) {
         severity = BACKLOG_FINDING_SEVERITY.INTEGRITY;
       } else if (Number.isSafeInteger(sequence)) {
         driftSequences.add(sequence);
