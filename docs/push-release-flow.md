@@ -87,6 +87,35 @@ the agent is cryptographically incapable of producing this proof by design
 (`docs/adr/0055-critical-human-proof-waiver.md`,
 `docs/adr/0056-push-approval-mode.md`).
 
+## Feature-branch checkpoint (no publication ceremony)
+
+An off-machine backup of an active feature branch is not a publication. The
+explicit, configuration-controlled checkpoint lane is available only when the
+destination is in this repository's exact `refs/heads/feat/` namespace, the
+source is the same full feature ref, and the command names both the remote and
+destination. Before it is used, the candidate commit must contain exactly one
+short printable `Checkpoint-Intent: <reason>` trailer and the whole working
+tree must be clean.
+
+```
+node "${PIPELINE_PLUGIN_ROOT}/scripts/push-init.mjs" --root <repo> --by <name> --remote origin --destination refs/heads/feat/<branch> --checkpoint
+```
+
+On success it prints the sole accepted `git push origin
+refs/heads/feat/<branch>:refs/heads/feat/<branch>` form. Run that exact command
+as a separate invocation. The guard independently rechecks the ref binding,
+clean candidate, and committed intent, then appends a local attempted-delivery
+record under the repository's Git common directory. This route does **not**
+require fresh Verify/security evidence, marketplace synchronization,
+`approve-push`, or a release signature; it never permits force, deletion,
+implicit destinations, a source/destination mismatch, or a dirty tree.
+
+There is no fallback classification. `main`, configured protected refs,
+release/stable refs, tags, force/deletion forms, unknown destinations, and a
+missing, malformed, or future policy schema remain on the strict publication
+path below, with all existing proof, candidate, marketplace, and release gates
+unchanged.
+
 ### Layer 1b — reconcile the range against the decisions that govern it (agent work, before anything is signed)
 
 ```

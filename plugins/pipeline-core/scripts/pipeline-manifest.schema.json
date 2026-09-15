@@ -66,6 +66,19 @@
         }
       }
     },
+    "pushDestinationPolicy": {
+      "type": "object",
+      "description": "Optional explicit classification policy for checkpoint versus protected push destinations. Absent, malformed, and unknown policies are interpreted by guard-push as protected-publication only; no default namespace exists.",
+      "required": ["schema", "checkpointNamespace"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "type": "string", "enum": ["pipeline.push-destination-policy.v1"] },
+        "checkpointNamespace": {
+          "type": "string",
+          "description": "Exact refs/heads/ feature namespace ending in /. Semantic safety validation lives in push-destination-policy.mjs."
+        }
+      }
+    },
     "security": {
       "type": "object",
       "additionalProperties": false,

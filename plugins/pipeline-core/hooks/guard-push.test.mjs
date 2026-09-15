@@ -2278,6 +2278,23 @@ function freshRepoIn(parentDir, name) {
   }
 }
 
+// ---- PG-CHECKPOINT: exact feature lane only; all other targets stay strict ---------
+{
+  const { dir } = freshRepo("checkpoint-policy");
+  gitAt(dir, "checkout", "-q", "-b", "feat/checkpoint");
+  writeManifest(dir, `${manifestPush({ approval: "required" })}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n`);
+  writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
+  gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
+  gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
+  check("PG-CHECKPOINT allow configured clean feature checkpoint without publication evidence or signature", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, ALLOW, { stderrEmpty: true });
+  check("PG-CHECKPOINT block main never receives checkpoint relaxation", "git push origin feat/checkpoint:refs/heads/main", dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+  check("PG-CHECKPOINT block release/stable destination remains on strict evidence lane", "git push origin feat/checkpoint:refs/heads/release/0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
+  check("PG-CHECKPOINT block tags remain on strict evidence lane", "git push origin feat/checkpoint:refs/tags/v0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
+  check("PG-CHECKPOINT block force refspec before any checkpoint classification", "git push origin +feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["push target is not unambiguous"] });
+  writeManifest(dir, `${manifestPush({ approval: "required" })}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v2\n  checkpointNamespace: refs/heads/feat/\n`);
+  check("PG-CHECKPOINT block malformed policy cannot select the relaxed lane", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["destination policy"] });
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

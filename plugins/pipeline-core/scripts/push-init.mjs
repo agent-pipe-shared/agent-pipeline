@@ -111,6 +111,8 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { loadManifest } from "../lib/manifest.mjs";
+import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
 import { pushPrepareReport as realPushPrepareReport } from "./push-prepare.mjs";
@@ -124,14 +126,16 @@ export const PUSH_INIT_SCRIPT_PATH = fileURLToPath(import.meta.url);
 export const RECONCILIATION_SCRIPT_RELATIVE_PATH = "harness/scripts/check-doc-reconciliation.mjs";
 
 export function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--base <ref> --candidate <ref> [--record-ref <ref>]]";
+  return "Usage: node plugins/pipeline-core/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]]";
 }
 
 export function parseArgs(argv) {
   const output = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (["--root", "--by", "--remote", "--destination", "--base", "--candidate", "--record-ref"].includes(arg)) {
+    if (arg === "--checkpoint") {
+      output.checkpoint = true;
+    } else if (["--root", "--by", "--remote", "--destination", "--base", "--candidate", "--record-ref"].includes(arg)) {
       const value = argv[index + 1];
       if (typeof value !== "string" || value === "" || value.startsWith("--")) return { error: `${arg} requires a value` };
       output[arg.slice(2)] = value;
@@ -156,12 +160,51 @@ export function parseArgs(argv) {
  * feeds the guard's real admission function a REAL emitted argv rather than a hand-typed
  * copy that could silently drift from what this file's own `parseArgs()` actually accepts.
  */
-export function buildPushInitArgv({ root, by, remote, destination, base = null, candidate = null, recordRef = null }) {
+export function buildPushInitArgv({ root, by, remote, destination, base = null, candidate = null, recordRef = null, checkpoint = false }) {
   const argv = ["--root", root, "--by", by, "--remote", remote, "--destination", destination];
   if (base !== null) argv.push("--base", base);
   if (candidate !== null) argv.push("--candidate", candidate);
   if (recordRef !== null) argv.push("--record-ref", recordRef);
+  if (checkpoint) argv.push("--checkpoint");
   return argv;
+}
+
+function gitText(root, args, run) {
+  const result = run("git", ["-C", root, ...args], { encoding: "utf8", timeout: 5000 });
+  return result?.status === 0 && typeof result.stdout === "string" ? result.stdout.trim() : null;
+}
+
+/**
+ * The checkpoint preflight does not produce or consume PO authority. It verifies
+ * only the intentional lower-rigor contract and emits the one exact refspec the
+ * guard will independently classify and audit at push time.
+ */
+export function driveCheckpointPushInit({ rootDir, by, remote, destination, run = spawnSync, load = loadManifest } = {}) {
+  const root = resolve(rootDir);
+  const manifestResult = load(root);
+  const sourceRef = gitText(root, ["symbolic-ref", "-q", "HEAD"], run);
+  const classification = classifyPushDestination({
+    manifestStatus: manifestResult?.status,
+    policy: manifestResult?.manifest?.pushDestinationPolicy,
+    binding: { ok: true, remote, sourceRef, destination },
+  });
+  const checks = [];
+  checks.push({ id: "checkpoint-destination", ok: classification.lane === "feature-checkpoint", message: classification.reason ?? "configured feature checkpoint destination." });
+  const status = gitText(root, ["status", "--porcelain"], run);
+  checks.push({ id: "working-tree-clean", ok: status === "", message: status === "" ? "working tree is clean." : "working tree is not clean or cannot be read." });
+  const intent = gitText(root, ["show", "-s", "--format=%(trailers:key=Checkpoint-Intent,valueonly)", "HEAD"], run);
+  const intents = intent === null ? [] : intent.split("\n").map((value) => value.trim()).filter(Boolean);
+  checks.push({ id: "checkpoint-intent", ok: intents.length === 1 && validCheckpointIntent(intents[0]), message: intents.length === 1 && validCheckpointIntent(intents[0]) ? "committed Checkpoint-Intent is present." : "HEAD needs exactly one bounded Checkpoint-Intent commit trailer." });
+  const ready = checks.every((check) => check.ok);
+  return {
+    schema: SCHEMA,
+    root,
+    outcome: ready ? "checkpoint-ready" : "precondition-unmet",
+    lane: "feature-checkpoint",
+    by,
+    checks,
+    ...(ready ? { gitPushLine: `git push ${remote} ${sourceRef}:${destination}` } : {}),
+  };
 }
 
 /**
@@ -237,7 +280,7 @@ export function buildReconciliationArgv({ scriptPath, base, candidate, root, rec
  * reason `deps.exists` is threaded through push-prepare.mjs itself.
  */
 export function drivePushInit({
-  rootDir, by, remote, destination, base = null, candidate = null, recordRef = null,
+  rootDir, by, remote, destination, base = null, candidate = null, recordRef = null, checkpoint = false,
   run = spawnSync,
   exists = existsSync,
   assessPushGateSatisfiability = realAssessPushGateSatisfiability,
@@ -251,6 +294,7 @@ export function drivePushInit({
       return { schema: SCHEMA, root, outcome: "usage-error", message: `${name} is required and must be a non-empty string` };
     }
   }
+  if (checkpoint) return driveCheckpointPushInit({ rootDir: root, by, remote, destination, run });
 
   const steps = [];
   const failedChecks = [];
@@ -367,10 +411,10 @@ export function main(args = process.argv.slice(2), {
   }
   const result = drivePushInit({
     rootDir: options.root, by: options.by, remote: options.remote, destination: options.destination,
-    base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null,
+    base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null, checkpoint: options.checkpoint === true,
   });
   write(`${JSON.stringify(result, null, 2)}\n`);
-  return result.outcome === "signature-required" ? 0 : 1;
+  return ["signature-required", "checkpoint-ready"].includes(result.outcome) ? 0 : 1;
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main());

@@ -141,8 +141,10 @@ import { USER_SOURCE_PATH, criticalProofWaiverFor, readCriticalHumanProofPolicy 
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
+import { checkpointAuditRecord, recordCheckpointPushAttempt } from "../lib/checkpoint-push-audit.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
+import { CHECKPOINT_LANE, classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
 import {
   LEGACY_CALIBRATION,
   LEGACY_MANIFEST,
@@ -1767,8 +1769,10 @@ if (manifestResult.status === "absent") allowExit(); // opt-in feature, nothing 
 
 const releaseSection = manifestResult.manifest?.release;
 const hasRelease = Boolean(releaseSection) && typeof releaseSection === "object" && !Array.isArray(releaseSection);
+const declaresPushDestinationPolicy = Boolean(manifestResult.manifest)
+  && Object.hasOwn(manifestResult.manifest, "pushDestinationPolicy");
 
-if (manifestResult.status === "invalid" && !hasRelease) {
+if (manifestResult.status === "invalid" && !hasRelease && !declaresPushDestinationPolicy) {
   const reason = manifestFindingText(manifestResult.errors?.[0]);
   emit(1, [
     `[guard-push] WARN: ${projectManifestRelPath(projectDir)} is invalid (${reason}).`,
@@ -1778,7 +1782,7 @@ if (manifestResult.status === "invalid" && !hasRelease) {
 
 const manifest = manifestResult.manifest;
 const pushGate = gateConfig(manifest, "push");
-const guardActive = hasRelease || (pushGate && pushGate.mode !== "off");
+const guardActive = hasRelease || declaresPushDestinationPolicy || (pushGate && pushGate.mode !== "off");
 if (!guardActive) allowExit();
 
 if (!pushBinding.ok) {
@@ -1797,6 +1801,13 @@ if (hasRelease) {
 const sourceCommit = resolveSourceCommit(pushBinding);
 if (!sourceCommit) {
   emit(2, ["BLOCKED (guard-push, plugin pipeline-core): the explicit push source does not resolve to one commit."]);
+}
+
+if (manifestResult.status !== "ok" && declaresPushDestinationPolicy) {
+  emit(2, [
+    "BLOCKED (guard-push destination policy): the explicit checkpoint policy is malformed or unrecognized.",
+    "Fix the manifest policy before pushing; no partially parsed policy can select the lower-rigor lane.",
+  ]);
 }
 
 function portableCleanupBaselineFailure(binding, commit) {
@@ -1900,12 +1911,89 @@ if (!evidenceProject.ok) {
 }
 const evidenceProjectDir = evidenceProject.projectDir;
 
+function resolvedPushSourceRef(binding) {
+  const source = spawnSync(
+    "git",
+    ["-C", binding.projectDir, "rev-parse", "--symbolic-full-name", "--verify", "--end-of-options", binding.source],
+    { encoding: "utf8", timeout: 5000 },
+  );
+  const ref = source.status === 0 ? source.stdout?.trim() : "";
+  return ref.startsWith("refs/heads/") ? ref : null;
+}
+
+/**
+ * The reduced lane is still candidate-bound: the named source must be the
+ * checked-out candidate in its own attached worktree, whose whole tree is
+ * clean. The one committed intent trailer is an immutable human statement and
+ * the local git-common-dir ledger records the exact attempted delivery.
+ */
+function checkpointEligibility({ binding, commit, projectDir }) {
+  const failures = [];
+  const head = spawnSync("git", ["-C", projectDir, "rev-parse", "--verify", "HEAD^{commit}"], { encoding: "utf8", timeout: 5000 });
+  if (head.status !== 0 || head.stdout?.trim() !== commit) failures.push("checkpoint source is not the clean checked-out candidate");
+  const status = spawnSync("git", ["-C", projectDir, "status", "--porcelain"], { encoding: "utf8", timeout: 5000 });
+  if (status.status !== 0 || status.stdout?.trim() !== "") failures.push("checkpoint working tree is not clean");
+  const trailers = spawnSync(
+    "git",
+    ["-C", projectDir, "show", "-s", "--format=%(trailers:key=Checkpoint-Intent,valueonly)", commit],
+    { encoding: "utf8", timeout: 5000 },
+  );
+  const values = trailers.status === 0 ? trailers.stdout.split("\n").map((value) => value.trim()).filter(Boolean) : [];
+  if (values.length !== 1 || !validCheckpointIntent(values[0])) failures.push("checkpoint candidate needs exactly one bounded Checkpoint-Intent commit trailer");
+  if (failures.length > 0) return { ok: false, failures };
+  const tree = spawnSync("git", ["-C", projectDir, "rev-parse", `${commit}^{tree}`], { encoding: "utf8", timeout: 5000 });
+  if (tree.status !== 0 || !/^[0-9a-f]{40,64}$/i.test(tree.stdout?.trim() ?? "")) return { ok: false, failures: ["checkpoint candidate tree cannot be resolved"] };
+  const record = checkpointAuditRecord({
+    commit,
+    tree: tree.stdout.trim(),
+    remote: binding.remote,
+    destination: binding.destination,
+    intent: values[0],
+  });
+  if (!record) return { ok: false, failures: ["checkpoint audit record cannot be constructed"] };
+  return { ok: true, record };
+}
+
+const pushDestination = classifyPushDestination({
+  manifestStatus: manifestResult.status,
+  policy: manifest?.pushDestinationPolicy,
+  binding: { ...pushBinding, sourceRef: resolvedPushSourceRef(pushBinding) },
+});
+
 if (!pushGate || pushGate.mode === "off") {
+  if (declaresPushDestinationPolicy) {
+    emit(2, [
+      "BLOCKED (guard-push destination policy): an explicit checkpoint policy requires an active strict push gate.",
+      "Fix the push-gate configuration; a disabled or absent gate cannot be the fallback for protected destinations.",
+    ]);
+  }
   // Fall-matrix case B with NO active push gate: still surface the semantic-invalidity
   // WARN instead of exiting silently (pre-existing behavior emitted WARN for any push on
   // an invalid manifest). `invalidityNote` is null on every non-case-B path, so a valid
   // manifest keeps exiting 0 unchanged.
   if (invalidityNote) emit(1, [invalidityNote]);
+  allowExit();
+}
+
+if (pushDestination.lane === CHECKPOINT_LANE) {
+  const checkpoint = checkpointEligibility({
+    binding: pushBinding,
+    commit: sourceCommit,
+    projectDir: evidenceProjectDir,
+  });
+  if (!checkpoint.ok) {
+    emit(2, [
+      "BLOCKED (guard-push feature checkpoint): the lower-rigor lane still requires a clean, exact candidate and committed human intent.",
+      ...checkpoint.failures.map((failure) => `Reason: ${failure}.`),
+    ]);
+  }
+  const audit = recordCheckpointPushAttempt({ projectDir: evidenceProjectDir, record: checkpoint.record });
+  if (!audit.ok) {
+    emit(2, [
+      "BLOCKED (guard-push feature checkpoint): the required local audit record could not be written.",
+      `Reason: ${audit.reason}.`,
+    ]);
+  }
   allowExit();
 }
 

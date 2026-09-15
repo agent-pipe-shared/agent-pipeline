@@ -22,7 +22,7 @@ import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { buildPushInitArgv, buildReconciliationArgv, drivePushInit, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
+import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
 import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -55,6 +55,12 @@ test("parseArgs: refuses an unknown argument and a flag with no value", () => {
   assert.ok(parseArgs(["--root", "/x", "--by"]).error);
 });
 
+test("parseArgs: accepts the explicit checkpoint selector without weakening the ordinary path", () => {
+  const parsed = parseArgs(["--root", "/x", "--by", "t", "--remote", "origin", "--destination", "refs/heads/feat/checkpoint", "--checkpoint"]);
+  assert.equal(parsed.error, undefined);
+  assert.equal(parsed.checkpoint, true);
+});
+
 // ---------------------------------------------------------------------------
 // buildPushInitArgv / buildReconciliationArgv -- shape sanity (guard-admission is proven
 // against these same functions in guard-lifecycle-ready.test.mjs, NVA-V4-PUSHDRIVER)
@@ -68,6 +74,26 @@ test("buildPushInitArgv: preserves every optional reconciliation selector in a r
     base: "HEAD~1", candidate: "candidate-S", recordRef: "record-R",
   });
   assert.deepEqual(withSelectors.slice(-6), ["--base", "HEAD~1", "--candidate", "candidate-S", "--record-ref", "record-R"]);
+});
+
+test("driveCheckpointPushInit: accepts only the configured exact feature source/destination with clean candidate and intent", () => {
+  const run = (_command, argv) => {
+    const last = argv.at(-1);
+    if (argv.includes("symbolic-ref")) return { status: 0, stdout: "refs/heads/feat/checkpoint\n" };
+    if (argv.includes("status")) return { status: 0, stdout: "" };
+    if (last === "HEAD") return { status: 0, stdout: "remote backup before refactor\n" };
+    throw new Error(`unexpected argv: ${JSON.stringify(argv)}`);
+  };
+  const load = () => ({
+    status: "ok",
+    manifest: { pushDestinationPolicy: { schema: "pipeline.push-destination-policy.v1", checkpointNamespace: "refs/heads/feat/" } },
+  });
+  const ready = driveCheckpointPushInit({ rootDir: "/fixture", by: "tester", remote: "origin", destination: "refs/heads/feat/checkpoint", run, load });
+  assert.equal(ready.outcome, "checkpoint-ready", JSON.stringify(ready));
+  assert.equal(ready.gitPushLine, "git push origin refs/heads/feat/checkpoint:refs/heads/feat/checkpoint");
+  const protectedDestination = driveCheckpointPushInit({ rootDir: "/fixture", by: "tester", remote: "origin", destination: "refs/heads/main", run, load });
+  assert.equal(protectedDestination.outcome, "precondition-unmet");
+  assert.equal(protectedDestination.checks.find((check) => check.id === "checkpoint-destination").ok, false);
 });
 
 test("buildReconciliationArgv: candidate and record-ref are explicit caller inputs, never invented (NVA-B-PUSHINIT-1)", () => {
