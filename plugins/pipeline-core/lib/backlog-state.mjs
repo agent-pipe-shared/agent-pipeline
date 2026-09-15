@@ -1116,25 +1116,36 @@ const CLOSURE_COMMIT_CROSSCHECK_FINDING = /^items: (.+) closure_commit must equa
 // (Triage: cutoff lives in the checking script).
 export const LEDGER_DRIFT_CUTOFF_SEQUENCE = 1000;
 
-// The 2026-09-15 PO disposition admits only this missing reconciliation
-// batch. Keeping it beside the severity decision, rather than moving the
-// cutoff, preserves the fail-closed rule for every lookalike event.
-export const PO_ACCEPTED_LOST_RECONCILIATION_BATCH = Object.freeze({
-  firstSequence: 1855,
-  lastSequence: 1862,
-  commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f",
-  actor: "backlog-reconciliation",
-  evidenceKind: "item-file-reconciliation",
-});
+// The 2026-09-15 PO disposition admits only these eight immutable ledger
+// identities. Keeping them beside the severity decision, rather than moving
+// the cutoff, preserves the fail-closed rule for every lookalike event.
+export const PO_ACCEPTED_LOST_RECONCILIATION_EVENTS = Object.freeze([
+  { sequence: 1855, id: "pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair", from: null, to: "open", at: "2026-09-13", actor: "backlog-reconciliation", reason: "Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.", previousHash: "e5c5e675d4d3e2d2237829b4b86024382c82dcdd83062c25baac5e41a6f0718e", entryHash: "91f95de6d0d8984b09df595f73fc579ab3124a96ed38a33d79d2f151d490d394", evidence: { commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f", kind: "item-file-reconciliation", reference: "backlog/items/2026-08-27-a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair.md" } },
+  { sequence: 1856, id: "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback", from: null, to: "open", at: "2026-09-13", actor: "backlog-reconciliation", reason: "Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.", previousHash: "91f95de6d0d8984b09df595f73fc579ab3124a96ed38a33d79d2f151d490d394", entryHash: "cdb4c9e93b3fb35d24f934f181564277252dcf650268e5bdc43d0309243aaac6", evidence: { commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f", kind: "item-file-reconciliation", reference: "backlog/items/2026-08-27-a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback.md" } },
+  { sequence: 1857, id: "pipeline.critic-dispatches-cannot-persist-their-scratch-notes", from: null, to: "open", at: "2026-09-13", actor: "backlog-reconciliation", reason: "Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.", previousHash: "cdb4c9e93b3fb35d24f934f181564277252dcf650268e5bdc43d0309243aaac6", entryHash: "a45d136dfb10b48c364009de6ac260a8f6018fd38776000b94adcd1116dc6d1a", evidence: { commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f", kind: "item-file-reconciliation", reference: "backlog/items/2026-08-27-critic-dispatches-cannot-persist-their-scratch-notes.md" } },
+  { sequence: 1858, id: "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session", from: null, to: "open", at: "2026-09-13", actor: "backlog-reconciliation", reason: "Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.", previousHash: "a45d136dfb10b48c364009de6ac260a8f6018fd38776000b94adcd1116dc6d1a", entryHash: "544c6272e321d24a3d8c732d25712652e33b4f30c05c3bea0d2a4d0621077386", evidence: { commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f", kind: "item-file-reconciliation", reference: "backlog/items/2026-08-27-discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session.md" } },
+  { sequence: 1859, id: "pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits", from: null, to: "open", at: "2026-09-13", actor: "backlog-reconciliation", reason: "Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.", previousHash: "544c6272e321d24a3d8c732d25712652e33b4f30c05c3bea0d2a4d0621077386", entryHash: "cce9ddba3b1d36cf18576929e552490b17d0a214abf8be0ad1e73c312526706e", evidence: { commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f", kind: "item-file-reconciliation", reference: "backlog/items/2026-08-27-no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits.md" } },
+  { sequence: 1860, id: "pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init", from: null, to: "open", at: "2026-09-13", actor: "backlog-reconciliation", reason: "Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.", previousHash: "cce9ddba3b1d36cf18576929e552490b17d0a214abf8be0ad1e73c312526706e", entryHash: "1663d63a4cabf1f75fad84f012936d18e3e76a5f6b4db962f581727d9c67b2ce", evidence: { commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f", kind: "item-file-reconciliation", reference: "backlog/items/2026-08-27-set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init.md" } },
+  { sequence: 1861, id: "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding", from: null, to: "open", at: "2026-09-13", actor: "backlog-reconciliation", reason: "Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.", previousHash: "1663d63a4cabf1f75fad84f012936d18e3e76a5f6b4db962f581727d9c67b2ce", entryHash: "0608da8f9ca0a671a75c2a92881018b6fa27f99eb32f99b814ed3f17848b5af1", evidence: { commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f", kind: "item-file-reconciliation", reference: "backlog/items/2026-08-28-a-design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding.md" } },
+  { sequence: 1862, id: "pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner", from: null, to: "open", at: "2026-09-13", actor: "backlog-reconciliation", reason: "Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.", previousHash: "0608da8f9ca0a671a75c2a92881018b6fa27f99eb32f99b814ed3f17848b5af1", entryHash: "70de58bddf4bc51c7021f23e08224b3e2d8b1891920135d6faa3ba1952d30a46", evidence: { commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f", kind: "item-file-reconciliation", reference: "backlog/items/2026-08-28-the-attended-po-acknowledge-gate-defaults-to-a-runner-that-cannot-satisfy-it.md" } },
+]);
 
 export function isPoAcceptedLostReconciliationEvent(event, physicalIndex) {
-  const accepted = PO_ACCEPTED_LOST_RECONCILIATION_BATCH;
-  return event?.sequence === physicalIndex + 1
-    && event.sequence >= accepted.firstSequence
-    && event.sequence <= accepted.lastSequence
+  const accepted = PO_ACCEPTED_LOST_RECONCILIATION_EVENTS.find(({ sequence }) => sequence === physicalIndex + 1);
+  if (accepted === undefined) return false;
+  return event?.schema === "pipeline.backlog-transition.v1"
+    && event.sequence === accepted.sequence
+    && event.id === accepted.id
+    && event.from === accepted.from
+    && event.to === accepted.to
+    && event.at === accepted.at
     && event.actor === accepted.actor
-    && event.evidence?.kind === accepted.evidenceKind
-    && event.evidence?.commit === accepted.commit;
+    && event.reason === accepted.reason
+    && event.previousHash === accepted.previousHash
+    && event.entryHash === accepted.entryHash
+    && event.evidence?.commit === accepted.evidence.commit
+    && event.evidence?.kind === accepted.evidence.kind
+    && event.evidence?.reference === accepted.evidence.reference;
 }
 
 function classifyBacklogFinding(finding) {
