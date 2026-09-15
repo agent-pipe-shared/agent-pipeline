@@ -419,6 +419,12 @@ try {
         "items: pipeline.codex-read-only-steps-escalate-individually-instead-of-once closure_commit must equal its final ledger evidence.commit",
       ],
     );
+    const acceptedLostReconciliationBatch = result.drift
+      .filter((entry) => entry.acceptedReason === "accepted-po-2026-09-15-lost-reconciliation-batch");
+    assert.deepEqual(
+      acceptedLostReconciliationBatch.map((entry) => entry.finding),
+      Array.from({ length: 8 }, (_, index) => `ledger event ${1855 + index}: evidence.commit is not a reachable local Git commit`),
+    );
     assert.ok(result.drift.every((entry) => typeof entry.acceptedReason === "string"), result.drift.map((entry) => entry.finding).join("; "));
   });
 
