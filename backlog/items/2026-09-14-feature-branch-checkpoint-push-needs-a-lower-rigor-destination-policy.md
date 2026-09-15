@@ -5,7 +5,7 @@ type: requirement
 owner: pipeline
 status: open
 created: 2026-09-14
-sprint: alfred
+sprint: nova
 source: "PO requirement, 2026-09-14, after an Alfred-sprint feature-branch checkpoint push was blocked by release-grade marketplace attestation and push-authority prerequisites while the active external marketplace could not safely be replaced."
 done_when: manual
 ---
@@ -93,7 +93,9 @@ active checkout owns.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** {{accepted | deferred | rejected | merged-into-<filename>}}
-- **Rationale:** {{mandatory for rejected/deferred; optional for accepted}}
-- **Assignment (if accepted):** {{phase/release}}
-- **Date:**
+- **Decision:** accepted
+- **Rationale:** PO reassigned this cross-sprint push-policy improvement from
+  Alfred to Nova on 2026-09-15. It remains open; this is a scope transfer, not
+  a rejection or implementation claim.
+- **Assignment (if accepted):** Nova
+- **Date:** 2026-09-15
