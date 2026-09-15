@@ -1,0 +1,24 @@
+{
+  "schema": "pipeline.focused-verification.v1",
+  "candidate": {
+    "commit": "77f18bcb8e6cc7ef6830e7b7d17696e74565f3df",
+    "tree": "55ddac10d368101f9f411491c183f7c7dfce5d5b"
+  },
+  "status": "passed",
+  "checks": [
+    {
+      "command": "node plugins/pipeline-core/scripts/check-backlog-state.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node --test plugins/pipeline-core/lib/backlog-state.test.mjs",
+      "exitCode": 0,
+      "checksPassed": 62
+    },
+    {
+      "command": "node --test plugins/pipeline-core/scripts/check-backlog-state.test.mjs",
+      "exitCode": 0,
+      "checksPassed": 17
+    }
+  ]
+}
