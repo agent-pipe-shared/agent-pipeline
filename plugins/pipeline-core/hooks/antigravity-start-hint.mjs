@@ -54,7 +54,7 @@ function main() {
     const rootDir = (input.workspacePaths && input.workspacePaths.length > 0)
         ? input.workspacePaths[0]
         : process.cwd();
-    decision = sessionStartDecision(rootDir);
+    decision = sessionStartDecision(rootDir, undefined, input.conversationId || input.session_id || null, 'antigravity');
 
     // A first-run directory is not yet a Git repository.  Never manufacture
     // `.git/agent-pipeline/...` there: creating `.git` before `git init`

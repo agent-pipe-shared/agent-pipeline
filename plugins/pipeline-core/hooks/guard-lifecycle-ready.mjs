@@ -221,6 +221,11 @@ const LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.
 const READBACK_SCRIPT = fileURLToPath(new URL("../scripts/codex-project-runtime-readback-host.mjs", import.meta.url));
 const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
+// The sole pre-bootstrap route that may inspect a runner's private transcript
+// collection.  Its own implementation derives the collection, authenticates the
+// recorded repository identity, and excludes the current session; this guard
+// admits only this exact argv shape, never a raw session-directory read.
+const TRANSCRIPT_RECOVERY_SCRIPT = fileURLToPath(new URL("../scripts/runner-transcript-recovery.mjs", import.meta.url));
 const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../scripts/repair-map.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
@@ -3921,6 +3926,18 @@ function sanctionedPushInitArgs(args, root) {
   });
 }
 
+function sanctionedTranscriptRecoveryArgs(args, root) {
+  const sessionId = (value) => typeof value === "string"
+    && value.trim() !== "" && !value.startsWith("-") && Buffer.byteLength(value, "utf8") <= 500;
+  return matchFlagSpec(args, {
+    requiredValue: {
+      "--root": (value) => value === root,
+      "--runner": (value) => value === "codex",
+      "--exclude-session": sessionId,
+    },
+  });
+}
+
 function sanctionedMigrationArgs(args, root) {
   // NVA-BOOTADMIT-2: both branches route through matchFlagSpec() so the flag SET stays exact
   // while its ORDER no longer matters, same rationale as sanctionedOnboardingArgs() above.
@@ -4274,6 +4291,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   // exact argv shape only (sanctionedPushInitArgs() above), grants no authority beyond what
   // push-init.mjs's own three read-only steps could already do if hand-typed one at a time.
   if (script === PUSH_INIT_SCRIPT) return sanctionedPushInitArgs(args, root);
+  if (script === TRANSCRIPT_RECOVERY_SCRIPT) return sanctionedTranscriptRecoveryArgs(args, root);
   if (script === MIGRATION_SCRIPT) return sanctionedMigrationArgs(args, root);
   if (script === V3_BOOTSTRAP_AUTHORITY_SCRIPT) {
     return exactRoot(args, root, 0) && args.length === 2;

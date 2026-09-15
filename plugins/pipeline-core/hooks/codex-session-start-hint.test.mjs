@@ -43,29 +43,17 @@ try {
   assert.match(governed.context, /Do not invent a human checkpoint for routine work/u);
   assert.match(governed.context, /A guard denial is not by itself a human gate/u);
 
-  // 2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript:
-  // a mandatory, unconditional (no resume-hint card required) instruction to locate and read the
-  // session's own most recent prior Codex rollout transcript, bounded and never a gate.
-  assert.match(governed.context, /locate and read your own most recent PRIOR Codex rollout transcript/u);
-  assert.match(governed.context, /\$CODEX_HOME\/sessions \(or ~\/\.codex\/sessions when CODEX_HOME is unset\)/u);
-  assert.match(governed.context, /bound the read to the most recent handful of tool-call, tool-result and error entries/u);
-  assert.match(governed.context, /never quote large raw excerpts into any git-tracked file/u);
-  assert.match(governed.context, /say so honestly rather than claiming this step was done/u);
-
-  // 2026-08-29-undocumented-transcript-fallback-selects-wrong-file-by-mtime: selection must be
-  // scoped by project identity FIRST, mtime only a tiebreaker within that matching set -- never
-  // a plain most-recent-overall ranking that can pick a DIFFERENT project's newer transcript
-  // over this project's own older one.
-  assert.match(governed.context, /pipeline\.deterministic-transcript-selection/u);
-  assert.match(governed.context, /first scope by PROJECT IDENTITY, not recency/u);
-  assert.match(governed.context, /discard outright any transcript whose recorded project does not match this repository's own root/u);
-  assert.match(
-    governed.context,
-    /a more-recently-modified transcript from a DIFFERENT project must never be selected over an older one belonging to THIS project/u,
-  );
-  assert.match(governed.context, /use modification time as a tiebreaker within the remaining project-matching set/u);
-  assert.match(governed.context, /if no transcript matches this project's identity, say so honestly and continue/u);
-  assert.match(governed.context, /never widen the search back to the most recent transcript overall/u);
+  // The no-session-id API call remains honest rather than inventing a current transcript
+  // identity. A real SessionStart supplies its id and receives one exact, guard-admitted reader.
+  assert.match(governed.context, /Prior-transcript recovery is unavailable because this SessionStart supplied no usable current session identity/u);
+  assert.doesNotMatch(governed.context, /\$CODEX_HOME\/sessions/u);
+  const governedWithSession = sessionStartDecision(root, undefined, "current-session");
+  assert.match(governedWithSession.context, /recover bounded operational context only by running exactly: node /u);
+  assert.match(governedWithSession.context, /runner-transcript-recovery\.mjs" --root /u);
+  assert.match(governedWithSession.context, /--runner codex --exclude-session "current-session"/u);
+  assert.match(governedWithSession.context, /own session metadata matches this repository identity/u);
+  assert.match(governedWithSession.context, /excludes this session by its supplied identity/u);
+  assert.match(governedWithSession.context, /never search \$CODEX_HOME, ~\/\.codex, or any runner session directory directly/u);
 
   let stdout = "";
   const originalWrite = process.stdout.write;

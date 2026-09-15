@@ -116,6 +116,7 @@ const PUSH_INIT_SCRIPT = fileURLToPath(new URL("../scripts/push-init.mjs", impor
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
+const TRANSCRIPT_RECOVERY_SCRIPT = fileURLToPath(new URL("../scripts/runner-transcript-recovery.mjs", import.meta.url));
 const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../scripts/repair-map.mjs", import.meta.url));
 const SCRIPTS_DIR = fileURLToPath(new URL("../scripts/", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
@@ -6554,6 +6555,26 @@ test("runner session collections never widen the exact current-session read scop
     const deps = { projectDir, ...hgoReadyDeps(), runner: "codex", env: { CODEX_HOME: codexHome } };
     assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior} | head -n 5`), deps).exitCode, 2);
     assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), { ...deps, runner: "claude" }).exitCode, 2);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(codexHome, { recursive: true, force: true });
+  }
+});
+
+test("the dedicated Codex transcript recovery route is admitted before readiness while every raw session read stays denied", () => {
+  const projectDir = hgoGitFixture("signature");
+  const codexHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-codex-recovery-home-"));
+  const prior = join(codexHome, "sessions", "2026", "09", "prior-rollout.jsonl");
+  mkdirSync(dirname(prior), { recursive: true });
+  writeFileSync(prior, "{\"type\":\"session_meta\",\"payload\":{\"cwd\":\"fixture\",\"session_id\":\"prior\"}}\n");
+  const command = `node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner codex --exclude-session current-session`;
+  try {
+    const nonReady = { projectDir, runner: "codex", env: { CODEX_HOME: codexHome }, requireProjectOnboardingReadyFn() { deny("intake-required"); } };
+    assert.equal(isSanctionedLifecycleCommand(command, projectDir), true);
+    assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner codex`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), nonReady).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(codexHome, { recursive: true, force: true });

@@ -4,6 +4,7 @@
 /** Surface a concise, non-mutating Agent-Pipeline entry hint in every Codex session. */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { inspectResumeHint, recordResumeHintConsumption, recordResumeHintDelivery } from "../lib/resume-hint.mjs";
@@ -36,71 +37,22 @@ const GOVERNANCE_MARKERS = [
  * this reads its result, never its absence or staleness, into a decision; a status other than
  * `available` adds no lines, exactly mirroring "no hint state can alter lifecycle readiness."
  */
-/**
- * NVA backlog (2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-
- * prior-transcript.md): the resume-hint card is deliberately barred from carrying "raw
- * transcripts, commands, approvals, lifecycle instructions, host paths" (pipeline-start/
- * SKILL.md #6) -- so even a fully working card was never going to recover the class of
- * context the PO observed lost across a restart (already-hit guard errors, established
- * workarounds, in-progress diagnostic state). Investigation found no code path in this
- * repository that can reliably hand a restarting session its exact PRIOR rollout file: the
- * one restart flow this codebase owns (`codex-onboarding-launch.mjs`) always spawns a
- * genuinely fresh, unrelated Codex process with no `--resume`/session linkage, and an
- * ordinary session restart (a human- or Codex-initiated new session) is not orchestrated by
- * this plugin at all. Passing the path down explicitly is therefore not available; a bounded,
- * host-specific DISCOVERY instruction is the next-best mechanism the PO's own direction
- * accepted. This line is a fixed INSTRUCTION, never captured data -- it names a generic path
- * PATTERN, not a specific host path, so it does not fall under the "no machine-specific
- * absolute paths" rule (CLAUDE.md) any more than the pattern already written in the backlog
- * item's own prose. It is unconditional (independent of resume-hint-card presence) because
- * the PO's own direction (2026-08-12/2026-08-17 re-triages) scoped it to every restart, and it
- * is phrased as a best-effort recovery step, never a blocking precondition, mirroring the
- * resume-hint MUST-read step's own "never a gate" discipline one line below it.
- */
-// pipeline.deterministic-transcript-selection (backlog:
-// 2026-08-29-undocumented-transcript-fallback-selects-wrong-file-by-mtime): a plain
-// most-recent-by-mtime rule can select a transcript belonging to a DIFFERENT project/repo --
-// confirmed live when a sibling guardian/review transcript, merely newer, was picked over the
-// session's own actual prior transcript. Selection must scope to THIS project's identity
-// first (the rollout file's own recorded session metadata, e.g. its cwd/workspace field, must
-// match this repository's root) and use modification time only as a tiebreaker WITHIN that
-// already-matching set -- never as the primary ranking across every session on the machine.
-const PRIOR_ROLLOUT_TRANSCRIPT_LINE =
-  "On a startup, resume, clear or compact restart, also locate and read your own most recent " +
-  "PRIOR Codex rollout transcript for operational-context recovery (already-hit guard errors, " +
-  "established workarounds, in-progress diagnostic state) that the resume-hint card alone may " +
-  "not carry: look under $CODEX_HOME/sessions (or ~/.codex/sessions when CODEX_HOME is unset); " +
-  "first scope by PROJECT IDENTITY, not recency (pipeline.deterministic-transcript-selection): " +
-  "read each candidate file's own recorded session metadata (e.g. its cwd/workspace field) and " +
-  "discard outright any transcript whose recorded project does not match this repository's own " +
-  "root -- a more-recently-modified transcript from a DIFFERENT project must never be selected " +
-  "over an older one belonging to THIS project; only after that identity scoping, and always " +
-  "excluding the file this session is itself writing to, use modification time as a tiebreaker " +
-  "within the remaining project-matching set, most recent first; if no transcript matches this " +
-  "project's identity, say so honestly and continue -- never widen the search back to the most " +
-  "recent transcript overall; and bound the read to the most recent handful of tool-call, " +
-  "tool-result and error entries rather than the full file; never quote large raw excerpts into " +
-  "any git-tracked file, and if no prior transcript can be found or read, say so honestly " +
-  "rather than claiming this step was done.";
+// Selection is implemented by the dedicated reader, not by host-path instructions in this hook.
+const TRANSCRIPT_RECOVERY_SCRIPT = fileURLToPath(new URL("../scripts/runner-transcript-recovery.mjs", import.meta.url));
 
-/**
- * NVA-CF-RESUMEVERBATIM-HOOK: resumeHintContextLines() below only ever surfaced the
- * DISTILLED resume-hint card (intent/scope/constraints/questions/progress) -- never the
- * onboarding intake checkpoint's own verbatim `materialInput` (the user's own design-input
- * chunks, captured specifically to survive a restart) or its answered `values`
- * (commit-author name/email, operator language, PO profile). `scripts/resume-hint.mjs`'s
- * CLI `inspect` command (marker NVA-RESUMEVERBATIM-1) already closes this exact gap for the
- * MANUAL path by merging readOnboardingIntakeCheckpoint()/readOnboardingIntakeMaterialInput()
- * into its output -- this mirrors that same read, for the ONE path that delivers text into a
- * session's context unbidden (see NVA-BL-72 above). Both reads sit behind a single try/catch:
- * an absent checkpoint, a not-yet-git-initialized root (the private-state resolver has no
- * git-free fallback), a malformed checkpoint, or any other read failure must degrade to
- * exactly today's behaviour -- no new lines, never a throw, never a block on SessionStart.
- * `materialInput` text is NOT re-screened here: `verbatimMaterialRejection()` already screens
- * every chunk at CAPTURE time (scripts/resume-hint.mjs, before it is ever written into this
- * checkpoint via applyOnboardingIntakeCapture) -- a duplicate screen here would be redundant,
- * not defensive.
- */
+function priorTranscriptRecoveryLine(root, sessionId, runner) {
+  if (runner !== "codex") {
+    return "Transcript recovery is unavailable for this runner because it has no trusted, declared transcript source; do not search host session storage.";
+  }
+  if (typeof sessionId !== "string" || sessionId.trim() === "") {
+    return "Prior-transcript recovery is unavailable because this SessionStart supplied no usable current session identity; continue honestly without searching host session storage.";
+  }
+  const command = `node ${JSON.stringify(TRANSCRIPT_RECOVERY_SCRIPT)} --root ${JSON.stringify(root)} --runner codex --exclude-session ${JSON.stringify(sessionId)}`;
+  return "On startup, resume, clear or compact restart, recover bounded operational context only by running exactly: "
+    + `${command}. This dedicated read-only command selects only a PRIOR Codex transcript whose own session metadata matches this repository identity, excludes this session by its supplied identity, and returns only a bounded tool/error excerpt. If it reports unavailable, state that honestly and continue; never search $CODEX_HOME, ~/.codex, or any runner session directory directly.`;
+}
+
+// Resume-hint material is surfaced only after the existing delivery receipt is recorded.
 function intakeVerbatimContextLines(root) {
   let checkpoint;
   let material;
@@ -183,7 +135,7 @@ function resumeHintContextLines(root, sessionId) {
   return lines;
 }
 
-export function sessionStartDecision(projectDir = process.cwd(), exists = existsSync, sessionId = null) {
+export function sessionStartDecision(projectDir = process.cwd(), exists = existsSync, sessionId = null, runner = "codex") {
   let governed = false;
   let root = null;
   try {
@@ -204,7 +156,7 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
         "After a ready bootstrap, the Operating Model and compiled manifest are the gate authority: continue ordinary implementation, focused tests, commits, Verify, Critic preparation and state readback autonomously.",
         "Do not invent a human checkpoint for routine work. Request the PO only for a configured decision gate, required final acceptance, an irreversible/external consequence, or a typed hard block with no safe returned recovery action.",
         "A guard denial is not by itself a human gate: first execute its exact typed read-only or lifecycle recovery action when one is supplied.",
-        PRIOR_ROLLOUT_TRANSCRIPT_LINE,
+        priorTranscriptRecoveryLine(root, sessionId, runner),
         ...resumeHintContextLines(root, sessionId),
       ].join(" "),
     };
