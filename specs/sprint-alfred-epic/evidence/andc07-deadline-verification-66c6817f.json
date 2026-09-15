@@ -1,0 +1,19 @@
+{
+  "schema": "pipeline.focused-verification.v1",
+  "candidate": {
+    "commit": "66c6817f11922f567938040a36ce1594e1078526",
+    "tree": "ce788ba5d5aa11a14ef7dc90762dd19fd7540a24"
+  },
+  "command": "node --test plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs",
+  "status": "passed",
+  "exitCode": 0,
+  "assertions": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0
+  },
+  "measuredDeadlineMs": {
+    "repositoryOnly": 4506,
+    "repositoryAndBatch": 4504
+  }
+}
