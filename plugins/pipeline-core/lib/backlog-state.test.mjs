@@ -15,6 +15,7 @@ import {
   ITEM_HASH_AMENDMENT_KIND,
   ITEM_HASH_AMENDMENT_TARGETS,
   ITEM_SCHEMA,
+  PO_ACCEPTED_LOST_RECONCILIATION_EVENTS,
   PRE_PUBLIC_CORE_REACHABILITY_KIND,
   PRE_PUBLIC_CORE_REACHABILITY_TARGETS,
   PROJECT_CLOSURE_READBACK_SCHEMA,
@@ -1352,26 +1353,30 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
 }
 
 {
-  const evidence = {
-    kind: "item-file-reconciliation",
-    commit: "0ad46d68b277dc8dfc3c9f74bb8edabf14054c2f",
-  };
+  const immutableEvent = { ...PO_ACCEPTED_LOST_RECONCILIATION_EVENTS[0], schema: "pipeline.backlog-transition.v1" };
   const authorizedEvents = Array(1855);
-  authorizedEvents[1854] = { id: "pipeline.example", sequence: 1855, actor: "backlog-reconciliation", evidence };
+  authorizedEvents[1854] = immutableEvent;
+  const tamperedAuthorizedEvents = Array(1855);
+  tamperedAuthorizedEvents[1854] = { ...immutableEvent, id: "pipeline.tampered" };
   const lookalikeEvents = Array(1001);
-  lookalikeEvents[1000] = { id: "pipeline.example", sequence: 1001, actor: "backlog-reconciliation", evidence };
+  lookalikeEvents[1000] = { ...immutableEvent, sequence: 1001 };
   const authorized = classifyBacklogFindings(
     ["ledger event 1855: evidence.commit is not a reachable local Git commit"],
     { events: authorizedEvents },
+  );
+  const tampered = classifyBacklogFindings(
+    ["ledger event 1855: evidence.commit is not a reachable local Git commit"],
+    { events: tamperedAuthorizedEvents },
   );
   const lookalike = classifyBacklogFindings(
     ["ledger event 1001: evidence.commit is not a reachable local Git commit"],
     { events: lookalikeEvents },
   );
-  check("BS38 the PO-approved reconciliation batch is exact while an in-range tuple lookalike remains INTEGRITY",
+  check("BS38 the PO-approved reconciliation batch is immutable while every lookalike remains INTEGRITY",
     authorized[0].severity === BACKLOG_FINDING_SEVERITY.DRIFT
+      && tampered[0].severity === BACKLOG_FINDING_SEVERITY.INTEGRITY
       && lookalike[0].severity === BACKLOG_FINDING_SEVERITY.INTEGRITY,
-    JSON.stringify({ authorized, lookalike }));
+    JSON.stringify({ authorized, tampered, lookalike }));
 }
 
 {
