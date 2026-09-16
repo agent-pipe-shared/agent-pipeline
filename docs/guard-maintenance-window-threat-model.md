@@ -27,6 +27,25 @@ The model does not treat an agent instruction, an environment variable, a
 free-form guard prefix, or possession of a request digest as PO authority —
 identical to HGO's own boundary.
 
+## Checkpoint-push lane boundary
+
+The opt-in feature-branch checkpoint lane is documented in
+[`specs/sprint-nova-epic/implementation/feature-checkpoint-push-policy.md`](../specs/sprint-nova-epic/implementation/feature-checkpoint-push-policy.md).
+It is a separate, lower-rigor backup path, not a Guard Maintenance Window
+capability and not a signature or release authorization. Its eligibility
+boundary is deliberately narrow: a valid
+`pipeline.push-destination-policy.v1`, an explicit same-ref source and
+destination inside the configured `refs/heads/feat/` namespace, a clean
+candidate, and exactly one bounded `Checkpoint-Intent` trailer. The guard
+rechecks that binding and writes a local attempted-delivery audit before the
+network action; audit failure blocks the action.
+
+All other destinations and malformed or absent policies remain on the existing
+strict publication path. The checkpoint lane does not bypass publication,
+release, security, Verify, Critic, marketplace, approval, or signature gates
+when a feature branch is later promoted. The linked policy artifact records
+disablement/rollback and names an owner plus expiry for every deferred risk.
+
 ## What makes this different from HGO, and why that matters here
 
 HGO's activation step, once a request is planned, is an ordinary command a
