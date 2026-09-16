@@ -33,6 +33,8 @@ import {
 } from "../lib/project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../scripts/pipeline-start-preflight.mjs";
 import { checkPlanningAdoptionDisposition } from "../scripts/architecture-adoption.mjs";
+import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
+import { deriveMinimumRigor, inferInputsFromRepo, loadPolicy } from "../scripts/rigor-floor.mjs";
 import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabilities.mjs";
 // NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: the shared argv-native renderer builds
 // every human ceremony step below. The default denial is therefore bounded
@@ -303,6 +305,8 @@ const CONTROLLING_NON_READY_STATUSES = new Set(
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
 );
 const ARCHITECTURE_ADOPTION_DENIAL_CODE = "GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED";
+const ARCHITECTURE_FITNESS_DENIAL_CODE = "GUARD-ARCHITECTURE-FITNESS-NON-GREEN";
+const MINIMUM_RIGOR_DENIAL_CODE = "GUARD-MINIMUM-RIGOR-FLOOR";
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
@@ -370,6 +374,17 @@ function activeFeaturePlanningScope(root, dependencies = {}) {
   }
 }
 
+/** Read the PO-bound lifecycle profile; never accept a caller-provided value. */
+function activeFeatureSelectedProfile(root, dependencies = {}) {
+  try {
+    const source = (dependencies.readFileSyncFn ?? readFileSync)(join(root, "project", "pipeline-state.json"), "utf8");
+    const profile = JSON.parse(source)?.planSubmission?.profile;
+    return new Set(["mini", "feature", "epic"]).has(profile) ? profile : null;
+  } catch {
+    return null;
+  }
+}
+
 function architectureAdoptionAuthorityVerdict(root, command, dependencies = {}) {
   if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
   const scope = (dependencies.activeFeaturePlanningScopeFn ?? activeFeaturePlanningScope)(root, dependencies);
@@ -396,6 +411,80 @@ function architectureAdoptionAuthorityVerdict(root, command, dependencies = {}) 
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${ARCHITECTURE_ADOPTION_DENIAL_CODE}: ${detail}\n`
       + "Record one PO-owned approved-scoped, deferred, or partial adoption decision for the active plan scope before requesting implementation authority.\n",
+  );
+}
+
+/**
+ * Adoption resolves who has accepted the repository's architecture posture;
+ * fitness establishes whether the active planning scope is mechanically green
+ * enough to receive implementation authority. Keep the two gates separate:
+ * a PO's adoption decision never turns an unavailable or failing evaluator
+ * result into a pass.
+ */
+function architectureFitnessAuthorityVerdict(root, command, dependencies = {}) {
+  if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
+  const scope = (dependencies.activeFeaturePlanningScopeFn ?? activeFeaturePlanningScope)(root, dependencies);
+  if (scope === null) return null; // Adoption gate above owns the invalid-state denial.
+  let fitness;
+  try {
+    fitness = (dependencies.evaluateArchitectureFitnessFn ?? evaluateArchitectureFitness)({
+      rootDir: root,
+      mode: "planning",
+      candidatePaths: [scope],
+    });
+  } catch {
+    fitness = null;
+  }
+  if (fitness?.overallStatus === "pass" || fitness?.overallStatus === "excepted") return null;
+  const status = typeof fitness?.overallStatus === "string" ? fitness.overallStatus : "unavailable";
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${ARCHITECTURE_FITNESS_DENIAL_CODE}: planning architecture fitness is ${status}.\n`
+      + "Resolve new or worsened findings, record a valid exception, or repair the evaluator/profile evidence before requesting implementation authority.\n",
+  );
+}
+
+/**
+ * The PO may select more rigor, never less. Feed the plan-bound selected
+ * profile into the deterministic B1 derivation over the observable working
+ * surface, then refuse only a demonstrated under-selection.
+ */
+function minimumRigorAuthorityVerdict(root, command, dependencies = {}) {
+  if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
+  const selectedProfile = (dependencies.activeFeatureSelectedProfileFn ?? activeFeatureSelectedProfile)(root, dependencies);
+  if (selectedProfile === null) {
+    return verdict(
+      2,
+      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+        + `${MINIMUM_RIGOR_DENIAL_CODE}: the active feature has no valid PO-bound lifecycle profile.\n`
+        + "Submit and approve a plan with mini, feature, or epic profile before requesting implementation authority.\n",
+    );
+  }
+  let derived;
+  try {
+    const inputs = (dependencies.inferRigorInputsFn ?? inferInputsFromRepo)(root);
+    inputs.selectedProfile = {
+      value: selectedProfile,
+      status: "available",
+      sourceContract: "pipeline.plan-submission.v1",
+    };
+    derived = (dependencies.deriveMinimumRigorFn ?? deriveMinimumRigor)(
+      inputs,
+      (dependencies.loadRigorPolicyFn ?? loadPolicy)(root),
+    );
+  } catch {
+    derived = null;
+  }
+  if (derived?.schema === "pipeline.rigor-derivation.v1"
+    && new Set(["mini", "feature", "epic"]).has(derived.minProfile)
+    && derived.disagreementLog === undefined) return null;
+  const minimum = typeof derived?.minProfile === "string" ? derived.minProfile : "unavailable";
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${MINIMUM_RIGOR_DENIAL_CODE}: the PO-bound ${selectedProfile} profile is below the derived ${minimum} floor.\n`
+      + "Raise the plan profile or resolve the observed material-input uncertainty before requesting implementation authority.\n",
   );
 }
 
@@ -5070,6 +5159,18 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       dependencies,
     );
     if (adoptionVerdict !== null) return adoptionVerdict;
+    const fitnessVerdict = architectureFitnessAuthorityVerdict(
+      root,
+      input.tool_input.command ?? input.tool_input.CommandLine,
+      dependencies,
+    );
+    if (fitnessVerdict !== null) return fitnessVerdict;
+    const rigorVerdict = minimumRigorAuthorityVerdict(
+      root,
+      input.tool_input.command ?? input.tool_input.CommandLine,
+      dependencies,
+    );
+    if (rigorVerdict !== null) return rigorVerdict;
   }
   return verdict(0);
 }

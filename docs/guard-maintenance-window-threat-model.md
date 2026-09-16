@@ -230,6 +230,9 @@ below assumes it holds and is written to catch a change that would break it.
   `scripts/module-inventory.mjs`: `guard-lifecycle-ready.mjs` calls this chain
   before implementation entry, so a maintenance window cannot rewrite its
   adoption verdict or the inventory and fitness inputs from which it derives.
+  The same boundary also uses `scripts/rigor-floor.mjs` to prevent an agent
+  from selecting a profile below the deterministic minimum derived from the
+  observed change surface.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

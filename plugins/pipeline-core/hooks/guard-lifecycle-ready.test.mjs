@@ -442,6 +442,7 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
     writeFileSync(join(path, "project", "pipeline-state.json"), JSON.stringify({
       schema: "pipeline.state.v0",
       activeFeature: { id: "d4-authority", planPath, phase: "design" },
+      planSubmission: { profile: "epic" },
       planApproved: true,
     }) + "\n");
 
@@ -470,8 +471,43 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
     const allowed = evaluateLifecycleReadyGuard(bash(command), {
       projectDir: path,
       requireProjectOnboardingReadyFn: readyStub,
+      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
     });
     assert.deepEqual(allowed, { exitCode: 0, stderr: "" });
+
+    const nonGreenFitness = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      evaluateArchitectureFitnessFn() { return { overallStatus: "unknown" }; },
+    });
+    assert.equal(nonGreenFitness.exitCode, 2, nonGreenFitness.stderr);
+    assert.match(nonGreenFitness.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
+    assert.match(nonGreenFitness.stderr, /fitness is unknown/u);
+
+    const insufficientRigor = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
+      deriveMinimumRigorFn() {
+        return {
+          minProfile: "epic",
+          disagreementLog: { selected: "mini", derived: "epic" },
+        };
+      },
+    });
+    assert.equal(insufficientRigor.exitCode, 2, insufficientRigor.stderr);
+    assert.match(insufficientRigor.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
+    assert.match(insufficientRigor.stderr, /below the derived epic floor/u);
+
+    const malformedRigor = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
+      deriveMinimumRigorFn() { return { minProfile: "mini" }; },
+    });
+    assert.equal(malformedRigor.exitCode, 2, malformedRigor.stderr);
+    assert.match(malformedRigor.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
+    assert.match(malformedRigor.stderr, /derived unavailable floor/u);
 
     writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
       schema: "pipeline.adoption-state.v1",

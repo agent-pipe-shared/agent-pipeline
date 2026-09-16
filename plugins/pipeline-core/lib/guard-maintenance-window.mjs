@@ -453,6 +453,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/architecture-fitness.mjs",
   "plugins/pipeline-core/scripts/architecture-remedy.mjs",
   "plugins/pipeline-core/scripts/module-inventory.mjs",
+  "plugins/pipeline-core/scripts/rigor-floor.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
