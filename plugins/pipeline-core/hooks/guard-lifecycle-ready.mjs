@@ -476,10 +476,16 @@ function minimumRigorAuthorityVerdict(root, command, dependencies = {}) {
   } catch {
     derived = null;
   }
-  if (derived?.schema === "pipeline.rigor-derivation.v1"
+  const validDerivation = derived?.schema === "pipeline.rigor-derivation.v1"
     && new Set(["mini", "feature", "epic"]).has(derived.minProfile)
-    && derived.disagreementLog === undefined) return null;
-  const minimum = typeof derived?.minProfile === "string" ? derived.minProfile : "unavailable";
+    && derived.disagreementLog === undefined;
+  if (validDerivation) return null;
+  // An incomplete or otherwise malformed derivation is a fail-closed condition.
+  // Its reported profile is not authority evidence and must not be rendered as one.
+  const minimum = derived?.schema === "pipeline.rigor-derivation.v1"
+    && new Set(["mini", "feature", "epic"]).has(derived.minProfile)
+    ? derived.minProfile
+    : "unavailable";
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "

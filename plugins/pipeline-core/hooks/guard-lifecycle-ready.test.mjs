@@ -490,6 +490,7 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
       evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
       deriveMinimumRigorFn() {
         return {
+          schema: "pipeline.rigor-derivation.v1",
           minProfile: "epic",
           disagreementLog: { selected: "mini", derived: "epic" },
         };
