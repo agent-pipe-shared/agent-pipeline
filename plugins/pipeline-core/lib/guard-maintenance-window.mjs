@@ -445,6 +445,14 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/dispatch-policy.mjs",
   "plugins/pipeline-core/lib/governance-hgo-consumption-action.mjs",
   "plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs",
+  // Alfred D4: guard-lifecycle-ready.mjs now evaluates implementation-entry
+  // architecture adoption through this complete helper closure. A GS-6 window
+  // must not be able to alter the adoption decision, the inventory used to
+  // establish scope, its fitness evaluation, or a resulting remedy proposal.
+  "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+  "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+  "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+  "plugins/pipeline-core/scripts/module-inventory.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

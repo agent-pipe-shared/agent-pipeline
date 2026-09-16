@@ -1483,7 +1483,7 @@ function canonicalFixtureJson(value) {
 // ---- PS17: close-feature without an activeFeature is refused, nothing written ----------
 {
   const dir = freshDir("close-feature-no-active");
-  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS17a close-feature without activeFeature refused (exit 2)", code === 2, `got ${code}`);
   ok("PS17b nothing written (state file absent)", readState(dir).status === "absent");
 }
@@ -1497,7 +1497,7 @@ function canonicalFixtureJson(value) {
     now: FIXED_NOW,
     poGateAuthority: injectedPoGateAuthority("p-close.md"),
   });
-  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS18a close-feature exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS18b activeFeature removed", state.activeFeature === undefined);
@@ -1510,6 +1510,7 @@ function canonicalFixtureJson(value) {
       state.closedFeatures[0].id === "f-close" &&
       state.closedFeatures[0].planPath === "p-close.md" &&
       state.closedFeatures[0].phaseAtClose === "design" &&
+      state.closedFeatures[0].architectureImpact === "no-architecture-impact" &&
       state.closedFeatures[0].closedAt === FIXED_NOW() &&
       state.closedFeatures[0].closedBy === "po-test" &&
       state.closedFeatures[0].forCommit === "abc123deadbeef",
@@ -1547,7 +1548,7 @@ function canonicalFixtureJson(value) {
       observedDigest: B,
       operationSha256: D,
       ...(phase === "feature-close-prepared"
-        ? { authority: { ...coordinator.authority, implementationResultSha256: D } }
+        ? { authority: { ...coordinator.authority, implementationResultSha256: D }, architectureImpact: "no-architecture-impact" }
         : {}),
     });
   }
@@ -1560,7 +1561,7 @@ function canonicalFixtureJson(value) {
     readCloseCoordinator: () => ({ coordinator, rawDigest: C }),
   };
   const rejected = run([
-    "close-feature", "--by", "po-test",
+    "close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact",
     "--coordinator-lifecycle", coordinator.lifecycleId,
     "--coordinator-sha256", D,
   ], deps);
@@ -1570,14 +1571,14 @@ function canonicalFixtureJson(value) {
   driftedState.updatedAt = "2026-07-07T21:00:01.000Z";
   writeFileSync(statePath(dir), JSON.stringify(driftedState, null, 2) + "\n");
   const stateDriftRejected = run([
-    "close-feature", "--by", "po-test",
+    "close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact",
     "--coordinator-lifecycle", coordinator.lifecycleId,
     "--coordinator-sha256", digest,
   ], deps);
   ok("PS18i coordinator-bound close rejects byte-level Pipeline State drift", stateDriftRejected === 2);
   writeFileSync(statePath(dir), exactStateBytes);
   const code = run([
-    "close-feature", "--by", "po-test",
+    "close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact",
     "--coordinator-lifecycle", coordinator.lifecycleId,
     "--coordinator-sha256", digest,
   ], deps);
@@ -1595,7 +1596,7 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("close-feature-git-error");
   run(["set-feature", "--id", "f-git-err", "--plan-path", "p.md"], { dir, now: FIXED_NOW });
-  const code = run(["close-feature", "--by", "po-test"], {
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], {
     dir,
     now: FIXED_NOW,
     gitHead: () => ({ ok: false, error: "not a git repository" }),
@@ -1610,9 +1611,9 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("close-feature-append");
   run(["set-feature", "--id", "f-first", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   run(["set-feature", "--id", "f-second", "--plan-path", "p2.md"], { dir, now: FIXED_NOW });
-  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS20a second close-feature exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS20b closedFeatures length 2", state.closedFeatures?.length === 2, JSON.stringify(state.closedFeatures));
@@ -1669,7 +1670,7 @@ function canonicalFixtureJson(value) {
     suggestionBefore,
   );
 
-  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS21b close-feature exit 0", code === 0, `got ${code}`);
 
   const manifestAfter = loadManifestSafe(dir);
@@ -1687,7 +1688,7 @@ function canonicalFixtureJson(value) {
     JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id: "", planPath: "p.md", phase: "design" } }, null, 2) + "\n",
   );
   const before = readFileSync(statePath(dir), "utf8");
-  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS22a close-feature with blank activeFeature.id refused (exit 2)", code === 2, `got ${code}`);
   const after = readFileSync(statePath(dir), "utf8");
   ok("PS22b file left byte-identical (no silent write)", after === before);
@@ -1702,7 +1703,7 @@ function canonicalFixtureJson(value) {
     JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id: "f-blank-plan", planPath: "  ", phase: "design" } }, null, 2) + "\n",
   );
   const before = readFileSync(statePath(dir), "utf8");
-  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS23a close-feature with blank activeFeature.planPath refused (exit 2)", code === 2, `got ${code}`);
   const after = readFileSync(statePath(dir), "utf8");
   ok("PS23b file left byte-identical (no silent write)", after === before);
@@ -1721,7 +1722,7 @@ function canonicalFixtureJson(value) {
     ) + "\n",
   );
   const before = readFileSync(statePath(dir), "utf8");
-  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS24a close-feature with non-array closedFeatures refused (exit 2)", code === 2, `got ${code}`);
   const after = readFileSync(statePath(dir), "utf8");
   ok("PS24b file left byte-identical (no silent overwrite with [])", after === before);
@@ -1733,7 +1734,7 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("close-feature-f2-happy-path");
   run(["set-feature", "--id", "f2-happy", "--plan-path", "p2-happy.md"], { dir, now: FIXED_NOW });
-  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS25a close-feature happy path exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok(
@@ -2805,9 +2806,9 @@ if (symlinkCapable) {
     closeEvidence: { path: "evidence/close.json", sha256: closeEvidenceSha256 },
   };
   const closeRequestFile = writeRequest(dir, "close-request", closeRequest);
-  const missingGate = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const missingGate = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS48c close-feature without revision/evidence request is refused", missingGate === 2, `got ${missingGate}`);
-  const closed = run(["close-feature", "--by", "po-test", "--continuity-close-request", closeRequestFile], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const closed = run(["close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", closeRequestFile], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   const final = readState(dir).state;
   ok("PS48d revision/evidence-bound close-feature succeeds", closed === 0, `got ${closed}`);
   ok("PS48e closing active feature removes continuity with activeFeature", final.activeFeature === undefined && final.continuity === undefined);
@@ -2846,7 +2847,7 @@ if (symlinkCapable) {
   const active = prepareBoundClose("continuity-bound-cleanup-active");
   const activeBefore = readFileSync(statePath(active.dir), "utf8");
   const refused = run([
-    "close-feature", "--by", "po-test", "--continuity-close-request", active.closeRequestFile,
+    "close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", active.closeRequestFile,
   ], {
     dir: active.dir,
     now: FIXED_NOW,
@@ -2859,7 +2860,7 @@ if (symlinkCapable) {
   const closed = prepareBoundClose("continuity-bound-cleanup-closed");
   const closedBefore = readFileSync(statePath(closed.dir), "utf8");
   const accepted = run([
-    "close-feature", "--by", "po-test", "--continuity-close-request", closed.closeRequestFile,
+    "close-feature", "--by", "po-test", "--architecture-impact", "no-architecture-impact", "--continuity-close-request", closed.closeRequestFile,
   ], {
     dir: closed.dir,
     now: FIXED_NOW,

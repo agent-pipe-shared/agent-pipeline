@@ -225,6 +225,11 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/governance-hgo-consumption-source.mjs`. Already-kernel dispatch-budget
   and HGO enforcement modules import these delegates, so a maintenance window
   cannot rewrite the delegated decision or its durable evidence.
+- Alfred D4 adds `scripts/architecture-adoption.mjs`,
+  `scripts/architecture-fitness.mjs`, `scripts/architecture-remedy.mjs`, and
+  `scripts/module-inventory.mjs`: `guard-lifecycle-ready.mjs` calls this chain
+  before implementation entry, so a maintenance window cannot rewrite its
+  adoption verdict or the inventory and fitness inputs from which it derives.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
