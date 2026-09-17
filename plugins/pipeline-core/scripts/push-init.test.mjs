@@ -93,7 +93,10 @@ test("driveCheckpointPushInit: accepts only the configured exact feature source/
   });
   const ready = driveCheckpointPushInit({ rootDir: "/fixture", by: "tester", remote: "origin", destination: "refs/heads/feat/checkpoint", run, load });
   assert.equal(ready.outcome, "checkpoint-ready", JSON.stringify(ready));
-  assert.equal(ready.gitPushLine, "git push origin refs/heads/feat/checkpoint:refs/heads/feat/checkpoint");
+  assert.equal(ready.gitPushLine, "git -C /fixture push origin refs/heads/feat/checkpoint:refs/heads/feat/checkpoint");
+  const quotedRoot = driveCheckpointPushInit({ rootDir: "/fixture with space", by: "tester", remote: "origin", destination: "refs/heads/feat/checkpoint", run, load });
+  assert.equal(quotedRoot.outcome, "checkpoint-ready", JSON.stringify(quotedRoot));
+  assert.equal(quotedRoot.gitPushLine, "git -C '/fixture with space' push origin refs/heads/feat/checkpoint:refs/heads/feat/checkpoint");
   const protectedDestination = driveCheckpointPushInit({ rootDir: "/fixture", by: "tester", remote: "origin", destination: "refs/heads/main", run, load });
   assert.equal(protectedDestination.outcome, "precondition-unmet");
   assert.equal(protectedDestination.checks.find((check) => check.id === "checkpoint-destination").ok, false);

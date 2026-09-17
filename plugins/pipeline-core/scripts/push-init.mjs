@@ -111,6 +111,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { gateConfig, loadManifest } from "../lib/manifest.mjs";
 import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -206,6 +207,12 @@ export function driveCheckpointPushInit({ rootDir, by, remote, destination, run 
   const intents = intent === null ? [] : intent.split("\n").map((value) => value.trim()).filter(Boolean);
   checks.push({ id: "checkpoint-intent", ok: intents.length === 1 && validCheckpointIntent(intents[0]), message: intents.length === 1 && validCheckpointIntent(intents[0]) ? "committed Checkpoint-Intent is present." : "HEAD needs exactly one bounded Checkpoint-Intent commit trailer." });
   const ready = checks.every((check) => check.ok);
+  const gitPushLine = ready
+    ? boundedCopySafeCommand({
+      executable: "git",
+      argv: ["-C", root, "push", remote, `${sourceRef}:${destination}`],
+    }).command
+    : null;
   return {
     schema: SCHEMA,
     root,
@@ -213,7 +220,7 @@ export function driveCheckpointPushInit({ rootDir, by, remote, destination, run 
     lane: "feature-checkpoint",
     by,
     checks,
-    ...(ready ? { gitPushLine: `git push ${remote} ${sourceRef}:${destination}` } : {}),
+    ...(gitPushLine === null ? {} : { gitPushLine }),
   };
 }
 
