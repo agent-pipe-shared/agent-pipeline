@@ -2296,6 +2296,60 @@ function freshRepoIn(parentDir, name) {
   check("PG-CHECKPOINT block malformed policy cannot select the relaxed lane", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["destination policy"] });
 }
 
+// ---- PG-CHECKPOINT-WORKTREE: explicit -C worktree is the evidence source -----------
+{
+  const { dir } = freshRepo("checkpoint-bound-worktree");
+  const branch = "feat/checkpoint-bound";
+  gitAt(dir, "checkout", "-q", "-b", branch);
+  writeManifest(dir, `${manifestPush({ approval: "required" })}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n`);
+  writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
+  gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
+  gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
+
+  const source = join(dir, "clean-bound-source");
+  gitAt(dir, "worktree", "add", "--force", "-q", source, branch);
+  writeFileSync(join(dir, "primary-is-dirty.txt"), "dirty primary\n");
+  const refspec = `refs/heads/${branch}:refs/heads/${branch}`;
+  check(
+    "PG-CHECKPOINT-WORKTREE allow explicit clean attached -C source over dirty primary",
+    `git -C ${source} push origin ${refspec}`,
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+
+  const detached = join(dir, "detached-source");
+  gitAt(dir, "worktree", "add", "-q", "--detach", detached, "HEAD");
+  check(
+    "PG-CHECKPOINT-WORKTREE block detached -C source falls back to dirty attached branch worktree",
+    `git -C ${detached} push origin ${refspec}`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["checkpoint working tree is not clean"] },
+  );
+
+  const mismatched = join(dir, "mismatched-source");
+  gitAt(dir, "branch", "feat/checkpoint-other");
+  gitAt(dir, "worktree", "add", "-q", mismatched, "feat/checkpoint-other");
+  check(
+    "PG-CHECKPOINT-WORKTREE block attached -C worktree on a different branch falls back",
+    `git -C ${mismatched} push origin ${refspec}`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["checkpoint working tree is not clean"] },
+  );
+
+  gitAt(dir, "branch", "feat/checkpoint-unattached");
+  const unattached = "refs/heads/feat/checkpoint-unattached";
+  check(
+    "PG-CHECKPOINT-WORKTREE block source branch with no attached worktree",
+    `git -C ${source} push origin ${unattached}:${unattached}`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["explicit source branch has no matching attached worktree"] },
+  );
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

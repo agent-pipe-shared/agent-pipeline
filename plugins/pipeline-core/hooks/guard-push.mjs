@@ -1882,15 +1882,26 @@ function resolveEvidenceProject(binding, commit) {
     return { ok: false, reason: "the explicit source branch worktree registry cannot be resolved" };
   }
 
-  let worktree = null;
+  const worktrees = [];
   for (const block of listed.stdout.split("\n\n")) {
     const lines = block.split("\n");
     const path = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length);
     const branch = lines.find((line) => line.startsWith("branch "))?.slice("branch ".length);
-    if (path && branch === sourceRef) {
-      worktree = path;
-      break;
-    }
+    if (path) worktrees.push({ path, branch });
+  }
+  // The command's resolved project directory is authoritative when it is an
+  // attached worktree for the precise source branch.  A hook may itself run
+  // from a different checkout, and Git permits multiple linked worktrees for
+  // one branch in exceptional maintenance cases; selecting the first registry
+  // entry there would test a different tree than the one the operator named.
+  // Keep the fresh HEAD read below: porcelain output is only the membership
+  // proof, not evidence that survives a concurrent ref movement.
+  let worktree = worktrees.find((entry) => entry.path === binding.projectDir && entry.branch === sourceRef)?.path ?? null;
+  if (!worktree) {
+    // Existing exact-registry fallback for callers whose bound directory is
+    // not an attached source worktree.  It remains fail-closed below if the
+    // selected attached branch no longer resolves to the pushed commit.
+    worktree = worktrees.find((entry) => entry.branch === sourceRef)?.path ?? null;
   }
   if (!worktree) {
     return { ok: false, reason: "the explicit source branch has no matching attached worktree" };
