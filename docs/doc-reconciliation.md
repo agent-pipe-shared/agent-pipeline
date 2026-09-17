@@ -399,6 +399,17 @@ The record is intentionally committed after substantive candidate S. The candida
 
 - ADR-0036: checked, no change needed.
 
+## Candidate 1c73cc42adbfc5847770b52c0ec1bfdbe5a44922 — 2026-09-17, CI-fixture stability reconciliation
+
+The candidate changes only test fixtures: an admitted `sed` command is no longer executed outside the offline CI tool allowlist, and a native protocol fixture receives a startup budget appropriate for parallel CI. Neither change alters runtime behavior, platform support, human authorization, or the release authority model.
+
+- ADR-0010: checked, no change needed.
+- ADR-0041: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0059: checked, no change needed.
+
 ## Candidate d93f2011c9f816fb4e203f5cf3afde5b2f91cf2f — 2026-09-17, 0.6.2 checkpoint and release-path repair reconciliation
 
 - ADR-0005: checked, no change needed.
