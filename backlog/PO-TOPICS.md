@@ -6,7 +6,7 @@ for the detailed backlog records or an authority to publish changes.
 
 | Priority | PO topic | Current disposition | Next safe action |
 | --- | --- | --- | --- |
-| P0 | A public `v0.6.2` exists, but its GitHub Verify is red. | Local CI repair candidate: `de3ccdc4`, reconciled by `b86ceb28`; targeted runtime suite 15/15. | Qualify this isolated candidate, then obtain a fresh action-specific push authorization for an external Verify readback. |
+| P0 | A public `v0.6.2` exists, but its GitHub Verify is red. | Local CI repair candidate `8b4aa6aa` contains `de3ccdc4`/`b86ceb28` plus the portable local-supervisor fixture correction; clean local Verify passed 551/551. | Obtain a fresh action-specific push authorization, then require an external GitHub Verify readback before closing the item. |
 | P0 | A Codex Greenfield must retain and read the complete first-session design input. | Implemented in the SessionStart intake checkpoint path; rechecked locally on 2026-09-17: direct suite 49/49. | Reproduce only if a new real Greenfield run demonstrates a failing lifecycle edge. |
 | P0 | Read-only recovery must access appropriate prior session transcripts. | Implemented by the repository-matching, bounded transcript reader; rechecked locally on 2026-09-17: direct suite 4/4. | Test the real runner/session identity handoff before expanding read scope. |
 | P1 | A kickoff lock must not force agents into an unsafe or confusing recovery route. | The reported incident was repaired in the test project; no new pipeline defect is yet reproduced here. | Capture the next typed lock failure with its exact owner/age state before changing locking semantics. |
