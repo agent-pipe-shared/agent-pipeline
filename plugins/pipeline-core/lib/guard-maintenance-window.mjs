@@ -302,6 +302,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/security-completeness-gate.mjs",
   "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
   "plugins/pipeline-core/lib/verify-evidence-path.mjs",
+  "plugins/pipeline-core/lib/checkpoint-push-audit.mjs",
   "plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
   // NVA-GS15-1: onboarding-staging-authoring.mjs is imported by both
   // guard-gate-strength.mjs and guard-lifecycle-ready.mjs (already kernel above), so it

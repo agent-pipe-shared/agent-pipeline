@@ -143,7 +143,8 @@ below assumes it holds and is written to catch a change that would break it.
   followed by `lib/dispatch-budget-core.mjs` in the 2026-09-11 closure refresh;
   the original group continues with `lib/plan-authority-staging-guard.mjs`,
   `lib/security-completeness-gate.mjs`,
-  `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`, and
+  `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`,
+  `lib/checkpoint-push-audit.mjs`, and
   `scripts/pre-push-hook-install.mjs`. A fourth closure gap (NVA-KERNELDOC-1,
   2026-08-27) added: `lib/onboarding-staging-authoring.mjs`, imported by both
   `guard-gate-strength.mjs` (GS-15) and `guard-lifecycle-ready.mjs` — it holds
