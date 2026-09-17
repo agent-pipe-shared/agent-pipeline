@@ -48,6 +48,14 @@ const HOOK_STARTED_AT = Date.now();
 // complete bounded chain plus a final typed-recovery window; a 9s adapter
 // budget made a multi-file patch impossible even when every guard was healthy.
 const HOOK_BUDGET_MS = 42_000;
+// Cold lifecycle readback legitimately takes about ten seconds in a source
+// checkout.  Derive its bounded share and recovery reserve from the outer
+// provider budget so the adapter leaves time to return a typed fail-closed
+// denial instead of timing out before the guard can report one.
+const LIFECYCLE_GUARD_BUDGET = Object.freeze({
+  capMs: Math.floor(HOOK_BUDGET_MS / 2),
+  reserveMs: Math.floor(HOOK_BUDGET_MS / 6),
+});
 const STDIN_TIMEOUT_MS = 1_000;
 const STDIN_MAX_BYTES = 1024 * 1024;
 const NESTED_GUARD_BUDGETS = Object.freeze({
@@ -403,7 +411,7 @@ if (lifecycleShouldRun) {
     env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
     encoding: "utf8",
     input: rawInput,
-  }, { capMs: 3_000, reserveMs: 1_500 });
+  }, LIFECYCLE_GUARD_BUDGET);
   const detail = String(lifecycle.stderr ?? "").trim();
   if (lifecycle.status === 2) denials.push({
     guard: lifecycleGuard,

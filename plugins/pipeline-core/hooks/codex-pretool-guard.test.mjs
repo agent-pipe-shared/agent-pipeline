@@ -413,6 +413,20 @@ check("Human override Git observation keeps a bounded cold-repository budget", (
   assert.doesNotMatch(source, /\{ capMs: 300, reserveMs: 400 \}/u);
 });
 
+check("lifecycle guard timeout derives from adapter budget and preserves recovery reserve", () => {
+  const source = readFileSync(adapter, "utf8");
+  const budget = Number(source.match(/const HOOK_BUDGET_MS = ([\d_]+);/u)?.[1].replaceAll("_", ""));
+  const lifecycleBudget = source.match(/const LIFECYCLE_GUARD_BUDGET = Object\.freeze\(\{\s*capMs: Math\.floor\(HOOK_BUDGET_MS \/ 2\),\s*reserveMs: Math\.floor\(HOOK_BUDGET_MS \/ 6\),\s*\}\);/u);
+  assert.equal(budget, 42_000);
+  assert.ok(lifecycleBudget, "the lifecycle cap must derive from the outer adapter budget");
+  const capMs = Math.floor(budget / 2);
+  const reserveMs = Math.floor(budget / 6);
+  assert.ok(capMs >= 10_000, "the cold lifecycle guard needs at least ten seconds");
+  assert.ok(reserveMs >= 5_000, "denial handling needs a meaningful reserve");
+  assert.ok(capMs + reserveMs < budget, "the nested lifecycle guard cannot consume the whole adapter budget");
+  assert.match(source, /\}, LIFECYCLE_GUARD_BUDGET\);/u);
+});
+
 check("Bash, apply_patch, Edit and Write each reach their intended guard family", () => {
   const root = fixture();
   writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({
