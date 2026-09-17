@@ -60,8 +60,9 @@ worktree: a fixture rooted under `/tmp` is correctly rejected because that
 ancestor is world-writable.  Commit `8b4aa6aa98c73654fd21703ea8143d26e4dcd2f5`
 adds the repository-scratch fixture correction to the local CI candidate.
 From a clean non-`/tmp` worktree, the direct supervisor suite
-passes 25/25 and the full local Verify run passes 551/551 for candidate
-tree `ba6b70592f8be955bfff7e2d0aec6d8bdc878502`.
+passes 25/25 and a full local candidate-mode Verify run with receipt reuse
+disabled passes 551/551 for candidate tree
+`ba6b70592f8be955bfff7e2d0aec6d8bdc878502`.
 
 This is local qualification, not a GitHub result.  The item remains open until
 the exact candidate receives a fresh, authorized push and an external Verify
