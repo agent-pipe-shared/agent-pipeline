@@ -429,11 +429,14 @@ flowchart LR
 | Preflight | Elephant und deterministische Checks. | Aktuelles PRD/Spec, Profil-/Phasenroute, Kapazität, Scope und Authority-Bindungen passen weiterhin zusammen. | Ein Mismatch vertagt oder öffnet eine Kursentscheidung; er wird nie zum informellen Dispatch. |
 | Test-Autor — optional | Eine separat gebriefte Test-Autoren-Duty. | Nutze sie, wenn sich Test- oder Gate-Vertrag selbst ändern muss. | Der Implementierende schwächt oder schreibt die Tests nicht um, die seine Umsetzung bewerten. Sein Ergebnis ist separat prüfbar. |
 | Implementieren | Goldfish. | Ein frisches, eigenständiges Implementierungspaket. Unabhängige Pakete dürfen parallel laufen, wenn Dateien und Daten nicht überlappen. | Ein Sechs-Felder-Briefing liefert Ziel, Kontext, Definition of Done, Verbote, Stopp-Bedingungen und Dispatch-Metadaten. |
-| Verify — Pflicht | Goldfish fährt den Evidence-Producer als konfiguriertes Projekt-Gate. | Der Producer fährt den einen konfigurierten Projektbefehl und die deterministische Kette, die für dieses Projekt gilt. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
+| Verify — Pflicht | Goldfish fährt den Evidence-Producer als konfiguriertes Projekt-Gate. | Für Releases fährt der Producer den einen konfigurierten Projektbefehl; dokumentierte grenzbewusste Modi fahren die feste Baseline plus registrierte Befehle für geänderte Bereiche. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
 | Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Der Critic bekommt Verweise auf Kandidat, Spec, Guardrails und Nachweis — nicht den Implementierungschat oder dessen Begründung. | Er läuft nach deterministischen Checks. Befunde brauchen Nachweis, Regel/Kriterium und Konsequenz. Eine Korrektur erhält ein frisches Delta-Re-Gate. Die Goldfish-Lieferung bleibt ohne unabhängigen Critic-Nachweis als Review-ausstehend markiert. |
 
-Jedes Projekt verwendet den einen `verify`-Befehl seiner Kalibrierung; ersetze
-ihn nicht durch einen bequemen Teilbefehl und nenne ihn gleichwertig.
+Jedes Projekt verwendet den einen vollständigen `verify`-Befehl seiner eigenen
+Kalibrierung. Für Nicht-Release-Grenzen darf der Evidence-Producer seine feste
+Baseline plus registrierte Impact-Befehle ausführen; dies erlaubt nicht, einen
+vollständigen Befehl durch einen bequemen Teilbefehl zu ersetzen. [Passenden Modus und geprüfte Basis
+wählen](docs/usage.md#verify-a-consumer-project).
 Maintainer finden den Release-Ablauf dieses Source-Checkouts im
 [Push- und Release-Ablauf](docs/push-release-flow.md).
 

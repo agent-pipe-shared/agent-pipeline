@@ -1,0 +1,19 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "nva-062-release-round-3",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "delivery-checklist-verify-evidence-producer",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "cabca643b445aababa334c8d2452383e15a8b8bc"
+    },
+    {
+      "id": "flow-boundary-aware-verify-mode",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "cabca643b445aababa334c8d2452383e15a8b8bc"
+    }
+  ]
+}

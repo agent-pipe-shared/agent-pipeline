@@ -331,6 +331,13 @@ configures a real human decision gate that uses the signature path. The
 [onboarding guide](docs/usage.md#start-or-adopt-a-project) distinguishes this
 optional setup from ordinary onboarding:
 
+Run the following commands from the governed project root, first defining
+`REPO` as that exact root:
+
+```sh
+REPO="$PWD"
+```
+
 ```sh
 node "<absolute-plugin-root>/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
 ```
