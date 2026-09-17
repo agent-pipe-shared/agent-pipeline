@@ -89,7 +89,8 @@ continues autonomously within that approved scope:
 1. Split independent, non-overlapping packages so they may run in parallel.
 2. Give each implementor a bounded goal, exact context paths, acceptance checks,
    prohibitions, and stop conditions.
-3. Run the configured verify command and any applicable security checks.
+3. Run the [Verify evidence producer](#verify-a-consumer-project) with the
+   appropriate mode and reviewed base, plus any applicable security checks.
 4. Run the independent Critic review; profile and risk determine its depth and route.
 5. Record the outcome and close the feature only when its tracked work is
    actually complete.

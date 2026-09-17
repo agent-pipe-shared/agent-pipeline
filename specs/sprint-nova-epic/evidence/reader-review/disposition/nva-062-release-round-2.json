@@ -1,0 +1,31 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "nva-062-release-round-2",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "policy-enforcement-route",
+      "class": "cut",
+      "status": "resolved",
+      "resolutionCommit": "f667f806dce3cda56cdaaad5471473645d8d5fd8"
+    },
+    {
+      "id": "codex-host-restart",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "f667f806dce3cda56cdaaad5471473645d8d5fd8"
+    },
+    {
+      "id": "verify-producer-boundary",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "f667f806dce3cda56cdaaad5471473645d8d5fd8"
+    },
+    {
+      "id": "work-candidate-invocations",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "f667f806dce3cda56cdaaad5471473645d8d5fd8"
+    }
+  ]
+}

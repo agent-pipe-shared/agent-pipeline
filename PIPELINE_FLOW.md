@@ -176,12 +176,14 @@ flowchart LR
 | Preflight | Elephant and deterministic checks. | Current PRD/Spec, profile/phase route, capacity, scope, and authority bindings still match. | A mismatch defers or opens a course decision; it never becomes an informal dispatch. |
 | Test author — optional | A separately briefed test-author duty. | Use it when the test or gate contract itself must change. | The implementor does not weaken or rewrite the tests that judge its own implementation. Its output is separately reviewable. |
 | Implement | Goldfish. | One fresh-context, self-contained implementation package. Independent packages may run in parallel when files and data do not overlap. | A six-field briefing supplies goal, context, Definition of Done, prohibitions, stop conditions, and dispatch metadata. |
-| Verify — mandatory | Goldfish runs the evidence producer as the configured project gate. | The producer runs the one configured project command and the deterministic chain that applies to that project. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
+| Verify — mandatory | Goldfish runs the evidence producer as the configured project gate. | For release, the producer runs the one configured project command; documented boundary-aware modes run the fixed baseline plus registered changed-area commands. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
 | Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | The Critic receives references to candidate, Spec, guardrails, and evidence — not implementation chat or rationale. | It runs after deterministic checks. Findings need evidence, a rule/criterion, and a consequence. A correction gets a fresh delta re-gate. Goldfish delivery stays review-pending until independent Critic evidence exists. |
 
-Each project uses the one `verify` command named by its own calibration; do not
-substitute a convenient partial command and call it equivalent. Maintainers can
-find this source checkout's release procedure in
+Each project uses the one full `verify` command named by its own calibration.
+For non-release boundaries, the evidence producer may run its fixed baseline
+plus registered impact commands; it does not authorize substituting a convenient
+partial command. [Choose the appropriate mode and reviewed base](docs/usage.md#verify-a-consumer-project).
+Maintainers can find this source checkout's release procedure in
 [push and release flow](docs/push-release-flow.md).
 
 ## 4. Optional branches are explicit, not implied
