@@ -1,0 +1,38 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "nva-062-release-round-4",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "german-pipeline-flow-verify-boundary-mismatch",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "b963aef2b115cd69d0fe850b6bc0e7d54578ce06"
+    },
+    {
+      "id": "setup-human-approval-repo-variable-undefined",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "b963aef2b115cd69d0fe850b6bc0e7d54578ce06"
+    }
+  ]
+}
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "nva-062-release-round-4",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "german-verify-boundary-aware-mode",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "b963aef2b115cd69d0fe850b6bc0e7d54578ce06"
+    },
+    {
+      "id": "human-approval-repo-variable",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "b963aef2b115cd69d0fe850b6bc0e7d54578ce06"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "nva-062-release-round-5",
+  "status": "no-findings",
+  "findings": []
+}
