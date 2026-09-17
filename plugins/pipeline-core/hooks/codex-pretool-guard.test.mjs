@@ -43,6 +43,7 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
 const checkFilter = process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER ?? "";
 const shardIndex = Number.parseInt(process.env.PIPELINE_CODEX_PRETOOL_TEST_SHARD ?? "", 10);
 const shardCount = 3;
+const totalChecks = 37;
 const shardResults = [];
 if (Number.isInteger(shardIndex) && (shardIndex < 0 || shardIndex >= shardCount)) {
   throw new Error(`PIPELINE_CODEX_PRETOOL_TEST_SHARD must be between 0 and ${shardCount - 1}`);
@@ -96,17 +97,17 @@ if (!Number.isInteger(shardIndex) && checkFilter === "") {
     if (outcome.code !== 0 || outcome.signal !== null) failed = true;
   }
   results.sort((left, right) => left.ordinal - right.ordinal);
-  if (results.length !== 36
+  if (results.length !== totalChecks
     || results.some((result, index) => result.ordinal !== index)
     || new Set(results.map(({ ordinal }) => ordinal)).size !== results.length) {
     failed = true;
-    process.stderr.write(`not ok - shards returned incomplete or duplicate coverage (${results.length}/36)\n`);
+    process.stderr.write(`not ok - shards returned incomplete or duplicate coverage (${results.length}/${totalChecks})\n`);
   }
   for (const [index, result] of results.entries()) {
     process.stdout.write(`${result.ok ? "ok" : "not ok"} ${index + 1} - ${result.name}\n`);
     if (!result.ok) failed = true;
   }
-  process.stdout.write(`1..${results.length}\n`);
+  process.stdout.write(`1..${totalChecks}\n`);
   process.exit(failed ? 1 : 0);
 }
 
@@ -149,6 +150,14 @@ function writeCanonicalManifest(root) {
 function lifecycleCommand(root, ...args) {
   const result = spawnSync(process.execPath, [onboardingScript, ...args], {
     cwd: root,
+    // A shard is a Node `fork()` child.  Do not let its internal IPC markers
+    // become input for the nested lifecycle CLI: Node reserves these values
+    // for its own fork bootstrap and they are not part of that CLI's contract.
+    env: {
+      ...process.env,
+      NODE_CHANNEL_FD: undefined,
+      NODE_UNIQUE_ID: undefined,
+    },
     encoding: "utf8",
     shell: false,
   });
