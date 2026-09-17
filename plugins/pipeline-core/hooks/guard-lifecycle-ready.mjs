@@ -3929,13 +3929,24 @@ function sanctionedPushInitArgs(args, root) {
 function sanctionedTranscriptRecoveryArgs(args, root) {
   const sessionId = (value) => typeof value === "string"
     && value.trim() !== "" && !value.startsWith("-") && Buffer.byteLength(value, "utf8") <= 500;
-  return matchFlagSpec(args, {
+  const base = {
     requiredValue: {
       "--root": (value) => value === root,
       "--runner": (value) => value === "codex",
       "--exclude-session": sessionId,
     },
-  });
+  };
+  // Preserve the original flag-only reader for compatibility.  `list` and
+  // `read` are the only operation prefixes: their exact flag sets keep this
+  // hook from becoming a general runner-session directory read capability.
+  if (args[0] === "list") return matchFlagSpec(args.slice(1), base);
+  if (args[0] === "read") {
+    return matchFlagSpec(args.slice(1), {
+      ...base,
+      requiredValue: { ...base.requiredValue, "--session-id": sessionId },
+    });
+  }
+  return matchFlagSpec(args, base);
 }
 
 function sanctionedMigrationArgs(args, root) {

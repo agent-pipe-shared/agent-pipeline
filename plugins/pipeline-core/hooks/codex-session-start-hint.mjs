@@ -48,9 +48,10 @@ function priorTranscriptRecoveryLine(root, sessionId, runner) {
   if (typeof sessionId !== "string" || sessionId.trim() === "") {
     return "Prior-transcript recovery is unavailable because this SessionStart supplied no usable current session identity; continue honestly without searching host session storage.";
   }
-  const command = `node ${JSON.stringify(TRANSCRIPT_RECOVERY_SCRIPT)} --root ${JSON.stringify(root)} --runner codex --exclude-session ${JSON.stringify(sessionId)}`;
-  return "On startup, resume, clear or compact restart, recover bounded operational context only by running exactly: "
-    + `${command}. This dedicated read-only command selects only a PRIOR Codex transcript whose own session metadata matches this repository identity, excludes this session by its supplied identity, and returns only a bounded tool/error excerpt. If it reports unavailable, state that honestly and continue; never search $CODEX_HOME, ~/.codex, or any runner session directory directly.`;
+  const listCommand = `node ${JSON.stringify(TRANSCRIPT_RECOVERY_SCRIPT)} list --root ${JSON.stringify(root)} --runner codex --exclude-session ${JSON.stringify(sessionId)}`;
+  const readCommand = `node ${JSON.stringify(TRANSCRIPT_RECOVERY_SCRIPT)} read --root ${JSON.stringify(root)} --runner codex --exclude-session ${JSON.stringify(sessionId)} --session-id <session-id-from-list>`;
+  return "On startup, resume, clear or compact restart, use the dedicated read-only transcript list as the safe entry point: "
+    + `${listCommand}. It lists only PRIOR Codex transcripts whose own session metadata matches this repository identity, excludes this session by its supplied identity, and returns bounded operational excerpts. Only when recovering a specific detail, read a session id returned by that list with exactly: ${readCommand}; that targeted read returns its complete JSONL and is never automatic context injection. If list or read reports unavailable, state that honestly and continue; never search $CODEX_HOME, ~/.codex, or any runner session directory directly.`;
 }
 
 // The intake checkpoint is the lossless, private authority store. Its material input is

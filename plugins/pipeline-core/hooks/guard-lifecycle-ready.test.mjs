@@ -6561,19 +6561,28 @@ test("runner session collections never widen the exact current-session read scop
   }
 });
 
-test("the dedicated Codex transcript recovery route is admitted before readiness while every raw session read stays denied", () => {
+test("the dedicated Codex transcript recovery routes are exact before readiness while every raw session read stays denied", () => {
   const projectDir = hgoGitFixture("signature");
   const codexHome = mkdtempSync(join(tmpdir(), "guard-lifecycle-codex-recovery-home-"));
   const prior = join(codexHome, "sessions", "2026", "09", "prior-rollout.jsonl");
   mkdirSync(dirname(prior), { recursive: true });
   writeFileSync(prior, "{\"type\":\"session_meta\",\"payload\":{\"cwd\":\"fixture\",\"session_id\":\"prior\"}}\n");
   const command = `node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner codex --exclude-session current-session`;
+  const list = `node ${TRANSCRIPT_RECOVERY_SCRIPT} list --root ${projectDir} --runner codex --exclude-session current-session`;
+  const read = `node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session --session-id prior-session`;
   try {
     const nonReady = { projectDir, runner: "codex", env: { CODEX_HOME: codexHome }, requireProjectOnboardingReadyFn() { deny("intake-required"); } };
     assert.equal(isSanctionedLifecycleCommand(command, projectDir), true);
     assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 0);
+    assert.equal(isSanctionedLifecycleCommand(list, projectDir), true);
+    assert.equal(evaluateLifecycleReadyGuard(bash(list), nonReady).exitCode, 0);
+    assert.equal(isSanctionedLifecycleCommand(read, projectDir), true);
+    assert.equal(evaluateLifecycleReadyGuard(bash(read), nonReady).exitCode, 0);
     assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
     assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} --root ${projectDir} --runner codex`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} list --root ${projectDir} --runner claude --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session`), nonReady).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node ${TRANSCRIPT_RECOVERY_SCRIPT} read --root ${projectDir} --runner codex --exclude-session current-session --session-id prior-session --extra no`), nonReady).exitCode, 2);
     assert.equal(evaluateLifecycleReadyGuard(bash(`cat ${prior}`), nonReady).exitCode, 2);
   } finally {
     rmSync(projectDir, { recursive: true, force: true });

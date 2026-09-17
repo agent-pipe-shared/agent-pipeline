@@ -53,15 +53,17 @@ try {
   assert.match(governed.context, /A guard denial is not by itself a human gate/u);
 
   // The no-session-id API call remains honest rather than inventing a current transcript
-  // identity. A real SessionStart supplies its id and receives one exact, guard-admitted reader.
+  // identity. A real SessionStart supplies its id and receives exact, guard-admitted list/read guidance.
   assert.match(governed.context, /Prior-transcript recovery is unavailable because this SessionStart supplied no usable current session identity/u);
   assert.doesNotMatch(governed.context, /\$CODEX_HOME\/sessions/u);
   const governedWithSession = sessionStartDecision(root, undefined, "current-session");
-  assert.match(governedWithSession.context, /recover bounded operational context only by running exactly: node /u);
-  assert.match(governedWithSession.context, /runner-transcript-recovery\.mjs" --root /u);
+  assert.match(governedWithSession.context, /safe entry point: node /u);
+  assert.match(governedWithSession.context, /runner-transcript-recovery\.mjs" list --root /u);
   assert.match(governedWithSession.context, /--runner codex --exclude-session "current-session"/u);
   assert.match(governedWithSession.context, /own session metadata matches this repository identity/u);
   assert.match(governedWithSession.context, /excludes this session by its supplied identity/u);
+  assert.match(governedWithSession.context, /read --root .*--session-id <session-id-from-list>/u);
+  assert.match(governedWithSession.context, /never automatic context injection/u);
   assert.match(governedWithSession.context, /never search \$CODEX_HOME, ~\/\.codex, or any runner session directory directly/u);
 
   let stdout = "";

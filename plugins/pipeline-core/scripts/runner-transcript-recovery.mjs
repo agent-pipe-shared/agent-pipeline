@@ -139,6 +139,26 @@ function candidateMetadata(filePath, projectIdentity) {
   try { return { filePath, sessionId: uniqueSessionIds[0], mtimeMs: statSync(filePath).mtimeMs, bytes }; } catch { return null; }
 }
 
+function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir } = {}) {
+  if (runner !== CODEX_RUNNER) return { unavailable: unavailable(runner ?? "unknown", "runner-transcript-source-unavailable") };
+  if (typeof excludeSession !== "string" || excludeSession.trim() === "") {
+    return { unavailable: unavailable(runner, "current-session-identity-unavailable") };
+  }
+  const root = realDirectory(rootDir);
+  if (root === null) return { unavailable: unavailable(runner, "project-root-unavailable") };
+  const projectIdentity = repositoryPathIdentityOrSelf(root);
+  const sessionsDirectory = resolveCodexSessionsDirectory(env, homedirFn);
+  if (sessionsDirectory === null) return { unavailable: unavailable(runner, "runner-session-storage-unavailable") };
+  const candidates = regularJsonlFiles(sessionsDirectory)
+    .map((filePath) => candidateMetadata(filePath, projectIdentity))
+    .filter((candidate) => candidate !== null && candidate.sessionId !== excludeSession)
+    .sort((left, right) => right.mtimeMs - left.mtimeMs);
+  if (candidates.length === 0) {
+    return { unavailable: unavailable(runner, "no-prior-project-matching-transcript") };
+  }
+  return { candidates };
+}
+
 function boundedDetail(value) {
   if (typeof value !== "string") return null;
   const normalized = value.replaceAll("\n", " ").replaceAll("\r", " ").trim();
@@ -192,21 +212,9 @@ function operationalExcerpt(bytes) {
  * distinguish a prior matching transcript from the file the caller is writing.
  */
 export function recoverRunnerTranscript({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir } = {}) {
-  if (runner !== CODEX_RUNNER) return unavailable(runner ?? "unknown", "runner-transcript-source-unavailable");
-  if (typeof excludeSession !== "string" || excludeSession.trim() === "") {
-    return unavailable(runner, "current-session-identity-unavailable");
-  }
-  const root = realDirectory(rootDir);
-  if (root === null) return unavailable(runner, "project-root-unavailable");
-  const projectIdentity = repositoryPathIdentityOrSelf(root);
-  const sessionsDirectory = resolveCodexSessionsDirectory(env, homedirFn);
-  if (sessionsDirectory === null) return unavailable(runner, "runner-session-storage-unavailable");
-  const candidates = regularJsonlFiles(sessionsDirectory)
-    .map((filePath) => candidateMetadata(filePath, projectIdentity))
-    .filter((candidate) => candidate !== null && candidate.sessionId !== excludeSession)
-    .sort((left, right) => right.mtimeMs - left.mtimeMs);
-  if (candidates.length === 0) return unavailable(runner, "no-prior-project-matching-transcript");
-  const selected = candidates[0];
+  const found = priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env, homedirFn });
+  if (found.unavailable) return found.unavailable;
+  const selected = found.candidates[0];
   const excerpt = operationalExcerpt(selected.bytes);
   if (excerpt.length === 0) return unavailable(runner, "prior-project-matching-transcript-has-no-operational-excerpt");
   return {
@@ -218,29 +226,74 @@ export function recoverRunnerTranscript({ rootDir, runner, excludeSession, env =
   };
 }
 
+/**
+ * List every metadata-authenticated prior session.  This deliberately exposes
+ * neither storage paths nor transcript bodies; an empty excerpt is meaningful
+ * and does not make an otherwise authenticated session disappear.
+ */
+export function listRunnerTranscripts(options = {}) {
+  const found = priorProjectMatchingCandidates(options);
+  if (found.unavailable) return found.unavailable;
+  return {
+    schema: SCHEMA,
+    status: "available",
+    runner: CODEX_RUNNER,
+    sessions: found.candidates.map((candidate) => ({
+      sessionId: candidate.sessionId,
+      excerpt: operationalExcerpt(candidate.bytes),
+    })),
+  };
+}
+
+/**
+ * Read one session selected by its public session id.  A repeated id is not a
+ * safe selector, so it fails closed rather than choosing by a host pathname or
+ * recency.  `bytes` is only emitted raw by the CLI's `read` operation below.
+ */
+export function readRunnerTranscript({ sessionId, ...options } = {}) {
+  const found = priorProjectMatchingCandidates(options);
+  if (found.unavailable) return found.unavailable;
+  if (typeof sessionId !== "string" || sessionId.trim() === "") {
+    return unavailable(CODEX_RUNNER, "requested-session-unavailable");
+  }
+  const matches = found.candidates.filter((candidate) => candidate.sessionId === sessionId);
+  if (matches.length !== 1) return unavailable(CODEX_RUNNER, "requested-session-unavailable");
+  return { schema: SCHEMA, status: "available", runner: CODEX_RUNNER, bytes: matches[0].bytes };
+}
+
 function parseArgs(argv) {
-  if (argv.length !== 6) return null;
+  const operation = argv[0] === "list" || argv[0] === "read" ? argv[0] : "legacy";
+  const values = operation === "legacy" ? argv : argv.slice(1);
+  const expectedLength = operation === "read" ? 8 : 6;
+  if (values.length !== expectedLength) return null;
   const fields = new Map();
-  for (let index = 0; index < argv.length; index += 2) {
-    const flag = argv[index];
-    const value = argv[index + 1];
-    if (!["--root", "--runner", "--exclude-session"].includes(flag)
-      || typeof value !== "string" || value === "" || fields.has(flag)) return null;
+  const permitted = operation === "read"
+    ? ["--root", "--runner", "--exclude-session", "--session-id"]
+    : ["--root", "--runner", "--exclude-session"];
+  for (let index = 0; index < values.length; index += 2) {
+    const flag = values[index];
+    const value = values[index + 1];
+    if (!permitted.includes(flag) || typeof value !== "string" || value === "" || value.startsWith("-") || fields.has(flag)) return null;
     fields.set(flag, value);
   }
   return {
+    operation,
     rootDir: fields.get("--root"),
     runner: fields.get("--runner"),
     excludeSession: fields.get("--exclude-session"),
+    sessionId: fields.get("--session-id"),
   };
 }
 
 export function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
-  const result = args === null
-    ? unavailable("unknown", "invalid-invocation")
-    : recoverRunnerTranscript(args);
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  const result = args === null ? unavailable("unknown", "invalid-invocation") : (() => {
+    if (args.operation === "list") return listRunnerTranscripts(args);
+    if (args.operation === "read") return readRunnerTranscript(args);
+    return recoverRunnerTranscript(args);
+  })();
+  if (args?.operation === "read" && result.status === "available") process.stdout.write(result.bytes);
+  else process.stdout.write(`${JSON.stringify(result)}\n`);
   return result;
 }
 
