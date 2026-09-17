@@ -176,6 +176,17 @@ test("actual commit paths reject false T5/T0 and allow generated lockfile T0", (
   assert.equal(evaluate(trueT0Root, ["generated/client.mjs", "package-lock.json"]).ok, true);
 });
 
+test("empty commit paths preserve T5 admission and reject T0", () => {
+  const t0 = { schema: CRITIC_SKIP_SCHEMA, trigger: trigger({ diff: { mechanical: true, architecture: false, guardrails: false, security: false } }), appliedRow: "T0" };
+  const t5Root = fixture({ "evidence/dispatch-record-T5.json": json(v3("T5", { criticSkip: skip() })) });
+  assert.equal(evaluate(t5Root, []).ok, true);
+
+  const t0Root = fixture({ "evidence/dispatch-record-T0.json": json(v3("T0", { criticSkip: t0 })) });
+  const result = evaluate(t0Root, []);
+  assert.equal(result.ok, false);
+  assert.match(result.readFindings.join("\n"), /T0 mechanical disposition includes a path outside conservative generated\/lockfile surfaces/u);
+});
+
 test("git path reader uses argv-only diff-tree and NUL-delimited output", () => {
   const calls = [];
   const paths = readCommitChangedPaths("/repo", [SHA], { execFile(command, args, options) {
@@ -186,4 +197,15 @@ test("git path reader uses argv-only diff-tree and NUL-delimited output", () => 
   assert.equal(calls[0].command, "git");
   assert.deepEqual(calls[0].args.at(-1), SHA);
   assert.equal(calls[0].options.cwd, "/repo");
+});
+
+test("git path reader returns an empty array for a valid zero-path commit", () => {
+  const calls = [];
+  const paths = readCommitChangedPaths("/repo", [SHA], { execFile(command, args, options) {
+    calls.push({ command, args, options });
+    return Buffer.alloc(0);
+  } });
+  assert.deepEqual(paths, []);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].args.at(-1), SHA);
 });

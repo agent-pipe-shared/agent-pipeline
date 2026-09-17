@@ -54,7 +54,7 @@ function verifyCriticEvidence(root, sourcePath, reference) {
 }
 
 export function readCommitChangedPaths(root, commits, { execFile = execFileSync } = {}) {
-  if (!Array.isArray(commits) || commits.length === 0) throw new Error("criticSkip requires at least one commit for path verification");
+  if (!Array.isArray(commits)) throw new Error("criticSkip commits must be an array for path verification");
   const paths = new Set();
   for (const sha of commits) {
     const output = execFile("git", ["diff-tree", "--root", "--no-commit-id", "--no-renames", "--name-only", "-r", "-z", sha], {
@@ -62,7 +62,6 @@ export function readCommitChangedPaths(root, commits, { execFile = execFileSync 
     });
     for (const path of Buffer.from(output).toString("utf8").split("\0").filter(Boolean)) paths.add(path);
   }
-  if (paths.size === 0) throw new Error("criticSkip commit set has no observable changed paths");
   return [...paths].sort();
 }
 

@@ -308,7 +308,11 @@ check("HAW-A05b accepts only rendered target anchors, never comments or code exa
 });
 
 for (const [name, fixture, pattern] of [
-  ["a tree that does not belong to its commit", () => ({ baseline: { commit: revision("HEAD^").commit, tree: revision("HEAD").tree } }), /sourceBaseline tree does not match commit/],
+  ["a tree that does not belong to its commit", () => {
+    const baseline = revision("HEAD^");
+    const nonmatchingTree = `${baseline.tree[0] === "0" ? "1" : "0"}${baseline.tree.slice(1)}`;
+    return { baseline: { commit: baseline.commit, tree: nonmatchingTree } };
+  }, /sourceBaseline tree does not match commit/],
   ["a resolvable commit outside current HEAD ancestry", nonAncestorBaseline, /sourceBaseline commit is not an ancestor of current HEAD/],
 ]) {
   check(`HAW-A06 rejects ${name}`, () => {
