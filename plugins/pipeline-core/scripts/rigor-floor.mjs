@@ -341,6 +341,9 @@ export function deriveMinimumRigor(inputs, policy = null) {
   // 4. Evaluate plannedPaths vs actualPaths (Surface Expansion Asymmetry)
   const pp = normalized.plannedPaths;
   if (pp.status === "available" && Array.isArray(pp.value) && ap.status === "available" && Array.isArray(ap.value)) {
+    if (pp.value.length > maxChangedFiles) {
+      escalate("feature", "PLANNED_SURFACE_EXCEEDS_THRESHOLD", "Planned file count " + pp.value.length + " exceeds mini threshold " + maxChangedFiles);
+    }
     const plannedSet = new Set(pp.value);
     const expandedPaths = ap.value.filter((p) => !plannedSet.has(p));
     if (expandedPaths.length > 0) {

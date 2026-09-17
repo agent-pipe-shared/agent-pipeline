@@ -190,6 +190,22 @@ describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
     assert.ok(result.escalationTriggers.includes("SURFACE_EXPANSION"));
   });
 
+  test("7a. A clean worktree cannot hide an over-threshold PO-bound plan surface", () => {
+    const input = {
+      plannedPaths: { value: ["docs/a.md", "docs/b.md", "docs/c.md", "docs/d.md", "docs/e.md", "docs/f.md"], status: "available", sourceContract: "pipeline.po-bound-plan-surface.v1" },
+      actualPaths: { value: [], status: "available", sourceContract: "git.working-tree" },
+      protectedTouches: false,
+      contractDeltas: false,
+      reversibility: "high",
+      diffStats: { files: 0, lines: 0 },
+      selectedProfile: "mini"
+    };
+    const result = deriveMinimumRigor(input, policy);
+    assert.equal(result.minProfile, "feature");
+    assert.ok(result.escalationTriggers.includes("PLANNED_SURFACE_EXCEEDS_THRESHOLD"));
+    assert.equal(result.disagreementLog?.derived, "feature");
+  });
+
   // Fixture 8: Higher human-selected profile is respected beside floor (not lowered to floor)
   test("8. Higher human-selected profile is respected beside floor (not lowered to floor)", () => {
     const input = {
