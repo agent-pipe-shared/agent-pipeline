@@ -539,7 +539,7 @@
 | pipeline.runner-neutrality-before-third-runner | closed | workflow-improvement | pipeline | — | 2026-08-08 | 2026-12-31 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | — | 2026-07-27 | — | — |
 | pipeline.runtime-projections-drift-after-v3-refresh | closed | defect | pipeline | nova-b | 2026-08-28 | — | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
-| pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop | open | defect | pipeline | nova | 2026-09-13 | — | NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies. |
+| pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop | closed | defect | pipeline | nova | 2026-09-13 | — | NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies. |
 | pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | closed | defect | pipeline | nova | 2026-08-08 | 2026-08-15 | — |
 | pipeline.scratch-write-exemption-does-not-cover-restart-required | closed | defect | pipeline | nova | 2026-08-29 | — | — |
@@ -681,8 +681,8 @@
 
 ## Counts
 
-- open: 80
+- open: 79
 - in_progress: 1
-- closed: 578
+- closed: 579
 - rejected: 3
 - deferred: 11

@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop
 type: defect
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
 sprint: nova
+closed_at: 2026-09-17
+closure_repository: self
+closure_commit: 6970805a573550ddf7835f28f80dae83e66b4851
+closure_evidence: backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md
 tracking: "NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies."
 source: "evidence/pipeline-analysis-claude-session-2026-09-13.md §5.1; independently reproduced against the current source's pipeline-state writer and generated pre-commit backstop."
 ---
@@ -41,3 +45,18 @@ other protected path must remain blocked normally.
 - A wider calibration rewrite, a missing state transition, and an inconsistent
   twin remain refused at the real Git-hook boundary.
 - Existing generic GS-10/GS-11 refusal coverage remains green.
+
+## Closure — 2026-09-17
+
+Commit `6970805a573550ddf7835f28f80dae83e66b4851` implements the narrow
+semantic exemption in the installed pre-commit hook.  It admits only the
+complete, matching baseline-only-to-configured verification transition and
+keeps broader or incomplete variants in the ordinary protected-path boundary.
+
+The canonical local Git/child-process readback recorded in
+`backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md`
+executed the real suite with **51/51 passing**.  That suite includes the
+successful sanctioned transition, the wider-calibration refusal, the
+missing-lifecycle-transition refusal, and the generic protected-path refusal
+coverage.  The earlier restricted-sandbox red result was separately measured
+as `EPERM` before the hook started and is not used as closure evidence.

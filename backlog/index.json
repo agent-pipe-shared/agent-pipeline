@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b554780b50b6338ce631fafadb72103e80c88007016cca98b3517a0bd29f9f31"
+    "transitionHead": "6ec8fc95a1f9c646fb4682ea6ccc1ff48d2efd6ba8e0e5b06efc5f872b5e16cd"
   },
   "counts": {
-    "open": 80,
+    "open": 79,
     "in_progress": 1,
-    "closed": 578,
+    "closed": 579,
     "rejected": 3,
     "deferred": 11
   },
@@ -7172,14 +7172,18 @@
     },
     {
       "id": "pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md §5.1; independently reproduced against the current source's pipeline-state writer and generated pre-commit backstop.",
       "deferred": false,
       "tracking": "NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies.",
-      "sprint": "nova"
+      "sprint": "nova",
+      "closedAt": "2026-09-17",
+      "closureRepository": "self",
+      "closureCommit": "6970805a573550ddf7835f28f80dae83e66b4851",
+      "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
     },
     {
       "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",
