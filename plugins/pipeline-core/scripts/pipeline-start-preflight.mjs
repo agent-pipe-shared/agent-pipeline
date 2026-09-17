@@ -483,7 +483,8 @@ export const PRE_PUSH_HOOK_OBSERVATION_SCHEMA = "pipeline.pre-push-hook-observat
  * escapable by design. A live bootstrap against a real repository under the ORIGINAL
  * (pre-correction) design reported the session non-ready and unworkable purely because the
  * hook was not installed, which was wrong. No state `observePrePushHookInstallation` returns
- * (absent, declined, present-but-not-ours-or-modified, or installed-and-current) gates
+ * (absent, declined, present-but-not-ours-or-modified, installed-but-stale, or
+ * installed-and-current) gates
  * readiness any more -- every one of them is carried in the result purely as an advisory
  * observation. The `PRE_PUSH_HOOK_NOT_INSTALLED_STATUS` constant this comment used to
  * document was removed along with the branch that produced it (see the `status` computation
@@ -495,6 +496,7 @@ export const PRE_PUSH_HOOK_OBSERVATION_SCHEMA = "pipeline.pre-push-hook-observat
 // plugin copy, never a repo-relative guess (DoD (c)). pre-push-hook-install.mjs is a fixed
 // sibling of this file (both live directly under plugins/pipeline-core/scripts/).
 const PRE_PUSH_HOOK_INSTALLER_SCRIPT_PATH = fileURLToPath(new URL("./pre-push-hook-install.mjs", import.meta.url));
+const PRE_PUSH_HOOK_PLUGIN_LIB_DIR = fileURLToPath(new URL("../lib", import.meta.url));
 
 /** The exact command a human or agent runs to install the hook -- the installer's own
  * documented `--install` verb (pre-push-hook-install.mjs's CLI surface), resolved against the
@@ -551,18 +553,31 @@ function prePushHookInstallCommand(rootDir) {
  * repository already produces, never a crash. NEVER MUTATES OR INSTALLS ANYTHING: this
  * function only reads, via `planInstall`'s own read-only surface.
  */
-export function observePrePushHookInstallation({ rootDir = process.cwd(), planInstallFn = planInstall } = {}) {
+export function observePrePushHookInstallation({
+  rootDir = process.cwd(),
+  pluginLibDir = PRE_PUSH_HOOK_PLUGIN_LIB_DIR,
+  planInstallFn = planInstall,
+} = {}) {
   let plan;
   try {
-    plan = planInstallFn({ rootDir });
+    plan = planInstallFn({ rootDir, pluginLibDir });
   } catch {
     plan = null;
   }
   if (!plan || plan.status === "repository-unresolved") {
     return { schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA, state: "repository-unresolved", installed: false, installCommand: null };
   }
-  if (plan.status === "ready-to-upgrade") {
+  if (plan.status === "ready-to-upgrade" && plan.current === true) {
     return { schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA, state: "installed-and-current", installed: true, installCommand: null };
+  }
+  if (plan.status === "ready-to-upgrade") {
+    return {
+      schema: PRE_PUSH_HOOK_OBSERVATION_SCHEMA,
+      state: "installed-but-stale",
+      installed: false,
+      detail: "the pipeline-owned hook is intact but bound to an older plugin distribution; run the installer update",
+      installCommand: prePushHookInstallCommand(rootDir),
+    };
   }
   if (plan.status === "foreign-hook-present") {
     return {

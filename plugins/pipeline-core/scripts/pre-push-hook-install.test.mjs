@@ -325,8 +325,59 @@ test("planInstall then applyInstall: reinstalling over our OWN prior install upg
   assert.equal(first.status, "installed");
   const plan = planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
   assert.equal(plan.status, "ready-to-upgrade");
+  assert.equal(plan.current, true);
+  assert.equal(plan.updateRequired, false);
   const second = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
   assert.equal(second.status, "installed");
+});
+
+test("planInstall: an intact pipeline hook bound to an older plugin library is stale and applyInstall upgrades it", () => {
+  const { dir } = freshRepo("stale-plugin-library");
+  const oldLib = "/pipeline-cache/a/lib";
+  const currentLib = "/pipeline-cache/b/lib";
+  const first = applyInstall({ rootDir: dir, pluginLibDir: oldLib });
+  assert.equal(first.status, "installed");
+
+  const stale = planInstall({ rootDir: dir, pluginLibDir: currentLib });
+  assert.equal(stale.status, "ready-to-upgrade");
+  assert.equal(stale.current, false);
+  assert.equal(stale.updateRequired, true);
+
+  const update = applyInstall({ rootDir: dir, pluginLibDir: currentLib });
+  assert.equal(update.status, "installed");
+  const current = planInstall({ rootDir: dir, pluginLibDir: currentLib });
+  assert.equal(current.status, "ready-to-upgrade");
+  assert.equal(current.current, true);
+  assert.equal(current.updateRequired, false);
+});
+
+test("planInstall: an impl or marker discrepancy is foreign and applyInstall leaves the hook untouched", () => {
+  const cases = [
+    {
+      name: "impl",
+      mutate: (install) => writeFileSync(install.implPath, "export const tampered = true;\n"),
+    },
+    {
+      name: "marker",
+      mutate: (install) => {
+        const marker = JSON.parse(readFileSync(install.markerPath, "utf8"));
+        marker.implSha256 = "0".repeat(64);
+        writeFileSync(install.markerPath, `${JSON.stringify(marker, null, 2)}\n`);
+      },
+    },
+  ];
+  for (const { name, mutate } of cases) {
+    const { dir } = freshRepo(`modified-${name}`);
+    const install = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+    assert.equal(install.status, "installed");
+    const hookBefore = readFileSync(install.hookPath, "utf8");
+    mutate(install);
+    const plan = planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+    assert.equal(plan.status, "foreign-hook-present", `${name} discrepancy must fail closed`);
+    const result = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+    assert.equal(result.status, "refused-foreign-hook");
+    assert.equal(readFileSync(install.hookPath, "utf8"), hookBefore, `${name} discrepancy must not overwrite the hook`);
+  }
 });
 
 // ---- generated content sanity -----------------------------------------------------------

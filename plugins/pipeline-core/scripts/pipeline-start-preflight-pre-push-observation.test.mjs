@@ -123,6 +123,30 @@ test("installed-and-current: a repo where this installer's own hook is present a
   });
 });
 
+test("installed-but-stale: an intact hook from plugin library A advises the exact update for library B, then becomes current", () => {
+  withFreshRepo("stale-plugin-library", (dir) => {
+    const oldLib = "/pipeline-cache/a/lib";
+    const currentLib = "/pipeline-cache/b/lib";
+    const install = applyInstall({ rootDir: dir, pluginLibDir: oldLib });
+    assert.equal(install.status, "installed");
+    const hookBefore = readFileSync(install.hookPath, "utf8");
+
+    const stale = observePrePushHookInstallation({ rootDir: dir, pluginLibDir: currentLib });
+    assert.equal(stale.state, "installed-but-stale");
+    assert.equal(stale.installed, false);
+    assert.ok(stale.installCommand, "a stale pipeline hook must advertise the installer update");
+    assert.deepEqual(stale.installCommand.argv.slice(1), ["--install"]);
+    assert.equal(readFileSync(install.hookPath, "utf8"), hookBefore, "observation must not silently update the hook");
+
+    const update = applyInstall({ rootDir: dir, pluginLibDir: currentLib });
+    assert.equal(update.status, "installed");
+    const current = observePrePushHookInstallation({ rootDir: dir, pluginLibDir: currentLib });
+    assert.equal(current.state, "installed-and-current");
+    assert.equal(current.installed, true);
+    assert.equal(current.installCommand, null);
+  });
+});
+
 test("absent: a real repository that never had the hook installed", () => {
   withFreshRepo("absent", (dir) => {
     const result = observePrePushHookInstallation({ rootDir: dir });

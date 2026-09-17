@@ -99,14 +99,19 @@ function declineMarkerPath(commonDir) {
   return join(commonDir, "agent-pipeline", "pre-push-hook", "decline-marker.json");
 }
 
-function readMarker(commonDir) {
+function readMarkerRecord(commonDir) {
   try {
-    const parsed = JSON.parse(readFileSync(markerPath(commonDir), "utf8"));
-    if (parsed?.schema !== MARKER_SCHEMA) return null;
-    return parsed;
+    const raw = readFileSync(markerPath(commonDir), "utf8");
+    const marker = JSON.parse(raw);
+    if (marker?.schema !== MARKER_SCHEMA) return null;
+    return { marker, raw };
   } catch {
     return null;
   }
+}
+
+function readMarker(commonDir) {
+  return readMarkerRecord(commonDir)?.marker ?? null;
 }
 
 function readDeclineMarker(commonDir) {
@@ -117,6 +122,51 @@ function readDeclineMarker(commonDir) {
   } catch {
     return null;
   }
+}
+
+function renderMarker(marker) {
+  return `${JSON.stringify(marker, null, 2)}\n`;
+}
+
+function expectedArtifacts({ hookPath, commonDir, pluginLibDir, installedAt }) {
+  const impl = implPath(commonDir);
+  const implContent = renderImpl(pluginLibDir);
+  const shimContent = renderShim(impl);
+  const marker = {
+    schema: MARKER_SCHEMA,
+    installerVersion: INSTALLER_VERSION,
+    installedAt,
+    hookPath,
+    implPath: impl,
+    pluginLibDir,
+    hookSha256: sha256(shimContent),
+    implSha256: sha256(implContent),
+  };
+  return { impl, implContent, shimContent, marker, markerContent: renderMarker(marker) };
+}
+
+/**
+ * Proves that the three generated artifacts still belong together before an install is
+ * allowed to replace them.  The marker's recorded distribution is checked first (ownership),
+ * then the caller's requested distribution is compared separately (currentness).  That keeps
+ * an old, intact pipeline hook safely upgradeable while refusing a modified hook, impl, or
+ * marker rather than treating its self-asserted hash as authority.
+ */
+function installedArtifactsMatch({ hookPath, commonDir, pluginLibDir, record }) {
+  const { marker, raw } = record;
+  if (typeof marker?.installedAt !== "string" || marker.installedAt.trim() === "") return false;
+  const expected = expectedArtifacts({ hookPath, commonDir, pluginLibDir, installedAt: marker.installedAt });
+  let hookContent;
+  let implContent;
+  try {
+    hookContent = readFileSync(hookPath, "utf8");
+    implContent = readFileSync(expected.impl, "utf8");
+  } catch {
+    return false;
+  }
+  return raw === expected.markerContent
+    && hookContent === expected.shimContent
+    && implContent === expected.implContent;
 }
 
 /** The `/bin/sh` shim installed at the actual hook path. `implAbsPath` is DATA baked in
@@ -491,21 +541,29 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
   const paths = resolveGitPaths(rootDir);
   if (!paths) return { status: "repository-unresolved" };
   const { commonDir, hookPath } = paths;
-  const marker = readMarker(commonDir);
-  if (existsSync(hookPath) && !marker) {
+  const markerRecord = readMarkerRecord(commonDir);
+  if (existsSync(hookPath) && !markerRecord) {
     return { status: "foreign-hook-present", hookPath };
   }
-  if (existsSync(hookPath) && marker) {
-    let current;
-    try {
-      current = readFileSync(hookPath, "utf8");
-    } catch {
-      return { status: "foreign-hook-present", hookPath };
+  if (existsSync(hookPath) && markerRecord) {
+    const recordedPluginLibDir = markerRecord.marker.pluginLibDir;
+    if (typeof recordedPluginLibDir !== "string"
+      || !installedArtifactsMatch({ hookPath, commonDir, pluginLibDir: recordedPluginLibDir, record: markerRecord })) {
+      return {
+        status: "foreign-hook-present",
+        hookPath,
+        detail: "existing hook, implementation, or install marker was modified after this installer wrote it",
+      };
     }
-    if (sha256(current) !== marker.hookSha256) {
-      return { status: "foreign-hook-present", hookPath, detail: "existing hook was modified after this installer wrote it" };
-    }
-    return { status: "ready-to-upgrade", hookPath, commonDir, pluginLibDir };
+    const current = installedArtifactsMatch({ hookPath, commonDir, pluginLibDir, record: markerRecord });
+    return {
+      status: "ready-to-upgrade",
+      hookPath,
+      commonDir,
+      pluginLibDir,
+      current,
+      updateRequired: !current,
+    };
   }
   const decline = readDeclineMarker(commonDir);
   if (decline) {
@@ -547,26 +605,20 @@ export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } 
   if (plan.status === "foreign-hook-present") return { status: "refused-foreign-hook", hookPath: plan.hookPath, detail: plan.detail };
 
   const { hookPath, commonDir } = plan;
-  const impl = implPath(commonDir);
-  const implContent = renderImpl(pluginLibDir);
-  const shimContent = renderShim(impl);
+  const artifacts = expectedArtifacts({
+    hookPath,
+    commonDir,
+    pluginLibDir,
+    installedAt: new Date().toISOString(),
+  });
+  const { impl, implContent, shimContent, marker } = artifacts;
 
   mkdirSync(join(commonDir, "agent-pipeline", "pre-push-hook"), { recursive: true, mode: 0o700 });
   writeFileSync(impl, implContent, { encoding: "utf8", mode: 0o600 });
   writeFileSync(hookPath, shimContent, { encoding: "utf8", mode: 0o700 });
   chmodSync(hookPath, 0o755);
 
-  const marker = {
-    schema: MARKER_SCHEMA,
-    installerVersion: INSTALLER_VERSION,
-    installedAt: new Date().toISOString(),
-    hookPath,
-    implPath: impl,
-    pluginLibDir,
-    hookSha256: sha256(shimContent),
-    implSha256: sha256(implContent),
-  };
-  writeFileSync(markerPath(commonDir), `${JSON.stringify(marker, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  writeFileSync(markerPath(commonDir), renderMarker(marker), { encoding: "utf8", mode: 0o600 });
 
   return { status: "installed", hookPath, implPath: impl, markerPath: markerPath(commonDir) };
 }
