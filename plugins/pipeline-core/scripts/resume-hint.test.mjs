@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, "resume-hint.mjs");
 const REPO_ROOT = join(HERE, "..", "..", "..");
+const SESSION_START_HOOK = join(REPO_ROOT, "plugins", "pipeline-core", "hooks", "codex-session-start-hint.mjs");
 const SCRATCH = join(REPO_ROOT, "scratch");
 mkdirSync(SCRATCH, { recursive: true });
 const WORK = mkdtempSync(join(SCRATCH, "resume-hint-cli-"));
@@ -64,6 +65,17 @@ const SCHEMA_INVALID_CARD = {
 function run(args) {
   try {
     const stdout = execFileSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    return { status: 0, stdout, stderr: "" };
+  } catch (error) {
+    return { status: error.status ?? 1, stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
+  }
+}
+
+function runSessionStart(root, input) {
+  try {
+    const stdout = execFileSync(process.execPath, [SESSION_START_HOOK], {
+      cwd: root, input: JSON.stringify(input), encoding: "utf8", stdio: ["pipe", "pipe", "pipe"],
+    });
     return { status: 0, stdout, stderr: "" };
   } catch (error) {
     return { status: error.status ?? 1, stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
@@ -176,6 +188,42 @@ test("a materialInput chunk change alters the recorded cardDigest", () => {
   const capturedB = JSON.parse(run(["capture", "--root", rootB, "--card-file", cardFileB]).stdout);
 
   assert.notEqual(capturedA.cardDigest, capturedB.cardDigest, "differing materialInput must yield a differing cardDigest");
+});
+
+test("capture persists Amon Sûl material in the private intake checkpoint for inspect and the next identified SessionStart", () => {
+  const root = freshRoot("greenfield-amon-sul-e2e");
+  const cardFile = join(root, "amon-sul-card.json");
+  const materialInput = [
+    "Amon Sûl – Das letzte Licht",
+    "",
+    "## Leitidee",
+    "Ein einsamer Wachturm hält dem Sturm über den Nordhöhen stand.",
+    "",
+    "## Spätere Abschnittszeile",
+    "Wenn die Dämmerung fällt, soll sein letztes Licht den Weg nach Westen weisen.",
+  ].join("\n");
+  const card = {
+    ...VALID_CARD,
+    intent: "Die Amon-Sûl-Gestaltung in der nächsten Session fortsetzen.",
+    materialInput: [materialInput],
+  };
+  writeFileSync(cardFile, JSON.stringify(card), "utf8");
+
+  const captured = run(["capture", "--root", root, "--card-file", cardFile]);
+  assert.equal(captured.status, 0, captured.stderr);
+  const inspected = JSON.parse(run(["inspect", "--root", root]).stdout);
+  assert.equal(inspected.status, "available");
+  assert.equal(inspected.intakeCheckpoint.status, "present");
+  assert.equal(inspected.intakeCheckpoint.materialInput.length, 1);
+  assert.equal(inspected.intakeCheckpoint.materialInput[0].text, materialInput, "inspect must return the checkpoint material byte-for-byte");
+
+  const hook = runSessionStart(root, { session_id: "amon-sul-next-session" });
+  assert.equal(hook.status, 0, hook.stderr);
+  const context = JSON.parse(hook.stdout).hookSpecificOutput.additionalContext;
+  assert.match(context, /Resume-hint intent: Die Amon-Sûl-Gestaltung in der nächsten Session fortsetzen\./u);
+  const materialBytes = Buffer.from(materialInput, "utf8");
+  assert.equal(Buffer.from(context, "utf8").includes(materialBytes), true, "the full original input must be surfaced byte-identically");
+  assert.equal(context.indexOf(materialInput), context.lastIndexOf(materialInput), "the material input must not be duplicated when the Resume-Hint card is available");
 });
 
 test("query before any capture reports the no-card outcome", () => {

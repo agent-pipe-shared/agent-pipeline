@@ -3,10 +3,9 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { main, sessionStartDecision, sessionStartMessage } from "./codex-session-start-hint.mjs";
 import {
@@ -19,7 +18,17 @@ import {
 import { checkResumeConsumptionAnySession } from "../scripts/check-resume-consumption.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "codex-session-start-hint-"));
-const script = fileURLToPath(new URL("./codex-session-start-hint.mjs", import.meta.url));
+function mainPayload(options) {
+  let stdout = "";
+  const originalWrite = process.stdout.write;
+  process.stdout.write = (chunk) => { stdout += chunk; return true; };
+  try {
+    main(options);
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+  return JSON.parse(stdout);
+}
 try {
   const optional = sessionStartDecision(root);
   assert.equal(optional.governed, false);
@@ -70,21 +79,13 @@ try {
 
   const fresh = mkdtempSync(join(tmpdir(), "codex-session-start-native-cwd-"));
   try {
-    const governedCwd = spawnSync(process.execPath, [script], {
-      cwd: root,
-      encoding: "utf8",
-      env: { ...process.env, CLAUDE_PROJECT_DIR: fresh },
-    });
-    assert.equal(governedCwd.status, 0, governedCwd.stderr);
-    assert.equal(JSON.parse(governedCwd.stdout).systemMessage, governed.message);
+    const governedRootPayload = mainPayload({ projectDir: root });
+    assert.equal(governedRootPayload.systemMessage, governed.message);
+    assert.equal(governedRootPayload.hookSpecificOutput.additionalContext, governed.context);
 
-    const optionalCwd = spawnSync(process.execPath, [script], {
-      cwd: fresh,
-      encoding: "utf8",
-      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
-    });
-    assert.equal(optionalCwd.status, 0, optionalCwd.stderr);
-    assert.equal(JSON.parse(optionalCwd.stdout).systemMessage, optional.message);
+    const optionalRootPayload = mainPayload({ projectDir: fresh });
+    assert.equal(optionalRootPayload.systemMessage, optional.message);
+    assert.equal(optionalRootPayload.hookSpecificOutput.additionalContext, optional.context);
   } finally {
     rmSync(fresh, { recursive: true, force: true });
   }
@@ -130,7 +131,7 @@ try {
   assert.match(compactStdout, /PCR-OUTER-INVALID/u);
 
   // Second, a valid ready continuity state -> the lightweight reground continuation,
-  // not the full bootstrap instruction, via the real CLI (exercises stdin JSON parsing).
+  // not the full bootstrap instruction, via the direct hook payload path.
   const compactRoot = mkdtempSync(join(tmpdir(), "codex-session-start-compact-"));
   try {
     mkdirSync(join(compactRoot, ".claude"), { recursive: true });
@@ -170,25 +171,14 @@ try {
       },
     };
     writeFileSync(join(compactRoot, ".claude", "pipeline-state.json"), `${JSON.stringify(continuityState)}\n`);
-    const compactCli = spawnSync(process.execPath, [script], {
-      cwd: compactRoot,
-      encoding: "utf8",
-      input: JSON.stringify({ source: "compact" }),
-    });
-    assert.equal(compactCli.status, 0, compactCli.stderr);
-    const compactPayload = JSON.parse(compactCli.stdout);
+    const compactPayload = mainPayload({ projectDir: compactRoot, input: { source: "compact" } });
     assert.doesNotMatch(compactPayload.systemMessage, /run pipeline-core:pipeline-start/u);
     assert.match(compactPayload.systemMessage, /Re-grounding after \/compact\./u);
     assert.match(compactPayload.systemMessage, /"code":"PCR-READY"/u);
 
-    // A stdin read failure (empty/malformed) must still fall back safely, never crash.
-    const nonCompactCli = spawnSync(process.execPath, [script], {
-      cwd: compactRoot,
-      encoding: "utf8",
-      input: "",
-    });
-    assert.equal(nonCompactCli.status, 0, nonCompactCli.stderr);
-    assert.equal(JSON.parse(nonCompactCli.stdout).hookSpecificOutput.hookEventName, "SessionStart");
+    // A missing/malformed payload must still fall back safely, never crash.
+    const nonCompactPayload = mainPayload({ projectDir: compactRoot, input: null });
+    assert.equal(nonCompactPayload.hookSpecificOutput.hookEventName, "SessionStart");
   } finally {
     rmSync(compactRoot, { recursive: true, force: true });
   }
@@ -254,9 +244,8 @@ try {
       "not-consumed",
     );
 
-    // Full CLI path: main({ input: { session_id } }) must thread the real hook payload's
-    // session_id through to the same recording call, exercising the exact wiring a live
-    // Claude/Codex SessionStart event drives.
+    // Direct hook-payload path: input.session_id must thread through to the same
+    // recording call a live Claude/Codex SessionStart drives.
     const cliRoot = mkdtempSync(join(tmpdir(), "codex-session-start-hint-consume-cli-"));
     try {
       mkdirSync(join(cliRoot, "project"), { recursive: true });
@@ -266,13 +255,8 @@ try {
       captureResumeHint({ rootDir: cliRoot, context });
       recordResumeHintCardDigest({ rootDir: cliRoot, card: context });
 
-      const cliResult = spawnSync(process.execPath, [script], {
-        cwd: cliRoot,
-        encoding: "utf8",
-        input: JSON.stringify({ session_id: "session-cli" }),
-      });
-      assert.equal(cliResult.status, 0, cliResult.stderr);
-      assert.match(JSON.parse(cliResult.stdout).hookSpecificOutput.additionalContext, /Resume-hint intent: Resume the resume-consumption wiring work\./u);
+      const cliPayload = mainPayload({ projectDir: cliRoot, input: { session_id: "session-cli" } });
+      assert.match(cliPayload.hookSpecificOutput.additionalContext, /Resume-hint intent: Resume the resume-consumption wiring work\./u);
       assert.equal(
         queryResumeHintConsumption({ rootDir: cliRoot, sessionId: "session-cli" }).outcome,
         "consumed",
@@ -311,15 +295,15 @@ try {
     // Card available, but no intake checkpoint at all yet -- unchanged: no new lines.
     const noCheckpoint = sessionStartDecision(verbatimRoot, undefined, "verbatim-no-checkpoint");
     assert.match(noCheckpoint.context, /Resume-hint intent: Resume the resume-hint verbatim surfacing work\./u);
-    assert.doesNotMatch(noCheckpoint.context, /Resume-hint answered onboarding values/u);
-    assert.doesNotMatch(noCheckpoint.context, /Resume-hint material input chunk/u);
+    assert.doesNotMatch(noCheckpoint.context, /Onboarding intake answered values/u);
+    assert.doesNotMatch(noCheckpoint.context, /Onboarding intake material input chunk/u);
 
     // Consent granted but nothing answered/captured yet -- an empty checkpoint is still
     // "unchanged" output, never a bare label with no content.
     applyOnboardingIntakeConsent({ rootDir: verbatimRoot, granted: true, activate: true });
     const emptyCheckpoint = sessionStartDecision(verbatimRoot, undefined, "verbatim-empty-checkpoint");
-    assert.doesNotMatch(emptyCheckpoint.context, /Resume-hint answered onboarding values/u);
-    assert.doesNotMatch(emptyCheckpoint.context, /Resume-hint material input chunk/u);
+    assert.doesNotMatch(emptyCheckpoint.context, /Onboarding intake answered values/u);
+    assert.doesNotMatch(emptyCheckpoint.context, /Onboarding intake material input chunk/u);
 
     // Now seed real answered values and two verbatim material-input chunks.
     applyOnboardingIntakeConsent({
@@ -338,17 +322,17 @@ try {
     // New: answered onboarding values.
     assert.match(
       withVerbatim.context,
-      /Resume-hint answered onboarding values \(already answered, do not re-ask\): commit author Jane PO <jane@example\.com>; operator language en; PO profile feature\./u,
+      /Onboarding intake answered values \(already answered, do not re-ask\): commit author Jane PO <jane@example\.com>; operator language en; PO profile feature\./u,
     );
     // New: verbatim material input, byte-identical, in capture order, MUST-read framing.
-    assert.match(withVerbatim.context, /MUST be read in full now, not treated as already condensed by the summary above \(2 chunk\(s\)\)/u);
+    assert.match(withVerbatim.context, /MUST be read in full now, not treated as already condensed by any resume-hint summary \(2 chunk\(s\)\)/u);
     assert.match(
       withVerbatim.context,
-      /Resume-hint material input chunk 1 of 2: Line one of a verbatim design brief\.\nLine two, multi-line, unbounded by short-string caps\./u,
+      /Onboarding intake material input chunk 1 of 2: Line one of a verbatim design brief\.\nLine two, multi-line, unbounded by short-string caps\./u,
     );
     assert.match(
       withVerbatim.context,
-      /Resume-hint material input chunk 2 of 2: A second, later chunk of user input -- unicode: café, 日本語\./u,
+      /Onboarding intake material input chunk 2 of 2: A second, later chunk of user input -- unicode: café, 日本語\./u,
     );
     assert.match(withVerbatim.context, /Retain these checkpoint-origin chunks byte-for-byte in capture order/u);
     assert.match(withVerbatim.context, /do not recapture an existing chunk merely to satisfy a ritual/u);
@@ -361,14 +345,46 @@ try {
     writeFileSync(checkpointPath, "{ not valid json");
     const withMalformed = sessionStartDecision(verbatimRoot, undefined, "verbatim-malformed");
     assert.match(withMalformed.context, /Resume-hint intent: Resume the resume-hint verbatim surfacing work\./u);
-    assert.doesNotMatch(withMalformed.context, /Resume-hint answered onboarding values/u);
-    assert.doesNotMatch(withMalformed.context, /Resume-hint material input chunk/u);
+    assert.doesNotMatch(withMalformed.context, /Onboarding intake answered values/u);
+    assert.doesNotMatch(withMalformed.context, /Onboarding intake material input chunk/u);
     writeFileSync(checkpointPath, validBytes);
   } finally {
     rmSync(verbatimRoot, { recursive: true, force: true });
   }
 
-  console.log("codex-session-start-hint: 48 passed");
+  // NVA-062-GREENFIELD-INTAKE-REENTRY: the private intake checkpoint is the
+  // lossless authority even before any Resume-Hint card exists. Exercise the
+  // direct SessionStart payload path with its session_id.
+  const greenfieldRoot = mkdtempSync(join(tmpdir(), "codex-session-start-greenfield-intake-"));
+  try {
+    mkdirSync(join(greenfieldRoot, "project"), { recursive: true });
+    writeFileSync(join(greenfieldRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    const greenfieldGit = spawnSync("git", ["init", "-q"], { cwd: greenfieldRoot, encoding: "utf8", shell: false });
+    assert.equal(greenfieldGit.status, 0, greenfieldGit.stderr);
+    const amonSulInput = [
+      "Amon Sûl – Das letzte Licht",
+      "",
+      "## Leitidee",
+      "Ein einsamer Wachturm hält dem Sturm über den Nordhöhen stand.",
+      "",
+      "## Spätere Abschnittszeile",
+      "Wenn die Dämmerung fällt, soll sein letztes Licht den Weg nach Westen weisen.",
+    ].join("\n");
+    applyOnboardingIntakeConsent({ rootDir: greenfieldRoot, granted: true, activate: true });
+    applyOnboardingIntakeCapture({ rootDir: greenfieldRoot, text: amonSulInput, activate: true });
+    assert.equal(existsSync(join(greenfieldRoot, "project", "resume-hint.json")), false);
+
+    const greenfieldPayload = mainPayload({ projectDir: greenfieldRoot, input: { session_id: "greenfield-session" } });
+    const greenfieldContext = greenfieldPayload.hookSpecificOutput.additionalContext;
+    const amonSulBytes = Buffer.from(amonSulInput, "utf8");
+    assert.equal(Buffer.from(greenfieldContext, "utf8").includes(amonSulBytes), true, "the full intake input must be surfaced byte-identically");
+    assert.equal(greenfieldContext.indexOf(amonSulInput), greenfieldContext.lastIndexOf(amonSulInput), "the intake input must appear exactly once without a Resume-Hint card");
+    assert.doesNotMatch(greenfieldContext, /Resume-hint intent:/u);
+  } finally {
+    rmSync(greenfieldRoot, { recursive: true, force: true });
+  }
+
+  console.log("codex-session-start-hint: 49 passed");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

@@ -53,8 +53,12 @@ function priorTranscriptRecoveryLine(root, sessionId, runner) {
     + `${command}. This dedicated read-only command selects only a PRIOR Codex transcript whose own session metadata matches this repository identity, excludes this session by its supplied identity, and returns only a bounded tool/error excerpt. If it reports unavailable, state that honestly and continue; never search $CODEX_HOME, ~/.codex, or any runner session directory directly.`;
 }
 
-// Resume-hint material is surfaced only after the existing delivery receipt is recorded.
+// The intake checkpoint is the lossless, private authority store. Its material input is
+// independent of a resume card and is therefore surfaced on every governed SessionStart.
 function intakeVerbatimContextLines(root) {
+  // The private checkpoint is Git-owned state. A governed fixture or project without
+  // Git cannot have one, so avoid asking its resolver to discover private storage.
+  if (!existsSync(join(root, ".git"))) return [];
   let checkpoint;
   let material;
   try {
@@ -72,15 +76,15 @@ function intakeVerbatimContextLines(root) {
     if (author && (author.name || author.email)) parts.push(`commit author ${author.name ?? "?"} <${author.email ?? "?"}>`);
     if (values.language) parts.push(`operator language ${values.language}`);
     if (values.profile) parts.push(`PO profile ${values.profile}`);
-    if (parts.length > 0) lines.push(`Resume-hint answered onboarding values (already answered, do not re-ask): ${parts.join("; ")}.`);
+    if (parts.length > 0) lines.push(`Onboarding intake answered values (already answered, do not re-ask): ${parts.join("; ")}.`);
   }
   const chunks = Array.isArray(material?.chunks) ? material.chunks : [];
   if (chunks.length > 0) {
     lines.push(
-      `Resume-hint verbatim material input from onboarding intake is also available and MUST be read in full now, not treated as already condensed by the summary above (${chunks.length} chunk(s)):`,
+      `Onboarding intake verbatim material input is private authority and MUST be read in full now, not treated as already condensed by any resume-hint summary (${chunks.length} chunk(s)):`,
     );
     chunks.forEach((chunk, index) => {
-      lines.push(`Resume-hint material input chunk ${index + 1} of ${chunks.length}: ${chunk.text}`);
+      lines.push(`Onboarding intake material input chunk ${index + 1} of ${chunks.length}: ${chunk.text}`);
     });
     lines.push("Retain these checkpoint-origin chunks byte-for-byte in capture order; do not recapture an existing chunk merely to satisfy a ritual, and do not substitute answered onboarding settings for product requirements.");
   }
@@ -132,7 +136,6 @@ function resumeHintContextLines(root, sessionId) {
   if (Array.isArray(constraints) && constraints.length > 0) lines.push(`Resume-hint constraints: ${constraints.join("; ")}`);
   if (Array.isArray(questions) && questions.length > 0) lines.push(`Resume-hint questions: ${questions.join("; ")}`);
   if (Array.isArray(progress) && progress.length > 0) lines.push(`Resume-hint progress: ${progress.join("; ")}`);
-  lines.push(...intakeVerbatimContextLines(root));
   return lines;
 }
 
@@ -158,6 +161,7 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
         "Do not invent a human checkpoint for routine work. Request the PO only for a configured decision gate, required final acceptance, an irreversible/external consequence, or a typed hard block with no safe returned recovery action.",
         "A guard denial is not by itself a human gate: first execute its exact typed read-only or lifecycle recovery action when one is supplied.",
         priorTranscriptRecoveryLine(root, sessionId, runner),
+        ...intakeVerbatimContextLines(root),
         ...resumeHintContextLines(root, sessionId),
       ].join(" "),
     };
