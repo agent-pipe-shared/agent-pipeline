@@ -410,6 +410,12 @@ The candidate changes only test fixtures: an admitted `sed` command is no longer
 - ADR-0057: checked, no change needed.
 - ADR-0059: checked, no change needed.
 
+## Candidate de3ccdc469f4daa108df04baaf4b34d811a060ff — 2026-09-17, external Verify fixture reconciliation
+
+The candidate makes the Codex sandbox runtime fixture independent of the local WSL2 host and of PATH-dependent fake-CLI startup. It changes test injection only; the production host observation still remains mandatory when no test dependency is supplied.
+
+- ADR-0041: checked, no change needed.
+
 ## Candidate d93f2011c9f816fb4e203f5cf3afde5b2f91cf2f — 2026-09-17, 0.6.2 checkpoint and release-path repair reconciliation
 
 - ADR-0005: checked, no change needed.
