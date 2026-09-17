@@ -312,6 +312,41 @@ against the project trust anchors and remains fail-closed for every race.
 - ADR-0082: checked, no change needed.
 - ADR-0083: checked, no change needed.
 
+## Candidate d93f2011c9f816fb4e203f5cf3afde5b2f91cf2f — 2026-09-17, 0.6.2 checkpoint and release-path repair reconciliation
+
+- ADR-0005: checked, no change needed.
+- ADR-0010: checked, no change needed.
+- ADR-0027: checked, no change needed.
+- ADR-0028: checked, no change needed.
+- ADR-0029: checked, no change needed.
+- ADR-0033: checked, no change needed.
+- ADR-0034: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0042: checked, no change needed.
+- ADR-0043: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0048: checked, no change needed.
+- ADR-0049: checked, no change needed.
+- ADR-0050: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0052: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0062: checked, no change needed.
+- ADR-0064: checked, no change needed.
+- ADR-0065: checked, no change needed.
+- ADR-0069: checked, no change needed.
+- ADR-0070: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0075: checked, no change needed.
+- ADR-0077: checked, no change needed.
+- ADR-0081: checked, no change needed.
+
 ## Candidate 0d5b041b1d50200ad329b6dc4667f4fbd1e3694f — 2026-09-14, final 0.6.2 feature-branch push reconciliation
 
 - ADR-0001: checked, no change needed.
