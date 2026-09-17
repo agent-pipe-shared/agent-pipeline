@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { chmodSync, lstatSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import childProcess from "node:child_process";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -63,7 +63,7 @@ function exact(value, keys) {
   return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 }
 function gitText(root, args) {
-  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5_000 });
+  const result = childProcess.spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5_000 });
   // A contained host can expose an EPERM diagnostic after the child has
   // already completed with status 0. Preserve Git's exit status as the
   // authority, otherwise finalization rejects a successful observation.

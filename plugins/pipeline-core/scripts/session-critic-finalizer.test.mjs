@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import childProcess from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -112,6 +113,13 @@ function cliRequest(fx, overrides = {}) {
   };
 }
 
+function withSpawnSyncMock(t, mock, action) {
+  const original = childProcess.spawnSync;
+  t.after(() => { childProcess.spawnSync = original; });
+  childProcess.spawnSync = mock;
+  return action(original);
+}
+
 test("normal fresh-session finalization automatically prepares, claims, records, consumes, reads back, and emits", () => {
   const fx = fixture();
   try {
@@ -130,6 +138,24 @@ test("normal fresh-session finalization automatically prepares, claims, records,
     assert.deepEqual(JSON.parse(readFileSync(join(fx.root, "evidence", "review-action.json"), "utf8")), result.event);
     const serialized = JSON.stringify({ receipt: result.receipt, event: result.event });
     for (const forbidden of ["runner", "provider", "modelTier", "effortTier", "routeId"]) assert.equal(serialized.includes(forbidden), false, forbidden);
+  } finally { cleanup(fx); }
+});
+
+test("a successful Git exit remains admissible when a contained host adds an EPERM diagnostic", (t) => {
+  const fx = fixture();
+  try {
+    let injected = 0, originalSpawn;
+    withSpawnSyncMock(t, (command, args, options) => {
+      const result = originalSpawn(command, args, options);
+      if (command === "git" && args[2] === "rev-parse") {
+        injected += 1;
+        return { ...result, error: new Error("spawnSync git EPERM") };
+      }
+      return result;
+    }, (original) => { originalSpawn = original; });
+    const result = finalizeSessionCriticReview(options(fx, { packetId: "8".repeat(32) }));
+    assert.equal(result.status, "completed");
+    assert.ok(injected > 0);
   } finally { cleanup(fx); }
 });
 
