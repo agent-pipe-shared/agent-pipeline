@@ -4,6 +4,10 @@ This queue records only decisions that the final independent review found to
 be reserved to the Product Owner. It is not an approval, a threat-model
 snapshot, or a substitute for reopening the bound plan.
 
+**Accountability:** Owner: André (Product Owner). Expiry: both decisions must
+be resolved against the frozen delivery candidate before any push or release;
+they are not time-deferred risks and do not expire merely by continuing work.
+
 ## 1. Threat-model and candidate-bound approval — required before push
 
 **Why this is a PO decision:** Commit `9963d2c6` changes the admission rule

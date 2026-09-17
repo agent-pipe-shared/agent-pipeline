@@ -583,6 +583,46 @@ test("a successful Git exit remains admissible when a contained host adds an EPE
   assert.ok(injected > 1);
 });
 
+test("a successful EPERM Git observation remains admissible for the empty-tree read", (t) => {
+  const fx = captureFixture(t), originalSpawn = childProcess.spawnSync;
+  const emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+  let emptyTreeInjected = false;
+  withBuiltinMocks(t, [[childProcess, "spawnSync", (command, args, options) => {
+    if (args[2] === "rev-parse" && args[4] === `${fx.base}^{commit}`) return { status: 1, stdout: "" };
+    if (args[2] === "rev-parse" && args[4] === `${fx.base}^{tree}`) return { status: 0, stdout: `${emptyTree}\n` };
+    const result = originalSpawn(command, args, options);
+    if (args[2] === "hash-object" && args[3] === "-t") {
+      emptyTreeInjected = true;
+      return { ...result, error: new Error("spawnSync git EPERM") };
+    }
+    return result;
+  }]], () => {
+    const result = preflightCriticDispatch(input(fx));
+    assert.equal(result.status, "packet-ready");
+  });
+  assert.equal(emptyTreeInjected, true);
+});
+
+test("a successful EPERM Git observation remains admissible for a byte candidate read", (t) => {
+  const fx = captureFixture(t), originalSpawn = childProcess.spawnSync;
+  let byteReadInjected = false;
+  withBuiltinMocks(t, [[childProcess, "spawnSync", (command, args, options) => {
+    const result = originalSpawn(command, args, options);
+    if (args[2] === "show" && args[3].endsWith(":specs/spec.md") && options.encoding === null) {
+      byteReadInjected = true;
+      return { ...result, error: new Error("spawnSync git EPERM") };
+    }
+    return result;
+  }]], () => {
+    const result = preflightCriticDispatch(input(fx, {
+      base: null,
+      reviewScope: { kind: "current-artifacts", paths: ["specs/spec.md"] },
+    }));
+    assert.equal(result.status, "packet-ready");
+  });
+  assert.equal(byteReadInjected, true);
+});
+
 test("injected evidence containment refusal is captured without rerunning any guard", (t) => {
   const fx = captureFixture(t);
   withBuiltinMocks(t, [[path, "relative", () => ".."]], () => {
