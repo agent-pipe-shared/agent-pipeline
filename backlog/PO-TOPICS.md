@@ -25,6 +25,20 @@ for the detailed backlog records or an authority to publish changes.
 - No blanket session-transcript read access beyond the existing
   project-matching, read-only recovery contract.
 
+## Canonical runner-report mapping
+
+The three Greenfield reports remain source observations; this table prevents a
+later reread from creating a second item for the same confirmed issue.
+
+| Reported concern | Canonical owner / disposition |
+| --- | --- |
+| `verify: null` blocks a new consumer project's legitimate first verify command. | [baseline-only Verify recovery](items/2026-09-13-baseline-only-verify-needs-an-actionable-release-recovery.md) — open; needs a sanctioned late configuration route, not a bypass of calibration protection. |
+| Browser/Playwright proof is unavailable in some runner environments. | [portable browser evidence](items/2026-09-13-greenfield-browser-evidence-is-not-portably-provisioned.md) — open; preserve the distinction between unavailable evidence and a failing browser test. |
+| A runner lacks a native dispatch parent identity. | [runner-native subagent identity](items/2026-09-13-runner-native-subagent-tool-identity-is-not-portable.md) — open; require a sanitized native envelope before changing fail-closed binding. |
+| An invalid role packet wastes launcher time. | [role-dispatch packet preflight](items/2026-09-10-role-dispatch-payload-errors-fail-before-model-launch.md) — remaining work is real production-coordinator coverage, not another adapter-local validator. |
+| Completed local work remains visibly `implementing` after a deferred public release. | [feature-close and usage-ledger recovery](items/2026-09-13-feature-close-recovery-and-usage-ledger-need-runner-selectors.md) — open; terminal recovery must not fabricate a publication. |
+| Windows or native-runner claims that are not reproducible here. | Keep the existing platform-specific owners; do not promote a report assertion to a new security defect until its native sanitized fixture is captured. |
+
 ## Evidence note: cache identity collision
 
 The current source and the active cache share the exact same Codex build
