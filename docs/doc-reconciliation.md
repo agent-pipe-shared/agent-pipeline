@@ -47,6 +47,44 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 1a759ec3954c5cd5af3afc560824d6ed08d99078
+
+- ADR-0003: checked, no change needed.
+- ADR-0009: checked, no change needed.
+- ADR-0010: checked, no change needed.
+- ADR-0012: checked, no change needed.
+- ADR-0014: checked, no change needed.
+- ADR-0015: checked, no change needed.
+- ADR-0023: checked, no change needed.
+- ADR-0029: checked, no change needed.
+- ADR-0030: checked, no change needed.
+- ADR-0033: checked, no change needed.
+- ADR-0037: checked, no change needed.
+- ADR-0043: checked, no change needed.
+- ADR-0044: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0046: checked, no change needed.
+- ADR-0048: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0058: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0060: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0063: checked, no change needed.
+- ADR-0066: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0068: checked, no change needed.
+- ADR-0070: checked, no change needed.
+- ADR-0072: checked, no change needed.
+- ADR-0073: checked, no change needed.
+- ADR-0075: checked, no change needed.
+- ADR-0077: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+
 ## Candidate e7233fe618d6f3fa442e5630e9cbdb536c41c611 — 2026-09-02, range 266d691f..e7233fe6, re-head onto the final candidate: the one additional commit beyond 6a44b152 answers four obligations the full verify surfaced
 
 The five ADRs implicated by this range are the same five, for the same changed
