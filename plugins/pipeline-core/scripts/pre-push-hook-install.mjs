@@ -255,7 +255,7 @@ export function parseRefUpdates(stdinText) {
   return updates;
 }
 
-function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, classify, checkpointAuditRecord, recordCheckpointPushAttempt) {
+function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, classify, validCheckpointIntent, checkpointAuditRecord, recordCheckpointPushAttempt) {
   if (classify.lane !== "feature-checkpoint") return null;
   if (localRef !== remoteRef) {
     return "checkpoint source and destination must be the same explicit feature ref";
@@ -333,7 +333,7 @@ async function evaluateOneCommit({ projectRoot, commit, remote, localRef, remote
     policy: manifest.pushDestinationPolicy,
     binding: { ok: true, remote, sourceRef: localRef, destination: remoteRef },
   });
-  const checkpointBlock = checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, checkpointClass, checkpointAuditRecord, recordCheckpointPushAttempt);
+  const checkpointBlock = checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, checkpointClass, validCheckpointIntent, checkpointAuditRecord, recordCheckpointPushAttempt);
   if (checkpointClass.lane === "feature-checkpoint") {
     return checkpointBlock
       ? { hardBlock: checkpointBlock, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: false }
