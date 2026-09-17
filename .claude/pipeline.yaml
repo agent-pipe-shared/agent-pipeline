@@ -40,6 +40,10 @@ gates:
     mode: blocking
     type: automated
 
+pushDestinationPolicy:
+  schema: pipeline.push-destination-policy.v1
+  checkpointNamespace: refs/heads/feat/
+
 security:
   scanners:
     gitleaks:
