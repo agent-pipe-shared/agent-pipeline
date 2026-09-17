@@ -239,6 +239,20 @@ test("installed hook: fresh verify evidence + standing-approved -> ALLOW, record
   assert.equal(log.at(-1).commit, head);
 });
 
+test("installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit", () => {
+  const { dir, git } = freshRepo("e2e-checkpoint");
+  git("checkout", "-q", "-b", "feat/checkpoint");
+  writeManifest(dir, { approval: "required" });
+  writeFileSync(join(dir, ".claude", "pipeline.yaml"), `${readFileSync(join(dir, ".claude", "pipeline.yaml"), "utf8")}pushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n`);
+  git("add", ".claude/pipeline.yaml");
+  git("commit", "-q", "--amend", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup");
+  const head = git("rev-parse", "HEAD").stdout.trim();
+  const { code, stderr } = runInstalledHook(dir, `refs/heads/feat/checkpoint ${head} refs/heads/feat/checkpoint ${ZERO40}\n`);
+  assert.equal(code, 0, stderr);
+  assert.equal(readLog(dir).at(-1).verdict, "allowed");
+  assert.equal(readLog(dir).at(-1).remoteRef, "refs/heads/feat/checkpoint");
+});
+
 test("installed hook: fresh verify evidence + recorded approval (general mode) -> ALLOW", () => {
   const { dir, head } = freshRepo("e2e-approved");
   writeManifest(dir, { approval: "required" });
@@ -248,15 +262,15 @@ test("installed hook: fresh verify evidence + recorded approval (general mode) -
   assert.equal(code, 0, stderr);
 });
 
-// ---- delete case: allowed, not evaluated, still recorded -------------------------------
+// ---- delete case: fail-closed and recorded ---------------------------------------------
 
-test("installed hook: ref deletion is allowed without evidence evaluation, and recorded", () => {
+test("installed hook: ref deletion is blocked without evidence evaluation, and recorded", () => {
   const { dir, head } = freshRepo("e2e-delete");
   writeManifest(dir, { approval: "required" }); // no evidence written at all -- would BLOCK a normal push
   const { code } = runInstalledHook(dir, `refs/heads/doomed ${ZERO40} refs/heads/doomed ${head}\n`);
-  assert.equal(code, 0);
+  assert.equal(code, 1);
   const log = readLog(dir);
-  assert.equal(log.at(-1).verdict, "allowed");
+  assert.equal(log.at(-1).verdict, "blocked");
   assert.match(log.at(-1).note, /deletion/);
 });
 

@@ -111,7 +111,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { loadManifest } from "../lib/manifest.mjs";
+import { gateConfig, loadManifest } from "../lib/manifest.mjs";
 import { classifyPushDestination, validCheckpointIntent } from "../lib/push-destination-policy.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
@@ -182,6 +182,7 @@ function gitText(root, args, run) {
 export function driveCheckpointPushInit({ rootDir, by, remote, destination, run = spawnSync, load = loadManifest } = {}) {
   const root = resolve(rootDir);
   const manifestResult = load(root);
+  const pushGate = manifestResult?.status === "ok" ? gateConfig(manifestResult.manifest, "push") : null;
   const sourceRef = gitText(root, ["symbolic-ref", "-q", "HEAD"], run);
   const classification = classifyPushDestination({
     manifestStatus: manifestResult?.status,
@@ -189,6 +190,15 @@ export function driveCheckpointPushInit({ rootDir, by, remote, destination, run 
     binding: { ok: true, remote, sourceRef, destination },
   });
   const checks = [];
+  checks.push({
+    id: "checkpoint-push-gate",
+    ok: manifestResult?.status === "ok" && pushGate?.mode !== "off" && Boolean(pushGate),
+    message: manifestResult?.status !== "ok"
+      ? "the loaded manifest is absent or invalid; checkpoint policy cannot be selected."
+      : !pushGate || pushGate.mode === "off"
+        ? "an active push gate is required for the checkpoint policy."
+        : "the push gate is active.",
+  });
   checks.push({ id: "checkpoint-destination", ok: classification.lane === "feature-checkpoint", message: classification.reason ?? "configured feature checkpoint destination." });
   const status = gitText(root, ["status", "--porcelain"], run);
   checks.push({ id: "working-tree-clean", ok: status === "", message: status === "" ? "working tree is clean." : "working tree is not clean or cannot be read." });

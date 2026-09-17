@@ -255,6 +255,26 @@ export function parseRefUpdates(stdinText) {
   return updates;
 }
 
+function checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, classify, checkpointAuditRecord, recordCheckpointPushAttempt) {
+  if (classify.lane !== "feature-checkpoint") return null;
+  if (localRef !== remoteRef) {
+    return "checkpoint source and destination must be the same explicit feature ref";
+  }
+  const head = git(["-C", projectRoot, "rev-parse", "--verify", "HEAD^{commit}"], projectRoot);
+  if (head.status !== 0 || head.stdout.trim() !== commit) return "checkpoint source is not the clean checked-out candidate";
+  const status = git(["-C", projectRoot, "status", "--porcelain"], projectRoot);
+  if (status.status !== 0 || status.stdout.trim() !== "") return "checkpoint working tree is not clean";
+  const trailers = git(["-C", projectRoot, "show", "-s", "--format=%(trailers:key=Checkpoint-Intent,valueonly)", commit], projectRoot);
+  const values = trailers.status === 0 ? trailers.stdout.split("\\n").map((value) => value.trim()).filter(Boolean) : [];
+  if (values.length !== 1 || !validCheckpointIntent(values[0])) return "checkpoint candidate needs exactly one bounded Checkpoint-Intent commit trailer";
+  const tree = git(["-C", projectRoot, "rev-parse", String(commit) + "^{tree}"], projectRoot);
+  if (tree.status !== 0) return "checkpoint candidate tree cannot be resolved";
+  const record = checkpointAuditRecord({ commit, tree: tree.stdout.trim(), remote, destination: remoteRef, intent: values[0] });
+  if (!record) return "checkpoint audit record cannot be constructed";
+  const audit = recordCheckpointPushAttempt({ projectDir: projectRoot, record });
+  return audit.ok ? null : audit.reason;
+}
+
 export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit) {
   const failures = [];
   let raw;
@@ -276,10 +296,12 @@ export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit) {
   return failures;
 }
 
-async function evaluateOneCommit({ projectRoot, commit, remoteRef }) {
+async function evaluateOneCommit({ projectRoot, commit, remote, localRef, remoteRef }) {
   const { loadManifest, gateConfig } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "manifest.mjs")).href);
   const { VERIFY_EVIDENCE_DEFAULT_PATH } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "verify-evidence-path.mjs")).href);
   const { checkSecurityCompleteness } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "security-completeness-gate.mjs")).href);
+  const { classifyPushDestination, validCheckpointIntent } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "push-destination-policy.mjs")).href);
+  const { checkpointAuditRecord, recordCheckpointPushAttempt } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "checkpoint-push-audit.mjs")).href);
   const { resolveProjectAuthorityPaths, NEUTRAL_STATE, LEGACY_STATE } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "project-authority.mjs")).href);
 
   const manifestResult = loadManifest(projectRoot);
@@ -305,6 +327,18 @@ async function evaluateOneCommit({ projectRoot, commit, remoteRef }) {
   const failures = [];
   const securityFailures = [];
   let securityGateMode = "blocking";
+
+  const checkpointClass = classifyPushDestination({
+    manifestStatus: manifestResult.status,
+    policy: manifest.pushDestinationPolicy,
+    binding: { ok: true, remote, sourceRef: localRef, destination: remoteRef },
+  });
+  const checkpointBlock = checkpointFailure(projectRoot, commit, remote, localRef, remoteRef, checkpointClass, checkpointAuditRecord, recordCheckpointPushAttempt);
+  if (checkpointClass.lane === "feature-checkpoint") {
+    return checkpointBlock
+      ? { hardBlock: checkpointBlock, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: false }
+      : { hardBlock: null, failures: [], securityFailures: [], pushGateMode, securityGateMode, skipped: true };
+  }
 
   const treeResult = git(["-C", projectRoot, "rev-parse", \`\${commit}^{tree}\`], projectRoot);
   const sourceTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
@@ -359,6 +393,7 @@ function block(lines) {
 
 async function main() {
   const stdinText = readFileSync(0, "utf8");
+  const remote = process.argv[2] ?? "";
   const updates = parseRefUpdates(stdinText);
   const projectRoot = resolveProjectRoot();
   const commonDir = resolveGitCommonDir();
@@ -370,14 +405,22 @@ async function main() {
   const allFindings = [];
   let anyBlocking = false;
 
+  const nonEmptyLines = stdinText.split("\\n").map((line) => line.trim()).filter(Boolean);
+  if (updates.length !== nonEmptyLines.length) {
+    block(["pre-push input contained a malformed ref-update line; cannot evaluate the push safely."]);
+    return;
+  }
+
   for (const update of updates) {
     if (update.isDelete) {
-      recordLog(commonDir, { verdict: "allowed", note: "ref deletion -- not evaluated (guard-git.mjs territory)", localRef: update.localRef, remoteRef: update.remoteRef });
+      allFindings.push(String(update.remoteRef) + ": ref deletion is not permitted by the installed pre-push backstop.");
+      anyBlocking = true;
+      recordLog(commonDir, { verdict: "blocked", note: "ref deletion", localRef: update.localRef, remoteRef: update.remoteRef });
       continue;
     }
     let result;
     try {
-      result = await evaluateOneCommit({ projectRoot, commit: update.localSha, remoteRef: update.remoteRef });
+      result = await evaluateOneCommit({ projectRoot, commit: update.localSha, remote, localRef: update.localRef, remoteRef: update.remoteRef });
     } catch (error) {
       // Fault boundary: unlike guard-push.mjs, an unexpected exception here ALWAYS
       // blocks, never mode-gated (file header FAIL-CLOSED section).
@@ -433,7 +476,7 @@ function isDirectlyInvoked() {
   }
 }
 if (isDirectlyInvoked()) {
-  main().catch((error) => {
+  main().then(() => process.exit(process.exitCode ?? 0)).catch((error) => {
     block([\`this hook's own evaluation faulted before producing a verdict (\${error?.name ?? "Error"}).\`]);
   });
 }

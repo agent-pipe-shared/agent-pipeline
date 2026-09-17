@@ -13,8 +13,20 @@ export const PUSH_DESTINATION_POLICY_SCHEMA = "pipeline.push-destination-policy.
 export const CHECKPOINT_LANE = "feature-checkpoint";
 export const PROTECTED_LANE = "protected-publication";
 
-const FEATURE_NAMESPACE_RE = /^refs\/heads\/feat\/[A-Za-z0-9._/-]*$/u;
-const BRANCH_RE = /^refs\/heads\/[A-Za-z0-9._/-]+$/u;
+const SAFE_REMOTE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+const SAFE_BRANCH_RE = /^refs\/heads\/(?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+const FEATURE_NAMESPACE_RE = /^refs\/heads\/feat\/(?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*$/u;
+
+export function isSafePushRemote(value) {
+  return typeof value === "string" && SAFE_REMOTE_RE.test(value);
+}
+
+export function isSafeBranchRef(value) {
+  return typeof value === "string"
+    && SAFE_BRANCH_RE.test(value)
+    && !value.includes("..")
+    && !value.includes("@{");
+}
 
 function invalid(reason) {
   return { ok: false, reason, namespace: null };
@@ -51,11 +63,11 @@ export function classifyPushDestination({ manifestStatus, policy, binding } = {}
   if (manifestStatus !== "ok") return { lane: PROTECTED_LANE, reason: "manifest is not valid", policy: parsed };
   if (!parsed.ok) return { lane: PROTECTED_LANE, reason: parsed.reason, policy: parsed };
   if (!binding || binding.ok !== true) return { lane: PROTECTED_LANE, reason: "push binding is not exact", policy: parsed };
-  if (typeof binding.remote !== "string" || binding.remote === "") return { lane: PROTECTED_LANE, reason: "remote is not explicit", policy: parsed };
-  if (typeof binding.sourceRef !== "string" || !BRANCH_RE.test(binding.sourceRef)) {
+  if (!isSafePushRemote(binding.remote)) return { lane: PROTECTED_LANE, reason: "remote is not a safe explicit name", policy: parsed };
+  if (!isSafeBranchRef(binding.sourceRef)) {
     return { lane: PROTECTED_LANE, reason: "source is not an explicit branch ref", policy: parsed };
   }
-  if (typeof binding.destination !== "string" || !BRANCH_RE.test(binding.destination)) {
+  if (!isSafeBranchRef(binding.destination)) {
     return { lane: PROTECTED_LANE, reason: "destination is not an explicit branch ref", policy: parsed };
   }
   if (!binding.destination.startsWith(parsed.namespace)) {

@@ -86,7 +86,10 @@ test("driveCheckpointPushInit: accepts only the configured exact feature source/
   };
   const load = () => ({
     status: "ok",
-    manifest: { pushDestinationPolicy: { schema: "pipeline.push-destination-policy.v1", checkpointNamespace: "refs/heads/feat/" } },
+    manifest: {
+      gates: { push: { mode: "blocking", type: "human", approval: "required" } },
+      pushDestinationPolicy: { schema: "pipeline.push-destination-policy.v1", checkpointNamespace: "refs/heads/feat/" },
+    },
   });
   const ready = driveCheckpointPushInit({ rootDir: "/fixture", by: "tester", remote: "origin", destination: "refs/heads/feat/checkpoint", run, load });
   assert.equal(ready.outcome, "checkpoint-ready", JSON.stringify(ready));
@@ -94,6 +97,37 @@ test("driveCheckpointPushInit: accepts only the configured exact feature source/
   const protectedDestination = driveCheckpointPushInit({ rootDir: "/fixture", by: "tester", remote: "origin", destination: "refs/heads/main", run, load });
   assert.equal(protectedDestination.outcome, "precondition-unmet");
   assert.equal(protectedDestination.checks.find((check) => check.id === "checkpoint-destination").ok, false);
+});
+
+test("driveCheckpointPushInit: absent or off push gate fails closed", () => {
+  const run = (_command, argv) => {
+    if (argv.includes("symbolic-ref")) return { status: 0, stdout: "refs/heads/feat/checkpoint\n" };
+    if (argv.includes("status")) return { status: 0, stdout: "" };
+    return { status: 0, stdout: "remote backup\n" };
+  };
+  const policy = { schema: "pipeline.push-destination-policy.v1", checkpointNamespace: "refs/heads/feat/" };
+  for (const manifest of [
+    { pushDestinationPolicy: policy },
+    { gates: { push: { mode: "off", type: "human", approval: "required" } }, pushDestinationPolicy: policy },
+  ]) {
+    const result = driveCheckpointPushInit({ rootDir: "/fixture", by: "tester", remote: "origin", destination: "refs/heads/feat/checkpoint", run, load: () => ({ status: "ok", manifest }) });
+    assert.equal(result.outcome, "precondition-unmet");
+    assert.equal(result.checks.find((check) => check.id === "checkpoint-push-gate").ok, false);
+  }
+});
+
+test("driveCheckpointPushInit: unsafe command inputs never reach checkpoint-ready", () => {
+  const run = (_command, argv) => {
+    if (argv.includes("symbolic-ref")) return { status: 0, stdout: "refs/heads/feat/checkpoint\n" };
+    if (argv.includes("status")) return { status: 0, stdout: "" };
+    return { status: 0, stdout: "remote backup\n" };
+  };
+  const load = () => ({ status: "ok", manifest: { gates: { push: { mode: "blocking", type: "human", approval: "required" } }, pushDestinationPolicy: { schema: "pipeline.push-destination-policy.v1", checkpointNamespace: "refs/heads/feat/" } } });
+  for (const [remote, destination] of [["origin;touch", "refs/heads/feat/checkpoint"], ["origin", "refs/heads/feat/checkpoint with-space"], ["origin", "refs/heads/feat/"]]) {
+    const result = driveCheckpointPushInit({ rootDir: "/fixture", by: "tester", remote, destination, run, load });
+    assert.notEqual(result.outcome, "checkpoint-ready");
+    assert.equal(Object.hasOwn(result, "gitPushLine"), false);
+  }
 });
 
 test("buildReconciliationArgv: candidate and record-ref are explicit caller inputs, never invented (NVA-B-PUSHINIT-1)", () => {
