@@ -31,10 +31,12 @@ by hand to move past it.
 
 ## Verify a consumer project
 
-Use the installed plugin's `scripts/verify-evidence-producer.mjs` to run
-Verify in your project. It combines general pipeline checks with your existing
-configured product command, and records progress, individual results and
-candidate-bound evidence through the Verify journal.
+Use the installed plugin's `scripts/verify-evidence-producer.mjs` as the
+Verify invocation in your project. It runs your one configured product command
+alongside the general pipeline checks, then records progress, individual
+results, and candidate-bound evidence through the Verify journal. Running the
+configured product command by itself runs product checks, but does not create
+the Verify receipt.
 
 New onboarding creates the project adapter. To prepare an existing project,
 run `node <plugin-root>/scripts/verify-evidence-producer.mjs --prepare --root
@@ -42,12 +44,13 @@ run `node <plugin-root>/scripts/verify-evidence-producer.mjs --prepare --root
 the project changes. Preparation preserves your configured verify command;
 it does not replace your tests. A conflicting adapter is reported for repair.
 
-On the clean committed candidate, run
-`node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root>`.
-Choose the boundary explicitly and supply the reviewed base:
+On the clean committed candidate, choose the boundary explicitly and run the
+evidence producer once with the reviewed base:
 
 ```bash
+node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode work --base <work-base>
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode critic --base <review-base>
+node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode candidate --base <candidate-base>
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode push --base <remote-base>
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode release --base <release-base>
 ```
@@ -57,9 +60,11 @@ selected suite again at the same commit. The default continues to reuse valid
 receipts. Public evidence records `verifyRun.receiptReuse` as `disabled` or
 `allowed`, and each step records whether it was reused.
 
-`work`, `critic`, `candidate`, and `push` run the fixed baseline plus commands
-registered for changed areas. `release` always runs the full project command.
-Unknown paths, missing bindings and incomplete policies fall back to full.
+`work`, `critic`, `candidate`, and `push` select the fixed baseline plus
+commands registered for changed areas from the supplied base; choose the mode
+that matches the work, review, candidate, or push boundary. `release` always
+runs the full project command. Unknown paths, missing bindings and incomplete
+policies fall back to full.
 
 The fixed baseline validates project authority and a present runtime manifest,
 tracked JSON syntax, merge-conflict markers, and `git diff --check`. If no

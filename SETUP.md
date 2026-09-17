@@ -59,8 +59,9 @@ choices through the normal reviewed workflow.
 
 For Claude Code, bind the project-scoped `pipeline-core` plugin, then fully
 restart the host before the first bootstrap. For Codex, use its approved
-marketplace/add commands and begin a new thread after binding or refresh. For
-another runner, use only its supported integration and the manual controls
+marketplace/add commands, fully end the Codex host process, then start a new
+thread after binding or refresh. For another runner, use only its supported
+integration and the manual controls
 stated in [runtime boundary](docs/runtime-boundary.md). Do not copy Claude
 commands or claim its hooks are installed elsewhere.
 
@@ -152,7 +153,8 @@ The final command must report exactly one installed and enabled
 `pipeline-core@agent-pipeline`. A Git marketplace snapshot is not the running
 plugin: after the first binding, fully end the Codex host process and start a
 new thread in the project root before invoking `/pipeline-core:pipeline-start`.
-For a later refresh, start a new Codex thread as well. Do not hand-edit Codex
+For a later refresh, fully end the Codex host process and start a new Codex
+thread in the project root as well. Do not hand-edit Codex
 marketplace or cache files.
 
 ### 1. Let `pipeline-start` classify the consumer root

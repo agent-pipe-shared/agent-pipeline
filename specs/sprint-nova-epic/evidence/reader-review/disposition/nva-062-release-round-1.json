@@ -1,0 +1,43 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "nva-062-release-round-1",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "compatibility-before-selector",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "989bc68cb5c0f0e1b3997469d548f47745e46861"
+    },
+    {
+      "id": "onboarding-key-condition",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "989bc68cb5c0f0e1b3997469d548f47745e46861"
+    },
+    {
+      "id": "diagram-close-label",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "989bc68cb5c0f0e1b3997469d548f47745e46861"
+    },
+    {
+      "id": "prospective-release-wording",
+      "class": "cut",
+      "status": "resolved",
+      "resolutionCommit": "989bc68cb5c0f0e1b3997469d548f47745e46861"
+    },
+    {
+      "id": "feature-package-prerequisite",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "989bc68cb5c0f0e1b3997469d548f47745e46861"
+    },
+    {
+      "id": "measurement-context",
+      "class": "cut",
+      "status": "resolved",
+      "resolutionCommit": "989bc68cb5c0f0e1b3997469d548f47745e46861"
+    }
+  ]
+}

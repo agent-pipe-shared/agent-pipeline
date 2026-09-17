@@ -1,0 +1,4 @@
+- README.md:110–120: The phase-one policy finding still applies: the categorical “block a gate the moment” claim outweighs later conditional machine-versus-human enforcement explanation.
+- SETUP.md:61 and 151–155: The phase-one Codex restart finding still applies: summary must name ending host process before beginning new thread.
+- PIPELINE_FLOW.md:179 and docs/usage.md:34–46: The phase-one Verify finding still applies: relationship between configured project command, evidence producer, and explicit boundary is unclear.
+- docs/usage.md:45–52,60–62: work/candidate modes are explained but neither supplied as usable invocation, so reader cannot select them.

@@ -107,8 +107,8 @@ nothing new is added. Details: [`docs/operating-model.md`](docs/operating-model.
 
 A project can bring its own house rules, split into two classes: **guidelines**
 are recommended principles you may deliberately deviate from, as long as the
-deviation is named; **policies** are binding rules that block a gate the moment
-they're violated. Start from the templates under
+deviation is named; **policies** are binding rules whose enforcement follows
+their evaluation route. Start from the templates under
 [`governance/examples/`](governance/examples/README.md), copy the selected
 rules into project-owned paths, and configure those paths through the
 `governance` block in the project's manifest.
@@ -283,7 +283,7 @@ nichts Neues hinzu. Details: [`docs/operating-model.md`](docs/operating-model.md
 Ein Projekt kann eigene Hausregeln mitbringen — getrennt in zwei Klassen:
 **Guidelines** sind empfohlene Prinzipien, von denen bewusst und benannt
 abgewichen werden darf; **Policies** sind verbindliche Regeln, die ein Gate
-blockieren, sobald sie verletzt werden. Nutze die Vorlagen unter
+gemäß ihrem Auswertungsweg durchgesetzt werden. Nutze die Vorlagen unter
 [`governance/examples/`](governance/examples/README.md) als Ausgangspunkt,
 kopiere die ausgewählten Regeln in projektverwaltete Pfade und konfiguriere
 diese Pfade über den `governance`-Block im Projektmanifest.
