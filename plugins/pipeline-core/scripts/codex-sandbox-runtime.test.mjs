@@ -28,6 +28,15 @@ const CONTEXT = { repoFingerprint: "a".repeat(64), referenceSetSha256: "b".repea
 
 const NATIVE_NOW_MS = Date.parse("2026-09-09T08:00:00.000Z");
 const NATIVE_POLICY_OPTIONS = Object.freeze({ nowMs: NATIVE_NOW_MS, maxAgeMs: 60_000 });
+function nativeHostFixture() {
+  return {
+    cli: { version: "fake-native-codex 1.0", sha256: "a".repeat(64) },
+    host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6.18.33.2-microsoft-standard-WSL2", machine: "x64" }, filesystemClass: "wsl2-native", bootIdSha256: "b".repeat(64) },
+  };
+}
+function runNativeFixture(input, dependencies = {}) {
+  return runNativeCriticPreflight(input, { observeNativeHost: () => nativeHostFixture(), ...dependencies });
+}
 function nativeTuple() {
   return {
     cli: { version: "codex-cli 0.153.4", sha256: "1".repeat(64) },
@@ -248,7 +257,7 @@ function writeFakeCodex(root) {
   // and real sandbox-enforced write denial, neither of which this stand-in
   // (or any non-live-Codex substitute) can honestly provide.
   writeFileSync(path, [
-    "#!/usr/bin/env node",
+    `#!${process.execPath}`,
     "const argv = process.argv.slice(2);",
     "if (argv[0] === \"--version\") { process.stdout.write(\"fake-codex 0.144.6\\n\"); process.exit(0); }",
     "process.stderr.write(\"fake-codex: unsupported subcommand\\n\");",
@@ -360,7 +369,7 @@ function writeNativePreflightFake(root, { malformedFeature = false, malformedSch
   const protocol = JSON.stringify(malformedSchema ? {} : { definitions: { ClientRequest: { oneOf: ["initialize", "thread/start", "experimentalFeature/list", "mcpServerStatus/list", "command/exec"].map((method) => ({ properties: { method: { enum: [method] } } })) }, "v2/CommandExecParams": { required: ["command"], properties: { sandboxPolicy: { type: "object", readOnly: true } } }, "v2/ThreadStartParams": { properties: { sandbox: { type: "string" } } }, "v2/ExperimentalFeatureListParams": { properties: { threadId: { type: "string" } } }, "v2/ListMcpServerStatusParams": { properties: { threadId: { type: "string" } } } } });
   const features = JSON.stringify(NATIVE_CRITIC_PROHIBITED_FEATURES.map((name) => ({ name, enabled: false })));
   writeFileSync(path, [
-    "#!/usr/bin/env node",
+    `#!${process.execPath}`,
     "import fs from 'node:fs'; import readline from 'node:readline'; const argv = process.argv.slice(2);",
     "if (argv[0] === '--version') { process.stdout.write('fake-native-codex 1.0\\n'); process.exit(0); }",
     `if (argv[0] === 'app-server' && argv[1] === 'generate-json-schema') { const out = argv[argv.indexOf('--out') + 1]; fs.mkdirSync(out, { recursive: true }); fs.writeFileSync(out + '/codex_app_server_protocol.schemas.json', ${JSON.stringify(protocol)}); fs.writeFileSync(out + '/codex_app_server_protocol.v2.schemas.json', ${JSON.stringify(protocol)}); process.exit(0); }`,
@@ -399,7 +408,7 @@ test("native Critic preflight's default adapter generates a fake CLI schema, dra
   const { repo, scratch } = createNativePreflightRepo(root);
   writeFileSync(join(scratch, "preexisting.txt"), "preserve\n");
   const cli = writeNativePreflightFake(root);
-  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: cli });
+  const result = await runNativeFixture({ scratchPath: scratch, candidateRoot: repo, codexPath: cli });
   assert.equal(result.status, "passed", JSON.stringify(result));
   assert.equal(result.metadata.turnsStarted, 0);
   assert.equal(result.smokeReceipt.observed.nativeWriteDenied, true);
@@ -413,7 +422,7 @@ test("native Critic preflight admits only the schema-declared remote-control sta
   const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-notification-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const { repo, scratch } = createNativePreflightRepo(root);
-  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { remoteControlNotification: true }) });
+  const result = await runNativeFixture({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { remoteControlNotification: true }) });
   assert.equal(result.status, "passed");
   assert.equal(JSON.stringify(result).includes("ignored"), false);
 });
@@ -423,10 +432,10 @@ test("native Critic preflight fails closed for incomplete feature evidence and m
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const { repo, scratch } = createNativePreflightRepo(root);
   const cli = writeNativePreflightFake(root, { malformedFeature: true });
-  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: cli });
+  const result = await runNativeFixture({ scratchPath: scratch, candidateRoot: repo, codexPath: cli });
   assert.equal(result.status, "unavailable");
   assert.equal(result.code, "preflight-failed");
-  const invalidSchema = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, "schema"), { malformedSchema: true }) });
+  const invalidSchema = await runNativeFixture({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, "schema"), { malformedSchema: true }) });
   assert.equal(invalidSchema.status, "unavailable");
   assert.equal(invalidSchema.code, "schema-invalid");
 });
@@ -435,7 +444,7 @@ test("native Critic preflight distinguishes timeout, launch denial, wrong readba
   const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-boundaries-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const { repo, scratch } = createNativePreflightRepo(root);
-  const run = (options, dependencies = {}) => runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, `fake-${Object.keys(options).join("-") || "pass"}`), options) }, dependencies);
+  const run = (options, dependencies = {}) => runNativeFixture({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, `fake-${Object.keys(options).join("-") || "pass"}`), options) }, dependencies);
   const timeout = await run({ hang: true }, { timeoutMs: 10 });
   assert.equal(timeout.status, "unavailable"); assert.equal(timeout.code, "timed-out");
   const launch = await run({ launchDenied: true });
@@ -443,7 +452,7 @@ test("native Critic preflight distinguishes timeout, launch denial, wrong readba
   const policy = await run({ wrongSandbox: true });
   assert.equal(policy.status, "unavailable"); assert.equal(policy.code, "protocol-invalid");
   const outside = realpathSync(mkdirSync(join(root, "outside"), { recursive: true }));
-  const escaped = await runNativeCriticPreflight({ scratchPath: outside, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, "fake-escape")) });
+  const escaped = await runNativeFixture({ scratchPath: outside, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, "fake-escape")) });
   assert.equal(escaped.status, "unavailable"); assert.equal(escaped.code, "input-invalid");
 });
 
@@ -452,7 +461,7 @@ test("native Critic preflight retains late server requests and malformed frames 
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const { repo, scratch } = createNativePreflightRepo(root);
   for (const [name, options] of [["late", { lateServerRequest: true }], ["null", { nullFrame: true }]]) {
-    const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, name), options) });
+    const result = await runNativeFixture({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(join(root, name), options) });
     assert.equal(result.status, "unavailable", `${name}: ${JSON.stringify(result)}`);
     assert.equal(result.code, "protocol-invalid", `${name}: ${JSON.stringify(result)}`);
   }
@@ -465,7 +474,7 @@ test("native Critic preflight refuses a next request after same-batch initialize
   // The assertion is protocol rejection, not process-startup speed. A live
   // Node child can legitimately need more than 100 ms on the parallel CI
   // runner before it reaches the injected forbidden server request.
-  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { initializeServerRequest: true }) }, { timeoutMs: 1_000 });
+  const result = await runNativeFixture({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { initializeServerRequest: true }) }, { timeoutMs: 1_000 });
   assert.equal(result.status, "unavailable", JSON.stringify(result));
   assert.equal(result.code, "preflight-failed", JSON.stringify(result));
 });
@@ -474,7 +483,7 @@ test("native Critic preflight converts a closed stdin pipe into a bounded unavai
   const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-epipe-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const { repo, scratch } = createNativePreflightRepo(root);
-  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { closeStdin: true }) }, { timeoutMs: 100 });
+  const result = await runNativeFixture({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { closeStdin: true }) }, { timeoutMs: 100 });
   assert.equal(result.status, "unavailable", JSON.stringify(result));
   assert.notEqual(result.code, "smoke-failed", JSON.stringify(result));
 });

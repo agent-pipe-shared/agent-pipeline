@@ -188,7 +188,7 @@ async function runNativeCriticPreflightInternal(input, dependencies = {}) {
     try { (dependencies.execFileSync ?? execFileSync)(cliPath, ["app-server", "generate-json-schema", "--out", schemaDir], { encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "pipe"] }); }
     catch (error) { fail("schema-generation-failed", cleanText(error?.stderr?.toString()) ?? "schema generation failed"); }
     const protocolSchemaSha256 = generatedSchemaDigest(schemaDir, dependencies);
-    const host = observeNativeHost({ cliPath, candidateRoot }, dependencies);
+    const host = (dependencies.observeNativeHost ?? observeNativeHost)({ cliPath, candidateRoot }, dependencies);
     writeFileSync(canary, "native-critic-canary\n", "utf8"); const originalCanary = sha256(readFileSync(canary));
     writeFileSync(canary, "host-positive-control\n", "utf8"); writeFileSync(canary, "native-critic-canary\n", "utf8");
     hostWriteControl = sha256(readFileSync(canary)) === originalCanary;
