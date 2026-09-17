@@ -32,3 +32,40 @@ observed.
 - A failed remote readback is non-success and yields an exact safe retry.
 - Sole pending audit state is folded only under the existing no-unrelated-work
   constraint.
+
+## Prepared decision sketch — not an implementation authorization
+
+The eventual driver should expose one versioned `push-transaction` result,
+not infer completion from a sequence of script exits.  It owns five explicit
+stages: immutable candidate preflight, intent/approval validation, conditional
+audit fold, one push attempt, and destination readback.  Each stage records
+the exact candidate commit/tree and prior-stage digest it consumed; a later
+stage must not silently refresh an earlier binding.
+
+The audit fold remains conditional: it may run only where the existing
+no-unrelated-work predicate proves that the sole pending state write is the
+driver's own expected record.  Otherwise the result stops before any push
+with `audit-fold-blocked` and names the typed recovery.  It must never fold a
+mixed worktree merely to make delivery convenient.
+
+After a push attempt, success is impossible until an authenticated remote
+readback resolves the exact destination ref to the expected candidate commit.
+The terminal result vocabulary should at minimum distinguish:
+
+- `not-started` for failed local preflight, intent, or audit-fold predicates;
+- `push-not-confirmed` if the transport returns an error or ambiguous result;
+- `remote-readback-failed` if transport may have succeeded but the destination
+  cannot yet be observed safely; and
+- `pushed` only for an exact destination-ref readback match.
+
+`remote-readback-failed` must retain the push attempt identity and give an
+exact read-only recheck action.  Retrying must first inspect that recorded
+attempt; it may not issue another push merely because the first observation
+timed out.  A destination mismatch is a hard non-success that preserves all
+local evidence for diagnosis.
+
+The adversarial matrix must cover a clean success, an unrelated dirty
+worktree, a foldable sole audit write, a transport failure, an ambiguous
+transport success followed by delayed matching readback, a mismatching remote
+tip, and repeated recovery invocation.  No case may report delivery before
+the exact remote readback.
