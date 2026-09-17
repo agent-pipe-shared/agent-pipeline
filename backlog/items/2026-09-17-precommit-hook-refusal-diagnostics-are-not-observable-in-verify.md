@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.precommit-hook-refusal-diagnostics-are-not-observable-in-verify
 type: defect
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-17
 sprint: nova-b
-tracking: "Nova B — the registered pre-commit hook suite currently sees expected refusal exit codes but an empty captured diagnostic stream for every negative end-to-end case."
+closed_at: 2026-09-17
+closure_repository: self
+closure_commit: 1522567a0e69d4b720b9e052f7e8d33861e7ce99
+closure_evidence: backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md
+tracking: "Reclassified on 2026-09-17: restricted Codex sandbox child-process EPERM, not a pre-commit hook product defect. The existing Codex sandbox item is the single owner."
 source: "Direct local reproduction on 2026-09-17: `node plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs` returned 41 pass / 10 fail; every failure was an empty expected diagnostic, while the positive sanctioned verify transition passed."
 ---
 
@@ -41,7 +45,18 @@ first proves a non-zero refusal code, then fails only because the expected
 fails in this runtime, but reports only the enclosing-file failure; it is not
 the registered Verify command and must not be substituted as a fix.
 
-## Direction
+## Correction and closure
+
+The apparent defect was re-measured before any hook change.  The failing child
+process returned `error: EPERM` in the restricted Codex sandbox, so it never
+started the generated hook.  The same suite passed 51/51 through the
+authorized local Git/child-process boundary.  It is therefore a duplicate
+intake for
+`pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn`,
+not a release or pre-commit product defect.  The full measurement and
+readback are in the closure evidence named above.
+
+## Historical direction (not to implement from this item)
 
 Find the actual process/stdio boundary that loses the child diagnostic, then
 make the suite observe the real installed-hook output through a stable channel
@@ -49,7 +64,7 @@ without relaxing the assertion that a refusal is human-actionable.  Preserve
 all existing positive and negative commit-boundary tests.  Receipt reuse must
 not be used as evidence that this suite executes green on a new runtime.
 
-## Acceptance criteria
+## Historical acceptance criteria (superseded by the reclassification)
 
 - The registered Verify invocation exits zero on a fresh execution, not merely
   a reused receipt.

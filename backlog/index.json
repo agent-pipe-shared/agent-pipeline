@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c12f5391d4dc301d226685b64dcace1d7f41ea5cc4ebb37faaec2c077869aac5"
+    "transitionHead": "b554780b50b6338ce631fafadb72103e80c88007016cca98b3517a0bd29f9f31"
   },
   "counts": {
-    "open": 81,
+    "open": 80,
     "in_progress": 1,
-    "closed": 577,
+    "closed": 578,
     "rejected": 3,
     "deferred": 11
   },
@@ -6060,14 +6060,18 @@
     },
     {
       "id": "pipeline.precommit-hook-refusal-diagnostics-are-not-observable-in-verify",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-17",
       "source": "Direct local reproduction on 2026-09-17: `node plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs` returned 41 pass / 10 fail; every failure was an empty expected diagnostic, while the positive sanctioned verify transition passed.",
       "deferred": false,
-      "tracking": "Nova B — the registered pre-commit hook suite currently sees expected refusal exit codes but an empty captured diagnostic stream for every negative end-to-end case.",
-      "sprint": "nova-b"
+      "tracking": "Reclassified on 2026-09-17: restricted Codex sandbox child-process EPERM, not a pre-commit hook product defect. The existing Codex sandbox item is the single owner.",
+      "sprint": "nova-b",
+      "closedAt": "2026-09-17",
+      "closureRepository": "self",
+      "closureCommit": "1522567a0e69d4b720b9e052f7e8d33861e7ce99",
+      "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
     },
     {
       "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
