@@ -398,7 +398,7 @@ function activeFeaturePlanningSurface(root, dependencies = {}) {
     return null;
   }
   const paths = new Set();
-  const token = /(?:^|[\s`"'([{])((?:\.claude|architecture|backlog|docs|governance|harness|plugins|policies|project|roles|schemas|specs|templates)\/[A-Za-z0-9_@+./-]+)/gmu;
+  const token = /(?:^|[\s`"'([{])((?:(?:\.claude|app|architecture|backlog|bin|config|docs|governance|harness|lib|plugins|policies|project|roles|schemas|scripts|specs|src|templates|test|tests)\/[A-Za-z0-9_@+./-]+)|(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|pipeline-manifest\.schema\.json|pipeline\.user\.schema\.json))/gmu;
   for (const match of source.matchAll(token)) {
     const candidate = match[1].replace(/[),.;:\]}`]+$/u, "");
     if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === "..")) {

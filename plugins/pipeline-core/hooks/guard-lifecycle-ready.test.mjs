@@ -585,6 +585,49 @@ test("implementation authority derives rigor from the PO-bound plan surface whil
   }
 });
 
+test("implementation authority treats root contract files named by the PO-bound plan as rigor input", () => {
+  const path = root();
+  const planPath = "specs/root-contract/prd.md";
+  const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(dirname(join(path, planPath)), { recursive: true });
+    mkdirSync(join(path, "project"), { recursive: true });
+    mkdirSync(join(path, "architecture"), { recursive: true });
+    writeFileSync(join(path, planPath), "Planned contract update: `package.json`; context: `specs/root-contract/spec.md`.\n");
+    writeFileSync(join(path, "project", "pipeline-state.json"), JSON.stringify({
+      schema: "pipeline.state.v0",
+      activeFeature: { id: "root-contract", planPath, phase: "design" },
+      planSubmission: { profile: "mini" },
+      planApproved: true,
+    }) + "\n");
+    writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
+      schema: "pipeline.adoption-state.v1",
+      state: "approved-scoped",
+      scope: "specs/root-contract/",
+      decidedAt: "2026-09-15T00:00:00.000Z",
+      expiresAt: null,
+      reviewDate: null,
+      decisionRef: "PO-TEST-ROOT-CONTRACT",
+      rationale: "Test-only scoped adoption decision",
+      coverageClass: "evaluated",
+      confidence: "measured",
+      by: "PO",
+    }) + "\n");
+
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
+    });
+    assert.equal(result.exitCode, 2, result.stderr);
+    assert.match(result.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
+    assert.match(result.stderr, /below the derived feature floor/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
 test("writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route", () => {
   const path = root();
   try {
