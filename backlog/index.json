@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2f3584154cc9439fdfb1430398a0c2b56d9542381561d17ce6f51eaaf1f8527f"
+    "transitionHead": "345c36daf373aa07cd6e979aa0230976af5b5210979e402c687f723186a98313"
   },
   "counts": {
-    "open": 77,
+    "open": 80,
     "in_progress": 1,
     "closed": 577,
     "rejected": 3,
@@ -1706,6 +1706,16 @@
       "closureRepository": "self",
       "closureCommit": "2f3940b63a3009822c6d4b109337c6dfd0ea3ac4",
       "closureEvidence": "backlog/items/2026-08-28-the-codex-runner-needed-three-sessions-for-one-small-feature.md"
+    },
+    {
+      "id": "pipeline.codex-runtime-fixture-assumes-wsl2-in-ci",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-17",
+      "source": "GitHub Actions Verify run 35263935526 for released commit f8cc1b2297b5b6a2ef2d64a2dd43f4a76ec37f31: only codex-sandbox-runtime-tests failed. Local source inspection and the targeted 15/15 regression run identified the WSL2-only fixture assumption.",
+      "deferred": false,
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.codex-sandbox-critic-longterm",
@@ -6378,6 +6388,16 @@
       "closureEvidence": "backlog/evidence/2026-08-11-push-approval-md-already-current.md"
     },
     {
+      "id": "pipeline.push-artifacts-precede-operator-intent",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-17",
+      "source": "evidence/codex-pipeline-session-analysis.md and evidence/pipeline-analysis-claude-session.md, independently compared with the 0.6.2 push-init experience on 2026-09-17.",
+      "deferred": false,
+      "sprint": "nova-b"
+    },
+    {
       "id": "pipeline.push-flow-needs-one-remote-readback-transaction",
       "status": "open",
       "type": "workflow-improvement",
@@ -6806,6 +6826,16 @@
       "closureRepository": "self",
       "closureCommit": "0c979a2722c7a29bf96ed3a02d3f6b9a861a1c21",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-git.mjs"
+    },
+    {
+      "id": "pipeline.release-evidence-promotion-repeats-full-qualification",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-17",
+      "source": "PO release observation, 2026-09-17: the 0.6.2 release/push path generated equivalent evidence under multiple names; independently measured in the 0.6.2 release session against harness/scripts/verify.mjs, scripts/push-init.mjs and scripts/push-prepare.mjs.",
+      "deferred": false,
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.release-preflight-cli-base-commit-not-peeled",

@@ -133,6 +133,7 @@
 | pipeline.codex-restart-context-loss-needs-a-different-approach | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply). |
 | pipeline.codex-runner-has-no-real-support-on-native-windows | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-runner-needed-three-sessions-for-one-small-feature | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova B — PO asked for this to be examined in detail |
+| pipeline.codex-runtime-fixture-assumes-wsl2-in-ci | open | defect | pipeline | nova-b | 2026-09-17 | — | — |
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it. |
@@ -480,6 +481,7 @@
 | pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile | closed | idea | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.push-approval-signature-commands-also-line-wrap | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.push-approval-skill-reference-predates-adr-0061 | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
+| pipeline.push-artifacts-precede-operator-intent | open | workflow-improvement | pipeline | nova-b | 2026-09-17 | — | — |
 | pipeline.push-flow-needs-one-remote-readback-transaction | open | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps. |
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | — | 2026-08-09 | 2026-08-10 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
@@ -511,6 +513,7 @@
 | pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | closed | defect | pipeline | none | 2026-08-27 | — | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.relative-commit-message-file-unreadable-from-a-worktree | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found |
+| pipeline.release-evidence-promotion-repeats-full-qualification | open | requirement | pipeline | nova-b | 2026-09-17 | — | — |
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.remote-side-enforcement-is-the-last-instance | open | requirement | pipeline | nightwing | 2026-08-28 | — | — |
@@ -677,7 +680,7 @@
 
 ## Counts
 
-- open: 77
+- open: 80
 - in_progress: 1
 - closed: 577
 - rejected: 3
