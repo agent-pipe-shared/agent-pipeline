@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "345c36daf373aa07cd6e979aa0230976af5b5210979e402c687f723186a98313"
+    "transitionHead": "c12f5391d4dc301d226685b64dcace1d7f41ea5cc4ebb37faaec2c077869aac5"
   },
   "counts": {
-    "open": 80,
+    "open": 81,
     "in_progress": 1,
     "closed": 577,
     "rejected": 3,
@@ -6057,6 +6057,17 @@
       "closureRepository": "self",
       "closureCommit": "caf9a2e6cd9c28390fc11bc9ccf9792ddcc3b0b8",
       "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+    },
+    {
+      "id": "pipeline.precommit-hook-refusal-diagnostics-are-not-observable-in-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-17",
+      "source": "Direct local reproduction on 2026-09-17: `node plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs` returned 41 pass / 10 fail; every failure was an empty expected diagnostic, while the positive sanctioned verify transition passed.",
+      "deferred": false,
+      "tracking": "Nova B — the registered pre-commit hook suite currently sees expected refusal exit codes but an empty captured diagnostic stream for every negative end-to-end case.",
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",

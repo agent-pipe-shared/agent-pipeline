@@ -456,6 +456,7 @@
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.pre-existing-failure-claims-need-evidence | closed | workflow-improvement | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.pre-push-hook-is-offered-not-installed | closed | defect | pipeline | nova | 2026-08-28 | — | — |
+| pipeline.precommit-hook-refusal-diagnostics-are-not-observable-in-verify | open | defect | pipeline | nova-b | 2026-09-17 | — | Nova B — the registered pre-commit hook suite currently sees expected refusal exit codes but an empty captured diagnostic stream for every negative end-to-end case. |
 | pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | — | 2026-08-11 | — | — |
 | pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.prepared-maintenance-window-dies-at-the-next-commit | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -680,7 +681,7 @@
 
 ## Counts
 
-- open: 80
+- open: 81
 - in_progress: 1
 - closed: 577
 - rejected: 3
