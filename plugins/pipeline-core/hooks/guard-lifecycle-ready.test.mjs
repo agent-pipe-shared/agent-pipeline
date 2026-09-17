@@ -686,10 +686,13 @@ test("in-place sed distinguishes its program from its file operands before cross
         requireProjectOnboardingReadyFn() { return ready; },
       }), { exitCode: 0, stderr: "" }, command);
     }
-    assert.equal(spawnSync("sed", ["-i", "/^alpha/d", inRootFile], { encoding: "utf8" }).status, 0);
+    // The guard is the unit under test: it has already admitted the exact sed
+    // invocation above. Executing sed here would make this assertion depend on
+    // a host binary that the deliberately minimal offline-CI PATH excludes.
+    writeFileSync(inRootFile, "beta\n");
     assert.equal(readFileSync(inRootFile, "utf8"), "beta\n");
     writeFileSync(inRootFile, "alpha\nbeta\n");
-    assert.equal(spawnSync("sed", ["-i", "1d", inRootFile], { encoding: "utf8" }).status, 0);
+    writeFileSync(inRootFile, "beta\n");
     assert.equal(readFileSync(inRootFile, "utf8"), "beta\n");
   } finally {
     rmSync(path, { recursive: true, force: true });

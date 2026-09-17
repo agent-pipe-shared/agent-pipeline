@@ -462,7 +462,10 @@ test("native Critic preflight refuses a next request after same-batch initialize
   const root = realpathSync(mkdtempSync(join(tmpdir(), "native-critic-preflight-reentrant-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const { repo, scratch } = createNativePreflightRepo(root);
-  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { initializeServerRequest: true }) }, { timeoutMs: 100 });
+  // The assertion is protocol rejection, not process-startup speed. A live
+  // Node child can legitimately need more than 100 ms on the parallel CI
+  // runner before it reaches the injected forbidden server request.
+  const result = await runNativeCriticPreflight({ scratchPath: scratch, candidateRoot: repo, codexPath: writeNativePreflightFake(root, { initializeServerRequest: true }) }, { timeoutMs: 1_000 });
   assert.equal(result.status, "unavailable", JSON.stringify(result));
   assert.equal(result.code, "preflight-failed", JSON.stringify(result));
 });
