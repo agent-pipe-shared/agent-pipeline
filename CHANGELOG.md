@@ -94,6 +94,32 @@ once.
   parse code. Nothing admitted became refused or vice versa; four negative
   cases pin that.
 
+### Fixed
+
+- **Codex Greenfield handover material is no longer conditional on a resume
+  card.** A governed `SessionStart` now surfaces the original, private intake
+  checkpoint exactly once when it belongs to the project, including a
+  Greenfield's first-session material when no resume card exists. The resume
+  card's digest and delivery semantics are unchanged; the material remains
+  project-private rather than being written into that card.
+- **Prior Codex session transcripts have an explicit, read-only recovery
+  route.** `runner-transcript-recovery.mjs list` enumerates all
+  metadata-authenticated, prior sessions for the same repository without
+  exposing host paths; its targeted `read` command returns only the selected
+  matching session's raw JSONL, bounded to 8 MiB. Current, foreign, ambiguous,
+  and unknown sessions remain unavailable. `SessionStart` only explains this
+  deliberate list-then-read route and never injects a full transcript.
+- **Pre-push installation state no longer treats a stale managed hook as
+  current.** Startup preflight distinguishes a managed installation whose
+  generated hook/implementation points at an older plugin cache from an
+  installed-and-current one, without mutating it during observation. The
+  sanctioned installer can then upgrade that owned stale installation; absent,
+  foreign, and declined-install cases retain their protections.
+- **Codex pre-tool test shards no longer inherit the parent process's IPC
+  channel.** The shard runner removes inherited fork IPC markers before it
+  starts nested lifecycle command-line checks, so their transport is isolated
+  from the surrounding worker process.
+
 ### Changed
 
 - **Local candidate stamped and green.** Commit `6565190d` carries
