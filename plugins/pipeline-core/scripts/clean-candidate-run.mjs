@@ -204,24 +204,27 @@ function seedPushInitEvidence(repo, worktreePath, oid) {
   validateVerifyEvidence(verify.data, oid, tree);
   const seeded = ["evidence/verify-latest.json"];
   const inputs = [["evidence/verify-latest.json", verify.raw]];
+  let securityCompletenessRequired = false;
   if (securityGateIsActive(worktreePath)) {
     const security = readTrustedJson(repo, "evidence/security-latest.json");
     validateSecurityEvidence(security.data, oid, tree);
     const envelope = readTrustedJson(repo, "evidence/security-latest.v2.json");
     const verdict = readTrustedJson(repo, "evidence/security-latest.v2.verdict.json");
-    // Validate the full v2 pair against the PRIMARY candidate before copying;
-    // the same helper is what the push hook consults after the handoff.
-    if (checkSecurityCompleteness({ projectDir: repo, commit: oid, tree }).length > 0) {
-      fail("CCR-SECURITY-EVIDENCE-MISMATCH", "security evidence is not policy-complete for the detached candidate");
-    }
     inputs.push(
       ["evidence/security-latest.json", security.raw],
       ["evidence/security-latest.v2.json", envelope.raw],
       ["evidence/security-latest.v2.verdict.json", verdict.raw],
     );
     seeded.push(...PUSH_INIT_EVIDENCE.slice(1));
+    securityCompletenessRequired = true;
   }
   for (const [relPath, raw] of inputs) writeSeededArtifact(worktreePath, relPath, raw);
+  // Validate the exact bytes now present in the detached candidate, rather
+  // than a second read of the primary checkout. This is the same shared v2
+  // completeness check the push hook runs later.
+  if (securityCompletenessRequired && checkSecurityCompleteness({ projectDir: worktreePath, commit: oid, tree }).length > 0) {
+    fail("CCR-SECURITY-EVIDENCE-MISMATCH", "security evidence is not policy-complete for the detached candidate");
+  }
   return seeded;
 }
 
