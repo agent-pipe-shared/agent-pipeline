@@ -4,7 +4,9 @@ Use measured receipts when weighing delivery assurance against elapsed time. The
 
 ## Full-Verify envelopes
 
-The table uses a different measurement: whole-run envelope, from a receipt's `startedAt` to `finishedAt`. Each row names its exact candidate and receipt outcome so a clean result is not confused with a red gate.
+The table measures the whole-run envelope, from a receipt's `startedAt` to
+`finishedAt`. Each row names its exact candidate and receipt outcome so a clean
+result is not confused with a red gate.
 
 | Receipt start date (UTC) and candidate commit | Envelope | Result |
 | --- | ---: | --- |
@@ -13,7 +15,9 @@ The table uses a different measurement: whole-run envelope, from a receipt's `st
 | 2026-09-08, `12556ed0ead9ab9ad12cf4892f7886c36b0bc73b` | 595.413s | 515/517 |
 | 2026-09-08, `37aa24fc327b910e6b74ba26bdcb8e1601605e7a` | 697.804s | 514/517 |
 
-The last two rows are red gates, so neither is a performance improvement. No verified 4.5-minute full-gate result appeared in the bounded examined receipt set. That statement is limited to this set; it does not claim that no such run has ever existed. Timing variation is observational here: do not attribute it to a particular code change or host condition without a controlled experiment.
+The last two rows are red gates, so neither is a performance improvement.
+Timing variation is observational here: do not attribute it to a particular
+code change or host condition without a controlled experiment.
 
 ## Historical lane eviction
 

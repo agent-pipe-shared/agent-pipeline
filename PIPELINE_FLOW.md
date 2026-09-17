@@ -83,7 +83,7 @@ flowchart TD
     GOV --> C
     C --> CR[Critic result and disposition]
     CR -->|correction needed| RC
-    CR -->|clear or disposition recorded| CL
+    CR -->|clear or disposition recorded| CL[Close feature lifecycle]
     CL --> REL{Release phase declared?}
     REL -->|yes| RP[Release evidence and human promotion gate]
     REL -->|no| DONE[Closed change]
@@ -242,7 +242,7 @@ ordered runner binding, restart, classification, and adoption procedure.
 
 ## Support boundary and current scope
 
-This guide describes the released V3 process and its configuration points. It does
+This guide describes the V3 process and its configuration points. It does
 not turn a repository rule into host-wide enforcement, a governance path into IAM,
 a requested route into observed model identity, or a machine gate into proof of
 every semantic property.
@@ -352,7 +352,7 @@ flowchart TD
     GOV --> C
     C --> CR[Critic-Ergebnis und Disposition]
     CR -->|Korrektur nötig| RC
-    CR -->|klar oder Disposition festgehalten| CL
+    CR -->|klar oder Disposition festgehalten| CL[Feature-Lifecycle abschließen]
     CL --> REL{Release-Phase deklariert?}
     REL -->|ja| RP[Release-Nachweis und menschliches Promotion-Gate]
     REL -->|nein| DONE[Änderung abgeschlossen]
@@ -481,7 +481,7 @@ Klassifizierung und die Übernahme eines Projekts.
 
 ## Supportgrenze und aktueller Scope
 
-Dieser Leitfaden beschreibt den veröffentlichten V3-Prozess und seine
+Dieser Leitfaden beschreibt den V3-Prozess und seine
 Konfigurationspunkte. Er macht aus einer Repository-Regel keine hostweite
 Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
 keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis

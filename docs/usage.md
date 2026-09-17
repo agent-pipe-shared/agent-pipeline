@@ -15,12 +15,15 @@ follow the action as returned and replace only its declared human-input
 placeholders. Do not rebuild a private sequence of onboarding commands.
 
 The ordinary human inputs are purposeful: project and author details, the
-first trust-anchor choice (an existing key is valid, as is a newly created
-one), the project/intake answers, and a plan decision where the selected
-profile requires it. A real full Verify command is required before release,
+project/intake answers, and a plan decision where the selected profile requires
+it. A real full Verify command is required before release,
 while new projects begin with the shipped, explicitly labelled baseline. The Driver retains approved
 onboarding context across its restart boundary so the next session does not
 need to rediscover it.
+
+A trust anchor is not a routine onboarding input. Prepare one only when the
+project deliberately configures a human decision gate that requires the
+signature path; see [the one-time human-approval key setup](../SETUP.md#human-approval-key-one-time-setup).
 
 A refusal, recovery result, or restart boundary is also an action contract.
 Use its named public recovery step; do not edit generated state or guard files
@@ -102,6 +105,15 @@ review admission, isolation, and correction/review limits.
 
 ## Choose the human-approval strength deliberately
 
+Before using this selector, check that the installed runtime recognizes it.
+Until it does, keep the action-local settings documented by
+[ADR-0056](adr/0056-push-approval-mode.md) (`gates.push_approval`, and where
+supported `gates.reconcile_approval`). They remain `signature` by default. Do
+not add the new key and assume it has a global effect until configuration
+validation and runtime readback show that the installed version supports it.
+See [ADR-0076](adr/0076-global-chat-attributed-unattested-approval-mode.md) for
+the full decision and migration boundary.
+
 The optional repository-wide selector is `gates.human_approval` in
 `pipeline.user.yaml`:
 
@@ -122,16 +134,6 @@ Do not use `chat` for security-sensitive, regulated, production-critical,
 financially consequential, or otherwise valuable repositories. Tests, action
 bindings, and other safety rules still apply, but none turn the chat answer
 into an attestation.
-
-This is a forward-compatible policy, not an assertion about every installed
-plugin. Before an installed runtime recognizes `gates.human_approval`, retain
-the action-local settings documented by [ADR-0056](adr/0056-push-approval-mode.md)
-(`gates.push_approval`, and where supported `gates.reconcile_approval`). They
-remain `signature` by default. Do not add the new key and assume it has a
-global effect until configuration validation and runtime readback show that the
-installed version supports it. See
-[ADR-0076](adr/0076-global-chat-attributed-unattested-approval-mode.md) for the
-full decision and migration boundary.
 
 ## Private review export
 

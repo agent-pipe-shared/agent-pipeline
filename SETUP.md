@@ -317,13 +317,17 @@ generated runtime files.
 ## Optional advanced setup
 
 These additions are not part of routine onboarding. Use them only when the
-project's declared operating model requires them.
+project’s declared operating model requires them.
 
 ### Human-approval key (one-time setup)
 
-Routine implementation, tests, and Critic review remain agent work after the
-approved plan. When a project configures a real human decision gate, create
-the portable external Ed25519 key once:
+Routine onboarding does not require a key: project and author details,
+project/intake answers, and any required plan decision are sufficient. Routine
+implementation, tests, and Critic review remain agent work after the approved
+plan. Create the portable external Ed25519 key once only when a project
+configures a real human decision gate that uses the signature path. The
+[onboarding guide](docs/usage.md#start-or-adopt-a-project) distinguishes this
+optional setup from ordinary onboarding:
 
 ```sh
 node "<absolute-plugin-root>/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"

@@ -13,4 +13,11 @@ The optional audit and evidence CLIs are explicit local entry points. They do no
 
 ## A safe review path
 
-Start with the Feature Package and its candidate-bound Verify receipt. Validate the package before building a bundle, keep the manifest and source records that an audit needs, and use the detailed pages above for the exact local CLI contracts. Keep the human approval record and any external change record in their own authority boundaries; an audit artifact does not replace either.
+First complete the planned delivery flow and prepare the Feature Package in
+`specs/<feature-id>/`; [Canonical artifact topology](artifact-topology.md)
+explains the required package contents and bindings. Then start with that
+package and its candidate-bound Verify receipt. Validate the package before
+building a bundle, keep the manifest and source records that an audit needs,
+and use the detailed pages above for the exact local CLI contracts. Keep the
+human approval record and any external change record in their own authority
+boundaries; an audit artifact does not replace either.
