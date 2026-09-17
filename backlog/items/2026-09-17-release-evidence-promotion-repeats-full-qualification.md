@@ -62,6 +62,65 @@ checkout.
 - Detached-candidate Verify and Security both write durable evidence to the
   canonical primary evidence root without relying on manual second commands.
 
+## Prepared decision sketch — not an implementation authorization
+
+The following is a bounded design input for the required ADR/review.  It does
+not alter any release or push gate, and it does not authorize reuse by itself.
+
+### One source qualification, one record-only promotion
+
+Let **S** be the substantive commit that was actually verified, and **R** a
+later commit that only records/reconciles that qualification.  A promotion
+envelope must contain all of the following immutable bindings:
+
+- `source`: S's full commit and tree OIDs;
+- `record`: R's full commit and tree OIDs;
+- `sourceQualification`: Verify policy digest, selected-suite inventory,
+  exact receipt digests, environment/classification digest and all declared
+  verification inputs for S;
+- `recordOnlyDelta`: the complete S..R name-status set and a digest of the
+  before/after blobs, checked against a narrow, versioned allowlist of
+  evidence/reconciliation paths;
+- `modeInclusion`: the named policy rule which says that a stronger completed
+  release mode contains a named weaker push requirement, plus the digest of
+  that rule; and
+- `securityEvidence`: canonical evidence-root references emitted by the same
+  candidate driver, never an unbound shell-side afterthought.
+
+The validator must recompute every binding from Git objects and the canonical
+evidence root.  It must reject an untracked change, a source/policy/input or
+environment mismatch, an unknown record-only path, absent or stale source
+receipt, and any attempted R→S reversal.  In particular, a changed test
+selection or a newly introduced policy rule always requires a new source
+qualification; the envelope is not a waiver.
+
+### Mode inclusion is a partial order, never a label comparison
+
+The first implementation should expose a small policy table rather than infer
+strength from names.  Only an explicit `release-satisfies-push` edge may
+permit reuse, and only after it proves that the push requirements are a strict
+subset of the bound release requirements for the same S.  No `push-satisfies-
+release` edge exists.  A missing, malformed or changed table is fail-closed.
+
+### Operator boundary and output
+
+Read-only preflight may create a preview that lists the exact receipts to be
+reused, any new work required, and the one remaining external action.  It may
+not create a push-capable artifact.  The action-producing command consumes
+that preview only after explicit operator intent and then asks the PO only for
+the external-key signature.  The driver returns one aggregated result rather
+than separate Verify, security and push readiness narratives.
+
+### Minimum adversarial matrix
+
+Before an implementation is proposed, pin at least these cases: a pure
+allowlisted S→R evidence record; an extra source-file change; a changed Verify
+policy; a receipt from a different S; a changed environment classification;
+a release→push inclusion; a forbidden push→release inclusion; a missing
+canonical Security record; and a detached-worktree source whose evidence is
+written/read from the canonical root.  Each denial must name the failed
+binding without printing protected evidence content.
+
 ## Triage
 
 - **Decision:** accepted by the PO as Nova-B follow-up; detailed security
