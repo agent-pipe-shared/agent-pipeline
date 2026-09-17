@@ -64,7 +64,10 @@ function exact(value, keys) {
 }
 function gitText(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5_000 });
-  if (result.error || result.status !== 0) fail("SCF-GIT");
+  // A contained host can expose an EPERM diagnostic after the child has
+  // already completed with status 0. Preserve Git's exit status as the
+  // authority, otherwise finalization rejects a successful observation.
+  if (result.status !== 0) fail("SCF-GIT");
   return String(result.stdout).trim();
 }
 function controlRootFor(repoRoot) {

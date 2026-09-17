@@ -121,7 +121,11 @@ function gitOrNull(root, args) {
     timeout: 10_000,
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.error || result.status !== 0) return null;
+  // Some contained runners report an EPERM diagnostic after a child has
+  // completed normally. The exit status remains the authoritative process
+  // outcome; treating that diagnostic as a failed Git read makes a valid
+  // read-only Critic route unavailable solely because of its host adapter.
+  if (result.status !== 0) return null;
   return String(result.stdout).trim();
 }
 
@@ -149,7 +153,7 @@ function emptyTreeOid(root) {
     timeout: 10_000,
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.error || result.status !== 0) fail("CDP-GIT", "Git observation failed for hash-object.");
+  if (result.status !== 0) fail("CDP-GIT", "Git observation failed for hash-object.");
   return String(result.stdout).trim();
 }
 
@@ -183,7 +187,7 @@ function candidateText(root, candidate, path) {
     timeout: 10_000,
     maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
   });
-  if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  if (result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
   return String(result.stdout);
 }
 
@@ -195,7 +199,7 @@ function candidateBytes(root, candidate, path) {
     timeout: 10_000,
     maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
   });
-  if (result.error || result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
+  if (result.status !== 0) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
   return result.stdout;
 }
 

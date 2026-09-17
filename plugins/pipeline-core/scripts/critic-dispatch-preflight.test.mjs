@@ -566,6 +566,23 @@ test("injected Git failures cover partial candidate inventory manifest governanc
   }
 });
 
+test("a successful Git exit remains admissible when a contained host adds an EPERM diagnostic", (t) => {
+  const fx = captureFixture(t), originalSpawn = childProcess.spawnSync;
+  let injected = 0;
+  withBuiltinMocks(t, [[childProcess, "spawnSync", (command, args, options) => {
+    const result = originalSpawn(command, args, options);
+    if ((args[2] === "rev-parse" && args[3] === `${fx.base}^{commit}`) || args[2] === "show") {
+      injected += 1;
+      return { ...result, error: new Error("spawnSync git EPERM") };
+    }
+    return result;
+  }]], () => {
+    const result = preflightCriticDispatch(input(fx));
+    assert.equal(result.status, "packet-ready");
+  });
+  assert.ok(injected > 1);
+});
+
 test("injected evidence containment refusal is captured without rerunning any guard", (t) => {
   const fx = captureFixture(t);
   withBuiltinMocks(t, [[path, "relative", () => ".."]], () => {
