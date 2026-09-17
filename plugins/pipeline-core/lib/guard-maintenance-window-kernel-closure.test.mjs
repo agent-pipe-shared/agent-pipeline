@@ -181,13 +181,15 @@ const DYNAMIC_IMPORT_EDGES = {
   "plugins/pipeline-core/lib/consumer-verify.mjs": [
     "../scripts/consumer-verify-check.mjs",
   ],
-  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these four via
+  // pre-push-hook-install.mjs's evaluateOneCommit() dynamically imports these six via
   // `pathToFileURL(join(PLUGIN_LIB_DIR, "<name>")).href` -- PLUGIN_LIB_DIR is an
   // install-time-bound absolute path, not a literal specifier the static scanner can read.
   "plugins/pipeline-core/scripts/pre-push-hook-install.mjs": [
     "../lib/manifest.mjs",
     "../lib/verify-evidence-path.mjs",
     "../lib/security-completeness-gate.mjs",
+    "../lib/push-destination-policy.mjs",
+    "../lib/checkpoint-push-audit.mjs",
     "../lib/project-authority.mjs",
   ],
   // NVA-CF-GMWKC-RETRY: pre-commit-hook-install.mjs's renderImpl() template-string
