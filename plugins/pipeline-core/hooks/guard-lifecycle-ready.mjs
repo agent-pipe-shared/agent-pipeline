@@ -34,7 +34,7 @@ import {
 import { observePipelineStartPreflight } from "../scripts/pipeline-start-preflight.mjs";
 import { checkPlanningAdoptionDisposition } from "../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
-import { deriveMinimumRigor, inferInputsFromRepo, loadPolicy } from "../scripts/rigor-floor.mjs";
+import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../scripts/rigor-floor.mjs";
 import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabilities.mjs";
 // NVA-GF-COPYSAFE/NVA-W12-COPYSAFE: the shared argv-native renderer builds
 // every human ceremony step below. The default denial is therefore bounded
@@ -374,6 +374,42 @@ function activeFeaturePlanningScope(root, dependencies = {}) {
   }
 }
 
+/**
+ * Derive the implementation surface from the writer-owned, PO-bound plan.
+ *
+ * A lifecycle transition must not substitute the currently dirty working tree
+ * for the plan: a clean tree is normal immediately before the first dispatch.
+ * The grammar is deliberately conservative and repository-relative.  A plan
+ * which names no governed implementation path is not evidence of a small
+ * change, so callers receive null and fail closed rather than silently
+ * evaluating the Markdown plan file itself.
+ */
+function activeFeaturePlanningSurface(root, dependencies = {}) {
+  const scope = (dependencies.activeFeaturePlanningScopeFn ?? activeFeaturePlanningScope)(root, dependencies);
+  if (scope === null || isAbsolute(scope) || scope.includes("\\") || scope.split("/").some((part) => part === "" || part === "." || part === "..")) {
+    return null;
+  }
+  const plan = resolve(root, scope);
+  if (relative(root, plan).startsWith(`..${sep}`) || relative(root, plan) === "") return null;
+  let source;
+  try {
+    source = (dependencies.readFileSyncFn ?? readFileSync)(plan, "utf8");
+  } catch {
+    return null;
+  }
+  const paths = new Set();
+  const token = /(?:^|[\s`"'([{])((?:\.claude|architecture|backlog|docs|governance|harness|plugins|policies|project|roles|schemas|specs|templates)\/[A-Za-z0-9_@+./-]+)/gmu;
+  for (const match of source.matchAll(token)) {
+    const candidate = match[1].replace(/[),.;:\]}`]+$/u, "");
+    if (candidate.length > 0 && !candidate.split("/").some((part) => part === "" || part === "." || part === "..")) {
+      paths.add(candidate);
+    }
+  }
+  return paths.size > 0
+    ? { planPath: scope, paths: [...paths].sort() }
+    : null;
+}
+
 /** Read the PO-bound lifecycle profile; never accept a caller-provided value. */
 function activeFeatureSelectedProfile(root, dependencies = {}) {
   try {
@@ -423,14 +459,23 @@ function architectureAdoptionAuthorityVerdict(root, command, dependencies = {}) 
  */
 function architectureFitnessAuthorityVerdict(root, command, dependencies = {}) {
   if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
-  const scope = (dependencies.activeFeaturePlanningScopeFn ?? activeFeaturePlanningScope)(root, dependencies);
-  if (scope === null) return null; // Adoption gate above owns the invalid-state denial.
+  const surface = (dependencies.activeFeaturePlanningSurfaceFn ?? activeFeaturePlanningSurface)(root, dependencies);
+  if (surface === null) {
+    return verdict(
+      2,
+      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+        + `${ARCHITECTURE_FITNESS_DENIAL_CODE}: the active plan has no valid declared implementation surface.\n`
+        + "Repair the PO-bound plan path or declare repository-relative implementation paths before requesting implementation authority.\n",
+    );
+  }
   let fitness;
   try {
     fitness = (dependencies.evaluateArchitectureFitnessFn ?? evaluateArchitectureFitness)({
       rootDir: root,
       mode: "planning",
-      candidatePaths: [scope],
+      candidatePaths: surface.paths,
+      files: surface.paths,
+      touchedContracts: surface.paths.filter(isContractPath),
     });
   } catch {
     fitness = null;
@@ -461,9 +506,35 @@ function minimumRigorAuthorityVerdict(root, command, dependencies = {}) {
         + "Submit and approve a plan with mini, feature, or epic profile before requesting implementation authority.\n",
     );
   }
+  const surface = (dependencies.activeFeaturePlanningSurfaceFn ?? activeFeaturePlanningSurface)(root, dependencies);
+  if (surface === null) {
+    return verdict(
+      2,
+      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+        + `${MINIMUM_RIGOR_DENIAL_CODE}: the active plan has no valid declared implementation surface.\n`
+        + "Repair the PO-bound plan path or declare repository-relative implementation paths before requesting implementation authority.\n",
+    );
+  }
   let derived;
   try {
     const inputs = (dependencies.inferRigorInputsFn ?? inferInputsFromRepo)(root);
+    const actualPaths = Array.isArray(inputs.actualPaths?.value) ? inputs.actualPaths.value : [];
+    const observedPaths = [...new Set([...surface.paths, ...actualPaths])];
+    inputs.plannedPaths = {
+      value: surface.paths,
+      status: "available",
+      sourceContract: "pipeline.po-bound-plan-surface.v1",
+    };
+    inputs.protectedTouches = {
+      value: observedPaths.some(isProtectedPath),
+      status: "available",
+      sourceContract: "pipeline.po-bound-plan-surface.v1+pipeline.protected-baseline.v1",
+    };
+    inputs.contractDeltas = {
+      value: observedPaths.some(isContractPath),
+      status: "available",
+      sourceContract: "pipeline.po-bound-plan-surface.v1+pipeline.contract-freeze.v1",
+    };
     inputs.selectedProfile = {
       value: selectedProfile,
       status: "available",

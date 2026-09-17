@@ -439,6 +439,8 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     mkdirSync(join(path, "project"), { recursive: true });
+    mkdirSync(dirname(join(path, planPath)), { recursive: true });
+    writeFileSync(join(path, planPath), "Planned implementation: `plugins/pipeline-core/scripts/example.mjs`.\n");
     writeFileSync(join(path, "project", "pipeline-state.json"), JSON.stringify({
       schema: "pipeline.state.v0",
       activeFeature: { id: "d4-authority", planPath, phase: "design" },
@@ -468,12 +470,18 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
       confidence: "measured",
       by: "PO",
     }) + "\n");
+    let observedPlanningFitness;
     const allowed = evaluateLifecycleReadyGuard(bash(command), {
       projectDir: path,
       requireProjectOnboardingReadyFn: readyStub,
-      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
+      evaluateArchitectureFitnessFn(input) {
+        observedPlanningFitness = input;
+        return { overallStatus: "pass" };
+      },
     });
     assert.deepEqual(allowed, { exitCode: 0, stderr: "" });
+    assert.deepEqual(observedPlanningFitness.candidatePaths, ["plugins/pipeline-core/scripts/example.mjs"]);
+    assert.deepEqual(observedPlanningFitness.files, ["plugins/pipeline-core/scripts/example.mjs"]);
 
     const nonGreenFitness = evaluateLifecycleReadyGuard(bash(command), {
       projectDir: path,
@@ -529,6 +537,49 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
     });
     assert.equal(wrongScope.exitCode, 2, wrongScope.stderr);
     assert.match(wrongScope.stderr, /outside approved architecture adoption scope/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("implementation authority derives rigor from the PO-bound plan surface while the worktree is clean", () => {
+  const path = root();
+  const planPath = "specs/plan-surface/prd.md";
+  const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(dirname(join(path, planPath)), { recursive: true });
+    mkdirSync(join(path, "project"), { recursive: true });
+    mkdirSync(join(path, "architecture"), { recursive: true });
+    writeFileSync(join(path, planPath), "Planned implementation: `plugins/pipeline-core/hooks/guard-git.mjs`.\n");
+    writeFileSync(join(path, "project", "pipeline-state.json"), JSON.stringify({
+      schema: "pipeline.state.v0",
+      activeFeature: { id: "plan-surface", planPath, phase: "design" },
+      planSubmission: { profile: "mini" },
+      planApproved: true,
+    }) + "\n");
+    writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
+      schema: "pipeline.adoption-state.v1",
+      state: "approved-scoped",
+      scope: "specs/plan-surface/",
+      decidedAt: "2026-09-15T00:00:00.000Z",
+      expiresAt: null,
+      reviewDate: null,
+      decisionRef: "PO-TEST-PLAN-SURFACE",
+      rationale: "Test-only scoped adoption decision",
+      coverageClass: "evaluated",
+      confidence: "measured",
+      by: "PO",
+    }) + "\n");
+
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
+    });
+    assert.equal(result.exitCode, 2, result.stderr);
+    assert.match(result.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
+    assert.match(result.stderr, /below the derived epic floor/u);
   } finally {
     rmSync(path, { recursive: true, force: true });
   }
