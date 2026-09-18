@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "release-063-r4",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "readme-german-document-split",
+      "class": "reordering",
+      "status": "no-change",
+      "resolutionCommit": null
+    },
+    {
+      "id": "flow-german-document-split",
+      "class": "reordering",
+      "status": "no-change",
+      "resolutionCommit": null
+    },
+    {
+      "id": "setup-runner-summary",
+      "class": "cut",
+      "status": "no-change",
+      "resolutionCommit": null
+    }
+  ]
+}
