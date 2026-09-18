@@ -5,6 +5,17 @@ reviewable, traceable, and measurable. It turns a change into a bounded task,
 machine evidence, independent review, and a durable record that a team can
 inspect later.
 
+**At a glance, Agent-Pipeline helps you to:**
+
+- turn an idea or change request into a scoped delivery path with checkable acceptance criteria;
+- split implementation into bounded, fresh-context tasks instead of one opaque agent session;
+- run configured Verify and security checks against the exact candidate before delivery;
+- apply your project's guidelines, policies, and Git/write boundaries where they are configured;
+- obtain an independent Critic review before a human makes the go/no-go decision;
+- keep human approval explicit for plans and consequential external actions, rather than inferring it from evidence;
+- retain candidate-bound evidence, review records, and offline audit bundles for later inspection;
+- calibrate rigor, roles, and model effort to the scope and stakes of each piece of work.
+
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
 > **Newcomer path:** Read this page, then follow [SETUP](SETUP.md) for the
@@ -177,6 +188,17 @@ Ein versioniertes Operating Model für Teams, die agentische Lieferung
 prüfbar, nachvollziehbar und messbar machen müssen. Es formt eine Änderung zu
 einer begrenzten Aufgabe, Maschinenevidenz, unabhängiger Prüfung und einem
 dauerhaften, später einsehbaren Nachweis.
+
+**Kurz gesagt hilft dir Agent-Pipeline dabei:**
+
+- aus einer Idee oder Änderungsanfrage einen begrenzten Lieferweg mit prüfbaren Akzeptanzkriterien zu machen;
+- die Umsetzung in klar eingegrenzte Aufgaben mit frischem Kontext zu teilen, statt alles einer undurchsichtigen Agentensitzung zu überlassen;
+- konfigurierte Verify- und Sicherheitsprüfungen gegen genau den Kandidaten vor der Lieferung auszuführen;
+- die Richtlinien, Policies sowie Git-/Schreibgrenzen deines Projekts dort anzuwenden, wo sie konfiguriert sind;
+- eine unabhängige Critic-Prüfung einzuholen, bevor ein Mensch Go oder No-Go entscheidet;
+- menschliche Freigaben für Pläne und folgenreiche externe Aktionen explizit zu halten, statt sie aus Evidenz abzuleiten;
+- kandidatengebundene Evidenz, Review-Nachweise und Offline-Audit-Bundles für spätere Prüfung vorzuhalten;
+- Rigor, Rollen und Modellaufwand an Umfang und Risiko jedes Arbeitspakets anzupassen.
 
 > **Einstieg für Neue:** Lies diese Seite und folge dann [SETUP](SETUP.md) für
 > den normalen Consumer-Ablauf, nutze danach [PIPELINE_FLOW](PIPELINE_FLOW.md)
