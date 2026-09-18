@@ -1,20 +1,20 @@
 {
   "schema": "pipeline.doc-reader-binding-record.v1",
-  "reviewedCommit": "e9f4de2ab088ce7e5670f533f0a8f8f7761aa56f",
-  "reviewedTree": "704048c130726fdfc33752f4e6e9996badebd230",
-  "docsetSha256": "54e3ed7746151131d0510e3f20369d251c911fe010a108e64739b89b9a4ec045",
+  "reviewedCommit": "a5a425081ce37c6f5f8e2961ae393b6cf76efcf4",
+  "reviewedTree": "c463951817e1c14529a14f6f9d2f8518287b25c4",
+  "docsetSha256": "54dd83f5a2d464dff6ec7a4e627c52025c65a6beae328585fb906b661d259326",
   "coverage": [
-    { "path": "PIPELINE_FLOW.md", "sha256": "0d3ce32c00d1268671952838643a9dd2599ca61b15f4f5150a45d64dbdb9c9ec" },
-    { "path": "README.md", "sha256": "252c8705ce5ec918cd8ca882bb7512cc85d74b21daeef60621536901b1e9cc4d" },
+    { "path": "PIPELINE_FLOW.md", "sha256": "0ac4cc46fe8fe698cb7af2d1035f746ab34b6377e5877bf4129472b41ba9eb16" },
+    { "path": "README.md", "sha256": "b1f359c6a7e153e09f3b4323396c81ecf734682fd341b15e0706dcff30f8e724" },
     { "path": "SETUP.md", "sha256": "0153eae72a0b4f5877d4c9264466666df63a8d87e4eb631effb6f32009c13af8" },
     { "path": "docs/README.md", "sha256": "264a8fd3ea8ddb7b393599dcdca36736a8944938e77e0cc373d1d59714f8e65f" },
     { "path": "docs/audit-and-evidence.md", "sha256": "e76d1f5d3f3787bbd97bee337fad07c4de93e8c099c0d61e10e42fcebceba51b" },
     { "path": "docs/cost-and-measurement.md", "sha256": "87b60aa9e34920764899469b0f5058816a8960706ffd9183b19cea5619869422" },
     { "path": "docs/enforcement.md", "sha256": "9f2909b05bb669285421de4dd4d48c6e27ebb55e5c3aac7e270c1213ab4f214b" },
-    { "path": "docs/overview.md", "sha256": "03c7e1589841ac67fc1e233dc55907867a09ff26f8a5ec958af298b63fec1449" },
+    { "path": "docs/overview.md", "sha256": "1e2b1670255fbf328324090a3ace12ed77d886f12c61410c5113e86f3019341c" },
     { "path": "docs/parallel-work.md", "sha256": "7f934d56637d97d59fe90034b7ce5524b7651d4aff0156cad2e98c92b92e9a38" },
     { "path": "docs/security-controls.md", "sha256": "c3e11b50bb798a68d0821931180ac153f403efec27934ae7cac44457dd72715c" },
-    { "path": "docs/usage.md", "sha256": "3562886c01a256a748841dcb1f15c7d9d796ea14e1ad991b55f1b2997cd2e74a" }
+    { "path": "docs/usage.md", "sha256": "8be2fa05c48ed39a0e2148e2d91722c78c2719146d17dc2a8c222b2d07c3d519" }
   ],
   "inputs": {
     "capabilityInventorySha256": "3c0d07557a53fb3dd1dfa6e1b854a32b11289e9afc3665200a73df3d54b561c9",
@@ -22,15 +22,15 @@
     "readerProtocolSha256": "9347e59408878daedf01f62b2ae1381d182d0bbdcaee47328dc10a8e9d8fad17"
   },
   "phaseOne": {
-    "path": "specs/sprint-nova-epic/evidence/reader-review/phase-one/nva-062-release-round-5.md",
-    "sha256": "33ad940586e5d39ba5cb1cb3faee4981594e176a4599ed977dd106e1b8fb9831"
+    "path": "specs/sprint-nova-epic/evidence/reader-review/phase-one/release-063-r4.md",
+    "sha256": "7d3dd34ca3b52108700673333214f44d7f24ba28889a240496ea7c331a571f7e"
   },
   "phaseTwo": {
-    "path": "specs/sprint-nova-epic/evidence/reader-review/phase-two/nva-062-release-round-5.md",
-    "sha256": "33ad940586e5d39ba5cb1cb3faee4981594e176a4599ed977dd106e1b8fb9831"
+    "path": "specs/sprint-nova-epic/evidence/reader-review/phase-two/release-063-r4.md",
+    "sha256": "5dbddc149478be72d4472f0bb47229ae533a46603b6fdbff21020eab2aeb8080"
   },
   "disposition": {
-    "path": "specs/sprint-nova-epic/evidence/reader-review/disposition/nva-062-release-round-5.json",
-    "sha256": "ac142c3206d602db6b5bb87906136f1e16bfbd9923743cfa14b0fbc79ee8a4da"
+    "path": "specs/sprint-nova-epic/evidence/reader-review/disposition/release-063-r4.json",
+    "sha256": "87279b50b74969ee92b932a865b70e10a1b73e93b9fb7484ecd9326e687e614c"
   }
 }
