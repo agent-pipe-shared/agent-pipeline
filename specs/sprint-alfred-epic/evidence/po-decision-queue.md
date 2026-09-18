@@ -22,6 +22,31 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## PO decisions
 
+### Latest continuation readback — 2026-09-18, 20:46 UTC
+
+This entry supersedes the current-status wording below, not its historical evidence.
+Clean candidate `eea18fe8475f5a0c9d8ad95046313510b7273d89` completed
+`verify-1789764159371-d2cb98594ff4324c`: **572/573 passed**, exit 1.
+Command: `node harness/scripts/verify.mjs --mode critic --base 55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1 --no-reuse`.
+Security passed; onboarding completion passed 283/283 with no skips.
+Machine evidence: `evidence/verify-1789764159371-d2cb98594ff4324c.json`.
+Terminal SHA-256: `a43a3ebbd6942578574ad3aa3964d41d547e3fdfc12507b932ba7dc8c5edaa2e`.
+
+**Collected course decision: truthful aborted-dispatch representation.**
+The sole failure is `critic-skip-coverage-check` on the interrupted local
+`evidence/dispatch-record-ALF-SCANNER-PREP.json`. Its missing `resultSha256`
+is not the only issue: an in-memory real incident digest then exposes
+`record-commit-binding`, because terminal records require a final commit.
+This task made no commit. Recommendation: define a narrow audited aborted/no-delivery
+contract and its review ordering; alternative: retain the failed gate pending that work.
+Do not invent commits, downgrade the schema, hide the record, or assert Critic clearance.
+Evidence: `plugins/pipeline-core/lib/dispatch-record.mjs` and the run's coverage log.
+Deferral blocks green Verify and the requested independent 1+1 review, not read-only preparation.
+
+**Review preparation remains open:** `docs/state.md` mixes operative rules with prior
+Critic results; `harness/review-protocol.md` §2.2 forbids excluding mixed content or
+passing those verdicts to a fresh reviewer. No full-scope review or filtering is claimed.
+
 ### Current full Verify — completed, two pending gates, 2026-09-18
 
 Candidate `f9649b0b1cb6a628320e6161a920af15bb143e5b`, tree
