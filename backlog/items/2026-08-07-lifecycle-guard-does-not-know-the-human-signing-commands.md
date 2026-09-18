@@ -103,3 +103,21 @@ but it does not substitute for Direction #2 (deriving the list from the
 CLI's actual command set, or a drift-detection check), which remains
 genuinely deferred to Sprint Alfred and is the reason this item's
 `status:` stays **open**.
+
+## Implementation and rollback, 2026-09-18
+
+The narrow drift-prevention slice is now implemented in `bf05188b`:
+`po-human-approval.mjs` exports its attended-signing subset, and
+`guard-lifecycle-ready.mjs` imports that subset instead of restating command
+names.  The catalog also includes `approve-fork-disposition`, which reaches the
+same human signing route but was absent from the old guard-local list.  Public
+`prepare*` and `verify*` commands are deliberately not part of the catalog.
+
+**Rollback:** revert `bf05188b` as one commit.  That restores the prior
+six-command guard-local classification without altering keys, proofs, request
+artifacts, external directories, or a remote.  Before restamping any rollback
+candidate, run `po-human-approval.test.mjs` and
+`guard-lifecycle-ready.test.mjs`; confirm the existing public prepare/verify
+and attended-signing cases retain their prior admission boundary.  The rollback
+is a temporary recovery only: it reintroduces the catalog-drift risk and must
+not be described as resolving Direction #2.
