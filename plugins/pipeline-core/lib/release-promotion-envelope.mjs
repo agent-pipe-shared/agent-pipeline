@@ -25,6 +25,18 @@ export const RELEASE_PROMOTION_DEFAULT_PATH = "evidence/release-promotion-latest
 export const MODE_INCLUSION_RULE = "release-satisfies-push";
 export const MODE_INCLUSION_RULE_SHA256 = createHash("sha256").update(MODE_INCLUSION_RULE).digest("hex");
 
+const SOURCE_QUALIFICATION_KEYS = Object.freeze([
+  "mode",
+  "execution",
+  "verifySelectionSha256",
+  "ruleSha256",
+  "changedInputSha256",
+  "selectedSuiteIds",
+  "omittedSuiteIds",
+]);
+const SHA256 = /^[a-f0-9]{64}$/u;
+const SUITE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+
 export const RECORD_ONLY_PATH_PATTERNS = Object.freeze([
   /^evidence\/.*$/u,
   /^backlog\/evidence\/.*$/u,
@@ -57,6 +69,18 @@ function canonicalJson(value) {
 
 export function digestReleasePromotionEnvelope(value) {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+function validateSourceQualification(qualification) {
+  if (!qualification || typeof qualification !== "object" || Array.isArray(qualification)
+      || Object.keys(qualification).length !== SOURCE_QUALIFICATION_KEYS.length
+      || Object.keys(qualification).some((key) => !SOURCE_QUALIFICATION_KEYS.includes(key))
+      || qualification.mode !== "release" || qualification.execution !== "full"
+      || ![qualification.verifySelectionSha256, qualification.ruleSha256, qualification.changedInputSha256].every((digest) => typeof digest === "string" && SHA256.test(digest))
+      || !Array.isArray(qualification.selectedSuiteIds) || qualification.selectedSuiteIds.length === 0
+      || !Array.isArray(qualification.omittedSuiteIds) || qualification.omittedSuiteIds.length !== 0) return false;
+  return qualification.selectedSuiteIds.every((suiteId, index) => SUITE_ID.test(suiteId)
+    && (index === 0 || qualification.selectedSuiteIds[index - 1] < suiteId));
 }
 
 function runGit(args, dir, deps = {}) {
@@ -115,6 +139,9 @@ export function createReleasePromotionEnvelope({ repoDir, sourceCommit, recordCo
   if (!sourceOid || !sourceTree || !recordOid || !recordTree) {
     return { ok: false, reason: "commit-resolution-failed" };
   }
+  if (sourceOid === recordOid) {
+    return { ok: false, reason: "source-equals-record" };
+  }
 
   // S must be strict ancestor of R
   const spawn = deps.spawn ?? deps.spawnSync ?? spawnSync;
@@ -156,6 +183,9 @@ export function createReleasePromotionEnvelope({ repoDir, sourceCommit, recordCo
     selectedSuiteIds: selection.selectedSuiteIds,
     omittedSuiteIds: selection.omittedSuiteIds,
   };
+  if (!validateSourceQualification(sourceQualification)) {
+    return { ok: false, reason: "verify-evidence-not-full-release" };
+  }
 
   const modeInclusion = {
     rule: MODE_INCLUSION_RULE,
@@ -217,6 +247,12 @@ export function validateReleasePromotionEnvelope(envelope, { repoDir, targetBoun
   if (!recordOid || recordOid !== envelope.record?.commit || !recordTree || recordTree !== envelope.record?.tree) {
     return { ok: false, reason: "record-object-mismatch" };
   }
+  if (sourceOid === recordOid) {
+    return { ok: false, reason: "source-equals-record" };
+  }
+  if (!validateSourceQualification(envelope.sourceQualification)) {
+    return { ok: false, reason: "invalid-source-qualification" };
+  }
 
   // Re-verify ancestry
   const spawn = deps.spawn ?? deps.spawnSync ?? spawnSync;
@@ -228,6 +264,9 @@ export function validateReleasePromotionEnvelope(envelope, { repoDir, targetBoun
   // Re-verify delta
   const deltaResult = computeRecordOnlyDelta(sourceOid, recordOid, { repoDir, deps });
   if (!deltaResult.ok) return deltaResult;
+  if (deltaResult.delta.length === 0) {
+    return { ok: false, reason: "empty-delta" };
+  }
 
   if (canonicalJson(deltaResult.delta) !== canonicalJson(envelope.recordOnlyDelta)) {
     return { ok: false, reason: "delta-mismatch" };

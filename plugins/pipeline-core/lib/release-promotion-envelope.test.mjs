@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import {
   isRecordOnlyPath,
   createReleasePromotionEnvelope,
+  digestReleasePromotionEnvelope,
   validateReleasePromotionEnvelope,
   RELEASE_PROMOTION_SCHEMA,
   MODE_INCLUSION_RULE,
@@ -48,7 +49,7 @@ function git(repo, args) {
   return result.stdout.trim();
 }
 
-test("release promotion envelope lifecycle and adversarial matrix", () => {
+test("release promotion envelope lifecycle and adversarial matrix", async (t) => {
   const tempDir = mkdtempSync(join(tmpdir(), "rel-promo-test-"));
   try {
     git(tempDir, ["init"]);
@@ -119,6 +120,61 @@ test("release promotion envelope lifecycle and adversarial matrix", () => {
     assert.equal(validation.sourceCommit, commitS);
     assert.equal(validation.recordCommit, commitR);
 
+    const recomputeEnvelope = (changes) => {
+      const { envelopeSha256: _ignored, ...body } = { ...created.envelope, ...changes };
+      return { ...body, envelopeSha256: digestReleasePromotionEnvelope(body) };
+    };
+
+    await t.test("validator rejects every malformed source qualification even with a recomputed checksum", () => {
+      const cases = [
+        ["missing", (value) => { delete value.sourceQualification; }],
+        ["null", (value) => { value.sourceQualification = null; }],
+        ["array", (value) => { value.sourceQualification = []; }],
+        ["wrong mode", (value) => { value.sourceQualification.mode = "push"; }],
+        ["wrong execution", (value) => { value.sourceQualification.execution = "impacted"; }],
+        ["omitted suite", (value) => { value.sourceQualification.omittedSuiteIds = ["source-test"]; }],
+        ["malformed verify selection digest", (value) => { value.sourceQualification.verifySelectionSha256 = "A".repeat(64); }],
+        ["malformed rule digest", (value) => { value.sourceQualification.ruleSha256 = "A".repeat(64); }],
+        ["malformed changed input digest", (value) => { value.sourceQualification.changedInputSha256 = "A".repeat(64); }],
+        ["empty selected suites", (value) => { value.sourceQualification.selectedSuiteIds = []; }],
+        ["duplicate selected suites", (value) => { value.sourceQualification.selectedSuiteIds = ["baseline", "baseline"]; }],
+        ["unsorted selected suites", (value) => { value.sourceQualification.selectedSuiteIds = ["source-test", "baseline"]; }],
+        ["invalid selected suite", (value) => { value.sourceQualification.selectedSuiteIds = ["invalid suite"]; }],
+        ["unexpected qualification field", (value) => { value.sourceQualification.extra = true; }],
+      ];
+      for (const [name, mutate] of cases) {
+        const candidate = structuredClone(created.envelope);
+        mutate(candidate);
+        const { envelopeSha256: _ignored, ...body } = candidate;
+        const result = validateReleasePromotionEnvelope({ ...body, envelopeSha256: digestReleasePromotionEnvelope(body) }, {
+          repoDir: tempDir,
+          targetBoundary: "push",
+        });
+        assert.deepEqual(result, { ok: false, reason: "invalid-source-qualification" }, name);
+      }
+    });
+
+    await t.test("validator rejects equal resolved source and record objects with a recomputed checksum", () => {
+      const equalObjects = recomputeEnvelope({
+        source: structuredClone(created.envelope.record),
+        recordOnlyDelta: [],
+      });
+      const result = validateReleasePromotionEnvelope(equalObjects, { repoDir: tempDir, targetBoundary: "push" });
+      assert.deepEqual(result, { ok: false, reason: "source-equals-record" });
+    });
+
+    git(tempDir, ["commit", "--allow-empty", "-m", "docs: empty record descendant"]);
+    const emptyRecord = git(tempDir, ["rev-parse", "HEAD"]);
+    await t.test("validator rejects an empty distinct record delta with a recomputed checksum", () => {
+      const emptyDelta = recomputeEnvelope({
+        source: structuredClone(created.envelope.record),
+        record: { commit: emptyRecord, tree: created.envelope.record.tree },
+        recordOnlyDelta: [],
+      });
+      const result = validateReleasePromotionEnvelope(emptyDelta, { repoDir: tempDir, targetBoundary: "push" });
+      assert.deepEqual(result, { ok: false, reason: "empty-delta" });
+    });
+
     // 2. Adversarial case: reverse reuse (push to release)
     const reverse = validateReleasePromotionEnvelope(created.envelope, {
       repoDir: tempDir,
@@ -148,6 +204,17 @@ test("release promotion envelope lifecycle and adversarial matrix", () => {
     });
     assert.equal(same.ok, false);
     assert.equal(same.reason, "source-equals-record");
+
+    // Equivalent revisions must not bypass the strict S != R invariant.
+    const aliasedSame = createReleasePromotionEnvelope({
+      repoDir: tempDir,
+      sourceCommit: commitS.slice(0, 12),
+      recordCommit: commitS,
+      verifyEvidence,
+      securityEvidence,
+    });
+    assert.equal(aliasedSame.ok, false);
+    assert.equal(aliasedSame.reason, "source-equals-record");
 
     // 5. Adversarial case: R -> S (not an ancestor)
     const backwards = createReleasePromotionEnvelope({
