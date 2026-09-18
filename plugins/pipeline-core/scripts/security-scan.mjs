@@ -95,7 +95,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -281,6 +281,25 @@ function resolveCommit(rootDir) {
     // git missing from PATH: evidence still written, commit stays "unknown"
   }
   return "unknown";
+}
+
+/**
+ * Keep latest security evidence at the repository's canonical working-tree root.
+ * A linked worktree has its own checkout but shares the primary worktree's git
+ * common directory; Verify already uses that location for its latest evidence.
+ * Ordinary checkouts and non-git directories retain their local root.
+ */
+export function resolveEvidenceRoot(rootDir, { spawnFn = spawnSync } = {}) {
+  const fallback = resolve(rootDir);
+  try {
+    const result = spawnFn("git", ["rev-parse", "--git-common-dir"], { encoding: "utf8", cwd: fallback });
+    const commonDir = String(result?.stdout ?? "").trim();
+    if (result?.status !== 0 || commonDir.length === 0) return fallback;
+    const resolvedCommonDir = resolve(fallback, commonDir);
+    return basename(resolvedCommonDir) === ".git" ? dirname(resolvedCommonDir) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function gitText(rootDir, args) {
@@ -1005,7 +1024,7 @@ export async function runSecurityScan({
   };
   const evidence = { ...evidenceCore, payloadSha256: sha256(canonicalJson(evidenceCore)) };
 
-  const evidenceDir = join(rootDir, "evidence");
+  const evidenceDir = join(resolveEvidenceRoot(rootDir), "evidence");
   mkdirSync(evidenceDir, { recursive: true });
   writeFileSync(join(evidenceDir, "security-latest.json"), JSON.stringify(evidence, null, 2) + "\n");
 

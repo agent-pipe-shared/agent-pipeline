@@ -30,7 +30,7 @@ import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
 import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
 import * as semgrepAdapter from "./security-adapters/semgrep.mjs";
 import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
-import { runSecurityScan } from "./security-scan.mjs";
+import { resolveEvidenceRoot, runSecurityScan } from "./security-scan.mjs";
 // NVA-SECGATE-1: security-scan.mjs's own gate-mode resolution now delegates to this exact
 // shared function -- see the pinning test below.
 // NVA-R18-SCANBOOT: also imports checkSecurityCompleteness -- the SAME function guard-push.mjs
@@ -86,6 +86,17 @@ function assertIncludes(id, haystack, needle) {
   const ok = typeof haystack === "string" && haystack.includes(needle);
   record(id, ok, ok ? "" : `expected string to include "${needle}", got ${JSON.stringify(haystack)}`);
 }
+
+assertEqual(
+  "evidence root: linked worktree publishes to its shared primary root",
+  resolveEvidenceRoot("/checkout/candidate", { spawnFn: () => ({ status: 0, stdout: "/checkout/.git\n" }) }),
+  "/checkout",
+);
+assertEqual(
+  "evidence root: unavailable git metadata keeps the scan root",
+  resolveEvidenceRoot("/checkout/candidate", { spawnFn: () => ({ status: 1, stdout: "" }) }),
+  "/checkout/candidate",
+);
 
 // ---------------------------------------------------------------------------------------------
 // Fixture plumbing
