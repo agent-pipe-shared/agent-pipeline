@@ -56,17 +56,15 @@ export const BACKLOG_STRIP_FENCE =
 // check is needed.
 const VERDICT_HEADING = /^(triage|closure|po-decision implementation|resolution)\b/iu;
 
-// "## Progress note (...)" is different: this repository's real convention
-// (surveyed 2026-09-06 across multiple closed/in-progress items) uses this
-// exact heading shape for BOTH legitimate delivery narrative ("what changed,
-// which files, which tests") and prior verdict/self-assessment prose ("byte-
-// identical, zero behavior change", "38/38 pass") -- unlike "## Resolution",
-// an unconditional heading-name match would swallow genuinely spec-shaped
-// delivery notes too. So a "progress note" heading is only a CANDIDATE: it
-// is only treated as verdict-shaped, and its whole section stripped, when
-// its own content also contains a verdict-shaped token (VERDICT_TOKEN_RE
-// below).
-const PROGRESS_NOTE_HEADING = /^progress note\b/iu;
+// "## Progress (...)" and "## Progress note (...)" are different from an
+// unconditional verdict heading: both conventions can contain legitimate
+// delivery detail, but either can also carry a prior self-assessment ("byte-
+// identical", "38/38 pass"). A bare dated Progress heading is used by the
+// Nova-B browser-evidence item, so accepting only the longer spelling would
+// leave the very implementor/test narrative a Critic must not receive. Both
+// forms are therefore CANDIDATES and are stripped only when the section has a
+// verdict-shaped token (VERDICT_TOKEN_RE below).
+const PROGRESS_HEADING = /^progress(?: note)?\b/iu;
 
 // Vocabulary shared by the "## Progress note" content gate and the
 // headingless bold-marker detector below -- deliberately small and drawn
@@ -193,10 +191,10 @@ export function stripBacklogVerdictProse(body) {
       entries.push({ start: heading.start, end, label: verdictMatch[1].toLowerCase() });
       continue;
     }
-    if (PROGRESS_NOTE_HEADING.test(title)) {
+    if (PROGRESS_HEADING.test(title)) {
       const end = headingSectionEnd(headings, i, heading.level, body.length);
       if (VERDICT_TOKEN_RE.test(body.slice(heading.start, end))) {
-        entries.push({ start: heading.start, end, label: "progress note" });
+        entries.push({ start: heading.start, end, label: "progress" });
       }
     }
   }
@@ -220,7 +218,8 @@ export function stripBacklogVerdictProse(body) {
   let cursor = 0;
   for (const [start, end] of merged) {
     const keep = body.slice(cursor, start).replace(/\s+$/u, "");
-    text += (keep.length ? `${keep}\n\n` : "") + `${BACKLOG_STRIP_FENCE}\n\n`;
+    const fenceSuffix = end === body.length ? "\n" : "\n\n";
+    text += (keep.length ? `${keep}\n\n` : "") + `${BACKLOG_STRIP_FENCE}${fenceSuffix}`;
     cursor = end;
   }
   text += body.slice(cursor);

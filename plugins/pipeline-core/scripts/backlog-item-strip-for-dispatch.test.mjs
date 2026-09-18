@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { after, test } from "node:test";
 
+import { stripBacklogItemForDispatch } from "../lib/backlog-dispatch-reference.mjs";
 import { run } from "./backlog-item-strip-for-dispatch.mjs";
 
 const ITEM = "---\nschema: pipeline.backlog-item.v1\nid: pipeline.example\ntype: defect\nowner: pipeline\nstatus: open\ncreated: 2026-08-18\nsource: test\n---\n\n## Description\n\nD.\n\n## Triage\n\n- **Decision:** accepted\n- **Rationale:** a prior Critic verdict lives here.\n";
@@ -35,4 +36,13 @@ test("run() requires --item", () => {
 
 test("run() rejects an unknown flag", () => {
   assert.throws(() => run(["--bogus", "x"]), /Unknown argument: --bogus/);
+});
+
+test("the tracked Greenfield Critic spec is exactly the dispatch-safe projection of its backlog item", () => {
+  const raw = readFileSync(new URL("../../../backlog/items/2026-09-13-greenfield-browser-evidence-is-not-portably-provisioned.md", import.meta.url), "utf8");
+  const projection = readFileSync(new URL("../../../backlog/dispatch-specs/2026-09-13-greenfield-browser-evidence-is-not-portably-provisioned.md", import.meta.url), "utf8");
+  const result = stripBacklogItemForDispatch(raw);
+  assert.equal(result.wasStripped, true);
+  assert.equal(result.removedHeading, "progress");
+  assert.equal(projection, result.text);
 });
