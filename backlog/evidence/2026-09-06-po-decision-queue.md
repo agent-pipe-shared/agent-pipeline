@@ -1,5 +1,60 @@
 # PO decision queue — collected 2026-09-06
 
+## 2026-09-19 audit correction — promotion design and remaining PO topics
+
+This is a current audit correction and proposed decision packet. Earlier
+dated sections below remain historical; their candidate, signature and
+blocking-status statements are not fresh authority for today's Nova work.
+The [release-promotion correction design](../../specs/sprint-nova-epic/design/2026-09-19-release-promotion-correction.md)
+is **proposed; not approved**. Reader review and independent high-risk Critic
+remain pending before design acceptance. Neither the earlier closure labels
+nor direct-import v1 tests prove a complete reachable qualification flow.
+
+**D1 is already decided.** [The 2026-09-18 decision](../PO-TOPICS.md#po-decisions--2026-09-18)
+permits one-way `release-satisfies-push` only for the same qualified source.
+Do not ask again whether that edge should exist. The remaining trust choices
+are bounded below; recommendations are not recorded acceptance.
+
+| Actual unresolved PO topic | Recommendation and alternative | Security / compatibility effect |
+| --- | --- | --- |
+| Exact record-policy owner and input/Security composition | Accept design §4's versioned Pipeline-owned single generated-record namespace and enforceable input independence; explicitly review the S-scan plus deterministic R-record proof as a successor Security contract. Alternative: retain exact whole-tree admission and re-qualify R. | Directory names do not remove declared-input dependencies. Current Tier-A/root and Security inventory bindings make a nonempty R ineligible until the relevant accepted contract exists. No broad state/backlog wildcard or silently filtered tree. Q0 must prove feasibility before implementation acceptance. |
+| Security gate off during promotion | Prefer design §6's explicit `off-by-policy` authority/digest binding. Alternative: make a real scan mandatory even for gate-off consumers. | The first preserves configured policy without calling an absent scan PASS; the second introduces a new tool/coverage requirement. Missing policy is never off. |
+| Legacy promotion admission | Prefer design §9's v1 diagnostic-only reading and atomic v2 admission cutover in both consumers. Alternative: a bounded v1 admission transition. | The recommended route requires intact source proof or re-qualification; continued v1 admission retains its missing-proof risk. No summary-only conversion. |
+| D5 — AI-hardening spec acceptance | Carry [D5](../PO-TOPICS.md#po-decisions--2026-09-18) into formal Nova B candidate acceptance with its exact spec home, criteria and evidence binding. The existing ruling retains code and defers that reconciliation. | This is the already-recorded acceptance obligation, not new implementation authorization or a claim that the retained code's spec has been accepted. |
+
+**Correction: Nova's own unpublished ancestor is not sibling consumption.**
+The [direct observer probe](../../scratch/nova-b-audit/probe-own-sprint-publication.json)
+for `sprint-nova-epic` reports `epics: ["nova"]`, a Nova ancestry consumption,
+and `PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT`; its `ownSprintMisclassified` is true.
+The current observer incorrectly labels own Nova ancestry as sibling
+consumption. Repair package/epic identity classification locally and retain
+the genuine sibling-consumption check. This does not require publication of
+that ancestor and is **not a PO push request**. No signature, remote target
+or publication intent is created by this correction.
+
+**Exact technical registration dependency, not a new PO decision.** The
+promotion proposal's future focused suites must be registered in
+`harness/scripts/verify.mjs` (TP-3); the existing Greenfield report separately
+names `plugins/pipeline-core/scripts/pipeline-state-late-verify.test.mjs` for
+that same manifest. [Spec §8](../../specs/sprint-nova-epic/spec.md#8-security-privacy-and-authority-boundaries)
+already supplies standing, exact-task Nova TP-1/3/5 authorization with audit
+binding and restoration before gates. Use its supported narrow procedure;
+report an actual unavailable technical route with the exact refusal, without
+inventing another signature request. No protected registration is changed
+by these documents.
+
+**Other audit facts stay in their proper scope.** The
+[redacted Security field probe](../../scratch/nova-b-audit/security-field-probe-result.json)
+found identifier-field matches that were not SHA-256-shaped values; it proves
+neither a clean scan nor a safe general evidence exemption. Local scanner
+diagnosis and exact regressions are coordinator work. Deferred native Codex
+WSL/App-Server evidence remains diagnostic under the 2026-09-12 disposition;
+an unavailable optional native host is not automatically a Nova-B blocker.
+Claude, Codex and Antigravity still owe independent portable implementations,
+without an invented mandatory native nine-cell gate. Final release/push
+authorization remains bound to the actual prepared candidate and external
+human signature; no such new request is made here.
+
 ## Priority 0 — 0.6.2 CI-repair push, pending fresh terminal evidence — 2026-09-18
 
 The separate release worktree has one clean, final candidate:
