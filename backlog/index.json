@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "97491289e30addb9804e4fc78285e6a77a5335e5bea99d62c234a80b1888dfa3"
+    "transitionHead": "ac0f42170686e6d241b371d7ad94fb5dc311b476fa777261137364d31eb19176"
   },
   "counts": {
-    "open": 72,
+    "open": 71,
     "in_progress": 1,
-    "closed": 586,
+    "closed": 587,
     "rejected": 3,
     "deferred": 11
   },
@@ -2949,13 +2949,17 @@
     },
     {
       "id": "pipeline.fourteen-evidence-files-are-tracked-inside-a-gitignored-directory",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Surfaced during the 2026-09-01 pre-release cleanup attempt for the 0.6.0 release: the dispatcher moved files out of evidence/ by wildcard without first checking which were tracked, and restored them on discovering closure_evidence citations pointed at four of them.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "f8937f15a74a5a2a697fa325354c2958d574b9af",
+      "closureEvidence": "backlog/evidence/2026-09-18-tracked-evidence-cleanup-closure.md"
     },
     {
       "id": "pipeline.fresh-repo-onboarding-intake-first-transaction",
