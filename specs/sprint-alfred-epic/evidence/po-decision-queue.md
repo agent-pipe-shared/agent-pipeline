@@ -22,6 +22,44 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## PO decisions
 
+### 0.7.0 cross-runner delivery scope — approved, implementation follows repairs
+
+On 2026-09-18 the PO explicitly required the productive Codex-Elephant to
+Antigravity Goldfish route with `gemini-3.8-flash-high` in the full 0.7.0
+release. Complete the current test corrections and intensive review first,
+then extend the existing E3 implementation to this outcome. The provider-free
+E3 fixture seam alone does not satisfy the newly requested release scope.
+Evidence: `spec.md` §8.1, `plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs`,
+and its 13-case fixture suite, freshly passed on 2026-09-18.
+
+The release-scope decision is resolved; implementation and live qualification
+are open agent work. Prepare the concrete live-pilot scope (Google/Antigravity,
+requested model, bounded no-write task, timeout, isolation expectation, output
+redaction and recorded readback) before any remaining configured human gate.
+Recommendation: qualify that route after repairs and carry its real outcome
+into 0.7.0 acceptance. Alternatives are deferring the release until it works
+or a new explicit PO scope revision; silently shipping only the fixture seam
+would contradict the current instruction. Existing A1 acceptance from the
+user-repository live test remains accepted, but must not be relabelled as
+candidate-bound E3 execution evidence.
+
+### Verify case-completion registration — signature pending, 2026-09-18
+
+The rebased onboarding suite declares and executes 283 cases, but
+`harness/scripts/verify.mjs` still admits only OBC001–OBC281. The required
+correction changes the registration length from 281 to 283, preserving all
+cases and the existing completion checks. The installed TP-3 guard rejected
+the edit and requires an externally signed authorization. No approval was
+inferred from the autonomous test-repair instruction. The attempted request
+digest was `f36a47351c5cebd37d9697c32db6def40744534693c00f0feb1d6d0f334fc337`;
+it covered a combined patch, so prepare a fresh, single-purpose request for
+the exact Verify edit when the PO returns. Recommendation: authorize that
+registration correction. Alternative: defer the edit and retain the failed
+completion gate; removing either real test is not a valid remedy. Until the
+registration matches the suite, full Verify and subsequent gated Critic
+dispatch remain incomplete. Evidence: `harness/scripts/verify.mjs` registration
+and `plugins/pipeline-core/lib/onboarding-continuity.test.mjs` corpus.
+
 ### Rebase governance disposition — approved and applied 2026-09-13
 
 The PO explicitly approved keeping Nova's Human governance sequence 12–14 and

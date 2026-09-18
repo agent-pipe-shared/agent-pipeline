@@ -40,6 +40,37 @@ below assumes it holds and is written to catch a change that would break it.
 
 ## Protected assets
 
+- The Alfred/Nova integration extends the same transitive trust closure with
+  `lib/checkpoint-push-audit.mjs`,
+  `lib/commit-message-policy.mjs`,
+  `lib/consumer-baseline-verify.mjs`,
+  `lib/critic-route-v3.mjs`,
+  `lib/dispatch-budget-binding.mjs`,
+  `lib/dispatch-budget-core.mjs`,
+  `lib/dispatch-policy.mjs`,
+  `lib/dispatch-record.mjs`,
+  `lib/governance-action-artifact.mjs`,
+  `lib/governance-action-events.mjs`,
+  `lib/governance-gate-action.mjs`,
+  `lib/governance-hgo-consumption-action.mjs`,
+  `lib/governance-hgo-consumption-source.mjs`,
+  `lib/installed-plugin-attestation.mjs`,
+  `lib/po-key-directory.mjs`,
+  `lib/protected-baseline.mjs`,
+  `lib/provenance-attestation.mjs`,
+  `lib/provenance-envelope.mjs`,
+  `lib/push-destination-policy.mjs`,
+  `lib/successful-spawn.mjs`,
+  `lib/verify-selection.mjs`,
+  `scripts/architecture-adoption.mjs`,
+  `scripts/architecture-fitness.mjs`,
+  `scripts/architecture-remedy.mjs`,
+  `scripts/check-clone-provisioning.mjs`,
+  `scripts/commit-msg-hook-install.mjs`,
+  `scripts/installed-plugin-attestation-host.mjs`,
+  `scripts/module-inventory.mjs`,
+  `scripts/rigor-floor.mjs`,
+  `scripts/settings-allowlist-merge.mjs`.
 - The unconditional-deny behavior of GS-1 through GS-5 and GS-7 — never
   reachable through this mechanism, regardless of what a signed payload
   claims to name.
@@ -69,7 +100,8 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/codex-onboarding-app-server.mjs`,
   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
-  `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
+  `lib/continuity-status.mjs`, `lib/consumer-verify.mjs`,
+  `lib/critic-export-policy.mjs`, `lib/critic-skip-decision.mjs`,
   `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
   `lib/entrypoint.mjs`, `lib/feature-package-topology.mjs`,
   `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,
@@ -92,6 +124,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
   `lib/windows-private-state.mjs`, `lib/worktree-lifecycle.mjs`,
   `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`,
+  `scripts/consumer-verify-check.mjs`,
   `scripts/continuity-status.mjs`, `scripts/pipeline-state.mjs`,
   `scripts/po-gate-profile-repair.mjs`, `scripts/project-onboarding-v3.mjs`,
   `scripts/publication-close-journal.mjs`, and

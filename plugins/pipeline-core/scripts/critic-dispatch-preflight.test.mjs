@@ -580,7 +580,7 @@ test("a successful Git exit remains admissible when a contained host adds an EPE
     const result = originalSpawn(command, args, options);
     if ((args[2] === "rev-parse" && args[3] === `${fx.base}^{commit}`) || args[2] === "show") {
       injected += 1;
-      return { ...result, error: new Error("spawnSync git EPERM") };
+      return { ...result, error: Object.assign(new Error("spawnSync git EPERM"), { code: "EPERM" }) };
     }
     return result;
   }]], () => {
@@ -600,7 +600,7 @@ test("a successful EPERM Git observation remains admissible for the empty-tree r
     const result = originalSpawn(command, args, options);
     if (args[2] === "hash-object" && args[3] === "-t") {
       emptyTreeInjected = true;
-      return { ...result, error: new Error("spawnSync git EPERM") };
+      return { ...result, error: Object.assign(new Error("spawnSync git EPERM"), { code: "EPERM" }) };
     }
     return result;
   }]], () => {
@@ -617,7 +617,7 @@ test("a successful EPERM Git observation remains admissible for a byte candidate
     const result = originalSpawn(command, args, options);
     if (args[2] === "show" && args[3].endsWith(":specs/spec.md") && options.encoding === null) {
       byteReadInjected = true;
-      return { ...result, error: new Error("spawnSync git EPERM") };
+      return { ...result, error: Object.assign(new Error("spawnSync git EPERM"), { code: "EPERM" }) };
     }
     return result;
   }]], () => {

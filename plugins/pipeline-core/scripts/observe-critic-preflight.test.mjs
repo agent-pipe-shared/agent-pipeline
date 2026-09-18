@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
@@ -25,6 +26,15 @@ function fixture() {
   // changes only an unrelated candidate file, so its bound spec remains exact.
   for (const path of ["project/pipeline.yaml", "project/pipeline-state.json", "project/pipeline.json", "project/guard-config.json", "project/guard-override.log.jsonl", "specs/sprint-alfred-epic/spec.md"])
     cpSync(join(workspace, path), join(root, path));
+  const statePath = join(root, "project/pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.activeFeature.id = "sprint-alfred-epic";
+  state.continuity.featureId = "sprint-alfred-epic";
+  state.continuity.authority.spec.path = "specs/sprint-alfred-epic/spec.md";
+  state.continuity.authority.spec.sha256 = createHash("sha256")
+    .update(readFileSync(join(root, "specs/sprint-alfred-epic/spec.md")))
+    .digest("hex");
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
   writeFileSync(join(root, ".claude/pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
   writeFileSync(join(root, "governance/guidelines/review.md"), "Review changed code.\n");
   writeFileSync(join(root, "governance/policies/checklist.md"), "- verify\n");

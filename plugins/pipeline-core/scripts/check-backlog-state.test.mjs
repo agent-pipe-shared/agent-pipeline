@@ -423,7 +423,9 @@ try {
       .filter((entry) => entry.acceptedReason === "accepted-po-2026-09-15-lost-reconciliation-batch");
     assert.deepEqual(
       acceptedLostReconciliationBatch.map((entry) => entry.finding),
-      Array.from({ length: 8 }, (_, index) => `ledger event ${1855 + index}: evidence.commit is not a reachable local Git commit`),
+      // The rebased ledger has been reconciled; a historical exception is not
+      // itself evidence that the current checkout still has unreachable OIDs.
+      [],
     );
     assert.ok(result.drift.every((entry) => typeof entry.acceptedReason === "string"), result.drift.map((entry) => entry.finding).join("; "));
   });

@@ -56,6 +56,9 @@ function fixture() {
   // inheriting that operational drift from the repository under test.
   const statePath = join(root, "project/pipeline-state.json");
   const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.activeFeature.id = "sprint-alfred-epic";
+  state.continuity.featureId = "sprint-alfred-epic";
+  state.continuity.authority.spec.path = "specs/sprint-alfred-epic/spec.md";
   state.continuity.authority.spec.sha256 = createHash("sha256")
     .update(readFileSync(join(root, "specs/sprint-alfred-epic/spec.md")))
     .digest("hex");

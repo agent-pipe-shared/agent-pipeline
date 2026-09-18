@@ -3547,7 +3547,7 @@ export function isAgentPoPublicCommand(command, root) {
 // The CLI owns the human-signing subset.  Prepare/verify commands remain agent work;
 // importing the semantic list prevents this guard from silently drifting when the
 // CLI adds another attended signing action.
-function isHumanPoSigningCommand(command, root) {
+export function isHumanPoSigningCommand(command, root) {
   const args = poApprovalArgs(command, root, PO_HUMAN_APPROVAL_SCRIPT);
   return args !== null && HUMAN_PO_SIGNING_COMMANDS.includes(args[0]);
 }

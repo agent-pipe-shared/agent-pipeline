@@ -73,6 +73,15 @@ Around those roles:
 > exercised as a local candidate, not a tag, installation recommendation,
 > production-availability claim, or evidence that its release gates passed.
 
+<a id="capability-architecture-adoption-and-fitness"></a>
+<!-- capability:architecture-adoption-and-fitness -->
+
+The Alfred candidate adds architecture decision assessment, a module inventory,
+machine-readable maps, and baseline/fitness checks. Existing repositories use
+a staged adoption proposal and an explicit human decision for the agreed scope.
+See the [architecture decision workflow](plugins/pipeline-core/skills/architecture-decision/SKILL.md)
+and the [release-scope overview](docs/overview.md).
+
 > **What you can inspect:** a candidate-bound Verify receipt, security-scan
 > status, review and approval records where the project requires them, and a
 > validated Feature Package or offline Audit Bundle. These artifacts support an

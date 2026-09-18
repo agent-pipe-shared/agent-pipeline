@@ -644,9 +644,9 @@ test("pushPrepareReport: v1/v2 trust-on-first-use uses the registered machine ke
   assert.match(result.lines.gitPush, /^Step: agent push\nPOSIX:/u);
 });
 
-test("pushPrepareReport: v1/v2 trust-on-first-use carries the registered machine key directory through command rendering", () => {
+test("pushPrepareReport: v1/v2 trust-on-first-use leaves private directory resolution to the human command", () => {
   const machine = machinePlaneFixture();
-  let renderedDirectory = null;
+  let renderedDirectory;
   const result = pushPrepareReport(
     ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
     readyDeps({
@@ -658,7 +658,7 @@ test("pushPrepareReport: v1/v2 trust-on-first-use carries the registered machine
           executable: "node",
           argv: [
             "/plugin-root/scripts/po-human-approval.mjs", "authorize-critical",
-            "--repo-root", FIXTURE_DIR, "--directory", directory,
+            "--repo-root", FIXTURE_DIR,
           ],
         };
       },
@@ -668,10 +668,13 @@ test("pushPrepareReport: v1/v2 trust-on-first-use carries the registered machine
   assert.equal(result.ok, true);
   assert.equal(result.report.ready, true, JSON.stringify(result.report.checks));
   assert.equal(result.report.checks.some((check) => check.id === "approval-directory"), false);
-  assert.equal(renderedDirectory, machine.keyDirectory);
+  assert.equal(renderedDirectory, null);
   assert.ok(result.lines.authorize.length > 0);
   assert.ok(result.lines.approvePush.length > 0);
-  assert.equal(result.lines.gitPush, "git push origin HEAD:refs/heads/main");
+  assert.match(result.lines.gitPush, /^Step: agent push\nPOSIX:/u);
+  const humanCommands = result.lines.authorize.join("\n");
+  assert.equal(humanCommands.includes(machine.keyDirectory), false);
+  assert.doesNotMatch(humanCommands, /--directory/u);
 });
 
 test("pushPrepareReport: one unmet precondition -> ready:false, no command lines, remedy present", () => {

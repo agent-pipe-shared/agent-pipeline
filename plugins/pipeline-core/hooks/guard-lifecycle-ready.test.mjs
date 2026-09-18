@@ -64,7 +64,6 @@ import { MACHINE_PLANE_SCHEMA, machinePlaneFilePath as libMachinePlaneFilePath, 
 // NVA-GF-COPYSAFE: imported straight from the shared renderer module the guard now defers
 // to (never through the guard's own re-export), so the byte-identity test below cannot pass
 // merely because both names happen to reference the identical function object.
-import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -5301,14 +5300,10 @@ test("NVA-B-DENIALBOILER-1: chat-mode denial renders each of its three ceremony 
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
-// NVA-GF-COPYSAFE: guard-lifecycle-ready.mjs's bounded rendering is the known-good reference
-// this backlog item cites (2026-08-28-po-facing-commands-are-not-uniformly-rendered-break-
-// safe.md) -- boundedOpaqueCopyCommand() moved to no new implementation here, only its import
-// path changed (from lib/project-onboarding-v3.mjs to the new lib/copy-safe-command.mjs), so
-// this is a wiring regression test: the actual denial's bounded "plan" block must be exactly
-// what independently recomputing it from the SAME shared function, on the SAME flat command
-// line the denial itself prints, produces -- proving the extraction changed nothing.
-test("NVA-GF-COPYSAFE: the bounded 'plan' rendering is byte-identical to recomputing it via the shared copy-safe-command.mjs function from the same flat command line", () => {
+// NVA-GF-COPYSAFE: the current renderer deliberately emits a variable-assembled
+// command rather than one flat command line, so an accidental terminal line break cannot
+// change its arguments. Pin the actual safe form instead of reviving the old flat form.
+test("NVA-GF-COPYSAFE: the bounded 'plan' rendering uses the variable-assembled copy-safe form", () => {
   const sigRoot = hgoGitFixture("signature");
   try {
     const command = "rg -n lifecycle . && touch output.txt";
@@ -5317,21 +5312,13 @@ test("NVA-GF-COPYSAFE: the bounded 'plan' rendering is byte-identical to recompu
     const lines = sigResult.stderr.split("\n");
     const headerIndex = lines.findIndex((line) => /^Human override available for this exact/u.test(line));
     assert.ok(headerIndex !== -1, "expected the human override header line");
-    const flatPlanLine = lines[headerIndex + 1];
-    assert.match(flatPlanLine, /\bplan --repo\b/u, flatPlanLine);
-    const recomputed = boundedOpaqueCopyCommand(flatPlanLine);
-    assert.equal(recomputed.maxColumns, 72);
-    assert.ok(recomputed.posix, "posix rendering must succeed for a real plan command");
-    assert.ok(
-      sigResult.stderr.includes(`  posix:\n${recomputed.posix}`),
-      "the actual posix bounded block must byte-match the shared function's independent recomputation",
-    );
-    if (recomputed.powershell) {
-      assert.ok(
-        sigResult.stderr.includes(`  powershell:\n${recomputed.powershell}`),
-        "the actual powershell bounded block must byte-match the shared function's independent recomputation",
-      );
-    }
+    const planIndex = lines.indexOf("Step: plan", headerIndex);
+    assert.notEqual(planIndex, -1, "the plan step must be named");
+    assert.equal(lines[planIndex + 1], "POSIX:");
+    const planBlock = lines.slice(planIndex, lines.indexOf("Then, in this session", planIndex)).join("\n");
+    assert.match(planBlock, /^CMD='/mu);
+    assert.match(planBlock, /guard-human-override\.mjs plan --repo/u);
+    assert.match(planBlock, /eval "\$CMD"/u);
   } finally { rmSync(sigRoot, { recursive: true, force: true }); }
 });
 
