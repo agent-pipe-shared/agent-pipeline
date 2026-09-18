@@ -5702,11 +5702,31 @@ function applyIntakeCheckpointMutation({
   const spawn = deps.spawn ?? defaultGitSpawn;
   const initialPaths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: false });
   const initial = readIntakeCheckpointRaw(initialPaths.checkpoint);
-  if (mutate(initial) === null) return { mutated: false, paths: initialPaths, value: initial.value };
+  const lockOptions = { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 };
+  const token = `intake-checkpoint-${sha256(Buffer.from(initialPaths.checkpoint, "utf8")).slice(0, 32)}`;
+  if (mutate(initial) === null) {
+    // A crash after the atomic rename leaves valid checkpoint bytes plus its
+    // writer lock.  An identical retry is otherwise a safe no-op, but leaving
+    // that stale, deterministic lock behind turns the *next* real intake
+    // change into KICKOFF-LOCKED.  Probe only when the lock path already
+    // exists: acquireLock() reclaims only this schema/token after its normal
+    // stale-age check.  A live, foreign, malformed, or otherwise unrecoverable
+    // lock remains untouched and must not make an idempotent read path fail.
+    if (existsSync(initialPaths.lock)) {
+      let recoveredLock = null;
+      try {
+        recoveredLock = acquireLock(initialPaths.lock, INTAKE_CHECKPOINT_LOCK_SCHEMA, token, lockOptions);
+      } catch {
+        // No-op replay preserves its established success semantics when this
+        // is a live or non-recoverable lock.  acquireLock() has not removed it.
+      } finally {
+        if (recoveredLock !== null) releaseLock(recoveredLock);
+      }
+    }
+    return { mutated: false, paths: initialPaths, value: initial.value };
+  }
 
   const paths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: true });
-  const lockOptions = { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 };
-  const token = `intake-checkpoint-${sha256(Buffer.from(paths.checkpoint, "utf8")).slice(0, 32)}`;
   const lock = acquireLock(paths.lock, INTAKE_CHECKPOINT_LOCK_SCHEMA, token, lockOptions);
   const fault = (point) => {
     if (deps.crashAt === point) throw new SimulatedIntakeCrash(point);
