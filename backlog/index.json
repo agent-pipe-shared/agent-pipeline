@@ -3,25 +3,29 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3606eb6186d24f72aa2226fcdf1809c94c2dce333131f13a2cb539c8b18f0f9c"
+    "transitionHead": "97491289e30addb9804e4fc78285e6a77a5335e5bea99d62c234a80b1888dfa3"
   },
   "counts": {
-    "open": 77,
+    "open": 72,
     "in_progress": 1,
-    "closed": 581,
+    "closed": 586,
     "rejected": 3,
     "deferred": 11
   },
   "items": [
     {
       "id": "pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Observed twice in one session, 2026-09-01: dispatches NVA-B-WFRECORD and NVA-B-DENIALTRIM each called the advisor tool although field 4 of their briefings forbade it. Both disclosed the call unprompted.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "28ca87187ad96fc94d970fa20c178e954371fa25",
+      "closureEvidence": "backlog/evidence/2026-09-18-advisor-prohibition-closure.md"
     },
     {
       "id": "pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it",
@@ -1153,14 +1157,18 @@
     },
     {
       "id": "pipeline.baseline-only-verify-needs-an-actionable-release-recovery",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-retrospective-2026-09-13.md.",
       "deferred": false,
       "tracking": "Nova B — the intentionally permitted baseline-only verify state becomes expensive when it is discovered late at push time and a runner cannot discover the exact recovery through its normal driver.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "3daeb7be99d2e1d534396b7ccdc8892ab0198be7",
+      "closureEvidence": "backlog/evidence/2026-09-18-baseline-only-verify-recovery-closure.md"
     },
     {
       "id": "pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code",
@@ -1439,13 +1447,17 @@
     },
     {
       "id": "pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, step Runner-free offline Core Verify, suite guard-lifecycle-ready-tests",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "5b2ce433f76c59805f998a0c1bbcd213e7417063",
+      "closureEvidence": "backlog/evidence/NVA-B-CI-PATH-TRUE-CLOSURE-1.md"
     },
     {
       "id": "pipeline.ci-topology-preflight-cannot-pass-on-this-branch",
@@ -1713,13 +1725,17 @@
     },
     {
       "id": "pipeline.codex-runtime-fixture-assumes-wsl2-in-ci",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-17",
       "source": "GitHub Actions Verify run 35263935526 for released commit f8cc1b2297b5b6a2ef2d64a2dd43f4a76ec37f31: only codex-sandbox-runtime-tests failed. Local source inspection and the targeted 15/15 regression run identified the WSL2-only fixture assumption.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "8b4aa6aa98c73654fd21703ea8143d26e4dcd2f5",
+      "closureEvidence": "backlog/evidence/2026-09-18-codex-runtime-fixture-ci-verification.md"
     },
     {
       "id": "pipeline.codex-sandbox-critic-longterm",
@@ -9004,14 +9020,18 @@
     },
     {
       "id": "pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "Elephant, 2026-09-02, while supplying the live-run observation that pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session is blocked on. hooks.json is TP-4 protected, so this is filed rather than fixed in session.",
       "deferred": false,
       "tracking": "Nova B — the worktree-isolation count check registers its baseline on the dispatch call itself, but its hooks.json matcher names Task and not Agent. guard-dispatch.mjs's own stanza names both and says in those words that naming the wrong tool is a silent no-op.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "28ca87187ad96fc94d970fa20c178e954371fa25",
+      "closureEvidence": "backlog/evidence/2026-09-18-worktree-isolation-matcher-closure.md"
     },
     {
       "id": "pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass",

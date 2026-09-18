@@ -5,7 +5,7 @@
 
 | ID | Status | Type | Owner | Sprint | Created | Due | Tracking |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -91,7 +91,7 @@
 | pipeline.backlog-status-drifts-from-code-across-compaction-with-no-hardening | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage | closed | defect | pipeline | alfred | 2026-08-25 | — | — |
 | pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
-| pipeline.baseline-only-verify-needs-an-actionable-release-recovery | open | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — the intentionally permitted baseline-only verify state becomes expensive when it is discovered late at push time and a runner cannot discover the exact recovery through its normal driver. |
+| pipeline.baseline-only-verify-needs-an-actionable-release-recovery | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — the intentionally permitted baseline-only verify state becomes expensive when it is discovered late at push time and a runner cannot discover the exact recovery through its normal driver. |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | — | 2026-08-11 | 2026-08-25 | — |
 | pipeline.blind-session-zero-followable-steps-on-push-path | closed | defect | pipeline | nova-a | 2026-08-28 | — | NOW / Nova A — measured, not argued: a fresh session gets 15 chained commands on the onboarding path and 0 on the feature/push path. PO 2026-08-28: the paths must be tested without the Pipeline's context knowledge, because a greenfield session does not have it. |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
@@ -113,7 +113,7 @@
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | — | 2026-08-25 | — | — |
 | pipeline.ci-failure-reporter-has-no-recorded-requirement | open | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec. |
-| pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names | open | defect | pipeline | nova-b | 2026-09-02 | — | — |
+| pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | none | 2026-08-28 | — | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook | closed | defect | pipeline | nova-b | 2026-08-29 | — | Nova B -- new hooks.json entry needed (TP-4 protected, PO signature ceremony), larger scope than the Codex-side fix; not this candidate. |
@@ -133,7 +133,7 @@
 | pipeline.codex-restart-context-loss-needs-a-different-approach | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A -- PO explicitly elevated this 2026-08-29, live: 'was echt ein riesen thema ist, sind die fehlenden codex übergaben. Da braucht es eine ganz andere idee mal als ansatz bzw. härtere durchsetzung mit dem hint - das kann codex so einfach nie sauber verarbeiten' (this is a genuinely huge topic; needs a completely different approach, or harder enforcement -- Codex apparently can never cleanly process the current mechanism this simply). |
 | pipeline.codex-runner-has-no-real-support-on-native-windows | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-runner-needed-three-sessions-for-one-small-feature | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova B — PO asked for this to be examined in detail |
-| pipeline.codex-runtime-fixture-assumes-wsl2-in-ci | open | defect | pipeline | nova-b | 2026-09-17 | — | — |
+| pipeline.codex-runtime-fixture-assumes-wsl2-in-ci | closed | defect | pipeline | nova-b | 2026-09-17 | — | — |
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- PO-raised 2026-08-30 from the Codex/WSL greenfield retrospective; confirmed via code trace to be a genuinely separate defect from the resume-hint enforcement gap and the design-binding gap raised alongside it. |
@@ -676,13 +676,13 @@
 | pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session | open | defect | pipeline | nova-b | 2026-08-25 | — | — |
 | pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | closed | defect | pipeline | — | 2026-08-11 | — | — |
-| pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name | open | defect | pipeline | nova-b | 2026-09-02 | — | Nova B — the worktree-isolation count check registers its baseline on the dispatch call itself, but its hooks.json matcher names Task and not Agent. guard-dispatch.mjs's own stanza names both and says in those words that naming the wrong tool is a silent no-op. |
+| pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name | closed | defect | pipeline | nova-b | 2026-09-02 | — | Nova B — the worktree-isolation count check registers its baseline on the dispatch call itself, but its hooks.json matcher names Task and not Agent. guard-dispatch.mjs's own stanza names both and says in those words that naming the wrong tool is a silent no-op. |
 | pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — a T1 Critic reviewing NVA-B-READCONTAIN-1's symlink-containment fix found that the read-scope lane's new realpath check still admits a `<symlink-inside-root>/../<outside>/<file>` argument, because `path.resolve()` collapses the `..` lexically before any symlink is examined. The write lane's own `isPathWithinRealpathedRoot` — the pattern the read-lane fix was modeled on — opens with the identical `resolve(root, filePath)` call, before its own existence/realpath walk. Whether this is actually exploitable for a WRITE depends on a fact this session could not verify from inside the repository: how the host tool that performs the actual Edit/Write file mutation resolves the same path string. |
 
 ## Counts
 
-- open: 77
+- open: 72
 - in_progress: 1
-- closed: 581
+- closed: 586
 - rejected: 3
 - deferred: 11
