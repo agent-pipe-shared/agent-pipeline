@@ -23,21 +23,6 @@ inspect later.
 > for the lifecycle, and then use [Usage](docs/usage.md). The links below are
 > optional reference.
 
-> **Documentation line: `0.6.3`.** This is the next release's documented scope,
-> not a tag, installation recommendation, production-availability claim, or
-> evidence that a local candidate has passed its release gates.
-
-> **What you can inspect:** a candidate-bound Verify receipt, security-scan
-> status, review and approval records where the project requires them, and a
-> validated Feature Package or offline Audit Bundle. These artifacts support an
-> audit trail; they do not certify compliance or replace an auditor. Start with
-> [audit and evidence](docs/audit-and-evidence.md).
-
-> **What it costs:** the [cost page](docs/cost-and-measurement.md) gives four
-> historical full-Verify examples, including two red receipts. They are
-> observations, not an onboarding estimate or a promise for your project.
-> Consumer administration overhead has not yet been measured across runners.
-
 ## The problem
 
 Teams with audit obligations often need more than a chat transcript or a claim
@@ -84,6 +69,39 @@ Around those roles:
   remain with the human where the project calibration and action require them;
   evidence never creates that authority.
 
+> **Documentation line: `0.6.3`.** This is the next release's documented scope,
+> not a tag, installation recommendation, production-availability claim, or
+> evidence that a local candidate has passed its release gates.
+
+> **What you can inspect:** a candidate-bound Verify receipt, security-scan
+> status, review and approval records where the project requires them, and a
+> validated Feature Package or offline Audit Bundle. These artifacts support an
+> audit trail; they do not certify compliance or replace an auditor. Start with
+> [audit and evidence](docs/audit-and-evidence.md).
+
+> **What it costs:** the [cost page](docs/cost-and-measurement.md) gives four
+> historical full-Verify examples, including two red receipts. They are
+> observations, not an onboarding estimate or a promise for your project.
+> Consumer administration overhead has not yet been measured across runners.
+
+## The front door: optional design pre-stage
+
+Before the pipeline itself there's deliberately no mandatory step, just a
+front door: idea → optional design brainstorming with any chat AI (guide +
+standard prompt + lean export template under
+[`docs/design/README.md`](docs/design/README.md)) → requirements export →
+feeds the pipeline. If a requirement looks large at triage (multiple
+modules/projects affected, new architecture, several plausible options, a
+larger security/data surface), the Elephant flags it **non-blocking** and
+links the guide — you can always skip the design pre-stage and go straight to
+work. An external design export never gets a free pass: the Elephant
+challenges it and re-derives it through the normal path (interview → spec →
+readiness) instead of adopting it as an already-approved design. For large
+topics, the Elephant also proposes a cut into several self-contained backlog
+items and waits for confirmation or correction — the existing per-item PRD
+review stays the only check point, nothing new is added. Details:
+[`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
+
 ## How it works
 
 ```mermaid
@@ -96,24 +114,6 @@ flowchart LR
     Critic -->|"findings"| Elephant
     Elephant -->|"decision"| PO
 ```
-
-## The front door: optional design pre-stage
-
-Before the pipeline itself there's deliberately no mandatory step, just a
-front door: idea → optional design
-brainstorming with any chat AI (guide + standard prompt + lean export
-template under [`docs/design/README.md`](docs/design/README.md)) →
-requirements export → feeds the pipeline. If a requirement looks large at
-triage (multiple modules/projects affected, new architecture, several
-plausible options, a larger security/data surface), the Elephant flags it
-**non-blocking** and links the guide — you can always skip the design
-pre-stage and go straight to work. An external design export never gets a
-free pass: the Elephant challenges it and re-derives it through the normal
-path (interview → spec → readiness) instead of adopting it as an
-already-approved design. For large topics, the Elephant also proposes a cut
-into several self-contained backlog items and waits for confirmation or
-correction — the existing per-item PRD review stays the only check point,
-nothing new is added. Details: [`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
 
 ## Bring your own architecture rules & guardrails
 
