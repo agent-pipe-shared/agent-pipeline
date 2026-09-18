@@ -60,3 +60,27 @@ Existing source coverage demonstrates each half separately:
 The new end-to-end late-recovery contract is still absent. It should be
 designed as one lifecycle package before implementation so it cannot silently
 weaken either the protected calibration boundary or release blocking.
+
+## Implementation and rollback plan — 2026-09-18
+
+The implementation is deliberately limited to a named `configure-verify`
+writer that is available only after a valid, already-approved implementation
+lifecycle is established.  It may replace only two identical baseline
+calibration twins with the same non-empty verify command.  `inspect` and the
+ordinary `push-init` driver must both expose that exact typed recovery action;
+neither may emit a reconstructed shell command or turn a baseline contract
+into a passing release state.
+
+The commit backstop must admit this post-implementation twin-only transaction
+only when the committed lifecycle state satisfies the same plan-authority
+validation as the writer.  Drift, malformed twins, missing or stale approval
+authority, a non-baseline command, or any simultaneous protected-file change
+must fail closed without a calibration write.
+
+Rollback is code-only and does not alter a consumer's declared verify command:
+before publication, revert the bounded implementation commit; after
+publication, deliver the same reversal in the next normal immutable plugin
+build.  A consumer that already used the sanctioned writer retains its explicit
+verify contract and continues to be subject to ordinary push verification.
+The rollback must never delete or blank that contract merely to restore an
+older plugin behavior.
