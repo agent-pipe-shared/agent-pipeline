@@ -1,0 +1,33 @@
+{
+  "schema": "pipeline.alfred-scanner-exceptions-applied.v1",
+  "taskId": "ALF-SCANNER-APPLY",
+  "date": "2026-09-18",
+  "source": "specs/sprint-alfred-epic/evidence/alfred-ledger-secret-triage-2026-09-18.json",
+  "beforeIgnoreSha256": "8fbce4e6c7df8cb1c76d856e5448fa6a6a03656ec7d02578a432354eb7f30ac7",
+  "afterIgnoreSha256": "e9d8d52f1058a65a0149ab60c2ca88bff27b671e9ac537e58d02031df1adb48e",
+  "originalIgnoreBytesPreservedAsPrefix": true,
+  "comment": "PO-approved Alfred archive hash false positives (2026-09-18); exact content-v1 entries only.",
+  "entryCount": 78,
+  "distinctEntryCount": 78,
+  "allEntriesPresentExactlyOnce": true,
+  "archiveHashes": [
+    {"path":"backlog/transitions-alfred-history.ndjson","expectedSha256":"1d5eb58e9e3e8d158773b0063b1cb6dd7f02a76a0242a9ceb8071cdbef492dfe","actualSha256":"1d5eb58e9e3e8d158773b0063b1cb6dd7f02a76a0242a9ceb8071cdbef492dfe"},
+    {"path":"backlog/transitions-alfred-history.pre-rebase.ndjson","expectedSha256":"c2dd423f4220288c3caf2753f2bb132071154c86d446b5a90d94d3d142043092","actualSha256":"c2dd423f4220288c3caf2753f2bb132071154c86d446b5a90d94d3d142043092"}
+  ],
+  "verification": [
+    {"command":"node --test plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs","exitCode":1},
+    {"command":"git diff --check","exitCode":0}
+  ],
+  "coordinatorReadback": {
+    "command": "node --test plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs",
+    "executionBoundary": "host-authorized-wsl",
+    "exitCode": 0,
+    "passed": 23,
+    "failed": 0,
+    "skipped": 0,
+    "exactEntriesPresentOnce": 78,
+    "archivesUnchanged": true
+  },
+  "fullSecurityAndVerify": "pending-coordinator",
+  "independentCritic": "pending-coordinator"
+}

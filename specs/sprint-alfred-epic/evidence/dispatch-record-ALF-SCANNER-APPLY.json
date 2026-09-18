@@ -1,0 +1,38 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "ALF-SCANNER-APPLY",
+  "date": "2026-09-18",
+  "ruleset": "0.6.3+codex.20260918143154.3daeb7be",
+  "agentType": "goldfish-implementor",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "rulesetSha": "0.6.3+codex.20260918143154.3daeb7be",
+  "dispatcher": "elephant",
+  "origin": "Fresh bounded apply dispatch; shared checkout per briefing; no independent review claimed.",
+  "outcome": "partial",
+  "log": [
+    {"phase":"bootstrap","toolUseCount":3,"note":"Pipeline preflight ready and observation governance passed; Goldfish did not execute onboarding action."},
+    {"phase":"precheck","toolUseCount":2,"note":"Archive SHA256 inputs matched; 78 distinct proposed entries were absent before edit."},
+    {"phase":"verification","toolUseCount":3,"note":"Exact-once readback passed; focused gitleaks test exited 1; git diff --check exited 0."}
+  ],
+  "criticRequired": {
+    "rigorLevel": 2,
+    "riskClass": "low",
+    "riskFlag": false,
+    "schema": "pipeline.critic-required.v1",
+    "taskId": "ALF-SCANNER-APPLY",
+    "diff": {"guardrail": false, "security": false, "architecture": false, "data": false, "publicApi": false}
+  },
+  "commits": [],
+  "report": {
+    "changedFiles": [
+      ".gitleaksignore",
+      "specs/sprint-alfred-epic/evidence/alfred-scanner-exceptions-applied-2026-09-18.json",
+      "specs/sprint-alfred-epic/evidence/dispatch-record-ALF-SCANNER-APPLY.json"
+    ],
+    "outcome": "partial",
+    "dod": {"precheck":"passed","exactApply":"passed","gitleaksTest":"failed","diffCheck":"passed","fullSecurity":"pending","verify":"pending","independentReview":"pending","poAcceptance":"open"},
+    "deviations": ["Focused gitleaks test exited 1; no second attempt made."],
+    "openItems": ["Coordinator must inspect focused test failure, run full security and Verify, and obtain independent Critic review."]
+  }
+}
