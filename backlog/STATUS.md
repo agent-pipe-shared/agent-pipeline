@@ -146,7 +146,7 @@
 | pipeline.commit-trailer-authoring-needs-a-typed-single-command-route | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — newline-free shell grammar makes ordinary multi-paragraph git commit commands expensive; retain strict trailer validation while removing scratch-file choreography from the normal path. |
 | pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
-| pipeline.compact-nudge-cadence-too-aggressive-and-not-configurable | open | idea | pipeline | nightwing | 2026-08-26 | — | — |
+| pipeline.compact-nudge-cadence-too-aggressive-and-not-configurable | closed | idea | pipeline | nightwing | 2026-08-26 | — | — |
 | pipeline.compaction-stable-bootstrap-lease | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | — | 2026-08-10 | — | — |
 | pipeline.complete-adr-governs-coverage-before-reader-review-binding | closed | requirement | pipeline | nova-b | 2026-09-07 | — | — |
@@ -681,8 +681,8 @@
 
 ## Counts
 
-- open: 79
+- open: 78
 - in_progress: 1
-- closed: 579
+- closed: 580
 - rejected: 3
 - deferred: 11
