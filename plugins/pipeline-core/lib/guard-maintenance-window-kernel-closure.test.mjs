@@ -199,12 +199,16 @@ const DYNAMIC_IMPORT_EDGES = {
   // commit 54fb5006 added a fourth call site, `../lib/handover-rotation.mjs`, to read the
   // handover-file configuration ahead of the commit-size check. The fifth edge loads the
   // maintenance-window evaluator so the generated hook can honor non-kernel windows.
+  // The sixth and seventh edges derive the current plan lifecycle and its typed late-verify
+  // recovery eligibility before admitting the corresponding protected-path route.
   "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs": [
     "../hooks/guard-gate-strength.mjs",
     "../lib/protected-test-paths.mjs",
     "./check-protected-path-integrity.mjs",
     "../lib/handover-rotation.mjs",
     "../lib/guard-maintenance-window.mjs",
+    "../lib/plan-spec-state-v2.mjs",
+    "./pipeline-state.mjs",
   ],
   "plugins/pipeline-core/scripts/commit-msg-hook-install.mjs": [
     "../lib/commit-message-policy.mjs",
