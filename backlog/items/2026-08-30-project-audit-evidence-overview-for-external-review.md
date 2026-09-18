@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.project-audit-evidence-overview-for-external-review
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-30
 sprint: nova-b
 tracking: "Nova B — PO requirement from the 0.6.0 three-runner greenfield evaluation: a reviewer of an independently developed project must be able to locate the Pipeline's applicable controls, human gates, exceptions, and evidence without relying on an operator's private local knowledge."
 source: "PO observation during the 0.6.0 greenfield evaluation, 2026-08-30. Direct inspection confirmed that durable project artifacts and private runtime ledgers are intentionally split across the tracked project tree and .git/agent-pipeline/, but no reviewer-facing map explains or links the split."
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 848d85b7f6d2ba9b63224d67e98099b197fdffe8
+closure_evidence: backlog/evidence/2026-09-18-audit-evidence-overview-closure.md
 ---
 
 # A project needs an audit-evidence overview that makes controls and exceptions discoverable

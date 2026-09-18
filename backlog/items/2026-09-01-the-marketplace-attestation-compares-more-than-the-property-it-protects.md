@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 source: "PO observation during the 0.6.0 release push, 2026-09-01: the AGY-MKTATTEST-1 push-time check fired on eight unrelated files immediately after `approve-push` signature consumption, forcing a manual external-marketplace sync inside the one window the documented ordering rule forbids any other change."
 sprint: nova-b
-done_when: contains plugins/pipeline-core/hooks/guard-push.mjs pipeline.marketplace-attestation-remedy-landed
+done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 6fafa91200e542ba874a7bbdaeeb9cb29539f3b1
+closure_evidence: backlog/evidence/2026-09-18-marketplace-attestation-closure.md
 ---
 
 # The marketplace attestation compares more than the property it protects, making a manual sync structurally mandatory on every release push

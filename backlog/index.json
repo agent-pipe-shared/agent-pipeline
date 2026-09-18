@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fb336f8ed0b2c9379c9559bffbe48806c41c457e905c5101216e181c936cf763"
+    "transitionHead": "5ffb5dcaa580186a444aa72e917c3834fbf6228a2c30600328f5272e212038b9"
   },
   "counts": {
-    "open": 68,
+    "open": 66,
     "in_progress": 1,
-    "closed": 590,
+    "closed": 592,
     "rejected": 3,
     "deferred": 11
   },
@@ -6210,14 +6210,18 @@
     },
     {
       "id": "pipeline.project-audit-evidence-overview-for-external-review",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "PO observation during the 0.6.0 greenfield evaluation, 2026-08-30. Direct inspection confirmed that durable project artifacts and private runtime ledgers are intentionally split across the tracked project tree and .git/agent-pipeline/, but no reviewer-facing map explains or links the split.",
       "deferred": false,
       "tracking": "Nova B — PO requirement from the 0.6.0 three-runner greenfield evaluation: a reviewer of an independently developed project must be able to locate the Pipeline's applicable controls, human gates, exceptions, and evidence without relying on an operator's private local knowledge.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "848d85b7f6d2ba9b63224d67e98099b197fdffe8",
+      "closureEvidence": "backlog/evidence/2026-09-18-audit-evidence-overview-closure.md"
     },
     {
       "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
@@ -8039,13 +8043,17 @@
     },
     {
       "id": "pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "PO observation during the 0.6.0 release push, 2026-09-01: the AGY-MKTATTEST-1 push-time check fired on eight unrelated files immediately after `approve-push` signature consumption, forcing a manual external-marketplace sync inside the one window the documented ordering rule forbids any other change.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "6fafa91200e542ba874a7bbdaeeb9cb29539f3b1",
+      "closureEvidence": "backlog/evidence/2026-09-18-marketplace-attestation-closure.md"
     },
     {
       "id": "pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write",

@@ -55,3 +55,10 @@ Disclosed and accepted unremediated for the 0.6.0 release: 0.6.0 shipped with
 this gap disclosed rather than remediated, by explicit PO decision. No valid
 privacy sign-off covers the shipped candidate; remediation (a fresh bounded
 re-review and re-binding §5) is deferred to `nova-b`.
+
+## PO decision, 2026-09-18 — Retain 2026-08-31 acceptance ruling
+
+The Product Owner reaffirmed the 2026-08-31 ruling for Nova B: retain the disclosed,
+accepted state without rewriting closed Phoenix epic digest records. Full candidate privacy
+sign-off is performed at the Nova candidate boundary, not by mutating closed historical records.
+

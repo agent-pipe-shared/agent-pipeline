@@ -23,11 +23,11 @@ for the detailed backlog records or an authority to publish changes.
 | P2 | Calibration twins must not turn one logical change into two protected ceremonies. | `project/pipeline.json` and `.claude/pipeline.json` are kept in sync today but still appear as separate user-facing authorities. The existing [calibration-twins item](items/2026-09-13-calibration-twins-should-have-one-canonical-writer-and-a-derived-copy.md) owns the migration design; no source behavior has changed. | Choose the canonical representation, derived-copy provenance, and consumer migration/readback before changing either protected calibration path. |
 | P2 | PO-facing commands must remain copy-safe across every runner. | The Greenfield-driven audit reconciled `onboarding-init.mjs` with the central renderer on 2026-09-18; a follow-up static import inventory found no remaining production direct import of the opaque renderer from its legacy module. The renderer and onboarding focused suites pass. | Design a durable emitter-conformance boundary; do not treat an import inventory as proof of the broader “every emitter” criterion. |
 | P2 | The release flow should be fast enough for ordinary releases. | Closed in 8fa47d91: PO decision D1 implemented via release-promotion-envelope with isRecordOnlyPath allowlist and one-way release-satisfies-push admission. | None required for Nova B; envelope active. |
-| P1 | Marketplace attestation compares more than the property it protects. | Push-time marketplace attestation check was decoupled from push publication in commit 6fafa912 (verified in human-guard-override.test.mjs 133/133 pass). The backlog item defines three permanent design options: 1) narrow comparison to executable guard surface (`hooks/` + imports), 2) replace equality with recorded provenance, 3) maintain publication decoupling. | PO to decide whether to retain complete decoupling or adopt Option 1 narrowed executable guard-surface comparison. |
-| P1 | Shipped AI hardening gate has no work package in approved epic spec. | The control (`ai-assisted-hardening.mjs`, `ai-assisted-hardening-gate.mjs`, `verify-topology-preflight.mjs`) is implemented and green, but unlisted in `specs/sprint-nova-epic/spec.md`. In-place edits to `spec.md` would invalidate `specSha256` in `pipeline-state.json`. | Adopt Option 1 (reconcile spec during formal candidate acceptance ceremony) or Option 2 (run standalone signed `feature-package-reconcile` now). |
-| P2 | Audit-evidence overview needed for external/independent review. | Greenfield evaluation confirmed durable Git artifacts and private `.git/agent-pipeline/` records are split with no reviewer-facing map. | Decide whether to publish static `docs/audit-evidence-overview.md` or a generated preflight index. |
-| P2 | Restricted-store files and privacy sign-off bound to superseded candidate. | Three restricted files (`human-decision-attribution.mjs` etc.) were built under authorized increment but omitted from closed Phoenix spec §§7.3-7.4; §5 sign-off is bound to superseded candidate. Re-binding requires rewriting closed epic digest records. | Retain 2026-08-31 PO ruling (disclose without rewriting closed epic authority; unify under Nova privacy review). |
-| P2 | Push approval occupies a single slot, serializing multi-destination releases. | `approve-push` writes single `pushApproval.lastApproved` slot; signing a second destination overwrites pending approval for the first. | Decide whether to batch destination approvals into a single signed subject or adopt a keyed destination store. |
+| P1 | Marketplace attestation compares more than the property it protects. | Closed: PO decision D4 adopts Option A (complete decoupling ratified). The push-time marketplace attestation check was decoupled in 6fafa912; closure evidence recorded in `backlog/evidence/2026-09-18-marketplace-attestation-closure.md`. | Completed. |
+| P1 | Shipped AI hardening gate has no work package in approved epic spec. | PO decision D5: retain code state (`ai-assisted-hardening.mjs`, `ai-assisted-hardening-gate.mjs`, `verify-topology-preflight.mjs`); defer spec reconciliation ceremony to formal candidate acceptance. | Candidate acceptance ceremony. |
+| P2 | Audit-evidence overview needed for external/independent review. | Closed: PO decision D6 published `docs/audit-evidence-overview.md`, doc governance entry, and `check-audit-evidence-overview.test.mjs`; closure evidence in `backlog/evidence/2026-09-18-audit-evidence-overview-closure.md`. | Completed. |
+| P2 | Restricted-store files and privacy sign-off bound to superseded candidate. | PO decision D7: retain 2026-08-31 PO ruling; preserve closed Phoenix epic digests without rewriting; privacy authority unified under Nova B candidate review. | Candidate privacy review. |
+| P2 | Push approval occupies a single slot, serializing multi-destination releases. | PO decision D8: accepted batch-destination approval direction in P1 Push-Lifecycle packet, eliminating serial re-signing loops. | Incorporate in Push-Lifecycle packet implementation. |
 
 ## Deferred PO decision packet — release-promotion simplification
 
@@ -62,6 +62,16 @@ outside this mechanism.
 - **D3 — ordinary commit provenance:** ordinary commits require genuine
   Dispatch/record provenance and never require a PO signature. These decisions
   grant neither a push, a release, nor a signing action.
+- **D4 — marketplace attestation decoupling:** ratified Option A (complete decoupling
+  from push publication); closed backlog item with closure evidence.
+- **D5 — AI hardening gate spec home:** retain current code implementation; defer
+  spec reconciliation to formal Nova B candidate acceptance ceremony.
+- **D6 — audit-evidence overview:** published `docs/audit-evidence-overview.md`
+  and automated test suite; closed backlog item with closure evidence.
+- **D7 — historic Phoenix privacy artifacts:** retain 2026-08-31 PO ruling without
+  retroactively modifying closed epic digest records; candidate privacy review governs Nova B.
+- **D8 — multi-destination push approval slot:** adopted batch-destination approval
+  direction within P1 Push-Lifecycle architecture packet.
 
 ## Explicit non-actions
 

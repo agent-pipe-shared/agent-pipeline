@@ -465,7 +465,7 @@
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
 | pipeline.product-capability-inventory-missing-two-new-guard-hooks | closed | defect | pipeline | — | 2026-08-19 | — | — |
 | pipeline.product-capability-inventory-two-guard-hooks-uncategorized | closed | defect | pipeline | — | 2026-08-19 | — | — |
-| pipeline.project-audit-evidence-overview-for-external-review | open | requirement | pipeline | nova-b | 2026-08-30 | — | Nova B — PO requirement from the 0.6.0 three-runner greenfield evaluation: a reviewer of an independently developed project must be able to locate the Pipeline's applicable controls, human gates, exceptions, and evidence without relying on an operator's private local knowledge. |
+| pipeline.project-audit-evidence-overview-for-external-review | closed | requirement | pipeline | nova-b | 2026-08-30 | — | Nova B — PO requirement from the 0.6.0 three-runner greenfield evaluation: a reviewer of an independently developed project must be able to locate the Pipeline's applicable controls, human gates, exceptions, and evidence without relying on an operator's private local knowledge. |
 | pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | closed | defect | pipeline | — | 2026-08-09 | — | — |
@@ -600,7 +600,7 @@
 | pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
-| pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | — | 2026-08-27 | — | — |
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | nova-b | 2026-08-31 | — | — |
@@ -681,8 +681,8 @@
 
 ## Counts
 
-- open: 68
+- open: 66
 - in_progress: 1
-- closed: 590
+- closed: 592
 - rejected: 3
 - deferred: 11

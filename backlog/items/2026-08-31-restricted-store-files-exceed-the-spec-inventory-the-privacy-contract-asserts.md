@@ -192,3 +192,11 @@ fires on `mutability` rather than `state`, but it is a discrepancy in a
 digest-bound record. Separately, whether any already-persisted
 `restricted-machine-local` record encodes the file path rather than only the
 schema string was not checked; if it does, route 2 costs more than stated.
+
+## PO decision, 2026-09-18 — Retain 2026-08-31 acceptance ruling without rewriting closed epic digests
+
+The Product Owner confirmed retaining the 2026-08-31 acceptance ruling for Nova B.
+Retroactive edits to closed Phoenix epic authority (`specs/sprint-phoenix-epic/lifecycle.json` and `spec.md`)
+remain out of scope and rejected. The three restricted-store files remain disclosed and accepted unremediated;
+privacy authority is unified under Nova's candidate-level privacy review.
+
