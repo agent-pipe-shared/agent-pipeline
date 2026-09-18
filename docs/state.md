@@ -29,16 +29,15 @@
 
 ### 2026-09-18 operational recovery: closed-item verification audit
 
-The Human requested a fresh audit of all closed Nova-B items and acceptance
-criteria against actual implementation, wiring, tests and review evidence.
-The starting checkout is `9c179fc7`; it was clean. The lifecycle inspector
-reports `PLAN-LIFECYCLE-CURRENT`, approved `sprint-nova-epic`, implementation.
-The September 12 counts and pending-work statements below are historical
-claims requiring reconciliation: September 18 commits close additional items
-and freeze candidate evidence. Neither those closures nor the freeze establish
-this audit's result. The available latest Verify artifact binds `986f8f03`,
-not the starting checkout. Inventory and bounded verification dispatches are
-next; no current-candidate PASS or completed audit is claimed.
+The [Nova-B audit](../backlog/evidence/2026-09-18-nova-b-current-code-audit/report.md)
+represents all 129 closed items, 94 base ACs and B61/B62/B7; coverage is not
+acceptance. Fresh no-reuse release Verify on `396f9b7c` was RED: 547/555 passed.
+Evidence records a reproduced promotion-validator defect, missing runtime
+connections, a frozen Verify candidate mismatch and corrected audit claims.
+Closed statuses and the old green freeze do not establish completion.
+Product repairs, independent review and native proof remain open. Approved
+`sprint-nova-epic` stays in implementation; no release is approved.
+
 
 **Release state:** version `0.6.1` · tag `v0.6.1` · commit `6262d408aa616651232b46ab8ecbfd88ce4055b0` · tree `69b12f1d8714de57e22acb730a09f4bbac067360` · status `published`
 
