@@ -10,19 +10,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { test as nodeTest } from "node:test";
-import { mkdtempSync, mkdirSync, openSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { createReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
-import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
-
-// The completion helper registers the cases with node:test; retain the standard
-// runner import so the suite is classified as a node:test module by Verify.
-void nodeTest;
-
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 
 function freshRepo(prefix) {
@@ -58,11 +52,7 @@ function runGuard(cmd, repoDir) {
   });
 }
 
-const cases = [
-  {
-    id: "GPP01",
-    name: "valid promotion envelope allows record-only commit",
-    run() {
+nodeTest("valid promotion envelope allows record-only commit", () => {
       const dir = freshRepo("allow");
       try {
         const commitSResult = gitAt(dir, "rev-parse", "HEAD");
@@ -102,12 +92,9 @@ const cases = [
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
-    },
-  },
-  {
-    id: "GPP02",
-    name: "tampered promotion envelope is rejected",
-    run() {
+});
+
+nodeTest("tampered promotion envelope is rejected", () => {
       const dir = freshRepo("tampered");
       try {
         const commitSResult = gitAt(dir, "rev-parse", "HEAD");
@@ -139,11 +126,4 @@ const cases = [
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
-    },
-  },
-];
-
-const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
-  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
-  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
-registerTestCaseCompletion({ cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+});
