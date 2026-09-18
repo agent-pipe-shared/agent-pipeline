@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Agent-Pipeline are documented here. `0.6.2` is the
+All notable changes to Agent-Pipeline are documented here. `0.6.3` is the
 most recently published version; `0.6.0` was a candidate and was never
 published. A version recorded here is not, by itself, a tag, GitHub Release,
 marketplace publication, remote readback, or production-support claim. Read
@@ -8,9 +8,19 @@ the corresponding release evidence for those observations.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): the `0.4.0` release candidate uses stable SemVer surfaces; a version in this file is not a tag, GitHub Release, marketplace publication, or remote readback.
 
-## [Unreleased] — 0.6.3 local candidate, assembling
+## [Unreleased] — 0.7.0 local architecture candidate
 
-Not a tag, not a release. This section contains only post-`0.6.2` repairs.
+Not a tag, not a release. This section records the Alfred architecture scope
+being exercised locally after `0.6.3`.
+
+### Added
+
+- **Staged architecture adoption for existing repositories.** A repository
+  without an adoption state is detected explicitly, receives a bounded
+  roadmap proposal, and requires a durable PO disposition before planning can
+  proceed. Architecture maps, baselines, fitness checks, remedy choices, and
+  typed feature-close impact make the resulting documentation a maintained
+  project surface rather than a one-time migration artifact.
 
 ### Fixed
 

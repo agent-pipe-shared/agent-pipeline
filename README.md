@@ -69,9 +69,9 @@ Around those roles:
   remain with the human where the project calibration and action require them;
   evidence never creates that authority.
 
-> **Documentation line: `0.6.3`.** This is the next release's documented scope,
-> not a tag, installation recommendation, production-availability claim, or
-> evidence that a local candidate has passed its release gates.
+> **Documentation line: `0.7.0`.** This is the Alfred architecture scope being
+> exercised as a local candidate, not a tag, installation recommendation,
+> production-availability claim, or evidence that its release gates passed.
 
 > **What you can inspect:** a candidate-bound Verify receipt, security-scan
 > status, review and approval records where the project requires them, and a
@@ -202,9 +202,10 @@ dauerhaften, später einsehbaren Nachweis.
 > für den Lifecycle und lies anschließend [Usage](docs/usage.md). Die weiteren Links sind
 > Nachschlagewerk.
 
-> **Dokumentationslinie: `0.6.3`.** Sie beschreibt den dokumentierten Umfang
-> des nächsten Releases, keinen Tag, keine Installationsempfehlung, keine
-> Produktivverfügbarkeit und keinen Nachweis bestandener lokaler Release-Gates.
+> **Dokumentationslinie: `0.7.0`.** Sie beschreibt den Alfred-Architekturumfang,
+> der als lokaler Kandidat erprobt wird, keinen Tag, keine
+> Installationsempfehlung, keine Produktivverfügbarkeit und keinen Nachweis
+> bestandener Release-Gates.
 
 > **Was du prüfen kannst:** kandidatengebundene Verify-Receipts,
 > Security-Scan-Status sowie erforderliche Review- und Freigabe-Nachweise. Ein

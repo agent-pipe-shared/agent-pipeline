@@ -6,13 +6,14 @@ bounded change, deterministic evidence, independent review, and a preserved
 decision. Candidate-bound receipts and validated packages can support an audit
 trail; they do not certify compliance or replace an auditor.
 
-## The next release line: 0.6.3
+## The next release line: 0.7.0
 
-`0.6.3` names the next release's documented scope. It is not a tag,
-installation recommendation, production-availability claim, or proof that a
-local candidate has passed release gates. Its scoped maintenance work makes
-linked-worktree delivery evidence canonical and lets an intact managed
-pre-push hook update across renderer revisions.
+`0.7.0` names the Alfred architecture scope currently exercised as a local
+candidate. It is not a tag, installation recommendation, production-
+availability claim, or proof that release gates passed. The scope adds a
+staged adoption route for existing repositories, a machine-readable
+architecture map, baseline and fitness checks, and typed architecture impact
+at feature close.
 
 | Product strand | What it contributes to this release scope | Status |
 | --- | --- | --- |
