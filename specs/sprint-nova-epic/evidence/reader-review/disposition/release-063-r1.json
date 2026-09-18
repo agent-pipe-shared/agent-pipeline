@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "release-063-r1",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "bootstrap-profile-order",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "e2ac986c853b2cf7fa9b5eb57a1e0ebc647dbbbd"
+    },
+    {
+      "id": "human-go-no-go-authority",
+      "class": "fileline",
+      "status": "resolved",
+      "resolutionCommit": "e2ac986c853b2cf7fa9b5eb57a1e0ebc647dbbbd"
+    },
+    {
+      "id": "verify-mode-selection-order",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "e2ac986c853b2cf7fa9b5eb57a1e0ebc647dbbbd"
+    }
+  ]
+}
