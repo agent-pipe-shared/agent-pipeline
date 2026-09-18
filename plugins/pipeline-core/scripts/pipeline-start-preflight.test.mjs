@@ -16,7 +16,7 @@ import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
   STATUS_SCOPE, CONCURRENT_SESSION_WARNING_SCHEMA, resolveActiveRunner, resolveCodexAttestationSourceForPreflight,
-  resolvePluginManifestVersion,
+  resolvePluginManifestVersion, observeCodexRegistryContentBinding,
 } from "./pipeline-start-preflight.mjs";
 import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
@@ -855,6 +855,42 @@ test("the Claude local-development id is accepted only from an attested director
       null,
     );
   }
+});
+
+// Greenfield runner regression: a cache directory can retain an old installer
+// while keeping the same cachebuster/manifest version as its marketplace
+// source. Version comparison alone would call this current; the binding must
+// compare the complete physical snapshots and make the discrepancy actionable.
+test("Codex registry binding rejects equal manifest versions with stale cached installer bytes", (t) => {
+  const base = mkdtempSync(join(tmpdir(), "preflight-codex-registry-content-"));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const sourceRoot = join(base, "marketplace", "plugins", "pipeline-core");
+  const installedRoot = join(base, "cache", "pipeline-core", "candidate");
+  const version = "0.6.2+codex.20260917090016.4c10f238";
+  const writePlugin = (root, installer) => {
+    mkdirSync(join(root, ".codex-plugin"), { recursive: true });
+    mkdirSync(join(root, "scripts"), { recursive: true });
+    writeFileSync(join(root, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "pipeline-core", version }));
+    writeFileSync(join(root, "scripts", "pre-push-hook-install.mjs"), installer);
+  };
+  writePlugin(sourceRoot, "export const installer = 'current';\n");
+  writePlugin(installedRoot, "export const installer = 'current';\n");
+
+  assert.deepEqual(observeCodexRegistryContentBinding({
+    registrySourcePluginRoot: sourceRoot,
+    installedPluginRoot: installedRoot,
+    plugin: { name: "pipeline-core", version },
+  }), { status: "ready", reasonCodes: [] });
+
+  writeFileSync(join(installedRoot, "scripts", "pre-push-hook-install.mjs"), "export const installer = 'stale';\n");
+  assert.deepEqual(observeCodexRegistryContentBinding({
+    registrySourcePluginRoot: sourceRoot,
+    installedPluginRoot: installedRoot,
+    plugin: { name: "pipeline-core", version },
+  }), {
+    status: "unavailable",
+    reasonCodes: ["IPA-HOST-REGISTRY-CONTENT-MISMATCH"],
+  });
 });
 
 test("a Gitless Codex local-development install is ready only with its installer-owned receipt", (t) => {
