@@ -6,17 +6,18 @@ bounded change, deterministic evidence, independent review, and a preserved
 decision. Candidate-bound receipts and validated packages can support an audit
 trail; they do not certify compliance or replace an auditor.
 
-## The next release line: 0.6.2
+## The next release line: 0.6.3
 
-`0.6.2` names the next release's documented scope. It is not a tag,
+`0.6.3` names the next release's documented scope. It is not a tag,
 installation recommendation, production-availability claim, or proof that a
-local candidate has passed release gates. The planned scope combines the
-integrated Phoenix foundation with the documented Nova increment.
+local candidate has passed release gates. Its scoped maintenance work makes
+linked-worktree delivery evidence canonical and lets an intact managed
+pre-push hook update across renderer revisions.
 
 | Product strand | What it contributes to this release scope | Status |
 | --- | --- | --- |
 | Phoenix | Durable delivery governance: explicit human decisions, candidate-bound evidence, deterministic gates before review, safe external-action boundaries, and recoverable public records. | Integrated foundation |
-| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Active; the listed subset is planned for `0.6.2` |
+| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Existing foundation; Nova B remains roadmap work |
 
 The documented Greenfield route is covered for Claude, Codex, and Antigravity:
 from an empty directory through public onboarding actions, plan approval and a

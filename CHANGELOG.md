@@ -1,18 +1,33 @@
 # Changelog
 
-All notable changes to Agent-Pipeline are documented here. `0.6.1` is the
-current release; `0.6.0` was a candidate and was never published. A version
-recorded here is not, by itself, a tag, GitHub Release, marketplace
-publication, remote readback, or production-support claim — `0.6.1` happens to
-carry all of those, and the entry below says so explicitly rather than leaving
-it to be inferred from the heading.
+All notable changes to Agent-Pipeline are documented here. `0.6.2` is the
+most recently published version; `0.6.0` was a candidate and was never
+published. A version recorded here is not, by itself, a tag, GitHub Release,
+marketplace publication, remote readback, or production-support claim. Read
+the corresponding release evidence for those observations.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): the `0.4.0` release candidate uses stable SemVer surfaces; a version in this file is not a tag, GitHub Release, marketplace publication, or remote readback.
 
-## [Unreleased] — 0.6.2 local candidate, assembling
+## [Unreleased] — 0.6.3 local candidate, assembling
 
-Not a tag, not a release. This section accumulates what has landed on `nova`
-since `0.6.1` and states, per item, what is proven and what is not. Status
+Not a tag, not a release. This section contains only post-`0.6.2` repairs.
+
+### Fixed
+
+- **Linked-worktree delivery evidence now has one canonical home.** Verify,
+  security scanning, push preparation, and the managed pre-push hook resolve
+  their latest evidence through the repository's shared primary worktree. A
+  candidate prepared in a linked worktree therefore validates the same
+  candidate-bound records that its push hook reads.
+- **A managed pre-push hook can self-update across implementation revisions.**
+  The installer now verifies its recorded managed artifact by marker and file
+  digest, then plans an upgrade when the current renderer has changed. An
+  intact older managed hook is no longer misclassified as foreign.
+
+## [0.6.2] — 2026-09-17
+
+This released-source record accumulates what landed on `nova` since `0.6.1`
+and states, per item, what is proven and what is not. Status
 words are load-bearing: **built** means committed with tests green by hand;
 **gated** means those tests run in the verify gate; **wired** means a hook is
 registered and fires; **exercised** means run against the real thing at least

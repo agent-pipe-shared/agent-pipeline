@@ -492,7 +492,7 @@ Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
 keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis
 jeder semantischen Eigenschaft.
 
-`0.6.2` bezeichnet den dokumentierten Umfang des nächsten Source- und Plugin-
+`0.6.3` bezeichnet den dokumentierten Umfang des nächsten Source- und Plugin-
 Releases. Das ist weder ein Tag noch eine Installations- oder
 Verfügbarkeitsaussage:
 

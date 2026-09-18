@@ -23,7 +23,7 @@ inspect later.
 > for the lifecycle, and then use [Usage](docs/usage.md). The links below are
 > optional reference.
 
-> **Documentation line: `0.6.2`.** This is the next release's documented scope,
+> **Documentation line: `0.6.3`.** This is the next release's documented scope,
 > not a tag, installation recommendation, production-availability claim, or
 > evidence that a local candidate has passed its release gates.
 
@@ -205,7 +205,7 @@ dauerhaften, später einsehbaren Nachweis.
 > für den Lifecycle und lies anschließend [Usage](docs/usage.md). Die weiteren Links sind
 > Nachschlagewerk.
 
-> **Dokumentationslinie: `0.6.2`.** Sie beschreibt den dokumentierten Umfang
+> **Dokumentationslinie: `0.6.3`.** Sie beschreibt den dokumentierten Umfang
 > des nächsten Releases, keinen Tag, keine Installationsempfehlung, keine
 > Produktivverfügbarkeit und keinen Nachweis bestandener lokaler Release-Gates.
 
