@@ -4681,7 +4681,7 @@ check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) st
   assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
 });
 
-assert.equal(cases.length, 281, "the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 283, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

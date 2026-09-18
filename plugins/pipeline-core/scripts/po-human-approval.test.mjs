@@ -123,53 +123,6 @@ function writeEd25519KeyPair(privateKeyPath, publicKeyPath, passphrase = null) {
 }
 
 /**
- * The ceremony's PRODUCTION signing path shells out to `openssl pkeyutl -sign`
- * (po-human-approval.mjs:923) on purpose: the operator's private key is handed
- * to openssl and never read into this process. Tests that drive a real signature
- * therefore need the binary, and are gated on it rather than rewritten against
- * node crypto -- reimplementing the signature here would test a different thing
- * than the one that ships.
- *
- * Under CI's runner-free Core Verify the PATH holds only node/git/bash/sh, so
- * those tests report a typed skip naming the missing tool instead of a wall of
- * assertions that read like a broken ceremony (backlog:
- * pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path). Everything that
- * does NOT reach the real signature -- argument parsing, fail-closed paths,
- * confirmation cancellation, disclosure text, symlink refusals -- stays active
- * on every host, and the fixture keypairs no longer need openssl at all.
- */
-const opensslProbe = spawnSync("openssl", ["version"], { stdio: "pipe" });
-const REQUIRES_OPENSSL = opensslProbe.error != null || opensslProbe.status !== 0
-  ? "requires the openssl binary, which is not on PATH (the ceremony's production signing path shells out to it)"
-  : false;
-
-/**
- * Fixture keypair generation, in exactly the encodings openssl produces:
- * unencrypted PKCS#8 (`genpkey -algorithm ED25519`) or, with a passphrase,
- * aes-256-cbc-encrypted PKCS#8 carrying the "ENCRYPTED PRIVATE KEY" armor that
- * `isPrivateKeyPassphraseProtected` reads (`genpkey -aes-256-cbc`); the public
- * half is SPKI either way (`pkey -pubout`).
- *
- * Generated through node:crypto rather than by shelling out, because CI's
- * runner-free Core Verify step trims PATH to node/git/bash/sh and an openssl
- * fixture call fails there with a bare assertion (backlog:
- * pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path). This is FIXTURE
- * material only -- what production's `setup` generates and what `sign-intent`
- * accepts is untouched.
- */
-function writeEd25519KeyPair(privateKeyPath, publicKeyPath, passphrase = null) {
-  const privateKeyEncoding = passphrase === null
-    ? { type: "pkcs8", format: "pem" }
-    : { type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase };
-  const { privateKey, publicKey } = generateKeyPairSync("ed25519", {
-    privateKeyEncoding,
-    publicKeyEncoding: { type: "spki", format: "pem" },
-  });
-  writeFileSync(privateKeyPath, privateKey);
-  writeFileSync(publicKeyPath, publicKey);
-}
-
-/**
  * Throwaway, unencrypted, test-only Ed25519 keypair placed directly in the fixture's
  * external directory. This is fine for a test fixture only because a test cannot
  * supply an interactive passphrase; it does not change what the real `setup`
