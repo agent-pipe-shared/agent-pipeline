@@ -241,34 +241,6 @@ follows the close boundary under its own evidence and approval rules.
 Pipeline-source migration commands belong to the occasional maintainer path,
 not this consumer lifecycle. See [SETUP](SETUP.md) for that path and for the
 ordered runner binding, restart, classification, and adoption procedure.
-
-## Support boundary and current scope
-
-This guide describes the V3 process and its configuration points. It does
-not turn a repository rule into host-wide enforcement, a governance path into IAM,
-a requested route into observed model identity, or a machine gate into proof of
-every semantic property.
-
-- The completed Phoenix product strand is integrated as the delivery-governance
-  foundation: candidate-bound evidence and approvals, deterministic checks
-  before independent review, recoverable operational records, and typed
-  boundaries for external actions.
-- Nova's candidate-ready increment is included: the guided Greenfield Driver,
-  a practical first project, and runner-aware delivery.
-- Nova B remains open as a roadmap item — smoother plan amendment and close
-  flows, clearer cross-runner approval and verification guidance, stronger
-  delivery-loop observability, and remaining platform- or runner-specific
-  evidence.
-- The three-runner Greenfield contract is covered for Claude, Codex, and
-  Antigravity, but that coverage is not a claim of identical native
-  enforcement per host.
-- This release does not claim publication, a Git tag, marketplace
-  availability, or production support.
-
-For normative detail, see the [Operating Model](docs/operating-model.md). For
-adoption and migration, use [SETUP.md](SETUP.md) and
-[docs/migration.md](docs/migration.md). For the optional deploy tail, see
-[docs/deploy/README.md](docs/deploy/README.md).
 ---
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->

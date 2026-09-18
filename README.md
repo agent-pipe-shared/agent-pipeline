@@ -145,24 +145,20 @@ that:
   phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
   bootstrap and consultation is on demand)
 
-## Source-maintainer reference
-
-Source maintainers can find the checkout commands and V3 authority sequence in
-[Maintain a shared pipeline source](SETUP.md). Routine adopters should follow
-the consumer path above.
-
-## Runtime
-
-Supported runner integrations can enforce configured guards. The methodology
-remains portable; see [`docs/runtime-boundary.md`](docs/runtime-boundary.md)
-for current runner boundaries and setup requirements.
-
 ## Learn more
 
 Follow the canonical [documentation map](docs/README.md): it keeps adoption,
 enforcement, evidence, security, cost, and maintainer references in one order.
 For the normative contract, read [`docs/operating-model.md`](docs/operating-model.md).
 - [`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional Permission; see [`docs/licensing.md`](docs/licensing.md).
+
+### Maintainer and runtime reference
+
+Source maintainers can find checkout commands and the V3 authority sequence in
+[Maintain a shared pipeline source](SETUP.md). Supported runner integrations
+can enforce configured guards, while the methodology remains portable; see
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for current boundaries
+and setup requirements.
 
 ## Acknowledgments
 
