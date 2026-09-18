@@ -255,3 +255,40 @@ commit; consumer-safe-paths check unevidenced), code confirmed correct;
 both remediated. Round 2 (fix-verification scope, two-round cap exhausted):
 PASS. Full findings, including the disposed EL-01 authorship finding and
 two minor follow-ups filed: `backlog/evidence/2026-09-06-nva-b-codexguardimport-1-findings.md`.
+
+## Progress note (2026-09-18, Greenfield copy-safe audit)
+
+The repo-wide audit found `scripts/onboarding-init.mjs` as one more
+operator-facing emitter which imported `boundedOpaqueCopyCommand` directly
+from `project-onboarding-v3.mjs`.  It now imports the exact same function
+through `copy-safe-command.mjs`, the central re-export used by the other
+reconciled emitters.  This is intentionally a byte-identical wiring change,
+not a new renderer: the renderer suite asserts the two exports are the same
+function object.
+
+Focused verification passed outside the restricted runner sandbox, whose
+child-process restriction otherwise makes the real shell/Git fixtures fail
+before the tested code runs:
+
+- `node plugins/pipeline-core/scripts/onboarding-init.test.mjs` — 29/29.
+- `node plugins/pipeline-core/lib/copy-safe-command.test.mjs` — 34/34.
+
+The item remains open.  The audit established another concrete emitter but
+does not yet prove the full acceptance criterion that every current and future
+PO-facing command producer routes through the shared renderer.
+
+## Static emitter-inventory refinement (2026-09-18)
+
+A source-only follow-up inventory found no remaining production import of
+`boundedOpaqueCopyCommand` directly from `project-onboarding-v3.mjs` outside
+the renderer itself.  The reconciled operator-facing users now obtain it from
+`copy-safe-command.mjs`: Codex and Antigravity pretool guards,
+`human-guard-override.mjs`, and `onboarding-init.mjs`.  The remaining direct
+imports of `project-onboarding-v3.mjs` in production code are for non-renderer
+APIs (`inspectProjectOnboardingV3`, seed generation, or `shellWord` inside the
+registered human-terminal-action builder), not the opaque command renderer.
+
+This is deliberately narrower than the acceptance criterion: a symbol-import
+inventory cannot prove that a future or differently shaped PO-facing producer
+will use the renderer.  It closes no ledger state and creates no duplicate
+backlog item; a durable conformance boundary remains the necessary follow-up.

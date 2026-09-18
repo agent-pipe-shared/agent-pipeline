@@ -14,13 +14,17 @@
  *   write, pretty-printed and meant to be git-committed (same audit-trail philosophy
  *   as `.claude/guard-override.log.jsonl`).
  *
- * ONE NAMED EXCEPTION (NVA-CF-VERIFYDEADLOCK): `set-phase --phase implementation`
+ * TWO NAMED VERIFY-RECOVERY ROUTES (NVA-CF-VERIFYDEADLOCK): `set-phase --phase implementation`
  * additionally writes the calibration's `verify` field (`project/pipeline.json`,
  * plus its legacy `.claude/pipeline.json` twin when present) when `--verify-command`
  * is supplied, or refuses the transition outright if the calibration still carries
  * the seeded UNCONFIGURED_VERIFY placeholder and no command was supplied. This is
- * the one sanctioned moment that write is allowed to happen, mirroring the
- * trust-anchor "same transaction" fix pattern -- see the comment on
+ * the one sanctioned moment that write is allowed to happen. A project which
+ * deliberately entered implementation on that baseline may later use the
+ * separately typed `configure-verify --verify-command <command>` route. That
+ * route is closed to every lifecycle except established implementation and
+ * accepts only two intact, identical baseline calibration twins. Both routes
+ * mirror the trust-anchor "same transaction" fix pattern -- see the comment on
  * `readCalibrationVerifyStatus()` below for the full rationale.
  *
  * SCHEMA (`pipeline.state.v0`) -- the file this CLI reads/writes:
@@ -3335,6 +3339,96 @@ function readCalibrationVerifyStatus(dir) {
 }
 
 /**
+ * The late recovery must not repair calibration drift while configuring verify.
+ * It therefore requires the two ordinary compatibility twins to exist, parse as
+ * plain JSON objects, be structurally identical, and carry the same verify
+ * classification. This validates the complete write set before the canonical
+ * writer below is invoked, so a missing or malformed sibling never results in a
+ * partial configuration write.
+ */
+function readIdenticalCalibrationVerifyTwins(dir) {
+  const parsed = [];
+  for (const relPath of [AUTHORITY_ARTIFACTS.calibration.neutral, AUTHORITY_ARTIFACTS.calibration.legacy]) {
+    const path = join(dir, relPath);
+    if (!existsSync(path)) return { status: "missing" };
+    try {
+      const value = JSON.parse(readFileSync(path, "utf8"));
+      if (value === null || typeof value !== "object" || Array.isArray(value)) return { status: "malformed" };
+      parsed.push(value);
+    } catch {
+      return { status: "malformed" };
+    }
+  }
+  if (!sameJson(parsed[0], parsed[1])) return { status: "drifted" };
+  const status = classifyVerifyCommand(parsed[0].verify);
+  return status === "configured"
+    ? { status, command: parsed[0].verify }
+    : { status };
+}
+
+/**
+ * The late route is narrower than merely having `phase: implementation`: the
+ * shared lifecycle projection must confirm a current, authorized approval.
+ * Keeping this predicate exported lets every caller which advertises or admits
+ * the route use the writer's exact authority boundary.
+ */
+export function isLateVerifyRecoveryLifecycle(lifecycle) {
+  return lifecycle?.ok === true
+    && lifecycle.status === "implementing"
+    && lifecycle.code === "PLAN-LIFECYCLE-CURRENT"
+    && lifecycle.approvalCurrent === true;
+}
+
+/**
+ * Read-only, driver-safe presentation of the one sanctioned late recovery.
+ * Returning null is intentional for malformed state, stale authority, missing
+ * twins and calibration drift: none of those conditions may be repaired by a
+ * verify-command write.
+ */
+export function buildLateVerifyRecoveryAction(dir, state = null) {
+  const resolvedState = state ?? (() => {
+    const existing = readState(dir);
+    return existing.status === "ok" ? existing.state : null;
+  })();
+  if (resolvedState === null) return null;
+  const lifecycle = derivePlanLifecycle(resolvedState);
+  if (!isLateVerifyRecoveryLifecycle(lifecycle)) return null;
+  const verifyTwins = readIdenticalCalibrationVerifyTwins(dir);
+  if (verifyTwins.status !== "baseline-only") return null;
+  const scriptPath = fileURLToPath(import.meta.url);
+  const rendered = boundedCopySafeCommand({
+    executable: process.execPath,
+    argv: [scriptPath, "configure-verify", "--verify-command", placeholder("<project verify command>")],
+  });
+  return {
+    kind: "collect-input",
+    inputs: [{
+      name: "verify-command",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: 32_768,
+      singleLine: true,
+      rejectNul: true,
+    }],
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "implementation is using the deliberate baseline-only verification contract. Before push readiness, provide this project's real verification command and execute the exact configure-verify apply action; do not edit calibration files or use a human-override capability.",
+    applyAction: {
+      kind: "command",
+      ...rendered,
+      mutation: true,
+      // Replacing a protected verify command changes what later executes at
+      // release verification. The driver may collect the project command
+      // without a prompt, but the actual calibration mutation needs a fresh
+      // attended confirmation.
+      requiresConfirmation: true,
+    },
+    expected: { schema: INSPECT_SCHEMA, statuses: ["implementing"] },
+  };
+}
+
+/**
  * Writes `command` into the calibration's `verify` field for every twin tier that
  * actually exists (`project/pipeline.json` AND its legacy `.claude/pipeline.json`
  * compatibility copy, seeded byte-identical on day one) so this never introduces
@@ -3807,6 +3901,8 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     };
   }
   if (lifecycle.status === "implementing") {
+    const lateVerifyRecovery = buildLateVerifyRecoveryAction(dir, state);
+    if (lateVerifyRecovery !== null) return lateVerifyRecovery;
     const threatModel = resolvePushThreatModelArtifact(dir);
     if (!threatModel.ok) {
       return {
@@ -8466,6 +8562,48 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log('Phase set: "implementation"; lifecycle="implementing".');
+      return 0;
+    }
+
+    // NVA-GF-LATEVERIFY-1: an intentionally baseline-only project can enter
+    // implementation before its real test command is known. This is the one
+    // later, typed recovery -- deliberately separate from set-phase so it
+    // cannot turn an unrelated lifecycle transition into a calibration writer.
+    // It never repairs a missing, malformed or diverged twin, and an already
+    // configured contract is accepted only as an exact zero-write replay.
+    case "configure-verify": {
+      const parsed = parseExactFlags(rest, new Set(["verify-command"]));
+      if (!parsed.ok || classifyVerifyCommand(parsed.value["verify-command"]) !== "configured") {
+        console.error('Error: configure-verify requires exactly --verify-command <real, non-blank verification command>; the seeded UNCONFIGURED_VERIFY placeholder is refused.');
+        return 2;
+      }
+      const lifecycle = derivePlanLifecycle(base);
+      if (!isLateVerifyRecoveryLifecycle(lifecycle)) {
+        console.error(`Error: configure-verify requires an established implementing lifecycle (${lifecycle.code ?? "PS-LIFECYCLE-NOT-IMPLEMENTING"}); zero calibration write.`);
+        return 2;
+      }
+      const twins = readIdenticalCalibrationVerifyTwins(dir);
+      const command = parsed.value["verify-command"];
+      if (twins.status === "configured" && twins.command === command) {
+        console.log("Verify command already configured; exact zero-write replay accepted.");
+        return 0;
+      }
+      if (twins.status !== "baseline-only") {
+        console.error(`Error: configure-verify requires two intact, identical baseline-only calibration twins (${twins.status}); zero calibration write.`);
+        return 2;
+      }
+      const written = writeCalibrationVerifyCommand(dir, command);
+      if (written.length !== 2
+        || written[0] !== AUTHORITY_ARTIFACTS.calibration.neutral
+        || written[1] !== AUTHORITY_ARTIFACTS.calibration.legacy) {
+        // The full write set was validated immediately above. This defensive
+        // failure is retained for an unexpected filesystem race; callers must
+        // inspect the durable files rather than treating an incomplete result
+        // as a successful recovery.
+        console.error("Error: configure-verify could not write both calibration twins; inspect calibration before retrying.");
+        return 2;
+      }
+      console.log("Verify command configured for the established implementation lifecycle.");
       return 0;
     }
 

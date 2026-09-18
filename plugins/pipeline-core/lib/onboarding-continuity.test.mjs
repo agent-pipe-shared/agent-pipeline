@@ -3688,22 +3688,11 @@ for (const stage of INTAKE_CHECKPOINT_WRITE_FAULT_STAGES) {
     assert.equal(recovered.checkpoint.values.language, "en");
     assert.equal(recovered.checkpoint.values.profile, "feature");
     if (stage === "rename" || stage === "directory-fsync") {
-      // Narrow, named, non-blocking gap: the crashed write already fully
-      // committed (see above), so this identical-values retry is a true
-      // no-op that returns from applyIntakeCheckpointMutation's UNLOCKED
-      // fast path -- it never touches the lock at all, so the stale lock
-      // the crash left behind is NOT cleaned up here. This is not a data-
-      // correctness bug (the checkpoint content itself is exactly right,
-      // and acquireLock()'s existing same-token/staleness recovery already
-      // handles this lock cleanly the next time a call actually has
-      // something to write) -- proven below with one such real mutation.
-      assert.equal(existsSync(paths.lock), true, "documents the known no-op-retry-never-releases-a-stale-lock gap");
-      const nextRealMutation = applyOnboardingIntakeConsent({
-        rootDir: root, granted: true, profile: "feature", gitAuthor: { name: "A", email: "a@example.com" }, activate: true,
-        deps: { lockStaleMs: 0, nowMs: Date.now() + 120_000 },
-      });
-      assert.equal(nextRealMutation.mutated, true);
-      assert.equal(existsSync(paths.lock), false, "the next call with real work to do does clean up the stale lock");
+      // The crash already published a complete checkpoint.  Its identical
+      // retry remains checkpoint-byte-null, but now exercises the existing
+      // schema/token/age-gated stale-lock recovery so it does not strand the
+      // next real intake mutation behind KICKOFF-LOCKED.
+      assert.equal(existsSync(paths.lock), false, "the identical retry reclaims its own stale writer lock");
     } else {
       assert.equal(existsSync(paths.lock), false);
     }

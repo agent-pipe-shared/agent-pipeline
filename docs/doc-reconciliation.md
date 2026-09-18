@@ -459,6 +459,12 @@ The candidate makes the Codex sandbox runtime fixture independent of the local W
 
 - ADR-0041: checked, no change needed.
 
+## Candidate 3f1309646482dc2070b3772817e5270f0fe470f6 — 2026-09-17, local Verify fixture-root reconciliation
+
+The candidate moves Local Supervisor test fixtures from the operator home directory to the existing repository-local test scratch helper. It changes no Local Supervisor state, ownership, DACL, or repair behavior; it lets the unchanged assertions run under a restricted runtime whose home is read-only.
+
+- ADR-0070: checked, no change needed.
+
 ## Candidate d93f2011c9f816fb4e203f5cf3afde5b2f91cf2f — 2026-09-17, 0.6.2 checkpoint and release-path repair reconciliation
 
 - ADR-0005: checked, no change needed.

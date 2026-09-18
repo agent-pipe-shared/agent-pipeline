@@ -37,6 +37,7 @@ import { isSessionCapabilityFailurePhase } from "../lib/codex-onboarding-capabil
 // every human ceremony step below. The default denial is therefore bounded
 // and copy-safe without asking the human to run a second rendering command.
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
+import { HUMAN_PO_SIGNING_COMMANDS } from "../scripts/po-human-approval.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
 import {
@@ -3301,22 +3302,12 @@ export function isAgentPoPublicCommand(command, root) {
   return false;
 }
 
-// The full po-human-approval.mjs KNOWN_COMMANDS set is twelve subcommands, but only six of
-// them are human-terminal signing actions -- po-human-approval.mjs's own header docstring is
-// explicit: "prepare" (and prepare-all/prepare-critical) "writes only public candidate-bound
-// requests and is agent work", and "verify" (and verify-all/verify-critical) "is public
-// readback and is agent work again". Only setup/approve/approve-all/approve-critical/
-// authorize-critical/sign-intent are the human-terminal signing half of the split (backlog
-// 2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md: "names only three of
-// six" -- six, not twelve, is the correct target). Recognising the agent-work half here too
-// would regress the existing agent-executable prepare/verify path this guard's own test suite
-// pins ("agents prepare and verify only public PO artifacts while human signing stays
-// external").
+// The CLI owns the human-signing subset.  Prepare/verify commands remain agent work;
+// importing the semantic list prevents this guard from silently drifting when the
+// CLI adds another attended signing action.
 function isHumanPoSigningCommand(command, root) {
   const args = poApprovalArgs(command, root, PO_HUMAN_APPROVAL_SCRIPT);
-  return args !== null && [
-    "setup", "approve", "approve-all", "approve-critical", "authorize-critical", "sign-intent",
-  ].includes(args[0]);
+  return args !== null && HUMAN_PO_SIGNING_COMMANDS.includes(args[0]);
 }
 
 /**

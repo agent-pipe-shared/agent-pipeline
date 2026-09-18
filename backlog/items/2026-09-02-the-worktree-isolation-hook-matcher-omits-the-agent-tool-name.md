@@ -118,3 +118,14 @@ cannot spawn Git in the managed WSL process sandbox; the remaining 43 cases
 also passed there. Documentation contracts pass. The item remains open only
 until an exact-candidate independent Critic has reviewed this hook-surface
 change and its result is recorded in the backlog ledger.
+
+### Current-source recheck — 2026-09-18
+
+The current tree still contains the exact `Task|Agent|Workflow` matcher. The
+manifest-shape suite passed 14/14 directly. `worktree-count-check.test.mjs`
+first showed its two real-Git fixtures as `spawnSync git EPERM` in the managed
+process sandbox, then passed all 45/45 through the authorized local
+Git-child-process boundary. This confirms the former two red cases were an
+execution-boundary limitation, not a matcher or worktree-count regression.
+It is current-source evidence only: it neither substitutes for the required
+exact-candidate independent Critic nor claims live host-hook delivery.

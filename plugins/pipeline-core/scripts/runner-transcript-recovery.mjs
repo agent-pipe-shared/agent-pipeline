@@ -25,7 +25,7 @@ const CODEX_RUNNER = "codex";
 const MAX_CANDIDATES = 2_000;
 const MAX_METADATA_LINES = 256;
 const MAX_METADATA_BYTES = 512 * 1024;
-const MAX_TRANSCRIPT_BYTES = 8 * 1024 * 1024;
+const MAX_EXCERPT_BYTES = 8 * 1024 * 1024;
 const MAX_EXCERPT_ENTRIES = 8;
 const MAX_EXCERPT_DETAIL_BYTES = 600;
 const PROJECT_PATH_KEYS = new Set(["cwd", "workspace", "workspace_path", "workspacePath", "project_root", "projectRoot"]);
@@ -120,13 +120,47 @@ function metadataIdentity(path) {
   try { return repositoryPathIdentityOrSelf(realpathSync(path)); } catch { return null; }
 }
 
-function candidateMetadata(filePath, projectIdentity) {
-  let bytes;
+function readTranscriptPrefix(filePath, maximumBytes) {
+  let size;
   try {
-    if (statSync(filePath).size > MAX_TRANSCRIPT_BYTES) return null;
-    bytes = readFileSync(filePath);
-  } catch { return null; }
-  const records = parseJsonLines(bytes.subarray(0, MAX_METADATA_BYTES), MAX_METADATA_LINES);
+    size = statSync(filePath).size;
+    if (!Number.isSafeInteger(size) || size < 0) return null;
+  } catch {
+    return null;
+  }
+  const prefix = Buffer.alloc(Math.min(size, maximumBytes));
+  let descriptor;
+  try {
+    descriptor = openSync(filePath, "r");
+    const bytesRead = readSync(descriptor, prefix, 0, prefix.length, 0);
+    return prefix.subarray(0, bytesRead);
+  } catch {
+    return null;
+  } finally {
+    if (descriptor !== undefined) {
+      try { closeSync(descriptor); } catch { /* Best-effort close after a failed read. */ }
+    }
+  }
+}
+
+function readTranscriptMetadataBytes(filePath) {
+  return readTranscriptPrefix(filePath, MAX_METADATA_BYTES);
+}
+
+function readTranscriptBytes(filePath) {
+  try {
+    const size = statSync(filePath).size;
+    if (!Number.isSafeInteger(size) || size < 0) return null;
+    return readFileSync(filePath);
+  } catch {
+    return null;
+  }
+}
+
+function candidateMetadata(filePath, projectIdentity) {
+  const metadataBytes = readTranscriptMetadataBytes(filePath);
+  if (metadataBytes === null) return null;
+  const records = parseJsonLines(metadataBytes, MAX_METADATA_LINES);
   const metas = records.map(sessionMetaRecord).filter((value) => value !== null);
   if (metas.length === 0) return null;
   const projectPaths = metas.flatMap((meta) => stringsAtKnownKeys(meta, PROJECT_PATH_KEYS));
@@ -136,7 +170,7 @@ function candidateMetadata(filePath, projectIdentity) {
   if (identities.some((identity) => identity === null) || !identities.every((identity) => identity === projectIdentity)) return null;
   const uniqueSessionIds = [...new Set(sessionIds)];
   if (uniqueSessionIds.length !== 1) return null;
-  try { return { filePath, sessionId: uniqueSessionIds[0], mtimeMs: statSync(filePath).mtimeMs, bytes }; } catch { return null; }
+  try { return { filePath, sessionId: uniqueSessionIds[0], mtimeMs: statSync(filePath).mtimeMs }; } catch { return null; }
 }
 
 function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir } = {}) {
@@ -215,7 +249,8 @@ export function recoverRunnerTranscript({ rootDir, runner, excludeSession, env =
   const found = priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env, homedirFn });
   if (found.unavailable) return found.unavailable;
   const selected = found.candidates[0];
-  const excerpt = operationalExcerpt(selected.bytes);
+  const bytes = readTranscriptPrefix(selected.filePath, MAX_EXCERPT_BYTES);
+  const excerpt = bytes === null ? [] : operationalExcerpt(bytes);
   if (excerpt.length === 0) return unavailable(runner, "prior-project-matching-transcript-has-no-operational-excerpt");
   return {
     schema: SCHEMA,
@@ -240,7 +275,7 @@ export function listRunnerTranscripts(options = {}) {
     runner: CODEX_RUNNER,
     sessions: found.candidates.map((candidate) => ({
       sessionId: candidate.sessionId,
-      excerpt: operationalExcerpt(candidate.bytes),
+      excerpt: operationalExcerpt(readTranscriptPrefix(candidate.filePath, MAX_EXCERPT_BYTES) ?? Buffer.alloc(0)),
     })),
   };
 }
@@ -248,7 +283,9 @@ export function listRunnerTranscripts(options = {}) {
 /**
  * Read one session selected by its public session id.  A repeated id is not a
  * safe selector, so it fails closed rather than choosing by a host pathname or
- * recency.  `bytes` is only emitted raw by the CLI's `read` operation below.
+ * recency.  This explicit, authenticated read intentionally has no transcript
+ * size cap; only automatic metadata and excerpt paths are bounded.  `bytes` is
+ * only emitted raw by the CLI's `read` operation below.
  */
 export function readRunnerTranscript({ sessionId, ...options } = {}) {
   const found = priorProjectMatchingCandidates(options);
@@ -258,7 +295,9 @@ export function readRunnerTranscript({ sessionId, ...options } = {}) {
   }
   const matches = found.candidates.filter((candidate) => candidate.sessionId === sessionId);
   if (matches.length !== 1) return unavailable(CODEX_RUNNER, "requested-session-unavailable");
-  return { schema: SCHEMA, status: "available", runner: CODEX_RUNNER, bytes: matches[0].bytes };
+  const bytes = readTranscriptBytes(matches[0].filePath);
+  if (bytes === null) return unavailable(CODEX_RUNNER, "requested-session-unavailable");
+  return { schema: SCHEMA, status: "available", runner: CODEX_RUNNER, bytes };
 }
 
 function parseArgs(argv) {

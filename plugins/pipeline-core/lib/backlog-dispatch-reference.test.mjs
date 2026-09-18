@@ -173,10 +173,24 @@ test("stripBacklogVerdictProse strips a '## Progress note (...)' heading whose c
     "Critic review any guardrail-hook diff requires.\n";
   const result = stripBacklogVerdictProse(body);
   assert.equal(result.wasStripped, true);
-  assert.equal(result.removedHeading, "progress note");
+  assert.equal(result.removedHeading, "progress");
   assert.ok(result.text.includes("## Acceptance criteria"));
   assert.ok(!result.text.includes("d398a662"));
   assert.ok(!result.text.includes("byte-identical function"));
+  assert.ok(result.text.includes(BACKLOG_STRIP_FENCE));
+});
+
+test("stripBacklogVerdictProse strips a dated '## Progress' heading when it carries test/result narration", () => {
+  const body =
+    "\n## Acceptance criteria\n\n- A.\n\n" +
+    "## Progress — 2026-09-18\n\n" +
+    "Implementation complete; the focused suite passed 33/33 and the host " +
+    "readback reported the expected unavailable capability.\n";
+  const result = stripBacklogVerdictProse(body);
+  assert.equal(result.wasStripped, true);
+  assert.equal(result.removedHeading, "progress");
+  assert.ok(result.text.includes("## Acceptance criteria"));
+  assert.ok(!result.text.includes("focused suite passed"));
   assert.ok(result.text.includes(BACKLOG_STRIP_FENCE));
 });
 

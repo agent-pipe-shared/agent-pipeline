@@ -62,6 +62,25 @@ Live observation during a 2026-08-27 session: the PO asked directly whether
 the stamp had been refreshed after a block of work that included a new
 PreToolUse hook wiring; it had not. Corrected in ruleset `a49cd41a`.
 
+## 0.6.2 follow-up observation — 2026-09-18
+
+The Greenfield/release recovery supplied the same failure class in a stronger
+form: the installed Codex local-development cache and the current source both
+reported `0.6.2+codex.20260917090016.4c10f238`, but their
+`pre-push-hook-install.mjs` bytes differed. The cache still had the former
+unconditional upgrade result, whereas source contained the newer
+integrity/currentness behavior. Thus the manifest/cachebuster identity was not
+an adequate claim that the loaded code was current.
+
+The existing registry-content binding is now directly regression-tested in
+`pipeline-start-preflight.test.mjs`: two physical plugin trees with equal
+Codex manifests start `ready`; changing only the cached installer requires
+`IPA-HOST-REGISTRY-CONTENT-MISMATCH`. The direct suite passed 58/58 on
+2026-09-18. This detects and makes the divergence actionable for the local
+development topology; it does **not** retrofit bytes into an already published
+or cached `0.6.2` identity. Normal remediation remains a new immutable build
+identity followed by installed-runtime readback.
+
 ## Affected artifact
 
 - `plugins/pipeline-core/.claude-plugin/plugin.json` (cachebuster field)

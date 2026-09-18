@@ -11,16 +11,16 @@ source: "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding i
 done_when: manual
 ---
 
-# `guard-lifecycle-ready`'s human-signing list names only three of six commands
+# Historical finding: `guard-lifecycle-ready`'s human-signing list named only three of six commands
 
 ## Description
 
-`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` carries an
+At the time of the 2026-08-07 observation,
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` carried an
 `isHumanPoSigningCommand` list used to recognise invocations that belong to the
-human's terminal rather than to an in-session agent. It names `setup`,
-`approve` and `approve-all`. It does not name `approve-critical`, `sign-intent`,
-or the new `authorize-critical` — the three commands that actually reach the
-signer today.
+human's terminal rather than to an in-session agent. It named `setup`,
+`approve` and `approve-all`. It did not name `approve-critical`, `sign-intent`,
+or the new `authorize-critical` — the three commands that reached the signer.
 
 The list predates all three. `approve-critical` and `sign-intent` were added
 later, and `authorize-critical` landed on 2026-08-07 with the one-command
@@ -103,3 +103,22 @@ but it does not substitute for Direction #2 (deriving the list from the
 CLI's actual command set, or a drift-detection check), which remains
 genuinely deferred to Sprint Alfred and is the reason this item's
 `status:` stays **open**.
+
+## Implementation and rollback, 2026-09-18
+
+The narrow drift-prevention slice is now implemented in `bf05188b`:
+`po-human-approval.mjs` exports its attended-signing subset, and
+`guard-lifecycle-ready.mjs` imports that subset instead of restating command
+names.  The catalog also includes `approve-fork-disposition`, which reaches the
+same human signing route but was absent from the old guard-local list.  Public
+`prepare*` and `verify*` commands are deliberately not part of the catalog.
+
+**Rollback:** revert `13b1648e` first and then `bf05188b`, as one bounded
+recovery sequence.  Reverting both commits keeps the source and this historical
+record aligned while restoring the prior six-command guard-local classification;
+it does not alter keys, proofs, request artifacts, external directories, or a
+remote.  Before restamping any rollback candidate, run `po-human-approval.test.mjs` and
+`guard-lifecycle-ready.test.mjs`; confirm the existing public prepare/verify
+and attended-signing cases retain their prior admission boundary.  The rollback
+is a temporary recovery only: it reintroduces the catalog-drift risk and must
+not be described as resolving Direction #2.

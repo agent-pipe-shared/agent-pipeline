@@ -258,6 +258,8 @@ const PLUGIN_LIB_DIR = ${lib};
 const PLUGIN_HOOKS_DIR = ${hooksDir};
 const PLUGIN_SCRIPTS_DIR = ${scriptsDir};
 const EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+let derivePlanLifecycle = null;
+let isLateVerifyRecoveryLifecycle = null;
 
 function git(args, cwd) {
   return spawnSync("git", args, { cwd, encoding: "utf8", timeout: 15000 });
@@ -533,6 +535,19 @@ function exactImplementationStateTransition(before, after) {
   return sameJsonValue(left, right);
 }
 
+// The late configure-verify route never rewrites lifecycle state. Its
+// commit-bound exception therefore accepts only a prior, already-established
+// implementation state -- not a hand-written state change staged beside the
+// calibration twins. The committed state remains the authority here.
+function establishedImplementationState(state) {
+  if (typeof derivePlanLifecycle !== "function" || typeof isLateVerifyRecoveryLifecycle !== "function") return false;
+  try {
+    return isLateVerifyRecoveryLifecycle(derivePlanLifecycle(state));
+  } catch {
+    return false;
+  }
+}
+
 /** Returns the exact calibration paths exempted by the sanctioned writer's
  * complete three-file transaction, or an empty set for every other diff. */
 function sanctionedVerifyTransitionPaths(projectRoot, paths) {
@@ -557,6 +572,39 @@ function sanctionedVerifyTransitionPaths(projectRoot, paths) {
   const stateAfter = jsonAt(projectRoot, ":" + VERIFY_TRANSITION_STATE_PATH);
   if (!exactImplementationStateTransition(stateBefore, stateAfter)) return new Set();
   return new Set(expected);
+}
+
+/**
+ * The separately typed late recovery is narrower than the design transition:
+ * its complete protected delta is exactly the two calibration twins and no
+ * lifecycle state file. Both twins must move from an identical baseline-only
+ * value to one identical real command, while HEAD already proves an established
+ * implementing lifecycle. Any malformed/missing twin, calibration drift,
+ * staged state rewrite or extra protected rewrite stays on the ordinary
+ * capability path and is refused there.
+ */
+function sanctionedLateVerifyRecoveryPaths(projectRoot, paths) {
+  if (paths.includes(VERIFY_TRANSITION_STATE_PATH)) return new Set();
+  const stagedCalibrations = paths.filter((path) => VERIFY_CALIBRATION_PATHS.includes(path));
+  if (stagedCalibrations.length !== VERIFY_CALIBRATION_PATHS.length
+    || !VERIFY_CALIBRATION_PATHS.every((path) => stagedCalibrations.includes(path))) return new Set();
+  const before = [];
+  const after = [];
+  for (const path of VERIFY_CALIBRATION_PATHS) {
+    const head = jsonAt(projectRoot, "HEAD:" + path);
+    const staged = jsonAt(projectRoot, ":" + path);
+    if (head === null || staged === null
+      || !sameExceptVerify(head, staged)
+      || classifyVerifyContract(head.verify) !== "baseline-only"
+      || classifyVerifyContract(staged.verify) !== "configured") return new Set();
+    before.push(head);
+    after.push(staged);
+  }
+  if (!sameJsonValue(before[0], before[1])
+    || !sameJsonValue(after[0], after[1])
+    || after[0].verify !== after[1].verify) return new Set();
+  const state = jsonAt(projectRoot, "HEAD:" + VERIFY_TRANSITION_STATE_PATH);
+  return establishedImplementationState(state) ? new Set(VERIFY_CALIBRATION_PATHS) : new Set();
 }
 
 /**
@@ -663,6 +711,8 @@ async function main() {
     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
     ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
     ({ isNeverLiftableKernelPath, windowCoversRule } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "guard-maintenance-window.mjs")).href));
+    ({ derivePlanLifecycle } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "plan-spec-state-v2.mjs")).href));
+    ({ isLateVerifyRecoveryLifecycle } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "pipeline-state.mjs")).href));
   } catch (error) {
     block([\`the pipeline's own protected-path rule modules could not be loaded from the installed plugin copy (\${error?.name ?? "Error"}) -- cannot evaluate protected-path enforcement.\`]);
     return;
@@ -707,7 +757,12 @@ async function main() {
   } catch { testPathRules = []; }
 
   let sanctionedVerifyPaths;
-  try { sanctionedVerifyPaths = sanctionedVerifyTransitionPaths(projectRoot, paths); } catch { sanctionedVerifyPaths = new Set(); }
+  try {
+    sanctionedVerifyPaths = new Set([
+      ...sanctionedVerifyTransitionPaths(projectRoot, paths),
+      ...sanctionedLateVerifyRecoveryPaths(projectRoot, paths),
+    ]);
+  } catch { sanctionedVerifyPaths = new Set(); }
 
   const findings = [];
   for (const relPath of paths) {

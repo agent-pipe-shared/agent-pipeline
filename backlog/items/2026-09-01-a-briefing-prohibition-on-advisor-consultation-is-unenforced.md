@@ -222,3 +222,20 @@ Private pending bindings and denial records contain only digests and closed
 fields; they may remain as audit history and are ignored when the adapter is
 absent. A replacement must use a new candidate-bound threat-model approval at
 the stable-candidate freeze rather than reusing an approval for these bytes.
+
+### Current-source and installed-cache recheck — 2026-09-18
+
+The protected registration is now present in the current Claude manifest:
+one `advisor` PreToolUse entry invokes
+`guard-advisor-prohibition.mjs`. The manifest-shape suite passed 14/14, and
+the real adapter path in `guard-dispatch.test.mjs` passed 43/43 through the
+authorized local Git-child-process boundary (the managed process sandbox cannot
+start that fixture's Git processes). The installed local Codex cache carrying
+the same `0.6.2+codex.20260917090016.4c10f238` identity has byte-identical
+`hooks.json` and `guard-advisor-prohibition.mjs` bytes, so this specific
+integration is not part of the observed stale pre-push-installer divergence.
+
+These checks prove source and installed artifact presence, not a live Claude
+raw-`advisor` event or native Codex/Antigravity enforcement. The item's
+runner-native acceptance boundary therefore remains open; no host behavior is
+inferred from the byte comparison.

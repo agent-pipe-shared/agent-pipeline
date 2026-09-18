@@ -185,6 +185,28 @@ item's own acceptance test needs) has not started, and the known
 (`guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands`)
 remains open.
 
+### Stale no-op writer-lock recovery — 2026-09-18
+
+The Greenfield `KICKOFF-LOCKED` report made the previously documented edge
+operationally relevant.  Commit `2bfb196582f009c627118c325eb35224148db11f`
+keeps an idempotent intake retry checkpoint-byte-null while, only when its
+deterministic lock path already exists, it invokes the existing schema/token/
+age-gated recovery and releases the lock it recovered.  A live, foreign,
+malformed, or unrecoverable lock remains untouched and does not turn the
+otherwise successful replay into a failure.
+
+The existing rename and directory-fsync crash matrix now proves that the
+identical retry removes its own stale lock.  Focused continuity tests passed
+281/281; the complete project-onboarding suite passed 177 cases across four
+shards through the local child-process-enabled test boundary.
+
+**Rollback.** Revert `2bfb196582f009c627118c325eb35224148db11f` as one unit.
+That restores the earlier conservative behavior in which an idempotent replay
+leaves a crash-stale lock untouched until a later real mutation recovers it.
+Before restamping, rerun `onboarding-continuity.test.mjs` and
+`project-onboarding-v3.test.mjs`; do not remove a lock manually as part of the
+rollback.
+
 ### Progress, 2026-08-19 (NVA-W5-COORD2-1)
 
 Recon dispatch (goldfish-deep, worktree-isolated) confirmed **step 4 is

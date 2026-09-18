@@ -415,6 +415,19 @@ const FORK_DISPOSITION_COMMANDS = new Set(["prepare-fork-disposition", "approve-
 // "did you mean" suggestion on an unrecognised one -- a single list, never
 // two that could drift apart. Includes the fork-disposition trio (ADR-0072)
 // so an unrecognised fork-disposition subcommand also gets a suggestion.
+// The lifecycle guard imports this semantic subset rather than restating it.
+// Keep it distinct from KNOWN_COMMANDS: prepare/verify commands are deliberately
+// agent work, while these commands cross the attended human signing boundary.
+export const HUMAN_PO_SIGNING_COMMANDS = Object.freeze([
+  "setup",
+  "approve",
+  "approve-all",
+  "approve-critical",
+  "authorize-critical",
+  "sign-intent",
+  "approve-fork-disposition",
+]);
+
 const KNOWN_COMMANDS = ["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent", ...FORK_DISPOSITION_COMMANDS];
 
 // NVA-CLI-FEEDBACK-1: standard O(len(a)*len(b)) Levenshtein edit distance

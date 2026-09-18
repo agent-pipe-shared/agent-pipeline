@@ -190,21 +190,25 @@ test("a materialInput chunk change alters the recorded cardDigest", () => {
   assert.notEqual(capturedA.cardDigest, capturedB.cardDigest, "differing materialInput must yield a differing cardDigest");
 });
 
-test("capture persists Amon Sûl material in the private intake checkpoint for inspect and the next identified SessionStart", () => {
-  const root = freshRoot("greenfield-amon-sul-e2e");
-  const cardFile = join(root, "amon-sul-card.json");
+test("capture preserves a complete disposable Greenfield fixture in the private intake checkpoint for inspect and the next identified SessionStart", () => {
+  const root = freshRoot("greenfield-material-input-e2e");
+  const cardFile = join(root, "greenfield-card.json");
   const materialInput = [
-    "Amon Sûl – Das letzte Licht",
+    "Vollständige externe Greenfield-Eingabe",
     "",
     "## Leitidee",
-    "Ein einsamer Wachturm hält dem Sturm über den Nordhöhen stand.",
+    "Diese neutrale Testeingabe stellt nur die Wiederaufnahme einer ersten Sitzung nach.",
     "",
     "## Spätere Abschnittszeile",
-    "Wenn die Dämmerung fällt, soll sein letztes Licht den Weg nach Westen weisen.",
+    "Ihr vollständiger Wortlaut muss in der Folgesitzung unverändert lesbar bleiben.",
+    "",
+    "## Vollständiger Erstinput",
+    "Anforderungssatz ".repeat(800),
   ].join("\n");
+  assert.ok(Buffer.byteLength(materialInput, "utf8") >= 10 * 1024, "fixture must exercise a material input larger than 10 KiB");
   const card = {
     ...VALID_CARD,
-    intent: "Die Amon-Sûl-Gestaltung in der nächsten Session fortsetzen.",
+    intent: "Die externe Greenfield-Eingabe in der nächsten Session fortsetzen.",
     materialInput: [materialInput],
   };
   writeFileSync(cardFile, JSON.stringify(card), "utf8");
@@ -217,10 +221,10 @@ test("capture persists Amon Sûl material in the private intake checkpoint for i
   assert.equal(inspected.intakeCheckpoint.materialInput.length, 1);
   assert.equal(inspected.intakeCheckpoint.materialInput[0].text, materialInput, "inspect must return the checkpoint material byte-for-byte");
 
-  const hook = runSessionStart(root, { session_id: "amon-sul-next-session" });
+  const hook = runSessionStart(root, { session_id: "greenfield-next-session" });
   assert.equal(hook.status, 0, hook.stderr);
   const context = JSON.parse(hook.stdout).hookSpecificOutput.additionalContext;
-  assert.match(context, /Resume-hint intent: Die Amon-Sûl-Gestaltung in der nächsten Session fortsetzen\./u);
+  assert.match(context, /Resume-hint intent: Die externe Greenfield-Eingabe in der nächsten Session fortsetzen\./u);
   const materialBytes = Buffer.from(materialInput, "utf8");
   assert.equal(Buffer.from(context, "utf8").includes(materialBytes), true, "the full original input must be surfaced byte-identically");
   assert.equal(context.indexOf(materialInput), context.lastIndexOf(materialInput), "the material input must not be duplicated when the Resume-Hint card is available");

@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CAPABILITY_TOOL_ROOTS, evaluateCapabilityCompleteness } from "./toolchain-preflight.mjs";
+import { parseBrowserEvidencePreflightArgs, preflightBrowserEvidence } from "./browser-evidence-preflight.mjs";
 
 let passed = 0;
 function check(name, fn) { fn(); passed += 1; process.stdout.write(`PASS TCP${String(passed).padStart(2, "0")} ${name}\n`); }
@@ -34,6 +35,83 @@ function gitStatus() {
   assert.equal(result.status, 0, `git status failed: ${String(result.stderr)}`);
   return result.stdout;
 }
+
+check("browser evidence preflight distinguishes available local browser capability without running a test", () => {
+  const calls = [];
+  const result = preflightBrowserEvidence({ rootDir: process.cwd() }, {
+    spawnFn: (...args) => {
+      calls.push(args);
+      return { status: 0, stdout: JSON.stringify({ state: "ready", executablePath: "/browser/chrome" }) };
+    },
+  });
+  assert.equal(result.code, "BEP-BROWSER-E2E-READY");
+  assert.equal(result.status, "ready");
+  assert.equal(result.testExecuted, false);
+  assert.equal(result.installAttempted, false);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0][1], ["-e", calls[0][1][1]]);
+  assert.match(calls[0][1][1], /"@playwright\/test", "playwright"/u, "the capability probe must accept either standard local Playwright package");
+});
+
+check("browser evidence preflight accepts a consumer that provides only the playwright package", () => {
+  const repo = root();
+  try {
+    const packageDir = join(repo, "node_modules", "playwright");
+    mkdirSync(packageDir, { recursive: true });
+    writeFileSync(join(packageDir, "chromium"), "fixture browser", "utf8");
+    writeFileSync(
+      join(packageDir, "index.js"),
+      'const { join } = require("node:path"); module.exports = { chromium: { executablePath: () => join(__dirname, "chromium") } };',
+      "utf8",
+    );
+    const result = preflightBrowserEvidence({ rootDir: repo });
+    assert.equal(result.code, "BEP-BROWSER-E2E-READY");
+    assert.equal(result.status, "ready");
+    assert.equal(result.testExecuted, false);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+
+check("browser evidence preflight reports unavailable browser separately from a test failure", () => {
+  const probe = () => ({ status: 0, stdout: JSON.stringify({ state: "browser-missing", executablePath: "/browser/chrome" }) });
+  const required = preflightBrowserEvidence({ rootDir: process.cwd() }, { spawnFn: probe });
+  assert.equal(required.code, "BEP-CHROMIUM-UNAVAILABLE");
+  assert.equal(required.status, "unavailable");
+  assert.equal(required.exitCode, 1);
+  assert.equal(required.testExecuted, false);
+  const fallback = preflightBrowserEvidence({ rootDir: process.cwd(), fallbackEvidence: "offline-behaviour" }, { spawnFn: probe });
+  assert.equal(fallback.code, "BEP-BROWSER-E2E-UNAVAILABLE-FALLBACK-DECLARED");
+  assert.equal(fallback.status, "degraded");
+  assert.equal(fallback.selectedEvidence, "offline-behaviour");
+  assert.equal(fallback.exitCode, 2);
+});
+
+check("browser evidence preflight never probes when a weaker evidence class is explicitly declared", () => {
+  const result = preflightBrowserEvidence({ rootDir: process.cwd(), requiredEvidence: "static" }, {
+    spawnFn: () => { throw new Error("a static declaration must not probe or install Playwright"); },
+  });
+  assert.equal(result.code, "BEP-DECLARED-NON-BROWSER");
+  assert.equal(result.selectedEvidence, "static");
+  assert.equal(result.installAttempted, false);
+  assert.equal(result.testExecuted, false);
+  const unusedFallback = preflightBrowserEvidence({ rootDir: process.cwd(), requiredEvidence: "offline-behaviour", fallbackEvidence: "static" });
+  assert.equal(unusedFallback.code, "BEP-FALLBACK-UNUSED");
+  assert.equal(unusedFallback.exitCode, 2);
+});
+
+check("browser evidence preflight CLI grammar rejects duplicate and malformed declarations", () => {
+  assert.deepEqual(parseBrowserEvidencePreflightArgs(["--required-evidence", "browser-e2e", "--fallback-evidence", "offline-behaviour"]), {
+    rootDir: process.cwd(), requiredEvidence: "browser-e2e", fallbackEvidence: "offline-behaviour",
+  });
+  assert.equal(parseBrowserEvidencePreflightArgs(["--root", "one", "--root", "two"]), null);
+  assert.equal(parseBrowserEvidencePreflightArgs(["--required-evidence"]), null);
+});
+
+check("browser evidence preflight rejects an absent required evidence class fail-closed", () => {
+  const result = preflightBrowserEvidence({ rootDir: process.cwd(), requiredEvidence: null });
+  assert.equal(result.code, "BEP-INPUT-INVALID");
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.exitCode, 2);
+});
 
 check("invalid manifest blocks before every identity or capability probe", () => {
   const repo = root(); let calls = 0;
@@ -302,4 +380,4 @@ check("capability-completeness: performs zero filesystem/git mutation (repo stat
   const after = gitStatus();
   assert.equal(after, before);
 });
-process.stdout.write(`${passed}/27 checks passed.\n`);
+process.stdout.write(`${passed}/33 checks passed.\n`);

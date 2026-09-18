@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.compact-nudge-cadence-too-aggressive-and-not-configurable
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-26
 sprint: nightwing
-done_when: contains plugins/pipeline-core/hooks/stop-suggest.mjs resolveCompactNudgeThresholds
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 868ee75549ce997a24f13bd9da985edbe7be88de
+closure_evidence: plugins/pipeline-core/hooks/stop-suggest.test.mjs
+done_when: manual
 source: "PO observation (chat), 2026-08-26, during a long Phoenix-merge session"
 ---
 
@@ -53,3 +57,27 @@ a session can never run so long it silently loses handover fidelity.
 
 - **Decision:** open, unassigned — filed per PO instruction ("erst mal nur
   backlog", 2026-08-26); not investigated or implemented this session.
+
+## Resolution evidence, 2026-09-18
+
+The repository-owned Stop hook no longer emits a context-budget or `/compact`
+nudge at all.  Its former warn/overdue/emergency policy was removed because it
+was calibrated for a smaller context window and forced compaction discarded
+useful in-flight context.  The current `stop-suggest.mjs` contract is limited
+to an advisory next-phase suggestion, while `stop-suggest.test.mjs` explicitly
+rejects `/compact`, `compact`, urgency tiers, and context-count wording.
+
+The original cadence therefore has no remaining Pipeline configuration surface
+to tune.  Any comparable future nudge is a host-runtime observation and needs
+its own host-specific reproduction, not a `pipeline.yaml` setting that would
+claim control of unavailable behavior.
+
+## Formal closure — 2026-09-18
+
+The actual source resolution is `868ee75549ce997a24f13bd9da985edbe7be88de`
+(`fix(stop-suggest): remove the mandatory-compact emergency brake`), rather
+than the later documentation-only checkpoint. The current `stop-suggest` suite
+passed on 2026-09-18 and its cases cover only phase/gate advisory output; no
+`/compact`, context-budget or urgency behavior remains. `done_when` is
+therefore manual: the former predicate named a deliberately removed function
+and could never represent the resolved product state.

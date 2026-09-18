@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2f3584154cc9439fdfb1430398a0c2b56d9542381561d17ce6f51eaaf1f8527f"
+    "transitionHead": "3606eb6186d24f72aa2226fcdf1809c94c2dce333131f13a2cb539c8b18f0f9c"
   },
   "counts": {
     "open": 77,
     "in_progress": 1,
-    "closed": 577,
+    "closed": 581,
     "rejected": 3,
     "deferred": 11
   },
@@ -226,13 +226,17 @@
     },
     {
       "id": "pipeline.a-read-only-command-is-refused-for-naming-a-protected-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Measured live, 2026-08-27 session: a read-only node -e command that only printed a sorted-insertion index over docs/product-capability-inventory.json was refused as a write because the string \"verify.mjs\" appeared inside its interpreter code text.",
       "deferred": false,
-      "sprint": "nightwing"
+      "sprint": "nightwing",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "e52e5373d81afde912ff35df043aade44ee7c073",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.a-registered-but-abandoned-worktree-is-never-retired",
@@ -1708,6 +1712,16 @@
       "closureEvidence": "backlog/items/2026-08-28-the-codex-runner-needed-three-sessions-for-one-small-feature.md"
     },
     {
+      "id": "pipeline.codex-runtime-fixture-assumes-wsl2-in-ci",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-17",
+      "source": "GitHub Actions Verify run 35263935526 for released commit f8cc1b2297b5b6a2ef2d64a2dd43f4a76ec37f31: only codex-sandbox-runtime-tests failed. Local source inspection and the targeted 15/15 regression run identified the WSL2-only fixture assumption.",
+      "deferred": false,
+      "sprint": "nova-b"
+    },
+    {
       "id": "pipeline.codex-sandbox-critic-longterm",
       "status": "closed",
       "type": "defect",
@@ -1872,13 +1886,17 @@
     },
     {
       "id": "pipeline.compact-nudge-cadence-too-aggressive-and-not-configurable",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-26",
       "source": "PO observation (chat), 2026-08-26, during a long Phoenix-merge session",
       "deferred": false,
-      "sprint": "nightwing"
+      "sprint": "nightwing",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "868ee75549ce997a24f13bd9da985edbe7be88de",
+      "closureEvidence": "plugins/pipeline-core/hooks/stop-suggest.test.mjs"
     },
     {
       "id": "pipeline.compaction-stable-bootstrap-lease",
@@ -6049,6 +6067,21 @@
       "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
     },
     {
+      "id": "pipeline.precommit-hook-refusal-diagnostics-are-not-observable-in-verify",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-17",
+      "source": "Direct local reproduction on 2026-09-17: `node plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs` returned 41 pass / 10 fail; every failure was an empty expected diagnostic, while the positive sanctioned verify transition passed.",
+      "deferred": false,
+      "tracking": "Reclassified on 2026-09-17: restricted Codex sandbox child-process EPERM, not a pre-commit hook product defect. The existing Codex sandbox item is the single owner.",
+      "sprint": "nova-b",
+      "closedAt": "2026-09-17",
+      "closureRepository": "self",
+      "closureCommit": "1522567a0e69d4b720b9e052f7e8d33861e7ce99",
+      "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
+    },
+    {
       "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
       "status": "closed",
       "type": "defect",
@@ -6376,6 +6409,16 @@
       "closureRepository": "self",
       "closureCommit": "873de39530f7eb977327b388d15997879d839d06",
       "closureEvidence": "backlog/evidence/2026-08-11-push-approval-md-already-current.md"
+    },
+    {
+      "id": "pipeline.push-artifacts-precede-operator-intent",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-17",
+      "source": "evidence/codex-pipeline-session-analysis.md and evidence/pipeline-analysis-claude-session.md, independently compared with the 0.6.2 push-init experience on 2026-09-17.",
+      "deferred": false,
+      "sprint": "nova-b"
     },
     {
       "id": "pipeline.push-flow-needs-one-remote-readback-transaction",
@@ -6808,6 +6851,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-git.mjs"
     },
     {
+      "id": "pipeline.release-evidence-promotion-repeats-full-qualification",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-17",
+      "source": "PO release observation, 2026-09-17: the 0.6.2 release/push path generated equivalent evidence under multiple names; independently measured in the 0.6.2 release session against harness/scripts/verify.mjs, scripts/push-init.mjs and scripts/push-prepare.mjs.",
+      "deferred": false,
+      "sprint": "nova-b"
+    },
+    {
       "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
       "status": "closed",
       "type": "defect",
@@ -7127,14 +7180,18 @@
     },
     {
       "id": "pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md §5.1; independently reproduced against the current source's pipeline-state writer and generated pre-commit backstop.",
       "deferred": false,
       "tracking": "NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies.",
-      "sprint": "nova"
+      "sprint": "nova",
+      "closedAt": "2026-09-17",
+      "closureRepository": "self",
+      "closureCommit": "6970805a573550ddf7835f28f80dae83e66b4851",
+      "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
     },
     {
       "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",

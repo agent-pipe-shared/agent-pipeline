@@ -363,24 +363,24 @@ try {
     writeFileSync(join(greenfieldRoot, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
     const greenfieldGit = spawnSync("git", ["init", "-q"], { cwd: greenfieldRoot, encoding: "utf8", shell: false });
     assert.equal(greenfieldGit.status, 0, greenfieldGit.stderr);
-    const amonSulInput = [
-      "Amon Sûl – Das letzte Licht",
+    const externalGreenfieldInput = [
+      "Vollständige externe Greenfield-Eingabe",
       "",
       "## Leitidee",
-      "Ein einsamer Wachturm hält dem Sturm über den Nordhöhen stand.",
+      "Diese neutrale Eingabe simuliert nur einen vollständigen Erstkontakt.",
       "",
       "## Spätere Abschnittszeile",
-      "Wenn die Dämmerung fällt, soll sein letztes Licht den Weg nach Westen weisen.",
+      "Ihr Wortlaut muss in der Folgesitzung unverändert lesbar bleiben.",
     ].join("\n");
     applyOnboardingIntakeConsent({ rootDir: greenfieldRoot, granted: true, activate: true });
-    applyOnboardingIntakeCapture({ rootDir: greenfieldRoot, text: amonSulInput, activate: true });
+    applyOnboardingIntakeCapture({ rootDir: greenfieldRoot, text: externalGreenfieldInput, activate: true });
     assert.equal(existsSync(join(greenfieldRoot, "project", "resume-hint.json")), false);
 
     const greenfieldPayload = mainPayload({ projectDir: greenfieldRoot, input: { session_id: "greenfield-session" } });
     const greenfieldContext = greenfieldPayload.hookSpecificOutput.additionalContext;
-    const amonSulBytes = Buffer.from(amonSulInput, "utf8");
-    assert.equal(Buffer.from(greenfieldContext, "utf8").includes(amonSulBytes), true, "the full intake input must be surfaced byte-identically");
-    assert.equal(greenfieldContext.indexOf(amonSulInput), greenfieldContext.lastIndexOf(amonSulInput), "the intake input must appear exactly once without a Resume-Hint card");
+    const externalGreenfieldBytes = Buffer.from(externalGreenfieldInput, "utf8");
+    assert.equal(Buffer.from(greenfieldContext, "utf8").includes(externalGreenfieldBytes), true, "the full intake input must be surfaced byte-identically");
+    assert.equal(greenfieldContext.indexOf(externalGreenfieldInput), greenfieldContext.lastIndexOf(externalGreenfieldInput), "the intake input must appear exactly once without a Resume-Hint card");
     assert.doesNotMatch(greenfieldContext, /Resume-hint intent:/u);
   } finally {
     rmSync(greenfieldRoot, { recursive: true, force: true });

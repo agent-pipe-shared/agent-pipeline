@@ -85,7 +85,11 @@ test("list returns every prior project-matching session by recency without paths
   mkdirSync(project);
   mkdirSync(foreign);
   try {
-    const oldest = transcript(codexHome, { cwd: project, sessionId: "prior-oldest", entries: [{ type: "tool_result", tool_name: "exec_command", error: "oldest" }] });
+    const oldest = transcript(codexHome, {
+      cwd: project,
+      sessionId: "prior-oldest",
+      entries: [{ type: "tool_result", tool_name: "exec_command", error: "oldest", message: "x".repeat(9 * 1024 * 1024) }],
+    });
     const middle = transcript(codexHome, { cwd: project, sessionId: "prior-middle" });
     const newest = transcript(codexHome, { cwd: project, sessionId: "prior-newest", entries: [{ type: "tool_result", tool_name: "exec_command", error: "newest" }] });
     transcript(codexHome, { cwd: project, sessionId: "current-session" });
@@ -99,6 +103,12 @@ test("list returns every prior project-matching session by recency without paths
     assert.deepEqual(result.sessions[1].excerpt, []);
     assert.equal(JSON.stringify(result).includes(fixture), false);
     assert.doesNotMatch(JSON.stringify(result), /foreign-session|current-session/u);
+    assert.ok(readFileSync(oldest).byteLength > 8 * 1024 * 1024, "fixture must exceed the bounded automatic-excerpt limit");
+    for (const [sessionId, source] of [["prior-newest", newest], ["prior-middle", middle], ["prior-oldest", oldest]]) {
+      const selected = readRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId, env: { CODEX_HOME: codexHome } });
+      assert.equal(selected.status, "available");
+      assert.deepEqual(selected.bytes, readFileSync(source), `${sessionId} must remain fully readable after list selection`);
+    }
     const chunks = [];
     const originalWrite = process.stdout.write;
     const originalCodexHome = process.env.CODEX_HOME;
@@ -128,7 +138,7 @@ test("read emits byte-identical selected JSONL while current, foreign, and unkno
     const prior = transcript(codexHome, {
       cwd: project,
       sessionId: "prior-design",
-      entries: [{ type: "user_message", message: "The design calls Amon Sûl a watchtower." }],
+      entries: [{ type: "user_message", message: "The external Greenfield input must remain byte-identical." }],
     });
     transcript(codexHome, { cwd: project, sessionId: "current-session" });
     transcript(codexHome, { cwd: foreign, sessionId: "foreign-session" });
@@ -136,7 +146,7 @@ test("read emits byte-identical selected JSONL while current, foreign, and unkno
     const selected = readRunnerTranscript({ ...args, sessionId: "prior-design" });
     assert.equal(selected.status, "available");
     assert.deepEqual(selected.bytes, readFileSync(prior));
-    assert.match(selected.bytes.toString("utf8"), /Amon Sûl/u);
+    assert.match(selected.bytes.toString("utf8"), /external Greenfield input/u);
     for (const sessionId of ["current-session", "foreign-session", "unknown-session"]) {
       const unavailable = readRunnerTranscript({ ...args, sessionId });
       assert.deepEqual(unavailable, {

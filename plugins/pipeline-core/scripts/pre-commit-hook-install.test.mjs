@@ -157,6 +157,19 @@ function writeVerifyTransitionFixture(dir, { command = null, phase = "design", e
   }, null, 2)}\n`);
 }
 
+/** A canonical, already-implementing authority state for the late route. The
+ * legacy approval is deliberately complete (`approvedBy` + ISO timestamp), so
+ * the real shared derivePlanLifecycle() projection accepts it; it is not the
+ * shallow phase/planApproved lookalike older backstop fixtures used. */
+function writeEstablishedLateVerifyFixture(dir, { command = null, updatedAt = "2026-09-13T12:00:00.000Z" } = {}) {
+  writeVerifyTransitionFixture(dir, { command, phase: "implementation", updatedAt });
+  const path = join(dir, "project", "pipeline-state.json");
+  const state = JSON.parse(readFileSync(path, "utf8"));
+  delete state.planSubmission;
+  state.planApproval = { approvedBy: "PO", approvedAt: updatedAt };
+  writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
+}
+
 /** Installs the real hook into `dir`, then runs an actual `git commit` -- exactly the boundary
  * this hook exists to guard, not a direct invocation of the hook binary. */
 function installHook(dir) {
@@ -343,6 +356,56 @@ test("installed hook: admits only the complete sanctioned baseline-verify to imp
   git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
   const { code, stderr } = commit(dir, "configure verify while entering implementation");
   assert.equal(code, 0, stderr);
+});
+
+test("installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery", () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-late-verify-recovery");
+  writeEstablishedLateVerifyFixture(dir);
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and established implementation");
+  installHook(dir);
+
+  writeEstablishedLateVerifyFixture(dir, { command: "node --test test.mjs" });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  const { code, stderr } = commit(dir, "configure late verify in established implementation");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: refuses a late verify rewrite when it also stages lifecycle state", () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-late-verify-state-rewrite");
+  writeEstablishedLateVerifyFixture(dir, { updatedAt: "2026-09-13T12:00:00.000Z" });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and established implementation");
+  installHook(dir);
+
+  writeEstablishedLateVerifyFixture(dir, {
+    command: "node --test test.mjs",
+    updatedAt: "2026-09-13T12:01:00.000Z",
+  });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  const { code } = commit(dir, "attempt late verify with unrelated lifecycle rewrite");
+  assert.notEqual(code, 0);
+});
+
+test("installed hook: refuses late verify recovery when committed plan approval is stale", () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-late-verify-stale-approval");
+  writeEstablishedLateVerifyFixture(dir);
+  const statePath = join(dir, "project", "pipeline-state.json");
+  const stale = JSON.parse(readFileSync(statePath, "utf8"));
+  stale.planApproval = { submissionSha256: "a-different-submission" };
+  writeFileSync(statePath, `${JSON.stringify(stale, null, 2)}\n`);
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification with stale approval");
+  installHook(dir);
+
+  writeEstablishedLateVerifyFixture(dir, { command: "node --test test.mjs" });
+  // Preserve the committed stale authority while staging only the two otherwise
+  // valid calibration changes -- a shallow phase/planApproved check must not
+  // grant their protected-path exception.
+  writeFileSync(statePath, `${JSON.stringify(stale, null, 2)}\n`);
+  git("add", "project/pipeline.json", ".claude/pipeline.json");
+  const { code } = commit(dir, "attempt late verify with stale plan approval");
+  assert.notEqual(code, 0);
 });
 
 test("installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction", () => {
