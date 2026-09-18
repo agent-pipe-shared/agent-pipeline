@@ -97,7 +97,7 @@ The arrows do not promise that every change visits every box. The tables state
 when a branch exists, who owns it, the evidence that makes it real, and where it
 returns.
 
-## 1. Choose the V3 profile first
+## 1. Choose the V3 profile after bootstrap
 
 <!-- capability:v3-routed-duties -->
 <a id="capability-v3-routed-duties"></a>

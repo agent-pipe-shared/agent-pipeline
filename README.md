@@ -56,7 +56,8 @@ Four deliberately separated roles carry the model:
 - **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
   final sign-off.
 - **Elephant** — the long-lived orchestrator session. Turns your intent into a spec,
-  breaks it into small tasks, dispatches them, and makes the go/no-go call.
+  breaks it into small tasks, dispatches them, and prepares a go/no-go
+  recommendation for the Product Owner.
 - **Goldfish** — a fresh-context implementor subagent. Executes exactly one clearly
   defined task and reports back only with evidence, never a bare claim.
 - **Critic** — an independent, read-only reviewer with a fresh context. Never sees

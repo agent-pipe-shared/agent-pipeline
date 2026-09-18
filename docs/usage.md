@@ -44,8 +44,14 @@ run `node <plugin-root>/scripts/verify-evidence-producer.mjs --prepare --root
 the project changes. Preparation preserves your configured verify command;
 it does not replace your tests. A conflicting adapter is reported for repair.
 
-On the clean committed candidate, choose the boundary explicitly and run the
-evidence producer once with the reviewed base:
+On the clean committed candidate, choose the boundary explicitly. `work`,
+`critic`, `candidate`, and `push` select the fixed baseline plus commands
+registered for changed areas from the supplied base; use the mode matching the
+work, review, candidate, or push boundary. `release` always runs the full
+project command. Unknown paths, missing bindings and incomplete policies fall
+back to full.
+
+Run the evidence producer once with the reviewed base:
 
 ```bash
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode work --base <work-base>
@@ -59,12 +65,6 @@ Add `--no-reuse` when a race, flake, or environment check must execute every
 selected suite again at the same commit. The default continues to reuse valid
 receipts. Public evidence records `verifyRun.receiptReuse` as `disabled` or
 `allowed`, and each step records whether it was reused.
-
-`work`, `critic`, `candidate`, and `push` select the fixed baseline plus
-commands registered for changed areas from the supplied base; choose the mode
-that matches the work, review, candidate, or push boundary. `release` always
-runs the full project command. Unknown paths, missing bindings and incomplete
-policies fall back to full.
 
 The fixed baseline validates project authority and a present runtime manifest,
 tracked JSON syntax, merge-conflict markers, and `git diff --check`. If no
