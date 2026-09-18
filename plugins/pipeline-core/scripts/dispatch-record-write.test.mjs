@@ -25,12 +25,15 @@ function fixture(value = record(), target = `evidence/dispatch-record-${value.ta
 }
 
 check("writer validates, atomically publishes exclusively, and returns matching readback digest", () => {
-  const root = fixture();
+  const reportText = `1. Result\n${"é".repeat(600)}\n\n2. Evidence\r\n\tcommand and output\r\n\n3. Changed files\n4. Deliberately NOT changed\n5. Deviations\n6. Open items`;
+  const expected = record({ report: { text: reportText, changedFiles: ["src/x.mjs"] } });
+  const root = fixture(expected);
   try {
     const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" });
     const raw = readFileSync(join(root, receipt.target));
     const persisted = validateDispatchRecord(JSON.parse(raw));
-    assert.deepEqual(persisted, record());
+    assert.deepEqual(persisted, expected);
+    assert.equal(persisted.report.text, reportText);
     assert.equal(receipt.bytes, raw.length); assert.match(receipt.sha256, /^[a-f0-9]{64}$/u);
     assert.equal(receipt.taskId, persisted.taskId); assert.equal(receipt.candidateCommit, persisted.candidateCommit);
     assert.equal(receipt.resultSha256, persisted.resultSha256);

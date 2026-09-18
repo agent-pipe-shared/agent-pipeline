@@ -20,6 +20,13 @@ check("opening and terminal records share the strict closed contract", () => {
   assert.deepEqual(validateDispatchRecord(opening()), opening());
   assert.deepEqual(validateDispatchRecord(terminal()), terminal());
   assert.match(dispatchRecordSha256(terminal()), /^[a-f0-9]{64}$/u);
+  const prose = `1. Result\n${"é".repeat(600)}\n\n2. Evidence\r\n\tcommand and output\r\n\n3. Changed files\n4. Deliberately NOT changed\n5. Deviations\n6. Open items`;
+  const record = terminal(); record.report = { ...record.report, text: prose };
+  assert.deepEqual(validateDispatchRecord(record), record);
+  for (const text of ["", "   ", "\u0000", "line\u0001control", "bare\rreturn", "x".repeat(65_537)]) {
+    assert.throws(() => validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text } }));
+  }
+  assert.throws(() => validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: "section\n/home/alice/private/report.json" } }), /private absolute path/u);
 });
 check("v2 is explicit read-only legacy evidence while v3 requires exactly one Critic disposition", () => {
   const legacy = { ...opening(), schema: "pipeline.dispatch-record.v2" };

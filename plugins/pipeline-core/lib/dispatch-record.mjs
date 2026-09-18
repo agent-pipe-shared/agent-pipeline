@@ -32,6 +32,10 @@ function durableText(value, label) {
   nonempty(value, label);
   if (PRIVATE_ABSOLUTE_PATH.test(value)) fail("record-private-path", `${label} contains a private absolute path`);
 }
+function reportText(value, label) {
+  if (typeof value !== "string" || value.trim() === "" || Buffer.byteLength(value, "utf8") > 65_536
+    || /[\0-\x08\x0b\x0c\x0e-\x1f]/u.test(value) || /\r(?!\n)/u.test(value)) fail("record-report", `${label} is invalid`);
+}
 function denyPrivateAbsolutePaths(value, label, seen = new WeakSet()) {
   if (typeof value === "string") {
     if (PRIVATE_ABSOLUTE_PATH.test(value)) fail("record-private-path", `${label} contains a private absolute path`);
@@ -147,7 +151,8 @@ function validateRecord(record, { legacy }) {
   });
   if (record.report !== null) {
     exactKeys(record.report, ["text", "changedFiles", "orchestratorAddedFiles"], "report", ["text", "changedFiles"]);
-    durableText(record.report.text, "report.text");
+    if (legacy) durableText(record.report.text, "report.text");
+    else reportText(record.report.text, "report.text");
     strictPathList(record.report.changedFiles, "report.changedFiles");
     if (Object.hasOwn(record.report, "orchestratorAddedFiles")) strictPathList(record.report.orchestratorAddedFiles, "report.orchestratorAddedFiles");
   } else if (isTerminalOutcome(record.outcome)) fail("record-report", "terminal dispatch record requires report");
