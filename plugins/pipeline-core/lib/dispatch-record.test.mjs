@@ -20,10 +20,18 @@ check("opening and terminal records share the strict closed contract", () => {
   assert.deepEqual(validateDispatchRecord(opening()), opening());
   assert.deepEqual(validateDispatchRecord(terminal()), terminal());
   assert.match(dispatchRecordSha256(terminal()), /^[a-f0-9]{64}$/u);
-  const prose = `1. Result\n${"é".repeat(600)}\n\n2. Evidence\r\n\tcommand and output\r\n\n3. Changed files\n4. Deliberately NOT changed\n5. Deviations\n6. Open items`;
+  const prose = `  1. Result\n${"é".repeat(600)}\n\n2. Evidence\r\n\tcommand and output\r\n\n3. Changed files\n4. Deliberately NOT changed\n5. Deviations\n6. Open items  `;
   const record = terminal(); record.report = { ...record.report, text: prose };
   assert.deepEqual(validateDispatchRecord(record), record);
-  for (const text of ["", "   ", "\u0000", "line\u0001control", "bare\rreturn", "x".repeat(65_537)]) {
+  const exactUtf8Limit = "x".repeat(65_536);
+  const multibyteAtLimit = "é".repeat(32_768);
+  assert.equal(Buffer.byteLength(exactUtf8Limit, "utf8"), 65_536);
+  assert.equal(Buffer.byteLength(multibyteAtLimit, "utf8"), 65_536);
+  assert.equal(multibyteAtLimit.length < 65_536, true);
+  assert.deepEqual(validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: exactUtf8Limit } }).report.text, exactUtf8Limit);
+  assert.deepEqual(validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: multibyteAtLimit } }).report.text, multibyteAtLimit);
+  const unsafeC0 = [...Array.from({ length: 9 }, (_, index) => index), 11, 12, ...Array.from({ length: 18 }, (_, index) => index + 14)];
+  for (const text of ["", "   ", "bare\rreturn", "x".repeat(65_537), "é".repeat(32_769), ...unsafeC0.map((index) => `before${String.fromCharCode(index)}after`)]) {
     assert.throws(() => validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text } }));
   }
   assert.throws(() => validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: "section\n/home/alice/private/report.json" } }), /private absolute path/u);
@@ -32,6 +40,9 @@ check("v2 is explicit read-only legacy evidence while v3 requires exactly one Cr
   const legacy = { ...opening(), schema: "pipeline.dispatch-record.v2" };
   delete legacy.criticSkip;
   assert.deepEqual(validateLegacyDispatchRecord(legacy), legacy);
+  for (const text of ["legacy\nmultiline", "x".repeat(1_025)]) {
+    assert.throws(() => validateLegacyDispatchRecord({ ...terminal(), schema: "pipeline.dispatch-record.v2", report: { ...terminal().report, text } }));
+  }
   assert.throws(() => validateDispatchRecord(legacy), (error) => error?.code === "record-schema");
   const missing = opening(); delete missing.criticSkip;
   assert.throws(() => validateDispatchRecord(missing), (error) => error?.code === "record-critic-disposition");
@@ -105,6 +116,17 @@ check("durable prose rejects private Unix, Windows and WSL absolute paths", () =
     ...terminal(),
     report: { text: "repo-relative neighbors root, rooted, private/var, and private/variant are fine", changedFiles: ["root/private/file.mjs", "rooted/file.mjs", "private/var/cache.txt", "private/variant/cache.txt"] },
   }));
+  const safe = "  leading\tcontent\r\ntrailing  ";
+  assert.equal(validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: safe } }).report.text, safe);
+  for (const text of ["log\nnote", "x".repeat(1_025)]) {
+    assert.throws(() => validateDispatchRecord({ ...terminal(), log: [{ phase: "done", toolUseCount: 1, note: text }] }));
+  }
+  for (const path of [
+    "/home/alice\nprivate/report.json",
+    "/Users/alice\nprivate/report.json",
+    "C:\\Users\\Alice\nprivate\\report.json",
+    "\\\\server\\share\nprivate\\report.json",
+  ]) assert.throws(() => validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: `reviewed ${path}` } }), /private absolute path/u);
 });
 
 check("every persisted string lane rejects Unix, Windows, WSL and UNC private paths", () => {

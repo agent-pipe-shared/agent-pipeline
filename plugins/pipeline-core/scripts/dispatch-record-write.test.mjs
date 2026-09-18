@@ -25,7 +25,7 @@ function fixture(value = record(), target = `evidence/dispatch-record-${value.ta
 }
 
 check("writer validates, atomically publishes exclusively, and returns matching readback digest", () => {
-  const reportText = `1. Result\n${"é".repeat(600)}\n\n2. Evidence\r\n\tcommand and output\r\n\n3. Changed files\n4. Deliberately NOT changed\n5. Deviations\n6. Open items`;
+  const reportText = `  1. Result\n${"é".repeat(600)}\n\n2. Evidence\r\n\tcommand and output\r\n\n3. Changed files\n4. Deliberately NOT changed\n5. Deviations\n6. Open items  `;
   const expected = record({ report: { text: reportText, changedFiles: ["src/x.mjs"] } });
   const root = fixture(expected);
   try {
