@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5ffb5dcaa580186a444aa72e917c3834fbf6228a2c30600328f5272e212038b9"
+    "transitionHead": "041611b04f43014d1eec270143afdcc94b66e520b7c373c0dbbb2cbb0f81892e"
   },
   "counts": {
-    "open": 66,
-    "in_progress": 1,
-    "closed": 592,
+    "open": 62,
+    "in_progress": 0,
+    "closed": 597,
     "rejected": 3,
     "deferred": 11
   },
@@ -4987,13 +4987,17 @@
     },
     {
       "id": "pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO judgment plus Claude/Windows audit section 3.1 from the 2026-08-29 three-runner greenfield test (finding F30 of scratch/greenfield-triage-2026-08-29.md), Antigravity/WSL run.",
       "deferred": true,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "7adbf8d55668a1978b41e106a2728e485a72bf60",
+      "closureEvidence": "backlog/evidence/2026-09-18-requirement-traceability-gate-closure.md"
     },
     {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
@@ -7110,13 +7114,17 @@
     },
     {
       "id": "pipeline.role-dispatch-payload-errors-fail-before-model-launch",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-10",
       "source": "PO observation during 0.6.2 candidate review: malformed or incomplete role dispatches repeatedly consumed roughly ten minutes before reporting a coordinator/payload failure. The requirement applies to every role, not only Critic.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "b3272edc25741fee42aaeda4913aa4b517fc531c",
+      "closureEvidence": "backlog/evidence/2026-09-18-role-dispatch-payload-preflight-closure.md"
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
@@ -7163,14 +7171,18 @@
     },
     {
       "id": "pipeline.runner-native-subagent-tool-identity-is-not-portable",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-agy-062-103.md.",
       "deferred": false,
       "tracking": "Nova B — Antigravity reports DBB-PARENT-TOOL-USE-ID-MISSING for ordinary roles; do not weaken dispatch binding before collecting the native sanitized payload.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "f5d93d5d96564a993860671312e0c171fd4d80f8",
+      "closureEvidence": "backlog/evidence/2026-09-18-runner-native-subagent-tool-identity-closure.md"
     },
     {
       "id": "pipeline.runner-neutrality-before-third-runner",
@@ -8094,13 +8106,17 @@
     },
     {
       "id": "pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Stashed draft, NVA-B-MKTATTEST (git stash list, stash@{0}: \"push-authority surface narrowing, enumeration proven INCOMPLETE (session-power.mjs missed via join()), do not trust without a sound dynamic-reference detector\"). Verified live 2026-09-01 against plugins/pipeline-core/scripts/session-cleanup.mjs and plugins/pipeline-core/lib/session-cleanup-recovery.mjs.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "6fafa91200e542ba874a7bbdaeeb9cb29539f3b1",
+      "closureEvidence": "backlog/evidence/2026-09-18-push-authority-surface-closure.md"
     },
     {
       "id": "pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable",
@@ -8996,7 +9012,7 @@
     },
     {
       "id": "pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-24",
@@ -9004,7 +9020,11 @@
       "deferred": false,
       "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova",
       "due": "2026-08-31",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "50a80e5110715af5b855ee693aabb49e1db749b5",
+      "closureEvidence": "backlog/evidence/2026-09-18-workflow-dispatch-record-closure.md"
     },
     {
       "id": "pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session",

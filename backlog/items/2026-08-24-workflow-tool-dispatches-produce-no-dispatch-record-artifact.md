@@ -3,13 +3,17 @@ schema: pipeline.backlog-item.v1
 id: pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-24
 sprint: nova-b
 tracking: "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
 source: "Third delta Critic review of sprint-agy-runner, finding F3 (specs/sprint-agy-runner/evidence/2026-08-24-delta3-critic-review-agy-runner.md); PO-accepted disposition 2026-08-24"
 due: 2026-08-31
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 50a80e5110715af5b855ee693aabb49e1db749b5
+closure_evidence: backlog/evidence/2026-09-18-workflow-dispatch-record-closure.md
 ---
 
 # Workflow-tool dispatches produce no `evidence/dispatch-record-<TASK_ID>.json` artifact

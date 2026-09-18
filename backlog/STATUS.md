@@ -375,7 +375,7 @@
 | pipeline.no-check-validates-prose-section-citations | closed | workflow-improvement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
-| pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code | in_progress | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | — |
+| pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code | closed | workflow-improvement | pipeline | nova-b | 2026-08-29 | — | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | closed | workflow-improvement | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.no-governed-directory-contract | closed | workflow-improvement | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
@@ -531,11 +531,11 @@
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.resume-hint-test-unregistered-in-verify-gate | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.rg-pipe-lexical-containment-gap | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — NVA-B-READCONTAIN-1 restored realpath-aware containment for the single-command read lane, the cat-pipeline lane, and the git-pipeline lane in guard-lifecycle-ready.mjs. It deliberately did not touch guard-command-grammar.mjs's approvedReadPath(), which backs the rg-to-rg/rg-to-head bounded pipeline (isBoundedReadOnlyPipeline) — that function stays purely lexical (resolve()+pathInside(), no existsSync/realpathSync at all), a strictly weaker check than even NVA-B-READCONTAIN-1's own round-1 (direct-symlink-only) fix. Traced and confirmed by the Elephant, 2026-09-06, while filing related gaps found during the same package's closure. |
-| pipeline.role-dispatch-payload-errors-fail-before-model-launch | open | defect | pipeline | nova-b | 2026-09-10 | — | — |
+| pipeline.role-dispatch-payload-errors-fail-before-model-launch | closed | defect | pipeline | nova-b | 2026-09-10 | — | — |
 | pipeline.ruleset-freshness-wsl-subsystem-absent | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.ruleset-source-test-unregistered-in-the-verify-gate | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.runner-fallback-defaults-to-codex-without-explicit-signal | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- surfaced 2026-08-30 while cross-checking the Claude/Windows greenfield retrospective (docs/pipeline-retrospective-claude-060-78.md, section 8) against current code; confirmed still present, unfixed. |
-| pipeline.runner-native-subagent-tool-identity-is-not-portable | open | defect | pipeline | nova-b | 2026-09-13 | — | Nova B — Antigravity reports DBB-PARENT-TOOL-USE-ID-MISSING for ordinary roles; do not weaken dispatch binding before collecting the native sanitized payload. |
+| pipeline.runner-native-subagent-tool-identity-is-not-portable | closed | defect | pipeline | nova-b | 2026-09-13 | — | Nova B — Antigravity reports DBB-PARENT-TOOL-USE-ID-MISSING for ordinary roles; do not weaken dispatch binding before collecting the native sanitized payload. |
 | pipeline.runner-neutrality-before-third-runner | closed | workflow-improvement | pipeline | — | 2026-08-08 | 2026-12-31 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | — | 2026-07-27 | — | — |
 | pipeline.runtime-projections-drift-after-v3-refresh | closed | defect | pipeline | nova-b | 2026-08-28 | — | Nova B — a silent divergence between two files that are meant to project the same authority; a consumer cannot judge it, and neither can this report |
@@ -604,7 +604,7 @@
 | pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | — | 2026-08-27 | — | — |
 | pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | nova-b | 2026-08-31 | — | — |
-| pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.the-sandbox-preflight-app-server-handshake-is-a-race | closed | defect | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses | open | defect | pipeline | none | 2026-09-06 | — | — |
@@ -672,7 +672,7 @@
 | pipeline.windows-verify-brittle-test-hygiene | closed | defect | pipeline | — | 2026-07-25 | — | — |
 | pipeline.windows-verify-reproducibility | closed | defect | pipeline | — | 2026-07-22 | — | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
-| pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact | open | defect | pipeline | nova-b | 2026-08-24 | 2026-08-31 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
+| pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact | closed | defect | pipeline | nova-b | 2026-08-24 | 2026-08-31 | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session | open | defect | pipeline | nova-b | 2026-08-25 | — | — |
 | pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | closed | defect | pipeline | — | 2026-08-11 | — | — |
@@ -681,8 +681,8 @@
 
 ## Counts
 
-- open: 66
-- in_progress: 1
-- closed: 592
+- open: 62
+- in_progress: 0
+- closed: 597
 - rejected: 3
 - deferred: 11
