@@ -9,27 +9,33 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { test as nodeTest } from "node:test";
+import { mkdtempSync, mkdirSync, openSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { createReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+
+// The completion helper registers the cases with node:test; retain the standard
+// runner import so the suite is classified as a node:test module by Verify.
+void nodeTest;
 
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
-const ALL_DIRS = [];
 
 function freshRepo(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `guard-push-promo-${prefix}-`));
-  ALL_DIRS.push(dir);
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
-  git("init", "-q", "-b", "feature-1");
-  git("config", "user.email", "goldfish@example.invalid");
-  git("config", "user.name", "Goldfish");
+  for (const args of [
+    ["init", "-q", "-b", "feature-1"],
+    ["config", "user.email", "goldfish@example.invalid"],
+    ["config", "user.name", "Goldfish"],
+  ]) assert.equal(git(...args).status, 0, `fixture git ${args[0]} failed`);
   writeFileSync(join(dir, "README.md"), "fixture\n");
-  git("add", "README.md");
-  git("commit", "-q", "-m", "init");
+  assert.equal(git("add", "README.md").status, 0, "fixture git add failed");
+  assert.equal(git("commit", "-q", "-m", "init").status, 0, "fixture git commit failed");
   return dir;
 }
 
@@ -52,53 +58,92 @@ function runGuard(cmd, repoDir) {
   });
 }
 
-try {
-  // Case 1: Valid promotion envelope allows record-only commit
+const cases = [
   {
-    const dir = freshRepo("allow");
-    const commitS = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
-    writeFile(dir, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
+    id: "GPP01",
+    name: "valid promotion envelope allows record-only commit",
+    run() {
+      const dir = freshRepo("allow");
+      try {
+        const commitSResult = gitAt(dir, "rev-parse", "HEAD");
+        assert.equal(commitSResult.status, 0, "fixture source commit lookup failed");
+        const commitS = commitSResult.stdout.trim();
+        writeFile(dir, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
 
-    // Commit R modifying only backlog/STATUS.md
-    writeFile(dir, "backlog/STATUS.md", "# Status\n");
-    gitAt(dir, "add", "backlog/STATUS.md");
-    gitAt(dir, "commit", "-q", "-m", "docs(backlog): update status");
-    const commitR = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+        // Commit R modifying only backlog/STATUS.md
+        writeFile(dir, "backlog/STATUS.md", "# Status\n");
+        assert.equal(gitAt(dir, "add", "backlog/STATUS.md").status, 0, "fixture record git add failed");
+        assert.equal(gitAt(dir, "commit", "-q", "-m", "docs(backlog): update status").status, 0, "fixture record git commit failed");
+        const commitRResult = gitAt(dir, "rev-parse", "HEAD");
+        assert.equal(commitRResult.status, 0, "fixture record commit lookup failed");
+        const commitR = commitRResult.stdout.trim();
 
-    const releaseSel = planVerifySelection({
-      mode: "release",
-      candidateCommit: commitS,
-      registeredSuiteIds: ["suite-a"],
-      policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "doc", paths: ["README.md"], suites: ["suite-a"] }] },
-      changedPaths: ["README.md"],
-    });
-    const verifyEvidence = { exitCode: 0, commit: commitS, selection: releaseSel };
-    writeFile(dir, "evidence/verify-latest.json", verifyEvidence);
+        const releaseSel = planVerifySelection({
+          mode: "release",
+          candidateCommit: commitS,
+          registeredSuiteIds: ["suite-a"],
+          policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "doc", paths: ["README.md"], suites: ["suite-a"] }] },
+          changedPaths: ["README.md"],
+        });
+        const verifyEvidence = { exitCode: 0, commit: commitS, selection: releaseSel };
+        writeFile(dir, "evidence/verify-latest.json", verifyEvidence);
 
-    const envelopeResult = createReleasePromotionEnvelope({
-      repoDir: dir,
-      sourceCommit: commitS,
-      recordCommit: commitR,
-      verifyEvidence,
-    });
-    assert.equal(envelopeResult.ok, true);
-    writeFile(dir, "evidence/release-promotion-latest.json", envelopeResult.envelope);
+        const envelopeResult = createReleasePromotionEnvelope({
+          repoDir: dir,
+          sourceCommit: commitS,
+          recordCommit: commitR,
+          verifyEvidence,
+        });
+        assert.equal(envelopeResult.ok, true);
+        writeFile(dir, "evidence/release-promotion-latest.json", envelopeResult.envelope);
 
-    const res = runGuard("git push origin feature-1:refs/heads/feature-1", dir);
-    assert.equal(res.status, 0, `Expected allow (exit 0), got ${res.status}: ${res.stderr}`);
-    console.log("PASS  guard-push: valid promotion envelope allows record-only commit");
+        const res = runGuard("git push origin feature-1:refs/heads/feature-1", dir);
+        assert.equal(res.status, 0, `Expected allow (exit 0), got ${res.status}: ${res.stderr}`);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  },
+  {
+    id: "GPP02",
+    name: "tampered promotion envelope is rejected",
+    run() {
+      const dir = freshRepo("tampered");
+      try {
+        const commitSResult = gitAt(dir, "rev-parse", "HEAD");
+        assert.equal(commitSResult.status, 0, "fixture source commit lookup failed");
+        const commitS = commitSResult.stdout.trim();
+        writeFile(dir, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
+        writeFile(dir, "backlog/STATUS.md", "# Status\n");
+        assert.equal(gitAt(dir, "add", "backlog/STATUS.md").status, 0, "fixture record git add failed");
+        assert.equal(gitAt(dir, "commit", "-q", "-m", "docs(backlog): update status").status, 0, "fixture record git commit failed");
+        const commitRResult = gitAt(dir, "rev-parse", "HEAD");
+        assert.equal(commitRResult.status, 0, "fixture record commit lookup failed");
+        const commitR = commitRResult.stdout.trim();
 
-    // Case 2: Tampered envelope is rejected
-    writeFile(dir, "evidence/release-promotion-latest.json", { ...envelopeResult.envelope, envelopeSha256: "0".repeat(64) });
-    const resTampered = runGuard("git push origin feature-1:refs/heads/feature-1", dir);
-    assert.equal(resTampered.status, 2, `Expected block (exit 2), got ${resTampered.status}`);
-    assert.match(resTampered.stderr, /is stale/);
-    console.log("PASS  guard-push: tampered promotion envelope is rejected");
-  }
+        const releaseSel = planVerifySelection({
+          mode: "release",
+          candidateCommit: commitS,
+          registeredSuiteIds: ["suite-a"],
+          policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "doc", paths: ["README.md"], suites: ["suite-a"] }] },
+          changedPaths: ["README.md"],
+        });
+        const verifyEvidence = { exitCode: 0, commit: commitS, selection: releaseSel };
+        writeFile(dir, "evidence/verify-latest.json", verifyEvidence);
+        const envelopeResult = createReleasePromotionEnvelope({ repoDir: dir, sourceCommit: commitS, recordCommit: commitR, verifyEvidence });
+        assert.equal(envelopeResult.ok, true);
+        writeFile(dir, "evidence/release-promotion-latest.json", { ...envelopeResult.envelope, envelopeSha256: "0".repeat(64) });
+        const resTampered = runGuard("git push origin feature-1:refs/heads/feature-1", dir);
+        assert.equal(resTampered.status, 2, `Expected block (exit 2), got ${resTampered.status}`);
+        assert.match(resTampered.stderr, /is stale/);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  },
+];
 
-  console.log("guard-push-promotion: all tests passed");
-} finally {
-  for (const dir of ALL_DIRS) {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
+const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+  ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
+  : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+registerTestCaseCompletion({ cases, fd: completionFd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
