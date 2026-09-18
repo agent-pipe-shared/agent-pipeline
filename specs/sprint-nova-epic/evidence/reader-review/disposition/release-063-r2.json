@@ -1,0 +1,19 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "release-063-r2",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "workflow-scope-duplication",
+      "class": "cut",
+      "status": "resolved",
+      "resolutionCommit": "8f3c881b00d7f922183398166b9a99e56d8d8785"
+    },
+    {
+      "id": "maintainer-reference-order",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "8f3c881b00d7f922183398166b9a99e56d8d8785"
+    }
+  ]
+}
