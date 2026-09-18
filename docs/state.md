@@ -27,18 +27,16 @@
 
 ## Current handover — 2026-09-12: Nova-B implementation and deferred native Windows work
 
-### 2026-09-18 operational recovery: closed-item verification audit
+### 2026-09-19 recovery: Nova-B audit
 
-The [Nova-B audit](../backlog/evidence/2026-09-18-nova-b-current-code-audit/report.md)
-covers 129 closed items, 94 base ACs and B61/B62/B7; acceptance remains open.
-Release Verify on `396f9b7c`: RED, 547/555. Fixes `3f16f2bf` (test registration)
-and `5b379dc4` (inventory/projection) pass focused checks. Verify and Critic
-remain pending. Promotion validation, runtime wiring and frozen Verify binding
-remain unresolved. Check normal entrypoints and all three runners' portable,
-autonomous flows; retain native deferrals. Nova stays in implementation;
-no release approval.
-
-
+[Checkpoint](../backlog/evidence/2026-09-18-nova-b-current-code-audit/correction-2026-09-19.md):
+129 items, 94 base ACs plus B61/B62/B7; acceptance open.
+Release Verify `f3f79edf`: RED 549/555; Security passed; exact journal binding.
+`2e1b1bb7` fixes two red doc checks. Publication, D5 acceptance, dispatch-record
+contracts and Critic remain open. Promotion producer/input binding and trusted
+human-terminal reachability are unfinished. Verify ordinary entrypoints for
+all three runners/platforms; fixtures are not native proof. Keep native
+deferrals and collect PO topics. No release approval.
 **Release state:** version `0.6.1` · tag `v0.6.1` · commit `6262d408aa616651232b46ab8ecbfd88ce4055b0` · tree `69b12f1d8714de57e22acb730a09f4bbac067360` · status `published`
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
