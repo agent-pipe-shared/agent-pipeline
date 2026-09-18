@@ -29,6 +29,9 @@ import {
 // table; the table and argv emitter keep arriving through the CLI seam below, unchanged.
 import { mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
 import {
+  EVIDENCE_HOST_PATH_DENIAL_CODE,
+  isEvidenceArtifactPath,
+  extractWritePayload,
   ADMITTED_GRAMMAR_SHAPES,
   BASE_GOVERNANCE_MARKERS,
   claudeSessionMemoryDirectory,
@@ -9460,6 +9463,101 @@ test("rebdead negative-5: a restart-required session with a validly-resolved act
     deps,
   );
   assert.equal(resumeHintWrite.exitCode, 0, resumeHintWrite.stderr);
+});
+
+
+test("EVIDENCE-HOST-PATH: isEvidenceArtifactPath matches evidence targets and rejects non-evidence paths", () => {
+  assert.equal(isEvidenceArtifactPath("backlog/evidence/foo.md"), true);
+  assert.equal(isEvidenceArtifactPath("backlog/evidence/nested/bar.txt"), true);
+  assert.equal(isEvidenceArtifactPath("specs/sprint-nova-epic/evidence/repro.txt"), true);
+  assert.equal(isEvidenceArtifactPath("specs/feature-x/evidence/capture.log"), true);
+  assert.equal(isEvidenceArtifactPath("evidence/dispatch-record-01.json"), true);
+  assert.equal(isEvidenceArtifactPath("./backlog/evidence/foo.md"), true);
+  assert.equal(isEvidenceArtifactPath("backlog/items/2026-09-04-item.md"), false);
+  assert.equal(isEvidenceArtifactPath("src/pipeline.js"), false);
+  assert.equal(isEvidenceArtifactPath("docs/operating-model.md"), false);
+  assert.equal(isEvidenceArtifactPath(null), false);
+  assert.equal(isEvidenceArtifactPath(""), false);
+});
+
+test("EVIDENCE-HOST-PATH: extractWritePayload extracts content across tools", () => {
+  assert.equal(extractWritePayload({ content: "hello" }, "Write"), "hello");
+  assert.equal(extractWritePayload({ new_string: "world" }, "Edit"), "world");
+  assert.equal(extractWritePayload({ CodeContent: "code" }, "write_to_file"), "code");
+  assert.equal(extractWritePayload({ ReplacementContent: "replacement" }, "replace_file_content"), "replacement");
+  assert.equal(extractWritePayload(null, "Write"), "");
+});
+
+test("EVIDENCE-HOST-PATH: writing an absolute host path into evidence is blocked and diagnostic redacts path", () => {
+  const path = root();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const writeCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "backlog/evidence/2026-09-18-host-path-test.md",
+        content: "Execution trace: failed at /home/developer/src/agent-pipeline/test.js:10\n",
+      },
+    };
+    const result = evaluateLifecycleReadyGuard(writeCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-EVIDENCE-HOST-PATH/u);
+    assert.match(result.stderr, /Matched pattern: posix-home/u);
+    // Diagnostic must not leak the matched sensitive host path itself
+    assert.equal(result.stderr.includes("/home/developer/src/agent-pipeline"), false);
+
+    // Clean relative/placeholder write to same target is admitted
+    const cleanWrite = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "backlog/evidence/2026-09-18-host-path-test.md",
+        content: "Execution trace: failed at <repo-root>/test.js:10\n",
+      },
+    };
+    const cleanResult = evaluateLifecycleReadyGuard(cleanWrite, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(cleanResult.exitCode, 0, cleanResult.stderr);
+
+    // Edit tool with host path in new_string is also blocked
+    const editCall = {
+      tool_name: "Edit",
+      tool_input: {
+        file_path: "specs/sprint-nova-epic/evidence/test.log",
+        old_string: "old",
+        new_string: "Error at C:\\Users\\Administrator\\AppData\\Local\\Temp\\run.log",
+      },
+    };
+    const editResult = evaluateLifecycleReadyGuard(editCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(editResult.exitCode, 2);
+    assert.match(editResult.stderr, /GUARD-EVIDENCE-HOST-PATH/u);
+    assert.match(editResult.stderr, /Matched pattern: windows-drive-letter/u);
+    assert.equal(editResult.stderr.includes("C:\\Users\\Administrator"), false);
+
+    // Writing a host path into a non-evidence file is not blocked under this code
+    const nonEvidenceCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "scratch/test-log.txt",
+        content: "Error at /home/developer/test.log",
+      },
+    };
+    const nonEvidenceResult = evaluateLifecycleReadyGuard(nonEvidenceCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(nonEvidenceResult.exitCode, 0, nonEvidenceResult.stderr);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
 });
 
 process.on("exit", () => {

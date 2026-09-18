@@ -40,6 +40,7 @@ import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-comman
 import { HUMAN_PO_SIGNING_COMMANDS } from "../scripts/po-human-approval.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
+import { findResidualHostPath } from "../scripts/capture-evidence.mjs";
 import {
   isBootstrapAcknowledgementMarkerMutation,
   isBootstrapBindingStagingAuthoringWrite,
@@ -894,6 +895,46 @@ function boundAuthorityDocumentPath(root, requested) {
     return null;
   }
   return null;
+}
+
+export const EVIDENCE_HOST_PATH_DENIAL_CODE = "GUARD-EVIDENCE-HOST-PATH";
+
+/**
+ * Returns true if repoPath targets a tracked evidence directory:
+ * - `backlog/evidence/**`
+ * - `specs/*.../evidence/**`
+ * - `evidence/**`
+ */
+export function isEvidenceArtifactPath(repoPath) {
+  if (typeof repoPath !== "string") return false;
+  const normalized = repoPath.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (normalized.startsWith("backlog/evidence/")) return true;
+  if (/^specs\/.*\/evidence\//.test(normalized)) return true;
+  if (normalized.startsWith("evidence/")) return true;
+  return false;
+}
+
+export function extractWritePayload(toolInput, toolName) {
+  if (toolInput === null || typeof toolInput !== "object") return "";
+  const candidates = [];
+  if (typeof toolInput.content === "string") candidates.push(toolInput.content);
+  if (typeof toolInput.new_string === "string") candidates.push(toolInput.new_string);
+  if (typeof toolInput.CodeContent === "string") candidates.push(toolInput.CodeContent);
+  if (typeof toolInput.ReplacementContent === "string") candidates.push(toolInput.ReplacementContent);
+  if (typeof toolInput.new_source === "string") candidates.push(toolInput.new_source);
+  return candidates.join("\n");
+}
+
+function blockedEvidenceHostPath(relPath, hit, overrideGuidance = "") {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${EVIDENCE_HOST_PATH_DENIAL_CODE}: Evidence artifact write into ${relPath} contains an absolute host path.\n`
+      + `Matched pattern: ${hit.name} at character offset ${hit.offset}.\n`
+      + "Evidence artifacts must never embed absolute host paths (POSIX user home, macOS home, WSL paths, or Windows drive paths).\n"
+      + "Redact host paths using <repo-root>, <home>, or relative paths before writing to disk, or use plugins/pipeline-core/scripts/capture-evidence.mjs to capture command output safely.\n"
+      + overrideGuidance,
+  );
 }
 
 // Hoisted for the same reason GRAMMAR_DENIAL_GUIDANCE is: the HGO request/capability is
@@ -5544,6 +5585,21 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
       const boundAuthority = boundAuthorityDocumentPath(root, requested);
       if (boundAuthority !== null) {
         return withLifts(lifts, protectedAuthorityDocumentWriteOnly(boundAuthority));
+      }
+      const relPath = relative(root, requested).replace(/\\/g, "/");
+      if (isEvidenceArtifactPath(relPath)) {
+        const payload = extractWritePayload(input.tool_input, toolName);
+        const hit = findResidualHostPath(payload);
+        if (hit !== null) {
+          const reason = `${EVIDENCE_HOST_PATH_DENIAL_CODE}: Evidence artifact write into ${relPath} contains an absolute host path (${hit.name} at character offset ${hit.offset}).`;
+          const route = humanOverrideRoute(
+            EVIDENCE_HOST_PATH_DENIAL_CODE, reason, "write", root, toolName, input.tool_input, dependencies,
+          );
+          if (!route.admitted) {
+            return withLifts(lifts, blockedEvidenceHostPath(relPath, hit, route.overrideGuidance));
+          }
+          lifts.push(route.admitted);
+        }
       }
     }
   }
