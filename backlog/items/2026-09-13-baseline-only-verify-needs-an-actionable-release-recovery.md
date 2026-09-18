@@ -84,3 +84,22 @@ build.  A consumer that already used the sanctioned writer retains its explicit
 verify contract and continues to be subject to ordinary push verification.
 The rollback must never delete or blank that contract merely to restore an
 older plugin behavior.
+
+## Local implementation result — 2026-09-18
+
+The bounded recovery is implemented locally across commits `45125761`,
+`9af3878f`, and `9a18c3b3`.  Both ordinary discovery points (`inspect` and
+`push-init`) now return the same structured, copy-safe `collect-input` action.
+Its mutating `configure-verify` apply action requires a fresh confirmation;
+the canonical writer still enforces a current approved implementation
+lifecycle, two identical baseline twins, a non-empty command, and exact
+zero-write replay only.
+
+The pre-commit backstop uses that canonical lifecycle predicate rather than a
+shallow plan-approval shape.  The focused end-to-end recovery, Push Init
+(26/26), and late pre-commit regressions pass locally.  Two initial
+diff-scoped Critic runs found and drove the reachable-push, lifecycle-authority
+and confirmation corrections; the final correction-diff Critic returned PASS
+with no findings.  This is not yet full candidate Verify evidence or a plugin
+publication: the item remains open for that normal qualification and release
+path.
