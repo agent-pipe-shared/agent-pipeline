@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3606eb6186d24f72aa2226fcdf1809c94c2dce333131f13a2cb539c8b18f0f9c"
+    "transitionHead": "b9b01afbe4c8ebd624094b4943d036921fdf80bb92fb3f0d874c1de50e6c1e1d"
   },
   "counts": {
-    "open": 77,
+    "open": 68,
     "in_progress": 1,
-    "closed": 581,
+    "closed": 599,
     "rejected": 3,
     "deferred": 11
   },
@@ -64,6 +64,20 @@
       "closureRepository": "self",
       "closureCommit": "615bcd247ccc0f339102d669e5d78cd6e684d874",
       "closureEvidence": "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
+    },
+    {
+      "id": "pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Hit live, 2026-08-27, in the Alfred clone: the sprint-nova-epic discard exposed a 2026-07-31 post-close amendment to the 0.4.7-hotfix Result that had been invisible for four weeks. Full incident narrative: scratch/incident-report.md of that session; durable facts restated here in full.",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "16d153da22cc12056e5a1d2534f5201547ca60ca",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md"
     },
     {
       "id": "pipeline.a-critic-has-no-writable-location-for-its-own-report",
@@ -160,6 +174,20 @@
       "source": "Measured live, twice, in the 2026-09-01 0.6.0 release range: docs/push-release-flow.md drift caught in commit 62ba638b, docs/adr/0076-global-chat-attributed-unattested-approval-mode.md drift caught in commit 56e91858.",
       "deferred": false,
       "sprint": "nova-b"
+    },
+    {
+      "id": "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Measured 2026-08-27 in the Alfred clone (fresh clone of the Nova line): each missing machine-local artifact surfaced as an isolated refusal at a different lifecycle point, none at bootstrap.",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path",
@@ -888,6 +916,20 @@
       "closureEvidence": "backlog/items/2026-08-18-atomic-prd-approval-without-mutation.md"
     },
     {
+      "id": "pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured live 2026-08-28 in the Alfred clone: two attended PO acknowledge ceremonies, the first failing its postimage readback and rolling back, the second succeeding with an explicit --runner flag.",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "7535e631f8c15a924a1c1ee426f82bbd650a1dee",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-governance-triple.md"
+    },
+    {
       "id": "pipeline.attestation-git-presence-gate-not-gs8-protected",
       "status": "closed",
       "type": "defect",
@@ -953,14 +995,18 @@
     },
     {
       "id": "pipeline.authority-gate-verdict-need-not-survive-checkout",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed by the Phoenix session of 2026-08-08, which caught it in its own work; generalised and verified against the source here.",
       "deferred": true,
       "due": "2026-08-22",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "16d153da22cc12056e5a1d2534f5201547ca60ca",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a5-lifecycle-evidence-closure.md"
     },
     {
       "id": "pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had",
@@ -1239,7 +1285,7 @@
       "source": "PO, 2026-08-08, on raising the pipeline-start byte budget 15,000 -> 18,000: optimisation is worth doing, but as an efficiency pass later, when more files still need to become modules — not as a detour inside the 0.5.4 hardening block.",
       "deferred": true,
       "due": "2026-09-05",
-      "sprint": "alfred"
+      "sprint": "nightwing"
     },
     {
       "id": "pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason",
@@ -2118,6 +2164,20 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
     },
     {
+      "id": "pipeline.critic-dispatches-cannot-persist-their-scratch-notes",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Measured twice on 2026-08-27, independently, by both design-review Critic dispatches of the sprint-alfred-epic package (reports persisted under specs/sprint-alfred-epic/evidence/critic/).",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
+    },
+    {
       "id": "pipeline.critic-md-protected-preimage-drift",
       "status": "closed",
       "type": "defect",
@@ -2161,14 +2221,18 @@
     },
     {
       "id": "pipeline.critic-route-pre-check-not-in-force-in-installed-plugin",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-11",
       "source": "Critic review (FAIL, F3) of NVA-BL-42 (plugins/pipeline-core/agents/critic.md, goldfish-deep.md, templates/prompts/critic-review.md, commit 08684e7874b79c04a44601c487f343be0dfaefa5), 2026-08-11.",
       "deferred": true,
       "due": "2026-08-25",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "7535e631f8c15a924a1c1ee426f82bbd650a1dee",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-governance-triple.md"
     },
     {
       "id": "pipeline.critic-skip-not-an-explicit-logged-decision",
@@ -2241,13 +2305,17 @@
     },
     {
       "id": "pipeline.critical-human-proof-policy-seeded-without-trust-anchor",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff.",
       "deferred": true,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6d6f5b34c546ed7b70dddd79f27e3fcecbcbd9c5",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-guard-override-trust.md"
     },
     {
       "id": "pipeline.critical-push-signing-ceremony-gives-no-path-feedback",
@@ -2344,6 +2412,20 @@
       "sprint": "batman"
     },
     {
+      "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-28",
+      "source": "Measured live 2026-08-28 in the Alfred clone, applying the PO's own PRD-gate decisions to the PRD and Spec the gate is about.",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d37e6eff196b7e4786fe58b89742e52f5190404e",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md"
+    },
+    {
       "id": "pipeline.design-to-implementation-path-has-no-driver",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2357,6 +2439,20 @@
       "closureRepository": "self",
       "closureCommit": "d7600de57502e89fc18bb95d2324f02e022e5352",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs"
+    },
+    {
+      "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Hit live, 2026-08-27, in the Alfred clone, executing the epic switch the tool itself directs (discard-feature then set-feature). Reproduced against the source the same session; line references verified.",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d590bbfdbdbc3c6e44a6ecf124d6b5015da9f481",
+      "closureEvidence": "backlog/evidence/2026-09-13-discard-feature-observer-conformance.md"
     },
     {
       "id": "pipeline.discarded-feature-dead-end",
@@ -2881,6 +2977,16 @@
       "closureEvidence": "backlog/items/2026-08-09-external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system.md"
     },
     {
+      "id": "pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-14",
+      "source": "PO requirement, 2026-09-14, after an Alfred-sprint feature-branch checkpoint push was blocked by release-grade marketplace attestation and push-authority prerequisites while the active external marketplace could not safely be replaced.",
+      "deferred": false,
+      "sprint": "nova"
+    },
+    {
       "id": "pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors",
       "status": "open",
       "type": "defect",
@@ -3315,13 +3421,17 @@
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-17",
       "source": "PO observation, 2026-08-17, live during a session dispatching several goldfish-deep and Critic subagents back-to-back for Nova A Windows bugfix work.",
       "deferred": true,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-dispatch-token-breakdown.md"
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
@@ -3970,14 +4080,18 @@
     },
     {
       "id": "pipeline.hardening-round-cannot-register-its-own-suites",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed 2026-08-08 during the 0.5.4 hardening block itself: the SETUP-2b dispatch was refused when registering its own new suite, correctly stopped rather than routing around the guard, and the registration is still outstanding. Second confirmed instance of the guard-testpath gap already recorded in docs/state.md.",
       "deferred": true,
       "due": "2026-08-22",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d37e6eff196b7e4786fe58b89742e52f5190404e",
+      "closureEvidence": "backlog/evidence/2026-09-13-declarative-verify-suite-registration.md"
     },
     {
       "id": "pipeline.harness-classifier-blocks-authorized-onboarding-action",
@@ -4624,14 +4738,18 @@
     },
     {
       "id": "pipeline.long-dispatches-truncate-before-emitting-their-report",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Three occurrences in one unattended block, 2026-08-07/08: two Goldfish dispatches and one Critic dispatch ended mid-sentence with the work done and no report.",
       "deferred": false,
       "due": "2026-08-22",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.lossless-pre-restart-checkpoint",
@@ -5035,6 +5153,20 @@
       "closureRepository": "self",
       "closureCommit": "344b49620f2353749b8bb44fc0dc2889dbdc339c",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
+    },
+    {
+      "id": "pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Flagged independently by both 2026-08-27 design-review Critics (round 1A finding F1, round 1B finding F10; reports under specs/sprint-alfred-epic/evidence/critic/); scope question resolved against docs/operating-model.md §3.3 in the round-1 response.",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "7535e631f8c15a924a1c1ee426f82bbd650a1dee",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-governance-triple.md"
     },
     {
       "id": "pipeline.no-sanctioned-way-to-start-over",
@@ -5638,13 +5770,17 @@
     },
     {
       "id": "pipeline.plan-approval-binds-a-staging-draft-as-project-authority",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Live state of a greenfield Antigravity test project, read 2026-08-27: the PO plan approval bound project/.onboarding-staging/ paths as project authority and advanced the feature to implementation. The generated staging files' own banner states they must not be bound as authority.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d37e6eff196b7e4786fe58b89742e52f5190404e",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md"
     },
     {
       "id": "pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown",
@@ -7469,6 +7605,20 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-27",
+      "source": "Second measured occurrence, 2026-08-27, in the Alfred clone (submit-plan refused with PLAN-SUBMIT-CONTINUITY-INVALID after a clean set-feature). First occurrence documented in specs/sprint-phoenix-epic/RECOVERY.md (2026-07, 'second integration gap').",
+      "deferred": false,
+      "sprint": "alfred",
+      "closedAt": "2026-09-13",
+      "closureRepository": "self",
+      "closureCommit": "d37e6eff196b7e4786fe58b89742e52f5190404e",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/a4-design-authority-sealing.md"
+    },
+    {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
       "status": "closed",
       "type": "defect",
@@ -7713,7 +7863,7 @@
       "source": "Cross-repo observation from a sibling Phoenix session, relayed by the PO into this Nova session for filing.",
       "deferred": true,
       "due": "2026-09-12",
-      "sprint": "alfred"
+      "sprint": "nightwing"
     },
     {
       "id": "pipeline.stale-worktree-directories-accumulate-with-no-sweep",
@@ -7864,14 +8014,18 @@
     },
     {
       "id": "pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Elephant, 2026-08-08, GF-057. Third confirmed instance across two blocks; each one verified at a line before filing. The first (GF-056) was walked around with a shell write, the second and third were reported and stopped.",
       "deferred": true,
       "due": "2026-08-15",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6d6f5b34c546ed7b70dddd79f27e3fcecbcbd9c5",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/b2-guard-override-trust.md"
     },
     {
       "id": "pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention",
@@ -8701,13 +8855,17 @@
     },
     {
       "id": "pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "PO, 2026-08-16: 'Was man hier an dem repo gut sehen kann ist, dass verify inzwischen unglaublich krass angeschwollen ist und sehr lange dauert.' Counts and the absent-duration finding were measured in the same session.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.verify-marketplace-attestation-blocks-normal-active-development",
@@ -8753,13 +8911,17 @@
     },
     {
       "id": "pipeline.verify-range-mode-registration-for-orchestrator-commit-control",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-25",
       "source": "Split out of backlog/items/2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md at closure, 2026-08-25 -- Part B of that item's 2026-08-19 'Direction 1 design' section, fully designed but never built and never required to consider that item's own stated problem closed.",
       "deferred": false,
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-14",
+      "closureRepository": "self",
+      "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
+      "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
     },
     {
       "id": "pipeline.verify-registration-check-fixtures-lack-real-git-topology",
