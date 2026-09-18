@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.nova-b5-candidate-freeze.v2",
   "candidate": {
-    "commit": "03eeff5a1635597facff3a062bf2ffb15a0a176c",
-    "tree": "3066828e67f054cb4bdcdc8bc3c7e9945138fa53",
+    "commit": "986f8f03b7ca737e93d2553be41d7877c5f84137",
+    "tree": "cce5739e609985784d5f46b88a0d4b2b899dd31c",
     "branch": "feat/sprint-nova-codex-v046"
   },
   "base": {
@@ -17,20 +17,20 @@
   },
   "backlog": {
     "status": "green",
-    "indexSha256": "ff3bc73a70eb2f228ddff1176b3555a01596fb0326eeb37addc647b8bdd5abe7",
-    "statusSha256": "a65088c9440471fdc4f6dd1553c8a7cf3ca98d2a293ad577ccc02a61dff56b60",
-    "ledgerSha256": "a79d1e41c5a9927bfc611bbca9beadc3fe9b0d8295fa65e4ffb14934cb2d2cbc"
+    "indexSha256": "55446184b53baba8530edcc390f2a9212dd1c6c862d6eda95a4cfe7533b5915b",
+    "statusSha256": "c0affcff5d9ebbaf345a6d861950bd01d4745df846f0eeb61f89cc4049c76a06",
+    "ledgerSha256": "7fcb572220738df0c85bafb4f81dd0557bd9fc9b91cddd70651a7077657644c6"
   },
   "gates": {
     "verify": {
       "path": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
-      "sha256": "d641894607acc14b0e28522fbb764098b992021004251e98664c46fc343df590",
+      "sha256": "e3e9eef128f75723addd764d95a0ff19fd6679040752ef9d18b8d50804b15de7",
       "exitCode": 0,
       "binding": "exact-clean-candidate"
     },
     "security": {
       "path": "specs/sprint-nova-epic/evidence/nova-b/security.json",
-      "sha256": "5c1480b33abf82072381dc2522d01122b574fbe8ee9490ffd832701df6d47d09",
+      "sha256": "5a5a936472a5b8604b96f06837313f6e9222c709ef4d8aa2a2f5fabcb081557c",
       "exitCode": 0,
       "binding": "clean-exact-candidate"
     }
@@ -42,5 +42,5 @@
     "B6 native Apple Silicon lifecycle, Critic and PO close"
   ],
   "status": "frozen-awaiting-external-native-gates",
-  "recordSha256": "3b83ea8b687c57f8cb59c889fbde71934edecd2a8d9bd6251a2f0bfe2d2d0031"
+  "recordSha256": "1f1d961b5369b1b362b437c0d903e04036c62e0113d5a800cbdf8bb1026d48a6"
 }

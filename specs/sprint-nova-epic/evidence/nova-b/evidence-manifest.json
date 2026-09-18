@@ -1,21 +1,21 @@
 {
   "schema": "pipeline.nova-b5-evidence-manifest.v1",
   "candidate": {
-    "commit": "03eeff5a1635597facff3a062bf2ffb15a0a176c",
-    "tree": "3066828e67f054cb4bdcdc8bc3c7e9945138fa53"
+    "commit": "986f8f03b7ca737e93d2553be41d7877c5f84137",
+    "tree": "cce5739e609985784d5f46b88a0d4b2b899dd31c"
   },
   "sources": [
     {
       "path": "backlog/STATUS.md",
-      "sha256": "a65088c9440471fdc4f6dd1553c8a7cf3ca98d2a293ad577ccc02a61dff56b60"
+      "sha256": "c0affcff5d9ebbaf345a6d861950bd01d4745df846f0eeb61f89cc4049c76a06"
     },
     {
       "path": "backlog/index.json",
-      "sha256": "ff3bc73a70eb2f228ddff1176b3555a01596fb0326eeb37addc647b8bdd5abe7"
+      "sha256": "55446184b53baba8530edcc390f2a9212dd1c6c862d6eda95a4cfe7533b5915b"
     },
     {
       "path": "backlog/transitions.ndjson",
-      "sha256": "a79d1e41c5a9927bfc611bbca9beadc3fe9b0d8295fa65e4ffb14934cb2d2cbc"
+      "sha256": "7fcb572220738df0c85bafb4f81dd0557bd9fc9b91cddd70651a7077657644c6"
     },
     {
       "path": "specs/sprint-nova-epic/design/backlog-spec-bindings.json",
@@ -23,17 +23,17 @@
     },
     {
       "path": "specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json",
-      "sha256": "716c1d3b1a3a53963e30077b8b1839dfbe8df1c3cdb73fcd1606df1e2a1e2a3a"
+      "sha256": "fb8323ad5010c7da0bfed92711ecc59cd8b565e9b30620adbe23a404e1edaf4b"
     },
     {
       "path": "specs/sprint-nova-epic/evidence/nova-b/security.json",
-      "sha256": "5c1480b33abf82072381dc2522d01122b574fbe8ee9490ffd832701df6d47d09"
+      "sha256": "5a5a936472a5b8604b96f06837313f6e9222c709ef4d8aa2a2f5fabcb081557c"
     },
     {
       "path": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
-      "sha256": "d641894607acc14b0e28522fbb764098b992021004251e98664c46fc343df590"
+      "sha256": "e3e9eef128f75723addd764d95a0ff19fd6679040752ef9d18b8d50804b15de7"
     }
   ],
   "scope": "candidate-freeze-only; native Apple Silicon, independent Critic and PO close remain pending",
-  "recordSha256": "6ea5a12cf386cd717aea7519782eea623650feb7c43b2047530c1948c3430165"
+  "recordSha256": "508b7bdd6d012102aac5e899e54e75f6e5e73dd0d989a4db53eb303311210806"
 }

@@ -2,11 +2,11 @@
   "schema": "pipeline.security-evidence.v1",
   "project": "agent-pipeline",
   "command": "node plugins/pipeline-core/scripts/security-scan.mjs",
-  "commit": "03eeff5a1635597facff3a062bf2ffb15a0a176c",
+  "commit": "986f8f03b7ca737e93d2553be41d7877c5f84137",
   "candidate": {
     "status": "clean",
-    "commit": "03eeff5a1635597facff3a062bf2ffb15a0a176c",
-    "tree": "3066828e67f054cb4bdcdc8bc3c7e9945138fa53",
+    "commit": "986f8f03b7ca737e93d2553be41d7877c5f84137",
+    "tree": "cce5739e609985784d5f46b88a0d4b2b899dd31c",
     "inputSha256": "e535049c67184e15c309bc0a121eea826b939af0819627a44268cf299d658aa5",
     "repositorySha256": "b6137fe69f388c729e9c782159a75c7f1dbf9e3749281fda9f840031e72dfa85",
     "inventory": {
@@ -20,7 +20,7 @@
       "verifiedBeforeAfter": true
     }
   },
-  "finishedAt": "2026-09-18T16:50:45.773Z",
+  "finishedAt": "2026-09-18T20:07:06.170Z",
   "thresholds": {
     "block_on": [
       "critical",
