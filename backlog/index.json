@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c03b52ab36907d54a994b373ca67c9c7fa4ffed423133f7f6963a005ee3cedb1"
+    "transitionHead": "fb336f8ed0b2c9379c9559bffbe48806c41c457e905c5101216e181c936cf763"
   },
   "counts": {
-    "open": 69,
+    "open": 68,
     "in_progress": 1,
-    "closed": 589,
+    "closed": 590,
     "rejected": 3,
     "deferred": 11
   },
@@ -6880,13 +6880,17 @@
     },
     {
       "id": "pipeline.release-evidence-promotion-repeats-full-qualification",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-17",
       "source": "PO release observation, 2026-09-17: the 0.6.2 release/push path generated equivalent evidence under multiple names; independently measured in the 0.6.2 release session against harness/scripts/verify.mjs, scripts/push-init.mjs and scripts/push-prepare.mjs.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "9dc5b8e5407491ffccf85d304f111571c192b199",
+      "closureEvidence": "backlog/evidence/2026-09-18-release-promotion-simplification-closure.md"
     },
     {
       "id": "pipeline.release-preflight-cli-base-commit-not-peeled",

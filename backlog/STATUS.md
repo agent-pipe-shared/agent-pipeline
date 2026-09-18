@@ -514,7 +514,7 @@
 | pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory | closed | defect | pipeline | none | 2026-08-27 | — | — |
 | pipeline.regulated-document-hooks | deferred | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; deferred per PO triage 2026-08-23. |
 | pipeline.relative-commit-message-file-unreadable-from-a-worktree | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — blocks the Pipeline's own worktree-isolated dispatch pattern; fix dispatched as NVA-B-GUARDF in the same session it was found |
-| pipeline.release-evidence-promotion-repeats-full-qualification | open | requirement | pipeline | nova-b | 2026-09-17 | — | — |
+| pipeline.release-evidence-promotion-repeats-full-qualification | closed | requirement | pipeline | nova-b | 2026-09-17 | — | — |
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.remote-side-enforcement-is-the-last-instance | open | requirement | pipeline | nightwing | 2026-08-28 | — | — |
@@ -681,8 +681,8 @@
 
 ## Counts
 
-- open: 69
+- open: 68
 - in_progress: 1
-- closed: 589
+- closed: 590
 - rejected: 3
 - deferred: 11
