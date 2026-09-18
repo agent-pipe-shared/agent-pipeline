@@ -1,0 +1,31 @@
+{
+  "schema": "pipeline.doc-reader-disposition.v1",
+  "round": "release-063-r3",
+  "status": "resolved",
+  "findings": [
+    {
+      "id": "readme-german-reference",
+      "class": "cut",
+      "status": "no-change",
+      "resolutionCommit": null
+    },
+    {
+      "id": "flow-german-reference",
+      "class": "cut",
+      "status": "no-change",
+      "resolutionCommit": null
+    },
+    {
+      "id": "release-notice-order",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "c40b652511f883dd4851d071343d0c2aa645bf75"
+    },
+    {
+      "id": "optional-prestage-order",
+      "class": "reordering",
+      "status": "resolved",
+      "resolutionCommit": "c40b652511f883dd4851d071343d0c2aa645bf75"
+    }
+  ]
+}
