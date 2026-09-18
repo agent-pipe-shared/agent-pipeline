@@ -1,9 +1,9 @@
 # Advisor Prohibition Closure Evidence
 
-**Backlog Item:** `pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced`  
-**Date:** 2026-09-18  
-**Author:** Antigravity (Elephant orchestrator)  
-**Integrated in Commit:** `28ca87187ad96fc94d970fa20c178e954371fa25`  
+**Backlog Item:** `pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced`
+**Date:** 2026-09-18
+**Author:** Antigravity (Elephant orchestrator)
+**Integrated in Commit:** `28ca87187ad96fc94d970fa20c178e954371fa25`
 
 ## Verification
 

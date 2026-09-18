@@ -285,4 +285,3 @@ remain unchanged. These local results do not supply actual-CI acceptance.
 ### Final closure — 2026-09-18
 
 Actual-CI criterion 2 is satisfied: GitHub Actions run `35335056284` (job `105567860510`, duration 8m1s, exit code 0) on `main` executed the full suite set on the Ubuntu hosted runner. The `guard-lifecycle-ready-tests` suite passed 226/226 without failure under synthetic CI PATH. Accepted Route 2 (`rbTrueShimDir()`) and sweep criterion 3 are completely verified. Evidence: `backlog/evidence/NVA-B-CI-PATH-TRUE-CLOSURE-1.md` and CI run `35335056284`. Item closed.
-

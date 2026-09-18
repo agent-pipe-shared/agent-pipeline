@@ -75,4 +75,3 @@ readback confirms the original Ubuntu-host failure is gone.
 ## Closure — 2026-09-18
 
 Confirmed green in GitHub Actions Verify run `35335056284` (job `105567860510`, duration 8m1s, exit code 0) for ancestor commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` on GitHub Ubuntu runner. The synthetic Ubuntu host tuple fixture and `/tmp` scratch corrections resolved the non-portable runner failure. Evidence: `backlog/evidence/2026-09-18-codex-runtime-fixture-ci-verification.md`. Item closed.
-

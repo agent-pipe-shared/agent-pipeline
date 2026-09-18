@@ -137,4 +137,3 @@ exact-candidate independent Critic nor claims live host-hook delivery.
 ## Closure — 2026-09-18
 
 The `hooks.json` matcher was integrated in commit `28ca87187ad96fc94d970fa20c178e954371fa25` containing `Task|Agent|Workflow` alongside all other tools. The manifest-shape suite passed 14/14 and worktree-count-check passed 45/45. Evidence: `backlog/evidence/2026-09-18-worktree-isolation-matcher-closure.md`. Item closed.
-

@@ -114,4 +114,3 @@ registry decision, normal qualification and release path.
 ## Closure — 2026-09-18
 
 The suite `pipeline-state-late-verify-tests` was registered in `harness/scripts/verify.mjs` in commit `3daeb7be99d2e1d534396b7ccdc8892ab0198be7`. Full Verify passed 551/551 on candidate `55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1` (`evidence/verify-latest.json`). Evidence: `backlog/evidence/2026-09-18-baseline-only-verify-recovery-closure.md`. Item closed.
-

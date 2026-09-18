@@ -1,11 +1,11 @@
 # CI Verification Evidence — Codex Runtime Fixture WSL2 Assumption Repair
 
-**Backlog Item:** `pipeline.codex-runtime-fixture-assumes-wsl2-in-ci`  
-**Date:** 2026-09-18  
-**Author:** Antigravity (Elephant orchestrator)  
-**Verified CI Run:** GitHub Actions run `35335056284`, job `105567860510`  
-**Verified Commit:** `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` (ancestor of HEAD `55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1`)  
-**Target Runner:** GitHub Hosted Runner (`ubuntu-latest`)  
+**Backlog Item:** `pipeline.codex-runtime-fixture-assumes-wsl2-in-ci`
+**Date:** 2026-09-18
+**Author:** Antigravity (Elephant orchestrator)
+**Verified CI Run:** GitHub Actions run `35335056284`, job `105567860510`
+**Verified Commit:** `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` (ancestor of HEAD `55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1`)
+**Target Runner:** GitHub Hosted Runner (`ubuntu-latest`)
 
 ## Summary
 

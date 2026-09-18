@@ -247,4 +247,3 @@ inferred from the byte comparison.
 ## Closure — 2026-09-18
 
 The conditional blocking guard was integrated into `hooks.json` in commit `28ca87187ad96fc94d970fa20c178e954371fa25` under the `advisor` PreToolUse hook. All 43 tests in `guard-dispatch.test.mjs` and all 14 tests in `hooks-manifest-shape.test.mjs` passed. Evidence: `backlog/evidence/2026-09-18-advisor-prohibition-closure.md`. Item closed.
-

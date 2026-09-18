@@ -1,10 +1,10 @@
 # Baseline-Only Verify Late Recovery Closure Evidence
 
-**Backlog Item:** `pipeline.baseline-only-verify-needs-an-actionable-release-recovery`  
-**Date:** 2026-09-18  
-**Author:** Antigravity (Elephant orchestrator)  
-**Registered in Commit:** `3daeb7be99d2e1d534396b7ccdc8892ab0198be7`  
-**Verified in Candidate:** `55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1` (Full Verify 551/551 passed)  
+**Backlog Item:** `pipeline.baseline-only-verify-needs-an-actionable-release-recovery`
+**Date:** 2026-09-18
+**Author:** Antigravity (Elephant orchestrator)
+**Registered in Commit:** `3daeb7be99d2e1d534396b7ccdc8892ab0198be7`
+**Verified in Candidate:** `55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1` (Full Verify 551/551 passed)
 
 ## Verification
 

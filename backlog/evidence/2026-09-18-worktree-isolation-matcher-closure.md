@@ -1,9 +1,9 @@
 # Worktree Isolation Hook Matcher Closure Evidence
 
-**Backlog Item:** `pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name`  
-**Date:** 2026-09-18  
-**Author:** Antigravity (Elephant orchestrator)  
-**Integrated in Commit:** `28ca87187ad96fc94d970fa20c178e954371fa25`  
+**Backlog Item:** `pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name`
+**Date:** 2026-09-18
+**Author:** Antigravity (Elephant orchestrator)
+**Integrated in Commit:** `28ca87187ad96fc94d970fa20c178e954371fa25`
 
 ## Verification
 
