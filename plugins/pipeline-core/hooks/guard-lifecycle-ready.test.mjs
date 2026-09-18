@@ -30,6 +30,8 @@ import {
 import { mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
 import {
   EVIDENCE_HOST_PATH_DENIAL_CODE,
+  checkDispatchRecordCollision,
+  DISPATCH_RECORD_COLLISION_DENIAL_CODE,
   isEvidenceArtifactPath,
   extractWritePayload,
   ADMITTED_GRAMMAR_SHAPES,
@@ -9555,6 +9557,110 @@ test("EVIDENCE-HOST-PATH: writing an absolute host path into evidence is blocked
       requireProjectOnboardingReadyFn() { return readiness; },
     });
     assert.equal(nonEvidenceResult.exitCode, 0, nonEvidenceResult.stderr);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+
+test("DISPATCH-RECORD-COLLISION: checkDispatchRecordCollision detects completed record overwrite and git history collisions", () => {
+  const path = root();
+  try {
+    const evidenceDir = join(path, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+
+    // 1. File exists with terminal outcome: opening write is rejected
+    const existingFile = join(evidenceDir, "dispatch-record-TASK-COMPLETED.json");
+    writeFileSync(existingFile, JSON.stringify({
+      taskId: "TASK-COMPLETED",
+      outcome: "completed",
+      candidateCommit: "a".repeat(40),
+    }), "utf8");
+
+    const hitTerminal = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-TASK-COMPLETED.json",
+      requested: existingFile,
+      payload: JSON.stringify({ taskId: "TASK-COMPLETED", outcome: "in-progress" }),
+      root: path,
+    });
+    assert.ok(hitTerminal !== null);
+    assert.equal(hitTerminal.taskId, "TASK-COMPLETED");
+    assert.match(hitTerminal.reason, /already been used by a completed dispatch/);
+
+    // 2. Fresh task ID with no file and no git commit: allowed
+    const hitFresh = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-FRESH-TASK.json",
+      requested: join(evidenceDir, "dispatch-record-FRESH-TASK.json"),
+      payload: JSON.stringify({ taskId: "FRESH-TASK", outcome: "in-progress" }),
+      root: path,
+      dependencies: { gitCommitForTaskIdFn: () => null },
+    });
+    assert.equal(hitFresh, null);
+
+    // 3. Updating an in-progress record to terminal: allowed
+    const inProgressFile = join(evidenceDir, "dispatch-record-TASK-RUNNING.json");
+    writeFileSync(inProgressFile, JSON.stringify({
+      taskId: "TASK-RUNNING",
+      outcome: "in-progress",
+    }), "utf8");
+    const hitFinalize = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-TASK-RUNNING.json",
+      requested: inProgressFile,
+      payload: JSON.stringify({ taskId: "TASK-RUNNING", outcome: "completed" }),
+      root: path,
+    });
+    assert.equal(hitFinalize, null);
+
+    // 4. Opening write with task ID already in git history: rejected
+    const hitGitHistory = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-PRIOR-TASK.json",
+      requested: join(evidenceDir, "dispatch-record-PRIOR-TASK.json"),
+      payload: JSON.stringify({ taskId: "PRIOR-TASK", outcome: "in-progress" }),
+      root: path,
+      dependencies: { gitCommitForTaskIdFn: () => "f262a5c712345678" },
+    });
+    assert.ok(hitGitHistory !== null);
+    assert.equal(hitGitHistory.taskId, "PRIOR-TASK");
+    assert.match(hitGitHistory.reason, /already bound to commit f262a5c71234 in git history/);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("DISPATCH-RECORD-COLLISION: evaluateLifecycleReadyGuard blocks tool writes colliding on task IDs", () => {
+  const path = root();
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const evidenceDir = join(path, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+
+    // Pre-populate completed record
+    const recordPath = join(evidenceDir, "dispatch-record-DONE-TASK.json");
+    writeFileSync(recordPath, JSON.stringify({
+      taskId: "DONE-TASK",
+      outcome: "completed",
+    }), "utf8");
+
+    const writeCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "evidence/dispatch-record-DONE-TASK.json",
+        content: JSON.stringify({ taskId: "DONE-TASK", outcome: "in-progress" }, null, 2),
+      },
+    };
+
+    const result = evaluateLifecycleReadyGuard(writeCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-DISPATCH-RECORD-COLLISION/u);
+    assert.match(result.stderr, /already been used by a completed dispatch/u);
   } finally {
     rmSync(path, { recursive: true, force: true });
   }

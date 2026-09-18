@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Codex implementation-write guard for already Pipeline-governed roots. */
+import { spawnSync } from "node:child_process";
 import {
   appendFileSync,
   existsSync,
@@ -41,6 +42,7 @@ import { HUMAN_PO_SIGNING_COMMANDS } from "../scripts/po-human-approval.mjs";
 import { automatedLifecycleArgvCommands, MUTATING_ONBOARDING_ARGV_SHAPES } from "../scripts/project-onboarding-v3.mjs";
 import { classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
 import { findResidualHostPath } from "../scripts/capture-evidence.mjs";
+import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
 import {
   isBootstrapAcknowledgementMarkerMutation,
   isBootstrapBindingStagingAuthoringWrite,
@@ -923,6 +925,74 @@ export function extractWritePayload(toolInput, toolName) {
   if (typeof toolInput.ReplacementContent === "string") candidates.push(toolInput.ReplacementContent);
   if (typeof toolInput.new_source === "string") candidates.push(toolInput.new_source);
   return candidates.join("\n");
+}
+
+export const DISPATCH_RECORD_COLLISION_DENIAL_CODE = "GUARD-DISPATCH-RECORD-COLLISION";
+
+export function checkDispatchRecordCollision({ relPath, requested, payload, root, dependencies = {} }) {
+  const match = /^evidence\/dispatch-record-([A-Za-z0-9._-]+)\.json$/.exec(relPath);
+  if (!match) return null;
+  const taskId = match[1];
+
+  let incoming = null;
+  try {
+    if (typeof payload === "string" && payload.trim() !== "") {
+      incoming = JSON.parse(payload);
+    }
+  } catch {}
+
+  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+
+  if (existsSyncFn(requested)) {
+    let existing = null;
+    try {
+      existing = JSON.parse(readFileSyncFn(requested, "utf8"));
+    } catch {}
+
+    if (existing && typeof existing === "object") {
+      const isTerminalFn = dependencies.isTerminalOutcomeFn ?? isTerminalOutcome;
+      if (isTerminalFn(existing.outcome)) {
+        if (!incoming || incoming.outcome === "in-progress" || (incoming.candidateCommit && incoming.candidateCommit !== existing.candidateCommit)) {
+          return {
+            taskId,
+            reason: `task ID "${taskId}" has already been used by a completed dispatch (outcome: "${existing.outcome}"). Overwriting a completed dispatch record orphans prior commit authorship. Choose a fresh, unique task ID.`,
+          };
+        }
+      }
+    }
+  }
+
+  if (incoming && incoming.outcome === "in-progress") {
+    const gitLogFn = dependencies.gitCommitForTaskIdFn ?? ((id, repo) => {
+      const res = spawnSync("git", ["log", "-1", "--format=%H", `--grep=^Dispatch:[ \t]*${id}[ \t]*(`], {
+        cwd: repo,
+        encoding: "utf8",
+        timeout: 3000,
+      });
+      return (res.status === 0 && res.stdout) ? res.stdout.trim() : null;
+    });
+    const priorSha = gitLogFn(taskId, root);
+    if (priorSha && priorSha.length >= 7) {
+      return {
+        taskId,
+        reason: `task ID "${taskId}" is already bound to commit ${priorSha.slice(0, 12)} in git history. Reusing a task ID orphans commit authorship. Choose a fresh, unique task ID.`,
+      };
+    }
+  }
+
+  return null;
+}
+
+function blockedDispatchRecordCollision(relPath, hit, overrideGuidance = "") {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${DISPATCH_RECORD_COLLISION_DENIAL_CODE}: ${hit.reason}\n`
+      + `Target: ${relPath}\n`
+      + "Why: task IDs must uniquely identify exactly one dispatch package. Reusing a task ID permanently breaks deterministic commit authorship verification (dispatch-authorship-verify.mjs: record-names-different-commit).\n"
+      + overrideGuidance,
+  );
 }
 
 function blockedEvidenceHostPath(relPath, hit, overrideGuidance = "") {
@@ -5597,6 +5667,23 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
           );
           if (!route.admitted) {
             return withLifts(lifts, blockedEvidenceHostPath(relPath, hit, route.overrideGuidance));
+          }
+          lifts.push(route.admitted);
+        }
+        const collision = checkDispatchRecordCollision({
+          relPath,
+          requested,
+          payload,
+          root,
+          dependencies,
+        });
+        if (collision !== null) {
+          const reason = `${DISPATCH_RECORD_COLLISION_DENIAL_CODE}: ${collision.reason}`;
+          const route = humanOverrideRoute(
+            DISPATCH_RECORD_COLLISION_DENIAL_CODE, reason, "write", root, toolName, input.tool_input, dependencies,
+          );
+          if (!route.admitted) {
+            return withLifts(lifts, blockedDispatchRecordCollision(relPath, collision, route.overrideGuidance));
           }
           lifts.push(route.admitted);
         }
