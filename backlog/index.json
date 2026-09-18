@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ad414bfdf84b2f5e01a7890bcd676f020254cb8cfa8027f198206a5e374dfcda"
+    "transitionHead": "3606eb6186d24f72aa2226fcdf1809c94c2dce333131f13a2cb539c8b18f0f9c"
   },
   "counts": {
-    "open": 78,
+    "open": 77,
     "in_progress": 1,
-    "closed": 580,
+    "closed": 581,
     "rejected": 3,
     "deferred": 11
   },
@@ -226,13 +226,17 @@
     },
     {
       "id": "pipeline.a-read-only-command-is-refused-for-naming-a-protected-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "Measured live, 2026-08-27 session: a read-only node -e command that only printed a sorted-insertion index over docs/product-capability-inventory.json was refused as a write because the string \"verify.mjs\" appeared inside its interpreter code text.",
       "deferred": false,
-      "sprint": "nightwing"
+      "sprint": "nightwing",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "e52e5373d81afde912ff35df043aade44ee7c073",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.a-registered-but-abandoned-worktree-is-never-retired",

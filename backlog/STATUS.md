@@ -21,7 +21,7 @@
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
 | pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
-| pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
+| pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | closed | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.a-registered-but-abandoned-worktree-is-never-retired | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
@@ -681,8 +681,8 @@
 
 ## Counts
 
-- open: 78
+- open: 77
 - in_progress: 1
-- closed: 580
+- closed: 581
 - rejected: 3
 - deferred: 11

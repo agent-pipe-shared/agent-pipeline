@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-read-only-command-is-refused-for-naming-a-protected-path
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
 sprint: nightwing
 source: "Measured live, 2026-08-27 session: a read-only node -e command that only printed a sorted-insertion index over docs/product-capability-inventory.json was refused as a write because the string \"verify.mjs\" appeared inside its interpreter code text."
-done_when: contains plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs read-only retryAction for the opaque-interpreter-code and write-command lanes (pipeline.a-read-only-command-is-refused-for-naming-a-protected-path)
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: e52e5373d81afde912ff35df043aade44ee7c073
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+done_when: manual
 ---
 
 # A read-only command is refused for naming a protected path, and the only route offered is a PO signature
@@ -138,3 +142,23 @@ does not loosen its fail-closed conservative fallback.
   Alfred is in flight and closed to new scope (PO, 2026-08-28), and a triage that
   confirmed `alfred` would be keying it there for the first time.
 - **Date:** 2026-08-28
+
+## Formal closure — 2026-09-18
+
+The two observed false-positive families have subsequently been resolved at
+the classifier boundary, which is stronger than the originally selected
+retry-only fallback. `e52e5373d81afde912ff35df043aade44ee7c073` makes the
+opaque interpreter lane distinguish recognized write calls from a path merely
+mentioned in prose or read by a known read-only form; unresolved indirection
+remains refused because it can still conceal a real write. The later
+destination-only extractor correction also admits a protected source copied to
+an unprotected scratch destination, while retaining a protected destination
+block.
+
+This supersedes the older option-2 decision rather than claiming it was
+implemented: the original routine read-only action no longer needs a signature
+or retry route because it is directly admitted, and unclassifiable runtime
+indirection is not honestly a read-only retry candidate. The current full
+`guard-lifecycle-ready` suite passed on 2026-09-18. `done_when` is manual
+because the previous literal retry-action predicate names an intentionally
+unneeded intermediate route.
