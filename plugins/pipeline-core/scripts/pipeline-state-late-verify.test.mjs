@@ -55,6 +55,10 @@ test("baseline-only implementation exposes and completes the typed late verify r
   assert.equal(inspection.result, 0);
   const action = JSON.parse(inspection.logs.join("\n")).nextAction;
   assert.deepEqual(action.inputs.map((input) => input.name), ["verify-command"]);
+  assert.equal(action.requiresConfirmation, false,
+    "collecting the project-specific command remains read-only");
+  assert.equal(action.applyAction.requiresConfirmation, true,
+    "the protected calibration mutation requires a fresh attended confirmation");
   assert.deepEqual(action.applyAction.argv.slice(1, 3), ["configure-verify", "--verify-command"],
     "the ordinary driver receives a typed recovery rather than discovering it at push time");
 
@@ -66,7 +70,10 @@ test("baseline-only implementation exposes and completes the typed late verify r
     "a blank input fails before either calibration twin changes");
 
   const command = `${process.execPath} --test harness/scripts/check-consumer-safe-paths.test.mjs`;
-  assert.equal(quietConsole(() => run(["configure-verify", "--verify-command", command], deps)).result, 0);
+  const applied = quietConsole(() => run(["configure-verify", "--verify-command", command], deps));
+  assert.equal(applied.result, 0);
+  assert.equal(applied.logs.some((line) => /signature|override/u.test(line)), false,
+    "the confirmed apply action reaches the direct writer without inventing a second signature or override ceremony");
   assert.equal(JSON.parse(readFileSync(neutralPath, "utf8")).verify, command);
   assert.equal(JSON.parse(readFileSync(legacyPath, "utf8")).verify, command,
     "both calibration twins receive the same command through the canonical writer");

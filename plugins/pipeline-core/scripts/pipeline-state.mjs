@@ -3418,7 +3418,11 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
       kind: "command",
       ...rendered,
       mutation: true,
-      requiresConfirmation: false,
+      // Replacing a protected verify command changes what later executes at
+      // release verification. The driver may collect the project command
+      // without a prompt, but the actual calibration mutation needs a fresh
+      // attended confirmation.
+      requiresConfirmation: true,
     },
     expected: { schema: INSPECT_SCHEMA, statuses: ["implementing"] },
   };

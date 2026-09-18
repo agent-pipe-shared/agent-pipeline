@@ -244,6 +244,10 @@ test("drivePushInit: baseline-only implementation publishes configure-verify and
     const action = blocked.recovery.actions[0];
     assert.equal(action.kind, "collect-input");
     assert.deepEqual(action.inputs.map((input) => input.name), ["verify-command"]);
+    assert.equal(action.requiresConfirmation, false,
+      "the push driver only collects the command at its read-only recovery boundary");
+    assert.equal(action.applyAction.requiresConfirmation, true,
+      "the exact protected calibration write requires fresh attended confirmation");
     assert.deepEqual(action.applyAction.argv.slice(1, 3), ["configure-verify", "--verify-command"],
       "push-init must return the sanctioned CLI action rather than a reconstructed shell command");
     assert.equal(action.applyAction.argv.some((value) => String(value).includes("scratch") || String(value).includes("guard-human-override")), false,
