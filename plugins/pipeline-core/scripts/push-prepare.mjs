@@ -384,8 +384,8 @@ function resolveGitCommonDirPath(dir, deps = {}) {
 }
 
 /**
- * Verify deliberately publishes its volatile evidence in the primary worktree
- * (see harness/scripts/verify.mjs), even when the candidate itself is checked
+ * Verify deliberately publishes its volatile evidence in the primary worktree,
+ * even when the candidate itself is checked
  * out in a clean linked worktree.  Read that same shared slot here; otherwise
  * a successful prescribed Verify can never satisfy this preparation check.
  */
