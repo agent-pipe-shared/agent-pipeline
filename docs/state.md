@@ -30,13 +30,13 @@
 ### 2026-09-18 operational recovery: closed-item verification audit
 
 The [Nova-B audit](../backlog/evidence/2026-09-18-nova-b-current-code-audit/report.md)
-represents all 129 closed items, 94 base ACs and B61/B62/B7; coverage is not
-acceptance. Fresh no-reuse release Verify on `396f9b7c` was RED: 547/555 passed.
-Evidence records a reproduced promotion-validator defect, missing runtime
-connections, a frozen Verify candidate mismatch and corrected audit claims.
-Closed statuses and the old green freeze do not establish completion.
-Product repairs, independent review and native proof remain open. Approved
-`sprint-nova-epic` stays in implementation; no release is approved.
+covers 129 closed items, 94 base ACs and B61/B62/B7; acceptance remains open.
+Release Verify on `396f9b7c`: RED, 547/555. Fixes `3f16f2bf` (test registration)
+and `5b379dc4` (inventory/projection) pass focused checks. Verify and Critic
+remain pending. Promotion validation, runtime wiring and frozen Verify binding
+remain unresolved. Check normal entrypoints and all three runners' portable,
+autonomous flows; retain native deferrals. Nova stays in implementation;
+no release approval.
 
 
 **Release state:** version `0.6.1` · tag `v0.6.1` · commit `6262d408aa616651232b46ab8ecbfd88ce4055b0` · tree `69b12f1d8714de57e22acb730a09f4bbac067360` · status `published`
