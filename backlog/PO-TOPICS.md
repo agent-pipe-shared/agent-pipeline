@@ -23,6 +23,30 @@ for the detailed backlog records or an authority to publish changes.
 | P2 | The closed copy-safe backlog ledger conflicts with its still-open full-coverage acceptance claim. | The item’s ledger is authoritatively closed, while its later evidence correctly says the repository-wide “every emitter” audit is incomplete. A direct status edit fails the ledger consistency check and was reverted. | PO must decide whether to reopen through the sanctioned ledger transition or accept the historical closure scope and create one precisely scoped successor; do not silently alter item state. |
 | P2 | The release flow should be fast enough for ordinary releases. | Current delay is measured and tied to exact candidate/mode/evidence duplication. | Implement the promotion envelope only after its trust and ADR implications are reviewed. |
 
+## Deferred PO decision packet — release-promotion simplification
+
+No release or push behavior changes through this packet. It turns the already
+accepted S→R design into the smallest later PO/ADR decision, so the next
+release does not rediscover the same three questions under time pressure.
+
+1. **Record-only allowlist owner.** Select one versioned policy surface that
+   owns the exact evidence/reconciliation paths permitted between substantive
+   source candidate S and record-only commit R. Recommended constraint: the
+   validator recomputes the complete S..R name-status and blob delta; unknown
+   paths always require a fresh qualification.
+2. **Mode inclusion.** Approve or reject one explicit partial-order edge:
+   `release-satisfies-push` for the same source candidate and policy. The
+   reverse edge remains forbidden. Labels alone must never imply reuse.
+3. **Canonical Security evidence root.** Decide that detached candidate Verify
+   and Security publish/read the same primary evidence root, with the root and
+   source candidate bound in the envelope. This removes the manual secondary
+   scan without treating worktree location as an evidence property.
+
+If adopted, the implementation target is one qualified S plus at most one
+allowlisted record-only R; a changed source, test policy, environment class or
+unallowlisted path always starts a new qualification. Public `v0.6.2` remains
+outside this mechanism.
+
 ## Explicit non-actions
 
 - No retroactive edit, retag, or replacement of public `v0.6.2`.
