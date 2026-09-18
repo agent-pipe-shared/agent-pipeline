@@ -159,7 +159,10 @@ export function verifyEvidenceSatisfiesBoundary(evidence, boundary) {
   if (boundary === "release") return selection.mode === "release" && selection.execution === "full" && selection.omittedSuiteIds.length === 0;
   const completeFallback = selection.execution === "full" && selection.omittedSuiteIds.length === 0;
   const classifiedImpact = selection.unmatchedPaths.length === 0;
-  if (boundary === "push") return selection.mode === "push" && (classifiedImpact || completeFallback);
+  if (boundary === "push") {
+    if (selection.mode === "release" && completeFallback) return true;
+    return selection.mode === "push" && (classifiedImpact || completeFallback);
+  }
   if (boundary === "critic") return selection.mode === "critic" && (classifiedImpact || completeFallback);
   if (boundary === "candidate") return selection.mode === "candidate" && (classifiedImpact || completeFallback);
   return selection.mode === "work" && (classifiedImpact || completeFallback);

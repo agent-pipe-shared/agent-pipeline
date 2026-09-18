@@ -150,6 +150,46 @@ test("checkEvidenceFreshness: exitCode 0 and matching commit -> ok:true", () => 
   assert.equal(result.ok, true);
 });
 
+test("checkEvidenceFreshness: stale commit with valid promotion envelope -> ok:true", () => {
+  const releaseEvidence = {
+    schema: "pipeline.verify-evidence.v0",
+    exitCode: 0,
+    commit: "commit-S",
+    selection: planVerifySelection({
+      mode: "release",
+      candidateCommit: "commit-S",
+      changedPaths: ["src/a.mjs"],
+      registeredSuiteIds: ["a"],
+      policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "source", paths: ["src/**"], suites: ["a"] }] },
+    }),
+  };
+  const mockEnvelope = {
+    schema: "pipeline.release-promotion-envelope.v1",
+    source: { commit: "commit-S", tree: "tree-S" },
+    record: { commit: "commit-R", tree: "tree-R" },
+  };
+  const mockValidate = () => ({ ok: true, sourceCommit: "commit-S", recordCommit: "commit-R" });
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, "commit-R", {
+    readFile: () => JSON.stringify(releaseEvidence),
+    promotionEnvelope: mockEnvelope,
+    validateReleasePromotionEnvelope: mockValidate,
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.message, /promoted from commit-S/);
+});
+
+test("checkEvidenceFreshness: stale commit with invalid promotion envelope -> ok:false", () => {
+  const mockEnvelope = { schema: "pipeline.release-promotion-envelope.v1" };
+  const mockValidate = () => ({ ok: false, reason: "reverse-inclusion-forbidden" });
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, "commit-R", {
+    readFile: () => JSON.stringify({ exitCode: 0, commit: "commit-S" }),
+    promotionEnvelope: mockEnvelope,
+    validateReleasePromotionEnvelope: mockValidate,
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /stale/);
+});
+
 test("resolveEvidenceProjectDir: linked worktree reads Verify evidence from its primary checkout", () => {
   const primary = mkdtempSync(join(SCRATCH, "push-prepare-primary-"));
   const common = join(primary, ".git");

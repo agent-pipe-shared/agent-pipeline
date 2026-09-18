@@ -176,6 +176,7 @@ function projectCalibrationRelPath(rootDir) {
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { RELEASE_PROMOTION_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 // NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
 // calls-it.md, Point 3): read-only observer, no mkdirSync/physicalScratchRoot call -- see
 // buildScratchOrphanAdvisory below for the full rationale.
@@ -2039,7 +2040,17 @@ function checkEvidenceFreshness(relPath) {
     failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)`);
   }
   if (data?.commit !== sourceCommit) {
-    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
+    let promoted = false;
+    const promoRead = readEvidence(RELEASE_PROMOTION_DEFAULT_PATH);
+    if (promoRead.ok) {
+      const validation = validateReleasePromotionEnvelope(promoRead.data, { repoDir: evidenceProjectDir, targetBoundary: "push" });
+      if (validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit) {
+        promoted = true;
+      }
+    }
+    if (!promoted) {
+      failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
+    }
   }
   if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && !verifyEvidenceSatisfiesBoundary(data, "push")) {
     failures.push(`${relPath}: Verify evidence was not produced for the push boundary`);

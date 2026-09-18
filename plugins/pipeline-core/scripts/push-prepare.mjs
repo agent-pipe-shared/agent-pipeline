@@ -51,6 +51,7 @@ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHu
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { RELEASE_PROMOTION_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
 export const PIPELINE_STATE_SCRIPT_PATH = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
@@ -165,6 +166,23 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
   if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy };
   if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy };
   if (data.commit !== headCommit) {
+    const promotionPath = join(dir, RELEASE_PROMOTION_DEFAULT_PATH);
+    const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
+    if (promotionEnvelope !== null) {
+      const validator = deps.validateReleasePromotionEnvelope ?? validateReleasePromotionEnvelope;
+      const validation = validator(promotionEnvelope, { repoDir: dir, targetBoundary: "push", deps });
+      if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
+        if (id === "verify-evidence") {
+          if (!verifyEvidenceSatisfiesBoundary(data, "push")) {
+            return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push` };
+          }
+          return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
+        }
+        if (id === "security-evidence") {
+          return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
+        }
+      }
+    }
     return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy };
   }
   if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
