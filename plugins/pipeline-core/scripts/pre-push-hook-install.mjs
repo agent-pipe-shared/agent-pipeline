@@ -254,7 +254,7 @@ export function renderImpl(pluginLibDir) {
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 const PLUGIN_LIB_DIR = ${lib};
@@ -273,6 +273,13 @@ function resolveProjectRoot() {
 function resolveGitCommonDir() {
   const result = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], process.cwd());
   return result.status === 0 && result.stdout?.trim() ? result.stdout.trim() : null;
+}
+
+function resolveEvidenceProjectRoot(projectRoot, commonDir) {
+  // Verify and security-scan publish their mutable latest evidence once per
+  // repository, at the primary worktree that owns the shared git common dir.
+  // A linked worktree must therefore read the same canonical location.
+  return basename(commonDir) === ".git" ? dirname(commonDir) : projectRoot;
 }
 
 function recordLog(commonDir, entry) {
@@ -346,7 +353,7 @@ export function checkEvidenceFreshness(projectRoot, relPath, sourceCommit) {
   return failures;
 }
 
-async function evaluateOneCommit({ projectRoot, commit, remote, localRef, remoteRef }) {
+async function evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit, remote, localRef, remoteRef }) {
   const { loadManifest, gateConfig } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "manifest.mjs")).href);
   const { VERIFY_EVIDENCE_DEFAULT_PATH } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "verify-evidence-path.mjs")).href);
   const { checkSecurityCompleteness } = await import(pathToFileURL(join(PLUGIN_LIB_DIR, "security-completeness-gate.mjs")).href);
@@ -394,14 +401,14 @@ async function evaluateOneCommit({ projectRoot, commit, remote, localRef, remote
   const sourceTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
 
   // (a) verify evidence.
-  failures.push(...checkEvidenceFreshness(projectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit));
+  failures.push(...checkEvidenceFreshness(evidenceProjectRoot, VERIFY_EVIDENCE_DEFAULT_PATH, commit));
 
   // (b)/(b.2) security evidence, only when configured and not "off".
   const securityGate = gateConfig(manifest, "security");
   if (securityGate && securityGate.mode !== "off") {
     securityGateMode = securityGate.mode === "warn" ? "warn" : "blocking";
-    securityFailures.push(...checkEvidenceFreshness(projectRoot, "evidence/security-latest.json", commit));
-    securityFailures.push(...checkSecurityCompleteness({ projectDir: projectRoot, commit, tree: sourceTree }));
+    securityFailures.push(...checkEvidenceFreshness(evidenceProjectRoot, "evidence/security-latest.json", commit));
+    securityFailures.push(...checkSecurityCompleteness({ projectDir: evidenceProjectRoot, commit, tree: sourceTree }));
   }
 
   // (c) approval -- general mode only, see file header SCOPE.
@@ -451,6 +458,7 @@ async function main() {
     block(["this repository's own root/common-dir could not be resolved via \`git rev-parse\` -- cannot evaluate the Push-Gate."]);
     return;
   }
+  const evidenceProjectRoot = resolveEvidenceProjectRoot(projectRoot, commonDir);
 
   const allFindings = [];
   let anyBlocking = false;
@@ -470,7 +478,7 @@ async function main() {
     }
     let result;
     try {
-      result = await evaluateOneCommit({ projectRoot, commit: update.localSha, remote, localRef: update.localRef, remoteRef: update.remoteRef });
+      result = await evaluateOneCommit({ projectRoot, evidenceProjectRoot, commit: update.localSha, remote, localRef: update.localRef, remoteRef: update.remoteRef });
     } catch (error) {
       // Fault boundary: unlike guard-push.mjs, an unexpected exception here ALWAYS
       // blocks, never mode-gated (file header FAIL-CLOSED section).

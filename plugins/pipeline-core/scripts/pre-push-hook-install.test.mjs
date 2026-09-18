@@ -239,6 +239,17 @@ test("installed hook: fresh verify evidence + standing-approved -> ALLOW, record
   assert.equal(log.at(-1).commit, head);
 });
 
+test("installed hook: linked worktree reads fresh canonical evidence", () => {
+  const { dir, head, git } = freshRepo("e2e-linked-evidence");
+  const linked = `${dir}-linked`;
+  const added = git("worktree", "add", "--detach", linked, head);
+  assert.equal(added.status, 0, added.stderr);
+  writeManifest(linked, { approval: "standing-approved" });
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const { code, stderr } = runInstalledHook(linked, `refs/heads/main ${head} refs/heads/main ${ZERO40}\n`);
+  assert.equal(code, 0, stderr);
+});
+
 test("installed hook: exact configured feature checkpoint bypasses publication evidence and records the audit", () => {
   const { dir, git } = freshRepo("e2e-checkpoint");
   git("checkout", "-q", "-b", "feat/checkpoint");
