@@ -146,27 +146,30 @@ function expectedArtifacts({ hookPath, commonDir, pluginLibDir, installedAt }) {
 }
 
 /**
- * Proves that the three generated artifacts still belong together before an install is
- * allowed to replace them.  The marker's recorded distribution is checked first (ownership),
- * then the caller's requested distribution is compared separately (currentness).  That keeps
- * an old, intact pipeline hook safely upgradeable while refusing a modified hook, impl, or
- * marker rather than treating its self-asserted hash as authority.
+ * Proves that the three installed artifacts still belong together before an install is
+ * allowed to replace them. The marker records the exact artifact hashes at installation;
+ * comparing it to the current renderer would instead misclassify every legitimate renderer
+ * upgrade as a foreign hook. Currentness is evaluated separately by `planInstall`.
  */
 function installedArtifactsMatch({ hookPath, commonDir, pluginLibDir, record }) {
   const { marker, raw } = record;
-  if (typeof marker?.installedAt !== "string" || marker.installedAt.trim() === "") return false;
-  const expected = expectedArtifacts({ hookPath, commonDir, pluginLibDir, installedAt: marker.installedAt });
+  if (marker?.schema !== MARKER_SCHEMA || marker?.installerVersion !== INSTALLER_VERSION
+    || typeof marker?.installedAt !== "string" || marker.installedAt.trim() === ""
+    || marker.hookPath !== hookPath || marker.implPath !== implPath(commonDir)
+    || marker.pluginLibDir !== pluginLibDir
+    || !/^[a-f0-9]{64}$/u.test(marker.hookSha256 ?? "")
+    || !/^[a-f0-9]{64}$/u.test(marker.implSha256 ?? "")) return false;
   let hookContent;
   let implContent;
   try {
     hookContent = readFileSync(hookPath, "utf8");
-    implContent = readFileSync(expected.impl, "utf8");
+    implContent = readFileSync(marker.implPath, "utf8");
   } catch {
     return false;
   }
-  return raw === expected.markerContent
-    && hookContent === expected.shimContent
-    && implContent === expected.implContent;
+  return raw === renderMarker(marker)
+    && sha256(hookContent) === marker.hookSha256
+    && sha256(implContent) === marker.implSha256;
 }
 
 /** The `/bin/sh` shim installed at the actual hook path. `implAbsPath` is DATA baked in

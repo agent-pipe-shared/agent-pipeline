@@ -11,6 +11,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -360,6 +361,20 @@ test("planInstall: an intact pipeline hook bound to an older plugin library is s
   assert.equal(current.status, "ready-to-upgrade");
   assert.equal(current.current, true);
   assert.equal(current.updateRequired, false);
+});
+
+test("planInstall: an intact recorded older implementation is upgradeable", () => {
+  const { dir } = freshRepo("prior-renderer");
+  const installed = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(installed.status, "installed");
+  const markerPath = join(dir, ".git", "agent-pipeline", "pre-push-hook", "install-marker.json");
+  const marker = JSON.parse(readFileSync(markerPath, "utf8"));
+  const priorImpl = "#!/usr/bin/env node\n// prior generated implementation\n";
+  writeFileSync(marker.implPath, priorImpl);
+  marker.implSha256 = createHash("sha256").update(priorImpl, "utf8").digest("hex");
+  writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`);
+  const plan = planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(plan.status, "ready-to-upgrade");
 });
 
 test("planInstall: an impl or marker discrepancy is foreign and applyInstall leaves the hook untouched", () => {
