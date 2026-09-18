@@ -31,6 +31,7 @@ import {
 } from "../lib/plan-authority-staging-guard.mjs";
 import { ONBOARDING_SUBCOMMANDS } from "./project-onboarding-v3.mjs";
 import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
+import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -1595,6 +1596,79 @@ function awaitingApprovalFixture() {
   writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify(revertedToDesign, null, 2));
   assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
     "once the calibration already carries a real verify command, --verify-command is optional on replay");
+}
+
+// NVA-GF-LATEVERIFY-1 (pipeline.baseline-only-verify-needs-an-actionable-
+// release-recovery): the deliberately permissive baseline route above must not
+// strand an already-implementing project at push readiness. The only late
+// mutation is the named configure-verify command; it validates both committed
+// calibration twins before writing either one, leaves lifecycle state untouched,
+// and accepts no generic override or scratch-file workaround.
+{
+  const root = mktempProjectDir();
+  const seededVerify = "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"";
+  const calibration = { project: "late-verify-fixture", verify: seededVerify, handover: "docs/state.md" };
+  mkdirSync(join(root, "project"), { recursive: true });
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "late-verify", planPath: "specs/late-verify/prd.md", phase: "design" },
+    planApproved: true,
+    planApproval: { approvedBy: "PO", approvedAt: now },
+  }, null, 2));
+  const deps = { dir: root, now: () => now };
+
+  assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
+    "the fresh approved baseline seed must first enter implementation without inventing a command");
+  const inspection = capturedStdout(() => run(["inspect"], deps));
+  assert.equal(inspection.result, 0);
+  const nextAction = JSON.parse(inspection.lines.join("\n")).nextAction;
+  assert.equal(nextAction.kind, "collect-input");
+  assert.deepEqual(nextAction.inputs.map((input) => input.name), ["verify-command"]);
+  assert.deepEqual(nextAction.applyAction.argv.slice(1, 3), ["configure-verify", "--verify-command"],
+    "a driver receives the single named recovery route rather than a late push failure");
+
+  const neutralPath = join(root, "project", "pipeline.json");
+  const legacyPath = join(root, ".claude", "pipeline.json");
+  const beforeInvalid = [readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")];
+  assert.equal(capturedStderr(() => run(["configure-verify", "--verify-command", "  "], deps)).result, 2,
+    "a blank command must fail before touching either calibration twin");
+  assert.deepEqual([readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")], beforeInvalid);
+
+  const realVerify = `${process.execPath} --test harness/scripts/check-consumer-safe-paths.test.mjs`;
+  assert.equal(run(["configure-verify", "--verify-command", realVerify], deps), 0);
+  assert.equal(JSON.parse(readFileSync(neutralPath, "utf8")).verify, realVerify);
+  assert.equal(JSON.parse(readFileSync(legacyPath, "utf8")).verify, realVerify,
+    "the canonical writer must update both twins identically");
+  assert.equal(checkVerifyContractConfigured(root).ok, true,
+    "the push-readiness verify-contract check can now proceed without a scratch workaround or human-override capability");
+  const configuredBytes = [readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")];
+  assert.equal(run(["configure-verify", "--verify-command", realVerify], deps), 0,
+    "the identical command is an explicit zero-write replay");
+  assert.deepEqual([readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")], configuredBytes);
+  assert.equal(capturedStderr(() => run(["configure-verify", "--verify-command", "node --test other.mjs"], deps)).result, 2,
+    "an already-configured command must fail closed unless it is the exact replay");
+  assert.deepEqual([readFileSync(neutralPath, "utf8"), readFileSync(legacyPath, "utf8")], configuredBytes);
+
+  // A malformed or missing sibling is not a recovery opportunity: the route
+  // must refuse before modifying the healthy neutral copy.
+  const malformedRoot = mktempProjectDir();
+  mkdirSync(join(malformedRoot, "project"), { recursive: true });
+  mkdirSync(join(malformedRoot, ".claude"), { recursive: true });
+  writeFileSync(join(malformedRoot, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  writeFileSync(join(malformedRoot, ".claude", "pipeline.json"), "{ malformed\n");
+  writeFileSync(join(malformedRoot, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "late-verify-malformed", planPath: "specs/late-verify-malformed/prd.md", phase: "implementation" },
+    planApproved: true,
+    planApproval: { approvedBy: "PO", approvedAt: now },
+  }, null, 2));
+  const malformedNeutralBefore = readFileSync(join(malformedRoot, "project", "pipeline.json"), "utf8");
+  assert.equal(capturedStderr(() => run(["configure-verify", "--verify-command", realVerify], { dir: malformedRoot, now: () => now })).result, 2);
+  assert.equal(readFileSync(join(malformedRoot, "project", "pipeline.json"), "utf8"), malformedNeutralBefore,
+    "a malformed twin must cause zero calibration writes");
 }
 
 // backlog/items/2026-08-30-runner-fallback-defaults-to-codex-without-explicit-signal.md:

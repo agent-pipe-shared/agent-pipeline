@@ -345,6 +345,36 @@ test("installed hook: admits only the complete sanctioned baseline-verify to imp
   assert.equal(code, 0, stderr);
 });
 
+test("installed hook: admits only the two calibration twins for the sanctioned late baseline-verify recovery", () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-late-verify-recovery");
+  writeVerifyTransitionFixture(dir, { phase: "implementation" });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and established implementation");
+  installHook(dir);
+
+  writeVerifyTransitionFixture(dir, { command: "node --test test.mjs", phase: "implementation" });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  const { code, stderr } = commit(dir, "configure late verify in established implementation");
+  assert.equal(code, 0, stderr);
+});
+
+test("installed hook: refuses a late verify rewrite when it also stages lifecycle state", () => {
+  const { dir, git } = freshRepo("e2e-sanctioned-late-verify-state-rewrite");
+  writeVerifyTransitionFixture(dir, { phase: "implementation", updatedAt: "2026-09-13T12:00:00.000Z" });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  git("commit", "-q", "-m", "seed baseline verification and established implementation");
+  installHook(dir);
+
+  writeVerifyTransitionFixture(dir, {
+    command: "node --test test.mjs",
+    phase: "implementation",
+    updatedAt: "2026-09-13T12:01:00.000Z",
+  });
+  git("add", "project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json");
+  const { code } = commit(dir, "attempt late verify with unrelated lifecycle rewrite");
+  assert.notEqual(code, 0);
+});
+
 test("installed hook: refuses a wider calibration rewrite that merely resembles the sanctioned verify transaction", () => {
   const { dir, git } = freshRepo("e2e-sanctioned-verify-transition-extra-field");
   writeVerifyTransitionFixture(dir);
