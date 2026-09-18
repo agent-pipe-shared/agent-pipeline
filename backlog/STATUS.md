@@ -294,7 +294,7 @@
 | pipeline.guided-init-human-rounds-above-floor | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO asked directly whether the four human rounds can be collapsed to one or two. Three is the floor; one of the four is removable, and it is the cheapest of the four to remove. |
 | pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array | closed | defect | pipeline | — | 2026-08-25 | — | — |
 | pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2 | closed | requirement | pipeline | — | 2026-08-18 | — | — |
-| pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge | closed | defect | pipeline | — | 2026-08-27 | — | — |
 | pipeline.handover-file-has-no-rotation-obligation | closed | workflow-improvement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped | closed | defect | pipeline | — | 2026-08-18 | — | — |
@@ -681,8 +681,8 @@
 
 ## Counts
 
-- open: 70
+- open: 69
 - in_progress: 1
-- closed: 588
+- closed: 589
 - rejected: 3
 - deferred: 11

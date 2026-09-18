@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "96c0acb19a5917dd017c22e4c4479cdea5cdc68223a5bf8dad139bfce428e7ca"
+    "transitionHead": "c03b52ab36907d54a994b373ca67c9c7fa4ffed423133f7f6963a005ee3cedb1"
   },
   "counts": {
-    "open": 70,
+    "open": 69,
     "in_progress": 1,
-    "closed": 588,
+    "closed": 589,
     "rejected": 3,
     "deferred": 11
   },
@@ -3903,13 +3903,17 @@
     },
     {
       "id": "pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Critic round I, finding F-2, 2026-09-01, reviewing commit 7bca7f5d. Measured against evidence/dispatch-record-NVA-B-HANDOVERPATH-FIX.json and then against the whole evidence corpus.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "8f7b617d0f4c8d6834cfb73eabfb5e32c68ba83f",
+      "closureEvidence": "backlog/evidence/2026-09-18-dispatch-record-binding-and-collision-closure.md"
     },
     {
       "id": "pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge",
