@@ -40,6 +40,22 @@ later reread from creating a second item for the same confirmed issue.
 | Completed local work remains visibly `implementing` after a deferred public release. | [feature-close and usage-ledger recovery](items/2026-09-13-feature-close-recovery-and-usage-ledger-need-runner-selectors.md) — open; terminal recovery must not fabricate a publication. |
 | Windows or native-runner claims that are not reproducible here. | Keep the existing platform-specific owners; do not promote a report assertion to a new security defect until its native sanitized fixture is captured. |
 
+## Greenfield optimisation status
+
+The reports are implementation input, not a second backlog namespace.  This
+table records their current disposition so subsequent Nova work starts with the
+remaining problem rather than re-opening a corrected one.
+
+| Reported friction | Current disposition |
+| --- | --- |
+| Placeholder design answers could become permanent while the CLI was being debugged. | Closed by the explicit, revisioned pre-generation replacement route: [onboarding-answer correction](items/2026-09-10-onboarding-design-answers-have-no-pre-generation-correction-path.md). |
+| Push prerequisites appeared one after another, after earlier work had already been spent. | Closed for independent local checks: `push-init` aggregates its preflight failures before signature preparation; the remaining intent/readback optimisation is tracked by the P1 push topic above. |
+| Multi-paragraph commit trailers required a scratch-file relay. | Closed by the typed, copy-safe trailer route: [commit trailer authoring](items/2026-09-13-commit-trailer-authoring-needs-a-typed-single-command-route.md). |
+| One PO-facing onboarding command still bypassed the central renderer import. | Corrected locally in `03ca9c85`; focused onboarding and renderer suites passed. The broader emitter inventory remains open under [copy-safe PO commands](items/2026-08-28-po-facing-commands-are-not-uniformly-rendered-break-safe.md). |
+| Fresh projects can legitimately carry `verify: null`, but late release recovery is not uniformly driver-visible. | Open and prioritized: [baseline-only Verify recovery](items/2026-09-13-baseline-only-verify-needs-an-actionable-release-recovery.md). It needs a deliberate lifecycle design, not a scratch-script bypass. |
+| First-session input and read-only prior-session recovery were unreliable. | Implemented and rechecked locally: 49/49 intake and 4/4 bounded transcript-recovery assertions; retain the current scope until a live runner disproves it. |
+| Native Windows path, adapter identity, and runtime-hook assertions. | Not promoted without a native, sanitized reproduction; existing platform/runner owners remain authoritative. |
+
 ## Evidence note: cache identity collision
 
 The current source and the active cache share the exact same Codex build
