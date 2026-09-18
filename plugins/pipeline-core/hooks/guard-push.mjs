@@ -2043,7 +2043,14 @@ function checkEvidenceFreshness(relPath) {
     let promoted = false;
     const promoRead = readEvidence(RELEASE_PROMOTION_DEFAULT_PATH);
     if (promoRead.ok) {
-      const validation = validateReleasePromotionEnvelope(promoRead.data, { repoDir: evidenceProjectDir, targetBoundary: "push" });
+      const verifyEvidence = relPath === VERIFY_EVIDENCE_DEFAULT_PATH
+        ? data
+        : readEvidence(VERIFY_EVIDENCE_DEFAULT_PATH).data;
+      const validation = validateReleasePromotionEnvelope(promoRead.data, {
+        repoDir: evidenceProjectDir,
+        targetBoundary: "push",
+        verifyEvidence,
+      });
       if (validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit) {
         promoted = true;
       }

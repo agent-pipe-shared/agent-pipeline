@@ -127,3 +127,27 @@ nodeTest("tampered promotion envelope is rejected", () => {
         rmSync(dir, { recursive: true, force: true });
       }
 });
+
+nodeTest("push-mode Verify cannot substitute for the release record bound by the envelope", () => {
+  const dir = freshRepo("mode-substitution");
+  try {
+    const commitS = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+    writeFile(dir, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
+    writeFile(dir, "backlog/STATUS.md", "# Status\n");
+    assert.equal(gitAt(dir, "add", "backlog/STATUS.md").status, 0);
+    assert.equal(gitAt(dir, "commit", "-q", "-m", "docs: record").status, 0);
+    const commitR = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+    const inputs = { candidateCommit: commitS, registeredSuiteIds: ["suite-a"], policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "doc", paths: ["README.md"], suites: ["suite-a"] }] }, changedPaths: ["README.md"] };
+    const releaseEvidence = { exitCode: 0, commit: commitS, selection: planVerifySelection({ ...inputs, mode: "release" }) };
+    const pushEvidence = { exitCode: 0, commit: commitS, selection: planVerifySelection({ ...inputs, mode: "push" }) };
+    const envelope = createReleasePromotionEnvelope({ repoDir: dir, sourceCommit: commitS, recordCommit: commitR, verifyEvidence: releaseEvidence });
+    assert.equal(envelope.ok, true);
+    writeFile(dir, "evidence/verify-latest.json", pushEvidence);
+    writeFile(dir, "evidence/release-promotion-latest.json", envelope.envelope);
+    const result = runGuard("git push origin feature-1:refs/heads/feature-1", dir);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /stale/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

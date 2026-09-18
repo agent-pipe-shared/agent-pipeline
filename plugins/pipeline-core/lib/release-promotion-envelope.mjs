@@ -83,6 +83,29 @@ function validateSourceQualification(qualification) {
     && (index === 0 || qualification.selectedSuiteIds[index - 1] < suiteId));
 }
 
+/**
+ * Derives the immutable qualification projection from the canonical Verify
+ * evidence a consumer actually read.  Creation and admission deliberately
+ * share this function so an envelope cannot substitute a different valid
+ * release selection after it has been written.
+ */
+export function sourceQualificationFromVerifyEvidence(verifyEvidence, sourceCommit) {
+  if (!verifyEvidence || verifyEvidence.exitCode !== 0 || verifyEvidence.commit !== sourceCommit) return null;
+  const selection = verifyEvidence.selection;
+  if (!validateVerifySelection(selection) || selection.candidateCommit !== sourceCommit
+      || selection.mode !== "release" || selection.execution !== "full" || selection.omittedSuiteIds.length !== 0) return null;
+  const qualification = {
+    mode: selection.mode,
+    execution: selection.execution,
+    verifySelectionSha256: selection.selectionSha256,
+    ruleSha256: selection.ruleSha256,
+    changedInputSha256: selection.changedInputSha256,
+    selectedSuiteIds: selection.selectedSuiteIds,
+    omittedSuiteIds: selection.omittedSuiteIds,
+  };
+  return validateSourceQualification(qualification) ? qualification : null;
+}
+
 function runGit(args, dir, deps = {}) {
   const spawn = deps.spawn ?? deps.spawnSync ?? spawnSync;
   const result = spawn("git", ["-C", dir, ...args], { encoding: "utf8" });
@@ -161,30 +184,14 @@ export function createReleasePromotionEnvelope({ repoDir, sourceCommit, recordCo
   if (!verifyEvidence || verifyEvidence.exitCode !== 0 || verifyEvidence.commit !== sourceOid) {
     return { ok: false, reason: "invalid-verify-evidence" };
   }
-  const selection = verifyEvidence.selection;
-  if (!validateVerifySelection(selection) || selection.candidateCommit !== sourceOid
-      || selection.mode !== "release" || selection.execution !== "full" || selection.omittedSuiteIds.length !== 0) {
-    return { ok: false, reason: "verify-evidence-not-full-release" };
-  }
+  const sourceQualification = sourceQualificationFromVerifyEvidence(verifyEvidence, sourceOid);
+  if (sourceQualification === null) return { ok: false, reason: "verify-evidence-not-full-release" };
 
   // Validate optional security evidence
   if (securityEvidence) {
     if (securityEvidence.exitCode !== 0 || securityEvidence.commit !== sourceOid) {
       return { ok: false, reason: "invalid-security-evidence" };
     }
-  }
-
-  const sourceQualification = {
-    mode: selection.mode,
-    execution: selection.execution,
-    verifySelectionSha256: selection.selectionSha256,
-    ruleSha256: selection.ruleSha256,
-    changedInputSha256: selection.changedInputSha256,
-    selectedSuiteIds: selection.selectedSuiteIds,
-    omittedSuiteIds: selection.omittedSuiteIds,
-  };
-  if (!validateSourceQualification(sourceQualification)) {
-    return { ok: false, reason: "verify-evidence-not-full-release" };
   }
 
   const modeInclusion = {
@@ -212,7 +219,7 @@ export function createReleasePromotionEnvelope({ repoDir, sourceCommit, recordCo
   return { ok: true, envelope: Object.freeze({ ...body, envelopeSha256 }) };
 }
 
-export function validateReleasePromotionEnvelope(envelope, { repoDir, targetBoundary = "push", deps = {} }) {
+export function validateReleasePromotionEnvelope(envelope, { repoDir, targetBoundary = "push", verifyEvidence, deps = {} }) {
   if (!envelope || typeof envelope !== "object" || Array.isArray(envelope) || envelope.schema !== RELEASE_PROMOTION_SCHEMA) {
     return { ok: false, reason: "invalid-schema" };
   }
@@ -252,6 +259,13 @@ export function validateReleasePromotionEnvelope(envelope, { repoDir, targetBoun
   }
   if (!validateSourceQualification(envelope.sourceQualification)) {
     return { ok: false, reason: "invalid-source-qualification" };
+  }
+  const actualQualification = sourceQualificationFromVerifyEvidence(verifyEvidence, sourceOid);
+  if (actualQualification === null) {
+    return { ok: false, reason: "invalid-verify-evidence-context" };
+  }
+  if (canonicalJson(actualQualification) !== canonicalJson(envelope.sourceQualification)) {
+    return { ok: false, reason: "source-qualification-mismatch" };
   }
 
   // Re-verify ancestry

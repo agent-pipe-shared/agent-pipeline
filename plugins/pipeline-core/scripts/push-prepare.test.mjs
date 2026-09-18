@@ -168,7 +168,11 @@ test("checkEvidenceFreshness: stale commit with valid promotion envelope -> ok:t
     source: { commit: "commit-S", tree: "tree-S" },
     record: { commit: "commit-R", tree: "tree-R" },
   };
-  const mockValidate = () => ({ ok: true, sourceCommit: "commit-S", recordCommit: "commit-R" });
+  let receivedVerifyEvidence = null;
+  const mockValidate = (_envelope, options) => {
+    receivedVerifyEvidence = options.verifyEvidence;
+    return { ok: true, sourceCommit: "commit-S", recordCommit: "commit-R" };
+  };
   const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, "commit-R", {
     readFile: () => JSON.stringify(releaseEvidence),
     promotionEnvelope: mockEnvelope,
@@ -176,6 +180,22 @@ test("checkEvidenceFreshness: stale commit with valid promotion envelope -> ok:t
   });
   assert.equal(result.ok, true);
   assert.match(result.message, /promoted from commit-S/);
+  assert.deepEqual(receivedVerifyEvidence, releaseEvidence);
+});
+
+test("checkEvidenceFreshness: Security promotion reads and binds canonical Verify evidence", () => {
+  const releaseEvidence = { exitCode: 0, commit: "commit-S", selection: planVerifySelection({ mode: "release", candidateCommit: "commit-S", registeredSuiteIds: ["a"], policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "source", paths: ["src/**"], suites: ["a"] }] }, changedPaths: ["src/a.mjs"] }) };
+  let receivedVerifyEvidence = null;
+  const result = checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", FIXTURE_DIR, "commit-R", {
+    readFile: (path) => JSON.stringify(String(path).endsWith("verify-latest.json") ? releaseEvidence : { exitCode: 0, commit: "commit-S" }),
+    promotionEnvelope: { schema: "pipeline.release-promotion-envelope.v1" },
+    validateReleasePromotionEnvelope: (_envelope, options) => {
+      receivedVerifyEvidence = options.verifyEvidence;
+      return { ok: true, sourceCommit: "commit-S", recordCommit: "commit-R" };
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(receivedVerifyEvidence, releaseEvidence);
 });
 
 test("checkEvidenceFreshness: stale commit with invalid promotion envelope -> ok:false", () => {

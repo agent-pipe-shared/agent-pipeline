@@ -170,7 +170,15 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
     const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
     if (promotionEnvelope !== null) {
       const validator = deps.validateReleasePromotionEnvelope ?? validateReleasePromotionEnvelope;
-      const validation = validator(promotionEnvelope, { repoDir: dir, targetBoundary: "push", deps });
+      const verifyEvidence = id === "verify-evidence"
+        ? data
+        : readJson(join(dir, VERIFY_EVIDENCE_DEFAULT_PATH), deps);
+      const validation = validator(promotionEnvelope, {
+        repoDir: dir,
+        targetBoundary: "push",
+        verifyEvidence,
+        deps,
+      });
       if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
         if (id === "verify-evidence") {
           if (!verifyEvidenceSatisfiesBoundary(data, "push")) {
