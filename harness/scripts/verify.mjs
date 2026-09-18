@@ -839,6 +839,9 @@ const TEST_SUITES = [
   { name: "capture-evidence-tests", file: join(pluginScriptsDir, "capture-evidence.test.mjs") },
   { name: "verify-evidence-writer-tests", file: join(scriptDir, "verify-evidence-writer.test.mjs") },
   { name: "dispatch-record-strip-for-critic-tests", file: join(libDir, "dispatch-record-strip-for-critic.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 11 }, (_, index) => `DRS${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "audit-evidence-overview-tests", file: join(scriptDir, "check-audit-evidence-overview.test.mjs") },
+  { name: "guard-push-promotion-tests", file: join(hooksDir, "guard-push-promotion.test.mjs") },
+  { name: "release-promotion-envelope-tests", file: join(libDir, "release-promotion-envelope.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
