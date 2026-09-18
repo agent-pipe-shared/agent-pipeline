@@ -276,3 +276,19 @@ before the tested code runs:
 The item remains open.  The audit established another concrete emitter but
 does not yet prove the full acceptance criterion that every current and future
 PO-facing command producer routes through the shared renderer.
+
+## Static emitter-inventory refinement (2026-09-18)
+
+A source-only follow-up inventory found no remaining production import of
+`boundedOpaqueCopyCommand` directly from `project-onboarding-v3.mjs` outside
+the renderer itself.  The reconciled operator-facing users now obtain it from
+`copy-safe-command.mjs`: Codex and Antigravity pretool guards,
+`human-guard-override.mjs`, and `onboarding-init.mjs`.  The remaining direct
+imports of `project-onboarding-v3.mjs` in production code are for non-renderer
+APIs (`inspectProjectOnboardingV3`, seed generation, or `shellWord` inside the
+registered human-terminal-action builder), not the opaque command renderer.
+
+This is deliberately narrower than the acceptance criterion: a symbol-import
+inventory cannot prove that a future or differently shaped PO-facing producer
+will use the renderer.  It closes no ledger state and creates no duplicate
+backlog item; a durable conformance boundary remains the necessary follow-up.
