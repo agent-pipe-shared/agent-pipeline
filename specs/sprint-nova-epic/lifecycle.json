@@ -48,7 +48,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "6a12e4f2e3651b614cda6bfe08d312c3aa2d1d32c20e8bc11e1109c40d1360a9",
+      "sha256": "bffd69384abdce549ba4f803d9e90a7e7396ab32a61ffd7b6e670ebb1d1964a8",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -317,34 +317,54 @@
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json",
-      "sha256": "3699e2e25c5daa09f688ba5e86851ae9b6da1d5abacbb4382b46cb34b53503f1",
+      "sha256": "716c1d3b1a3a53963e30077b8b1839dfbe8df1c3cdb73fcd1606df1e2a1e2a3a",
       "authority": false,
       "mutability": "immutable",
-      "retention": "retain"
+      "retention": "retain",
+      "amendment": {
+        "at": "2026-09-18T16:50:00.000Z",
+        "reason": "auto-rebind: candidate freeze evidence rebound to candidate 03eeff5a1635597facff3a062bf2ffb15a0a176c",
+        "previousSha256": "716c1d3b1a3a53963e30077b8b1839dfbe8df1c3cdb73fcd1606df1e2a1e2a3a"
+      }
     },
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/evidence-manifest.json",
-      "sha256": "aa2e3ead4724a0af974adefb01cf7a698bb11aa8d28770a22745290b0f7b8f2b",
+      "sha256": "2c49dbe9e588951d34736cd64de19ebc0030c1b6170b499ead18cd89bcf781b8",
       "authority": false,
       "mutability": "immutable",
-      "retention": "retain"
+      "retention": "retain",
+      "amendment": {
+        "at": "2026-09-18T16:50:00.000Z",
+        "reason": "auto-rebind: candidate freeze evidence rebound to candidate 03eeff5a1635597facff3a062bf2ffb15a0a176c",
+        "previousSha256": "2c49dbe9e588951d34736cd64de19ebc0030c1b6170b499ead18cd89bcf781b8"
+      }
     },
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
-      "sha256": "2d1848b76981d873d21a201b8262d00e03553a82641d90d0a8e2408a44f72578",
+      "sha256": "d641894607acc14b0e28522fbb764098b992021004251e98664c46fc343df590",
       "authority": false,
       "mutability": "immutable",
-      "retention": "retain"
+      "retention": "retain",
+      "amendment": {
+        "at": "2026-09-18T16:50:00.000Z",
+        "reason": "auto-rebind: candidate freeze evidence rebound to candidate 03eeff5a1635597facff3a062bf2ffb15a0a176c",
+        "previousSha256": "d641894607acc14b0e28522fbb764098b992021004251e98664c46fc343df590"
+      }
     },
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/security.json",
-      "sha256": "753955f2f5f13e105e0f42e2fdd6891df68e77c2e252efc2361090f5ac9c4ad6",
+      "sha256": "5c1480b33abf82072381dc2522d01122b574fbe8ee9490ffd832701df6d47d09",
       "authority": false,
       "mutability": "immutable",
-      "retention": "retain"
+      "retention": "retain",
+      "amendment": {
+        "at": "2026-09-18T16:50:00.000Z",
+        "reason": "auto-rebind: candidate freeze evidence rebound to candidate 03eeff5a1635597facff3a062bf2ffb15a0a176c",
+        "previousSha256": "5c1480b33abf82072381dc2522d01122b574fbe8ee9490ffd832701df6d47d09"
+      }
     },
     {
       "class": "candidate-evidence",
@@ -355,6 +375,9 @@
       "retention": "retain"
     }
   ],
-  "candidate": null,
+  "candidate": {
+    "commit": "03eeff5a1635597facff3a062bf2ffb15a0a176c",
+    "tree": "3066828e67f054cb4bdcdc8bc3c7e9945138fa53"
+  },
   "supersedes": null
 }

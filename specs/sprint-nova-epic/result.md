@@ -1027,3 +1027,41 @@ This entry records the TP-3 use for B0 payload verification wiring only:
 `bootstrap-payload-measure.test.mjs` suites. Both focused suites passed, no
 existing registration changed, and the TP-3 protected-path entry in
 `project/guard-config.json` was restored before Full Verify.
+
+## 2026-09-18 — Nova B candidate freeze and evidence manifest seal
+
+Status: `candidate-frozen; external-native-gates-pending`.
+
+The Nova B product candidate `03eeff5a1635597facff3a062bf2ffb15a0a176c`
+(tree `3066828e67f054cb4bdcdc8bc3c7e9945138fa53`) is frozen on
+`feat/sprint-nova-codex-v046`, based on released `v0.4.7` commit
+`89cb12b99e3fd86ac44878d0c23b278f00538921`.
+Its 17-Issue binding, clean canonical backlog projection, exact Full Verify
+(`552/552` suites passed, exit 0), clean Security scan (0 findings, exit 0),
+and session Critic review pass are retained under
+`specs/sprint-nova-epic/evidence/nova-b/`. No unpublished Cyborg bytes are an
+input.
+
+This record seals the candidate freeze and evidence manifest. Deferred scopes
+(B2-I remote broker integration, B3-I direct Antigravity implementation, live B4
+forge operation, and B6 native Apple Silicon lifecycle, Critic and PO close)
+remain documented as pending external/native gates.
+
+## 2026-09-18 — Nova B candidate freeze and evidence manifest seal
+
+Status: `candidate-frozen; external-native-gates-pending`.
+
+The Nova B product candidate `03eeff5a1635597facff3a062bf2ffb15a0a176c`
+(tree `3066828e67f054cb4bdcdc8bc3c7e9945138fa53`) is frozen on
+`feat/sprint-nova-codex-v046`, based on released `v0.4.7` commit
+`89cb12b99e3fd86ac44878d0c23b278f00538921`.
+Its 17-Issue binding, clean canonical backlog projection, exact Full Verify
+(`552/552` suites passed, exit 0), clean Security scan (0 findings, exit 0),
+and session Critic review pass are retained under
+`specs/sprint-nova-epic/evidence/nova-b/`. No unpublished Cyborg bytes are an
+input.
+
+This record seals the candidate freeze and evidence manifest. Deferred scopes
+(B2-I remote broker integration, B3-I direct Antigravity implementation, live B4
+forge operation, and B6 native Apple Silicon lifecycle, Critic and PO close)
+remain documented as pending external/native gates.
