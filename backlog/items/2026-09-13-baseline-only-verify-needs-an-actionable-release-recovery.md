@@ -100,6 +100,9 @@ shallow plan-approval shape.  The focused end-to-end recovery, Push Init
 (26/26), and late pre-commit regressions pass locally.  Two initial
 diff-scoped Critic runs found and drove the reachable-push, lifecycle-authority
 and confirmation corrections; the final correction-diff Critic returned PASS
-with no findings.  This is not yet full candidate Verify evidence or a plugin
-publication: the item remains open for that normal qualification and release
-path.
+with no findings.  A clean-worktree full candidate Verify then correctly found
+that the new focused suite is missing its protected central Verify-registry
+entry.  Its exact one-line registration is currently blocked by `TP-3`; no
+override was requested or consumed.  This is not yet full candidate Verify
+evidence or a plugin publication: the item remains open for that bounded
+registry decision, normal qualification and release path.
