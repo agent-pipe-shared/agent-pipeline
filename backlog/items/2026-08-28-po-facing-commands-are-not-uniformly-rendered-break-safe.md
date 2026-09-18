@@ -255,3 +255,24 @@ commit; consumer-safe-paths check unevidenced), code confirmed correct;
 both remediated. Round 2 (fix-verification scope, two-round cap exhausted):
 PASS. Full findings, including the disposed EL-01 authorship finding and
 two minor follow-ups filed: `backlog/evidence/2026-09-06-nva-b-codexguardimport-1-findings.md`.
+
+## Progress note (2026-09-18, Greenfield copy-safe audit)
+
+The repo-wide audit found `scripts/onboarding-init.mjs` as one more
+operator-facing emitter which imported `boundedOpaqueCopyCommand` directly
+from `project-onboarding-v3.mjs`.  It now imports the exact same function
+through `copy-safe-command.mjs`, the central re-export used by the other
+reconciled emitters.  This is intentionally a byte-identical wiring change,
+not a new renderer: the renderer suite asserts the two exports are the same
+function object.
+
+Focused verification passed outside the restricted runner sandbox, whose
+child-process restriction otherwise makes the real shell/Git fixtures fail
+before the tested code runs:
+
+- `node plugins/pipeline-core/scripts/onboarding-init.test.mjs` — 29/29.
+- `node plugins/pipeline-core/lib/copy-safe-command.test.mjs` — 34/34.
+
+The item remains open.  The audit established another concrete emitter but
+does not yet prove the full acceptance criterion that every current and future
+PO-facing command producer routes through the shared renderer.

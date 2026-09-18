@@ -111,9 +111,9 @@ import {
 import {
   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH,
   PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
-  boundedOpaqueCopyCommand,
   shellWord,
 } from "../lib/project-onboarding-v3.mjs";
+import { boundedOpaqueCopyCommand } from "../lib/copy-safe-command.mjs";
 import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
