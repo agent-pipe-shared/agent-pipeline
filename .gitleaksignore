@@ -197,3 +197,9 @@ content-v1:081327d87b1ab19f416c119d3504a9c913f2247cc95b810870c60f24d012f680:gove
 # its structured idempotency key; this exact content fingerprint was generated
 # from the raw finding with gitleaksContentAuthorityLine().
 content-v1:90d2c785141be4f2159703a252dfa0020556b321d8c510484411ec301246efcf:governance/events/human/14-evt-gmw-revoke-593e132e33447e2b0299b238f5fa6841-0.json:generic-api-key:1:1024
+# NVA-B-FIX-GOVERNANCE-FP-R2 (2026-09-19): deterministic public GMW revoke
+# decision IDs. Both content-v1 entries were generated from normalized real
+# gitleaks findings with gitleaksContentAuthorityLine(); each binds one exact
+# idempotencyKey/payload.decisionId, rule, repository-relative path, line and column.
+content-v1:4cfbf0ca18387ff1f404c00757265933984703de4f8606f2b8f1c31dbf94aa8d:governance/events/human/17-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-0.json:generic-api-key:1:1019
+content-v1:f0ce87116e1b527f5ab54097347aed245477dc9f8b0a30e13547c0c38e5b74cb:governance/events/human/19-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-1.json:generic-api-key:1:1024

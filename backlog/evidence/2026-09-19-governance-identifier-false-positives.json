@@ -1,0 +1,142 @@
+{
+  "schema": "nova.governance-identifier-false-positive-experiment.v2",
+  "scope": "exactly two deterministic public governance revoke decision identifiers; redacted scanner metadata only",
+  "producer": {
+    "module": "plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs",
+    "functions": [
+      "revokeDecisionId",
+      "buildAppendIntent"
+    ],
+    "grammar": "gmw-revoke-<first 32 lowercase hex chars of intentSha256>-<generation>"
+  },
+  "trustedBinary": {
+    "sha256": "8b95a336428cac9a470dc72744b4475fd50ab9221c7be6b7b776edd4d053540a"
+  },
+  "original": {
+    "status": "FINDINGS",
+    "rawFindingCount": 2,
+    "retainedFindingCount": 2,
+    "ignoredFindingCount": 0,
+    "findings": [
+      {
+        "file": "governance/events/human/17-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-0.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1019,
+        "matchLength": 45
+      },
+      {
+        "file": "governance/events/human/19-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-1.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1024,
+        "matchLength": 45
+      }
+    ]
+  },
+  "corrected": {
+    "status": "PASS",
+    "rawFindingCount": 2,
+    "retainedFindingCount": 0,
+    "ignoredFindingCount": 2,
+    "findings": [
+      {
+        "file": "governance/events/human/17-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-0.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1019,
+        "matchLength": 45
+      },
+      {
+        "file": "governance/events/human/19-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-1.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1024,
+        "matchLength": 45
+      }
+    ]
+  },
+  "syntheticIdentifierNegative": {
+    "status": "FINDINGS",
+    "rawFindingCount": 2,
+    "retainedFindingCount": 2,
+    "ignoredFindingCount": 0,
+    "findings": [
+      {
+        "file": "governance/events/human/17-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-0.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1019,
+        "matchLength": 45
+      },
+      {
+        "file": "governance/events/human/19-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-1.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1024,
+        "matchLength": 45
+      }
+    ]
+  },
+  "unlistedPathNegative": {
+    "status": "FINDINGS",
+    "rawFindingCount": 3,
+    "retainedFindingCount": 1,
+    "ignoredFindingCount": 2,
+    "findings": [
+      {
+        "file": "governance/events/human/19-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-1.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1024,
+        "matchLength": 45
+      },
+      {
+        "file": "governance/events/human/17-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-0.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1019,
+        "matchLength": 45
+      },
+      {
+        "file": "governance/events/human/unlisted-copy/17-revoke-copy.json",
+        "rule": "generic-api-key",
+        "line": 1,
+        "column": 1019,
+        "matchLength": 45
+      }
+    ]
+  },
+  "provenance": [
+    {
+      "file": "governance/events/human/17-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-0.json",
+      "rule": "generic-api-key",
+      "line": 1,
+      "column": 1019,
+      "matchLength": 45,
+      "matchesIdempotencyKey": true,
+      "matchesPayloadDecisionId": true,
+      "deterministicProducerGrammar": true,
+      "credential": false
+    },
+    {
+      "file": "governance/events/human/19-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-1.json",
+      "rule": "generic-api-key",
+      "line": 1,
+      "column": 1024,
+      "matchLength": 45,
+      "matchesIdempotencyKey": true,
+      "matchesPayloadDecisionId": true,
+      "deterministicProducerGrammar": true,
+      "credential": false
+    }
+  ],
+  "authorityLineCount": 2,
+  "assertions": {
+    "noAbsoluteToolPathPersisted": true,
+    "noRawMatchOrSecretPersisted": true,
+    "correctedRetainsNoFindings": true,
+    "negativeMutationChangedIdempotencyKeyAndPayloadDecisionId": true,
+    "unlistedPathRetainsOneAndIgnoresTwo": true
+  }
+}
