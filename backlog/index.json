@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ac0f42170686e6d241b371d7ad94fb5dc311b476fa777261137364d31eb19176"
+    "transitionHead": "96c0acb19a5917dd017c22e4c4479cdea5cdc68223a5bf8dad139bfce428e7ca"
   },
   "counts": {
-    "open": 71,
+    "open": 70,
     "in_progress": 1,
-    "closed": 587,
+    "closed": 588,
     "rejected": 3,
     "deferred": 11
   },
@@ -167,14 +167,18 @@
     },
     {
       "id": "pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-04",
       "source": "Split out of backlog/items/2026-09-02-red-evidence-captured-from-node-test-embeds-the-absolute-repository-path.md, whose 'Direction to evaluate' section named two directions and whose remedy dispatch (NVA-B-REDCAPTURE-1, 2026-09-03/04) was scoped to the first one only. Filed so the parent item's closure does not bury the second.",
       "deferred": false,
       "tracking": "Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "d0e04f13936314a770fb7fc617fd552a58763a18",
+      "closureEvidence": "backlog/evidence/2026-09-18-evidence-host-path-guard-closure.md"
     },
     {
       "id": "pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair",

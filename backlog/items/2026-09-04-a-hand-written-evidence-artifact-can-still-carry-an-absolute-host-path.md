@@ -1,14 +1,18 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path
-type: defect
-owner: pipeline
-status: open
-created: 2026-09-04
-sprint: nova-b
-done_when: manual
-tracking: "Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand."
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-09-04"
 source: "Split out of backlog/items/2026-09-02-red-evidence-captured-from-node-test-embeds-the-absolute-repository-path.md, whose 'Direction to evaluate' section named two directions and whose remedy dispatch (NVA-B-REDCAPTURE-1, 2026-09-03/04) was scoped to the first one only. Filed so the parent item's closure does not bury the second."
+tracking: "Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand."
+sprint: "nova-b"
+done_when: "manual"
+closed_at: "2026-09-18"
+closure_repository: "self"
+closure_commit: "d0e04f13936314a770fb7fc617fd552a58763a18"
+closure_evidence: "backlog/evidence/2026-09-18-evidence-host-path-guard-closure.md"
 ---
 
 # A hand-written evidence artifact can still carry an absolute host path
