@@ -63,6 +63,7 @@ import {
   checkCriticalHumanProofPolicy,
   checkEvidenceFreshness,
   checkPushThreatModel,
+  resolveEvidenceProjectDir,
   resolveHeadCommit,
 } from "./push-prepare.mjs";
 
@@ -140,7 +141,11 @@ export function checkVerifyContractConfigured(dir, deps = {}) {
  */
 export function checkVerifyEvidenceBound(dir, headCommit, deps = {}) {
   const checker = deps.checkEvidenceFreshness ?? checkEvidenceFreshness;
-  const check = checker("verify-evidence-bound", VERIFY_EVIDENCE_DEFAULT_PATH, dir, headCommit, deps);
+  // Match push-prepare and the managed hook: Verify writes volatile evidence
+  // in the primary worktree even for a clean linked-worktree candidate.
+  const resolveEvidenceDir = deps.resolveEvidenceProjectDir ?? resolveEvidenceProjectDir;
+  const evidenceDir = resolveEvidenceDir(dir, deps);
+  const check = checker("verify-evidence-bound", VERIFY_EVIDENCE_DEFAULT_PATH, evidenceDir, headCommit, deps);
   let status;
   if (check.ok) status = "fresh-and-bound";
   else if (check.message.includes("is missing or unreadable")) status = "missing";

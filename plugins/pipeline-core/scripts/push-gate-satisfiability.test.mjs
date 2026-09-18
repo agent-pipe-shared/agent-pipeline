@@ -6,6 +6,7 @@
  * Every precondition check takes injected dependencies (`readFile`,
  * `resolveAuthorityArtifactPath`, `checkEvidenceFreshness`,
  * `checkCriticalHumanProofPolicy`, `checkPushThreatModel`, `resolveHeadCommit`,
+ * `resolveEvidenceProjectDir`,
  * `resolveGitCommonDir`, `readdir`, `now`), mirroring `push-prepare.test.mjs`'s own
  * discipline: a fixture never has to be a real Git working tree with real evidence
  * files. The one exception is the read-only-invariant test near the bottom, which runs
@@ -133,6 +134,24 @@ test("checkVerifyEvidenceBound: fresh and bound -> status fresh-and-bound, ok:tr
   const result = checkVerifyEvidenceBound(FIXTURE_DIR, HEAD, {
     readFile: () => JSON.stringify({ exitCode: 0, commit: HEAD }),
   });
+  assert.equal(result.status, "fresh-and-bound");
+  assert.equal(result.ok, true);
+});
+
+test("checkVerifyEvidenceBound: linked-worktree candidates resolve evidence through the shared primary worktree", () => {
+  const sharedEvidenceRoot = "/primary/worktree";
+  let observedDir = null;
+  const result = checkVerifyEvidenceBound("/linked/worktree", HEAD, {
+    resolveEvidenceProjectDir: (dir) => {
+      assert.equal(dir, "/linked/worktree");
+      return sharedEvidenceRoot;
+    },
+    checkEvidenceFreshness: (_id, _path, dir) => {
+      observedDir = dir;
+      return { ok: true, message: "fresh" };
+    },
+  });
+  assert.equal(observedDir, sharedEvidenceRoot);
   assert.equal(result.status, "fresh-and-bound");
   assert.equal(result.ok, true);
 });
