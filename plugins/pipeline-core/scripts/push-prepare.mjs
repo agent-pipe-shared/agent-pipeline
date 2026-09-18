@@ -384,6 +384,17 @@ function resolveGitCommonDirPath(dir, deps = {}) {
 }
 
 /**
+ * Verify deliberately publishes its volatile evidence in the primary worktree
+ * (see harness/scripts/verify.mjs), even when the candidate itself is checked
+ * out in a clean linked worktree.  Read that same shared slot here; otherwise
+ * a successful prescribed Verify can never satisfy this preparation check.
+ */
+export function resolveEvidenceProjectDir(dir, deps = {}) {
+  const commonDir = resolveGitCommonDirPath(dir, deps);
+  return commonDir === dir ? dir : dirname(commonDir);
+}
+
+/**
  * The agent-side push command consumes only the repo-local mirror written by
  * `authorize-critical`; it never names the external directory holding the PO
  * key material. Delegating to the producer's exported builder keeps the
@@ -514,10 +525,11 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   const checks = [];
   checks.push(checkWorkingTreeClean(dir, deps));
   const securityGateActive = isSecurityGateActive(dir, deps);
+  const evidenceDir = resolveEvidenceProjectDir(dir, deps);
   if (headCommit) {
-    checks.push(checkEvidenceFreshness("verify-evidence", VERIFY_EVIDENCE_DEFAULT_PATH, dir, headCommit, deps));
+    checks.push(checkEvidenceFreshness("verify-evidence", VERIFY_EVIDENCE_DEFAULT_PATH, evidenceDir, headCommit, deps));
     if (securityGateActive) {
-      checks.push(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", dir, headCommit, deps));
+      checks.push(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", evidenceDir, headCommit, deps));
     }
   } else {
     const message = "HEAD commit could not be determined (git rev-parse HEAD failed).";

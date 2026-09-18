@@ -39,6 +39,7 @@ import {
   preparePushSubject,
   printReport,
   pushPrepareReport,
+  resolveEvidenceProjectDir,
   resolveFeatureContext,
   resolveVerifyRemedy,
 } from "./push-prepare.mjs";
@@ -147,6 +148,19 @@ test("checkEvidenceFreshness: exitCode 0 and matching commit -> ok:true", () => 
     readFile: () => JSON.stringify(pushVerifyEvidence()),
   });
   assert.equal(result.ok, true);
+});
+
+test("resolveEvidenceProjectDir: linked worktree reads Verify evidence from its primary checkout", () => {
+  const primary = mkdtempSync(join(SCRATCH, "push-prepare-primary-"));
+  const common = join(primary, ".git");
+  mkdirSync(common);
+  const linked = join(primary, "linked");
+  mkdirSync(linked);
+  try {
+    assert.equal(resolveEvidenceProjectDir(linked, { gitCommonDir: () => common }), primary);
+  } finally {
+    rmSync(primary, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------------------
