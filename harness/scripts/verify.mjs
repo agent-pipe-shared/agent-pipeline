@@ -452,6 +452,7 @@ const TEST_SUITES = [
   { name: "product-capability-inventory-tests", file: join(scriptDir, "check-product-capability-inventory.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 28 }, (_, index) => `PCI${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "module-cluster-reachability-tests", file: join(scriptDir, "check-module-cluster-reachability.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
+  { name: "pipeline-state-late-verify-tests", file: join(pluginScriptsDir, "pipeline-state-late-verify.test.mjs") },
   { name: "dispatch-provenance-tests", file: join(scriptDir, "check-dispatch-provenance.test.mjs") },
   { name: "guard-git-phoenix-authority-grant-tests", file: join(hooksDir, "guard-git-phoenix-authority-grant.test.mjs") },
   { name: "decision-reference-dual-evaluation-tests", file: join(libDir, "decision-reference-dual-evaluation.test.mjs") },

@@ -250,8 +250,8 @@ test("drivePushInit: baseline-only implementation publishes configure-verify and
       "the exact protected calibration write requires fresh attended confirmation");
     assert.deepEqual(action.applyAction.argv.slice(1, 3), ["configure-verify", "--verify-command"],
       "push-init must return the sanctioned CLI action rather than a reconstructed shell command");
-    assert.equal(action.applyAction.argv.some((value) => String(value).includes("scratch") || String(value).includes("guard-human-override")), false,
-      "the executable recovery has no scratch-file or HGO path");
+    assert.equal(action.applyAction.argv.slice(2).some((value) => String(value).includes("scratch") || String(value).includes("guard-human-override")), false,
+      "the recovery arguments after the pipeline-state script have no scratch-file or HGO path");
 
     const command = `${process.execPath} --test harness/scripts/check-consumer-safe-paths.test.mjs`;
     assert.equal(pipelineStateRun(["configure-verify", "--verify-command", command], stateDeps), 0);

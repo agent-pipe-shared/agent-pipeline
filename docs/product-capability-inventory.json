@@ -435,6 +435,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-external-push-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-inspect-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-inspection-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-late-verify-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-lifecycle-event-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-mutable-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
