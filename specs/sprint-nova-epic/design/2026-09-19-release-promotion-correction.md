@@ -21,7 +21,7 @@ already permits one-way `release-satisfies-push` for the same qualified source
 candidate. D1 is retained and is not a question in this proposal. It permits
 neither `push-satisfies-release` nor reuse after substantive source, policy,
 environment class or declared-input drift. The
-[requirement](../../../scratch/nova-b-audit/items/2026-09-17-release-evidence-promotion-repeats-full-qualification.md)
+[requirement](../../../backlog/items/2026-09-17-release-evidence-promotion-repeats-full-qualification.md)
 also requires real receipt readback, strict record-only deltas, canonical
 evidence roots, and ordinary driver reachability. Its historical closure
 metadata is not qualification evidence.
@@ -37,13 +37,10 @@ and a record proof; it must not silently rewrite any of these contracts.
 
 ## 2. Current source evidence and limits
 
-These are source observations, not prior Critic findings. The dated
-[investigation](../../../scratch/nova-b-audit/NVA-B-PROMOTION-MAP.md) and its
-[machine map](../../../scratch/nova-b-audit/NVA-B-PROMOTION-MAP.json) are inputs.
-The dispatch validator records fresh file digests and symbol locations;
-function names below remain the anchors if concurrent parity repairs move
-lines. Such repairs to existing v1 invariants do not establish the complete
-qualification chain proposed here.
+These are source observations, not prior Critic findings. The tracked source
+links and symbol anchors in the table below identify the observed contracts if
+concurrent parity repairs move lines. Such repairs to existing v1 invariants do
+not establish the complete qualification chain proposed here.
 
 | Existing surface | Observed contract and consequence |
 | --- | --- |
@@ -261,12 +258,14 @@ stronger uniform scan coverage, but a new requirement for gate-off consumers
 and unavailable tools. This proposal recommends policy binding, subject to
 acceptance, rather than quietly imposing that extra gate.
 
-The [redacted field probe](../../../scratch/nova-b-audit/security-field-probe-result.json)
-found two `generic-api-key` findings at public governance identifiers; neither
-matched value had SHA-256 shape. That is not a clean Security result and does
-not justify a hash-shaped exemption or blanket exclusion of evidence files.
-Any scanner correction needs its own exact field/schema test and normal
-security disposition; promotion never suppresses findings.
+The committed [isolated identifier false-positive evidence](../../../backlog/evidence/2026-09-19-governance-identifier-false-positives.md)
+records two public governance-identifier findings that were ignored only after
+the exact correction; its synthetic-identifier and unlisted-path negative
+controls still retain findings. It is not native Security, full
+Security/Verify, publication, or signing acceptance, and does not justify a
+hash-shaped exemption or blanket exclusion of evidence files. Any scanner
+correction needs its own exact field/schema test and normal security
+disposition; promotion never suppresses findings.
 
 ## 7. Inclusion proof and canonical physical roots
 

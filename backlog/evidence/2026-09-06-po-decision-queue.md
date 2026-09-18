@@ -23,7 +23,7 @@ are bounded below; recommendations are not recorded acceptance.
 | D5 — AI-hardening spec acceptance | Carry [D5](../PO-TOPICS.md#po-decisions--2026-09-18) into formal Nova B candidate acceptance with its exact spec home, criteria and evidence binding. The existing ruling retains code and defers that reconciliation. | This is the already-recorded acceptance obligation, not new implementation authorization or a claim that the retained code's spec has been accepted. |
 
 **Correction: Nova's own unpublished ancestor is not sibling consumption.**
-The [direct observer probe](../../scratch/nova-b-audit/probe-own-sprint-publication.json)
+The [current-code observer probe](2026-09-18-nova-b-current-code-audit/publication-self-classification.json)
 for `sprint-nova-epic` reports `epics: ["nova"]`, a Nova ancestry consumption,
 and `PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT`; its `ownSprintMisclassified` is true.
 The current observer incorrectly labels own Nova ancestry as sibling
@@ -43,11 +43,11 @@ report an actual unavailable technical route with the exact refusal, without
 inventing another signature request. No protected registration is changed
 by these documents.
 
-**Other audit facts stay in their proper scope.** The
-[redacted Security field probe](../../scratch/nova-b-audit/security-field-probe-result.json)
-found identifier-field matches that were not SHA-256-shaped values; it proves
-neither a clean scan nor a safe general evidence exemption. Local scanner
-diagnosis and exact regressions are coordinator work. Deferred native Codex
+**Other audit facts stay in their proper scope.** The committed
+[isolated identifier false-positive evidence](2026-09-19-governance-identifier-false-positives.md)
+records exact public governance-identifier controls; it proves neither a clean
+scan nor a safe general evidence exemption. Local scanner diagnosis and exact
+regressions are coordinator work. Deferred native Codex
 WSL/App-Server evidence remains diagnostic under the 2026-09-12 disposition;
 an unavailable optional native host is not automatically a Nova-B blocker.
 Claude, Codex and Antigravity still owe independent portable implementations,
