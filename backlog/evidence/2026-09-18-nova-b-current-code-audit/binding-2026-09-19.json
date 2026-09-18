@@ -1,0 +1,51 @@
+{
+  "schema": "nova-b-audit.current-run-binding.v1",
+  "candidate": {
+    "commit": "f3f79edfda2b8fe772bd8da3c1f320ef33a6b777",
+    "tree": "ce0599c6b2f1edee7a570bd67e3d62760079c1c4"
+  },
+  "runId": "verify-1789770687736-bba0b2692cb5c0ca",
+  "startedAt": "2026-09-18T22:31:28.087Z",
+  "completedAt": "2026-09-18T22:35:29.124Z",
+  "manifestSha256": "784fd1c557292d07d680bb106d823109ae49994244d98c41838859260d785bba",
+  "terminalSha256": "8fefcde488458a9defef14f573aa51ede87f25df1aec548db5bc98406722834b",
+  "policySha256": "f2b868ab1b7eb6d778612dc32a34cb5e254140bf190456a9680d83ce92c16fbe",
+  "receiptCount": 555,
+  "logCount": 555,
+  "bindingChecksPassed": true,
+  "verifyExitCode": 1,
+  "verifyStatus": "failed",
+  "failedSteps": [
+    {
+      "name": "doc-contract-tests",
+      "exitCode": 1
+    },
+    {
+      "name": "doc-contract-check",
+      "exitCode": 2
+    },
+    {
+      "name": "epic-ac02-publication-check-tests",
+      "exitCode": 1
+    },
+    {
+      "name": "epic-ac02-publication-check",
+      "exitCode": 2
+    },
+    {
+      "name": "backlog-done-predicate-check",
+      "exitCode": 1
+    },
+    {
+      "name": "critic-skip-coverage-check",
+      "exitCode": 1
+    }
+  ],
+  "securityStep": {
+    "name": "security-scan",
+    "exitCode": 0,
+    "durationMs": 10731,
+    "reused": false
+  },
+  "scope": "Local journal integrity and exact candidate binding; not a passed Verify or native runner/platform acceptance."
+}

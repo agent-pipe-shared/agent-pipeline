@@ -1,0 +1,4496 @@
+{
+  "schema": "pipeline.verify-evidence.v0",
+  "project": "agent-pipeline",
+  "command": "node harness/scripts/verify.mjs --mode release --no-reuse",
+  "commit": "f3f79edfda2b8fe772bd8da3c1f320ef33a6b777",
+  "tree": "ce0599c6b2f1edee7a570bd67e3d62760079c1c4",
+  "candidate": {
+    "start": {
+      "status": "clean",
+      "commit": "f3f79edfda2b8fe772bd8da3c1f320ef33a6b777",
+      "tree": "ce0599c6b2f1edee7a570bd67e3d62760079c1c4"
+    },
+    "finish": {
+      "status": "clean",
+      "commit": "f3f79edfda2b8fe772bd8da3c1f320ef33a6b777",
+      "tree": "ce0599c6b2f1edee7a570bd67e3d62760079c1c4"
+    },
+    "binding": "exact"
+  },
+  "startedAt": "2026-09-18T22:31:27.736Z",
+  "finishedAt": "2026-09-18T22:35:29.160Z",
+  "steps": [
+    {
+      "name": "setup-tests",
+      "exitCode": 0,
+      "durationMs": 189,
+      "reused": false
+    },
+    {
+      "name": "routing-projection-tests",
+      "exitCode": 0,
+      "durationMs": 105,
+      "reused": false
+    },
+    {
+      "name": "routing-projection-check",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "route-receipt-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "recovery-preview-attestation-tests",
+      "exitCode": 0,
+      "durationMs": 72,
+      "reused": false
+    },
+    {
+      "name": "repository-path-identity-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "artifact-lifecycle-tests",
+      "exitCode": 0,
+      "durationMs": 74,
+      "reused": false
+    },
+    {
+      "name": "artifact-lifecycle-check",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "artifact-topology-tests",
+      "exitCode": 0,
+      "durationMs": 44,
+      "reused": false
+    },
+    {
+      "name": "artifact-topology-check",
+      "exitCode": 0,
+      "durationMs": 71,
+      "reused": false
+    },
+    {
+      "name": "afk-ledger-tests",
+      "exitCode": 0,
+      "durationMs": 70,
+      "reused": false
+    },
+    {
+      "name": "state-budget-tests",
+      "exitCode": 0,
+      "durationMs": 47,
+      "reused": false
+    },
+    {
+      "name": "state-budget-check",
+      "exitCode": 0,
+      "durationMs": 30,
+      "reused": false
+    },
+    {
+      "name": "repository-freshness-tests",
+      "exitCode": 0,
+      "durationMs": 2848,
+      "reused": false
+    },
+    {
+      "name": "ruleset-freshness-tests",
+      "exitCode": 0,
+      "durationMs": 1831,
+      "reused": false
+    },
+    {
+      "name": "pipeline-update-channel-tests",
+      "exitCode": 0,
+      "durationMs": 310,
+      "reused": false
+    },
+    {
+      "name": "bootstrap-env-check-tests",
+      "exitCode": 0,
+      "durationMs": 36,
+      "reused": false
+    },
+    {
+      "name": "critic-bare-tests",
+      "exitCode": 0,
+      "durationMs": 2066,
+      "reused": false
+    },
+    {
+      "name": "codex-critic-host-tests",
+      "exitCode": 0,
+      "durationMs": 22573,
+      "reused": false
+    },
+    {
+      "name": "codex-native-critic-host-tests",
+      "exitCode": 0,
+      "durationMs": 321,
+      "reused": false
+    },
+    {
+      "name": "codex-critic-isolation-tests",
+      "exitCode": 0,
+      "durationMs": 4940,
+      "reused": false
+    },
+    {
+      "name": "codex-isolated-critic-contract-tests",
+      "exitCode": 0,
+      "durationMs": 128,
+      "reused": false
+    },
+    {
+      "name": "claude-critic-host-tests",
+      "exitCode": 0,
+      "durationMs": 1815,
+      "reused": false
+    },
+    {
+      "name": "continuity-host-adapter-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "continuity-result-bootstrap-tests",
+      "exitCode": 0,
+      "durationMs": 158,
+      "reused": false
+    },
+    {
+      "name": "continuity-result-close-tests",
+      "exitCode": 0,
+      "durationMs": 128,
+      "reused": false
+    },
+    {
+      "name": "continuity-result-rebind-tests",
+      "exitCode": 0,
+      "durationMs": 127,
+      "reused": false
+    },
+    {
+      "name": "continuity-result-case-migration-tests",
+      "exitCode": 0,
+      "durationMs": 137,
+      "reused": false
+    },
+    {
+      "name": "continuity-state-tests",
+      "exitCode": 0,
+      "durationMs": 65,
+      "reused": false
+    },
+    {
+      "name": "main-session-route-tests",
+      "exitCode": 0,
+      "durationMs": 29,
+      "reused": false
+    },
+    {
+      "name": "wsl-ipc-compatibility-tests",
+      "exitCode": 0,
+      "durationMs": 269,
+      "reused": false
+    },
+    {
+      "name": "session-power-core-tests",
+      "exitCode": 0,
+      "durationMs": 41,
+      "reused": false
+    },
+    {
+      "name": "session-power-controller-tests",
+      "exitCode": 0,
+      "durationMs": 53,
+      "reused": false
+    },
+    {
+      "name": "session-power-cli-tests",
+      "exitCode": 0,
+      "durationMs": 266,
+      "reused": false
+    },
+    {
+      "name": "session-cleanup-power-tests",
+      "exitCode": 0,
+      "durationMs": 513,
+      "reused": false
+    },
+    {
+      "name": "session-cleanup-binding-tests",
+      "exitCode": 0,
+      "durationMs": 9013,
+      "reused": false
+    },
+    {
+      "name": "human-guard-override-tests",
+      "exitCode": 0,
+      "durationMs": 17760,
+      "reused": false
+    },
+    {
+      "name": "guard-maintenance-window-tests",
+      "exitCode": 0,
+      "durationMs": 5253,
+      "reused": false
+    },
+    {
+      "name": "guard-maintenance-window-cli-tests",
+      "exitCode": 0,
+      "durationMs": 3984,
+      "reused": false
+    },
+    {
+      "name": "review-economy-tests",
+      "exitCode": 0,
+      "durationMs": 49,
+      "reused": false
+    },
+    {
+      "name": "guard-git-tests",
+      "exitCode": 0,
+      "durationMs": 9983,
+      "reused": false
+    },
+    {
+      "name": "guard-apply-patch-tests",
+      "exitCode": 0,
+      "durationMs": 20079,
+      "reused": false
+    },
+    {
+      "name": "guard-testpath-tests",
+      "exitCode": 0,
+      "durationMs": 2351,
+      "reused": false
+    },
+    {
+      "name": "staleness-check-tests",
+      "exitCode": 0,
+      "durationMs": 162,
+      "reused": false
+    },
+    {
+      "name": "guard-devplan-tests",
+      "exitCode": 0,
+      "durationMs": 2957,
+      "reused": false
+    },
+    {
+      "name": "guard-lifecycle-ready-tests",
+      "exitCode": 0,
+      "durationMs": 43224,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-revocation-tests",
+      "exitCode": 0,
+      "durationMs": 103,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-rebind-runner-tests",
+      "exitCode": 0,
+      "durationMs": 284,
+      "reused": false
+    },
+    {
+      "name": "codex-pretool-guard-tests",
+      "exitCode": 0,
+      "durationMs": 17278,
+      "reused": false
+    },
+    {
+      "name": "codex-session-start-hint-tests",
+      "exitCode": 0,
+      "durationMs": 383,
+      "reused": false
+    },
+    {
+      "name": "guard-push-tests",
+      "exitCode": 0,
+      "durationMs": 28348,
+      "reused": false
+    },
+    {
+      "name": "guard-push-v2-tests",
+      "exitCode": 0,
+      "durationMs": 1395,
+      "reused": false
+    },
+    {
+      "name": "guard-push-attestation-diagnostics-tests",
+      "exitCode": 0,
+      "durationMs": 620,
+      "reused": false
+    },
+    {
+      "name": "push-destination-policy-tests",
+      "exitCode": 0,
+      "durationMs": 37,
+      "reused": false
+    },
+    {
+      "name": "stop-suggest-tests",
+      "exitCode": 0,
+      "durationMs": 727,
+      "reused": false
+    },
+    {
+      "name": "close-coordinator-tests",
+      "exitCode": 0,
+      "durationMs": 3183,
+      "reused": false
+    },
+    {
+      "name": "post-compact-reground-tests",
+      "exitCode": 0,
+      "durationMs": 250,
+      "reused": false
+    },
+    {
+      "name": "setup-check-tests",
+      "exitCode": 0,
+      "durationMs": 351,
+      "reused": false
+    },
+    {
+      "name": "statusline-context-tests",
+      "exitCode": 0,
+      "durationMs": 181,
+      "reused": false
+    },
+    {
+      "name": "yaml-lite-tests",
+      "exitCode": 0,
+      "durationMs": 28,
+      "reused": false
+    },
+    {
+      "name": "schema-lite-tests",
+      "exitCode": 0,
+      "durationMs": 27,
+      "reused": false
+    },
+    {
+      "name": "runner-profiles-v2-tests",
+      "exitCode": 0,
+      "durationMs": 86,
+      "reused": false
+    },
+    {
+      "name": "runtime-projection-v2-tests",
+      "exitCode": 0,
+      "durationMs": 307,
+      "reused": false
+    },
+    {
+      "name": "runner-profile-migration-v2-tests",
+      "exitCode": 0,
+      "durationMs": 439,
+      "reused": false
+    },
+    {
+      "name": "runner-profiles-v3-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "runtime-projection-v3-tests",
+      "exitCode": 0,
+      "durationMs": 400,
+      "reused": false
+    },
+    {
+      "name": "runner-profile-migration-v3-tests",
+      "exitCode": 0,
+      "durationMs": 1703,
+      "reused": false
+    },
+    {
+      "name": "project-onboarding-v3-tests",
+      "exitCode": 0,
+      "durationMs": 22803,
+      "reused": false
+    },
+    {
+      "name": "project-onboarding-ready-gate-tests",
+      "exitCode": 0,
+      "durationMs": 134,
+      "reused": false
+    },
+    {
+      "name": "codex-onboarding-runtime-tests",
+      "exitCode": 0,
+      "durationMs": 7221,
+      "reused": false
+    },
+    {
+      "name": "codex-onboarding-capabilities-tests",
+      "exitCode": 0,
+      "durationMs": 1443,
+      "reused": false
+    },
+    {
+      "name": "onboarding-continuity-tests",
+      "exitCode": 0,
+      "durationMs": 12975,
+      "reused": false
+    },
+    {
+      "name": "codex-onboarding-app-server-tests",
+      "exitCode": 0,
+      "durationMs": 44,
+      "reused": false
+    },
+    {
+      "name": "v3-bootstrap-authority-tests",
+      "exitCode": 0,
+      "durationMs": 545,
+      "reused": false
+    },
+    {
+      "name": "project-onboarding-e2e-tests",
+      "exitCode": 0,
+      "durationMs": 7039,
+      "reused": false
+    },
+    {
+      "name": "onboarding-runner-identity-tests",
+      "exitCode": 0,
+      "durationMs": 6186,
+      "reused": false
+    },
+    {
+      "name": "project-authority-tests",
+      "exitCode": 0,
+      "durationMs": 9866,
+      "reused": false
+    },
+    {
+      "name": "project-authority-migration-cli-tests",
+      "exitCode": 0,
+      "durationMs": 1060,
+      "reused": false
+    },
+    {
+      "name": "feature-package-topology-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "human-role-label-tests",
+      "exitCode": 0,
+      "durationMs": 28,
+      "reused": false
+    },
+    {
+      "name": "human-role-rendering-tests",
+      "exitCode": 0,
+      "durationMs": 30,
+      "reused": false
+    },
+    {
+      "name": "advisory-receipt-tests",
+      "exitCode": 0,
+      "durationMs": 51,
+      "reused": false
+    },
+    {
+      "name": "advisory-lifecycle-v2-tests",
+      "exitCode": 0,
+      "durationMs": 63,
+      "reused": false
+    },
+    {
+      "name": "advisory-coordinator-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "advisory-decision-event-tests",
+      "exitCode": 0,
+      "durationMs": 57,
+      "reused": false
+    },
+    {
+      "name": "critic-export-policy-tests",
+      "exitCode": 0,
+      "durationMs": 2667,
+      "reused": false
+    },
+    {
+      "name": "advisory-host-bridge-tests",
+      "exitCode": 0,
+      "durationMs": 1701,
+      "reused": false
+    },
+    {
+      "name": "codex-sandbox-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 176,
+      "reused": false
+    },
+    {
+      "name": "codex-sandbox-compatibility-tests",
+      "exitCode": 0,
+      "durationMs": 52,
+      "reused": false
+    },
+    {
+      "name": "codex-sandbox-select-tests",
+      "exitCode": 0,
+      "durationMs": 136,
+      "reused": false
+    },
+    {
+      "name": "codex-sandbox-runtime-tests",
+      "exitCode": 0,
+      "durationMs": 2805,
+      "reused": false
+    },
+    {
+      "name": "codex-app-server-health-tests",
+      "exitCode": 0,
+      "durationMs": 201,
+      "reused": false
+    },
+    {
+      "name": "codex-advisory-app-server-tests",
+      "exitCode": 0,
+      "durationMs": 379,
+      "reused": false
+    },
+    {
+      "name": "codex-advisory-bootstrap-tests",
+      "exitCode": 0,
+      "durationMs": 226,
+      "reused": false
+    },
+    {
+      "name": "advisor-capability-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 127,
+      "reused": false
+    },
+    {
+      "name": "codex-host-advisor-route-tests",
+      "exitCode": 0,
+      "durationMs": 46,
+      "reused": false
+    },
+    {
+      "name": "codex-host-repository-init-tests",
+      "exitCode": 0,
+      "durationMs": 451,
+      "reused": false
+    },
+    {
+      "name": "host-advisor-status-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "host-advisor-workspace-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "codex-plugin-validator-parity-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "worktree-lifecycle-tests",
+      "exitCode": 0,
+      "durationMs": 3770,
+      "reused": false
+    },
+    {
+      "name": "lifecycle-ready-enforcement-tests",
+      "exitCode": 0,
+      "durationMs": 95,
+      "reused": false
+    },
+    {
+      "name": "lifecycle-gate-satisfiability-tests",
+      "exitCode": 0,
+      "durationMs": 4151,
+      "reused": false
+    },
+    {
+      "name": "gate-strength-guard-tests",
+      "exitCode": 0,
+      "durationMs": 17928,
+      "reused": false
+    },
+    {
+      "name": "entrypoint-reachability-tests",
+      "exitCode": 0,
+      "durationMs": 6937,
+      "reused": false
+    },
+    {
+      "name": "notebook-write-coverage-tests",
+      "exitCode": 0,
+      "durationMs": 910,
+      "reused": false
+    },
+    {
+      "name": "guard-testpath-override-tests",
+      "exitCode": 0,
+      "durationMs": 4726,
+      "reused": false
+    },
+    {
+      "name": "guard-dispatch-tests",
+      "exitCode": 0,
+      "durationMs": 1301,
+      "reused": false
+    },
+    {
+      "name": "guard-slicing-tests",
+      "exitCode": 0,
+      "durationMs": 1536,
+      "reused": false
+    },
+    {
+      "name": "advisor-consult-v3-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "sandboxed-readonly-duty-tests",
+      "exitCode": 0,
+      "durationMs": 773,
+      "reused": false
+    },
+    {
+      "name": "sandboxed-readonly-host-bridge-tests",
+      "exitCode": 0,
+      "durationMs": 132,
+      "reused": false
+    },
+    {
+      "name": "spec-readiness-host-tests",
+      "exitCode": 0,
+      "durationMs": 59,
+      "reused": false
+    },
+    {
+      "name": "pipeline-start-v3-tests",
+      "exitCode": 0,
+      "durationMs": 124,
+      "reused": false
+    },
+    {
+      "name": "pipeline-start-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 7979,
+      "reused": false
+    },
+    {
+      "name": "runner-usage-v1-tests",
+      "exitCode": 0,
+      "durationMs": 93,
+      "reused": false
+    },
+    {
+      "name": "p3b-runner-conformance-tests",
+      "exitCode": 0,
+      "durationMs": 96,
+      "reused": false
+    },
+    {
+      "name": "git-cmd-tests",
+      "exitCode": 0,
+      "durationMs": 30,
+      "reused": false
+    },
+    {
+      "name": "workflow-writer-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 66,
+      "reused": false
+    },
+    {
+      "name": "workflow-runner-boundary-tests",
+      "exitCode": 0,
+      "durationMs": 87,
+      "reused": false
+    },
+    {
+      "name": "control-execution-exchange-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "security-policy-resolver-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "control-catalog-schema-tests",
+      "exitCode": 0,
+      "durationMs": 118,
+      "reused": false
+    },
+    {
+      "name": "control-evaluation-receipt-tests",
+      "exitCode": 0,
+      "durationMs": 39,
+      "reused": false
+    },
+    {
+      "name": "control-waiver-lifecycle-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "control-catalog-drift-tests",
+      "exitCode": 0,
+      "durationMs": 36,
+      "reused": false
+    },
+    {
+      "name": "provenance-attestation-tests",
+      "exitCode": 0,
+      "durationMs": 36,
+      "reused": false
+    },
+    {
+      "name": "provenance-envelope-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "provenance-fixture-matrix-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "provenance-local-builder-tests",
+      "exitCode": 0,
+      "durationMs": 168,
+      "reused": false
+    },
+    {
+      "name": "security-evidence-fixture-matrix-tests",
+      "exitCode": 0,
+      "durationMs": 44,
+      "reused": false
+    },
+    {
+      "name": "security-evidence-evaluator-tests",
+      "exitCode": 0,
+      "durationMs": 48,
+      "reused": false
+    },
+    {
+      "name": "ai-assisted-hardening-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "finding-lifecycle-tests",
+      "exitCode": 0,
+      "durationMs": 53,
+      "reused": false
+    },
+    {
+      "name": "security-readiness-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "stack-adapter-contract-tests",
+      "exitCode": 0,
+      "durationMs": 4654,
+      "reused": false
+    },
+    {
+      "name": "stack-dynamic-boundary-tests",
+      "exitCode": 0,
+      "durationMs": 41,
+      "reused": false
+    },
+    {
+      "name": "stack-fuzz-replay-tests",
+      "exitCode": 0,
+      "durationMs": 39,
+      "reused": false
+    },
+    {
+      "name": "stack-discovery-tests",
+      "exitCode": 0,
+      "durationMs": 152,
+      "reused": false
+    },
+    {
+      "name": "stack-run-outcome-tests",
+      "exitCode": 0,
+      "durationMs": 28,
+      "reused": false
+    },
+    {
+      "name": "threat-model-discovery-tests",
+      "exitCode": 0,
+      "durationMs": 48,
+      "reused": false
+    },
+    {
+      "name": "threat-model-fixture-matrix-tests",
+      "exitCode": 0,
+      "durationMs": 45,
+      "reused": false
+    },
+    {
+      "name": "threat-model-tests",
+      "exitCode": 0,
+      "durationMs": 68,
+      "reused": false
+    },
+    {
+      "name": "po-approval-proof-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "critical-human-proof-policy-tests",
+      "exitCode": 0,
+      "durationMs": 1070,
+      "reused": false
+    },
+    {
+      "name": "trust-anchor-bootstrap-circularity-repro-tests",
+      "exitCode": 0,
+      "durationMs": 418,
+      "reused": false
+    },
+    {
+      "name": "critical-action-authorization-tests",
+      "exitCode": 0,
+      "durationMs": 112,
+      "reused": false
+    },
+    {
+      "name": "commit-message-policy-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "dispatch-budget-core-tests",
+      "exitCode": 0,
+      "durationMs": 53,
+      "reused": false
+    },
+    {
+      "name": "dispatch-budget-calibration-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "dispatch-policy-tests",
+      "exitCode": 0,
+      "durationMs": 687,
+      "reused": false
+    },
+    {
+      "name": "dispatch-record-tests",
+      "exitCode": 0,
+      "durationMs": 64,
+      "reused": false
+    },
+    {
+      "name": "installed-plugin-attestation-tests",
+      "exitCode": 0,
+      "durationMs": 566,
+      "reused": false
+    },
+    {
+      "name": "threat-model-approval-request-tests",
+      "exitCode": 0,
+      "durationMs": 178,
+      "reused": false
+    },
+    {
+      "name": "sbom-lifecycle-tests",
+      "exitCode": 0,
+      "durationMs": 34,
+      "reused": false
+    },
+    {
+      "name": "sbom-manifest-tests",
+      "exitCode": 0,
+      "durationMs": 45,
+      "reused": false
+    },
+    {
+      "name": "sbom-node-adapter-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "sbom-discovery-tests",
+      "exitCode": 0,
+      "durationMs": 53,
+      "reused": false
+    },
+    {
+      "name": "sbom-discovery-cli-tests",
+      "exitCode": 0,
+      "durationMs": 194,
+      "reused": false
+    },
+    {
+      "name": "sbom-fixture-matrix-tests",
+      "exitCode": 0,
+      "durationMs": 58,
+      "reused": false
+    },
+    {
+      "name": "sbom-release-binding-tests",
+      "exitCode": 0,
+      "durationMs": 46,
+      "reused": false
+    },
+    {
+      "name": "po-gate-authority-fixture-tests",
+      "exitCode": 0,
+      "durationMs": 631,
+      "reused": false
+    },
+    {
+      "name": "public-core-observation-tests",
+      "exitCode": 0,
+      "durationMs": 953,
+      "reused": false
+    },
+    {
+      "name": "public-core-origin-allowlist-tests",
+      "exitCode": 0,
+      "durationMs": 44,
+      "reused": false
+    },
+    {
+      "name": "bootstrap-source-attestation-acceptance-tests",
+      "exitCode": 0,
+      "durationMs": 163,
+      "reused": false
+    },
+    {
+      "name": "external-push-ledger-tests",
+      "exitCode": 0,
+      "durationMs": 245,
+      "reused": false
+    },
+    {
+      "name": "guard-push-external-ledger-tests",
+      "exitCode": 0,
+      "durationMs": 1671,
+      "reused": false
+    },
+    {
+      "name": "guard-gate-strength-gmw-tests",
+      "exitCode": 0,
+      "durationMs": 654,
+      "reused": false
+    },
+    {
+      "name": "guard-gate-strength-ledger-tests",
+      "exitCode": 0,
+      "durationMs": 518,
+      "reused": false
+    },
+    {
+      "name": "guard-gate-strength-origin-attestation-tests",
+      "exitCode": 0,
+      "durationMs": 5664,
+      "reused": false
+    },
+    {
+      "name": "guard-handover-size-tests",
+      "exitCode": 0,
+      "durationMs": 69,
+      "reused": false
+    },
+    {
+      "name": "guard-testpath-gmw-tests",
+      "exitCode": 0,
+      "durationMs": 644,
+      "reused": false
+    },
+    {
+      "name": "private-overlay-activation-tests",
+      "exitCode": 0,
+      "durationMs": 301,
+      "reused": false
+    },
+    {
+      "name": "private-overlay-runtime-projection-tests",
+      "exitCode": 0,
+      "durationMs": 264,
+      "reused": false
+    },
+    {
+      "name": "po-gate-profile-publisher-tests",
+      "exitCode": 0,
+      "durationMs": 376,
+      "reused": false
+    },
+    {
+      "name": "private-overlay-bootstrap-status-tests",
+      "exitCode": 0,
+      "durationMs": 176,
+      "reused": false
+    },
+    {
+      "name": "private-overlay-activation-cli-tests",
+      "exitCode": 0,
+      "durationMs": 139,
+      "reused": false
+    },
+    {
+      "name": "private-overlay-activation-e2e-tests",
+      "exitCode": 0,
+      "durationMs": 889,
+      "reused": false
+    },
+    {
+      "name": "codex-private-overlay-activation-tests",
+      "exitCode": 0,
+      "durationMs": 143,
+      "reused": false
+    },
+    {
+      "name": "po-language-projection-tests",
+      "exitCode": 0,
+      "durationMs": 124,
+      "reused": false
+    },
+    {
+      "name": "po-language-projection-check",
+      "exitCode": 0,
+      "durationMs": 137,
+      "reused": false
+    },
+    {
+      "name": "error-register-tests",
+      "exitCode": 0,
+      "durationMs": 29,
+      "reused": false
+    },
+    {
+      "name": "error-register-check",
+      "exitCode": 0,
+      "durationMs": 31,
+      "reused": false
+    },
+    {
+      "name": "critic-fail-closed-tests",
+      "exitCode": 0,
+      "durationMs": 34,
+      "reused": false
+    },
+    {
+      "name": "critic-fail-closed-check",
+      "exitCode": 0,
+      "durationMs": 29,
+      "reused": false
+    },
+    {
+      "name": "agents-adapter-migration-tests",
+      "exitCode": 0,
+      "durationMs": 110,
+      "reused": false
+    },
+    {
+      "name": "agents-adapter-migration-check",
+      "exitCode": 0,
+      "durationMs": 116,
+      "reused": false
+    },
+    {
+      "name": "validate-manifest-tests",
+      "exitCode": 0,
+      "durationMs": 2148,
+      "reused": false
+    },
+    {
+      "name": "capture-observation-intake-tests",
+      "exitCode": 0,
+      "durationMs": 115,
+      "reused": false
+    },
+    {
+      "name": "github-issue-operations-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "github-actions-permissions-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "github-actions-permissions-check",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "publication-executor-tests",
+      "exitCode": 0,
+      "durationMs": 1679,
+      "reused": false
+    },
+    {
+      "name": "publication-gate-evidence-tests",
+      "exitCode": 0,
+      "durationMs": 46,
+      "reused": false
+    },
+    {
+      "name": "release-preflight-cli-tests",
+      "exitCode": 0,
+      "durationMs": 5137,
+      "reused": false
+    },
+    {
+      "name": "migrate-backlog-state-tests",
+      "exitCode": 0,
+      "durationMs": 52,
+      "reused": false
+    },
+    {
+      "name": "spec-retention-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "spec-retention-check",
+      "exitCode": 0,
+      "durationMs": 37,
+      "reused": false
+    },
+    {
+      "name": "observation-governance-tests",
+      "exitCode": 0,
+      "durationMs": 84,
+      "reused": false
+    },
+    {
+      "name": "document-hooks-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "document-identifier-tests",
+      "exitCode": 0,
+      "durationMs": 110,
+      "reused": false
+    },
+    {
+      "name": "document-lifecycle-tests",
+      "exitCode": 0,
+      "durationMs": 50,
+      "reused": false
+    },
+    {
+      "name": "document-hooks-manifest-tests",
+      "exitCode": 0,
+      "durationMs": 136,
+      "reused": false
+    },
+    {
+      "name": "private-document-binding-tests",
+      "exitCode": 0,
+      "durationMs": 753,
+      "reused": false
+    },
+    {
+      "name": "release-version-plan-tests",
+      "exitCode": 0,
+      "durationMs": 75,
+      "reused": false
+    },
+    {
+      "name": "product-capability-inventory-tests",
+      "exitCode": 0,
+      "durationMs": 8516,
+      "reused": false
+    },
+    {
+      "name": "module-cluster-reachability-tests",
+      "exitCode": 0,
+      "durationMs": 74,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-tests",
+      "exitCode": 0,
+      "durationMs": 2614,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-late-verify-tests",
+      "exitCode": 0,
+      "durationMs": 128,
+      "reused": false
+    },
+    {
+      "name": "dispatch-provenance-tests",
+      "exitCode": 0,
+      "durationMs": 911,
+      "reused": false
+    },
+    {
+      "name": "guard-git-phoenix-authority-grant-tests",
+      "exitCode": 0,
+      "durationMs": 583,
+      "reused": false
+    },
+    {
+      "name": "decision-reference-dual-evaluation-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "human-authority-grant-tests",
+      "exitCode": 0,
+      "durationMs": 1132,
+      "reused": false
+    },
+    {
+      "name": "po-approval-gate-tests",
+      "exitCode": 0,
+      "durationMs": 124,
+      "reused": false
+    },
+    {
+      "name": "doc-contract-tests",
+      "exitCode": 1,
+      "durationMs": 16253,
+      "reused": false
+    },
+    {
+      "name": "doc-contract-check",
+      "exitCode": 2,
+      "durationMs": 872,
+      "reused": false
+    },
+    {
+      "name": "auth-gate-inventory-drift-tests",
+      "exitCode": 0,
+      "durationMs": 177,
+      "reused": false
+    },
+    {
+      "name": "auth-gate-inventory-drift-check",
+      "exitCode": 0,
+      "durationMs": 105,
+      "reused": false
+    },
+    {
+      "name": "section-citation-tests",
+      "exitCode": 0,
+      "durationMs": 117,
+      "reused": false
+    },
+    {
+      "name": "section-citation-check",
+      "exitCode": 0,
+      "durationMs": 105,
+      "reused": false
+    },
+    {
+      "name": "authority-tier-agreement-tests",
+      "exitCode": 0,
+      "durationMs": 41,
+      "reused": false
+    },
+    {
+      "name": "authority-tier-agreement-check",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "language-canon-tests",
+      "exitCode": 0,
+      "durationMs": 52,
+      "reused": false
+    },
+    {
+      "name": "language-canon-check",
+      "exitCode": 0,
+      "durationMs": 27,
+      "reused": false
+    },
+    {
+      "name": "license-contract-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "license-contract-check",
+      "exitCode": 0,
+      "durationMs": 104,
+      "reused": false
+    },
+    {
+      "name": "pr-contributor-gate-tests",
+      "exitCode": 0,
+      "durationMs": 1183,
+      "reused": false
+    },
+    {
+      "name": "security-scan-tests",
+      "exitCode": 0,
+      "durationMs": 2440,
+      "reused": false
+    },
+    {
+      "name": "no-autoupdate-key-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "phase26-invariants-tests",
+      "exitCode": 0,
+      "durationMs": 1156,
+      "reused": false
+    },
+    {
+      "name": "phase26-invariants-check",
+      "exitCode": 0,
+      "durationMs": 26,
+      "reused": false
+    },
+    {
+      "name": "sdlc-run-graph-tests",
+      "exitCode": 0,
+      "durationMs": 41,
+      "reused": false
+    },
+    {
+      "name": "phase3-sdlc-coherence-tests",
+      "exitCode": 0,
+      "durationMs": 102,
+      "reused": false
+    },
+    {
+      "name": "phase3-sdlc-coherence-check",
+      "exitCode": 0,
+      "durationMs": 31,
+      "reused": false
+    },
+    {
+      "name": "sdlc-efficiency-metrics-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "check-ownership-tests",
+      "exitCode": 0,
+      "durationMs": 30,
+      "reused": false
+    },
+    {
+      "name": "backlog-state-tests",
+      "exitCode": 0,
+      "durationMs": 4379,
+      "reused": false
+    },
+    {
+      "name": "backlog-ledger-reconciliation-tests",
+      "exitCode": 0,
+      "durationMs": 1458,
+      "reused": false
+    },
+    {
+      "name": "backlog-state-check",
+      "exitCode": 0,
+      "durationMs": 2680,
+      "reused": false
+    },
+    {
+      "name": "deferred-backlog-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "deferred-backlog-check",
+      "exitCode": 0,
+      "durationMs": 68,
+      "reused": false
+    },
+    {
+      "name": "parallel-dispatch-planner-tests",
+      "exitCode": 0,
+      "durationMs": 28,
+      "reused": false
+    },
+    {
+      "name": "parallel-sprint-integration-tests",
+      "exitCode": 0,
+      "durationMs": 79,
+      "reused": false
+    },
+    {
+      "name": "epic-ac02-publication-check-tests",
+      "exitCode": 1,
+      "durationMs": 312,
+      "reused": false
+    },
+    {
+      "name": "epic-ac02-publication-check",
+      "exitCode": 2,
+      "durationMs": 71,
+      "reused": false
+    },
+    {
+      "name": "continuity-status-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "continuity-status-cli-tests",
+      "exitCode": 0,
+      "durationMs": 181,
+      "reused": false
+    },
+    {
+      "name": "delivery-course-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "critic-packet-governance-tests",
+      "exitCode": 0,
+      "durationMs": 29,
+      "reused": false
+    },
+    {
+      "name": "critic-dispatch-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 949,
+      "reused": false
+    },
+    {
+      "name": "requirement-traceability-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "session-critic-finalizer-tests",
+      "exitCode": 0,
+      "durationMs": 1231,
+      "reused": false
+    },
+    {
+      "name": "windows-private-state-tests",
+      "exitCode": 0,
+      "durationMs": 32,
+      "reused": false
+    },
+    {
+      "name": "windows-assurance-verify-registration-tests",
+      "exitCode": 0,
+      "durationMs": 132,
+      "reused": false
+    },
+    {
+      "name": "symlink-capability-tests",
+      "exitCode": 0,
+      "durationMs": 31,
+      "reused": false
+    },
+    {
+      "name": "runner-native-continuation-tests",
+      "exitCode": 0,
+      "durationMs": 45,
+      "reused": false
+    },
+    {
+      "name": "bootstrap-payload-budget-tests",
+      "exitCode": 0,
+      "durationMs": 96,
+      "reused": false
+    },
+    {
+      "name": "governance-action-artifact-tests",
+      "exitCode": 0,
+      "durationMs": 56,
+      "reused": false
+    },
+    {
+      "name": "governance-gate-action-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "governance-recovery-reconciliation-action-tests",
+      "exitCode": 0,
+      "durationMs": 105,
+      "reused": false
+    },
+    {
+      "name": "governance-review-action-tests",
+      "exitCode": 0,
+      "durationMs": 51,
+      "reused": false
+    },
+    {
+      "name": "governance-verification-action-tests",
+      "exitCode": 0,
+      "durationMs": 108,
+      "reused": false
+    },
+    {
+      "name": "bootstrap-payload-measure-cli-tests",
+      "exitCode": 0,
+      "durationMs": 107,
+      "reused": false
+    },
+    {
+      "name": "local-supervisor-state-tests",
+      "exitCode": 0,
+      "durationMs": 166,
+      "reused": false
+    },
+    {
+      "name": "local-supervisor-setup-tests",
+      "exitCode": 0,
+      "durationMs": 182,
+      "reused": false
+    },
+    {
+      "name": "local-worker-supervisor-core-tests",
+      "exitCode": 0,
+      "durationMs": 292,
+      "reused": false
+    },
+    {
+      "name": "local-worker-supervisor-cli-tests",
+      "exitCode": 0,
+      "durationMs": 15792,
+      "reused": false
+    },
+    {
+      "name": "codex-goal-host-tests",
+      "exitCode": 0,
+      "durationMs": 45,
+      "reused": false
+    },
+    {
+      "name": "claude-goal-host-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "nova-backlog-reconciliation-tests",
+      "exitCode": 0,
+      "durationMs": 53,
+      "reused": false
+    },
+    {
+      "name": "nova-backlog-reconciler-cli-tests",
+      "exitCode": 0,
+      "durationMs": 86,
+      "reused": false
+    },
+    {
+      "name": "nova-runner-capability-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "nova-sandbox-disposition-tests",
+      "exitCode": 0,
+      "durationMs": 39,
+      "reused": false
+    },
+    {
+      "name": "nova-invocation-reliability-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "nova-invocation-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 45,
+      "reused": false
+    },
+    {
+      "name": "nova-execution-plane-tests",
+      "exitCode": 0,
+      "durationMs": 44,
+      "reused": false
+    },
+    {
+      "name": "nova-scheduling-lifecycle-tests",
+      "exitCode": 0,
+      "durationMs": 53,
+      "reused": false
+    },
+    {
+      "name": "nova-critic-lineage-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "nova-critic-packet-tests",
+      "exitCode": 0,
+      "durationMs": 1698,
+      "reused": false
+    },
+    {
+      "name": "nova-benchmark-tests",
+      "exitCode": 0,
+      "durationMs": 52,
+      "reused": false
+    },
+    {
+      "name": "nova-release-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 52,
+      "reused": false
+    },
+    {
+      "name": "nova-increment-receipt-tests",
+      "exitCode": 0,
+      "durationMs": 50,
+      "reused": false
+    },
+    {
+      "name": "nova-macos-acceptance-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "nova-b2-gitlab-ci-broker-core-tests",
+      "exitCode": 0,
+      "durationMs": 2210,
+      "reused": false
+    },
+    {
+      "name": "nova-b2-gitlab-ci-broker-cli-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "nova-b4-git-transport-contract-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "nova-b4-github-forge-adapter-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "nova-b4-gitlab-forge-adapter-tests",
+      "exitCode": 0,
+      "durationMs": 46,
+      "reused": false
+    },
+    {
+      "name": "nova-candidate-freeze-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "nova-verify-resume-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "verify-selection-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "consumer-baseline-verify-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "self-verify-selection-tests",
+      "exitCode": 0,
+      "durationMs": 46,
+      "reused": false
+    },
+    {
+      "name": "nova-verify-journal-tests",
+      "exitCode": 0,
+      "durationMs": 7293,
+      "reused": false
+    },
+    {
+      "name": "test-case-completion-tests",
+      "exitCode": 0,
+      "durationMs": 128,
+      "reused": false
+    },
+    {
+      "name": "verify-case-completion-receipt-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "verify-case-completion-registry-tests",
+      "exitCode": 0,
+      "durationMs": 1027,
+      "reused": false
+    },
+    {
+      "name": "verify-case-completion-check",
+      "exitCode": 0,
+      "durationMs": 512,
+      "reused": false
+    },
+    {
+      "name": "afk-assumption-mode-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "afk-capability-worker-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "afk-git-adapter-tests",
+      "exitCode": 0,
+      "durationMs": 594,
+      "reused": false
+    },
+    {
+      "name": "afk-review-tests",
+      "exitCode": 0,
+      "durationMs": 386,
+      "reused": false
+    },
+    {
+      "name": "afk-transaction-host-tests",
+      "exitCode": 0,
+      "durationMs": 368,
+      "reused": false
+    },
+    {
+      "name": "afk-claude-host-tests",
+      "exitCode": 0,
+      "durationMs": 75,
+      "reused": false
+    },
+    {
+      "name": "codex-sandbox-preflight-host-control-tests",
+      "exitCode": 0,
+      "durationMs": 2106,
+      "reused": false
+    },
+    {
+      "name": "codex-isolation-control-decomposition-tests",
+      "exitCode": 0,
+      "durationMs": 560,
+      "reused": false
+    },
+    {
+      "name": "codex-critic-packet-host-tests",
+      "exitCode": 0,
+      "durationMs": 747,
+      "reused": false
+    },
+    {
+      "name": "codex-critic-probe-split-tests",
+      "exitCode": 0,
+      "durationMs": 127,
+      "reused": false
+    },
+    {
+      "name": "codex-critic-shadow-tests",
+      "exitCode": 0,
+      "durationMs": 48,
+      "reused": false
+    },
+    {
+      "name": "codex-isolated-critic-claims-tests",
+      "exitCode": 0,
+      "durationMs": 29,
+      "reused": false
+    },
+    {
+      "name": "run-codex-critic-isolation-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "run-codex-critic-probe-split-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "evidence-view-model-tests",
+      "exitCode": 0,
+      "durationMs": 72,
+      "reused": false
+    },
+    {
+      "name": "evidence-view-renderer-tests",
+      "exitCode": 0,
+      "durationMs": 52,
+      "reused": false
+    },
+    {
+      "name": "evidence-viewer-tests",
+      "exitCode": 0,
+      "durationMs": 80,
+      "reused": false
+    },
+    {
+      "name": "governance-authority-resolver-tests",
+      "exitCode": 0,
+      "durationMs": 64,
+      "reused": false
+    },
+    {
+      "name": "governance-event-projection-tests",
+      "exitCode": 0,
+      "durationMs": 47,
+      "reused": false
+    },
+    {
+      "name": "governance-event-store-tests",
+      "exitCode": 0,
+      "durationMs": 4932,
+      "reused": false
+    },
+    {
+      "name": "governance-event-core-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "governance-export-adapter-tests",
+      "exitCode": 0,
+      "durationMs": 55,
+      "reused": false
+    },
+    {
+      "name": "governance-export-delivery-tests",
+      "exitCode": 0,
+      "durationMs": 157,
+      "reused": false
+    },
+    {
+      "name": "governance-export-outbox-store-tests",
+      "exitCode": 0,
+      "durationMs": 112,
+      "reused": false
+    },
+    {
+      "name": "governance-export-outbox-tests",
+      "exitCode": 0,
+      "durationMs": 51,
+      "reused": false
+    },
+    {
+      "name": "governance-replay-view-tests",
+      "exitCode": 0,
+      "durationMs": 60,
+      "reused": false
+    },
+    {
+      "name": "governance-replay-core-tests",
+      "exitCode": 0,
+      "durationMs": 58,
+      "reused": false
+    },
+    {
+      "name": "human-governance-ledger-tests",
+      "exitCode": 0,
+      "durationMs": 593,
+      "reused": false
+    },
+    {
+      "name": "lifecycle-governance-events-tests",
+      "exitCode": 0,
+      "durationMs": 49,
+      "reused": false
+    },
+    {
+      "name": "lifecycle-governance-events-schema-parity-tests",
+      "exitCode": 0,
+      "durationMs": 51,
+      "reused": false
+    },
+    {
+      "name": "governance-action-events-tests",
+      "exitCode": 0,
+      "durationMs": 65,
+      "reused": false
+    },
+    {
+      "name": "governance-authority-tests",
+      "exitCode": 0,
+      "durationMs": 366,
+      "reused": false
+    },
+    {
+      "name": "governance-event-cli-tests",
+      "exitCode": 0,
+      "durationMs": 309,
+      "reused": false
+    },
+    {
+      "name": "governance-export-tests",
+      "exitCode": 0,
+      "durationMs": 50,
+      "reused": false
+    },
+    {
+      "name": "governance-replay-viewer-tests",
+      "exitCode": 0,
+      "durationMs": 55,
+      "reused": false
+    },
+    {
+      "name": "governance-replay-cli-tests",
+      "exitCode": 0,
+      "durationMs": 55,
+      "reused": false
+    },
+    {
+      "name": "phoenix-governance-threat-model-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "phoenix-authority-approval-tests",
+      "exitCode": 0,
+      "durationMs": 45,
+      "reused": false
+    },
+    {
+      "name": "critical-human-proof-gate-tests",
+      "exitCode": 0,
+      "durationMs": 162,
+      "reused": false
+    },
+    {
+      "name": "guard-human-override-tests",
+      "exitCode": 0,
+      "durationMs": 1086,
+      "reused": false
+    },
+    {
+      "name": "po-human-approval-tests",
+      "exitCode": 0,
+      "durationMs": 1534,
+      "reused": false
+    },
+    {
+      "name": "network-lockdown-tests",
+      "exitCode": 0,
+      "durationMs": 314,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-external-push-ledger-tests",
+      "exitCode": 0,
+      "durationMs": 411,
+      "reused": false
+    },
+    {
+      "name": "agent-decision-journal-tests",
+      "exitCode": 0,
+      "durationMs": 570,
+      "reused": false
+    },
+    {
+      "name": "async-execution-tests",
+      "exitCode": 0,
+      "durationMs": 104,
+      "reused": false
+    },
+    {
+      "name": "authority-revision-proof-tests",
+      "exitCode": 0,
+      "durationMs": 49,
+      "reused": false
+    },
+    {
+      "name": "credential-lease-tests",
+      "exitCode": 0,
+      "durationMs": 108,
+      "reused": false
+    },
+    {
+      "name": "critical-action-approval-request-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "external-command-offer-tests",
+      "exitCode": 0,
+      "durationMs": 69,
+      "reused": false
+    },
+    {
+      "name": "forge-capability-tests",
+      "exitCode": 0,
+      "durationMs": 57,
+      "reused": false
+    },
+    {
+      "name": "gate-estimate-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "local-worker-pool-tests",
+      "exitCode": 0,
+      "durationMs": 47,
+      "reused": false
+    },
+    {
+      "name": "plan-spec-state-v2-tests",
+      "exitCode": 0,
+      "durationMs": 69,
+      "reused": false
+    },
+    {
+      "name": "remote-provisional-receipt-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "ruleset-source-tests",
+      "exitCode": 0,
+      "durationMs": 30,
+      "reused": false
+    },
+    {
+      "name": "security-capability-plan-builder-tests",
+      "exitCode": 0,
+      "durationMs": 47,
+      "reused": false
+    },
+    {
+      "name": "security-completeness-gate-tests",
+      "exitCode": 0,
+      "durationMs": 47,
+      "reused": false
+    },
+    {
+      "name": "security-evidence-v1-migration-fixture-tests",
+      "exitCode": 0,
+      "durationMs": 48,
+      "reused": false
+    },
+    {
+      "name": "source-observation-tests",
+      "exitCode": 0,
+      "durationMs": 41,
+      "reused": false
+    },
+    {
+      "name": "stack-capability-plan-tests",
+      "exitCode": 0,
+      "durationMs": 29,
+      "reused": false
+    },
+    {
+      "name": "ai-assisted-hardening-gate-tests",
+      "exitCode": 0,
+      "durationMs": 277,
+      "reused": false
+    },
+    {
+      "name": "antigravity-alpha-adapter-tests",
+      "exitCode": 0,
+      "durationMs": 30,
+      "reused": false
+    },
+    {
+      "name": "check-close-security-completeness-tests",
+      "exitCode": 0,
+      "durationMs": 183,
+      "reused": false
+    },
+    {
+      "name": "check-completeness-vocabulary-doclint-tests",
+      "exitCode": 0,
+      "durationMs": 39,
+      "reused": false
+    },
+    {
+      "name": "check-release-state-consistency-tests",
+      "exitCode": 0,
+      "durationMs": 75,
+      "reused": false
+    },
+    {
+      "name": "critic-route-activation-tests",
+      "exitCode": 0,
+      "durationMs": 62,
+      "reused": false
+    },
+    {
+      "name": "critic-t1-po-override-tests",
+      "exitCode": 0,
+      "durationMs": 246,
+      "reused": false
+    },
+    {
+      "name": "live-runner-certification-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "native-plugin-readback-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "neutral-range-plan-tests",
+      "exitCode": 0,
+      "durationMs": 374,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-reopen-design-tests",
+      "exitCode": 0,
+      "durationMs": 106,
+      "reused": false
+    },
+    {
+      "name": "po-guarded-push-tests",
+      "exitCode": 0,
+      "durationMs": 34,
+      "reused": false
+    },
+    {
+      "name": "public-baseline-diagnose-tests",
+      "exitCode": 0,
+      "durationMs": 163,
+      "reused": false
+    },
+    {
+      "name": "ruleset-update-policy-tests",
+      "exitCode": 0,
+      "durationMs": 44,
+      "reused": false
+    },
+    {
+      "name": "run-codex-isolation-control-decomposition-tests",
+      "exitCode": 0,
+      "durationMs": 37,
+      "reused": false
+    },
+    {
+      "name": "runner-contracts.schema-tests",
+      "exitCode": 0,
+      "durationMs": 35,
+      "reused": false
+    },
+    {
+      "name": "verify-topology-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 146,
+      "reused": false
+    },
+    {
+      "name": "worktree-target-binding-tests",
+      "exitCode": 0,
+      "durationMs": 635,
+      "reused": false
+    },
+    {
+      "name": "critic-review-scope-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "audit-bundle-core-tests",
+      "exitCode": 0,
+      "durationMs": 126,
+      "reused": false
+    },
+    {
+      "name": "change-control-core-tests",
+      "exitCode": 0,
+      "durationMs": 59,
+      "reused": false
+    },
+    {
+      "name": "control-catalog-migration-tests",
+      "exitCode": 0,
+      "durationMs": 29,
+      "reused": false
+    },
+    {
+      "name": "organization-policy-activation-tests",
+      "exitCode": 0,
+      "durationMs": 228,
+      "reused": false
+    },
+    {
+      "name": "organization-policy-core-tests",
+      "exitCode": 0,
+      "durationMs": 70,
+      "reused": false
+    },
+    {
+      "name": "audit-bundle-cli-tests",
+      "exitCode": 0,
+      "durationMs": 47,
+      "reused": false
+    },
+    {
+      "name": "change-control-cli-tests",
+      "exitCode": 0,
+      "durationMs": 52,
+      "reused": false
+    },
+    {
+      "name": "organization-policy-cli-tests",
+      "exitCode": 0,
+      "durationMs": 56,
+      "reused": false
+    },
+    {
+      "name": "publication-state-authority-tests",
+      "exitCode": 0,
+      "durationMs": 562,
+      "reused": false
+    },
+    {
+      "name": "provenance-release-binding-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "publication-authority-tests",
+      "exitCode": 0,
+      "durationMs": 56,
+      "reused": false
+    },
+    {
+      "name": "publication-bundle-v2-tests",
+      "exitCode": 0,
+      "durationMs": 41,
+      "reused": false
+    },
+    {
+      "name": "publication-bundle-tests",
+      "exitCode": 0,
+      "durationMs": 49,
+      "reused": false
+    },
+    {
+      "name": "publication-capability-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "publication-close-journal-tests",
+      "exitCode": 0,
+      "durationMs": 50,
+      "reused": false
+    },
+    {
+      "name": "publication-executor-v2-tests",
+      "exitCode": 0,
+      "durationMs": 3939,
+      "reused": false
+    },
+    {
+      "name": "external-reference-adapter-tests",
+      "exitCode": 0,
+      "durationMs": 77,
+      "reused": false
+    },
+    {
+      "name": "reference-catalog-views-tests",
+      "exitCode": 0,
+      "durationMs": 50,
+      "reused": false
+    },
+    {
+      "name": "reference-catalog-tests",
+      "exitCode": 0,
+      "durationMs": 44,
+      "reused": false
+    },
+    {
+      "name": "external-reference-tests",
+      "exitCode": 0,
+      "durationMs": 56,
+      "reused": false
+    },
+    {
+      "name": "gitleaks-tests",
+      "exitCode": 0,
+      "durationMs": 210,
+      "reused": false
+    },
+    {
+      "name": "license-check-tests",
+      "exitCode": 0,
+      "durationMs": 47,
+      "reused": false
+    },
+    {
+      "name": "osv-scanner-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "semgrep-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "security-readiness-harness-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "security-scan-v2-integration-tests",
+      "exitCode": 0,
+      "durationMs": 1815,
+      "reused": false
+    },
+    {
+      "name": "verify-suite-registration-tests",
+      "exitCode": 0,
+      "durationMs": 280,
+      "reused": false
+    },
+    {
+      "name": "verify-suite-registration-check",
+      "exitCode": 0,
+      "durationMs": 45,
+      "reused": false
+    },
+    {
+      "name": "self-application-attestation-gate-tests",
+      "exitCode": 0,
+      "durationMs": 49,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-decision-reference-tests",
+      "exitCode": 0,
+      "durationMs": 673,
+      "reused": false
+    },
+    {
+      "name": "guard-push-decision-reference-tests",
+      "exitCode": 0,
+      "durationMs": 1230,
+      "reused": false
+    },
+    {
+      "name": "control-execution-lifecycle-event-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "governance-export-view-status-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "guard-authority-ledger-intake-tests",
+      "exitCode": 0,
+      "durationMs": 70,
+      "reused": false
+    },
+    {
+      "name": "guard-handoff-offer-tests",
+      "exitCode": 0,
+      "durationMs": 737,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-lifecycle-event-tests",
+      "exitCode": 0,
+      "durationMs": 193,
+      "reused": false
+    },
+    {
+      "name": "epic-file-contract-tests",
+      "exitCode": 0,
+      "durationMs": 34,
+      "reused": false
+    },
+    {
+      "name": "plan-spec-state-v2-legacy-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "recovery-bridge-approval-tests",
+      "exitCode": 0,
+      "durationMs": 100,
+      "reused": false
+    },
+    {
+      "name": "guard-git-phoenix-tests",
+      "exitCode": 0,
+      "durationMs": 469,
+      "reused": false
+    },
+    {
+      "name": "afk-activation-tests",
+      "exitCode": 0,
+      "durationMs": 61,
+      "reused": false
+    },
+    {
+      "name": "codex-isolated-critic-protected-preimage-tests",
+      "exitCode": 0,
+      "durationMs": 33,
+      "reused": false
+    },
+    {
+      "name": "resume-hint-tests",
+      "exitCode": 0,
+      "durationMs": 1151,
+      "reused": false
+    },
+    {
+      "name": "resume-hint-scripts-tests",
+      "exitCode": 0,
+      "durationMs": 3152,
+      "reused": false
+    },
+    {
+      "name": "guard-el01-tripwire-tests",
+      "exitCode": 0,
+      "durationMs": 659,
+      "reused": false
+    },
+    {
+      "name": "guard-onboarding-consent-lock-tests",
+      "exitCode": 0,
+      "durationMs": 260,
+      "reused": false
+    },
+    {
+      "name": "onboarding-consent-marker-tests",
+      "exitCode": 0,
+      "durationMs": 32,
+      "reused": false
+    },
+    {
+      "name": "onboarding-consent-guard-tests",
+      "exitCode": 0,
+      "durationMs": 128,
+      "reused": false
+    },
+    {
+      "name": "protected-test-paths-tests",
+      "exitCode": 0,
+      "durationMs": 56,
+      "reused": false
+    },
+    {
+      "name": "rebase-authority-tests",
+      "exitCode": 0,
+      "durationMs": 74,
+      "reused": false
+    },
+    {
+      "name": "onboarding-consent-mark-tests",
+      "exitCode": 0,
+      "durationMs": 41,
+      "reused": false
+    },
+    {
+      "name": "clean-candidate-run-tests",
+      "exitCode": 0,
+      "durationMs": 666,
+      "reused": false
+    },
+    {
+      "name": "verify-evidence-root-tests",
+      "exitCode": 0,
+      "durationMs": 1194,
+      "reused": false
+    },
+    {
+      "name": "human-decision-attribution-tests",
+      "exitCode": 0,
+      "durationMs": 46,
+      "reused": false
+    },
+    {
+      "name": "handover-rotate-tests",
+      "exitCode": 0,
+      "durationMs": 1299,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-rebind-mutable-tests",
+      "exitCode": 0,
+      "durationMs": 119,
+      "reused": false
+    },
+    {
+      "name": "session-cleanup-owner-nonce-tests",
+      "exitCode": 0,
+      "durationMs": 112,
+      "reused": false
+    },
+    {
+      "name": "antigravity-pretool-guard-tests",
+      "exitCode": 0,
+      "durationMs": 43808,
+      "reused": false
+    },
+    {
+      "name": "worktree-create-tests",
+      "exitCode": 0,
+      "durationMs": 116,
+      "reused": false
+    },
+    {
+      "name": "state-numeric-claims-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "state-numeric-claims-check",
+      "exitCode": 0,
+      "durationMs": 28,
+      "reused": false
+    },
+    {
+      "name": "codex-sandbox-preflight-plugin-tests",
+      "exitCode": 0,
+      "durationMs": 2282,
+      "reused": false
+    },
+    {
+      "name": "nova-sandbox-launch-tests",
+      "exitCode": 0,
+      "durationMs": 36,
+      "reused": false
+    },
+    {
+      "name": "nova-execution-plane-real-tests",
+      "exitCode": 0,
+      "durationMs": 37,
+      "reused": false
+    },
+    {
+      "name": "machine-plane-tests",
+      "exitCode": 0,
+      "durationMs": 68,
+      "reused": false
+    },
+    {
+      "name": "consumer-safe-paths-tests",
+      "exitCode": 0,
+      "durationMs": 131,
+      "reused": false
+    },
+    {
+      "name": "verify-evidence-producer-tests",
+      "exitCode": 0,
+      "durationMs": 12899,
+      "reused": false
+    },
+    {
+      "name": "lifecycle-recovery-contract-tests",
+      "exitCode": 0,
+      "durationMs": 1263,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-inspection-contract-tests",
+      "exitCode": 0,
+      "durationMs": 153,
+      "reused": false
+    },
+    {
+      "name": "project-reset-tests",
+      "exitCode": 0,
+      "durationMs": 1306,
+      "reused": false
+    },
+    {
+      "name": "reference-path-tests",
+      "exitCode": 0,
+      "durationMs": 2078,
+      "reused": false
+    },
+    {
+      "name": "reference-path-check",
+      "exitCode": 0,
+      "durationMs": 391,
+      "reused": false
+    },
+    {
+      "name": "repair-map-tests",
+      "exitCode": 0,
+      "durationMs": 3065,
+      "reused": false
+    },
+    {
+      "name": "obligations-contract-tests",
+      "exitCode": 0,
+      "durationMs": 133,
+      "reused": false
+    },
+    {
+      "name": "harness-lib-plan-spec-state-v2-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "check-directory-contract-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "check-gitignore-anchoring-tests",
+      "exitCode": 0,
+      "durationMs": 39,
+      "reused": false
+    },
+    {
+      "name": "check-review-retry-plan-tests",
+      "exitCode": 0,
+      "durationMs": 75,
+      "reused": false
+    },
+    {
+      "name": "review-retry-plan-check",
+      "exitCode": 0,
+      "durationMs": 30,
+      "reused": false
+    },
+    {
+      "name": "check-session-bootstrap-directory-contract-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "generate-vendored-canon-tests",
+      "exitCode": 0,
+      "durationMs": 59,
+      "reused": false
+    },
+    {
+      "name": "agent-model-registry-tests",
+      "exitCode": 0,
+      "durationMs": 43,
+      "reused": false
+    },
+    {
+      "name": "backlog-dispatch-reference-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "guard-maintenance-window-kernel-closure-tests",
+      "exitCode": 0,
+      "durationMs": 262,
+      "reused": false
+    },
+    {
+      "name": "handover-rotation-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "observation-governance-bootstrap-tests",
+      "exitCode": 0,
+      "durationMs": 27,
+      "reused": false
+    },
+    {
+      "name": "lib-plan-spec-state-v2-tests",
+      "exitCode": 0,
+      "durationMs": 67,
+      "reused": false
+    },
+    {
+      "name": "review-retry-planner-tests",
+      "exitCode": 0,
+      "durationMs": 61,
+      "reused": false
+    },
+    {
+      "name": "session-cleanup-recovery-tests",
+      "exitCode": 0,
+      "durationMs": 2301,
+      "reused": false
+    },
+    {
+      "name": "test-tmpdir-budget-tests",
+      "exitCode": 0,
+      "durationMs": 55,
+      "reused": false
+    },
+    {
+      "name": "test-tmpdir-tests",
+      "exitCode": 0,
+      "durationMs": 30,
+      "reused": false
+    },
+    {
+      "name": "transfer-classification-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "antigravity-execution-host-tests",
+      "exitCode": 0,
+      "durationMs": 2104,
+      "reused": false
+    },
+    {
+      "name": "antigravity-native-dispatch-coordinator-tests",
+      "exitCode": 0,
+      "durationMs": 10541,
+      "reused": false
+    },
+    {
+      "name": "antigravity-native-dispatch-pretool-tests",
+      "exitCode": 0,
+      "durationMs": 2089,
+      "reused": false
+    },
+    {
+      "name": "backlog-item-strip-for-dispatch-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "check-backlog-state-tests",
+      "exitCode": 0,
+      "durationMs": 7587,
+      "reused": false
+    },
+    {
+      "name": "check-suite-registration-tests",
+      "exitCode": 0,
+      "durationMs": 51,
+      "reused": false
+    },
+    {
+      "name": "check-vendored-template-sync-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "dispatch-authorship-verify-tests",
+      "exitCode": 0,
+      "durationMs": 387,
+      "reused": false
+    },
+    {
+      "name": "dispatch-record-write-tests",
+      "exitCode": 0,
+      "durationMs": 64,
+      "reused": false
+    },
+    {
+      "name": "execution-plane-launch-tests",
+      "exitCode": 0,
+      "durationMs": 38,
+      "reused": false
+    },
+    {
+      "name": "installed-plugin-attestation-host-tests",
+      "exitCode": 0,
+      "durationMs": 1507,
+      "reused": false
+    },
+    {
+      "name": "nova-a8-benchmark-runner-tests",
+      "exitCode": 0,
+      "durationMs": 169,
+      "reused": false
+    },
+    {
+      "name": "pipeline-start-scratch-lifecycle-tests",
+      "exitCode": 0,
+      "durationMs": 316,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-approve-announce-tests",
+      "exitCode": 0,
+      "durationMs": 116,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-approve-push-argv-closure-tests",
+      "exitCode": 0,
+      "durationMs": 111,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-discard-feature-tests",
+      "exitCode": 0,
+      "durationMs": 110,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-gate-action-event-tests",
+      "exitCode": 0,
+      "durationMs": 434,
+      "reused": false
+    },
+    {
+      "name": "pipeline-state-inspect-tests",
+      "exitCode": 0,
+      "durationMs": 405,
+      "reused": false
+    },
+    {
+      "name": "scripts-pipeline-state-tests",
+      "exitCode": 0,
+      "durationMs": 886,
+      "reused": false
+    },
+    {
+      "name": "project-onboarding-v3-argv-closure-tests",
+      "exitCode": 0,
+      "durationMs": 618,
+      "reused": false
+    },
+    {
+      "name": "publication-executor-productive-flow-tests",
+      "exitCode": 0,
+      "durationMs": 1783,
+      "reused": false
+    },
+    {
+      "name": "push-prepare-tests",
+      "exitCode": 0,
+      "durationMs": 565,
+      "reused": false
+    },
+    {
+      "name": "push-release-flow-docs-contract-tests",
+      "exitCode": 0,
+      "durationMs": 118,
+      "reused": false
+    },
+    {
+      "name": "rotate-handover-sections-tests",
+      "exitCode": 0,
+      "durationMs": 41,
+      "reused": false
+    },
+    {
+      "name": "settings-allowlist-merge-tests",
+      "exitCode": 0,
+      "durationMs": 45,
+      "reused": false
+    },
+    {
+      "name": "signing-ceremony-tests",
+      "exitCode": 0,
+      "durationMs": 956,
+      "reused": false
+    },
+    {
+      "name": "tmp-leak-enumerate-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "tmp-leak-guard-tests",
+      "exitCode": 0,
+      "durationMs": 102,
+      "reused": false
+    },
+    {
+      "name": "usage-ledger-tests",
+      "exitCode": 0,
+      "durationMs": 380,
+      "reused": false
+    },
+    {
+      "name": "pipeline-start-preflight-antigravity-hard-enforcement-tests",
+      "exitCode": 0,
+      "durationMs": 605,
+      "reused": false
+    },
+    {
+      "name": "guard-dispatch-budget-tests",
+      "exitCode": 0,
+      "durationMs": 1971,
+      "reused": false
+    },
+    {
+      "name": "dispatch-budget-binding-tests",
+      "exitCode": 0,
+      "durationMs": 50,
+      "reused": false
+    },
+    {
+      "name": "wire-dispatch-budget-hook-tests",
+      "exitCode": 0,
+      "durationMs": 53,
+      "reused": false
+    },
+    {
+      "name": "pipeline-user-v3-drift-tests",
+      "exitCode": 0,
+      "durationMs": 49,
+      "reused": false
+    },
+    {
+      "name": "hooks-manifest-shape-tests",
+      "exitCode": 0,
+      "durationMs": 29,
+      "reused": false
+    },
+    {
+      "name": "check-adr-consistency-tests",
+      "exitCode": 0,
+      "durationMs": 106,
+      "reused": false
+    },
+    {
+      "name": "check-critic-contract-citations-tests",
+      "exitCode": 0,
+      "durationMs": 436,
+      "reused": false
+    },
+    {
+      "name": "check-doc-reconciliation-tests",
+      "exitCode": 0,
+      "durationMs": 1275,
+      "reused": false
+    },
+    {
+      "name": "pipeline-start-preflight-pre-push-observation-tests",
+      "exitCode": 0,
+      "durationMs": 927,
+      "reused": false
+    },
+    {
+      "name": "pre-push-hook-install-tests",
+      "exitCode": 0,
+      "durationMs": 1238,
+      "reused": false
+    },
+    {
+      "name": "check-backlog-sprint-assignment-tests",
+      "exitCode": 0,
+      "durationMs": 78,
+      "reused": false
+    },
+    {
+      "name": "backlog-sprint-assignment-check",
+      "exitCode": 0,
+      "durationMs": 72,
+      "reused": false
+    },
+    {
+      "name": "backlog-done-predicate-check",
+      "exitCode": 1,
+      "durationMs": 363,
+      "reused": false
+    },
+    {
+      "name": "copy-safe-command-tests",
+      "exitCode": 0,
+      "durationMs": 1429,
+      "reused": false
+    },
+    {
+      "name": "project-onboarding-v3-pre-push-hook-offer-tests",
+      "exitCode": 0,
+      "durationMs": 289,
+      "reused": false
+    },
+    {
+      "name": "onboarding-init-tests",
+      "exitCode": 0,
+      "durationMs": 20311,
+      "reused": false
+    },
+    {
+      "name": "push-gate-satisfiability-tests",
+      "exitCode": 0,
+      "durationMs": 277,
+      "reused": false
+    },
+    {
+      "name": "chat-gate-ceremony-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "push-init-tests",
+      "exitCode": 0,
+      "durationMs": 3849,
+      "reused": false
+    },
+    {
+      "name": "runner-transcript-recovery-tests",
+      "exitCode": 0,
+      "durationMs": 137,
+      "reused": false
+    },
+    {
+      "name": "semgrep-default-rules-tests",
+      "exitCode": 0,
+      "durationMs": 11927,
+      "reused": false
+    },
+    {
+      "name": "backlog-done-predicate-tests",
+      "exitCode": 0,
+      "durationMs": 405,
+      "reused": false
+    },
+    {
+      "name": "generate-elephant-role-prohibitions-tests",
+      "exitCode": 0,
+      "durationMs": 50,
+      "reused": false
+    },
+    {
+      "name": "guard-push-scratch-advisory-tests",
+      "exitCode": 0,
+      "durationMs": 680,
+      "reused": false
+    },
+    {
+      "name": "critic-skip-decision-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "worktree-count-check-tests",
+      "exitCode": 0,
+      "durationMs": 64,
+      "reused": false
+    },
+    {
+      "name": "check-protected-path-integrity-tests",
+      "exitCode": 0,
+      "durationMs": 764,
+      "reused": false
+    },
+    {
+      "name": "check-resume-consumption-tests",
+      "exitCode": 0,
+      "durationMs": 792,
+      "reused": false
+    },
+    {
+      "name": "resume-consumption-check",
+      "exitCode": 0,
+      "durationMs": 37,
+      "reused": false
+    },
+    {
+      "name": "check-state-phase-consistency-tests",
+      "exitCode": 0,
+      "durationMs": 130,
+      "reused": false
+    },
+    {
+      "name": "pre-commit-hook-install-tests",
+      "exitCode": 0,
+      "durationMs": 6634,
+      "reused": false
+    },
+    {
+      "name": "commit-msg-hook-install-tests",
+      "exitCode": 0,
+      "durationMs": 907,
+      "reused": false
+    },
+    {
+      "name": "manual-check-logic-tests",
+      "exitCode": 0,
+      "durationMs": 36,
+      "reused": false
+    },
+    {
+      "name": "pre-commit-hook-install-trust-anchor-bootstrap-tests",
+      "exitCode": 0,
+      "durationMs": 922,
+      "reused": false
+    },
+    {
+      "name": "project-onboarding-v3-unborn-head-tests",
+      "exitCode": 0,
+      "durationMs": 5233,
+      "reused": false
+    },
+    {
+      "name": "print-verify-failures-tests",
+      "exitCode": 0,
+      "durationMs": 113,
+      "reused": false
+    },
+    {
+      "name": "guard-push-release-tag-ancestry-tests",
+      "exitCode": 0,
+      "durationMs": 1638,
+      "reused": false
+    },
+    {
+      "name": "check-critic-skip-coverage-tests",
+      "exitCode": 0,
+      "durationMs": 54,
+      "reused": false
+    },
+    {
+      "name": "critic-skip-coverage-check",
+      "exitCode": 1,
+      "durationMs": 182,
+      "reused": false
+    },
+    {
+      "name": "measure-tofu-push-e2e-tests",
+      "exitCode": 0,
+      "durationMs": 7815,
+      "reused": false
+    },
+    {
+      "name": "suite-registration-check",
+      "exitCode": 0,
+      "durationMs": 44,
+      "reused": false
+    },
+    {
+      "name": "pre-gate-tests",
+      "exitCode": 0,
+      "durationMs": 145,
+      "reused": false
+    },
+    {
+      "name": "capture-evidence-tests",
+      "exitCode": 0,
+      "durationMs": 559,
+      "reused": false
+    },
+    {
+      "name": "verify-evidence-writer-tests",
+      "exitCode": 0,
+      "durationMs": 93,
+      "reused": false
+    },
+    {
+      "name": "dispatch-record-strip-for-critic-tests",
+      "exitCode": 0,
+      "durationMs": 50,
+      "reused": false
+    },
+    {
+      "name": "audit-evidence-overview-tests",
+      "exitCode": 0,
+      "durationMs": 39,
+      "reused": false
+    },
+    {
+      "name": "guard-push-promotion-tests",
+      "exitCode": 0,
+      "durationMs": 616,
+      "reused": false
+    },
+    {
+      "name": "release-promotion-envelope-tests",
+      "exitCode": 0,
+      "durationMs": 377,
+      "reused": false
+    },
+    {
+      "name": "scoped-verify-registration-tests",
+      "exitCode": 0,
+      "durationMs": 110,
+      "reused": false
+    },
+    {
+      "name": "workflow-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 52,
+      "reused": false
+    },
+    {
+      "name": "interaction-continuity-tests",
+      "exitCode": 0,
+      "durationMs": 40,
+      "reused": false
+    },
+    {
+      "name": "trusted-tool-resolution-tests",
+      "exitCode": 0,
+      "durationMs": 42,
+      "reused": false
+    },
+    {
+      "name": "advisory-receipt-assurance-tests",
+      "exitCode": 0,
+      "durationMs": 49,
+      "reused": false
+    },
+    {
+      "name": "toolchain-preflight-tests",
+      "exitCode": 0,
+      "durationMs": 207,
+      "reused": false
+    },
+    {
+      "name": "validate-manifest",
+      "exitCode": 0,
+      "durationMs": 47,
+      "reused": false
+    },
+    {
+      "name": "security-scan",
+      "exitCode": 0,
+      "durationMs": 10731,
+      "reused": false
+    }
+  ],
+  "verifyRun": {
+    "runId": "verify-1789770687736-bba0b2692cb5c0ca",
+    "policySha256": "f2b868ab1b7eb6d778612dc32a34cb5e254140bf190456a9680d83ce92c16fbe",
+    "resumePlanSha256": "d01b19fe6e1d35cc09430aa819ad3f3ec49476839ba8c61cd1e3612139b763cb",
+    "terminalSha256": "8fefcde488458a9defef14f573aa51ede87f25df1aec548db5bc98406722834b",
+    "registeredSuiteCount": 555,
+    "terminalReceiptCount": 555,
+    "receiptReuse": "disabled",
+    "status": "failed"
+  },
+  "selection": {
+    "schema": "pipeline.verify-selection.v1",
+    "mode": "release",
+    "execution": "full",
+    "baseCommit": null,
+    "candidateCommit": "f3f79edfda2b8fe772bd8da3c1f320ef33a6b777",
+    "changedPaths": null,
+    "registeredSuiteIds": [
+      "advisor-capability-preflight-tests",
+      "advisor-consult-v3-tests",
+      "advisory-coordinator-tests",
+      "advisory-decision-event-tests",
+      "advisory-host-bridge-tests",
+      "advisory-lifecycle-v2-tests",
+      "advisory-receipt-assurance-tests",
+      "advisory-receipt-tests",
+      "afk-activation-tests",
+      "afk-assumption-mode-tests",
+      "afk-capability-worker-tests",
+      "afk-claude-host-tests",
+      "afk-git-adapter-tests",
+      "afk-ledger-tests",
+      "afk-review-tests",
+      "afk-transaction-host-tests",
+      "agent-decision-journal-tests",
+      "agent-model-registry-tests",
+      "agents-adapter-migration-check",
+      "agents-adapter-migration-tests",
+      "ai-assisted-hardening-gate-tests",
+      "ai-assisted-hardening-tests",
+      "antigravity-alpha-adapter-tests",
+      "antigravity-execution-host-tests",
+      "antigravity-native-dispatch-coordinator-tests",
+      "antigravity-native-dispatch-pretool-tests",
+      "antigravity-pretool-guard-tests",
+      "artifact-lifecycle-check",
+      "artifact-lifecycle-tests",
+      "artifact-topology-check",
+      "artifact-topology-tests",
+      "async-execution-tests",
+      "audit-bundle-cli-tests",
+      "audit-bundle-core-tests",
+      "audit-evidence-overview-tests",
+      "auth-gate-inventory-drift-check",
+      "auth-gate-inventory-drift-tests",
+      "authority-revision-proof-tests",
+      "authority-tier-agreement-check",
+      "authority-tier-agreement-tests",
+      "backlog-dispatch-reference-tests",
+      "backlog-done-predicate-check",
+      "backlog-done-predicate-tests",
+      "backlog-item-strip-for-dispatch-tests",
+      "backlog-ledger-reconciliation-tests",
+      "backlog-sprint-assignment-check",
+      "backlog-state-check",
+      "backlog-state-tests",
+      "bootstrap-env-check-tests",
+      "bootstrap-payload-budget-tests",
+      "bootstrap-payload-measure-cli-tests",
+      "bootstrap-source-attestation-acceptance-tests",
+      "capture-evidence-tests",
+      "capture-observation-intake-tests",
+      "change-control-cli-tests",
+      "change-control-core-tests",
+      "chat-gate-ceremony-tests",
+      "check-adr-consistency-tests",
+      "check-backlog-sprint-assignment-tests",
+      "check-backlog-state-tests",
+      "check-close-security-completeness-tests",
+      "check-completeness-vocabulary-doclint-tests",
+      "check-critic-contract-citations-tests",
+      "check-critic-skip-coverage-tests",
+      "check-directory-contract-tests",
+      "check-doc-reconciliation-tests",
+      "check-gitignore-anchoring-tests",
+      "check-ownership-tests",
+      "check-protected-path-integrity-tests",
+      "check-release-state-consistency-tests",
+      "check-resume-consumption-tests",
+      "check-review-retry-plan-tests",
+      "check-session-bootstrap-directory-contract-tests",
+      "check-state-phase-consistency-tests",
+      "check-suite-registration-tests",
+      "check-vendored-template-sync-tests",
+      "claude-critic-host-tests",
+      "claude-goal-host-tests",
+      "clean-candidate-run-tests",
+      "close-coordinator-tests",
+      "codex-advisory-app-server-tests",
+      "codex-advisory-bootstrap-tests",
+      "codex-app-server-health-tests",
+      "codex-critic-host-tests",
+      "codex-critic-isolation-tests",
+      "codex-critic-packet-host-tests",
+      "codex-critic-probe-split-tests",
+      "codex-critic-shadow-tests",
+      "codex-goal-host-tests",
+      "codex-host-advisor-route-tests",
+      "codex-host-repository-init-tests",
+      "codex-isolated-critic-claims-tests",
+      "codex-isolated-critic-contract-tests",
+      "codex-isolated-critic-protected-preimage-tests",
+      "codex-isolation-control-decomposition-tests",
+      "codex-native-critic-host-tests",
+      "codex-onboarding-app-server-tests",
+      "codex-onboarding-capabilities-tests",
+      "codex-onboarding-runtime-tests",
+      "codex-plugin-validator-parity-tests",
+      "codex-pretool-guard-tests",
+      "codex-private-overlay-activation-tests",
+      "codex-sandbox-compatibility-tests",
+      "codex-sandbox-preflight-host-control-tests",
+      "codex-sandbox-preflight-plugin-tests",
+      "codex-sandbox-preflight-tests",
+      "codex-sandbox-runtime-tests",
+      "codex-sandbox-select-tests",
+      "codex-session-start-hint-tests",
+      "commit-message-policy-tests",
+      "commit-msg-hook-install-tests",
+      "consumer-baseline-verify-tests",
+      "consumer-safe-paths-tests",
+      "continuity-host-adapter-tests",
+      "continuity-result-bootstrap-tests",
+      "continuity-result-case-migration-tests",
+      "continuity-result-close-tests",
+      "continuity-result-rebind-tests",
+      "continuity-state-tests",
+      "continuity-status-cli-tests",
+      "continuity-status-tests",
+      "control-catalog-drift-tests",
+      "control-catalog-migration-tests",
+      "control-catalog-schema-tests",
+      "control-evaluation-receipt-tests",
+      "control-execution-exchange-tests",
+      "control-execution-lifecycle-event-tests",
+      "control-waiver-lifecycle-tests",
+      "copy-safe-command-tests",
+      "credential-lease-tests",
+      "critic-bare-tests",
+      "critic-dispatch-preflight-tests",
+      "critic-export-policy-tests",
+      "critic-fail-closed-check",
+      "critic-fail-closed-tests",
+      "critic-packet-governance-tests",
+      "critic-review-scope-tests",
+      "critic-route-activation-tests",
+      "critic-skip-coverage-check",
+      "critic-skip-decision-tests",
+      "critic-t1-po-override-tests",
+      "critical-action-approval-request-tests",
+      "critical-action-authorization-tests",
+      "critical-human-proof-gate-tests",
+      "critical-human-proof-policy-tests",
+      "decision-reference-dual-evaluation-tests",
+      "deferred-backlog-check",
+      "deferred-backlog-tests",
+      "delivery-course-tests",
+      "dispatch-authorship-verify-tests",
+      "dispatch-budget-binding-tests",
+      "dispatch-budget-calibration-tests",
+      "dispatch-budget-core-tests",
+      "dispatch-policy-tests",
+      "dispatch-provenance-tests",
+      "dispatch-record-strip-for-critic-tests",
+      "dispatch-record-tests",
+      "dispatch-record-write-tests",
+      "doc-contract-check",
+      "doc-contract-tests",
+      "document-hooks-manifest-tests",
+      "document-hooks-tests",
+      "document-identifier-tests",
+      "document-lifecycle-tests",
+      "entrypoint-reachability-tests",
+      "epic-ac02-publication-check",
+      "epic-ac02-publication-check-tests",
+      "epic-file-contract-tests",
+      "error-register-check",
+      "error-register-tests",
+      "evidence-view-model-tests",
+      "evidence-view-renderer-tests",
+      "evidence-viewer-tests",
+      "execution-plane-launch-tests",
+      "external-command-offer-tests",
+      "external-push-ledger-tests",
+      "external-reference-adapter-tests",
+      "external-reference-tests",
+      "feature-package-topology-tests",
+      "finding-lifecycle-tests",
+      "forge-capability-tests",
+      "gate-estimate-tests",
+      "gate-strength-guard-tests",
+      "generate-elephant-role-prohibitions-tests",
+      "generate-vendored-canon-tests",
+      "git-cmd-tests",
+      "github-actions-permissions-check",
+      "github-actions-permissions-tests",
+      "github-issue-operations-tests",
+      "gitleaks-tests",
+      "governance-action-artifact-tests",
+      "governance-action-events-tests",
+      "governance-authority-resolver-tests",
+      "governance-authority-tests",
+      "governance-event-cli-tests",
+      "governance-event-core-tests",
+      "governance-event-projection-tests",
+      "governance-event-store-tests",
+      "governance-export-adapter-tests",
+      "governance-export-delivery-tests",
+      "governance-export-outbox-store-tests",
+      "governance-export-outbox-tests",
+      "governance-export-tests",
+      "governance-export-view-status-tests",
+      "governance-gate-action-tests",
+      "governance-recovery-reconciliation-action-tests",
+      "governance-replay-cli-tests",
+      "governance-replay-core-tests",
+      "governance-replay-view-tests",
+      "governance-replay-viewer-tests",
+      "governance-review-action-tests",
+      "governance-verification-action-tests",
+      "guard-apply-patch-tests",
+      "guard-authority-ledger-intake-tests",
+      "guard-devplan-tests",
+      "guard-dispatch-budget-tests",
+      "guard-dispatch-tests",
+      "guard-el01-tripwire-tests",
+      "guard-gate-strength-gmw-tests",
+      "guard-gate-strength-ledger-tests",
+      "guard-gate-strength-origin-attestation-tests",
+      "guard-git-phoenix-authority-grant-tests",
+      "guard-git-phoenix-tests",
+      "guard-git-tests",
+      "guard-handoff-offer-tests",
+      "guard-handover-size-tests",
+      "guard-human-override-tests",
+      "guard-lifecycle-ready-tests",
+      "guard-maintenance-window-cli-tests",
+      "guard-maintenance-window-kernel-closure-tests",
+      "guard-maintenance-window-tests",
+      "guard-onboarding-consent-lock-tests",
+      "guard-push-attestation-diagnostics-tests",
+      "guard-push-decision-reference-tests",
+      "guard-push-external-ledger-tests",
+      "guard-push-promotion-tests",
+      "guard-push-release-tag-ancestry-tests",
+      "guard-push-scratch-advisory-tests",
+      "guard-push-tests",
+      "guard-push-v2-tests",
+      "guard-slicing-tests",
+      "guard-testpath-gmw-tests",
+      "guard-testpath-override-tests",
+      "guard-testpath-tests",
+      "handover-rotate-tests",
+      "handover-rotation-tests",
+      "harness-lib-plan-spec-state-v2-tests",
+      "hooks-manifest-shape-tests",
+      "host-advisor-status-tests",
+      "host-advisor-workspace-tests",
+      "human-authority-grant-tests",
+      "human-decision-attribution-tests",
+      "human-governance-ledger-tests",
+      "human-guard-override-tests",
+      "human-role-label-tests",
+      "human-role-rendering-tests",
+      "installed-plugin-attestation-host-tests",
+      "installed-plugin-attestation-tests",
+      "interaction-continuity-tests",
+      "language-canon-check",
+      "language-canon-tests",
+      "lib-plan-spec-state-v2-tests",
+      "license-check-tests",
+      "license-contract-check",
+      "license-contract-tests",
+      "lifecycle-gate-satisfiability-tests",
+      "lifecycle-governance-events-schema-parity-tests",
+      "lifecycle-governance-events-tests",
+      "lifecycle-ready-enforcement-tests",
+      "lifecycle-recovery-contract-tests",
+      "live-runner-certification-tests",
+      "local-supervisor-setup-tests",
+      "local-supervisor-state-tests",
+      "local-worker-pool-tests",
+      "local-worker-supervisor-cli-tests",
+      "local-worker-supervisor-core-tests",
+      "machine-plane-tests",
+      "main-session-route-tests",
+      "manual-check-logic-tests",
+      "measure-tofu-push-e2e-tests",
+      "migrate-backlog-state-tests",
+      "module-cluster-reachability-tests",
+      "native-plugin-readback-tests",
+      "network-lockdown-tests",
+      "neutral-range-plan-tests",
+      "no-autoupdate-key-tests",
+      "notebook-write-coverage-tests",
+      "nova-a8-benchmark-runner-tests",
+      "nova-b2-gitlab-ci-broker-cli-tests",
+      "nova-b2-gitlab-ci-broker-core-tests",
+      "nova-b4-git-transport-contract-tests",
+      "nova-b4-github-forge-adapter-tests",
+      "nova-b4-gitlab-forge-adapter-tests",
+      "nova-backlog-reconciler-cli-tests",
+      "nova-backlog-reconciliation-tests",
+      "nova-benchmark-tests",
+      "nova-candidate-freeze-tests",
+      "nova-critic-lineage-tests",
+      "nova-critic-packet-tests",
+      "nova-execution-plane-real-tests",
+      "nova-execution-plane-tests",
+      "nova-increment-receipt-tests",
+      "nova-invocation-preflight-tests",
+      "nova-invocation-reliability-tests",
+      "nova-macos-acceptance-tests",
+      "nova-release-preflight-tests",
+      "nova-runner-capability-tests",
+      "nova-sandbox-disposition-tests",
+      "nova-sandbox-launch-tests",
+      "nova-scheduling-lifecycle-tests",
+      "nova-verify-journal-tests",
+      "nova-verify-resume-tests",
+      "obligations-contract-tests",
+      "observation-governance-bootstrap-tests",
+      "observation-governance-tests",
+      "onboarding-consent-guard-tests",
+      "onboarding-consent-mark-tests",
+      "onboarding-consent-marker-tests",
+      "onboarding-continuity-tests",
+      "onboarding-init-tests",
+      "onboarding-runner-identity-tests",
+      "organization-policy-activation-tests",
+      "organization-policy-cli-tests",
+      "organization-policy-core-tests",
+      "osv-scanner-tests",
+      "p3b-runner-conformance-tests",
+      "parallel-dispatch-planner-tests",
+      "parallel-sprint-integration-tests",
+      "phase26-invariants-check",
+      "phase26-invariants-tests",
+      "phase3-sdlc-coherence-check",
+      "phase3-sdlc-coherence-tests",
+      "phoenix-authority-approval-tests",
+      "phoenix-governance-threat-model-tests",
+      "pipeline-start-preflight-antigravity-hard-enforcement-tests",
+      "pipeline-start-preflight-pre-push-observation-tests",
+      "pipeline-start-preflight-tests",
+      "pipeline-start-scratch-lifecycle-tests",
+      "pipeline-start-v3-tests",
+      "pipeline-state-approve-announce-tests",
+      "pipeline-state-approve-push-argv-closure-tests",
+      "pipeline-state-decision-reference-tests",
+      "pipeline-state-discard-feature-tests",
+      "pipeline-state-external-push-ledger-tests",
+      "pipeline-state-gate-action-event-tests",
+      "pipeline-state-inspect-tests",
+      "pipeline-state-inspection-contract-tests",
+      "pipeline-state-late-verify-tests",
+      "pipeline-state-lifecycle-event-tests",
+      "pipeline-state-rebind-mutable-tests",
+      "pipeline-state-rebind-runner-tests",
+      "pipeline-state-reopen-design-tests",
+      "pipeline-state-revocation-tests",
+      "pipeline-state-tests",
+      "pipeline-update-channel-tests",
+      "pipeline-user-v3-drift-tests",
+      "plan-spec-state-v2-legacy-tests",
+      "plan-spec-state-v2-tests",
+      "po-approval-gate-tests",
+      "po-approval-proof-tests",
+      "po-gate-authority-fixture-tests",
+      "po-gate-profile-publisher-tests",
+      "po-guarded-push-tests",
+      "po-human-approval-tests",
+      "po-language-projection-check",
+      "po-language-projection-tests",
+      "post-compact-reground-tests",
+      "pr-contributor-gate-tests",
+      "pre-commit-hook-install-tests",
+      "pre-commit-hook-install-trust-anchor-bootstrap-tests",
+      "pre-gate-tests",
+      "pre-push-hook-install-tests",
+      "print-verify-failures-tests",
+      "private-document-binding-tests",
+      "private-overlay-activation-cli-tests",
+      "private-overlay-activation-e2e-tests",
+      "private-overlay-activation-tests",
+      "private-overlay-bootstrap-status-tests",
+      "private-overlay-runtime-projection-tests",
+      "product-capability-inventory-tests",
+      "project-authority-migration-cli-tests",
+      "project-authority-tests",
+      "project-onboarding-e2e-tests",
+      "project-onboarding-ready-gate-tests",
+      "project-onboarding-v3-argv-closure-tests",
+      "project-onboarding-v3-pre-push-hook-offer-tests",
+      "project-onboarding-v3-tests",
+      "project-onboarding-v3-unborn-head-tests",
+      "project-reset-tests",
+      "protected-test-paths-tests",
+      "provenance-attestation-tests",
+      "provenance-envelope-tests",
+      "provenance-fixture-matrix-tests",
+      "provenance-local-builder-tests",
+      "provenance-release-binding-tests",
+      "public-baseline-diagnose-tests",
+      "public-core-observation-tests",
+      "public-core-origin-allowlist-tests",
+      "publication-authority-tests",
+      "publication-bundle-tests",
+      "publication-bundle-v2-tests",
+      "publication-capability-preflight-tests",
+      "publication-close-journal-tests",
+      "publication-executor-productive-flow-tests",
+      "publication-executor-tests",
+      "publication-executor-v2-tests",
+      "publication-gate-evidence-tests",
+      "publication-state-authority-tests",
+      "push-destination-policy-tests",
+      "push-gate-satisfiability-tests",
+      "push-init-tests",
+      "push-prepare-tests",
+      "push-release-flow-docs-contract-tests",
+      "rebase-authority-tests",
+      "recovery-bridge-approval-tests",
+      "recovery-preview-attestation-tests",
+      "reference-catalog-tests",
+      "reference-catalog-views-tests",
+      "reference-path-check",
+      "reference-path-tests",
+      "release-preflight-cli-tests",
+      "release-promotion-envelope-tests",
+      "release-version-plan-tests",
+      "remote-provisional-receipt-tests",
+      "repair-map-tests",
+      "repository-freshness-tests",
+      "repository-path-identity-tests",
+      "requirement-traceability-tests",
+      "resume-consumption-check",
+      "resume-hint-scripts-tests",
+      "resume-hint-tests",
+      "review-economy-tests",
+      "review-retry-plan-check",
+      "review-retry-planner-tests",
+      "rotate-handover-sections-tests",
+      "route-receipt-tests",
+      "routing-projection-check",
+      "routing-projection-tests",
+      "ruleset-freshness-tests",
+      "ruleset-source-tests",
+      "ruleset-update-policy-tests",
+      "run-codex-critic-isolation-tests",
+      "run-codex-critic-probe-split-tests",
+      "run-codex-isolation-control-decomposition-tests",
+      "runner-contracts.schema-tests",
+      "runner-native-continuation-tests",
+      "runner-profile-migration-v2-tests",
+      "runner-profile-migration-v3-tests",
+      "runner-profiles-v2-tests",
+      "runner-profiles-v3-tests",
+      "runner-transcript-recovery-tests",
+      "runner-usage-v1-tests",
+      "runtime-projection-v2-tests",
+      "runtime-projection-v3-tests",
+      "sandboxed-readonly-duty-tests",
+      "sandboxed-readonly-host-bridge-tests",
+      "sbom-discovery-cli-tests",
+      "sbom-discovery-tests",
+      "sbom-fixture-matrix-tests",
+      "sbom-lifecycle-tests",
+      "sbom-manifest-tests",
+      "sbom-node-adapter-tests",
+      "sbom-release-binding-tests",
+      "schema-lite-tests",
+      "scoped-verify-registration-tests",
+      "scripts-pipeline-state-tests",
+      "sdlc-efficiency-metrics-tests",
+      "sdlc-run-graph-tests",
+      "section-citation-check",
+      "section-citation-tests",
+      "security-capability-plan-builder-tests",
+      "security-completeness-gate-tests",
+      "security-evidence-evaluator-tests",
+      "security-evidence-fixture-matrix-tests",
+      "security-evidence-v1-migration-fixture-tests",
+      "security-policy-resolver-tests",
+      "security-readiness-harness-tests",
+      "security-readiness-tests",
+      "security-scan",
+      "security-scan-tests",
+      "security-scan-v2-integration-tests",
+      "self-application-attestation-gate-tests",
+      "self-verify-selection-tests",
+      "semgrep-default-rules-tests",
+      "semgrep-tests",
+      "session-cleanup-binding-tests",
+      "session-cleanup-owner-nonce-tests",
+      "session-cleanup-power-tests",
+      "session-cleanup-recovery-tests",
+      "session-critic-finalizer-tests",
+      "session-power-cli-tests",
+      "session-power-controller-tests",
+      "session-power-core-tests",
+      "settings-allowlist-merge-tests",
+      "setup-check-tests",
+      "setup-tests",
+      "signing-ceremony-tests",
+      "source-observation-tests",
+      "spec-readiness-host-tests",
+      "spec-retention-check",
+      "spec-retention-tests",
+      "stack-adapter-contract-tests",
+      "stack-capability-plan-tests",
+      "stack-discovery-tests",
+      "stack-dynamic-boundary-tests",
+      "stack-fuzz-replay-tests",
+      "stack-run-outcome-tests",
+      "staleness-check-tests",
+      "state-budget-check",
+      "state-budget-tests",
+      "state-numeric-claims-check",
+      "state-numeric-claims-tests",
+      "statusline-context-tests",
+      "stop-suggest-tests",
+      "suite-registration-check",
+      "symlink-capability-tests",
+      "test-case-completion-tests",
+      "test-tmpdir-budget-tests",
+      "test-tmpdir-tests",
+      "threat-model-approval-request-tests",
+      "threat-model-discovery-tests",
+      "threat-model-fixture-matrix-tests",
+      "threat-model-tests",
+      "tmp-leak-enumerate-tests",
+      "tmp-leak-guard-tests",
+      "toolchain-preflight-tests",
+      "transfer-classification-tests",
+      "trust-anchor-bootstrap-circularity-repro-tests",
+      "trusted-tool-resolution-tests",
+      "usage-ledger-tests",
+      "v3-bootstrap-authority-tests",
+      "validate-manifest",
+      "validate-manifest-tests",
+      "verify-case-completion-check",
+      "verify-case-completion-receipt-tests",
+      "verify-case-completion-registry-tests",
+      "verify-evidence-producer-tests",
+      "verify-evidence-root-tests",
+      "verify-evidence-writer-tests",
+      "verify-selection-tests",
+      "verify-suite-registration-check",
+      "verify-suite-registration-tests",
+      "verify-topology-preflight-tests",
+      "windows-assurance-verify-registration-tests",
+      "windows-private-state-tests",
+      "wire-dispatch-budget-hook-tests",
+      "workflow-preflight-tests",
+      "workflow-runner-boundary-tests",
+      "workflow-writer-preflight-tests",
+      "worktree-count-check-tests",
+      "worktree-create-tests",
+      "worktree-lifecycle-tests",
+      "worktree-target-binding-tests",
+      "wsl-ipc-compatibility-tests",
+      "yaml-lite-tests"
+    ],
+    "selectedSuiteIds": [
+      "advisor-capability-preflight-tests",
+      "advisor-consult-v3-tests",
+      "advisory-coordinator-tests",
+      "advisory-decision-event-tests",
+      "advisory-host-bridge-tests",
+      "advisory-lifecycle-v2-tests",
+      "advisory-receipt-assurance-tests",
+      "advisory-receipt-tests",
+      "afk-activation-tests",
+      "afk-assumption-mode-tests",
+      "afk-capability-worker-tests",
+      "afk-claude-host-tests",
+      "afk-git-adapter-tests",
+      "afk-ledger-tests",
+      "afk-review-tests",
+      "afk-transaction-host-tests",
+      "agent-decision-journal-tests",
+      "agent-model-registry-tests",
+      "agents-adapter-migration-check",
+      "agents-adapter-migration-tests",
+      "ai-assisted-hardening-gate-tests",
+      "ai-assisted-hardening-tests",
+      "antigravity-alpha-adapter-tests",
+      "antigravity-execution-host-tests",
+      "antigravity-native-dispatch-coordinator-tests",
+      "antigravity-native-dispatch-pretool-tests",
+      "antigravity-pretool-guard-tests",
+      "artifact-lifecycle-check",
+      "artifact-lifecycle-tests",
+      "artifact-topology-check",
+      "artifact-topology-tests",
+      "async-execution-tests",
+      "audit-bundle-cli-tests",
+      "audit-bundle-core-tests",
+      "audit-evidence-overview-tests",
+      "auth-gate-inventory-drift-check",
+      "auth-gate-inventory-drift-tests",
+      "authority-revision-proof-tests",
+      "authority-tier-agreement-check",
+      "authority-tier-agreement-tests",
+      "backlog-dispatch-reference-tests",
+      "backlog-done-predicate-check",
+      "backlog-done-predicate-tests",
+      "backlog-item-strip-for-dispatch-tests",
+      "backlog-ledger-reconciliation-tests",
+      "backlog-sprint-assignment-check",
+      "backlog-state-check",
+      "backlog-state-tests",
+      "bootstrap-env-check-tests",
+      "bootstrap-payload-budget-tests",
+      "bootstrap-payload-measure-cli-tests",
+      "bootstrap-source-attestation-acceptance-tests",
+      "capture-evidence-tests",
+      "capture-observation-intake-tests",
+      "change-control-cli-tests",
+      "change-control-core-tests",
+      "chat-gate-ceremony-tests",
+      "check-adr-consistency-tests",
+      "check-backlog-sprint-assignment-tests",
+      "check-backlog-state-tests",
+      "check-close-security-completeness-tests",
+      "check-completeness-vocabulary-doclint-tests",
+      "check-critic-contract-citations-tests",
+      "check-critic-skip-coverage-tests",
+      "check-directory-contract-tests",
+      "check-doc-reconciliation-tests",
+      "check-gitignore-anchoring-tests",
+      "check-ownership-tests",
+      "check-protected-path-integrity-tests",
+      "check-release-state-consistency-tests",
+      "check-resume-consumption-tests",
+      "check-review-retry-plan-tests",
+      "check-session-bootstrap-directory-contract-tests",
+      "check-state-phase-consistency-tests",
+      "check-suite-registration-tests",
+      "check-vendored-template-sync-tests",
+      "claude-critic-host-tests",
+      "claude-goal-host-tests",
+      "clean-candidate-run-tests",
+      "close-coordinator-tests",
+      "codex-advisory-app-server-tests",
+      "codex-advisory-bootstrap-tests",
+      "codex-app-server-health-tests",
+      "codex-critic-host-tests",
+      "codex-critic-isolation-tests",
+      "codex-critic-packet-host-tests",
+      "codex-critic-probe-split-tests",
+      "codex-critic-shadow-tests",
+      "codex-goal-host-tests",
+      "codex-host-advisor-route-tests",
+      "codex-host-repository-init-tests",
+      "codex-isolated-critic-claims-tests",
+      "codex-isolated-critic-contract-tests",
+      "codex-isolated-critic-protected-preimage-tests",
+      "codex-isolation-control-decomposition-tests",
+      "codex-native-critic-host-tests",
+      "codex-onboarding-app-server-tests",
+      "codex-onboarding-capabilities-tests",
+      "codex-onboarding-runtime-tests",
+      "codex-plugin-validator-parity-tests",
+      "codex-pretool-guard-tests",
+      "codex-private-overlay-activation-tests",
+      "codex-sandbox-compatibility-tests",
+      "codex-sandbox-preflight-host-control-tests",
+      "codex-sandbox-preflight-plugin-tests",
+      "codex-sandbox-preflight-tests",
+      "codex-sandbox-runtime-tests",
+      "codex-sandbox-select-tests",
+      "codex-session-start-hint-tests",
+      "commit-message-policy-tests",
+      "commit-msg-hook-install-tests",
+      "consumer-baseline-verify-tests",
+      "consumer-safe-paths-tests",
+      "continuity-host-adapter-tests",
+      "continuity-result-bootstrap-tests",
+      "continuity-result-case-migration-tests",
+      "continuity-result-close-tests",
+      "continuity-result-rebind-tests",
+      "continuity-state-tests",
+      "continuity-status-cli-tests",
+      "continuity-status-tests",
+      "control-catalog-drift-tests",
+      "control-catalog-migration-tests",
+      "control-catalog-schema-tests",
+      "control-evaluation-receipt-tests",
+      "control-execution-exchange-tests",
+      "control-execution-lifecycle-event-tests",
+      "control-waiver-lifecycle-tests",
+      "copy-safe-command-tests",
+      "credential-lease-tests",
+      "critic-bare-tests",
+      "critic-dispatch-preflight-tests",
+      "critic-export-policy-tests",
+      "critic-fail-closed-check",
+      "critic-fail-closed-tests",
+      "critic-packet-governance-tests",
+      "critic-review-scope-tests",
+      "critic-route-activation-tests",
+      "critic-skip-coverage-check",
+      "critic-skip-decision-tests",
+      "critic-t1-po-override-tests",
+      "critical-action-approval-request-tests",
+      "critical-action-authorization-tests",
+      "critical-human-proof-gate-tests",
+      "critical-human-proof-policy-tests",
+      "decision-reference-dual-evaluation-tests",
+      "deferred-backlog-check",
+      "deferred-backlog-tests",
+      "delivery-course-tests",
+      "dispatch-authorship-verify-tests",
+      "dispatch-budget-binding-tests",
+      "dispatch-budget-calibration-tests",
+      "dispatch-budget-core-tests",
+      "dispatch-policy-tests",
+      "dispatch-provenance-tests",
+      "dispatch-record-strip-for-critic-tests",
+      "dispatch-record-tests",
+      "dispatch-record-write-tests",
+      "doc-contract-check",
+      "doc-contract-tests",
+      "document-hooks-manifest-tests",
+      "document-hooks-tests",
+      "document-identifier-tests",
+      "document-lifecycle-tests",
+      "entrypoint-reachability-tests",
+      "epic-ac02-publication-check",
+      "epic-ac02-publication-check-tests",
+      "epic-file-contract-tests",
+      "error-register-check",
+      "error-register-tests",
+      "evidence-view-model-tests",
+      "evidence-view-renderer-tests",
+      "evidence-viewer-tests",
+      "execution-plane-launch-tests",
+      "external-command-offer-tests",
+      "external-push-ledger-tests",
+      "external-reference-adapter-tests",
+      "external-reference-tests",
+      "feature-package-topology-tests",
+      "finding-lifecycle-tests",
+      "forge-capability-tests",
+      "gate-estimate-tests",
+      "gate-strength-guard-tests",
+      "generate-elephant-role-prohibitions-tests",
+      "generate-vendored-canon-tests",
+      "git-cmd-tests",
+      "github-actions-permissions-check",
+      "github-actions-permissions-tests",
+      "github-issue-operations-tests",
+      "gitleaks-tests",
+      "governance-action-artifact-tests",
+      "governance-action-events-tests",
+      "governance-authority-resolver-tests",
+      "governance-authority-tests",
+      "governance-event-cli-tests",
+      "governance-event-core-tests",
+      "governance-event-projection-tests",
+      "governance-event-store-tests",
+      "governance-export-adapter-tests",
+      "governance-export-delivery-tests",
+      "governance-export-outbox-store-tests",
+      "governance-export-outbox-tests",
+      "governance-export-tests",
+      "governance-export-view-status-tests",
+      "governance-gate-action-tests",
+      "governance-recovery-reconciliation-action-tests",
+      "governance-replay-cli-tests",
+      "governance-replay-core-tests",
+      "governance-replay-view-tests",
+      "governance-replay-viewer-tests",
+      "governance-review-action-tests",
+      "governance-verification-action-tests",
+      "guard-apply-patch-tests",
+      "guard-authority-ledger-intake-tests",
+      "guard-devplan-tests",
+      "guard-dispatch-budget-tests",
+      "guard-dispatch-tests",
+      "guard-el01-tripwire-tests",
+      "guard-gate-strength-gmw-tests",
+      "guard-gate-strength-ledger-tests",
+      "guard-gate-strength-origin-attestation-tests",
+      "guard-git-phoenix-authority-grant-tests",
+      "guard-git-phoenix-tests",
+      "guard-git-tests",
+      "guard-handoff-offer-tests",
+      "guard-handover-size-tests",
+      "guard-human-override-tests",
+      "guard-lifecycle-ready-tests",
+      "guard-maintenance-window-cli-tests",
+      "guard-maintenance-window-kernel-closure-tests",
+      "guard-maintenance-window-tests",
+      "guard-onboarding-consent-lock-tests",
+      "guard-push-attestation-diagnostics-tests",
+      "guard-push-decision-reference-tests",
+      "guard-push-external-ledger-tests",
+      "guard-push-promotion-tests",
+      "guard-push-release-tag-ancestry-tests",
+      "guard-push-scratch-advisory-tests",
+      "guard-push-tests",
+      "guard-push-v2-tests",
+      "guard-slicing-tests",
+      "guard-testpath-gmw-tests",
+      "guard-testpath-override-tests",
+      "guard-testpath-tests",
+      "handover-rotate-tests",
+      "handover-rotation-tests",
+      "harness-lib-plan-spec-state-v2-tests",
+      "hooks-manifest-shape-tests",
+      "host-advisor-status-tests",
+      "host-advisor-workspace-tests",
+      "human-authority-grant-tests",
+      "human-decision-attribution-tests",
+      "human-governance-ledger-tests",
+      "human-guard-override-tests",
+      "human-role-label-tests",
+      "human-role-rendering-tests",
+      "installed-plugin-attestation-host-tests",
+      "installed-plugin-attestation-tests",
+      "interaction-continuity-tests",
+      "language-canon-check",
+      "language-canon-tests",
+      "lib-plan-spec-state-v2-tests",
+      "license-check-tests",
+      "license-contract-check",
+      "license-contract-tests",
+      "lifecycle-gate-satisfiability-tests",
+      "lifecycle-governance-events-schema-parity-tests",
+      "lifecycle-governance-events-tests",
+      "lifecycle-ready-enforcement-tests",
+      "lifecycle-recovery-contract-tests",
+      "live-runner-certification-tests",
+      "local-supervisor-setup-tests",
+      "local-supervisor-state-tests",
+      "local-worker-pool-tests",
+      "local-worker-supervisor-cli-tests",
+      "local-worker-supervisor-core-tests",
+      "machine-plane-tests",
+      "main-session-route-tests",
+      "manual-check-logic-tests",
+      "measure-tofu-push-e2e-tests",
+      "migrate-backlog-state-tests",
+      "module-cluster-reachability-tests",
+      "native-plugin-readback-tests",
+      "network-lockdown-tests",
+      "neutral-range-plan-tests",
+      "no-autoupdate-key-tests",
+      "notebook-write-coverage-tests",
+      "nova-a8-benchmark-runner-tests",
+      "nova-b2-gitlab-ci-broker-cli-tests",
+      "nova-b2-gitlab-ci-broker-core-tests",
+      "nova-b4-git-transport-contract-tests",
+      "nova-b4-github-forge-adapter-tests",
+      "nova-b4-gitlab-forge-adapter-tests",
+      "nova-backlog-reconciler-cli-tests",
+      "nova-backlog-reconciliation-tests",
+      "nova-benchmark-tests",
+      "nova-candidate-freeze-tests",
+      "nova-critic-lineage-tests",
+      "nova-critic-packet-tests",
+      "nova-execution-plane-real-tests",
+      "nova-execution-plane-tests",
+      "nova-increment-receipt-tests",
+      "nova-invocation-preflight-tests",
+      "nova-invocation-reliability-tests",
+      "nova-macos-acceptance-tests",
+      "nova-release-preflight-tests",
+      "nova-runner-capability-tests",
+      "nova-sandbox-disposition-tests",
+      "nova-sandbox-launch-tests",
+      "nova-scheduling-lifecycle-tests",
+      "nova-verify-journal-tests",
+      "nova-verify-resume-tests",
+      "obligations-contract-tests",
+      "observation-governance-bootstrap-tests",
+      "observation-governance-tests",
+      "onboarding-consent-guard-tests",
+      "onboarding-consent-mark-tests",
+      "onboarding-consent-marker-tests",
+      "onboarding-continuity-tests",
+      "onboarding-init-tests",
+      "onboarding-runner-identity-tests",
+      "organization-policy-activation-tests",
+      "organization-policy-cli-tests",
+      "organization-policy-core-tests",
+      "osv-scanner-tests",
+      "p3b-runner-conformance-tests",
+      "parallel-dispatch-planner-tests",
+      "parallel-sprint-integration-tests",
+      "phase26-invariants-check",
+      "phase26-invariants-tests",
+      "phase3-sdlc-coherence-check",
+      "phase3-sdlc-coherence-tests",
+      "phoenix-authority-approval-tests",
+      "phoenix-governance-threat-model-tests",
+      "pipeline-start-preflight-antigravity-hard-enforcement-tests",
+      "pipeline-start-preflight-pre-push-observation-tests",
+      "pipeline-start-preflight-tests",
+      "pipeline-start-scratch-lifecycle-tests",
+      "pipeline-start-v3-tests",
+      "pipeline-state-approve-announce-tests",
+      "pipeline-state-approve-push-argv-closure-tests",
+      "pipeline-state-decision-reference-tests",
+      "pipeline-state-discard-feature-tests",
+      "pipeline-state-external-push-ledger-tests",
+      "pipeline-state-gate-action-event-tests",
+      "pipeline-state-inspect-tests",
+      "pipeline-state-inspection-contract-tests",
+      "pipeline-state-late-verify-tests",
+      "pipeline-state-lifecycle-event-tests",
+      "pipeline-state-rebind-mutable-tests",
+      "pipeline-state-rebind-runner-tests",
+      "pipeline-state-reopen-design-tests",
+      "pipeline-state-revocation-tests",
+      "pipeline-state-tests",
+      "pipeline-update-channel-tests",
+      "pipeline-user-v3-drift-tests",
+      "plan-spec-state-v2-legacy-tests",
+      "plan-spec-state-v2-tests",
+      "po-approval-gate-tests",
+      "po-approval-proof-tests",
+      "po-gate-authority-fixture-tests",
+      "po-gate-profile-publisher-tests",
+      "po-guarded-push-tests",
+      "po-human-approval-tests",
+      "po-language-projection-check",
+      "po-language-projection-tests",
+      "post-compact-reground-tests",
+      "pr-contributor-gate-tests",
+      "pre-commit-hook-install-tests",
+      "pre-commit-hook-install-trust-anchor-bootstrap-tests",
+      "pre-gate-tests",
+      "pre-push-hook-install-tests",
+      "print-verify-failures-tests",
+      "private-document-binding-tests",
+      "private-overlay-activation-cli-tests",
+      "private-overlay-activation-e2e-tests",
+      "private-overlay-activation-tests",
+      "private-overlay-bootstrap-status-tests",
+      "private-overlay-runtime-projection-tests",
+      "product-capability-inventory-tests",
+      "project-authority-migration-cli-tests",
+      "project-authority-tests",
+      "project-onboarding-e2e-tests",
+      "project-onboarding-ready-gate-tests",
+      "project-onboarding-v3-argv-closure-tests",
+      "project-onboarding-v3-pre-push-hook-offer-tests",
+      "project-onboarding-v3-tests",
+      "project-onboarding-v3-unborn-head-tests",
+      "project-reset-tests",
+      "protected-test-paths-tests",
+      "provenance-attestation-tests",
+      "provenance-envelope-tests",
+      "provenance-fixture-matrix-tests",
+      "provenance-local-builder-tests",
+      "provenance-release-binding-tests",
+      "public-baseline-diagnose-tests",
+      "public-core-observation-tests",
+      "public-core-origin-allowlist-tests",
+      "publication-authority-tests",
+      "publication-bundle-tests",
+      "publication-bundle-v2-tests",
+      "publication-capability-preflight-tests",
+      "publication-close-journal-tests",
+      "publication-executor-productive-flow-tests",
+      "publication-executor-tests",
+      "publication-executor-v2-tests",
+      "publication-gate-evidence-tests",
+      "publication-state-authority-tests",
+      "push-destination-policy-tests",
+      "push-gate-satisfiability-tests",
+      "push-init-tests",
+      "push-prepare-tests",
+      "push-release-flow-docs-contract-tests",
+      "rebase-authority-tests",
+      "recovery-bridge-approval-tests",
+      "recovery-preview-attestation-tests",
+      "reference-catalog-tests",
+      "reference-catalog-views-tests",
+      "reference-path-check",
+      "reference-path-tests",
+      "release-preflight-cli-tests",
+      "release-promotion-envelope-tests",
+      "release-version-plan-tests",
+      "remote-provisional-receipt-tests",
+      "repair-map-tests",
+      "repository-freshness-tests",
+      "repository-path-identity-tests",
+      "requirement-traceability-tests",
+      "resume-consumption-check",
+      "resume-hint-scripts-tests",
+      "resume-hint-tests",
+      "review-economy-tests",
+      "review-retry-plan-check",
+      "review-retry-planner-tests",
+      "rotate-handover-sections-tests",
+      "route-receipt-tests",
+      "routing-projection-check",
+      "routing-projection-tests",
+      "ruleset-freshness-tests",
+      "ruleset-source-tests",
+      "ruleset-update-policy-tests",
+      "run-codex-critic-isolation-tests",
+      "run-codex-critic-probe-split-tests",
+      "run-codex-isolation-control-decomposition-tests",
+      "runner-contracts.schema-tests",
+      "runner-native-continuation-tests",
+      "runner-profile-migration-v2-tests",
+      "runner-profile-migration-v3-tests",
+      "runner-profiles-v2-tests",
+      "runner-profiles-v3-tests",
+      "runner-transcript-recovery-tests",
+      "runner-usage-v1-tests",
+      "runtime-projection-v2-tests",
+      "runtime-projection-v3-tests",
+      "sandboxed-readonly-duty-tests",
+      "sandboxed-readonly-host-bridge-tests",
+      "sbom-discovery-cli-tests",
+      "sbom-discovery-tests",
+      "sbom-fixture-matrix-tests",
+      "sbom-lifecycle-tests",
+      "sbom-manifest-tests",
+      "sbom-node-adapter-tests",
+      "sbom-release-binding-tests",
+      "schema-lite-tests",
+      "scoped-verify-registration-tests",
+      "scripts-pipeline-state-tests",
+      "sdlc-efficiency-metrics-tests",
+      "sdlc-run-graph-tests",
+      "section-citation-check",
+      "section-citation-tests",
+      "security-capability-plan-builder-tests",
+      "security-completeness-gate-tests",
+      "security-evidence-evaluator-tests",
+      "security-evidence-fixture-matrix-tests",
+      "security-evidence-v1-migration-fixture-tests",
+      "security-policy-resolver-tests",
+      "security-readiness-harness-tests",
+      "security-readiness-tests",
+      "security-scan",
+      "security-scan-tests",
+      "security-scan-v2-integration-tests",
+      "self-application-attestation-gate-tests",
+      "self-verify-selection-tests",
+      "semgrep-default-rules-tests",
+      "semgrep-tests",
+      "session-cleanup-binding-tests",
+      "session-cleanup-owner-nonce-tests",
+      "session-cleanup-power-tests",
+      "session-cleanup-recovery-tests",
+      "session-critic-finalizer-tests",
+      "session-power-cli-tests",
+      "session-power-controller-tests",
+      "session-power-core-tests",
+      "settings-allowlist-merge-tests",
+      "setup-check-tests",
+      "setup-tests",
+      "signing-ceremony-tests",
+      "source-observation-tests",
+      "spec-readiness-host-tests",
+      "spec-retention-check",
+      "spec-retention-tests",
+      "stack-adapter-contract-tests",
+      "stack-capability-plan-tests",
+      "stack-discovery-tests",
+      "stack-dynamic-boundary-tests",
+      "stack-fuzz-replay-tests",
+      "stack-run-outcome-tests",
+      "staleness-check-tests",
+      "state-budget-check",
+      "state-budget-tests",
+      "state-numeric-claims-check",
+      "state-numeric-claims-tests",
+      "statusline-context-tests",
+      "stop-suggest-tests",
+      "suite-registration-check",
+      "symlink-capability-tests",
+      "test-case-completion-tests",
+      "test-tmpdir-budget-tests",
+      "test-tmpdir-tests",
+      "threat-model-approval-request-tests",
+      "threat-model-discovery-tests",
+      "threat-model-fixture-matrix-tests",
+      "threat-model-tests",
+      "tmp-leak-enumerate-tests",
+      "tmp-leak-guard-tests",
+      "toolchain-preflight-tests",
+      "transfer-classification-tests",
+      "trust-anchor-bootstrap-circularity-repro-tests",
+      "trusted-tool-resolution-tests",
+      "usage-ledger-tests",
+      "v3-bootstrap-authority-tests",
+      "validate-manifest",
+      "validate-manifest-tests",
+      "verify-case-completion-check",
+      "verify-case-completion-receipt-tests",
+      "verify-case-completion-registry-tests",
+      "verify-evidence-producer-tests",
+      "verify-evidence-root-tests",
+      "verify-evidence-writer-tests",
+      "verify-selection-tests",
+      "verify-suite-registration-check",
+      "verify-suite-registration-tests",
+      "verify-topology-preflight-tests",
+      "windows-assurance-verify-registration-tests",
+      "windows-private-state-tests",
+      "wire-dispatch-budget-hook-tests",
+      "workflow-preflight-tests",
+      "workflow-runner-boundary-tests",
+      "workflow-writer-preflight-tests",
+      "worktree-count-check-tests",
+      "worktree-create-tests",
+      "worktree-lifecycle-tests",
+      "worktree-target-binding-tests",
+      "wsl-ipc-compatibility-tests",
+      "yaml-lite-tests"
+    ],
+    "omittedSuiteIds": [],
+    "matchedAreaIds": [],
+    "unmatchedPaths": [],
+    "fallbackReason": "full-boundary",
+    "ruleSha256": "1c68e1947ee7b39dd8018d8e002e3ed13101d98e4577289d6fc950fa78370595",
+    "changedInputSha256": "610fd4f2495996311951acaa2e3b7972f31b767361294878336a82d15fec40de",
+    "selectionSha256": "121f5878f5b508d817196a30b35c0ea5293929146e135c58bdb8330655c45d26"
+  },
+  "coverage": "repository-calibrated",
+  "verifyManualStatus": null,
+  "exitCode": 1
+}
