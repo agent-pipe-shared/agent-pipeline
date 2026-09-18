@@ -130,6 +130,36 @@ remaining problem rather than re-opening a corrected one.
 | First-session input and read-only prior-session recovery were unreliable. | Implemented and rechecked locally: a >10 KiB first-input E2E is 13/13 through the Git-capable host boundary, and bounded transcript recovery is 4/4; retain the current scope until a live runner disproves it. |
 | Native Windows path, adapter identity, and runtime-hook assertions. | Not promoted without a native, sanitized reproduction; existing platform/runner owners remain authoritative. |
 
+## Nova B audit: unresolved review lifecycle contract — 2026-09-19
+
+**Decision pending; no gate exception adopted.** The ordinary source-change
+selection in `critic` mode includes `critic-skip-coverage-check`. That check
+rejects an otherwise valid pending Critic disposition, while the
+[Operating Model](../docs/operating-model.md) requires the applicable
+deterministic chain to be green before Critic. At candidate
+`90988781b21e266d4561848695463fdaa6ced965`, a real selection probe selected
+555/555 suites, and the actual coverage CLI rejected an isolated valid pending
+T1 record. This reproduces a sequencing conflict, not an independent review.
+
+Proposed resolution: distinguish admission to the specifically bound current
+review from final completion. Validate records and existing evidence at both
+boundaries; require genuine task/candidate/path/digest-bound Critic evidence
+at final completion. Any pre-review pending allowance needs an explicit
+authenticated target and separate qualification/cache semantics. Unrelated
+pending records and malformed or stale evidence must remain blocking. This
+changes the accepted sequencing contract and requires review before adoption;
+removing the check, fabricating receipts or treating a pre-review result as
+release qualification is not a resolution.
+
+A separate record contract prevents truthful terminal records for analysis-only
+dispatches or stopped work with no commit: the validator requires a nonempty
+commit list for every terminal outcome. Define an explicit no-commit lifecycle
+bound to the inspected candidate and report digest, while preserving the
+authorship verifier's rejection of commit-authorship claims without an actual
+authored commit. Existing records must not acquire invented commits or a false
+in-progress status. The multiline report repair in `69c2c66d` does not resolve
+this lifecycle issue, model attestation or the review-ordering conflict.
+
 ## Evidence note: cache identity collision
 
 The current source and the active cache share the exact same Codex build

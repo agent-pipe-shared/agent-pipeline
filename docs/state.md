@@ -30,13 +30,13 @@
 ### 2026-09-19 recovery: Nova-B audit
 
 [Checkpoint](../backlog/evidence/2026-09-18-nova-b-current-code-audit/correction-2026-09-19.md):
-129 items, 94 base ACs plus B61/B62/B7; acceptance open.
-Release Verify `f3f79edf`: RED 549/555; Security passed; exact journal binding.
-`2e1b1bb7` fixes two red doc checks. Publication, D5 acceptance, dispatch-record
-contracts and Critic remain open. Promotion producer/input binding and trusted
-human-terminal reachability are unfinished. Verify ordinary entrypoints for
-all three runners/platforms; fixtures are not native proof. Keep native
-deferrals and collect PO topics. No release approval.
+129 items, 94 base ACs + B61/B62/B7; acceptance open. Release Verify
+`f3f79edf`: RED 549/555, Security green. Doc repair `2e1b1bb7`; multiline
+record repair `69c2c66d`, focused green. Eight records reconciled;
+reviews pending. Review-ordering/no-commit conflicts: [PO queue](../backlog/PO-TOPICS.md).
+Publication, D5, promotion producer/input binding and trusted human-terminal
+reachability open. Check entrypoints across three runners/platforms;
+keep native deferrals. No release approval.
 **Release state:** version `0.6.1` · tag `v0.6.1` · commit `6262d408aa616651232b46ab8ecbfd88ce4055b0` · tree `69b12f1d8714de57e22acb730a09f4bbac067360` · status `published`
 
 **Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
