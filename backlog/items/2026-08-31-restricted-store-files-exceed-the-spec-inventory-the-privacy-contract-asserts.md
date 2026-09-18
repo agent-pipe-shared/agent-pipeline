@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-31
 source: "Independent Critic privacy-sweep review (F1), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md, candidate 4defe09ece85721747f039036356ef80aed1b084"
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 11564c5c3ca41e3ef6aa73af4dd90ca859c6047f
+closure_evidence: backlog/evidence/2026-09-18-privacy-inventory-and-signoff-closure.md
 ---
 
 # Restricted-store files exceed the Spec inventory the privacy contract asserts

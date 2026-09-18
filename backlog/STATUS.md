@@ -15,12 +15,12 @@
 | pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — a mid-task instruction arrives inside a tool-result system-reminder and claims to come from the dispatcher. A dispatch has no way to tell that apart from injected text, and the closed-briefing contract gives it no rule for what to do about it. |
 | pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the dispatch record is the only artifact that binds a commit to its work package, so a Critic needs it; it also carries the implementor's narrative, which the Critic contract forbids as input. There is no way to hand over one without the other. |
-| pipeline.a-doc-edit-silently-obligates-its-vendored-copy | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.a-doc-edit-silently-obligates-its-vendored-copy | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand. |
 | pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
-| pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together | open | defect | pipeline | nova-b | 2026-09-01 | — | — |
+| pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-read-only-command-is-refused-for-naming-a-protected-path | closed | defect | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.a-registered-but-abandoned-worktree-is-never-retired | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.a-runner-improvised-the-po-signature-instructions | open | defect | pipeline | nightwing | 2026-08-27 | — | — |
@@ -59,7 +59,7 @@
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable | open | defect | pipeline | nightwing | 2026-08-28 | — | — |
-| pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run | open | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — a failing suite reports one failure and hides an unknown number of cases that never executed. The gate cannot distinguish 'one case failed' from 'one case failed and eight never ran'. |
+| pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — a failing suite reports one failure and hides an unknown number of cases that never executed. The gate cannot distinguish 'one case failed' from 'one case failed and eight never ran'. |
 | pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.anchor-check-passes-on-wrong-language-content | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths | closed | defect | pipeline | — | 2026-08-23 | 2026-08-30 | — |
@@ -104,7 +104,7 @@
 | pipeline.briefing-bundling-two-findings-asks-for-two-dispatches | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem. |
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.budget-guard-test-suite-silent-pass | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- guard-dispatch-budget.test.mjs imports its module at the test file's own module scope. If that guard's entrypoint gate ever regresses to an unconditional top-level body, the import calls process.exit at module-evaluation time and node --test reports the whole file as ONE PASSING TEST with no assertion having run. The sibling suite guard-dispatch.test.mjs had the identical shape and it was removed in e4aeb8fe; this one was on that package's no-go list and was carried forward in a commit message body, which is not a tracked mitigation. |
-| pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy | open | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes. |
+| pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes. |
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
@@ -112,7 +112,7 @@
 | pipeline.capture-evidence-refuses-fixture-literal-as-host-path | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- capture-evidence.mjs's windows-drive-letter leak heuristic (scripts/capture-evidence.mjs:120) matches a synthetic fixture literal such as C:\Users\Foo\repo inside a test's own description and body, and on any match refuses to write the capture (:197). The tool has no allowlist. Consequence measured 2026-09-06: guard-maintenance-window-tests clears every serial-lane safety signal and passes solo 62/62, but its self-race evidence cannot be captured because GMW45's description contains that literal -- so the suite stays in the lane on a tooling refusal, not a safety finding, at 16.3s of lane time. |
 | pipeline.chat-gate-non-ascii-name-windows | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | — | 2026-08-25 | — | — |
-| pipeline.ci-failure-reporter-has-no-recorded-requirement | open | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec. |
+| pipeline.ci-failure-reporter-has-no-recorded-requirement | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec. |
 | pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.ci-topology-preflight-cannot-pass-on-this-branch | closed | defect | pipeline | none | 2026-08-28 | — | — |
 | pipeline.citation-coordinate-checker-bare-basename | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -150,7 +150,7 @@
 | pipeline.compaction-stable-bootstrap-lease | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | — | 2026-08-10 | — | — |
 | pipeline.complete-adr-governs-coverage-before-reader-review-binding | closed | requirement | pipeline | nova-b | 2026-09-07 | — | — |
-| pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | open | defect | pipeline | nova-b | 2026-09-01 | 2026-09-30 | — |
+| pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches | closed | defect | pipeline | nova-b | 2026-09-01 | 2026-09-30 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.concurrent-session-prevention-supersedes-a-ac-01 | closed | requirement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.consumer-must-allowlist-every-runner-lane | closed | workflow-improvement | pipeline | nova-b | 2026-08-28 | — | Nova B — onboarding should write the permission entries a consumer needs, instead of leaving a second blocking layer undocumented |
@@ -324,7 +324,7 @@
 | pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.inode-identity-decides-deletion-in-a-second-rollback-path | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source | closed | defect | pipeline | nova | 2026-08-29 | — | PO decision 2026-08-29: candidate 3 (accept as inherent), documented permanently. |
-| pipeline.installed-plugin-copy-stale-vs-repo-source | open | defect | pipeline | nova-b | 2026-09-06 | 2026-09-30 | Nova B — a T1 Critic reviewing NVA-B-TILDEFIX-1 ran a live reachability probe (a synthetic marker path, never a real credential) and found the shell-expanded tilde was ADMITTED AND EXECUTED by the guard actually enforcing that dispatch's own session — even though the source fix is confirmed present and Critic-approved in the reviewed working tree. Traced by the Elephant: the enforcing hook is loaded from the installed marketplace copy (/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs), a plain regular file (not a symlink) last modified 2026-09-04 07:42, which diverges from the repo's own copy by roughly six commits and predates NVA-B-READCONTAIN-1 entirely, not only NVA-B-TILDEFIX-1. |
+| pipeline.installed-plugin-copy-stale-vs-repo-source | closed | defect | pipeline | nova-b | 2026-09-06 | 2026-09-30 | Nova B — a T1 Critic reviewing NVA-B-TILDEFIX-1 ran a live reachability probe (a synthetic marker path, never a real credential) and found the shell-expanded tilde was ADMITTED AND EXECUTED by the guard actually enforcing that dispatch's own session — even though the source fix is confirmed present and Critic-approved in the reviewed working tree. Traced by the Elephant: the enforcing hook is loaded from the installed marketplace copy (/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs), a plain regular file (not a symlink) last modified 2026-09-04 07:42, which diverges from the repo's own copy by roughly six commits and predates NVA-B-READCONTAIN-1 entirely, not only NVA-B-TILDEFIX-1. |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | — | 2026-08-16 | 2026-08-20 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.intake-generate-coordinator-path-undocumented-in-skill-references | closed | defect | pipeline | — | 2026-08-24 | — | — |
@@ -482,8 +482,8 @@
 | pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile | closed | idea | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.push-approval-signature-commands-also-line-wrap | closed | defect | pipeline | — | 2026-08-10 | — | — |
 | pipeline.push-approval-skill-reference-predates-adr-0061 | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
-| pipeline.push-artifacts-precede-operator-intent | open | workflow-improvement | pipeline | nova-b | 2026-09-17 | — | — |
-| pipeline.push-flow-needs-one-remote-readback-transaction | open | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps. |
+| pipeline.push-artifacts-precede-operator-intent | closed | workflow-improvement | pipeline | nova-b | 2026-09-17 | — | — |
+| pipeline.push-flow-needs-one-remote-readback-transaction | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps. |
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | — | 2026-08-09 | 2026-08-10 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
 | pipeline.push-gate-unsatisfiable-in-consumer-deployment | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — happy-path blocking, and the most severe finding of the day: a correctly-signed push cannot land in ANY consumer deployment. Also blocks the security-gate-ON decision, whose measurement was taken in the one environment where this defect does not fire. |
@@ -525,7 +525,7 @@
 | pipeline.resolved-backlog-items-can-keep-status-open-indefinitely | closed | defect | pipeline | nova-b | 2026-08-27 | — | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | — | 2026-08-06 | 2026-09-05 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
-| pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts | open | defect | pipeline | nova-b | 2026-08-31 | — | — |
+| pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage | closed | defect | pipeline | nova-b | 2026-08-31 | 2026-10-31 | — |
 | pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
@@ -588,10 +588,10 @@
 | pipeline.t1-governance-path-preflight | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | closed | workflow-improvement | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
-| pipeline.template-scripts-for-human-terminal-actions | open | idea | pipeline | nova-b | 2026-08-29 | — | Nova B -- runner-neutral design reviewed; catalog, POSIX runner, and first producer adoption implemented; native Windows launcher hardening is deferred. |
+| pipeline.template-scripts-for-human-terminal-actions | closed | idea | pipeline | nova-b | 2026-08-29 | — | Nova B -- runner-neutral design reviewed; catalog, POSIX runner, and first producer adoption implemented; native Windows launcher hardening is deferred. |
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | alfred | 2026-08-08 | 2026-08-15 | — |
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | — | 2026-08-17 | — | — |
-| pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | open | defect | pipeline | nova-b | 2026-08-28 | — | Scheduled for Nova B (PO decision 2026-08-28) |
+| pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package | closed | defect | pipeline | nova-b | 2026-08-28 | — | Scheduled for Nova B (PO decision 2026-08-28) |
 | pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink | closed | defect | pipeline | nova-b | 2026-09-07 | — | — |
 | pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries | closed | defect | pipeline | nova-b | 2026-09-06 | — | — |
@@ -603,7 +603,7 @@
 | pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers | closed | requirement | pipeline | — | 2026-08-27 | — | — |
-| pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | open | defect | pipeline | nova-b | 2026-08-31 | — | — |
+| pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate | closed | defect | pipeline | nova-b | 2026-08-31 | — | — |
 | pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable | closed | defect | pipeline | nova-b | 2026-09-02 | — | — |
 | pipeline.the-sandbox-preflight-app-server-handshake-is-a-race | closed | defect | pipeline | nova-b | 2026-09-06 | — | — |
@@ -638,7 +638,7 @@
 | pipeline.two-signature-ceremonies-overwrite-each-others-proof | open | defect | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.two-v3-scripts-admitted-but-unnamed | closed | defect | pipeline | nova | 2026-08-29 | — | NOW / Nova A — found by NVA-W8-VERIFYREG2's own new reachability check running against this repository |
 | pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime | closed | defect | pipeline | nova | 2026-08-29 | — | — |
-| pipeline.unenforced-process-rules-vary-by-runner | open | defect | pipeline | nova-b | 2026-08-28 | 2026-09-30 | Nova B |
+| pipeline.unenforced-process-rules-vary-by-runner | closed | defect | pipeline | nova-b | 2026-08-28 | 2026-09-30 | Nova B |
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | — | 2026-08-02 | 2026-08-30 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.universal-human-command-renderer | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | closed | defect | pipeline | — | 2026-08-07 | 2026-08-21 | — |
@@ -681,8 +681,8 @@
 
 ## Counts
 
-- open: 52
+- open: 38
 - in_progress: 0
-- closed: 607
+- closed: 621
 - rejected: 3
 - deferred: 11

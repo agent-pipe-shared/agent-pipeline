@@ -3,13 +3,17 @@ schema: pipeline.backlog-item.v1
 id: pipeline.unenforced-process-rules-vary-by-runner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
 due: 2026-09-30
 sprint: nova-b
 tracking: "Nova B"
 source: "Greenfield happy-path test of candidate 0.6.0 across all three runners, 2026-08-28. Independent self-analyses: Claude/Windows (docs/pipeline-haertungstest-und-analyse.md), Agy/WSL (pipeline-analysis.md), Codex/WSL (docs/pipeline-session-analysis-2026-08-28.md), plus the PO's own cross-run observations."
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 0be90b61c431bba82a25e39b194c8e74289d024e
+closure_evidence: backlog/evidence/2026-09-18-process-rules-and-concurrent-dispatch-closure.md
 ---
 
 # The rules no guard enforces are followed very differently by each runner — the rework limit failed by a factor of five

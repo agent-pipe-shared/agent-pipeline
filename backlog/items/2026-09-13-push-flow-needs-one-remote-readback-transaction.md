@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-flow-needs-one-remote-readback-transaction
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps."
 source: "evidence/pipeline-retrospective-2026-09-13.md §4 and recommendations."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 11564c5c3ca41e3ef6aa73af4dd90ca859c6047f
+closure_evidence: backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md
 ---
 
 # Push approval, audit fold, push, and remote readback are not one completed transaction

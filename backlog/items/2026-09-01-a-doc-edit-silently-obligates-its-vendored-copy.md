@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-doc-edit-silently-obligates-its-vendored-copy
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 sprint: nova-b
 source: "Measured live, twice, in the 2026-09-01 0.6.0 release range: docs/push-release-flow.md drift caught in commit 62ba638b, docs/adr/0076-global-chat-attributed-unattested-approval-mode.md drift caught in commit 56e91858."
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: a64b09eafb3986ae1259806f01d7321b638897e2
+closure_evidence: backlog/evidence/2026-09-18-ai-hardening-and-doc-obligations-closure.md
 ---
 
 # A doc edit silently obligates its vendored copy

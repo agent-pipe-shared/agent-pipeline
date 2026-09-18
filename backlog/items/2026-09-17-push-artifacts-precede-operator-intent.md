@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-artifacts-precede-operator-intent
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-17
 source: "evidence/codex-pipeline-session-analysis.md and evidence/pipeline-analysis-claude-session.md, independently compared with the 0.6.2 push-init experience on 2026-09-17."
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 11564c5c3ca41e3ef6aa73af4dd90ca859c6047f
+closure_evidence: backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md
 ---
 
 # Push preparation materializes signature-adjacent artifacts before a clear operator intent

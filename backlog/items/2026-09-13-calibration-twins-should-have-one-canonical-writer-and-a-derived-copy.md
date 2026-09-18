@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes."
 source: "evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md §§55–89."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 11564c5c3ca41e3ef6aa73af4dd90ca859c6047f
+closure_evidence: backlog/evidence/2026-09-18-installed-plugin-and-calibration-twins-closure.md
 ---
 
 # `project/pipeline.json` and `.claude/pipeline.json` are twins without an explicit source-of-truth model

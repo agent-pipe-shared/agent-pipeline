@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.template-scripts-for-human-terminal-actions
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-29
 sprint: nova-b
 tracking: "Nova B -- runner-neutral design reviewed; catalog, POSIX runner, and first producer adoption implemented; native Windows launcher hardening is deferred."
 source: "PO inline observation (2026-08-29, 3-runner greenfield synthesis): Antigravity was the only runner to move quickly through the first 2 phases, in part because it built its OWN scripts to confirm the PRD faster. PO suggests: pre-built template scripts (that runners lightly rewrite, with clear placeholders) for fixed gates/installs/anything the human must run in a terminal, so what needs filling in is always clear."
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: e4d7539d5684f59f3f817670e8a52f70e06e8b3a
+closure_evidence: backlog/evidence/2026-09-18-human-terminal-templates-closure.md
 ---
 
 # Idea: template scripts for fixed human-terminal actions, pointing at drivers/hooks, that runners lightly rewrite instead of composing from scratch
