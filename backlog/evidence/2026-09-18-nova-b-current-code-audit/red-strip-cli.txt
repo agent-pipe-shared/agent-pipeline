@@ -1,0 +1,62 @@
+command: node --test plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.test.mjs
+label: strip-cli-audit
+exitCode: 1
+--- stdout ---
+✔ run() strips Triage prose from a backlog item file and writes it to --out (5.071375ms)
+✔ run() requires --item (0.322889ms)
+✔ run() rejects an unknown flag (0.09828ms)
+✖ the tracked Greenfield Critic spec is exactly the dispatch-safe projection of its backlog item (1.454095ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46.706651
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.test.mjs:41:1
+✖ the tracked Greenfield Critic spec is exactly the dispatch-safe projection of its backlog item (1.454095ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+    '---\n' +
+      'schema: pipeline.backlog-item.v1\n' +
+      'id: pipeline.greenfield-browser-evidence-is-not-portably-provisioned\n' +
+      'type: workflow-improvement\n' +
+      'owner: pipeline\n' +
+  +   'status: open\n' +
+  -   'status: closed\n' +
+      'done_when: manual\n' +
+      'created: 2026-09-13\n' +
+      'sprint: nova-b\n' +
+      'tracking: "Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable."\n' +
+      'source: "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md."\n' +
+  -   'closed_at: 2026-09-18\n' +
+  -   'closure_repository: self\n' +
+  -   'closure_commit: 02d8d1db47fb14555dc77b4d5b048fbbdbf814e0\n' +
+  -   'closure_evidence: backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md\n' +
+      '---\n' +
+      '\n' +
+      '# Greenfield projects cannot reliably obtain the browser evidence their product claims invite\n' +
+      '\n' +
+      'The external Greenfield-runner reports describe a disposable browser fixture\n' +
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.test.mjs:47:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `---\nschema: pipeline.backlog-item.v1\nid: pipeline.greenfield-browser-evidence-is-not-portably-provisioned\ntype: workflow-improvement\nowner: pipeline\nstatus: open\ndone_when: manual\ncreated: 2026-09-13\nsprint: nova-b\ntracking: "Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable."\nsource: "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md."\n---\n\n# Greenfield projects cannot reliably obtain the browser evidence their product claims invite\n\nThe external Greenfield-runner reports describe a disposable browser fixture\nthat could be checked with static or offline suites, while Playwright/browser\nexecution was unavailable in some runners because dependencies or a browser\nwere absent.  The resulting evidence is honest, but the capability gap is\ndiscovered late and differs by runner.  This repository contains the pipeline,\nnot that fixture: the fixture is intentionally deleted after each runner test\nand is not a product, release artifact, or supported application here.\n\n## Direction\n\nProvide a portable browser-evidence preflight that either prepares the required\ndependency/browser through an authorized host boundary or records a typed\ndegraded-evidence result before implementation starts.  Product claims and\nrelease criteria must then consume that result explicitly.\n\n## Acceptance criteria\n\n- The preflight distinguishes unavailable tooling from a failed browser test.\n- It never installs dependencies or downloads browsers without the applicable\n  host/PO authority.\n- Consumer verification and CI can reproduce the selected evidence mode.\n\n<!-- SPEC-REFERENCE-STRIPPED-TRIAGE: this section of the original backlog item has been removed for dispatch citation. It recorded a prior human or Critic verdict about this item -- never spec/reference content -- and would otherwise contaminate an independent downstream review or implementation. See the item's own file for the full history. Convention: backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md. -->\n`,
+    expected: `---\nschema: pipeline.backlog-item.v1\nid: pipeline.greenfield-browser-evidence-is-not-portably-provisioned\ntype: workflow-improvement\nowner: pipeline\nstatus: closed\ndone_when: manual\ncreated: 2026-09-13\nsprint: nova-b\ntracking: "Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable."\nsource: "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md."\nclosed_at: 2026-09-18\nclosure_repository: self\nclosure_commit: 02d8d1db47fb14555dc77b4d5b048fbbdbf814e0\nclosure_evidence: backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md\n---\n\n# Greenfield projects cannot reliably obtain the browser evidence their product claims invite\n\nThe external Greenfield-runner reports describe a disposable browser fixture\nthat could be checked with static or offline suites, while Playwright/browser\nexecution was unavailable in some runners because dependencies or a browser\nwere absent.  The resulting evidence is honest, but the capability gap is\ndiscovered late and differs by runner.  This repository contains the pipeline,\nnot that fixture: the fixture is intentionally deleted after each runner test\nand is not a product, release artifact, or supported application here.\n\n## Direction\n\nProvide a portable browser-evidence preflight that either prepares the required\ndependency/browser through an authorized host boundary or records a typed\ndegraded-evidence result before implementation starts.  Product claims and\nrelease criteria must then consume that result explicitly.\n\n## Acceptance criteria\n\n- The preflight distinguishes unavailable tooling from a failed browser test.\n- It never installs dependencies or downloads browsers without the applicable\n  host/PO authority.\n- Consumer verification and CI can reproduce the selected evidence mode.\n\n<!-- SPEC-REFERENCE-STRIPPED-TRIAGE: this section of the original backlog item has been removed for dispatch citation. It recorded a prior human or Critic verdict about this item -- never spec/reference content -- and would otherwise contaminate an independent downstream review or implementation. See the item's own file for the full history. Convention: backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md. -->\n`,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

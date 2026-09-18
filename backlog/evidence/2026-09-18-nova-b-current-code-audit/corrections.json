@@ -1,0 +1,113 @@
+{
+  "schema": "nova-b-audit.coordinator-corrections.v1",
+  "candidate": "396f9b7c366fd874bf7e7d1317074271e68d466e",
+  "entries": [
+    {
+      "id": "pipeline.guard-denial-messages-repeat-70-lines-of-boilerplate",
+      "report": "02v4",
+      "disposition": "reported absence disproved; native delivery remains unverified",
+      "evidence": [
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:5060",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8221",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8362"
+      ],
+      "reason": "Session/agent scoped first-full then repeat-short state and behavioral regression tests exist. The report inspected the unrelated copy-safe renderer. Full fresh Verify and batch04 executed the actual guard suite successfully."
+    },
+    {
+      "id": "pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing",
+      "report": "02v4",
+      "disposition": "reported mechanism absence disproved; acceptance and adapter delivery still require reconciliation",
+      "evidence": [
+        "docs/adr/0080-parallel-dispatch-slicing-enforcement.md",
+        "plugins/pipeline-core/hooks/guard-slicing.mjs",
+        "plugins/pipeline-core/hooks/hooks.json:132",
+        "plugins/pipeline-core/hooks/native-slicing.mjs",
+        "plugins/pipeline-core/hooks/codex-slicing-hint.mjs",
+        "plugins/pipeline-core/hooks/antigravity-slicing-hint.mjs",
+        "harness/scripts/verify.mjs:352"
+      ],
+      "reason": "An ADR and a registered nonblocking advisory exist. Existence does not establish hard enforcement or native three-runner delivery."
+    },
+    {
+      "id": "pipeline.manifest-language-repair-demands-a-full-process-restart",
+      "report": "02v4",
+      "disposition": "focused test claim invalid; assess actual library suite and precise repair scenario",
+      "evidence": [
+        "scratch/nova-b-audit/captures/02v4-gates-overview.json",
+        "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs:4679",
+        "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs:7257"
+      ],
+      "reason": "The captured multi-file node --test command names nonexistent scripts/project-onboarding-v3.test.mjs. Exit zero of the aggregate cannot prove execution of that file. The real suite is in lib/. Existing projection-drift tests still require restart when runtime projection changes. Manifest-only repair is separately covered."
+    },
+    {
+      "id": "all",
+      "report": "all",
+      "disposition": "normalize proof levels conservatively",
+      "reason": "Runner-neutral Node tests executed on Linux/WSL do not prove actual Codex/Claude/Antigravity integration, and WSL does not prove native Windows. Gap labels for absent live tests are evidence gaps, not automatically implementation defects. Source baseline 9c179fc and tested HEAD 396f9b7c have identical production code but different documentation trees; preserve both identities explicitly."
+    },
+    {
+      "id": "pipeline.ci-failure-reporter-has-no-recorded-requirement",
+      "report": "05",
+      "disposition": "reported absence of contract and entrypoint disproved; final signature/review claims not established",
+      "evidence": [
+        "docs/adr/0084-ci-failure-reporter-public-log-boundary.md",
+        "harness/scripts/print-verify-failures.mjs",
+        "harness/scripts/print-verify-failures.test.mjs",
+        "harness/scripts/verify.mjs:832",
+        ".github/workflows/verify.yml:74"
+      ],
+      "reason": "Accepted ADR names the public log requirement, workflow invokes reporter on failure, and complete Verify executes its suite. This does not prove the final candidate Privacy/Threat-Model ceremony."
+    },
+    {
+      "id": "pipeline.release-evidence-promotion-repeats-full-qualification",
+      "report": "coordinator",
+      "disposition": "reproduced validator defect plus missing producer wiring",
+      "evidence": [
+        "scratch/nova-b-audit/promotion-negative-probe.json",
+        "scratch/nova-b-audit/probe-promotion-validation.mjs",
+        "plugins/pipeline-core/lib/release-promotion-envelope.mjs:195",
+        "plugins/pipeline-core/hooks/guard-push.mjs:2044",
+        "plugins/pipeline-core/scripts/push-prepare.mjs:169"
+      ],
+      "reason": "validateReleasePromotionEnvelope accepts both absent and explicitly incomplete sourceQualification when the public envelope digest is recomputed. Read-only negative probe exit 1. Production discovery finds consumers but no caller of createReleasePromotionEnvelope outside its defining module (search plugins and harness excluding tests); regular pipeline production of the envelope is not established. The validator does not reread canonical source receipts or recompute their policy/environment bindings."
+    },
+    {
+      "id": "pipeline.template-scripts-for-human-terminal-actions",
+      "report": "02v4",
+      "disposition": "public run success unreachable with shipped CLI; two named suites do not exist",
+      "evidence": [
+        "plugins/pipeline-core/scripts/human-terminal-action.mjs:46",
+        "plugins/pipeline-core/lib/human-terminal-action-instance.mjs:290",
+        "plugins/pipeline-core/lib/human-terminal-action-instance.mjs:176",
+        "scratch/nova-b-audit/captures/02v4-runner-terminal.json"
+      ],
+      "reason": "Only production caller invokes runHumanTerminalAction(input) without deps; run requires deps.callerEvidence.trusted and other attended-boundary fields, whose default is null. Therefore any request that reaches that guard is refused. No production producer of callerEvidence was found. This is an intentionally fail-closed boundary, not a reason to delete the guard. Prepare/inspect explicitly refuse win32. Missing tests in the aggregate command cannot prove either library."
+    },
+    {
+      "id": "acceptance-group-AC3",
+      "report": "AC3",
+      "disposition": "distinguish fulfilled synthetic contracts from unimplemented live capability; do not treat every missing provider as a regression",
+      "evidence": [
+        "specs/sprint-nova-epic/plans/nova-b.md:222",
+        "specs/sprint-nova-epic/plans/nova-b.md:237",
+        "plugins/pipeline-core/lib/async-execution.mjs",
+        "plugins/pipeline-core/lib/credential-lease.mjs"
+      ],
+      "reason": "Accepted B2-C explicitly implements pure validators with synthetic brokers/jobs only. B2-I is explicitly a token-free network-free local reducer, not a provider capability or live pilot. Passing deterministic fixtures may satisfy contract ACs while still failing the broader current user goal of active runtime functionality. Production import search finds async-execution has no consumer; credential-lease is used by that synthetic reducer only. Do not relabel intentionally scoped synthetic work as a reproduced runtime defect."
+    },
+    {
+      "id": "acceptance-group-AC1r3",
+      "report": "AC1r3",
+      "disposition": "AC17 measurement absence disproved; exact requested token budget and native continuation wiring remain unproved",
+      "evidence": [
+        "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs:1347",
+        "plugins/pipeline-core/hooks/post-compact-reground.mjs:271",
+        "plugins/pipeline-core/lib/bootstrap-payload-budget.mjs:20",
+        "harness/scripts/verify.mjs:507",
+        "harness/scripts/verify.mjs:513",
+        "plugins/pipeline-core/hooks/stop-suggest.mjs:47"
+      ],
+      "reason": "Normal bootstrap and post-Compact emit privacy-safe payload measurements. Current shared ceiling is 45000 UTF-8 byte upper-bound units, explicitly not model tokens; this does not by itself establish the ACs 10-15k token budget. Corresponding bootstrap measurement suites are registered and passed in the fresh full Verify. No production caller of the native goal reconciliation wrappers was found by the bounded source search. Original AC17 absence claim must not be repeated. AC18 is a contract-reconciliation question: stop-suggest explicitly documents removal of its former context-budget and soft-nudge machinery in NVA-B-NOCOMPACT-1 on 2026-09-04. The unchanged acceptance text still demands a 400k/500k soft nudge. Do not silently reintroduce the removed mechanism or claim its acceptance was met."
+    }
+  ]
+}

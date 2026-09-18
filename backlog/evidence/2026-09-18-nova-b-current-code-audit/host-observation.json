@@ -1,0 +1,16 @@
+{
+  "schema": "nova-b-audit.host-observation.v1",
+  "platform": "linux",
+  "architecture": "x64",
+  "wsl": true,
+  "node": "v24.15.0",
+  "runnerVersionCommands": [
+    {"command": "claude --version", "exitCode": 0, "output": "2.1.274 (Claude Code)"},
+    {"command": "codex --version", "exitCode": 0, "output": "codex-cli 0.155.1"}
+  ],
+  "antigravityInPath": false,
+  "assurance": "Version observation only; no installed-consumer model workflow, native Windows, or native macOS execution is established.",
+  "nativeHostsProvidedForThisAudit": false,
+  "ciWorkflowPlatforms": ["ubuntu-latest"],
+  "liveCertificationProvider": "codex-sandbox-preflight"
+}
