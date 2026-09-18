@@ -448,6 +448,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/dispatch-policy.mjs",
   "plugins/pipeline-core/lib/governance-hgo-consumption-action.mjs",
   "plugins/pipeline-core/lib/governance-hgo-consumption-source.mjs",
+  // Nova B candidate promotion and evidence capture transitive closure (GMWKC01):
+  // guard-lifecycle-ready.mjs imports capture-evidence.mjs;
+  // push-prepare.mjs imports release-promotion-envelope.mjs.
+  "plugins/pipeline-core/scripts/capture-evidence.mjs",
+  "plugins/pipeline-core/lib/release-promotion-envelope.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

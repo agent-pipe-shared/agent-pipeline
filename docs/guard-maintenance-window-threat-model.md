@@ -246,6 +246,12 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/governance-hgo-consumption-source.mjs`. Already-kernel dispatch-budget
   and HGO enforcement modules import these delegates, so a maintenance window
   cannot rewrite the delegated decision or its durable evidence.
+- The 2026-09-18 Nova B candidate promotion and evidence closure adds
+  `scripts/capture-evidence.mjs` and `lib/release-promotion-envelope.mjs`.
+  `guard-lifecycle-ready.mjs` imports `capture-evidence.mjs` and
+  `push-prepare.mjs` imports `release-promotion-envelope.mjs`, so neither
+  evidence capture nor candidate release promotion can be altered via a
+  maintenance window.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
