@@ -5,6 +5,43 @@
 
 ## Archived history
 
+## Alfred continuation checkpoint — 2026-09-18
+
+The current work in this checkout is the PO-requested Alfred 0.7.0 candidate
+qualification on top of Nova. The retained Nova lifecycle projection remains
+`sprint-nova-epic` / implementation with its recorded plan approval; this note
+does not change that authority or claim Alfred acceptance.
+
+Current committed candidate: `f9649b0b1cb6a628320e6161a920af15bb143e5b`.
+Full Verify run `verify-1789762105324-22df756734f4055a` completed 573 steps:
+571 passed; security and onboarding case-completion registration failed.
+All 283 onboarding tests passed, but the registry declared only 281. The PO
+signed intent `6c7a08957c9a04035c220742807d42ee9644e83156cc7278e051e0c723200712`;
+the exact one-use authorization was accepted and the 281-to-283 edit applied
+locally and committed at `52e20bcc4804127662e82a24fd2e4cc6212888b5` after
+independent finalization checks. It is not yet covered by a new full Verify.
+
+The 78 archive scanner findings are exact `evidence.supersedesEntryHash`
+matches. The PO approved exactly these content-bound exceptions, now applied
+with exact-once readback and unchanged archive hashes. The focused adapter
+suite passes 23/23 at the WSL-host boundary; clean-candidate full verification
+remains pending. Prepared evidence and the
+remaining decisions are in
+[the Alfred PO queue](../specs/sprint-alfred-epic/evidence/po-decision-queue.md).
+Complete that bounded exception disposition, then a clean-candidate Verify,
+the requested full Alfred Critic and fresh correction review, and disposition
+of all findings. The productive Codex-to-Antigravity Flash High route remains
+required for 0.7.0 after the current repair/review work; the fixture seam alone
+does not satisfy it. Installation belongs to the user; no agent push or
+publication is authorized by this checkpoint.
+
+The runtime interruption was repaired by the operator. Fresh bootstrap
+observation reports `CAS-READY` and `readback-current`; no native child or
+isolation claim follows. The older Nova handover below is retained context,
+not the current Alfred candidate result.
+
+### Earlier handover archive index
+
 | Date range | Summary | Archive |
 |---|---|---|
 | 2026-09-09 | Archive superseded 2026-09-09 candidate and lifecycle checkpoints | [docs/state-archive/2026-09-14--superseded-lifecycle-and-candidate-checkpoints.md](state-archive/2026-09-14--superseded-lifecycle-and-candidate-checkpoints.md) |

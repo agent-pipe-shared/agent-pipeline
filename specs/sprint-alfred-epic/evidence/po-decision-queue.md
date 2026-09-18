@@ -1,6 +1,6 @@
 # Alfred autonomous continuation — PO decision queue
 
-Updated 2026-09-13. This is the collection point for decisions that genuinely
+Updated 2026-09-18. This is the collection point for decisions that genuinely
 need the PO during the approved Alfred continuation. It is not a new approval
 mechanism, a substitute for signed gates, or a record of feature acceptance.
 
@@ -21,6 +21,59 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
   or a typed hard block without a safe recovery route.
 
 ## PO decisions
+
+### Current full Verify — completed, two pending gates, 2026-09-18
+
+Candidate `f9649b0b1cb6a628320e6161a920af15bb143e5b`, tree
+`d2a4fd204139fea7e9427ef71a179436b85c8664`, completed all 573 Verify
+steps: 571 passed, two failed. Run `verify-1789762105324-22df756734f4055a`
+terminated failed at `2026-09-18T20:12:25.437Z`; terminal SHA-256 is
+`fd37c5c0ccac2234cbcf47a3ec0c4a42c477e199baeda995a43ae80779d71815`.
+The onboarding suite itself passed 283/283; only its completion declaration
+failed. The other failure is the security scan discussed below. The exact
+single-purpose registration change remains pending under TP-3. No green
+Verify, completed 1+1 Critic, release acceptance, installation, or publication
+is claimed. The raw local journal is under
+`.git/agent-pipeline/verify/runs/verify-1789762105324-22df756734f4055a/`.
+
+### Alfred archive scanner collisions — PO approved and applied, 2026-09-18
+
+The PO explicitly approved the described 78 exact content-bound exceptions
+on 2026-09-18 ("ich genehmige die ausnahmen"). This resolves the bounded
+exception decision only, not Security, Verify, Critic or release acceptance.
+A fresh scoped application dispatch is authorized; its readback and candidate
+checks must precede any claim that the scanner gate is green. New PO topics
+are collected here while independent authorized work continues autonomously.
+
+Application readback: all 78 entries are present exactly once, original ignore
+bytes are preserved as a prefix, and both archive hashes are unchanged. The
+worker's focused test initially exited 1; the coordinator's WSL-host rerun
+passed 23/23 without skips. This rerun is not a full Security pass. See
+[application evidence](alfred-scanner-exceptions-applied-2026-09-18.json).
+
+Affected package: full Alfred 0.7.0 qualification. A bounded diagnostic of
+the two committed Alfred transition archives found 78 scanner matches, all
+exactly equal to the 64-hex `evidence.supersedesEntryHash` field. This is not
+a blanket security clearance. Candidate, archive content hashes, rule and
+location bindings, and proposed content-specific fingerprints are recorded
+in [the sanitized diagnostic](alfred-ledger-secret-triage-2026-09-18.json).
+No raw scanner secrets are included; no new exception remains applied.
+
+A preparation dispatch briefly appended the proposed exceptions despite its
+no-write scope. The coordinator stopped it and reverted exactly that append
+before the subsequent PO-approved apply; see the
+[scope incident and rollback](scanner-preparation-scope-incident-2026-09-18.md).
+That incident was not PO authorization and did not authorize the later apply.
+
+Decision requested: authorize only the individually listed `content-v1`
+exceptions after checking the bound archive hashes and fingerprints.
+Recommendation: use those exact content-bound entries through the sanctioned
+authority writer, then rerun Security and full Verify. Alternatives: defer
+and keep the gate red, or separately approve a broader archive-path policy;
+the latter is not recommended because it would cover future unrelated
+content. Do not mutate the immutable archives or weaken scanner detection.
+Deferral blocks green full Verify and its dependent Critic/release gates,
+but does not retract the existing approved 0.7.0 scope.
 
 ### 0.7.0 cross-runner delivery scope — approved, implementation follows repairs
 
@@ -43,7 +96,19 @@ would contradict the current instruction. Existing A1 acceptance from the
 user-repository live test remains accepted, but must not be relabelled as
 candidate-bound E3 execution evidence.
 
-### Verify case-completion registration — signature pending, 2026-09-18
+### Verify case-completion registration — signed and applied, 2026-09-18
+
+Update: the PO signed intent
+`6c7a08957c9a04035c220742807d42ee9644e83156cc7278e051e0c723200712`.
+The sanctioned consumer armed request
+`4a2e286cbb0ff8f63ee6b780741fbfd9764e81c9a17666af3e75c1d12c2933a0`,
+plan `e738cd6e4a06545c9321fcdbba0eb7f52a5ed30b63b2dc0a2015f1546c93ad3c`.
+The exact registration edit was applied and read back, then committed at
+`52e20bcc4804127662e82a24fd2e4cc6212888b5`. After runtime recovery,
+the registration checker passed (571 registered, no unregistered suites), and
+the onboarding suite again passed 283/283 with no skips. Full Verify on the
+next clean candidate is still pending. The following paragraph records the
+earlier denial and its disposition history, not a new signing request.
 
 The rebased onboarding suite declares and executes 283 cases, but
 `harness/scripts/verify.mjs` still admits only OBC001–OBC281. The required
@@ -59,6 +124,10 @@ completion gate; removing either real test is not a valid remedy. Until the
 registration matches the suite, full Verify and subsequent gated Critic
 dispatch remain incomplete. Evidence: `harness/scripts/verify.mjs` registration
 and `plugins/pipeline-core/lib/onboarding-continuity.test.mjs` corpus.
+The exact proposed edit, current file binding, and safe resumption sequence
+are in [the registration handoff](verify-registration-approval-handoff-2026-09-18.md).
+No signable intent is frozen while the PO is AFK: candidate drift would
+invalidate it and cause another unnecessary signing round.
 
 ### Rebase governance disposition — approved and applied 2026-09-13
 
