@@ -313,6 +313,49 @@ against the project trust anchors and remains fail-closed for every race.
 - ADR-0082: checked, no change needed.
 - ADR-0083: checked, no change needed.
 
+## Candidate d32772cf88e31a7ad1672458d26bdefd02918b25 — 2026-09-18, Nova feature-branch synchronization reconciliation
+
+- ADR-0001: checked, no change needed.
+- ADR-0002: checked, no change needed.
+- ADR-0010: checked, no change needed.
+- ADR-0011: checked, no change needed.
+- ADR-0013: checked, no change needed.
+- ADR-0015: checked, no change needed.
+- ADR-0030: checked, no change needed.
+- ADR-0032: checked, no change needed.
+- ADR-0041: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0051: checked, no change needed.
+- ADR-0054: checked, no change needed.
+- ADR-0055: checked, no change needed.
+- ADR-0057: checked, no change needed.
+- ADR-0058: checked, no change needed.
+- ADR-0059: checked, no change needed.
+- ADR-0061: checked, no change needed.
+- ADR-0065: checked, no change needed.
+- ADR-0066: checked, no change needed.
+- ADR-0067: checked, no change needed.
+- ADR-0070: checked, no change needed.
+- ADR-0074: checked, no change needed.
+- ADR-0076: checked, no change needed.
+- ADR-0077: checked, no change needed.
+- ADR-0078: checked, no change needed.
+- ADR-0081: checked, no change needed.
+- ADR-0082: checked, no change needed.
+
+The candidate carries the published `0.6.3` source line plus one narrow
+post-release repair: the lightweight push satisfiability check now resolves
+Verify evidence through the same canonical primary-worktree location as
+push preparation and the managed pre-push hook. The repair changes neither
+the configured gate strengths nor the human approval boundary. The listed
+ADRs continue to govern the changed delivery, runner, documentation, and
+evidence paths without amendment.
+
+This record is intentionally a later administrative commit. It reconciles
+the substantive candidate `d32772cf` against the preexisting Nova feature
+branch tip; its own commit identity is not substituted for the candidate in
+the Verify or approval evidence.
+
 ## Candidate 27ead1e302a3668abe3ef0f9beae205bd99a635d — 2026-09-17, final 0.6.2 release-candidate reconciliation
 
 - ADR-0001: checked, no change needed.
