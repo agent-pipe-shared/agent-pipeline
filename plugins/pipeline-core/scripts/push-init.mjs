@@ -117,6 +117,7 @@ import { classifyPushDestination, validCheckpointIntent } from "../lib/push-dest
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
 import { pushPrepareReport as realPushPrepareReport } from "./push-prepare.mjs";
+import { buildLateVerifyRecoveryAction } from "./pipeline-state.mjs";
 
 export const SCHEMA = "pipeline.push-init.v1";
 export const RECOVERY_SCHEMA = "pipeline.push-init-recovery.v1";
@@ -230,7 +231,7 @@ export function driveCheckpointPushInit({ rootDir, by, remote, destination, run 
  * driver nevertheless returns one closed, machine-readable recovery block so
  * a caller need not rediscover blockers one shell invocation at a time.
  */
-export function buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks }) {
+export function buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks, actions = [] }) {
   const blockers = checks.map(({ id, status, message, remedy }) => ({
     id,
     ...(typeof status === "string" ? { status } : {}),
@@ -242,6 +243,7 @@ export function buildPreconditionRecovery({ root, by, remote, destination, base,
     status: "action-required",
     summary: "Complete every listed remedy, then retry the exact push-init invocation below. The driver never executes a remedy or a human signature.",
     blockers,
+    ...(actions.length === 0 ? {} : { actions }),
     retryAction: {
       kind: "command",
       executable: process.execPath,
@@ -357,6 +359,13 @@ export function drivePushInit({
   if (!satisfiability.ok) {
     return { schema: SCHEMA, root, outcome: "error", steps, error: { faultCode: "usage-error", message: satisfiability.error } };
   }
+  // The satisfiability report deliberately treats a baseline-only contract as
+  // usable for implementation, but a normal push driver must still surface the
+  // sanctioned late recovery before its verify-evidence blocker becomes an
+  // opaque release failure. The exported state helper validates lifecycle and
+  // both twins itself; null means there is no safe command to advertise.
+  const lateVerifyRecovery = buildLateVerifyRecoveryAction(root);
+  const recoveryActions = lateVerifyRecovery === null ? [] : [lateVerifyRecovery];
   if (!satisfiability.report.satisfiable) {
     failedChecks.push(...satisfiability.report.checks.filter((check) => !check.ok));
   }
@@ -369,7 +378,7 @@ export function drivePushInit({
   if (!reconciliationCheck.ok) {
     return {
       schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks,
-      recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks }),
+      recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks, actions: recoveryActions }),
     };
   }
 
@@ -386,7 +395,7 @@ export function drivePushInit({
   if (failedChecks.length > 0) {
     return {
       schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: failedChecks,
-      recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks }),
+      recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: failedChecks, actions: recoveryActions }),
     };
   }
 

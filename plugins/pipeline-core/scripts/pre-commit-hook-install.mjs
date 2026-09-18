@@ -258,6 +258,8 @@ const PLUGIN_LIB_DIR = ${lib};
 const PLUGIN_HOOKS_DIR = ${hooksDir};
 const PLUGIN_SCRIPTS_DIR = ${scriptsDir};
 const EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+let derivePlanLifecycle = null;
+let isLateVerifyRecoveryLifecycle = null;
 
 function git(args, cwd) {
   return spawnSync("git", args, { cwd, encoding: "utf8", timeout: 15000 });
@@ -538,15 +540,12 @@ function exactImplementationStateTransition(before, after) {
 // implementation state -- not a hand-written state change staged beside the
 // calibration twins. The committed state remains the authority here.
 function establishedImplementationState(state) {
-  return plainObject(state)
-    && state.planApproved === true
-    && plainObject(state.activeFeature)
-    && state.activeFeature.phase === "implementation"
-    && typeof state.activeFeature.id === "string"
-    && state.activeFeature.id.trim() !== ""
-    && typeof state.activeFeature.planPath === "string"
-    && state.activeFeature.planPath.trim() !== ""
-    && plainObject(state.planApproval);
+  if (typeof derivePlanLifecycle !== "function" || typeof isLateVerifyRecoveryLifecycle !== "function") return false;
+  try {
+    return isLateVerifyRecoveryLifecycle(derivePlanLifecycle(state));
+  } catch {
+    return false;
+  }
 }
 
 /** Returns the exact calibration paths exempted by the sanctioned writer's
@@ -712,6 +711,8 @@ async function main() {
     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
     ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
     ({ isNeverLiftableKernelPath, windowCoversRule } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "guard-maintenance-window.mjs")).href));
+    ({ derivePlanLifecycle } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "plan-spec-state-v2.mjs")).href));
+    ({ isLateVerifyRecoveryLifecycle } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "pipeline-state.mjs")).href));
   } catch (error) {
     block([\`the pipeline's own protected-path rule modules could not be loaded from the installed plugin copy (\${error?.name ?? "Error"}) -- cannot evaluate protected-path enforcement.\`]);
     return;

@@ -23,6 +23,8 @@ import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
+import { run as pipelineStateRun } from "./pipeline-state.mjs";
+import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
 import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -195,9 +197,77 @@ function freshFixtureRoot() {
   return mkdtempSync(join(SCRATCH, "push-init-case-"));
 }
 
+function writeLateVerifyFixture(root) {
+  const verify = "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"";
+  const calibration = { project: "push-init-late-verify", verify, handover: "docs/state.md" };
+  mkdirSync(join(root, "project"), { recursive: true });
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "push-init-late-verify", planPath: "specs/push-init-late-verify/prd.md", phase: "design" },
+    planApproved: true,
+    planApproval: { approvedBy: "PO", approvedAt: "2026-09-18T12:00:00.000Z" },
+  }, null, 2));
+}
+
+function pushInitGateReport() {
+  return {
+    ok: true,
+    report: {
+      satisfiable: true,
+      checks: [{ id: "verify-contract-configured", status: "baseline-only", ok: true, message: "baseline contract" }],
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // DoD 1: chains consecutive command steps without a human turn between them
 // ---------------------------------------------------------------------------
+
+test("drivePushInit: baseline-only implementation publishes configure-verify and proceeds after its exact apply action", () => {
+  const root = freshFixtureRoot();
+  try {
+    writeLateVerifyFixture(root);
+    const stateDeps = { dir: root, now: () => "2026-09-18T12:00:00.000Z" };
+    assert.equal(pipelineStateRun(["set-phase", "--phase", "implementation"], stateDeps), 0);
+
+    const blocked = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: {},
+      assessPushGateSatisfiability: () => pushInitGateReport(),
+      pushPrepareReport: () => ({ ok: true, report: { ready: false, checks: [{ id: "verify-evidence-bound", ok: false, message: "baseline has no release evidence" }] } }),
+    });
+    assert.equal(blocked.outcome, "precondition-unmet", JSON.stringify(blocked, null, 2));
+    assert.equal(blocked.recovery.actions.length, 1);
+    const action = blocked.recovery.actions[0];
+    assert.equal(action.kind, "collect-input");
+    assert.deepEqual(action.inputs.map((input) => input.name), ["verify-command"]);
+    assert.deepEqual(action.applyAction.argv.slice(1, 3), ["configure-verify", "--verify-command"],
+      "push-init must return the sanctioned CLI action rather than a reconstructed shell command");
+    assert.equal(action.applyAction.argv.some((value) => String(value).includes("scratch") || String(value).includes("guard-human-override")), false,
+      "the executable recovery has no scratch-file or HGO path");
+
+    const command = `${process.execPath} --test harness/scripts/check-consumer-safe-paths.test.mjs`;
+    assert.equal(pipelineStateRun(["configure-verify", "--verify-command", command], stateDeps), 0);
+    assert.equal(checkVerifyContractConfigured(root).ok, true,
+      "the exact late recovery replaces the baseline contract for push readiness");
+    const ready = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: {},
+      assessPushGateSatisfiability: () => pushInitGateReport(),
+      pushPrepareReport: () => ({
+        ok: true,
+        report: { ready: true, subjectSha256: "a".repeat(64), checks: [] },
+        lines: { authorize: ["human command"], approvePush: ["approve command"], gitPush: "git push" },
+      }),
+    });
+    assert.equal(ready.outcome, "signature-required", JSON.stringify(ready, null, 2));
+    assert.equal(Object.hasOwn(ready, "recovery"), false,
+      "once configured, ordinary push-init can continue into its existing signature boundary");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("drivePushInit: chains all three steps (reconciliation, gate-satisfiability, push-prepare) in one call, reaches signature-required", () => {
   const root = freshFixtureRoot();

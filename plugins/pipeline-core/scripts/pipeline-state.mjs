@@ -3367,6 +3367,64 @@ function readIdenticalCalibrationVerifyTwins(dir) {
 }
 
 /**
+ * The late route is narrower than merely having `phase: implementation`: the
+ * shared lifecycle projection must confirm a current, authorized approval.
+ * Keeping this predicate exported lets every caller which advertises or admits
+ * the route use the writer's exact authority boundary.
+ */
+export function isLateVerifyRecoveryLifecycle(lifecycle) {
+  return lifecycle?.ok === true
+    && lifecycle.status === "implementing"
+    && lifecycle.code === "PLAN-LIFECYCLE-CURRENT"
+    && lifecycle.approvalCurrent === true;
+}
+
+/**
+ * Read-only, driver-safe presentation of the one sanctioned late recovery.
+ * Returning null is intentional for malformed state, stale authority, missing
+ * twins and calibration drift: none of those conditions may be repaired by a
+ * verify-command write.
+ */
+export function buildLateVerifyRecoveryAction(dir, state = null) {
+  const resolvedState = state ?? (() => {
+    const existing = readState(dir);
+    return existing.status === "ok" ? existing.state : null;
+  })();
+  if (resolvedState === null) return null;
+  const lifecycle = derivePlanLifecycle(resolvedState);
+  if (!isLateVerifyRecoveryLifecycle(lifecycle)) return null;
+  const verifyTwins = readIdenticalCalibrationVerifyTwins(dir);
+  if (verifyTwins.status !== "baseline-only") return null;
+  const scriptPath = fileURLToPath(import.meta.url);
+  const rendered = boundedCopySafeCommand({
+    executable: process.execPath,
+    argv: [scriptPath, "configure-verify", "--verify-command", placeholder("<project verify command>")],
+  });
+  return {
+    kind: "collect-input",
+    inputs: [{
+      name: "verify-command",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: 32_768,
+      singleLine: true,
+      rejectNul: true,
+    }],
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "implementation is using the deliberate baseline-only verification contract. Before push readiness, provide this project's real verification command and execute the exact configure-verify apply action; do not edit calibration files or use a human-override capability.",
+    applyAction: {
+      kind: "command",
+      ...rendered,
+      mutation: true,
+      requiresConfirmation: false,
+    },
+    expected: { schema: INSPECT_SCHEMA, statuses: ["implementing"] },
+  };
+}
+
+/**
  * Writes `command` into the calibration's `verify` field for every twin tier that
  * actually exists (`project/pipeline.json` AND its legacy `.claude/pipeline.json`
  * compatibility copy, seeded byte-identical on day one) so this never introduces
@@ -3839,42 +3897,8 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     };
   }
   if (lifecycle.status === "implementing") {
-    // A baseline-only contract is intentionally admissible for entering
-    // implementation, but it is not suitable for push readiness. Do not let a
-    // driver discover that only at the late push gate: name the sole sanctioned
-    // recovery now. This is a collection action because the command belongs to
-    // the project and cannot be derived from lifecycle state; it is not a PO
-    // decision and therefore carries an executable apply action once supplied.
-    const verifyTwins = readIdenticalCalibrationVerifyTwins(dir);
-    if (verifyTwins.status === "baseline-only") {
-      const scriptPath = fileURLToPath(import.meta.url);
-      const rendered = boundedCopySafeCommand({
-        executable: process.execPath,
-        argv: [scriptPath, "configure-verify", "--verify-command", placeholder("<project verify command>")],
-      });
-      return {
-        kind: "collect-input",
-        inputs: [{
-          name: "verify-command",
-          encoding: "utf8",
-          trim: true,
-          minBytes: 1,
-          maxBytes: 32_768,
-          singleLine: true,
-          rejectNul: true,
-        }],
-        mutation: false,
-        requiresConfirmation: false,
-        guidance: "implementation is using the deliberate baseline-only verification contract. Before push readiness, provide this project's real verification command and execute the exact configure-verify apply action; do not edit calibration files or use a human-override capability.",
-        applyAction: {
-          kind: "command",
-          ...rendered,
-          mutation: true,
-          requiresConfirmation: false,
-        },
-        expected: { schema: INSPECT_SCHEMA, statuses: ["implementing"] },
-      };
-    }
+    const lateVerifyRecovery = buildLateVerifyRecoveryAction(dir, state);
+    if (lateVerifyRecovery !== null) return lateVerifyRecovery;
     const threatModel = resolvePushThreatModelArtifact(dir);
     if (!threatModel.ok) {
       return {
@@ -8550,7 +8574,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const lifecycle = derivePlanLifecycle(base);
-      if (!lifecycle.ok || lifecycle.status !== "implementing") {
+      if (!isLateVerifyRecoveryLifecycle(lifecycle)) {
         console.error(`Error: configure-verify requires an established implementing lifecycle (${lifecycle.code ?? "PS-LIFECYCLE-NOT-IMPLEMENTING"}); zero calibration write.`);
         return 2;
       }

@@ -98,4 +98,16 @@ test("late verify recovery fails closed for malformed twins and non-implementing
   assert.equal(quietConsole(() => run(["configure-verify", "--verify-command", "node --test"], { dir: nonImplementing, now: () => NOW })).result, 2);
   assert.equal(readFileSync(nonImplementingNeutral, "utf8"), beforeNonImplementing,
     "the route cannot configure a design-phase project");
+
+  const staleAuthority = rootFor("stale-authority");
+  writeFixture(staleAuthority, { phase: "implementation" });
+  const staleStatePath = join(staleAuthority, "project", "pipeline-state.json");
+  const staleState = JSON.parse(readFileSync(staleStatePath, "utf8"));
+  staleState.planApproval = { submissionSha256: "stale" };
+  writeFileSync(staleStatePath, JSON.stringify(staleState, null, 2));
+  const staleNeutral = join(staleAuthority, "project", "pipeline.json");
+  const beforeStale = readFileSync(staleNeutral, "utf8");
+  assert.equal(quietConsole(() => run(["configure-verify", "--verify-command", "node --test"], { dir: staleAuthority, now: () => NOW })).result, 2);
+  assert.equal(readFileSync(staleNeutral, "utf8"), beforeStale,
+    "a stale or malformed plan approval cannot authorize the late calibration write");
 });
