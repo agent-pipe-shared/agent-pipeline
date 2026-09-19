@@ -2468,6 +2468,13 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step f
     assert.equal(applied.result.pushApprovalSetupAction.kind, "collect-input");
     assert.equal(applied.result.pushApprovalSetupAction.mutation, false);
     assert.equal(applied.result.pushApprovalSetupAction.input.name, "humanApprovalMode");
+    assert.deepEqual(Object.keys(applied.result.nextAction.pendingAsks[0].reviewedDefaults).sort(), ["gitIdentity", "humanApproval", "language", "runner"],
+      "the bundled initial review publishes one typed defaults envelope");
+    assert.deepEqual(applied.result.nextAction.pendingAsks[0].reviewedDefaults.language, {
+      value: "en", source: "fresh-project-default", requiresConfirmation: true,
+    });
+    assert.equal(applied.result.nextAction.pendingAsks[0].reviewedDefaults.humanApproval.requiresConfirmation, true);
+    assert.equal(applied.result.nextAction.pendingAsks[0].reviewedDefaults.gitIdentity["user.name"].source, "absent");
     assert.match(applied.result.pushApprovalSetupAction.guidance, /"signature"/u);
     assert.match(applied.result.pushApprovalSetupAction.guidance, /"chat"/u);
     assert.match(applied.result.pushApprovalSetupAction.guidance, /agent-pipeline-po/u,

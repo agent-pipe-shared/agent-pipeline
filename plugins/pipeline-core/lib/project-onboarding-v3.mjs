@@ -5028,13 +5028,49 @@ function unresolvedAuthorIdentityKeys(root, hostManaged, fs) {
   if (hostManaged) return [];
   const configured = (key) => {
     try {
-      const probe = fs.spawnSync("git", ["config", "--get", key], { cwd: root, encoding: "utf8" });
+      // Only repository-local identity satisfies this check.  A global or
+      // system value is surfaced separately as a proposed candidate with
+      // provenance; it is never treated as repository consent.
+      const probe = fs.spawnSync("git", ["config", "--get", "--local", key], { cwd: root, encoding: "utf8" });
       return isSuccessfulSpawn(probe) && String(probe.stdout ?? "").trim().length > 0;
     } catch {
       return true; // Unprobeable is not "missing" -- never ask on evidence we do not have.
     }
   };
   return ["user.name", "user.email"].filter((key) => !configured(key));
+}
+
+// Read-only provenance for the identity a future commit would inherit.  A
+// Git value is evidence about configuration, never the PO's consent.  Keep
+// the scope explicit so a global/system value can be shown as a proposal
+// without being mistaken for repository-local authority.
+function gitIdentityProvenance(root, fs) {
+  const result = {};
+  for (const key of ["user.name", "user.email"]) {
+    let selected = null;
+    let unreadable = false;
+    for (const scope of ["local", "global", "system"]) {
+      try {
+        const probe = fs.spawnSync("git", ["config", `--${scope}`, "--get", key], { cwd: root, encoding: "utf8" });
+        if (probe?.status === 0 && String(probe.stdout ?? "").trim().length > 0) {
+          selected = { value: String(probe.stdout).trim(), source: "git-config", scope };
+          break;
+        }
+        if (probe?.error) unreadable = true;
+      } catch {
+        unreadable = true;
+      }
+    }
+    if (selected === null) {
+      const environmentKey = key === "user.name" ? "GIT_AUTHOR_NAME" : "GIT_AUTHOR_EMAIL";
+      const environmentValue = process.env[environmentKey];
+      selected = typeof environmentValue === "string" && environmentValue.trim().length > 0
+        ? { value: environmentValue.trim(), source: "environment", scope: environmentKey }
+        : { value: null, source: unreadable ? "unknown" : "absent", scope: null };
+    }
+    result[key] = selected;
+  }
+  return result;
 }
 
 // A generous single-line bound for a real name or email address -- the same
@@ -6094,7 +6130,7 @@ function withPendingVerifyContractAsk(observed) {
 // step ever being masked. The original per-field channels
 // (`authorIdentityAction` etc.) are left in place, unchanged, for the
 // existing tests and any caller already reading them directly.
-function collectInitialAnswersAction(observed) {
+function collectInitialAnswersAction(observed, fs) {
   if (!observed.pushApprovalSetupAction) return null;
   const authorInputs = observed.authorIdentityAction?.inputs ?? [];
   const trustSetup = observed.trustAnchorGuidanceAction?.applyAction?.argv?.[0] === ONBOARDING_INIT_DRIVER
@@ -6105,6 +6141,7 @@ function collectInitialAnswersAction(observed) {
     observed.pushApprovalSetupAction.input,
     ...(trustSetup?.inputs ?? []),
   ];
+  const identityProvenance = gitIdentityProvenance(observed.root, fs);
   const argv = [ONBOARDING_INIT_DRIVER, "--root", observed.root, "--runner", observed.runner];
   if (authorInputs.length > 0) {
     argv.push(
@@ -6129,6 +6166,12 @@ function collectInitialAnswersAction(observed) {
     inputs,
     mutation: false,
     requiresConfirmation: false,
+    reviewedDefaults: {
+      runner: { value: observed.runner, source: "explicit-caller", requiresConfirmation: true },
+      language: { value: "en", source: "fresh-project-default", requiresConfirmation: true },
+      gitIdentity: identityProvenance,
+      humanApproval: { value: machinePushApprovalPreference(fs) ?? "signature", source: "machine-plane-or-fail-closed-default", requiresConfirmation: true },
+    },
     guidance: `collect this one initial PO round, replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
     applyAction: commandAction(
       argv,
@@ -6141,8 +6184,8 @@ function collectInitialAnswersAction(observed) {
   };
 }
 
-function withPendingAsksSurfacedOnNextAction(observed) {
-  const initialAnswersAction = collectInitialAnswersAction(observed);
+function withPendingAsksSurfacedOnNextAction(observed, fs) {
+  const initialAnswersAction = collectInitialAnswersAction(observed, fs);
   const trustSetupBundled = initialAnswersAction !== null
     && observed.trustAnchorGuidanceAction?.applyAction?.argv?.[0] === ONBOARDING_INIT_DRIVER;
   const pendingAsks = [
@@ -6465,7 +6508,7 @@ function withPendingProjectIgnoreGapAsk(observed, fs) {
 // instead. Byte-for-byte the same composition the two call sites spelled out
 // before this refactor -- a pure extraction, not a behavior change.
 function withAllPendingOnboardingAsksAttached(observed, fs) {
-  return withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs));
+  return withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs), fs);
 }
 
 // Sibling of `withAllPendingOnboardingAsksAttached()` immediately above, for
