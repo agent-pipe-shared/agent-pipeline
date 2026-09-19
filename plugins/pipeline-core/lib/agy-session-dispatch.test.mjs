@@ -39,7 +39,7 @@ test("same-session consent permits a bounded positive fixture dispatch and exclu
   const agy = join(root, "agy-mock");
   writeFileSync(join(root, "input.txt"), "input\n");
   mkdirSync(join(root, "results"));
-    writeFileSync(agy, "#!/usr/bin/env node\nconst mode = process.env.AGY_MODE; if (mode === 'auth') { console.error('Please login'); process.exit(1); } if (mode === 'quota') { console.error('quota exhausted'); process.exit(2); } if (mode === 'timeout') { setTimeout(() => {}, 5000); } else if (mode === 'malformed') console.log('not-json'); else if (mode === 'mismatch') console.log(JSON.stringify({model:'gemini-other', result:'ok'})); else console.log(JSON.stringify({model:'gemini-3.8-flash-high', result:'ok'}));\n");
+  writeFileSync(agy, "#!/usr/bin/env node\nconst mode = process.env.AGY_MODE; if (mode === 'auth') { console.error('Please login'); process.exit(1); } if (mode === 'quota') { console.error('quota exhausted'); process.exit(2); } if (mode === 'timeout') { setTimeout(() => {}, 5000); } else if (mode === 'malformed') console.log('not-json'); else if (mode === 'mismatch') console.log(JSON.stringify({model:'gemini-other', result:'ok'})); else if (mode === 'unknown') console.log(JSON.stringify({result:'ok'})); else console.log(JSON.stringify({model:'gemini-3.8-flash-high', result:'ok'}));\n");
   chmodSync(agy, 0o755);
   try {
     execFileSync("git", ["init", "-q"], { cwd: root });
@@ -57,6 +57,9 @@ test("same-session consent permits a bounded positive fixture dispatch and exclu
     assert.match(readFileSync(join(root, "results/result.json"), "utf8"), /gemini-3\.8-flash-high/u);
     const secondTask = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/second.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("different-task-input"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-dispatch-3" }), nowEpochMs: 2 });
     assert.equal(secondTask.status, "succeeded");
+    const unknown = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/unknown.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, env: { ...process.env, AGY_MODE: "unknown" }, packet: packet({ candidate, dispatchId: "agy-unknown" }), requireObservedModel: true, nowEpochMs: 2 });
+    assert.equal(unknown.code, "AGY-SESSION-MODEL-UNOBSERVED");
+    assert.equal(unknown.result, null);
     for (const [mode, code] of [["auth", "AGY-AUTH-REQUIRED"], ["quota", "AGY-NONZERO-EXIT"], ["timeout", "AGY-TIMEOUT"], ["malformed", "AGY-OUTPUT-MALFORMED"], ["mismatch", "AGY-MODEL-MISMATCH"]]) {
       const failure = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: `results/${mode}.json`, session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, env: { ...process.env, AGY_MODE: mode }, packet: packet({ candidate, dispatchId: `agy-${mode}` }), timeoutMs: mode === "timeout" ? 50 : 1_000, nowEpochMs: 2 });
       assert.equal(failure.status, "unavailable");

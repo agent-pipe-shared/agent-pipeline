@@ -60,7 +60,7 @@ function validateConsent(consent, { sessionId, model, role, scope, nowEpochMs })
   if (!exact(consent, ["schema", "status", "decisionId", "sessionId", "runner", "provider", "model", "role", "scope", "subjectSha256", "approvedAtMs", "expiresAtMs"]) || consent.schema !== AGY_SESSION_CONSENT_SCHEMA
     || consent.status !== "approved" || !SESSION_ID.test(consent.decisionId ?? "") || consent.sessionId !== sessionId
     || consent.runner !== "antigravity" || consent.provider !== "google" || consent.model !== model || consent.role !== role
-    || consent.scope !== scope || !SHA256.test(consent.subjectSha256 ?? "")
+    || digest(consent.scope) !== digest(scope) || !SHA256.test(consent.subjectSha256 ?? "")
     || !Number.isSafeInteger(consent.approvedAtMs) || !Number.isSafeInteger(consent.expiresAtMs)
     || consent.expiresAtMs <= consent.approvedAtMs || nowEpochMs >= consent.expiresAtMs) {
     return { ok: false, code: AGY_SESSION_DISPATCH_CODES.CONSENT_INVALID };
@@ -124,11 +124,12 @@ export async function dispatchAgySession({
   signal,
   nowEpochMs = Date.now(),
   verifyAuthority,
+  requireObservedModel = false,
 } = {}) {
   if (!validSessionIdentity(session)) return rejected(AGY_SESSION_DISPATCH_CODES.SESSION_MISMATCH, "session");
   if (!IMPLEMENTATION_ROLES.has(packet?.role)) return rejected(AGY_SESSION_DISPATCH_CODES.ROLE_FORBIDDEN, "packet.role");
   if (typeof requestedModel !== "string" || requestedModel.trim() === "") return rejected(AGY_SESSION_DISPATCH_CODES.MODEL_MISMATCH, "requestedModel");
-  if (typeof scope !== "string" || scope.trim() === "" || !SHA256.test(inputSha256 ?? "")) return rejected(AGY_SESSION_DISPATCH_CODES.INPUT_MISMATCH, "inputSha256");
+  if ((typeof scope !== "string" && (scope === null || typeof scope !== "object" || Array.isArray(scope))) || (typeof scope === "string" && scope.trim() === "") || !SHA256.test(inputSha256 ?? "")) return rejected(AGY_SESSION_DISPATCH_CODES.INPUT_MISMATCH, "inputSha256");
   const consentCheck = validateConsent(consent, { sessionId: session.id, model: requestedModel, role: packet.role, scope, nowEpochMs });
   if (!consentCheck.ok) return rejected(consentCheck.code, "consent");
   if (typeof verifyAuthority !== "function") return rejected(AGY_SESSION_DISPATCH_CODES.AUTHORITY_UNAVAILABLE, "authority");
@@ -161,6 +162,9 @@ export async function dispatchAgySession({
     result: null,
   };
   if (invoked.ok !== true) return receipt;
+  if (requireObservedModel === true && (typeof invoked.observedModel !== "string" || invoked.observedModel === "unknown")) {
+    return { ...receipt, status: "unavailable", code: "AGY-SESSION-MODEL-UNOBSERVED" };
+  }
   const published = writeExclusiveResult(resultRoot, resultPath, { schema: "pipeline.agy-session-dispatch-result.v1", dispatchId: packet.dispatchId, candidate: prepared.candidate, sessionId: session.id, requestedModel, observedModel: invoked.observedModel ?? null, payload: invoked.payload });
   if (!published.ok) return { ...receipt, status: "rejected", code: published.code, launcherCalls: invoked.launcherCalls ?? 0, modelCalls: invoked.modelCalls ?? 0 };
   return { ...receipt, result: published };

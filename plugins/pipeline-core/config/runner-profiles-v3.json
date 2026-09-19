@@ -232,7 +232,7 @@
         "evidence": "dispatch-receipt"
       },
       "antigravity": {
-        "state": "unavailable",
+        "state": "opt-in",
         "selector": {
           "kind": "model-id",
           "value": "gemini-3.8-flash-high"

@@ -15,6 +15,7 @@ import { dispatchAgySession } from "../lib/agy-session-dispatch.mjs";
 import { digest, loadLiveSession, loadStoredConsent, validateConsentRecord, validateDispatchBinding } from "../lib/agy-session-authority.mjs";
 
 export const LIVE_REQUEST_SCHEMA = "pipeline.agy-session-live-request.v1";
+export const LIVE_REQUEST_SEAL = "elephant-agy-implementation-dispatch.v1";
 
 function exact(value, keys) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -29,10 +30,9 @@ function readRequest(path) {
 }
 
 export async function runGoldfishAntigravityLiveHost(request, dependencies = {}) {
-  const keys = ["schema", "root", "resultRoot", "resultPath", "packet", "sessionId", "descriptorSha256", "consent", "requestedModel", "effort", "scope", "inputSha256", "timeoutMs"];
+  const keys = ["schema", "seal", "root", "resultRoot", "resultPath", "packet", "sessionId", "descriptorSha256", "consent", "requestedModel", "effort", "scope", "inputSha256", "routePolicySha256", "timeoutMs"];
   if (!exact(request, keys) || request.schema !== LIVE_REQUEST_SCHEMA) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-LIVE-REQUEST-SHAPE", modelCalls: 0, launcherCalls: 0 };
-  const agyPath = dependencies.agyPath ?? discoverAgyPath(dependencies.env ?? process.env);
-  if (!agyPath) return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: "AGY-NOT-INSTALLED", modelCalls: 0, launcherCalls: 0 };
+  if (request.seal !== LIVE_REQUEST_SEAL) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-LIVE-REQUEST-UNSEALED", modelCalls: 0, launcherCalls: 0 };
   if (request.consent === null) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-SESSION-CONSENT-REQUIRED", modelCalls: 0, launcherCalls: 0 };
   if (request.consent !== "stored") return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-SESSION-CONSENT-SUPPLIED", modelCalls: 0, launcherCalls: 0 };
   let live;
@@ -45,8 +45,10 @@ export async function runGoldfishAntigravityLiveHost(request, dependencies = {})
   if (!authority.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: authority.code, modelCalls: 0, launcherCalls: 0 };
   const binding = validateDispatchBinding(stored.record, { requestedModel: request.requestedModel, role: request.packet.role, scope: request.scope, requiredPaths: request.packet.requiredPaths ?? [], nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
   if (!binding.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: binding.code, modelCalls: 0, launcherCalls: 0 };
+  const agyPath = dependencies.agyPath ?? discoverAgyPath(dependencies.env ?? process.env);
+  if (!agyPath) return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: "AGY-NOT-INSTALLED", modelCalls: 0, launcherCalls: 0 };
   const dispatchConsent = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: stored.record.decisionId, sessionId: live.session.id, runner: "antigravity", provider: "google", model: stored.record.model, role: request.packet.role, scope: request.scope, subjectSha256: stored.record.subjectSha256, approvedAtMs: stored.record.approvedAtMs ?? 0, expiresAtMs: stored.record.expiresAtMs };
-  return dispatchAgySession({ ...request, session: { id: live.session.id, source: "runtime", observed: true }, consent: dispatchConsent, verifyAuthority: () => true, agyPath, env: dependencies.env ?? process.env, nowEpochMs: dependencies.nowEpochMs ?? Date.now(), signal: dependencies.signal });
+  return dispatchAgySession({ ...request, session: { id: live.session.id, source: "runtime", observed: true }, consent: dispatchConsent, verifyAuthority: () => true, agyPath, env: dependencies.env ?? process.env, nowEpochMs: dependencies.nowEpochMs ?? Date.now(), signal: dependencies.signal, requireObservedModel: true });
 }
 
 export function parseArgs(argv) {
@@ -55,12 +57,8 @@ export function parseArgs(argv) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    const result = await runGoldfishAntigravityLiveHost(readRequest(parseArgs(process.argv.slice(2))));
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-    process.exitCode = result.status === "succeeded" ? 0 : 1;
-  } catch {
-    process.stderr.write("goldfish-antigravity-live-host: request refused\n");
-    process.exitCode = 64;
-  }
+  void readRequest;
+  void parseArgs;
+  process.stderr.write("goldfish-antigravity-live-host: internal-only; use elephant-agy-implementation-dispatch.mjs\n");
+  process.exitCode = 64;
 }

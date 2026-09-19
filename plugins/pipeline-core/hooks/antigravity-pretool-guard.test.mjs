@@ -483,6 +483,28 @@ check("Antigravity pretool guard blocks invoke_subagent missing mandatory templa
   rmSync(root, { recursive: true, force: true });
 });
 
+check("Antigravity native implementation dispatch is refused even when candidate-bound", () => {
+  const root = nativeFixture();
+  const nativeSubagents = [{
+    TypeName: "goldfish-implementor",
+    Role: "Goldfish Implementor",
+    Prompt: [
+      "## 1. Goal\nImplement the bounded change.",
+      "## 2. Context files\n- input.txt",
+      "## 3. DoD checks\n- bounded output",
+      "## 4. Forbidden\n- unrelated changes",
+      "## 5. Stop conditions\n- missing input",
+      "## 6. Dispatch-Metadata\nModel: gemini-3.8-flash-high; Ruleset-SHA: fixture.",
+      "- **Tool budget (hard cap, first-class field):** <=40 tool uses.",
+    ].join("\n"),
+  }];
+  prepareNative(root, nativeSubagents);
+  const res = decision(run({ tool_use_id: "agy-native-implementation-refused", toolCall: { name: "invoke_subagent", args: { Subagents: nativeSubagents } } }, root));
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 check("Antigravity pretool guard blocks direct writes to pipeline-state.json", () => {
   const root = fixture();
   writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({

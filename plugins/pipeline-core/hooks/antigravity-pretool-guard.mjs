@@ -549,6 +549,19 @@ export async function runAntigravityPreToolGuard(rawInput) {
     && Array.isArray(input?.toolCall?.args?.Subagents)
     && input.toolCall.args.Subagents.some((entry) => isShippedPipelineAgentType(entry?.TypeName));
   if (denials.length === 0 && nativeContainsPipelineRole) {
+    const nativeImplementationRole = input.toolCall.args.Subagents.some((entry) => {
+      const type = typeof entry?.TypeName === "string" && entry.TypeName.startsWith("pipeline-core:")
+        ? entry.TypeName.slice("pipeline-core:".length)
+        : entry?.TypeName;
+      return type === "goldfish-implementor" || type === "goldfish-mechanic";
+    });
+    // `invoke_subagent` exposes only a prompt/type carrier. It cannot prove
+    // the live Codex session, PO consent, selected AGY route or effective
+    // identity. Productive implementation therefore enters only through the
+    // sealed Elephant-owned dispatch script; never infer consent here.
+    if (nativeImplementationRole) {
+      deny("BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding; use elephant-agy-implementation-dispatch.mjs.");
+    }
     const nativeVerdict = verifyAntigravityNativeDispatch({
       root: projectRoot,
       nativeSubagents: input?.toolCall?.args?.Subagents,
