@@ -9124,6 +9124,30 @@ test("a ready consumer with malformed permission shapes receives only the typed 
   }
 });
 
+test("runner-permission projection drift removes ready-only fields before the ready gate", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    completeKickoff(path, "Reject stale runner permissions", fakeDeps, "ready", "claude");
+    writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify({
+      permissions: { allow: ["Bash(git status *)"] },
+    }, null, 2)}\n`);
+
+    for (const intent of ["bootstrap", "session"]) {
+      const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent, runner: "claude" });
+      assert.equal(observed.status, "projection-drift");
+      assert.equal(Object.prototype.hasOwnProperty.call(observed, "pushApprovalMode"), false);
+      assert.equal(Object.prototype.hasOwnProperty.call(observed, "trustAnchorAvailability"), false);
+      assert.throws(() => requireProjectOnboardingReady({
+        rootDir: path,
+        intent,
+        runner: "claude",
+        inspect: () => observed,
+      }), (error) => error?.code === "PORG-NOT-READY" && error.lifecycleStatus === "projection-drift");
+    }
+  } finally { dispose(path); }
+});
+
 // NVA-B-ROUNDL-F4 regression, one test per remaining delete site. The
 // ownership predicate `ownsPublishedOutput()` was wired into the manifest
 // publication rollback only; three further sites still decided "this file is

@@ -1330,8 +1330,16 @@ function withRunnerPermissionsReadback(result, fs) {
       "pipeline.settings-allowlist-merge-plan.v1",
       ["ready", "no-op", "unrepairable"],
     );
+  // Ready-only fields describe capabilities that have been authenticated only
+  // by a ready observation. Once this readback downgrades that observation to
+  // projection-drift, remove them from the envelope before the ready gate
+  // validates the non-ready shape; otherwise they leak across the status
+  // transition and are rejected as an invalid observation instead of reaching
+  // the typed PORG-NOT-READY lifecycle result.
+  const nonReadyObserved = { ...observed };
+  for (const key of PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS) delete nonReadyObserved[key];
   return {
-    ...observed,
+    ...nonReadyObserved,
     status: "projection-drift",
     nextAction,
     diagnostics: [lifecycleDiagnostic(
