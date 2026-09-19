@@ -437,12 +437,28 @@ export async function runAntigravityPreToolGuard(rawInput) {
     }
   }
 
-  // PO Gate Hardening: Block agent from self-approving feature plans and push actions
+  // PO Gate Hardening: agent self-approval is prohibited in the default and
+  // legacy postures.  ADR-0076's explicit, committed *global* chat selection
+  // is the narrow exception: the PO's chat answer is deliberately recorded by
+  // the agent as `chat-attributed-unattested`, with no terminal ceremony or
+  // detached proof.  Do not widen this to an action-local legacy chat key --
+  // that older route still requires its human-operated record.
+  let globalChatAttribution = false;
+  try {
+    const approval = readHumanApprovalMode(projectRoot, { legacyKind: "push" });
+    globalChatAttribution = approval?.mode === "chat"
+      && approval?.scope === "global"
+      && approval?.source === USER_SOURCE_PATH;
+  } catch {
+    // A malformed/unreadable policy is never a reason to relax the PO gate.
+  }
   if (toolName === "Bash" && /(?:^|\s|\/)(?:pipeline-state(?:\.mjs)?)\s+approve-plan\b/u.test(command)) {
-    deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-plan' is an explicit Human/PO decision. You must present the PRD and Technical Specification to the user in chat and request approval. The user must approve the plan by running: pipeline-state approve-plan --by <name>");
+    if (!globalChatAttribution) {
+      deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-plan' is an explicit Human/PO decision. You must present the PRD and Technical Specification to the user in chat and request approval. The user must approve the plan by running: pipeline-state approve-plan --by <name>");
+    }
   }
   if (toolName === "Bash" && /(?:^|\s|\/)(?:pipeline-state(?:\.mjs)?)\s+approve-push\b/u.test(command)) {
-    if (!/(?:^|\s)--proof(?:\s+|=|$)/u.test(command)) {
+    if (!globalChatAttribution && !/(?:^|\s)--proof(?:\s+|=|$)/u.test(command)) {
       deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-push' is an explicit Human/PO decision. You must present the candidate commit and git status to the user in chat and request approval. The human operator must approve the push by running: pipeline-state approve-push --by <name> --remote <remote> --destination <destination> [--challenge <challenge>]");
     }
   }
