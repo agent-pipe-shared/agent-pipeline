@@ -31,12 +31,14 @@ export function validateConsentRecord(record, { root, session, nowEpochMs = Date
     || record.provider !== "google" || typeof record.model !== "string" || !Array.isArray(record.roles) || !Array.isArray(record.allowedPaths)
     || !SHA.test(record.subjectSha256 ?? "") || !Number.isSafeInteger(record.expiresAtMs) || nowEpochMs >= record.expiresAtMs) return { ok: false, code: "AGY-CONSENT-INVALID" };
   const expectedSubject = digest(record.subject);
-  if (expectedSubject !== record.subjectSha256) return { ok: false, code: "AGY-CONSENT-SUBJECT-MISMATCH" };
+  if (expectedSubject !== record.subjectSha256 || digest(record.subject?.session) !== digest(session)
+    || record.subject?.provider !== record.provider || record.subject?.model !== record.model) return { ok: false, code: "AGY-CONSENT-SUBJECT-MISMATCH" };
   if (record.mode === "chat") {
     if (record.attribution?.mode !== "chat-attributed-unattested" || typeof record.attribution.decisionReference !== "string" || record.attribution.decisionReference.trim() === "") return { ok: false, code: "AGY-CONSENT-CHAT-ATTRIBUTION" };
     return { ok: true, mode: "chat" };
   }
   if (record.mode !== "signature" || !record.intent || !record.proof) return { ok: false, code: "AGY-CONSENT-PROOF-MISSING" };
+  if (record.intent.value?.kind !== "agy-session" || record.intent.value?.subjectSha256 !== record.subjectSha256) return { ok: false, code: "AGY-CONSENT-INTENT-MISMATCH" };
   const resolved = policy ?? readCriticalHumanProofPolicy(root);
   if (!resolved.ok) return { ok: false, code: "AGY-CONSENT-POLICY-UNAVAILABLE" };
   const anchors = resolved.trustAnchors ?? (resolved.trustAnchor ? [resolved.trustAnchor] : []);
