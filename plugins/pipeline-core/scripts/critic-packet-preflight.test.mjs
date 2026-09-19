@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,6 +58,14 @@ function fixture() {
   git(root, ["add", "."]);
   git(root, ["commit", "--quiet", "-m", "candidate"]);
   const candidate = git(root, ["rev-parse", "HEAD"]);
+  mkdirSync(join(root, "evidence"));
+  writeFileSync(join(root, "evidence", "dispatch-record-batman-b1.json"), `${JSON.stringify({
+    schema: "pipeline.dispatch-record.v4", taskId: "batman-b1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+    rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: candidate, resultSha256: null,
+    outcome: "in-progress", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    commits: [], log: [], report: null,
+    criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" },
+  })}\n`);
   const common = git(root, ["rev-parse", "--git-common-dir"]);
   const control = join(root, common, "agent-pipeline", "critic-packets");
   mkdirSync(control, { recursive: true, mode: 0o700 });
@@ -96,6 +104,13 @@ function options(f, packetId = "1".repeat(32)) {
 function expectCode(code) {
   return (error) => error instanceof CriticPacketError && error.code === code;
 }
+
+check("CPP00 requires one exact current dispatch record before any packet checkout is created", () => {
+  const f = fixture();
+  rmSync(join(f.root, "evidence", "dispatch-record-batman-b1.json"));
+  assert.throws(() => prepareCandidatePacket(options(f)), expectCode("CPP-REVIEW-ADMISSION"));
+  assert.equal(existsSync(join(f.control, "1".repeat(32))), false);
+});
 function lineage(packet, reviewId = "nova-a5-review") {
   return compileCriticReviewLineage({
     packet,
@@ -252,17 +267,17 @@ check("binds an admissible closed Nova A5 lineage at claim and rejects a forged 
     const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
     const disposed = records.filter((record) => record.event === "DISPOSED");
     assert.equal(records[0].event, "DECLARED");
-    assert.equal(records[0].caseCount, 7);
-    assert.equal(disposed.length, 7);
+    assert.equal(records[0].caseCount, 8);
+    assert.equal(disposed.length, 8);
     assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
-    assert.equal(disposed.find((record) => record.id === "CPP07")?.disposition, "pass");
-    assert.deepEqual(records.at(-1).counts, { pass: 6, fail: 1, skip: 0, todo: 0 });
-    assert.equal(records.at(-1).declaredCount, 7);
-    assert.equal(records.at(-1).disposedCount, 7);
+    assert.equal(disposed.find((record) => record.id === "CPP08")?.disposition, "pass");
+    assert.deepEqual(records.at(-1).counts, { pass: 7, fail: 1, skip: 0, todo: 0 });
+    assert.equal(records.at(-1).declaredCount, 8);
+    assert.equal(records.at(-1).disposedCount, 8);
   }
 });
 
-assert.equal(cases.length, 7, "the complete candidate packet corpus must be registered before execution begins");
+assert.equal(cases.length, 8, "the complete candidate packet corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

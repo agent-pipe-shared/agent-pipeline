@@ -40,6 +40,7 @@ import {
   validateCriticPacketGovernance,
 } from "../lib/critic-packet-governance.mjs";
 import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
+import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
 
 export const PACKET_SCHEMA = "pipeline.critic-candidate-packet.v1";
 export const STATE_SCHEMA = "pipeline.critic-candidate-state.v1";
@@ -419,6 +420,8 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const base = assertOid(options.baseCommit, objectFormat, "baseCommit");
     const candidate = assertOid(options.candidateCommit, objectFormat, "candidateCommit");
     const rulesetOid = assertOid(options.rulesetOid, objectFormat, "rulesetOid");
+    const reviewAdmission = evaluateReviewAdmission({ root: repoRoot, taskId: options.taskId, candidateCommit: candidate });
+    if (!reviewAdmission.ok) fail("CPP-REVIEW-ADMISSION", `Critic review admission is blocked: ${reviewAdmission.readFindings.join("; ")}`);
     const baseType = gitText(repoRoot, ["cat-file", "-t", base]);
     if (gitText(repoRoot, ["cat-file", "-t", candidate]) !== "commit") fail("CPP-REF", "Candidate ref is not a commit.");
     if (baseType === "commit") {
