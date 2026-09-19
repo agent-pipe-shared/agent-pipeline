@@ -203,6 +203,56 @@ function createReadyLifecycleFixture(mode = "chat") {
   collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "HGO fixture." }]) });
   const generated = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "intake-generate-plan");
   lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "codex");
+  // Greenfield intake now stops for an explicit, bounded architecture package
+  // before the acknowledgement writer.  Keep this shared ready-fixture on the
+  // public lifecycle route so every HGO consumer below exercises the current
+  // bootstrap contract rather than an obsolete pre-design shortcut.
+  const designStop = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+  assert.equal(designStop.nextAction?.kind, "architecture-design-required", JSON.stringify(designStop));
+  const contract = "docs/hgo-fixture-contract.md";
+  const verification = "tests/hgo-fixture.test.mjs";
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "tests"), { recursive: true });
+  writeFileSync(join(root, contract), "# HGO fixture contract\n");
+  writeFileSync(join(root, verification), "import assert from 'node:assert/strict';\nassert.equal(true, true);\n");
+  const module = {
+    id: "hgo-fixture",
+    responsibility: "Bounded Codex guard fixture.",
+    nonResponsibilities: ["Production services"],
+    ownedPaths: ["src/hgo-fixture.mjs", contract, verification],
+    publicContracts: [contract],
+    allowedDependencies: [],
+    authorityEffects: [],
+    verificationEntryPoints: [verification],
+    adrReferences: [],
+  };
+  const architecture = {
+    schema: "pipeline.architecture-design.v1",
+    repositoryKind: "greenfield",
+    disposition: {
+      decision: "approved-scoped",
+      scope: ["specs/", "architecture/", "src/hgo-fixture.mjs", contract, verification],
+      rationale: "Bounded fixture design for lifecycle-guard coverage.",
+    },
+    modules: [module],
+    implementationSurface: ["src/hgo-fixture.mjs"],
+    fitnessModel: {
+      schema: "pipeline.fitness-model.v1",
+      profileId: "hgo-fixture",
+      revision: 1,
+      modules: [{ id: module.id, ownedPaths: module.ownedPaths, allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [verification] }],
+      allowedBoundaryCrossings: [],
+      antiFragmentationPolicy: { rejectTrivialFacades: true, rejectDuplicatedFacades: true, minStatementsPerModule: 1 },
+    },
+    baseline: {
+      schema: "pipeline.architecture-baseline.v1",
+      baselineRevision: 1,
+      acceptedViolations: [],
+      ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 },
+    },
+  };
+  const prdPath = join(root, designStop.nextAction.prdPath);
+  writeFileSync(prdPath, `${readFileSync(prdPath, "utf8")}\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture, null, 2)}\n\`\`\`\n`);
   // Even this chat-mode fixture must use the dedicated acknowledgement
   // writer.  A generated draft is never permitted to skip directly to bind.
   followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-acknowledge-chat-apply");
