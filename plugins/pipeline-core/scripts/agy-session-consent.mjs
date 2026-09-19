@@ -5,7 +5,7 @@
  * or installation into consent; signature/chat decisions arrive as an
  * already-recorded external decision and are verified before storage. */
 import { existsSync, lstatSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSignatureIntent, consentStoragePath, digest, loadLiveSession, validateConsentRecord } from "../lib/agy-session-authority.mjs";
 import { loadSessionDescriptor } from "../lib/worktree-lifecycle.mjs";

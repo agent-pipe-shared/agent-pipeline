@@ -48,9 +48,9 @@ export function validateConsentRecord(record, { root, repository, session, nowEp
     || !SHA.test(record.subjectSha256 ?? "") || !Number.isSafeInteger(record.expiresAtMs) || nowEpochMs >= record.expiresAtMs) return { ok: false, code: "AGY-CONSENT-INVALID" };
   const expectedSubject = digest(record.subject);
   const subject = record.subject;
-  if (expectedSubject !== record.subjectSha256 || digest(record.subject?.session) !== digest(session)
+  if (expectedSubject !== record.subjectSha256 || digest(record.subject?.session) !== digest({ id: session?.id, descriptorSha256: session?.descriptorSha256 })
     || record.subject?.provider !== record.provider || record.subject?.model !== record.model
-    || digest(subject?.repository) !== digest(repository)
+    || digest(subject?.repository) !== digest({ primaryRoot: repository?.primaryRoot, commonDir: repository?.commonDir })
     || !Array.isArray(subject?.roles) || !Array.isArray(subject?.allowedPaths)
     || subject.roles.some((role) => typeof role !== "string") || subject.allowedPaths.some((path) => typeof path !== "string")
     || subject.expiresAtMs !== record.expiresAtMs) return { ok: false, code: "AGY-CONSENT-SUBJECT-MISMATCH" };
