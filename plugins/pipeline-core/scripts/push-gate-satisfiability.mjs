@@ -61,6 +61,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import {
   checkCriticalHumanProofPolicy,
+  checkCriticalProofModeConflict,
   checkEvidenceFreshness,
   checkPushThreatModel,
   resolveEvidenceProjectDir,
@@ -299,6 +300,8 @@ export function assessPushGateSatisfiability(argv, deps = {}) {
       message: "HEAD commit could not be determined (git rev-parse HEAD failed); verify evidence cannot be checked against an unknown commit.",
     });
   }
+  const modeConflict = checkCriticalProofModeConflict(dir, deps);
+  if (modeConflict) checks.push(modeConflict);
   checks.push(checkTrustAnchorPresent(dir, deps));
   checks.push(checkPushThreatModelMaterialized(dir, deps));
   // HGO capabilities are separate audit/recovery artifacts.  In particular,

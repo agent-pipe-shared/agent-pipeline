@@ -42,7 +42,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
-import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { criticalProofWaiverFor, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -339,6 +339,29 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
 }
 
 /**
+ * Reports the policy/source contradiction before any human-facing preparation.
+ * `criticalProofWaiverFor()` is the authority for precedence and conflict
+ * semantics; this function only gives its typed result an actionable preflight
+ * shape shared by push preparation and the earlier satisfiability check.
+ */
+export function checkCriticalProofModeConflict(dir, deps = {}) {
+  const waiverFor = deps.criticalProofWaiverFor ?? criticalProofWaiverFor;
+  const result = waiverFor(dir, "push");
+  if (result?.code !== "CRITICAL-PROOF-MODE-CONFLICT") return null;
+  const readApproval = deps.readHumanApprovalMode ?? readHumanApprovalMode;
+  const approval = readApproval(dir, { legacyKind: "push" });
+  const source = approval?.source ?? "unknown source";
+  const key = approval?.key ?? "gates.push_approval";
+  return {
+    id: "critical-proof-mode-conflict",
+    ok: false,
+    code: result.code,
+    message: `CRITICAL-PROOF-MODE-CONFLICT: committed ${key}: chat (${source}) conflicts with the committed push proof policy in project/critical-human-proof.json; this is a push-only chat waiver versus the broader global human_approval choice. Choose one authority and commit the matching source, or retain signature mode.`,
+    remedy: "commit a consistent push approval mode and critical-human-proof policy (do not delete the anchor or create a waiver automatically)",
+  };
+}
+
+/**
  * READ-ONLY reuse of `pipeline-state.mjs`'s own `prepare-push-subject`
  * subcommand (its own header comment: "the SAME inputs approve-push itself
  * verifies against"). Calls the exported `run()` in-process and captures its
@@ -514,6 +537,20 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   const readHumanApproval = deps.readHumanApprovalMode ?? readHumanApprovalMode;
   const humanApproval = readHumanApproval(dir, { legacyKind: "push" });
   const chatMode = humanApproval.mode === "chat";
+  const modeConflict = checkCriticalProofModeConflict(dir, deps);
+  if (modeConflict) {
+    return {
+      ok: true,
+      report: {
+        schema: "pipeline.push-prepare-report.v1",
+        by, remote, destination, headCommit: resolveHeadCommit(dir, deps),
+        humanApproval: chatMode && humanApproval.scope === "global" ? "chat-attributed-unattested" : humanApproval.mode,
+        checks: [modeConflict],
+        ready: false,
+      },
+      lines: null,
+    };
+  }
 
   // Runs BEFORE anything below that assumes a clean tree (NVA-PUSHFOLD-1): a pending trailing
   // write from a prior `approve-push` is folded in here first, so `checkWorkingTreeClean`

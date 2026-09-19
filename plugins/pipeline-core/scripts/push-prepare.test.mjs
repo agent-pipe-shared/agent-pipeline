@@ -596,6 +596,27 @@ test("committed global chat reports chat-attributed-unattested and omits all pro
   assert.doesNotMatch(rendered, /authorize-critical|proof|anchor|key|directory/u);
 });
 
+test("legacy chat policy conflict is reported before pending approval folding", () => {
+  let foldCalls = 0;
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    {
+      dir: FIXTURE_DIR,
+      gitHead: () => HEAD,
+      readHumanApprovalMode: () => ({ mode: "chat", source: "pipeline.user.yaml", key: "gates.push_approval", scope: "legacy" }),
+      criticalProofWaiverFor: () => ({ waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT" }),
+      foldPendingApprovalWrite: () => { foldCalls += 1; },
+    },
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.report.checks.length, 1);
+  assert.equal(result.report.checks[0].id, "critical-proof-mode-conflict");
+  assert.match(result.report.checks[0].message, /CRITICAL-PROOF-MODE-CONFLICT/u);
+  assert.equal(result.lines, null);
+  assert.equal(foldCalls, 0);
+});
+
 test("printReport keeps stdout machine-readable and sends the bounded human commands to stderr", () => {
   const result = pushPrepareReport(
     ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],

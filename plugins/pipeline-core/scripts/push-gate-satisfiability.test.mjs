@@ -359,6 +359,18 @@ test("assessPushGateSatisfiability: each unmet precondition is named specificall
   assert.equal(failing[0].status, "absent");
 });
 
+test("assessPushGateSatisfiability: policy-mode conflict is surfaced before signature ceremony", () => {
+  const result = assessPushGateSatisfiability(["--root", FIXTURE_DIR], greenDeps({
+    readHumanApprovalMode: () => ({ mode: "chat", source: "pipeline.user.yaml", key: "gates.push_approval", scope: "legacy" }),
+    criticalProofWaiverFor: () => ({ waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT" }),
+  }));
+  assert.equal(result.report.satisfiable, false);
+  const conflict = result.report.checks.find((check) => check.id === "critical-proof-mode-conflict");
+  assert.equal(conflict?.ok, false);
+  assert.equal(conflict?.code, "CRITICAL-PROOF-MODE-CONFLICT");
+  assert.match(conflict.message, /gates\.push_approval: chat/u);
+});
+
 test("assessPushGateSatisfiability: an expired HGO capability is unrelated to push satisfiability", () => {
   const now = Date.parse("2026-08-28T10:10:00.000Z");
   const result = assessPushGateSatisfiability(["--root", FIXTURE_DIR], greenDeps({
