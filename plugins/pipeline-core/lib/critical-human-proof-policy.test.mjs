@@ -419,7 +419,7 @@ try {
       "a deliberate waiver was refused although the source has no opinion");
   });
 
-  check("CHP32 an anchored policy with trustAnchor cannot be waived by chat mode without explicit waiver", () => {
+  check("CHP32 a committed legacy push chat choice waives an anchored historical policy", () => {
     const base = userYaml(
       root({
         schema: "pipeline.critical-human-proof-policy.v1",
@@ -432,8 +432,17 @@ try {
       GATES("chat"),
     );
     const result = criticalProofWaiverFor(base, "push");
-    assert.equal(result.waived, false);
-    assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT");
+    assert.deepEqual(result, {
+      waived: true,
+      code: null,
+      waiver: {
+        kind: "push",
+        reason: "gates.push_approval: chat (pipeline.user.yaml)",
+        mode: "chat",
+        source: "pipeline.user.yaml",
+      },
+    });
+    assert.equal(criticalProofWaiverFor(base, "deploy").waived, false);
   });
 
   check("CHP33 committed global human_approval chat waives every critical kind before an unreadable policy is consulted", () => {

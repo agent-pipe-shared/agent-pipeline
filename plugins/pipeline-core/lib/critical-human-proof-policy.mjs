@@ -465,10 +465,14 @@ export function criticalProofWaiverFor(dir, kind) {
   if (approvalModeKey !== undefined) {
     const configured = readHumanApprovalMode(dir, { legacyKind: kind });
     if (configured.mode === "chat") {
-      const hasTrustAnchor = policy.trustAnchor !== null || (Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0);
-      if (hasTrustAnchor && reason === undefined) {
-        return { waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT" };
-      }
+      // A committed legacy action-local chat setting is itself the operator's
+      // explicit choice of the proof-free push posture. A historical trust
+      // anchor records which key MAY sign in signature mode; it must not turn
+      // that explicit chat choice into an unreachable mode. Existing projects
+      // commonly have an anchored v1/v2 policy from before human_approval.
+      // The anchor is retained unchanged for a later committed signature mode.
+      // Global chat continues to own all kinds above; this legacy branch is
+      // intentionally push-only.
       return {
         waived: true,
         code: null,

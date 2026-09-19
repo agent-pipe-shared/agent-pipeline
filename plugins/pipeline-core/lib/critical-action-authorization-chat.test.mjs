@@ -22,9 +22,13 @@ function fixture(mode) {
   writeFileSync(join(root, "pipeline.user.yaml"), mode === "global"
     ? "schema: \"pipeline.user.v3\"\ngates:\n  human_approval: chat\n"
     : "schema: \"pipeline.user.v3\"\ngates:\n  push_approval: chat\n");
-  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
-    schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"],
-    waivedKinds: mode === "global" ? [] : [{ kind: "push", reason: "explicit legacy chat waiver" }], trustAnchors: [],
+  // The legacy fixture has the old anchored policy with no waiver. This is
+  // the real consumer migration case: chat must work without deleting it.
+  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify(mode === "global" ? {
+    schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [],
+  } : {
+    schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"],
+    trustAnchor: { keyReference: "historical-po-key", publicKeySha256: "a".repeat(64) },
   }) + "\n");
   const threat = "# GG03 threat model\n";
   writeFileSync(join(root, "specs", "demo", "threat-model.md"), threat);
