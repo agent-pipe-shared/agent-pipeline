@@ -42,6 +42,7 @@ import {
   resolveEvidenceProjectDir,
   resolveFeatureContext,
   resolveVerifyRemedy,
+  resolveVerifyRemedyPlan,
 } from "./push-prepare.mjs";
 import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
 import { run as runPipelineState } from "./pipeline-state.mjs";
@@ -174,15 +175,19 @@ test("resolveVerifyRemedy (D1): resolves from the project's own calibration veri
     readFile: () => JSON.stringify({ verify: "node custom/verify.mjs" }),
   });
   assert.match(remedy, /verify-evidence-producer\.mjs.*--prepare/u);
-  assert.match(remedy, /node custom\/verify\.mjs --mode push --base <verified-base>/u);
+  assert.doesNotMatch(remedy, /node custom\/verify/u);
+  assert.match(remedy, /not executable until an explicit verified base/u);
+  const plan = resolveVerifyRemedyPlan(FIXTURE_DIR, "evidence/verify-latest.json", { verifyBase: "origin/main" });
+  assert.deepEqual(plan.produce.argv.slice(-6), ["--mode", "push", "--base", "origin/main", "--out", "evidence/verify-latest.json"]);
+  assert.equal(plan.produce.executableNow, true);
+  assert.equal(plan.prepare.argv[0], fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url)));
 });
 
 test("resolveVerifyRemedy (D2): no calibration resolves -> honest degradation, never a source-only path", () => {
   const remedy = resolveVerifyRemedy(FIXTURE_DIR, "evidence/verify-latest.json", {
     resolveAuthorityArtifactPath: () => ({ exists: false }),
   });
-  assert.match(remedy, /calibrated verify/);
-  assert.match(remedy, /does not define one/);
+  assert.match(remedy, /not executable until an explicit verified base/);
   assert.doesNotMatch(remedy, /harness\//);
 });
 
@@ -191,7 +196,7 @@ test("resolveVerifyRemedy (D2): calibration present but no verify key -> honest 
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
     readFile: () => JSON.stringify({ project: "consumer-project" }),
   });
-  assert.match(remedy, /calibrated verify/);
+  assert.match(remedy, /not executable until an explicit verified base/);
   assert.doesNotMatch(remedy, /harness\//);
 });
 
@@ -200,7 +205,7 @@ test("resolveVerifyRemedy (D2): unreadable calibration -> honest degradation, ne
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
     readFile: () => { throw new Error("ENOENT"); },
   });
-  assert.match(remedy, /calibrated verify/);
+  assert.match(remedy, /not executable until an explicit verified base/);
   assert.doesNotMatch(remedy, /harness\//);
 });
 
@@ -214,7 +219,7 @@ test("checkEvidenceFreshness (D1): remedy comes from the injected calibration re
   });
   assert.equal(result.ok, false);
   assert.match(result.remedy, /verify-evidence-producer\.mjs.*--prepare/u);
-  assert.match(result.remedy, /node custom\/verify\.mjs --mode push --base <verified-base>/u);
+  assert.doesNotMatch(result.remedy, /node custom\/verify/u);
 });
 
 test("checkPushThreatModel: absent -> ok:false with materialize remedy; present -> ok:true", () => {

@@ -45,7 +45,6 @@ import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
-import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
@@ -113,7 +112,6 @@ function readJson(path, deps) {
     return null;
   }
 }
-function appendCommandFlag(command, flag) { const marker = command.indexOf("  #"); return marker === -1 ? `${command} ${flag}` : `${command.slice(0, marker)} ${flag}${command.slice(marker)}`; }
 
 /**
  * Matches `checkEvidenceFreshness()` in `guard-push.mjs` (`exitCode === 0` and
@@ -132,45 +130,42 @@ function appendCommandFlag(command, flag) { const marker = command.indexOf("  #"
  * than being demanded unconditionally regardless of the setting.
  */
 /**
- * Resolves the remedy for a stale/missing evidence file to the PROJECT'S OWN
- * calibrated `verify` command -- never a path hardcoded to this repository's
- * own source-only tree layout (AC-11, the consumer-safe-path checker under
- * this repository's own build tooling). Reuses the same calibration-tier
- * resolver `security-scan.mjs` already routes
- * through (`resolveAuthorityArtifactPath`, `../lib/project-authority.mjs`)
- * rather than inventing a second calibration reader. An absent, unreadable, or
- * malformed calibration -- or one with no `verify` key -- degrades honestly:
- * it never invents a command and never falls back to a source-only path.
+ * Produce a typed preparation/production sequence using this distribution's
+ * producer. The producer resolves project authority and calibrated commands;
+ * those commands themselves are never advertised as evidence writers.
+ * An unknown base is an explicit non-executable prerequisite, not a guessed ref.
  */
+export function resolveVerifyRemedyPlan(dir, relPath, deps = {}) {
+  if (relPath !== "evidence/verify-latest.json") return { kind: "manual", reason: "Use the configured security evidence producer; Verify preparation does not regenerate security evidence." };
+  const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+  const base = typeof deps.verifyBase === "string" && deps.verifyBase.trim() && !deps.verifyBase.startsWith("-") ? deps.verifyBase : null;
+  return {
+    kind: "verify-evidence-repair",
+    prepare: { executable: "node", argv: [script, "--root", dir, "--prepare"] },
+    prerequisite: "Review and commit the generated consumer adapter before producing evidence at the resulting candidate.",
+    produce: { executable: "node", argv: [script, "--root", dir, "--mode", "push", ...(base ? ["--base", base] : []), "--out", relPath], executableNow: base !== null, unresolvedInputs: base ? [] : ["verified-base"] },
+  };
+}
+
 export function resolveVerifyRemedy(dir, relPath, deps = {}) {
-  const resolveArtifact = deps.resolveAuthorityArtifactPath ?? resolveAuthorityArtifactPath;
-  try {
-    const artifact = resolveArtifact("calibration", { rootDir: dir });
-    if (artifact.exists) {
-      const raw = (deps.readFile ?? readFileSync)(artifact.path, "utf8");
-      const parsed = JSON.parse(raw);
-      if (typeof parsed?.verify === "string" && parsed.verify.trim() !== "") {
-        const producer = `node ${JSON.stringify(new URL("./verify-evidence-producer.mjs", import.meta.url).pathname)} --root ${JSON.stringify(dir)} --prepare`;
-        return `${producer}  # review and commit the generated adapter, then run: ${parsed.verify} --mode push --base <verified-base> to regenerate ${relPath}`;
-      }
-    }
-  } catch {
-    // absent/unreadable/malformed calibration -- fall through to the honest degradation below.
-  }
-  return `node ${JSON.stringify(new URL("./verify-evidence-producer.mjs", import.meta.url).pathname)} --root ${JSON.stringify(dir)} --prepare  # review and commit the generated adapter; then run this project's calibrated verify with --mode push --base <verified-base> to regenerate ${relPath}`;
+  const plan = resolveVerifyRemedyPlan(dir, relPath, deps);
+  if (plan.kind === "manual") return plan.reason;
+  const render = action => [action.executable, ...action.argv.map(value => JSON.stringify(value))].join(" ");
+  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}`;
 }
 
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
   const path = join(dir, relPath);
   const data = readJson(path, deps);
   const remedy = resolveVerifyRemedy(dir, relPath, deps);
-  if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy };
-  if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy };
+  const remedyPlan = resolveVerifyRemedyPlan(dir, relPath, deps);
+  if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy, remedyPlan };
+  if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
   if (data.commit !== headCommit) {
-    return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy };
+    return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
   }
   if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
-    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: appendCommandFlag(remedy, "--mode push") };
+    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy, remedyPlan: resolveVerifyRemedyPlan(dir, relPath, deps) };
   }
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
 }

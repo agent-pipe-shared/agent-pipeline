@@ -5,6 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { VerifyEvidenceError, VERIFY_EVIDENCE_SCHEMA, produceVerifyEvidence } from "./verify-evidence-producer.mjs";
@@ -72,9 +73,24 @@ test("a failing verify command produces no artifact at all", async () => {
   await withFixture('node -e "process.exit(3)"', async (root) => {
     await assert.rejects(
       () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json" }),
-      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-VERIFY-FAILED",
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-VERIFY-FAILED" && /"suite":"configured-verify","exitCode":3/u.test(error.message),
     );
     assert.equal(existsSync(join(root, "evidence", "verify.json")), false, "a failing verify must leave no evidence file");
+  });
+});
+
+test("CLI failure identifies the real repository check and bounded invalid JSON finding", async () => {
+  await withFixture('node -e "process.exit(0)"', root => {
+    writeFileSync(join(root, ".claude/settings.json"), "{");
+    git(root, ["add", ".claude/settings.json"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "invalid json fixture"]);
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url)), "--root", root], { encoding: "utf8" });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /VEP-VERIFY-FAILED/u);
+    assert.match(result.stderr, /"suite":"baseline-repository","exitCode":1/u);
+    assert.match(result.stderr, /"code":"invalid-json","path":"\.claude\/settings.json"/u);
+    assert.doesNotMatch(result.stderr, new RegExp(root));
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
   });
 });
 
@@ -304,7 +320,7 @@ test("a bare invocation with no --out resolves to the shared VERIFY_EVIDENCE_DEF
 
 test("the CLI wrapper with no --out flag also resolves to the shared default path", async () => {
   await withFixture('node -e "process.exit(0)"', (root) => {
-    const scriptPath = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
+    const scriptPath = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
     const stdout = run("node", [scriptPath, "--root", root]);
     const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
     assert.equal(parsed.status, "passed");
@@ -314,7 +330,7 @@ test("the CLI wrapper with no --out flag also resolves to the shared default pat
 
 test("the CLI wrapper exits 0 and writes evidence for a passing run", async () => {
   await withFixture('node -e "process.exit(0)"', (root) => {
-    const scriptPath = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
+    const scriptPath = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
     const stdout = run("node", [scriptPath, "--root", root, "--out", "evidence/verify.json"]);
     const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
     assert.equal(parsed.status, "passed");
@@ -324,7 +340,7 @@ test("the CLI wrapper exits 0 and writes evidence for a passing run", async () =
 
 test("the CLI exposes the explicit event boundary without changing the evidence default", async () => {
   await withFixture('node -e "process.exit(0)"', (root) => {
-    const scriptPath = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
+    const scriptPath = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
     const stdout = run("node", [scriptPath, "--root", root, "--event-out", "evidence/actions/verify.json"]);
     const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
     assert.equal(parsed.status, "passed");
@@ -444,7 +460,7 @@ test("candidate drift rejects success and a new candidate never reuses baseline 
 });
 
 test("an external installed package works and implementation changes invalidate resume", async () => {
-  const installed = mkdtempSync(join(tmpdir(), "consumer-installed-"));
+  const installed = mkdtempSync(join(tmpdir(), "consumer installed space-"));
   try {
     cpSync(new URL("../", import.meta.url), installed, { recursive: true });
     await withFixture('node -e "require(\'assert\').equal(2 + 2, 4)"', (root) => {

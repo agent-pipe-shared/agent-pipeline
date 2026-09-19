@@ -56,7 +56,7 @@
  * configured verify command failed, the candidate drifted mid-run, or the
  * calibration names no usable command -- nothing is written.
  */
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -65,7 +65,7 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
-import { runVerifyJournal, sealVerifyCleanupRegistration } from "./verify-journal.mjs";
+import { runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource } from "../lib/worktree-lifecycle.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
@@ -88,6 +88,32 @@ export class VerifyEvidenceError extends Error {
   }
 }
 const fail = (code, message) => { throw new VerifyEvidenceError(code, message); };
+
+export function summarizeVerifyFailures(run) {
+  return (Array.isArray(run.steps) ? run.steps : []).filter(step => step.exitCode !== 0).slice(0, 32).map(step => {
+    const suite = typeof step.name === "string" && /^[a-zA-Z0-9_-]{1,100}$/u.test(step.name) ? step.name : "unknown";
+    const result = { suite, exitCode: Number.isSafeInteger(step.exitCode) ? step.exitCode : null, findings: [], diagnostics: "unavailable" };
+    if (suite === "unknown") return result;
+    const artifact = verifySuiteArtifactName(suite);
+    result.logRef = `logs/${artifact}.log`;
+    try {
+      const logPath = join(run.runDir, result.logRef);
+      const stat = lstatSync(logPath);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 65536) return result;
+      const bytes = readFileSync(logPath);
+      const receipt = JSON.parse(readFileSync(join(run.runDir, "receipts", `${artifact}.json`), "utf8"));
+      if (receipt.suite !== suite || receipt.exitCode !== step.exitCode || receipt.receiptSha256 !== step.receiptSha256 || receipt.log?.fileSha256 !== createHash("sha256").update(bytes).digest("hex")) return result;
+      result.diagnostics = "retained-private-log";
+      if (suite !== "baseline-repository") return result;
+      const parsed = JSON.parse(bytes.toString("utf8"));
+      if (parsed.schema !== "pipeline.consumer-baseline-result.v1" || parsed.status !== "failed" || !Array.isArray(parsed.findings)) return result;
+      result.findings = parsed.findings.slice(0, 16).filter(f => ["invalid-json", "unreadable-tracked-text", "merge-conflict-marker", "git-diff-check"].includes(f?.code)
+        && (f.path === null || (typeof f.path === "string" && f.path.length <= 240 && !/^(?:[\\/]|[a-z]:)/iu.test(f.path) && !f.path.split(/[\\/]/u).includes("..") && !/[\x00-\x1f]/u.test(f.path))))
+        .map(f => ({ code: f.code, path: f.path }));
+    } catch { /* Missing/malformed diagnostics never change the failed result. */ }
+    return result;
+  });
+}
 
 function git(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], {
@@ -263,9 +289,8 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   // Interrupted runs retain their creating intent rather than inventing a seal.
   finalizeTemporaryResource(root, { ...registration, canaryRelative: "terminal.json" });
   if (run.terminal.status !== "passed" && eventPlan === null) {
-    const steps = Array.isArray(run.terminal.steps) ? run.terminal.steps : [];
-    const failures = steps.filter((step) => step?.status === "failed" || step?.status === "error").slice(0, 32).map((step) => ({ suite: typeof step.suite === "string" ? step.suite : (typeof step.id === "string" ? step.id : "unknown"), ...(Number.isSafeInteger(step.exitCode) ? { exitCode: step.exitCode } : {}) }));
-    fail("VEP-VERIFY-FAILED", `Required consumer Verify checks failed; no success evidence was written. Failed checks: ${JSON.stringify(failures)}`);
+    const failures = summarizeVerifyFailures(run);
+    fail("VEP-VERIFY-FAILED", `Required consumer Verify checks failed; no success evidence was written. Private diagnostic run: ${run.runId}. Failed checks: ${JSON.stringify(failures)}`);
   }
   let terminalSource = run.terminal;
   if (eventPlan !== null) {
