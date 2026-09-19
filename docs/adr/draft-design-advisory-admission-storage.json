@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-design-advisory-admission-storage",
+  "title": "Durable storage for mandatory design-advisory admission",
+  "status": "proposed",
+  "digest": "5c905f1389c63e5e2cb09ddf2ea9146223097a46fa414c496f09592b5054dc15",
+  "scope": "project",
+  "date": "2026-09-19"
+}
