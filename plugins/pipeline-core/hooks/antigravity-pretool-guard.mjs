@@ -26,7 +26,7 @@ import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.m
 // item measured as one of the inconsistent emitters, mirroring the identical
 // adoption already landed in guard-lifecycle-ready.mjs, guard-testpath.mjs
 // and guard-gate-strength.mjs (NVA-W12-COPYSAFE).
-import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder } from "../lib/copy-safe-command.mjs";
+import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import {
   nativeHookSessionId,
   rememberedNativeHookFailure,
@@ -73,7 +73,8 @@ function humanOverrideFailureFields(error) {
 
 function nativeDispatchPreparationGuidance(projectRoot, code) {
   if (code !== "AGY-NATIVE-ARTIFACT-MISSING") return "The failure is distinct; inspect its code before preparing a replacement.";
-  const action = boundedCopySafeCommand({
+  const action = renderHumanCopySafeCommand({
+    label: "prepare native Antigravity dispatch",
     executable: process.execPath,
     argv: [
       AGY_NATIVE_DISPATCH_PREPARE,
@@ -83,13 +84,13 @@ function nativeDispatchPreparationGuidance(projectRoot, code) {
       "--request",
       placeholder("<native-dispatch-request.json>"),
     ],
-    forceCopyCommand: true,
   });
-  const copy = action.copyCommand.posix ?? action.command;
   return [
     "If no invoke_subagent call has launched, create the closed request containing packets and Subagents, then prepare it with the loaded entrypoint.",
-    `Exact argv: ${action.command}`,
-    `Copy-safe argv:\n${copy}`,
+    `Structured executable (tool/API, not a shell command): ${action.executable}`,
+    `Structured argv (tool/API, not a shell command): ${JSON.stringify(action.argv)}`,
+    "Copy one matching shell form:",
+    action.text,
     "After prepared status and exit 0, pass only invocation.Subagents unchanged to invoke_subagent. Do not retry a launched job.",
   ].join("\n");
 }

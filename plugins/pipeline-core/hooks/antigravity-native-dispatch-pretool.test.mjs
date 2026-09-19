@@ -20,7 +20,7 @@ const git = (root, ...args) => execFileSync("git", args, { cwd: root, encoding: 
 function fixture() {
   const parent = process.env.PIPELINE_TEST_TMPDIR ?? join(process.cwd(), "scratch");
   mkdirSync(parent, { recursive: true });
-  const root = mkdtempSync(join(parent, "agy-native-hook-"));
+  const root = mkdtempSync(join(parent, "agy native hook über-"));
   writeFileSync(join(root, "input.txt"), "input\n");
   git(root, "init", "-q");
   git(root, "config", "user.name", "Fixture");
@@ -81,7 +81,12 @@ const cases = [
     const result = invoke(root, nativeSubagents);
     assert.equal(result.status, 2);
     assert.match(result.stderr, /AGY-NATIVE-ARTIFACT-MISSING/u);
-    assert.match(result.stderr, /antigravity-native-dispatch-prepare\.mjs prepare --root .* --request <native-dispatch-request\.json>/u);
+    assert.match(result.stderr, /Structured executable \(tool\/API, not a shell command\): /u);
+    assert.match(result.stderr, /Structured argv \(tool\/API, not a shell command\): /u);
+    assert.match(result.stderr, /Step: prepare native Antigravity dispatch\nPOSIX:\n/u);
+    assert.match(result.stderr, /\nPowerShell:\n/u);
+    assert.match(result.stderr, /agy native hook über-/u);
+    assert.match(result.stderr, /<native-dispatch-request\.json>/u);
     assert.match(result.stderr, /closed request containing packets and Subagents/u);
   }],
   ["one complete prepared batch is allowed once", (value) => {
