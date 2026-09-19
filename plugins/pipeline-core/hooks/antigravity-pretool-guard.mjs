@@ -44,6 +44,7 @@ const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
 const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
 const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
+const AGY_NATIVE_DISPATCH_PREPARE = join(PLUGIN_ROOT, "scripts", "antigravity-native-dispatch-prepare.mjs");
 const HOOK_STARTED_AT = Date.now();
 const HOOK_BUDGET_MS = 42_000;
 const STDIN_TIMEOUT_MS = 1_000;
@@ -68,6 +69,29 @@ function humanOverrideFailureFields(error) {
     code: error?.code,
     ...(git ? { operation: git[1], outcome: git[2] } : {}),
   };
+}
+
+function nativeDispatchPreparationGuidance(projectRoot, code) {
+  if (code !== "AGY-NATIVE-ARTIFACT-MISSING") return "The failure is distinct; inspect its code before preparing a replacement.";
+  const action = boundedCopySafeCommand({
+    executable: process.execPath,
+    argv: [
+      AGY_NATIVE_DISPATCH_PREPARE,
+      "prepare",
+      "--root",
+      projectRoot,
+      "--request",
+      placeholder("<native-dispatch-request.json>"),
+    ],
+    forceCopyCommand: true,
+  });
+  const copy = action.copyCommand.posix ?? action.command;
+  return [
+    "If no invoke_subagent call has launched, create the closed request containing packets and Subagents, then prepare it with the loaded entrypoint.",
+    `Exact argv: ${action.command}`,
+    `Copy-safe argv:\n${copy}`,
+    "After prepared status and exit 0, pass only invocation.Subagents unchanged to invoke_subagent. Do not retry a launched job.",
+  ].join("\n");
 }
 
 export function allow() {
@@ -554,7 +578,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
       nativeSubagents: input?.toolCall?.args?.Subagents,
     });
     if (nativeVerdict.status !== "prepared") {
-      deny(`BLOCKED (Antigravity dispatch preflight): ${nativeVerdict.code}: the complete invoke_subagent batch must be prepared and candidate-bound before launch.`);
+      deny(`BLOCKED (Antigravity dispatch preflight): ${nativeVerdict.code}: the complete invoke_subagent batch must be prepared and candidate-bound before launch.\n${nativeDispatchPreparationGuidance(projectRoot, nativeVerdict.code)}`);
     }
   }
 

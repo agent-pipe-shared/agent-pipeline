@@ -408,6 +408,10 @@ The happy path loads no reference file. Load only the exact condition:
   Elephant-only orchestration rule, the mandatory worktree self-heal
   briefing text, the ~50-tool-call termination cliff and required budget
   language, and how to recover a truncated dispatch's real work.
+- `references/antigravity-native-dispatch.md` before an Elephant or other
+  authorized dispatcher constructs an Antigravity `invoke_subagent` call that
+  includes a Pipeline role. This applies whether or not the dispatcher uses
+  Workflow or worktrees.
 
 No happy-path reference is mandatory. Lazy loading never widens authority and
 must preserve lifecycle, V3 authority, calibration, handover, Verify and
@@ -438,6 +442,10 @@ guard-enforced rule — no guard blocks or detects a non-dispatched write, so
 skipping the dispatch right here produces no refusal to catch it: get this
 right by reading this paragraph now, not by expecting a later guard to stop
 a miss.
+Before constructing a native Antigravity `invoke_subagent` request that
+includes any Pipeline role, load
+`references/antigravity-native-dispatch.md`. Its preparation route is required
+independently of Workflow and worktree choices.
 A feature's implementation is not complete until a Critic review
 (`critic-review` skill) has been dispatched against it and returned a
 result — pass, or a documented fail-then-fix cycle; this is a requirement to

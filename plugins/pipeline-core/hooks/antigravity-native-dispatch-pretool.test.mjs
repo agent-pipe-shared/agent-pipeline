@@ -13,6 +13,7 @@ import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 
 const hook = join(dirname(fileURLToPath(import.meta.url)), "antigravity-pretool-guard.mjs");
+const prepareScript = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "antigravity-native-dispatch-prepare.mjs");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const git = (root, ...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 
@@ -80,10 +81,20 @@ const cases = [
     const result = invoke(root, nativeSubagents);
     assert.equal(result.status, 2);
     assert.match(result.stderr, /AGY-NATIVE-ARTIFACT-MISSING/u);
+    assert.match(result.stderr, /antigravity-native-dispatch-prepare\.mjs prepare --root .* --request <native-dispatch-request\.json>/u);
+    assert.match(result.stderr, /closed request containing packets and Subagents/u);
   }],
   ["one complete prepared batch is allowed once", (value) => {
-    assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
-    assert.equal(invoke(value.root, value.nativeSubagents).status, 0);
+    const requestPath = join(value.root, "agy-native-dispatch-request.json");
+    writeFileSync(requestPath, `${JSON.stringify({ packets: value.packets, Subagents: value.nativeSubagents })}\n`);
+    const prepared = spawnSync(process.execPath, [prepareScript, "prepare", "--root", value.root, "--request", "agy-native-dispatch-request.json"], {
+      cwd: value.root, encoding: "utf8", shell: false,
+    });
+    assert.equal(prepared.status, 0, prepared.stderr);
+    const output = JSON.parse(prepared.stdout);
+    assert.equal(output.status, "prepared");
+    assert.deepEqual(output.invocation.Subagents, value.nativeSubagents);
+    assert.equal(invoke(value.root, output.invocation.Subagents).status, 0);
     const replay = invoke(value.root, value.nativeSubagents);
     assert.equal(replay.status, 2);
     assert.match(replay.stderr, /AGY-NATIVE-ARTIFACT-MISSING/u);
