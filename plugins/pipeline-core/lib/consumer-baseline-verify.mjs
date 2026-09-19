@@ -33,7 +33,7 @@ export function inspectConsumerBaseline(rootDir, deps = {}) {
     if (CONFLICT_MARKER.test(text)) findings.push({ code: "merge-conflict-marker", path: relativePath });
     if (extname(relativePath).toLowerCase() === ".json") {
       jsonFiles += 1;
-      try { JSON.parse(text); } catch { findings.push({ code: "invalid-json", path: relativePath }); }
+      try { JSON.parse(text.startsWith("\uFEFF") ? text.slice(1) : text); } catch { findings.push({ code: "invalid-json", path: relativePath }); }
     }
   }
   const diffCheck = spawn("git", ["-C", root, "diff", "--check", "HEAD"], { encoding: "utf8", shell: false });

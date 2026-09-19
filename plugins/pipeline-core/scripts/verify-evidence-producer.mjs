@@ -262,7 +262,11 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   // Keep the real private descriptor and resource available for recovery/resume.
   // Interrupted runs retain their creating intent rather than inventing a seal.
   finalizeTemporaryResource(root, { ...registration, canaryRelative: "terminal.json" });
-  if (run.terminal.status !== "passed" && eventPlan === null) fail("VEP-VERIFY-FAILED", "Required consumer Verify checks failed; no success evidence was written.");
+  if (run.terminal.status !== "passed" && eventPlan === null) {
+    const steps = Array.isArray(run.terminal.steps) ? run.terminal.steps : [];
+    const failures = steps.filter((step) => step?.status === "failed" || step?.status === "error").slice(0, 32).map((step) => ({ suite: typeof step.suite === "string" ? step.suite : (typeof step.id === "string" ? step.id : "unknown"), ...(Number.isSafeInteger(step.exitCode) ? { exitCode: step.exitCode } : {}) }));
+    fail("VEP-VERIFY-FAILED", `Required consumer Verify checks failed; no success evidence was written. Failed checks: ${JSON.stringify(failures)}`);
+  }
   let terminalSource = run.terminal;
   if (eventPlan !== null) {
     try { terminalSource = JSON.parse(readFileSync(join(run.runDir, "terminal.json"), "utf8")); }

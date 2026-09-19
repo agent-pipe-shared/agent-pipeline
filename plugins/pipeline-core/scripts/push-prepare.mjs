@@ -113,6 +113,7 @@ function readJson(path, deps) {
     return null;
   }
 }
+function appendCommandFlag(command, flag) { const marker = command.indexOf("  #"); return marker === -1 ? `${command} ${flag}` : `${command.slice(0, marker)} ${flag}${command.slice(marker)}`; }
 
 /**
  * Matches `checkEvidenceFreshness()` in `guard-push.mjs` (`exitCode === 0` and
@@ -168,7 +169,7 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
     return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy };
   }
   if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
-    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push` };
+    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: appendCommandFlag(remedy, "--mode push") };
   }
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
 }
