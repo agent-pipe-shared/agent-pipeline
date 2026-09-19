@@ -63,7 +63,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
 import {
   CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V3,
-  readCriticalHumanProofPolicy, verifyAgainstTrustAnchors,
+  criticalProofWaiverFor, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors,
 } from "./critical-human-proof-policy.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { resolveLocalOperatorKeyAnchor } from "./machine-plane.mjs";
@@ -431,6 +431,52 @@ export function authorizeRecordedPush({
     authorized: true, code: `${prefix}-VERIFIED`,
     keyReference: verified.signer.keyReference, publicKeySha256: verified.signer.publicKeySha256,
   };
+}
+
+/** Verify explicitly selected, proof-free chat attribution for a raw push. */
+export function authorizeRecordedChatPush({
+  projectDir, anchorDir = projectDir, state, candidate, remote, destination,
+} = {}) {
+  const prefix = "PUSH-PROOF";
+  if (typeof projectDir !== "string" || typeof anchorDir !== "string" || !object(state) || !validCandidate(candidate)
+    || typeof remote !== "string" || remote === ""
+    || typeof destination !== "string" || destination === "") {
+    return { authorized: false, code: `${prefix}-INPUT-INVALID` };
+  }
+  let waiver;
+  try { waiver = criticalProofWaiverFor(anchorDir, "push"); }
+  catch { return { authorized: false, code: `${prefix}-CHAT-POLICY-UNREADABLE` }; }
+  if (waiver?.waived !== true || !waiver.waiver) {
+    return { authorized: false, code: waiver?.code ?? `${prefix}-CHAT-NOT-WAIVED` };
+  }
+  const approval = state?.pushApproval?.lastApproved;
+  if (!object(approval) || approval.forCommit !== candidate.commit
+    || approval.remote !== remote || approval.destination !== destination) {
+    return { authorized: false, code: `${prefix}-BINDING-MISMATCH` };
+  }
+  if (approval.criticalProof !== null) return { authorized: false, code: `${prefix}-CHAT-RECORD-MISMATCH` };
+  const recordedWaiver = approval.criticalProofWaiver;
+  if (!object(recordedWaiver) || recordedWaiver.kind !== "push"
+    || recordedWaiver.mode !== waiver.waiver.mode || recordedWaiver.source !== waiver.waiver.source) {
+    return { authorized: false, code: `${prefix}-CHAT-ATTRIBUTION-MISSING` };
+  }
+  if (waiver.waiver.mode === "chat-attributed-unattested"
+    && (!object(approval.humanApproval) || approval.humanApproval.kind !== "push"
+      || approval.humanApproval.mode !== "chat-attributed-unattested")) {
+    return { authorized: false, code: `${prefix}-CHAT-ATTRIBUTION-MISSING` };
+  }
+  if (waiver.waiver.mode !== "chat-attributed-unattested" && approval.humanApproval !== undefined) {
+    return { authorized: false, code: `${prefix}-CHAT-RECORD-MISMATCH` };
+  }
+  if (!object(approval.threatModel) || typeof approval.threatModel.path !== "string"
+    || !SHA256.test(approval.threatModel.sha256 ?? "")) {
+    return { authorized: false, code: `${prefix}-THREAT-MODEL` };
+  }
+  const threatModelDigest = boundArtifactDigest(projectDir, approval.threatModel.path);
+  if (threatModelDigest === null || threatModelDigest !== approval.threatModel.sha256) {
+    return { authorized: false, code: `${prefix}-THREAT-MODEL` };
+  }
+  return { authorized: true, code: "PUSH-PROOF-WAIVED", mode: waiver.waiver.mode };
 }
 
 /**

@@ -885,7 +885,38 @@ async function admitSignedPush() {
   }
   // Loaded lazily: this module chain (policy reader, request digests, Ed25519 verifier) is
   // needed by roughly no Bash call at all, and this hook runs on every one of them.
-  const { authorizeRecordedPush } = await import("../lib/critical-action-authorization.mjs");
+  const { authorizeRecordedChatPush, authorizeRecordedPush } = await import("../lib/critical-action-authorization.mjs");
+  const chat = authorizeRecordedChatPush({
+    projectDir,
+    anchorDir: projectDir,
+    state,
+    candidate: { commit, tree },
+    remote: binding.remote,
+    destination: binding.destination,
+  });
+  if (chat.authorized === true) {
+    const appended = appendLedger({
+      ts: new Date().toISOString(),
+      rule: "GG-03",
+      route: "chat-push-approval",
+      reason: "a verified chat push approval for this candidate, remote and destination ref",
+      commandSha256: sha256(cmd),
+      candidateCommit: commit,
+      status: "authorized",
+      keyReference: "chat-attributed-unattested",
+      forCommit: commit,
+      destination: binding.destination,
+      targetSha256: target.sha256,
+    }, target);
+    if (!appended) {
+      return {
+        admitted: false,
+        note: `Signed-approval route: NOT applied — the audit ledger (${guardAuditRelPath}) could not be written, so the `
+          + "verified chat approval is not acted on (fail-closed, exactly like an override without an audit record).",
+      };
+    }
+    return { admitted: true, keyReference: "chat-attributed-unattested", forCommit: commit, destination: binding.destination };
+  }
   const verdict = authorizeRecordedPush({
     projectDir,
     anchorDir: projectDir, // the governed session root IS the confirmed target here
