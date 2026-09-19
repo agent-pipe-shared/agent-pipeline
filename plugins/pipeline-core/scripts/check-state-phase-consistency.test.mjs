@@ -175,6 +175,13 @@ test("the marker stays atomic with a real design -> implementation transition", 
   const dir = freshDir();
   try {
     const planPath = "specs/atomic-feature/prd.md";
+    const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
+    mkdirSync(join(dir, "project"), { recursive: true });
+    writeFileSync(join(dir, "project/pipeline.json"), `${JSON.stringify({
+      project: "atomic-feature",
+      verify: verifyCommand,
+      handover: "docs/state.md",
+    }, null, 2)}\n`);
     const setFeature = run(["set-feature", "--id", "atomic-feature", "--plan-path", planPath], { dir, now: FIXED_NOW });
     assert.equal(setFeature, 0);
     const afterSetFeature = checkStatePhaseConsistency({ rootDir: dir });
@@ -192,8 +199,9 @@ test("the marker stays atomic with a real design -> implementation transition", 
     const approved = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, planPath));
     assert.equal(approved, 0);
 
-    const setPhase = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], { dir, now: FIXED_NOW });
+    const setPhase = run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir, now: FIXED_NOW });
     assert.equal(setPhase, 0);
+    assert.equal(JSON.parse(readFileSync(join(dir, "project/pipeline.json"), "utf8")).verify, verifyCommand);
     const afterSetPhase = checkStatePhaseConsistency({ rootDir: dir });
     assert.equal(afterSetPhase.status, "consistent", JSON.stringify(afterSetPhase));
     assert.equal(afterSetPhase.phase, "implementation");
