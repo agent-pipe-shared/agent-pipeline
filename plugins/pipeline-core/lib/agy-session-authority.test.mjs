@@ -7,11 +7,11 @@ import { canonical, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 
 const session = { id: "session-1", descriptorSha256: "a".repeat(64) };
 const expiry = Date.now() + 10000;
-const subject = consentSubject({ repository: { primaryRoot: "/repo", commonDir: "/repo/.git" }, session, model: "gemini-3.8-flash-high", roles: ["pipeline-core:goldfish-implementor"], allowedPaths: ["src/x.mjs"], scope: "implementation", fallbackPolicy: "none", expiresAtMs: expiry });
+const subject = consentSubject({ repository: { primaryRoot: "/repo", commonDir: "/repo/.git" }, session, model: "gemini-3.8-flash-high", roles: ["pipeline-core:goldfish-implementor"], allowedPaths: ["src/x.mjs"], scope: "implementation", fallbackPolicy: "none", expiresAtMs: expiry, decisionNonce: "decision-1-nonce" });
 const intent = buildSignatureIntent({ featureId: "alfred", planSha256: "b".repeat(64), specSha256: "c".repeat(64), candidate: { commit: "d".repeat(40), tree: "e".repeat(40) }, subjectSha256: digest(subject) });
 
 test("chat consent is explicitly attributed and binds the immutable subject", () => {
-  const record = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: "decision-1", mode: "chat", session, provider: "google", model: "gemini-3.8-flash-high", roles: subject.roles, allowedPaths: subject.allowedPaths, subject, subjectSha256: digest(subject), expiresAtMs: expiry, attribution: { mode: "chat-attributed-unattested", decisionReference: "chat-turn-1" } };
+  const record = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: "decision-1-nonce", mode: "chat", session, provider: "google", model: "gemini-3.8-flash-high", roles: subject.roles, allowedPaths: subject.allowedPaths, subject, subjectSha256: digest(subject), expiresAtMs: expiry, attribution: { mode: "chat-attributed-unattested", decisionReference: "chat-turn-1" } };
   assert.equal(validateConsentRecord(record, { session, repository: subject.repository }).ok, true);
   assert.equal(validateConsentRecord({ ...record, subjectSha256: "f".repeat(64) }, { session, repository: subject.repository }).code, "AGY-CONSENT-SUBJECT-MISMATCH");
 });
@@ -21,7 +21,7 @@ test("signature consent verifies exact intent and rejects replay/tamper", () => 
   const publicKeyText = publicKey.export({ type: "spki", format: "pem" });
   const publicKeySha256 = createHash("sha256").update(publicKeyText).digest("hex");
   const proof = { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "test-key", publicKey: publicKeyText, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") };
-  const record = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: "decision-2", mode: "signature", session, provider: "google", model: "gemini-3.8-flash-high", roles: subject.roles, allowedPaths: subject.allowedPaths, subject, subjectSha256: digest(subject), intent, proof, expiresAtMs: expiry };
+  const record = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: "decision-1-nonce", mode: "signature", session, provider: "google", model: "gemini-3.8-flash-high", roles: subject.roles, allowedPaths: subject.allowedPaths, subject, subjectSha256: digest(subject), intent, proof, expiresAtMs: expiry };
   const policy = { ok: true, trustAnchors: [{ keyReference: "test-key", publicKeySha256 }], trustAnchor: null };
   assert.equal(validateConsentRecord(record, { session, repository: subject.repository, root: process.cwd(), policy }).ok, true);
   assert.equal(validateConsentRecord({ ...record, proof: { ...proof, intentSha256: "f".repeat(64) } }, { session, repository: subject.repository, root: process.cwd(), policy }).ok, false);

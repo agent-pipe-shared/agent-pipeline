@@ -12,8 +12,8 @@ const SHA = /^[a-f0-9]{64}$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const digest = (value) => createHash("sha256").update(canonical(value)).digest("hex");
 
-export function consentSubject({ repository, session, provider = "google", model, roles, allowedPaths, scope, fallbackPolicy, expiresAtMs }) {
-  return { schema: "pipeline.agy-session-consent-subject.v1", repository, session, provider, model, roles: [...roles].sort(), allowedPaths: [...allowedPaths].sort(), scope, fallbackPolicy, expiresAtMs };
+export function consentSubject({ repository, session, provider = "google", model, roles, allowedPaths, scope, fallbackPolicy, expiresAtMs, decisionNonce }) {
+  return { schema: "pipeline.agy-session-consent-subject.v1", repository, session, provider, model, roles: [...roles].sort(), allowedPaths: [...allowedPaths].sort(), scope, fallbackPolicy, expiresAtMs, decisionNonce };
 }
 
 export function consentStoragePath(root, sessionId) {
@@ -44,7 +44,7 @@ export function buildSignatureIntent({ featureId, planSha256, specSha256, candid
 export function validateConsentRecord(record, { root, repository, session, nowEpochMs = Date.now(), policy = null } = {}) {
   if (!record || record.schema !== AGY_CONSENT_SCHEMA || !ID.test(record.decisionId ?? "") || record.status !== "approved"
     || !record.session || record.session.id !== session?.id || record.session.descriptorSha256 !== session?.descriptorSha256
-    || record.provider !== "google" || typeof record.model !== "string" || !Array.isArray(record.roles) || !Array.isArray(record.allowedPaths)
+    || record.provider !== "google" || typeof record.model !== "string" || !Array.isArray(record.roles) || !Array.isArray(record.allowedPaths) || typeof record.subject?.decisionNonce !== "string" || record.subject.decisionNonce.length < 16 || record.decisionId !== record.subject.decisionNonce
     || !SHA.test(record.subjectSha256 ?? "") || !Number.isSafeInteger(record.expiresAtMs) || nowEpochMs >= record.expiresAtMs) return { ok: false, code: "AGY-CONSENT-INVALID" };
   const expectedSubject = digest(record.subject);
   const subject = record.subject;

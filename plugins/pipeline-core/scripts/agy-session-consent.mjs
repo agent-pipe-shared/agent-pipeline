@@ -34,14 +34,14 @@ export async function runConsentCommand(argv, deps = {}) {
     return { schema: "pipeline.agy-session-consent-preparation.v1", sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256, subject, subjectSha256, mode, ...(intent ? { intent } : {}), status: mode === "signature" ? "awaiting-human-signature" : "awaiting-human-chat-attribution" };
   }
   if (args.command === "inspect") return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { status: "missing", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 };
-  if (args.command === "revoke") { if (existsSync(path)) { const prior = JSON.parse(readFileSync(path, "utf8")); writeFileSync(tombstone, `${JSON.stringify({ decisionId: prior.decisionId, subjectSha256: prior.subjectSha256, revokedAtMs: Date.now() })}\n`, { flag: "wx", mode: 0o600 }); unlinkSync(path); } return { status: "revoked", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 }; }
+  if (args.command === "revoke") { if (existsSync(path)) { const prior = JSON.parse(readFileSync(path, "utf8")); let history = []; if (existsSync(tombstone)) { try { history = JSON.parse(readFileSync(tombstone, "utf8")); } catch { throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); } } if (!Array.isArray(history)) throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); history.push({ decisionId: prior.decisionId, subjectSha256: prior.subjectSha256, revokedAtMs: Date.now() }); writeFileSync(tombstone, `${JSON.stringify(history)}\n`, { flag: "w", mode: 0o600 }); unlinkSync(path); } return { status: "revoked", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 }; }
   if (!args.record) throw new Error(usage);
   const record = JSON.parse(readFileSync(resolve(args.record), "utf8"));
   const live = loadLiveSession(args.root, args.sessionId, descriptor.descriptorSha256);
   if (!live.ok) throw new Error(live.code);
   const checked = validateConsentRecord(record, { root: args.root, repository: descriptor.repo, session: live.session, policy: deps.policy });
   if (!checked.ok) throw new Error(checked.code);
-  if (existsSync(tombstone)) { const prior = JSON.parse(readFileSync(tombstone, "utf8")); if (prior.decisionId === record.decisionId) throw new Error("AGY-CONSENT-REAUTH-REQUIRED"); unlinkSync(tombstone); }
+  if (existsSync(tombstone)) { let history; try { history = JSON.parse(readFileSync(tombstone, "utf8")); } catch { throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); } if (!Array.isArray(history)) throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); if (history.some((prior) => prior?.decisionId === record.decisionId || prior?.subjectSha256 === record.subjectSha256)) throw new Error("AGY-CONSENT-REAUTH-REQUIRED"); }
   mkdirSync(directory, { recursive: true, mode: 0o700 }); if (lstatSync(directory).isSymbolicLink()) throw new Error("AGY-CONSENT-STORAGE-UNSAFE");
   writeFileSync(path, `${JSON.stringify(record)}\n`, { flag: "wx", mode: 0o600 });
   return { status: "recorded", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256, mode: checked.mode };
