@@ -12,6 +12,10 @@ import {
 import { fileURLToPath } from "node:url";
 
 import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
+import { planFeatureCloseAudit } from "../lib/feature-close-audit-preflight.mjs";
+import { executeFeatureCloseAudit } from "../lib/feature-close-audit-executor.mjs";
+import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import {
   assertPrivateRegularFile,
   ensurePrivateDirectory,
@@ -208,6 +212,8 @@ function action(command, values, planSha256) {
   if (values.closeIntent) argv.push("--close-intent", values.closeIntent);
   if (values.phase) argv.push("--phase", values.phase);
   if (values.architectureImpact) argv.push("--architecture-impact", values.architectureImpact);
+  if (values.auditRequest) argv.push("--audit-request", values.auditRequest);
+  if (values.criticVerifyLifecycle) argv.push("--critic-verify-lifecycle", values.criticVerifyLifecycle);
   if (values.evidence) argv.push("--evidence", values.evidence);
   if (values.publication) argv.push("--publication", values.publication);
   if (values.continuityCloseRequest) {
@@ -222,6 +228,36 @@ function action(command, values, planSha256) {
     requiresConfirmation: true,
     expected: { schema: "pipeline.close-coordinator.apply.v1", statuses: ["applied", "replayed"] },
   };
+}
+
+function auditRequest(root, path) {
+  const request = readJsonFile(root, path, "feature-close audit request");
+  const expected = ["schema", "manifestPath", "coreVersion", "packs", "criticVerifyLifecycleId"].sort().join("\0");
+  if (request.value.schema !== "pipeline.feature-close-audit-request.v1"
+    || Object.keys(request.value).sort().join("\0") !== expected
+    || !SAFE_RELATIVE.test(request.value.manifestPath ?? "")
+    || typeof request.value.coreVersion !== "string" || request.value.coreVersion.length === 0
+    || !Array.isArray(request.value.packs) || !SHA256.test(request.value.criticVerifyLifecycleId ?? "")) {
+    fail("CLOSE-AUDIT-REQUEST", "feature-close audit request has an invalid exact shape");
+  }
+  return request;
+}
+
+function auditLifecycleReadback({ root, common, request, auditPlan }) {
+  const evidence = readJsonFile(root, auditPlan.qualification.path, "candidate Verify evidence");
+  let lifecycle;
+  try {
+    lifecycle = readCriticVerifyLifecycle({
+      gitCommonDir: common,
+      id: request.value.criticVerifyLifecycleId,
+      candidate: auditPlan.candidate,
+      evidencePath: auditPlan.qualification.path,
+      evidence: evidence.value,
+    });
+  } catch (error) {
+    fail(error?.code ?? "CLOSE-CRITIC-VERIFY-UNAVAILABLE", "feature close requires the exact private Critic/Verify lifecycle receipt");
+  }
+  return { evidence, lifecycle };
 }
 function startPlan(values) {
   const root = physicalRoot(values.root);
@@ -332,7 +368,7 @@ function continuityCloseRequest(root, snapshot, path) {
   }
   return request;
 }
-function transitionPlan(values) {
+async function transitionPlan(values) {
   const root = physicalRoot(values.root);
   if (!ID.test(values.lifecycle ?? "") || !COORDINATOR_PHASES.includes(values.phase)
     || typeof values.actor !== "string" || values.actor.trim() === "") fail("CLOSE-ARGS", "transition identity is invalid");
@@ -341,6 +377,12 @@ function transitionPlan(values) {
   }
   if (values.phase !== "feature-close-prepared" && values.architectureImpact !== undefined) {
     fail("CLOSE-ARCHITECTURE-IMPACT", "architecture impact is accepted only for feature-close-prepared");
+  }
+  if (values.phase !== "feature-close-prepared" && values.auditRequest !== undefined) {
+    fail("CLOSE-AUDIT-ARGS", "--audit-request is accepted only for feature-close-prepared");
+  }
+  if (values.phase !== "feature-close-prepared" && values.criticVerifyLifecycle !== undefined) {
+    fail("CLOSE-CRITIC-VERIFY-ARGS", "--critic-verify-lifecycle is accepted only for feature-close-prepared");
   }
   const common = gitCommonDir(root);
   const stored = readCloseCoordinator(common, values.lifecycle);
@@ -373,6 +415,7 @@ function transitionPlan(values) {
     }
   }
   let boundEvidenceSha256 = null;
+  let audit = null;
   if (values.phase === "checkpointed") {
     const feature = activeFeature(snapshot.state);
     if (feature.id !== stored.coordinator.featureId) fail("CLOSE-FEATURE", "checkpoint feature drifted");
@@ -382,11 +425,47 @@ function transitionPlan(values) {
     const observed = authorityFromState(root, snapshot, { requireResult: true });
     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
+    if (values.auditRequest === undefined) fail("FCA-POLICY-REQUIRED", "feature close requires --audit-request with an exact Critic/Verify lifecycle reference");
+    const request = auditRequest(root, values.auditRequest);
+    if (!SHA256.test(values.criticVerifyLifecycle ?? "") || values.criticVerifyLifecycle !== request.value.criticVerifyLifecycleId) {
+      fail("CLOSE-CRITIC-VERIFY-ARGS", "coordinator request and audit request must name the same exact Critic/Verify lifecycle ID");
+    }
+    const options = {
+      repositoryRoot: root,
+      featureId: observed.feature.id,
+      candidate: { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) },
+      manifestPath: request.value.manifestPath,
+      coreVersion: request.value.coreVersion,
+      packs: request.value.packs,
+    };
+    const auditPlan = await planFeatureCloseAudit(options);
+    if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
+    if (auditPlan.result.sha256 !== observed.authority.implementationResultSha256) fail("CLOSE-AUDIT-RESULT", "audit Result differs from active feature authority");
+    const packageValue = readJsonFile(root, options.manifestPath, "audit package").value;
+    const specPath = snapshot.state.planApproval?.poGateAuthority?.specPath;
+    for (const [kind, path, digest] of [["prd", observed.feature.planPath, observed.authority.prdSha256], ["spec", specPath, observed.authority.specSha256]]) {
+      const artifact = packageValue.artifacts?.find((item) => item?.class === kind);
+      if (artifact?.path !== path || artifact?.sha256 !== digest) fail("CLOSE-AUDIT-AUTHORITY", "audit package must bind the exact approved PRD and Spec");
+    }
+    const lifecycle = auditLifecycleReadback({ root, common, request, auditPlan });
+    audit = {
+      options,
+      planSha256: auditPlan.planSha256,
+      requestSha256: request.sha256,
+      criticVerifyLifecycleId: request.value.criticVerifyLifecycleId,
+      criticVerifyLifecycleReceiptSha256: lifecycle.lifecycle.receiptSha256,
+      verifyEvidencePath: auditPlan.qualification.path,
+      verifyEvidenceSha256: auditPlan.qualification.sha256,
+    };
     advance.authority = observed.authority;
     advance.architectureImpact = values.architectureImpact;
     advance.inputDigest = sha256(canonical({
       pipelineStateSha256: snapshot.sha256,
       continuityCloseRequestSha256: closeRequest?.sha256 ?? null,
+      auditPlanSha256: audit.planSha256,
+      criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
+      criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
+      verifyEvidenceSha256: audit.verifyEvidenceSha256,
     }));
     advance.observedDigest = observed.authority.implementationResultSha256;
   } else if (values.phase === "tracked-close-finalized") {
@@ -535,6 +614,7 @@ function transitionPlan(values) {
     phase: values.phase,
     architectureImpact: values.architectureImpact ?? null,
     evidenceSha256: boundEvidenceSha256,
+    audit,
     advance,
   };
   const digest = planDigest(payload);
@@ -579,7 +659,52 @@ function applyStart(values, suppliedDigest) {
     evidenceDirectory,
   };
 }
-function applyTransition(values, suppliedDigest) {
+function featureCloseAction(values, coordinator) {
+  const audit = coordinator.featureCloseAudit;
+  if (audit === null || audit === undefined) fail("CLOSE-AUDIT-MIGRATION-REQUIRED", "legacy prepared coordinator has no verified audit binding");
+  const argv = [
+    STATE_WRITER, "close-feature", "--by", values.actor,
+    "--architecture-impact", coordinator.architectureImpact,
+    "--coordinator-lifecycle", coordinator.lifecycleId,
+    "--coordinator-sha256", lifecycleDigest(coordinator),
+    "--critic-verify-lifecycle", audit.criticVerifyLifecycleId,
+  ];
+  if (values.continuityCloseRequest !== undefined) argv.push("--continuity-close-request", values.continuityCloseRequest);
+  return { executable: process.execPath, argv, mutation: true, requiresConfirmation: true,
+    expected: { exitCode: 0, coordinatorPhase: "feature-close-prepared" } };
+}
+
+function preparedAuditReadback(root, common, coordinator, continuityRequest) {
+  const audit = coordinator.featureCloseAudit;
+  if (audit === null || audit === undefined) fail("CLOSE-AUDIT-MIGRATION-REQUIRED", "legacy prepared coordinator has no verified audit binding; preserve it and begin a new lifecycle");
+  try {
+    const receiptPath = physicalAuditPath(common, `agent-pipeline/publication-close/${coordinator.lifecycleId}/evidence/feature-close-audit.json`);
+    assertPrivateRegularFile(receiptPath);
+    const saved = JSON.parse(readFileSync(receiptPath, "utf8"));
+    if (Object.keys(saved).sort().join("\0") !== "plan\0receipt") throw new Error("receipt shape");
+    const checked = validateFeatureCloseAuditReceipt({ repositoryRoot: root, lifecycleId: coordinator.lifecycleId,
+      expectedPlanSha256: audit.auditPlanSha256, plan: saved.plan, receipt: saved.receipt });
+    if (!checked.ok || checked.receiptSha256 !== audit.auditReceiptSha256) throw new Error(checked.code ?? "receipt binding");
+    const verify = readJsonFile(root, saved.plan.qualification.path, "candidate Verify evidence");
+    const lifecycle = readCriticVerifyLifecycle({ gitCommonDir: common, id: audit.criticVerifyLifecycleId,
+      candidate: saved.plan.candidate, evidencePath: saved.plan.qualification.path, evidence: verify.value });
+    if (lifecycle.receiptSha256 !== audit.criticVerifyLifecycleReceiptSha256) throw new Error("lifecycle receipt drift");
+    const expectedInput = sha256(canonical({
+      pipelineStateSha256: stateSnapshot(root).sha256,
+      continuityCloseRequestSha256: continuityRequest?.sha256 ?? null,
+      auditPlanSha256: audit.auditPlanSha256,
+      criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
+      criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
+      verifyEvidenceSha256: saved.plan.qualification.sha256,
+    }));
+    if (coordinator.effects.at(-1)?.inputDigest !== expectedInput) throw new Error("coordinator input drift");
+    return { saved, checked, lifecycle };
+  } catch (error) {
+    fail(error?.code ?? "CLOSE-AUDIT-READBACK", "prepared feature close audit or Critic/Verify lifecycle changed; zero State mutation");
+  }
+}
+
+async function applyTransition(values, suppliedDigest) {
   const root = physicalRoot(values.root);
   const common = gitCommonDir(root);
   const prior = readCloseCoordinator(common, values.lifecycle);
@@ -587,7 +712,7 @@ function applyTransition(values, suppliedDigest) {
   if (prior.coordinator.phase === values.phase) {
     if (priorEffect?.operationSha256 === suppliedDigest) {
       const completion = coordinatorCompletion(prior.coordinator.phase);
-      return {
+      const result = {
         schema: "pipeline.close-coordinator.apply.v1",
         status: "replayed",
         phase: prior.coordinator.phase,
@@ -597,18 +722,41 @@ function applyTransition(values, suppliedDigest) {
         stateSha256: lifecycleDigest(prior.coordinator),
         rawSha256: prior.rawDigest,
       };
+      if (prior.coordinator.phase === "feature-close-prepared") {
+        const request = continuityCloseRequest(root, stateSnapshot(root), values.continuityCloseRequest);
+        preparedAuditReadback(root, common, prior.coordinator, request);
+        result.nextAction = featureCloseAction(values, prior.coordinator);
+      }
+      return result;
     }
     if (!(values.phase === "cleanup-complete"
       && prior.coordinator.cleanup.status === "uncertain")) {
       fail("CLOSE-REPLAY", "transition conflicts with the durable phase");
     }
   }
-  const plan = transitionPlan(values);
+  const plan = await transitionPlan(values);
   if (plan.planSha256 !== suppliedDigest) fail("CLOSE-PLAN", "transition plan digest drifted");
   const stored = readCloseCoordinator(common, plan.lifecycleId);
   if (stored.rawDigest !== plan.expectedRawSha256 || lifecycleDigest(stored.coordinator) !== plan.expectedStateSha256) fail("CLOSE-CAS", "coordinator changed after planning");
+  let auditBinding;
+  if (plan.audit !== null) {
+    const executed = await executeFeatureCloseAudit({ options: plan.audit.options, lifecycleId: plan.lifecycleId,
+      expectedPlanSha256: plan.audit.planSha256, activate: true });
+    if (!new Set(["verified-pending-close", "replayed"]).has(executed.status)) fail(executed.code ?? "CLOSE-AUDIT-FAILED", "audit bundle did not verify; feature remains open");
+    const lifecycle = auditLifecycleReadback({ root, common, request: { value: { criticVerifyLifecycleId: plan.audit.criticVerifyLifecycleId } }, auditPlan: executed.receipt ? { ...((JSON.parse(readFileSync(executed.receiptPath, "utf8"))).plan) } : null });
+    if (lifecycle.lifecycle.receiptSha256 !== plan.audit.criticVerifyLifecycleReceiptSha256) fail("CLOSE-CRITIC-VERIFY-DRIFT", "Critic/Verify lifecycle changed while audit bundle was built");
+    if (readCloseCoordinator(common, plan.lifecycleId).rawDigest !== stored.rawDigest || stateSnapshot(root).sha256 !== plan.advance.authority.pipelineStateSha256) fail("CLOSE-CAS", "State changed while audit bundle was built; bundle is preserved for reconciliation");
+    auditBinding = {
+      auditPlanSha256: plan.audit.planSha256,
+      auditReceiptSha256: executed.receiptSha256,
+      criticVerifyLifecycleId: plan.audit.criticVerifyLifecycleId,
+      criticVerifyLifecycleReceiptSha256: plan.audit.criticVerifyLifecycleReceiptSha256,
+      outputPath: executed.receipt.outputPath,
+    };
+  }
   const next = advanceCloseCoordinator(stored.coordinator, {
     ...plan.advance,
+    ...(auditBinding === undefined ? {} : { featureCloseAudit: auditBinding }),
     operationSha256: suppliedDigest,
   });
   const saved = storeCloseCoordinator({ gitCommonDir: common, coordinator: next, expectedRawSha256: stored.rawDigest });
@@ -623,26 +771,7 @@ function applyTransition(values, suppliedDigest) {
     rawSha256: saved.rawDigest,
   };
   if (next.phase === "feature-close-prepared") {
-    result.nextAction = {
-      executable: process.execPath,
-      argv: [
-        STATE_WRITER,
-        "close-feature",
-        "--by", plan.actor,
-        "--architecture-impact", next.architectureImpact,
-        "--coordinator-lifecycle", next.lifecycleId,
-        "--coordinator-sha256", lifecycleDigest(next),
-      ],
-      mutation: true,
-      requiresConfirmation: true,
-      expected: { exitCode: 0, coordinatorPhase: "feature-close-prepared" },
-    };
-    if (values.continuityCloseRequest !== undefined) {
-      result.nextAction.argv.push(
-        "--continuity-close-request",
-        values.continuityCloseRequest,
-      );
-    }
+    result.nextAction = featureCloseAction(values, next);
   }
   return result;
 }
@@ -689,7 +818,7 @@ try {
   } else if (command === "plan-transition" || command === "apply-transition") {
     const parsed = exactArgs(argv, new Set([
       "root", "lifecycle", "actor", "phase", "evidence", "publication",
-      "continuity-close-request", "architecture-impact", "plan-sha256",
+      "continuity-close-request", "architecture-impact", "audit-request", "critic-verify-lifecycle", "plan-sha256",
     ]), new Set(["activate", "authorized"]));
     if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor || !parsed.values.phase) fail("CLOSE-ARGS", `${command} arguments invalid`);
     const values = {
@@ -701,14 +830,16 @@ try {
       evidence: parsed.values.evidence,
       publication: parsed.values.publication,
       continuityCloseRequest: parsed.values["continuity-close-request"],
+      auditRequest: parsed.values["audit-request"],
+      criticVerifyLifecycle: parsed.values["critic-verify-lifecycle"],
       authorized: parsed.booleans.authorized === true,
     };
     if (command === "plan-transition") {
       if (parsed.values["plan-sha256"] || parsed.booleans.activate) fail("CLOSE-ARGS", "plan-transition is read-only");
-      emit(transitionPlan(values));
+      emit(await transitionPlan(values));
     } else {
       if (!parsed.booleans.activate || !SHA256.test(parsed.values["plan-sha256"] ?? "")) fail("CLOSE-ACTIVATE", "apply-transition requires exact digest and activation");
-      emit(applyTransition(values, parsed.values["plan-sha256"]));
+      emit(await applyTransition(values, parsed.values["plan-sha256"]));
     }
   } else {
     fail("CLOSE-COMMAND", "unsupported close-coordinator command");

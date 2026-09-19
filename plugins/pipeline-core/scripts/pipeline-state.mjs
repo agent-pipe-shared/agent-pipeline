@@ -496,6 +496,9 @@ import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
+import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   nextActionSection,
@@ -10547,8 +10550,24 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "close-feature": {
-      const by = flags.by;
-      const architectureImpact = flags["architecture-impact"];
+      // Closing is deliberately a closed argument grammar.  A direct legacy
+      // invocation cannot smuggle an ignored flag or bypass the private
+      // Critic/Verify + audit readback with a green-looking public object.
+      const closeValues = {};
+      const closeNames = new Set(["by", "architecture-impact", "coordinator-lifecycle", "coordinator-sha256", "critic-verify-lifecycle", "continuity-close-request"]);
+      let closeArgsValid = true;
+      for (let index = 0; index < rest.length; index += 2) {
+        const name = rest[index]; const value = rest[index + 1];
+        if (typeof name !== "string" || !name.startsWith("--") || value === undefined || value.startsWith("--")
+          || !closeNames.has(name.slice(2)) || Object.hasOwn(closeValues, name.slice(2))) { closeArgsValid = false; break; }
+        closeValues[name.slice(2)] = value;
+      }
+      const by = closeValues.by;
+      const architectureImpact = closeValues["architecture-impact"];
+      if (!closeArgsValid) {
+        console.error("Error: close-feature accepts only exact coordinator-bound closure arguments; no legacy bypass is available.");
+        return 2;
+      }
       if (isBlank(by)) {
         console.error('Error: close-feature requires --by <name> (non-empty) -- an unattributed close is refused.');
         return 2;
@@ -10571,14 +10590,17 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       let coordinatorClose;
-      const coordinatorLifecycle = flags["coordinator-lifecycle"];
-      const coordinatorSha256 = flags["coordinator-sha256"];
-      if (coordinatorLifecycle !== undefined || coordinatorSha256 !== undefined) {
-        if (isBlank(coordinatorLifecycle) || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinatorLifecycle)
-          || !/^[0-9a-f]{64}$/u.test(coordinatorSha256 ?? "")) {
-          console.error("Error: close-feature coordinator binding requires exact --coordinator-lifecycle and --coordinator-sha256 values.");
-          return 2;
-        }
+      let auditReference;
+      let auditCandidate;
+      const coordinatorLifecycle = closeValues["coordinator-lifecycle"];
+      const coordinatorSha256 = closeValues["coordinator-sha256"];
+      const criticVerifyLifecycle = closeValues["critic-verify-lifecycle"];
+      if (isBlank(coordinatorLifecycle) || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinatorLifecycle)
+        || !/^[0-9a-f]{64}$/u.test(coordinatorSha256 ?? "") || !/^[0-9a-f]{64}$/u.test(criticVerifyLifecycle ?? "")) {
+        console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: close-feature requires the exact coordinator lifecycle/digest and private Critic/Verify lifecycle ID returned by finish-feature; direct or legacy close has zero mutation.");
+        return 2;
+      }
+      {
         const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
         if (!common?.ok) {
           console.error("Error: close-feature coordinator Git common directory is unavailable.");
@@ -10603,6 +10625,38 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           console.error("Error: close-feature coordinator is not bound to this exact feature-close-prepared State transition.");
           return 2;
         }
+        const audit = coordinator.featureCloseAudit;
+        if (!audit || audit.criticVerifyLifecycleId !== criticVerifyLifecycle) {
+          console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: coordinator is legacy or lacks the exact Critic/Verify lifecycle binding; preserve it and begin a new qualified close lifecycle.");
+          return 2;
+        }
+        try {
+          const receiptPath = physicalAuditPath(common.path, `agent-pipeline/publication-close/${coordinatorLifecycle}/evidence/feature-close-audit.json`);
+          assertPrivateRegularFile(receiptPath);
+          const saved = JSON.parse(readFileSync(receiptPath, "utf8"));
+          if (Object.keys(saved).sort().join("\0") !== "plan\0receipt") throw new Error("receipt shape");
+          const checked = validateFeatureCloseAuditReceipt({ repositoryRoot: dir, lifecycleId: coordinatorLifecycle,
+            expectedPlanSha256: audit.auditPlanSha256, plan: saved.plan, receipt: saved.receipt });
+          if (!checked.ok || checked.receiptSha256 !== audit.auditReceiptSha256 || saved.receipt.outputPath !== audit.outputPath) throw new Error(checked.code ?? "audit receipt drift");
+          const verifyPath = saved.plan.qualification.path;
+          const verifyBytes = readFileSync(physicalAuditPath(dir, verifyPath));
+          const verify = JSON.parse(verifyBytes);
+          const lifecycle = readCriticVerifyLifecycle({ gitCommonDir: common.path, id: criticVerifyLifecycle,
+            candidate: saved.plan.candidate, evidencePath: verifyPath, evidence: verify });
+          if (lifecycle.receiptSha256 !== audit.criticVerifyLifecycleReceiptSha256) throw new Error("Critic/Verify lifecycle drift");
+          auditReference = {
+            schema: "pipeline.feature-close-audit-reference.v1",
+            auditPlanSha256: audit.auditPlanSha256,
+            auditReceiptSha256: audit.auditReceiptSha256,
+            criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
+            criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
+            outputPath: audit.outputPath,
+          };
+          auditCandidate = saved.receipt.sourceCandidate;
+        } catch (error) {
+          console.error(`Error: CLOSE-AUDIT-READBACK: ${error?.message ?? "unavailable"}. Verified audit and Critic/Verify receipt are required; zero State mutation.`);
+          return 2;
+        }
         coordinatorClose = {
           schema: "pipeline.close-coordinator-reference.v1",
           lifecycleId: coordinatorLifecycle,
@@ -10613,13 +10667,13 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       let continuityClose;
       const requiresContinuityClose = base.continuity !== undefined
-        && (flags["continuity-close-request"] !== undefined
+        && (closeValues["continuity-close-request"] !== undefined
           || base.continuity.authority?.result !== null
           || (base.activeFeature?.phase !== "design" && base.activeFeature?.phase !== undefined)
           || base.continuity.revision > 0
           || base.continuity.queueHead?.nextAction === "close");
       if (requiresContinuityClose) {
-        const closeRequest = readContinuityRequest(dir, flags["continuity-close-request"]);
+        const closeRequest = readContinuityRequest(dir, closeValues["continuity-close-request"]);
         if (!closeRequest.ok || !validateContinuityCloseRequest(dir, base, closeRequest.value)) {
           console.error("Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence.");
           return 2;
@@ -10643,16 +10697,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           }
         }
       }
-      // DEVIATION vs. approve-push (declared in the header): a git failure here is NOT fatal --
-      // forCommit becomes null, a warning goes to stderr, and the close proceeds (exit 0).
       const head = gitHead(dir);
-      let forCommit = null;
-      if (head.ok) {
-        forCommit = head.commit;
-      } else {
-        console.error(`Warning: current commit (git rev-parse HEAD) could not be determined: ${head.error}.`);
-        console.error("close-feature proceeds anyway -- forCommit is recorded as null.");
+      if (!head.ok || head.commit !== auditCandidate?.commit) {
+        console.error("Error: CLOSE-AUDIT-CANDIDATE-DRIFT: current HEAD must equal the verified audit candidate; zero State mutation.");
+        return 2;
       }
+      const forCommit = head.commit;
       const closedAt = now();
       const priorClosed = Array.isArray(base.closedFeatures) ? base.closedFeatures : [];
       if (continuityClose !== undefined) {
@@ -10678,6 +10728,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       };
       if (continuityClose !== undefined) closedEntry.continuityClose = continuityClose;
       if (coordinatorClose !== undefined) closedEntry.coordinatorClose = coordinatorClose;
+      if (auditReference !== undefined) closedEntry.auditReference = auditReference;
       const next = {
         ...base,
         schema: SCHEMA_ID,

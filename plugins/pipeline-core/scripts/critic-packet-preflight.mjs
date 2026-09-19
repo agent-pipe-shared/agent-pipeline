@@ -567,9 +567,14 @@ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now
 /** Read a completed receipt from the private append-only Critic packet journal. */
 export function readConsumedCandidateReceipt({ controlRoot, packetId }) {
   const { packetDir, packet } = packetContext(controlRoot, packetId);
-  revalidateCandidate(packet);
   const state = currentState(packetDir, packet);
   if (state.phase !== "consumed") fail("CPP-RECEIPT", "Critic packet has not been consumed.");
+  // Normal finalization removes the ephemeral checkout after consuming the
+  // immutable packet. A later lifecycle consumer must be able to read that
+  // durable receipt; when the checkout still exists retain the stronger live
+  // revalidation, otherwise rely on the append-only packet/state chain and
+  // the caller's independent current-candidate binding.
+  if (existsSync(packet.checkout.path)) revalidateCandidate(packet);
   const receiptRecord = readJson(join(packetDir, "receipt.json"));
   if (!isObject(receiptRecord) || receiptRecord.phase !== "consumed" || !isObject(receiptRecord.body)
     || canonicalJson(receiptRecord.body) !== canonicalJson(state.body)) {

@@ -291,6 +291,32 @@ check("writer-shaped closed state is a valid feature re-entry boundary", () => {
   assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
 });
 
+check("a current closed entry keeps its compact audit reference observable without weakening historical entries", () => {
+  const root = fixture("closed-audit-reference");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T08:00:00.000Z",
+    closedFeatures: [{
+      id: "previous-feature",
+      planPath: "specs/previous/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T08:00:00.000Z",
+      closedBy: "PO",
+      forCommit: "a".repeat(40),
+      auditReference: {
+        schema: "pipeline.feature-close-audit-reference.v1",
+        auditPlanSha256: "a".repeat(64),
+        auditReceiptSha256: "b".repeat(64),
+        criticVerifyLifecycleId: "c".repeat(64),
+        criticVerifyLifecycleReceiptSha256: "d".repeat(64),
+        outputPath: `audit-bundles/previous-feature/${"a".repeat(40)}`,
+      },
+    }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+});
+
 check("writer-shaped unapproved design state remains valid before continuity initialization", () => {
   const root = fixture("design-feature-transition");
   writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
@@ -4681,7 +4707,7 @@ check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) st
   assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
 });
 
-assert.equal(cases.length, 283, "the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 284, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

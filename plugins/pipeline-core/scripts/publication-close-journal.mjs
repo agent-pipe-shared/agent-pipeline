@@ -161,12 +161,34 @@ function validateCoordinatorPublicationAuthorization(value, phase) {
   assertHex(value.evidenceSha256, "coordinator publication authorization.evidenceSha256", true);
 }
 
+// A coordinator may carry the closure-readiness binding only after the
+// preparation transition.  The exact legacy shape (without this field) stays
+// readable so its caller can give a typed migration refusal; it is never a
+// new close capability.
+function validateCoordinatorFeatureCloseAudit(value) {
+  if (value === null) return;
+  assertKeys(value, [
+    "auditPlanSha256", "auditReceiptSha256", "criticVerifyLifecycleId",
+    "criticVerifyLifecycleReceiptSha256", "outputPath",
+  ], "coordinator feature close audit");
+  for (const key of ["auditPlanSha256", "auditReceiptSha256", "criticVerifyLifecycleId", "criticVerifyLifecycleReceiptSha256"]) {
+    assertHex(value[key], `coordinator feature close audit.${key}`, true);
+  }
+  if (typeof value.outputPath !== "string" || !/^audit-bundles\/[a-z][a-z0-9-]{2,63}\/(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value.outputPath)) {
+    throw new Error("coordinator feature close audit output invalid");
+  }
+}
+
 export function validateCloseCoordinator(state) {
-  assertKeys(state, ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "featureId", "activeFeature", "authority", "architectureImpact", "candidateOid", "candidateTree", "effects", "publicationAuthorization", "publication", "cleanup"], "close coordinator");
+  const legacyKeys = ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "featureId", "activeFeature", "authority", "architectureImpact", "candidateOid", "candidateTree", "effects", "publicationAuthorization", "publication", "cleanup"];
+  const currentKeys = [...legacyKeys, "featureCloseAudit"];
+  const actual = Object.keys(state ?? {}).sort().join("\0");
+  if (actual !== legacyKeys.slice().sort().join("\0") && actual !== currentKeys.slice().sort().join("\0")) throw new Error("close coordinator keys invalid");
   if (state.schema !== COORDINATOR_SCHEMA || !COORDINATOR_PHASES.includes(state.phase) || !Number.isInteger(state.revision) || state.revision < 0) throw new Error("close coordinator invalid");
   assertId(state.lifecycleId, "lifecycleId"); assertId(state.featureId, "featureId");
   validateCoordinatorActiveFeature(state.activeFeature, state.featureId);
   validateCoordinatorAuthority(state.authority);
+  validateCoordinatorFeatureCloseAudit(state.featureCloseAudit ?? null);
   if (state.architectureImpact !== null && !ARCHITECTURE_IMPACTS.includes(state.architectureImpact)) {
     throw new Error("coordinator architecture impact invalid");
   }
@@ -203,7 +225,7 @@ export function validateCloseCoordinator(state) {
 
 export function createCloseCoordinator(input) {
   if (!input || typeof input !== "object") throw new Error("create coordinator input invalid");
-  const state = { schema: COORDINATOR_SCHEMA, lifecycleId: input.lifecycleId, revision: 0, priorStateSha256: null, phase: "active", featureId: input.featureId ?? input.lifecycleId, activeFeature: structuredClone(input.activeFeature ?? null), authority: structuredClone(input.authority ?? {}), architectureImpact: null, candidateOid: input.candidateOid ?? null, candidateTree: input.candidateTree ?? null, effects: [], publicationAuthorization: null, publication: null, cleanup: { status: "not-started", evidenceDigest: null } };
+  const state = { schema: COORDINATOR_SCHEMA, lifecycleId: input.lifecycleId, revision: 0, priorStateSha256: null, phase: "active", featureId: input.featureId ?? input.lifecycleId, activeFeature: structuredClone(input.activeFeature ?? null), authority: structuredClone(input.authority ?? {}), architectureImpact: null, candidateOid: input.candidateOid ?? null, candidateTree: input.candidateTree ?? null, effects: [], publicationAuthorization: null, publication: null, cleanup: { status: "not-started", evidenceDigest: null }, featureCloseAudit: null };
   validateCloseCoordinator(state); return state;
 }
 
@@ -212,7 +234,7 @@ export function advanceCloseCoordinator(state, args) {
   if (!args || typeof args !== "object") throw new Error("coordinator advance arguments invalid");
   const required = ["expectedRevision", "expectedStateSha256", "phase", "inputDigest", "observedDigest", "operationSha256"];
   for (const key of required) if (!(key in args)) throw new Error(`coordinator advance argument ${key} missing`);
-  const allowed = new Set([...required, "candidateOid", "candidateTree", "authorization", "publicationAuthorization", "publication", "cleanupStatus", "cleanupEvidenceDigest", "authority", "architectureImpact"]);
+  const allowed = new Set([...required, "candidateOid", "candidateTree", "authorization", "publicationAuthorization", "publication", "cleanupStatus", "cleanupEvidenceDigest", "authority", "architectureImpact", "featureCloseAudit"]);
   if (Object.keys(args).some((key) => !allowed.has(key))) throw new Error("coordinator advance arguments invalid");
   assertCas(state, args.expectedRevision, args.expectedStateSha256, "coordinator");
   assertHex(args.inputDigest, "inputDigest", true); assertHex(args.observedDigest, "observedDigest", true);
@@ -238,7 +260,9 @@ export function advanceCloseCoordinator(state, args) {
   if (!COORDINATOR_NEXT[state.phase]?.includes(args.phase)) throw new Error("coordinator transition invalid");
   if (args.phase === "feature-close-prepared") {
     if (!ARCHITECTURE_IMPACTS.includes(args.architectureImpact)) throw new Error("feature close requires architecture impact");
-  } else if (args.architectureImpact !== undefined) {
+    validateCoordinatorFeatureCloseAudit(args.featureCloseAudit);
+    if (args.featureCloseAudit === null || args.featureCloseAudit === undefined) throw new Error("feature close requires verified audit");
+  } else if (args.architectureImpact !== undefined || args.featureCloseAudit !== undefined) {
     throw new Error("coordinator architecture impact phase invalid");
   }
   let authority = state.authority;
@@ -300,6 +324,7 @@ export function advanceCloseCoordinator(state, args) {
     phase: args.phase,
     authority,
     architectureImpact: args.phase === "feature-close-prepared" ? args.architectureImpact : state.architectureImpact,
+    featureCloseAudit: args.phase === "feature-close-prepared" ? structuredClone(args.featureCloseAudit) : (state.featureCloseAudit ?? null),
     candidateOid,
     candidateTree,
     publicationAuthorization: args.publicationAuthorization ?? state.publicationAuthorization,

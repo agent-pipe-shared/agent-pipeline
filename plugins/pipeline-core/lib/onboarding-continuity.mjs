@@ -429,6 +429,7 @@ function closedEntryStaticShape(entry) {
   if (entry?.architectureImpact !== undefined) expectedKeys.add("architectureImpact");
   if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
   if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
+  if (entry?.auditReference !== undefined) expectedKeys.add("auditReference");
   if (!exactKeys(entry, expectedKeys)
     || typeof entry.id !== "string" || entry.id.length === 0
     || typeof entry.planPath !== "string" || entry.planPath.length === 0
@@ -466,6 +467,20 @@ function closedEntryStaticShape(entry) {
       || !SHA256_RE.test(coordinator.stateSha256 ?? "")
       || coordinator.revision !== 2
       || coordinator.phase !== "feature-close-prepared") return false;
+  }
+  if (entry.auditReference !== undefined) {
+    const audit = entry.auditReference;
+    if (!exactKeys(audit, new Set([
+      "schema", "auditPlanSha256", "auditReceiptSha256", "criticVerifyLifecycleId",
+      "criticVerifyLifecycleReceiptSha256", "outputPath",
+    ]))
+      || audit.schema !== "pipeline.feature-close-audit-reference.v1"
+      || !SHA256_RE.test(audit.auditPlanSha256 ?? "")
+      || !SHA256_RE.test(audit.auditReceiptSha256 ?? "")
+      || !SHA256_RE.test(audit.criticVerifyLifecycleId ?? "")
+      || !SHA256_RE.test(audit.criticVerifyLifecycleReceiptSha256 ?? "")
+      || typeof audit.outputPath !== "string"
+      || !/^audit-bundles\/[a-z][a-z0-9-]{2,63}\/(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(audit.outputPath)) return false;
   }
   return true;
 }

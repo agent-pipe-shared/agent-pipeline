@@ -37,6 +37,38 @@ function recordPath(privateRoot, id) {
 }
 
 /**
+ * Read a consumed Critic receipt from its private packet and prove that the
+ * receipt is the receipt for that packet's exact candidate and diff.  A
+ * syntactically valid receipt on its own is deliberately insufficient: the
+ * packet journal is the authority that makes it a completed, fresh review.
+ */
+export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, candidate: sourceCandidate }, deps = {}) {
+  if (typeof gitCommonDir !== "string" || gitCommonDir.length === 0 || !PACKET.test(criticPacketId ?? "") || !candidate(sourceCandidate)) {
+    fail("CVL-INPUT", "Critic/Verify lifecycle input is invalid.");
+  }
+  const common = resolve(gitCommonDir);
+  const readReceipt = deps.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt;
+  let consumed;
+  try { consumed = readReceipt({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId: criticPacketId }); }
+  catch (error) { fail("CVL-CRITIC-UNAVAILABLE", `No consumed private Critic receipt is available for this packet (${error?.code ?? "unavailable"}).`); }
+  const critic = consumed?.receipt;
+  const packet = consumed?.packet;
+  try { validateSessionCriticReceipt(critic); }
+  catch { fail("CVL-CRITIC-INVALID", "Private Critic receipt is malformed."); }
+  if (!packet || packet.packetId !== criticPacketId || critic.packetId !== criticPacketId
+    || critic.packetDigest !== sha256(canonicalJson(packet))
+    || packet.candidate?.base !== critic.candidate.base || packet.candidate?.commit !== critic.candidate.commit
+    || packet.candidate?.tree !== critic.candidate.tree || packet.diff?.base !== critic.reviewRange.base
+    || packet.diff?.commit !== critic.reviewRange.commit || packet.diff?.sha256 !== critic.reviewRange.diffSha256) {
+    fail("CVL-CRITIC-PACKET-MISMATCH", "Private Critic receipt is not bound to its consumed packet.");
+  }
+  if (critic.reviewPass !== true) fail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
+  if (critic.candidate.commit !== sourceCandidate.commit || critic.candidate.tree !== sourceCandidate.tree
+    || critic.reviewRange.commit !== sourceCandidate.commit) fail("CVL-CRITIC-STALE", "Private Critic receipt is not bound to the Verify candidate.");
+  return Object.freeze({ packet, critic, criticReceiptSha256: bytesSha256(canonicalJson(critic)) });
+}
+
+/**
  * Revalidate a consumed Critic packet and persist an immutable Verify binding.
  * `gitCommonDir` is supplied by the caller's already-resolved repository
  * boundary; this module never discovers or follows a user-provided path.
@@ -48,18 +80,10 @@ export function recordCriticVerifyLifecycle({ gitCommonDir, criticPacketId, cand
     || evidence.candidate.commit !== sourceCandidate.commit || evidence.candidate.tree !== sourceCandidate.tree) fail("CVL-VERIFY", "Passing Verify evidence is not bound to the current candidate.");
   const common = resolve(gitCommonDir);
   const privateRoot = join(common, "agent-pipeline");
-  const readReceipt = deps.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt;
-  let consumed;
-  try { consumed = readReceipt({ controlRoot: join(privateRoot, "critic-packets"), packetId: criticPacketId }); }
-  catch { fail("CVL-CRITIC-UNAVAILABLE", "No consumed private Critic receipt is available for this packet."); }
-  try { validateSessionCriticReceipt(consumed.receipt); }
-  catch { fail("CVL-CRITIC-INVALID", "Private Critic receipt is malformed."); }
-  const critic = consumed.receipt;
-  if (critic.reviewPass !== true) fail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
-  if (critic.candidate.commit !== sourceCandidate.commit || critic.candidate.tree !== sourceCandidate.tree
-    || critic.reviewRange.commit !== sourceCandidate.commit) fail("CVL-CRITIC-STALE", "Private Critic receipt is not bound to the Verify candidate.");
+  const bound = readBoundConsumedCriticReceipt({ gitCommonDir: common, criticPacketId, candidate: sourceCandidate }, deps);
+  const { critic } = bound;
   const verifyEvidenceSha256 = bytesSha256(canonicalJson(evidence));
-  const criticReceiptSha256 = bytesSha256(canonicalJson(critic));
+  const criticReceiptSha256 = bound.criticReceiptSha256;
   const id = criticVerifyLifecycleId({ candidate: sourceCandidate, criticPacketId, verifyEvidenceSha256 });
   const receipt = Object.freeze({
     schema: CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA,
@@ -85,15 +109,25 @@ export function recordCriticVerifyLifecycle({ gitCommonDir, criticPacketId, cand
 }
 
 /** Re-read a receipt by its opaque ID and bind it to the expected candidate/evidence. */
-export function readCriticVerifyLifecycle({ gitCommonDir, id, candidate: sourceCandidate, evidencePath, evidence }, deps = {}) {
-  if (typeof gitCommonDir !== "string" || !SHA.test(id ?? "") || !candidate(sourceCandidate) || typeof evidencePath !== "string") fail("CVL-INPUT", "Lifecycle read input is invalid.");
+export function readCriticVerifyLifecycle({ gitCommonDir, id, candidate: sourceCandidate, evidencePath = null, evidence }, deps = {}) {
+  if (typeof gitCommonDir !== "string" || !SHA.test(id ?? "") || !candidate(sourceCandidate) || (evidencePath !== null && typeof evidencePath !== "string")) fail("CVL-INPUT", "Lifecycle read input is invalid.");
   const target = recordPath(join(resolve(gitCommonDir), "agent-pipeline"), id);
   let receipt;
   try { receipt = JSON.parse(readFileSync(target, "utf8")); } catch { fail("CVL-RECEIPT-UNAVAILABLE", "Private Critic/Verify lifecycle receipt is unavailable."); }
   const keys = ["schema", "id", "candidate", "critic", "verify"];
   if (!exact(receipt, keys) || receipt.schema !== CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA || receipt.id !== id || !candidate(receipt.candidate)
     || receipt.candidate.commit !== sourceCandidate.commit || receipt.candidate.tree !== sourceCandidate.tree
-    || receipt.verify?.evidencePath !== evidencePath || !SHA.test(receipt.verify?.evidenceSha256 ?? "")) fail("CVL-RECEIPT-INVALID", "Private lifecycle receipt is malformed or stale.");
+    || !exact(receipt.critic, ["packetId", "packetDigest", "receiptSha256", "verdictSha256", "reviewRange"])
+    || !PACKET.test(receipt.critic.packetId ?? "") || !SHA.test(receipt.critic.packetDigest ?? "")
+    || !SHA.test(receipt.critic.receiptSha256 ?? "") || !SHA.test(receipt.critic.verdictSha256 ?? "")
+    || !exact(receipt.critic.reviewRange, ["base", "commit", "diffSha256"])
+    || !OID.test(receipt.critic.reviewRange.base ?? "") || receipt.critic.reviewRange.commit !== sourceCandidate.commit
+    || !SHA.test(receipt.critic.reviewRange.diffSha256 ?? "")
+    || !exact(receipt.verify, ["evidencePath", "evidenceSha256", "verifyRunTerminalSha256"])
+    || (evidencePath !== null && receipt.verify.evidencePath !== evidencePath) || !SHA.test(receipt.verify.evidenceSha256 ?? "")
+    || (receipt.verify.verifyRunTerminalSha256 !== null && !SHA.test(receipt.verify.verifyRunTerminalSha256 ?? ""))) {
+    fail("CVL-RECEIPT-INVALID", "Private lifecycle receipt is malformed or stale.");
+  }
   if (evidence !== undefined && bytesSha256(canonicalJson(evidence)) !== receipt.verify.evidenceSha256) fail("CVL-VERIFY-DRIFT", "Verify evidence differs from the private lifecycle binding.");
   return Object.freeze({ receipt, receiptSha256: bytesSha256(canonicalJson(receipt)), path: target });
 }

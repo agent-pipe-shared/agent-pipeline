@@ -17,6 +17,8 @@ import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { retryGovernanceVerificationAction } from "../lib/governance-verification-action.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
+import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
 
 function run(executable, args, options = {}) {
   const result = spawnSync(executable, args, { encoding: "utf8", ...options });
@@ -41,6 +43,25 @@ function fixture(verifyCommand) {
 async function withFixture(verifyCommand, run) {
   const root = fixture(verifyCommand);
   try { await run(root); } finally { rmSync(root, { recursive: true, force: true }); }
+}
+async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict = null } = {}) {
+  mkdirSync(join(root, "specs"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Review fixture\n");
+  git(root, ["add", ".claude/pipeline.yaml", "specs/spec.md"]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "critic candidate"]);
+  const candidate = git(root, ["rev-parse", "HEAD"]);
+  const base = git(root, ["rev-parse", "HEAD^1"]);
+  await produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-candidate.json", mode: "critic", base });
+  const final = finalizeSessionCriticReview({
+    preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/critic-candidate.json"], priorCriticEvidencePath: null },
+    taskId: "release-verify", projectId: "fixture", sessionId: "release-review-1", packetId,
+    route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
+    verdict: verdict ?? { findings: [], deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: true },
+  });
+  const observed = readConsumedCandidateReceipt({ controlRoot: join(root, ".git", "agent-pipeline", "critic-packets"), packetId });
+  assert.equal(observed.receipt.packetId, packetId);
+  return { packetId, candidate, final };
 }
 
 test("a passing verify produces a consumable artifact bound to the exact commit and tree", async () => {
@@ -211,15 +232,59 @@ test("a dirty working tree is refused before the verify command runs, and the re
   });
 });
 
-test("the produced artifact satisfies the real publication-gate-evidence consumer unmodified", async () => {
+test("release Verify refuses a missing, conflicting, or forged Critic claim before overwriting evidence", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
-    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1" });
+    const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+    const prior = join(root, "evidence", "verify-latest.json");
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(prior, "prior retained evidence\n");
+    const missing = spawnSync(process.execPath, [script, "--root", root, "--mode", "release"], { encoding: "utf8" });
+    assert.equal(missing.status, 2);
+    assert.match(missing.stderr, /VEP-CRITIC-REQUIRED/u);
+    assert.equal(readFileSync(prior, "utf8"), "prior retained evidence\n");
+    const conflicting = spawnSync(process.execPath, [script, "--root", root, "--mode", "release", "--critic-packet-id", "a".repeat(32), "--critic-reverify-receipt-id", "b".repeat(64)], { encoding: "utf8" });
+    assert.equal(conflicting.status, 2);
+    assert.match(conflicting.stderr, /VEP-CRITIC-REQUIRED/u);
+    const forged = spawnSync(process.execPath, [script, "--root", root, "--mode", "release", "--critic-packet-id", "c".repeat(32)], { encoding: "utf8" });
+    assert.equal(forged.status, 2);
+    assert.match(forged.stderr, /VEP-CVL-CRITIC-UNAVAILABLE/u);
+  });
+});
+
+test("release Verify consumes a real fresh Critic packet and its same-candidate reverify chain", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const critic = await completedCriticPacket(root);
+    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticPacketId: critic.packetId });
     const derived = deriveGateEvidence({ rootDir: root, gate: "verify", sourcePath: "evidence/verify.json" });
     assert.equal(derived.evidence.gate, "verify");
     assert.equal(derived.evidence.status, "passed");
     assert.equal(derived.evidence.exitCode, 0);
     assert.equal(derived.evidence.candidate.commit, result.evidence.commit);
     assert.equal(derived.evidence.candidate.tree, result.evidence.tree);
+    assert.ok(result.criticLifecycle?.receipt?.id);
+    const rerun = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticReverifyReceiptId: result.criticLifecycle.receipt.id });
+    assert.equal(rerun.status, "passed");
+    assert.notEqual(rerun.criticLifecycle.receipt.id, result.criticLifecycle.receipt.id);
+  });
+});
+
+test("release reverify refuses changed candidates and tampered prior evidence", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const critic = await completedCriticPacket(root);
+    const first = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticPacketId: critic.packetId });
+    writeFileSync(join(root, "evidence", "verify.json"), "{\"forged\":true}\n");
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticReverifyReceiptId: first.criticLifecycle.receipt.id }),
+      error => error.code === "VEP-CVL-VERIFY-DRIFT",
+    );
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(first.evidence)}\n`);
+    writeFileSync(join(root, "README.md"), "changed candidate\n");
+    git(root, ["add", "README.md"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "changed candidate"]);
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticReverifyReceiptId: first.criticLifecycle.receipt.id }),
+      error => error.code === "VEP-CVL-RECEIPT-INVALID",
+    );
   });
 });
 
@@ -463,12 +528,13 @@ test("an external installed package works and implementation changes invalidate 
   const installed = mkdtempSync(join(tmpdir(), "consumer installed space-"));
   try {
     cpSync(new URL("../", import.meta.url), installed, { recursive: true });
-    await withFixture('node -e "require(\'assert\').equal(2 + 2, 4)"', (root) => {
+    await withFixture('node -e "require(\'assert\').equal(2 + 2, 4)"', async (root) => {
+      const critic = await completedCriticPacket(root);
       const entry = join(installed, "scripts/verify-evidence-producer.mjs");
-      run(process.execPath, [entry, "--root", root, "--mode", "release"]);
+      run(process.execPath, [entry, "--root", root, "--mode", "release", "--critic-packet-id", critic.packetId]);
       const dependency = join(installed, "scripts/consumer-verify-check.mjs");
       writeFileSync(dependency, `${readFileSync(dependency, "utf8")}\n// changed installed implementation\n`);
-      run(process.execPath, [entry, "--root", root, "--mode", "release", "--no-reuse"]);
+      run(process.execPath, [entry, "--root", root, "--mode", "release", "--no-reuse", "--critic-packet-id", critic.packetId]);
       const evidence = JSON.parse(readFileSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH), "utf8"));
       assert.ok(evidence.steps.every((s) => !s.reused));
       assert.equal(evidence.verifyRun.receiptReuse, "disabled");
