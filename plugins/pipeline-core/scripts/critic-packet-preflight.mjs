@@ -564,6 +564,20 @@ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now
   return { ok: true, code: "CPP-CONSUMED", replay: false, packet, record };
 }
 
+/** Read a completed receipt from the private append-only Critic packet journal. */
+export function readConsumedCandidateReceipt({ controlRoot, packetId }) {
+  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  revalidateCandidate(packet);
+  const state = currentState(packetDir, packet);
+  if (state.phase !== "consumed") fail("CPP-RECEIPT", "Critic packet has not been consumed.");
+  const receiptRecord = readJson(join(packetDir, "receipt.json"));
+  if (!isObject(receiptRecord) || receiptRecord.phase !== "consumed" || !isObject(receiptRecord.body)
+    || canonicalJson(receiptRecord.body) !== canonicalJson(state.body)) {
+    fail("CPP-RECEIPT", "Critic receipt journal readback is inconsistent.");
+  }
+  return Object.freeze({ packet, receipt: receiptRecord.body });
+}
+
 export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapability }, { now = new Date() } = {}) {
   const { packetDir, packet } = packetContext(controlRoot, packetId);
   const state = currentState(packetDir, packet);

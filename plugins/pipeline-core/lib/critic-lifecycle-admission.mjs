@@ -43,11 +43,24 @@ function receiptFor(candidate, receipt, receiptSha256) {
   return { ok: true, pass: receipt.reviewPass, receiptSha256 };
 }
 
-function validVerify(value, candidate) {
-  if (!exact(value, ["status", "candidate", "receiptSha256"]) || !["not-run", "failed", "passed"].includes(value.status)
-    || !validCandidate(value.candidate) || !SHA.test(value.receiptSha256 ?? "")) return false;
-  return value.candidate.commit === candidate.commit && value.candidate.tree === candidate.tree
-    && value.candidate.diffSha256 === candidate.diffSha256;
+function verifyReceiptFor(candidate, value) {
+  // A status/digest pair supplied by a caller is not Verify evidence.  The
+  // lifecycle accepts the concrete, public Verify receipt and binds its own
+  // digest; callers cannot substitute a status assertion.
+  if (!exact(value, ["receipt", "receiptSha256"]) || !object(value.receipt)
+    || !SHA.test(value.receiptSha256 ?? "") || digest(value.receipt) !== value.receiptSha256) {
+    return failure("verify-receipt-required");
+  }
+  const receipt = value.receipt;
+  if (receipt.schema !== "pipeline.verify-evidence.v0" || receipt.exitCode !== 0
+    || !exact(receipt.candidate, ["commit", "tree"])
+    || !OID.test(receipt.candidate.commit ?? "") || !OID.test(receipt.candidate.tree ?? "")) {
+    return failure("verify-receipt-invalid");
+  }
+  if (receipt.candidate.commit !== candidate.commit || receipt.candidate.tree !== candidate.tree) {
+    return failure("verify-receipt-stale");
+  }
+  return { ok: true, receiptSha256: value.receiptSha256 };
 }
 
 /**
@@ -59,16 +72,17 @@ function validVerify(value, candidate) {
 export function evaluateCriticLifecycleAdmission(input) {
   if (!exact(input, ["candidate", "critic", "priorCritic", "verify"]) || !validCandidate(input.candidate)) return failure("lifecycle-input-invalid");
   const { candidate, critic, priorCritic, verify } = input;
-  if (!validVerify(verify, candidate)) return failure("verify-binding-invalid");
+  const verified = verifyReceiptFor(candidate, verify);
+  if (!verified.ok) return verified;
 
   if (!candidate.changedContent) {
-    if (verify.status !== "passed") return failure("final-verify-required");
     return { ok: true, code: "admitted-no-content-change", criticRequired: false, verifyRequired: false };
   }
 
   if (!exact(critic, ["receipt", "receiptSha256"])) return failure("critic-required-before-verify");
   const current = receiptFor(candidate, critic.receipt, critic.receiptSha256);
   if (!current.ok) return current;
+  if (!current.pass) return failure("critic-findings-unresolved");
 
   if (priorCritic !== null) {
     if (!exact(priorCritic, ["receipt", "receiptSha256"])) return failure("prior-critic-invalid");
@@ -81,12 +95,8 @@ export function evaluateCriticLifecycleAdmission(input) {
     }
   }
 
-  // Verify may have been run for an earlier candidate. Once the current diff
-  // has a valid fresh Critic receipt, that is a Verify-only invalidation.
-  if (verify.status !== "passed") return failure("final-verify-required");
   return {
-    ok: true,
-    code: current.pass ? "admitted" : "admitted-after-correction-review",
+    ok: true, code: "admitted",
     criticRequired: false,
     verifyRequired: false,
   };
