@@ -16,6 +16,8 @@ import { fileURLToPath } from "node:url";
 import { loadMapBundle, resolveModuleForPath } from "./module-inventory.mjs";
 import { isMisleadingTinyModuleOptimization } from "./architecture-remedy.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { adoptionSnapshot } from "../lib/architecture-adoption-authority.mjs";
+import { resolveAdoptionState } from "./architecture-adoption.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(__dirname, "../../..");
@@ -717,9 +719,25 @@ export function evaluateParallelOverlap({ concurrentDispatches = [] }) {
 /**
  * Class 9: Profile Drift & Identity Stability
  */
-export function evaluateProfileDrift({ inventory, fitnessModel, profileDrift = false }) {
+export function evaluateProfileDrift({ rootDir, now = new Date(), profileDrift = false }) {
   const violations = [];
-  const modules = Array.isArray(inventory) ? inventory : (inventory?.modules || []);
+  let evidence;
+  let unavailable = null;
+  try {
+    if (!rootDir) throw new Error("Repository root is required for accepted-reference readback");
+    const accepted = resolveAdoptionState(rootDir, now);
+    if (accepted.state !== "approved-scoped" || !accepted.authority?.request?.subject) throw new Error("Valid approved-scoped authority is unavailable");
+    const subject = accepted.authority.request.subject;
+    const scope = subject.scope.map(s => s.replace(/\/$/u, ""));
+    const required = ["architecture/map", "project/pipeline.json", "pipeline.user.yaml"];
+    if (!required.every(target => scope.some(s => target === s || target.startsWith(`${s}/`)))) throw new Error("Accepted reference does not cover profile, routing and module map");
+    const current = adoptionSnapshot(rootDir);
+    const changedDimensions = Object.keys(current).filter(key => current[key] !== subject[key]);
+    evidence = { decisionRef: subject.decisionRef, authorityMode: accepted.authority.mode,
+      accepted: Object.fromEntries(Object.keys(current).map(key => [key, subject[key]])), current, changedDimensions };
+    for (const dimension of changedDimensions) violations.push({ ruleId: "profile-drift", module: "identity", target: dimension,
+      details: `Governed ${dimension} differs from the accepted authority snapshot` });
+  } catch (error) { unavailable = error.message; }
 
   if (profileDrift) {
     violations.push({
@@ -737,9 +755,12 @@ export function evaluateProfileDrift({ inventory, fitnessModel, profileDrift = f
       outcome: OUTCOME_FINDING,
       details: `Profile drift detected: ${violations[0].details}`,
       violations,
-      evidence: { violations }
+      evidence: evidence || { unavailable }
     };
   }
+
+  if (unavailable) return { classId: 9, propertyId: "profile-drift", outcome: OUTCOME_UNAVAILABLE,
+    details: unavailable, violations: [], evidence: { status: "unavailable" } };
 
   return {
     classId: 9,
@@ -747,14 +768,14 @@ export function evaluateProfileDrift({ inventory, fitnessModel, profileDrift = f
     outcome: OUTCOME_PASS,
     details: "Governed module identities are stable and match accepted baseline.",
     violations: [],
-    evidence: { moduleCount: modules.length }
+    evidence
   };
 }
 
 /**
  * Class 10: Calibrated Context & Friction Thresholds
  */
-export function evaluateCalibratedFrictionThresholds({ windowDays, telemetryUnavailable = false, highFriction = false }) {
+export function evaluateCalibratedFrictionThresholds({ telemetryUnavailable = false, highFriction = false }) {
   if (telemetryUnavailable) {
     return {
       classId: 10,
@@ -766,14 +787,14 @@ export function evaluateCalibratedFrictionThresholds({ windowDays, telemetryUnav
     };
   }
 
-  if (typeof windowDays !== "number" || !Number.isFinite(windowDays) || windowDays < 14) {
+  if (!highFriction) {
     return {
       classId: 10,
       propertyId: "calibrated-friction-thresholds",
       outcome: OUTCOME_UNAVAILABLE,
-      details: `Calibration window (${String(windowDays)} days) is absent, invalid, or < 14 days; friction thresholds uncalibrated.`,
+      details: "Governed measured calibration and explicit threshold promotion are unavailable; elapsed days do not establish calibration.",
       violations: [],
-      evidence: { windowDays, minRequired: 14 }
+      evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] }
     };
   }
 
@@ -782,20 +803,12 @@ export function evaluateCalibratedFrictionThresholds({ windowDays, telemetryUnav
       classId: 10,
       propertyId: "calibrated-friction-thresholds",
       outcome: OUTCOME_FINDING,
-      details: "Sustained context traversal or rework friction exceeded calibrated thresholds.",
+      details: "Reported high friction remains a finding; no calibrated threshold PASS is claimed.",
       violations: [{ ruleId: "excessive-friction-threshold", module: "telemetry", target: "friction-receipts", details: "High friction" }],
       evidence: { highFriction: true }
     };
   }
 
-  return {
-    classId: 10,
-    propertyId: "calibrated-friction-thresholds",
-    outcome: OUTCOME_PASS,
-    details: "Context locality and friction receipts within calibrated thresholds.",
-    violations: [],
-    evidence: { status: "calibrated" }
-  };
 }
 
 /**
@@ -931,6 +944,8 @@ export function evaluateArchitectureFitness(options = {}) {
 
   // Class 9: Profile drift
   outcomes.push(evaluateProfileDrift({
+    rootDir,
+    now,
     inventory,
     fitnessModel,
     profileDrift: Boolean(options.profileDrift)

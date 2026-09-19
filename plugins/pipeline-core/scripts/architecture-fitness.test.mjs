@@ -5,6 +5,7 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import {
   evaluateArchitectureFitness,
@@ -36,6 +37,67 @@ import {
 } from "./architecture-fitness.mjs";
 import { loadMapBundle } from "./module-inventory.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { fixtureAdoption, fixtureGit } from "./architecture-adoption-test-fixture.mjs";
+
+it("actual fitness compares the durable accepted snapshot and refuses absent authority", () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-accepted-"));
+  try {
+    fs.mkdirSync(path.join(rootDir, "architecture"));
+    fs.cpSync(path.join(REPO_ROOT, "architecture/map"), path.join(rootDir, "architecture/map"), { recursive: true });
+    fs.mkdirSync(path.join(rootDir, "project"));
+    fs.writeFileSync(path.join(rootDir, "project/pipeline.json"), "{}\n");
+    const evaluate = () => evaluateArchitectureFitness({ rootDir, profileDrift: false }).outcomes.find(o => o.classId === 9);
+    assert.equal(evaluate().outcome, OUTCOME_UNAVAILABLE);
+    fixtureAdoption({ rootDir, decision: "approved-scoped", scope: ["architecture/map", "project/pipeline.json", "pipeline.user.yaml"], rationale: "Accept test baseline" });
+    assert.equal(evaluate().outcome, OUTCOME_PASS);
+    fixtureGit(rootDir, ["commit", "--allow-empty", "-qm", "legitimate later commit"]);
+    assert.equal(evaluate().outcome, OUTCOME_PASS, "durable authority survives later commits");
+    for (const [file, dimension] of [["project/pipeline.json", "profileSha256"], ["pipeline.user.yaml", "modelSha256"], ["architecture/map/pipeline-core.md", "moduleSnapshotSha256"]]) {
+      const full = path.join(rootDir, file), original = fs.readFileSync(full);
+      fs.appendFileSync(full, "\n");
+      const drift = evaluate();
+      assert.equal(drift.outcome, OUTCOME_FINDING, file);
+      assert.deepEqual(drift.evidence.changedDimensions, [dimension]);
+      fs.writeFileSync(full, original);
+    }
+    const added = path.join(rootDir, "architecture/map/new-module.md");
+    fs.writeFileSync(added, "new module");
+    assert.equal(evaluate().outcome, OUTCOME_FINDING);
+    fs.unlinkSync(added);
+    const modulePath = path.join(rootDir, "architecture/map/pipeline-core.md");
+    const moduleBytes = fs.readFileSync(modulePath);
+    fs.unlinkSync(modulePath);
+    assert.equal(evaluate().outcome, OUTCOME_FINDING, "deleted module");
+    fs.writeFileSync(modulePath, moduleBytes);
+    fs.writeFileSync(modulePath, moduleBytes.toString().replace("id: pipeline-core", "id: changed-identity"));
+    const cli = spawnSync(process.execPath, [path.join(REPO_ROOT, "plugins/pipeline-core/scripts/architecture-fitness.mjs"), "--root", rootDir, "--json"], { encoding: "utf8" });
+    assert.equal(cli.status, 1);
+    assert.equal(JSON.parse(cli.stdout).outcomes.find(o => o.classId === 9).outcome, OUTCOME_FINDING);
+    fs.writeFileSync(modulePath, moduleBytes);
+    const statePath = path.join(rootDir, "architecture/adoption-state.json");
+    const original = fs.readFileSync(statePath);
+    const tampered = JSON.parse(original);
+    tampered.authority.request.subject.profileSha256 = "0".repeat(64);
+    fs.writeFileSync(statePath, JSON.stringify(tampered));
+    assert.equal(evaluate().outcome, OUTCOME_UNAVAILABLE);
+    const missingProof = JSON.parse(original);
+    missingProof.authority.proof = null;
+    fs.writeFileSync(statePath, JSON.stringify(missingProof));
+    assert.equal(evaluate().outcome, OUTCOME_UNAVAILABLE);
+    fs.writeFileSync(statePath, original);
+    assert.equal(evaluate().outcome, OUTCOME_PASS);
+    for (const options of [
+      { decision: "partial" },
+      { decision: "deferred", reviewDate: "2099-01-01" },
+      { decision: "approved-scoped", expiresAt: "2020-01-01" },
+      { decision: "approved-scoped", scope: ["architecture/map"] },
+    ]) {
+      fixtureAdoption({ rootDir, decision: "approved-scoped", scope: ["architecture/map", "project/pipeline.json", "pipeline.user.yaml"], rationale: "Test invalid full reference", ...options });
+      assert.equal(evaluate().outcome, OUTCOME_UNAVAILABLE, JSON.stringify(options));
+      assert.notEqual(evaluateArchitectureFitness({ rootDir }).overallStatus, OUTCOME_PASS);
+    }
+  } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+});
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "../../..");
@@ -243,7 +305,7 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
         fitnessModel: { modules: inventory },
         profileDrift: false
       });
-      assert.equal(stable.outcome, OUTCOME_PASS);
+      assert.equal(stable.outcome, OUTCOME_UNAVAILABLE);
 
       const drift = evaluateProfileDrift({
         inventory,
@@ -260,13 +322,13 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
 
       const uncalibrated = evaluateCalibratedFrictionThresholds({ windowDays: 7 });
       assert.equal(uncalibrated.outcome, OUTCOME_UNAVAILABLE);
-      assert.ok(uncalibrated.details.includes("< 14 days"));
+      assert.ok(uncalibrated.details.includes("elapsed days"));
 
       const excessive = evaluateCalibratedFrictionThresholds({ windowDays: 15, highFriction: true });
       assert.equal(excessive.outcome, OUTCOME_FINDING);
 
       const calibrated = evaluateCalibratedFrictionThresholds({ windowDays: 15, highFriction: false });
-      assert.equal(calibrated.outcome, OUTCOME_PASS);
+      assert.equal(calibrated.outcome, OUTCOME_UNAVAILABLE);
     });
 
     it("Class 10: absent or invalid calibration windows never claim calibrated pass", () => {
@@ -336,13 +398,13 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
     it("reports unavailable when telemetry is unavailable and no findings block", () => {
       const res = evaluateArchitectureFitness({ rootDir: REPO_ROOT, telemetryUnavailable: true });
       assert.equal(res.overallStatus, OUTCOME_UNAVAILABLE);
-      assert.equal(res.summary.unavailableCount, 1);
+      assert.equal(res.summary.unavailableCount, 2);
     });
 
     it("keeps real findings blocking when calibration is unavailable", () => {
       const res = evaluateArchitectureFitness({ rootDir: REPO_ROOT, telemetryUnavailable: true, mapStale: true });
       assert.equal(res.overallStatus, "blocked");
-      assert.equal(res.summary.unavailableCount, 1);
+      assert.equal(res.summary.unavailableCount, 2);
       assert.ok(res.summary.findingCount > 0);
     });
 
@@ -359,7 +421,7 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
         candidateModules: [{ id: "micro", shredTopology: true }]
       });
       assert.equal(res.overallStatus, OUTCOME_UNAVAILABLE);
-      assert.equal(res.summary.unavailableCount, 1);
+      assert.equal(res.summary.unavailableCount, 2);
       assert.equal(res.summary.exceptedCount, 1);
     });
   });
@@ -487,7 +549,7 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       const res = evaluateArchitectureFitness({ rootDir: REPO_ROOT });
       assert.equal(res.overallStatus, OUTCOME_UNAVAILABLE);
       assert.equal(res.summary.findingCount, 0);
-      assert.equal(res.summary.unavailableCount, 1);
+      assert.equal(res.summary.unavailableCount, 2);
     });
 
     it("Fixture 4: missing/stale contract produces finding", () => {
