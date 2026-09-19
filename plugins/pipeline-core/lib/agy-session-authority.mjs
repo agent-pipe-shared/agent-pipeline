@@ -24,6 +24,8 @@ export function consentStoragePath(root, sessionId) {
 export function loadStoredConsent(root, sessionId, expectedDescriptorSha256) {
   const descriptor = loadSessionDescriptor(root, sessionId, { expectedDescriptorSha256 });
   const path = join(descriptor.repo.commonDir, "agent-pipeline", "run", "agy-session-consent", `${sessionId}.json`);
+  const tombstone = `${path}.revoked`;
+  if (existsSync(tombstone)) { const historyStat = lstatSync(tombstone); if (!historyStat.isFile() || historyStat.isSymbolicLink()) throw new Error("AGY-CONSENT-STORAGE-UNSAFE"); let history; try { history = JSON.parse(readFileSync(tombstone, "utf8")); } catch { throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); } if (!Array.isArray(history)) throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); if (existsSync(path)) { const current = JSON.parse(readFileSync(path, "utf8")); if (history.some((entry) => entry?.decisionId === current?.decisionId || entry?.subjectSha256 === current?.subjectSha256)) return { descriptor, record: null, revoked: true }; } }
   if (!existsSync(path)) return { descriptor, record: null };
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("AGY-CONSENT-STORAGE-UNSAFE");

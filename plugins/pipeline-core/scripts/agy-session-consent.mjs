@@ -4,7 +4,7 @@
 /** Private session-consent storage. It never signs and never turns preference
  * or installation into consent; signature/chat decisions arrive as an
  * already-recorded external decision and are verified before storage. */
-import { existsSync, lstatSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildSignatureIntent, configuredConsentMode, consentStoragePath, digest, loadLiveSession, validateConsentRecord } from "../lib/agy-session-authority.mjs";
@@ -34,7 +34,7 @@ export async function runConsentCommand(argv, deps = {}) {
     return { schema: "pipeline.agy-session-consent-preparation.v1", sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256, subject, subjectSha256, mode, ...(intent ? { intent } : {}), status: mode === "signature" ? "awaiting-human-signature" : "awaiting-human-chat-attribution" };
   }
   if (args.command === "inspect") return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { status: "missing", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 };
-  if (args.command === "revoke") { if (existsSync(path)) { const prior = JSON.parse(readFileSync(path, "utf8")); let history = []; if (existsSync(tombstone)) { try { history = JSON.parse(readFileSync(tombstone, "utf8")); } catch { throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); } } if (!Array.isArray(history)) throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); history.push({ decisionId: prior.decisionId, subjectSha256: prior.subjectSha256, revokedAtMs: Date.now() }); writeFileSync(tombstone, `${JSON.stringify(history)}\n`, { flag: "w", mode: 0o600 }); unlinkSync(path); } return { status: "revoked", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 }; }
+  if (args.command === "revoke") { if (existsSync(path)) { const prior = JSON.parse(readFileSync(path, "utf8")); let history = []; if (existsSync(tombstone)) { try { history = JSON.parse(readFileSync(tombstone, "utf8")); } catch { throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); } } if (!Array.isArray(history)) throw new Error("AGY-CONSENT-STORAGE-MALFORMED"); history.push({ decisionId: prior.decisionId, subjectSha256: prior.subjectSha256, revokedAtMs: Date.now() }); const temporary = `${tombstone}.${process.pid}.tmp`; writeFileSync(temporary, `${JSON.stringify(history)}\n`, { flag: "wx", mode: 0o600 }); renameSync(temporary, tombstone); unlinkSync(path); } return { status: "revoked", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 }; }
   if (!args.record) throw new Error(usage);
   const record = JSON.parse(readFileSync(resolve(args.record), "utf8"));
   const live = loadLiveSession(args.root, args.sessionId, descriptor.descriptorSha256);
