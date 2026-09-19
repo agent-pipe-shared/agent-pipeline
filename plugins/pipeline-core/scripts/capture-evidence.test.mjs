@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import {
   captureEvidence,
+  formatJsonArtifact,
   findRepoRoot,
   findResidualHostPath,
   formatArtifact,
@@ -55,6 +56,27 @@ test("redactText strips a plain-path occurrence and a file:// occurrence of the 
 test("formatArtifact matches the de facto backlog/evidence/ shape", () => {
   const text = formatArtifact({ command: "node x.mjs", label: "before", exitCode: 1, stdout: "out\n", stderr: "err\n" });
   assert.match(text, /^command: node x\.mjs\nlabel: before\nexitCode: 1\n--- stdout ---\nout\n\n--- stderr ---\nerr\n$/);
+});
+
+test("formatJsonArtifact produces candidate-bound machine-readable focused evidence", () => {
+  const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
+  const artifact = JSON.parse(formatJsonArtifact({ command: "node focused.test.mjs", label: "focused", exitCode: 0, stdout: "ok", stderr: "", candidate }));
+  assert.deepEqual(artifact, {
+    schema: "pipeline.command-evidence.v1",
+    label: "focused",
+    command: "node focused.test.mjs",
+    exitCode: 0,
+    stdout: "ok",
+    stderr: "",
+    candidate,
+  });
+});
+
+test("parseArgs accepts the explicit JSON evidence format and rejects lookalikes", () => {
+  assert.deepEqual(parseArgs(["--out", "scratch/evidence.json", "--label", "focused", "--format", "json", "--", "node", "test.mjs"]), {
+    out: "scratch/evidence.json", label: "focused", format: "json", command: ["node", "test.mjs"],
+  });
+  assert.throws(() => parseArgs(["--out", "x", "--label", "y", "--format", "yaml", "--", "node", "test.mjs"]), /format must be text or json/u);
 });
 
 test("captureEvidence: a failing command with the repo root in both plain and file:// form is fully redacted, and the exit code is recorded and preserved", () => {
@@ -387,7 +409,7 @@ test("parseArgs: throws on an unrecognized flag", () => {
 
 test("parseArgs: parses a valid invocation, and everything after -- is the command verbatim (including tokens that look like flags)", () => {
   const parsed = parseArgs(["--out", "evidence.txt", "--label", "green", "--", "node", "-e", "console.log('--out')"]);
-  assert.deepEqual(parsed, { out: "evidence.txt", label: "green", command: ["node", "-e", "console.log('--out')"] });
+  assert.deepEqual(parsed, { out: "evidence.txt", label: "green", format: "text", command: ["node", "-e", "console.log('--out')"] });
 });
 
 // --- NVA-B-REDFIX-1 F2 + F6: runCli, exercised as the actual CLI process (the documented

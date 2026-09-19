@@ -5,7 +5,10 @@ import { createHash } from "node:crypto";
 
 export const VERIFY_SELECTION_SCHEMA = "pipeline.verify-selection.v1";
 export const VERIFY_SELECTION_MODES = Object.freeze(["work", "critic", "push", "candidate", "release"]);
-const FULL_ONLY_MODES = new Set(["release"]);
+// A candidate is the local delivery boundary; release is its publication
+// boundary.  Both require a complete registry run.  Work, Critic and push
+// retain their impact-selected lanes and must never be confused with either.
+const FULL_ONLY_MODES = new Set(["candidate", "release"]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 function canonical(value) {
@@ -148,7 +151,7 @@ export function validateVerifySelection(selection) {
   if (selection.selectedSuiteIds.some((id) => !selection.registeredSuiteIds.includes(id)) || selection.omittedSuiteIds.some((id) => !selection.registeredSuiteIds.includes(id))) return false;
   if (selection.execution === "full" && selection.omittedSuiteIds.length !== 0) return false;
   if (selection.execution === "impacted" && selection.fallbackReason !== null) return false;
-  if (selection.mode === "release" && selection.execution !== "full") return false;
+  if (["candidate", "release"].includes(selection.mode) && selection.execution !== "full") return false;
   const { selectionSha256, ...body } = selection;
   return digestVerifySelection(body) === selectionSha256;
 }
@@ -161,6 +164,6 @@ export function verifyEvidenceSatisfiesBoundary(evidence, boundary) {
   const classifiedImpact = selection.unmatchedPaths.length === 0;
   if (boundary === "push") return selection.mode === "push" && (classifiedImpact || completeFallback);
   if (boundary === "critic") return selection.mode === "critic" && (classifiedImpact || completeFallback);
-  if (boundary === "candidate") return selection.mode === "candidate" && (classifiedImpact || completeFallback);
+  if (boundary === "candidate") return selection.mode === "candidate" && completeFallback;
   return selection.mode === "work" && (classifiedImpact || completeFallback);
 }

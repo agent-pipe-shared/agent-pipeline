@@ -27,7 +27,7 @@
  * ARTIFACT SHAPE. Matches the de facto convention already in `backlog/evidence/`
  * (`command:` / `label:` / `exitCode:` / `--- stdout ---` / `--- stderr ---`).
  *
- * CLI: `node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <label> --
+ * CLI: `node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <label> [--format text|json] --
  *   <command> [args...]`
  * Exit code: the WRAPPED command's own exit code, always -- capturing a RED run must not look
  * green. A failure inside this script itself (cannot determine repo root, cannot write the
@@ -183,6 +183,38 @@ export function formatArtifact({ command, label, exitCode, stdout, stderr }) {
 }
 
 /**
+ * Resolve one clean Git candidate for machine-readable review evidence.  Text
+ * captures deliberately remain usable outside a repository; JSON captures are
+ * different: their purpose is to let a Critic bind a focused check to one
+ * immutable candidate without manufacturing a broad Verify record.
+ */
+export function cleanCandidateIdentity(cwd) {
+  const commit = spawnSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" });
+  const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd, encoding: "utf8" });
+  const porcelain = spawnSync("git", ["status", "--porcelain=v1"], { cwd, encoding: "utf8" });
+  if (commit.status !== 0 || tree.status !== 0 || porcelain.status !== 0
+    || !commit.stdout.trim() || !tree.stdout.trim()) {
+    throw new Error("capture-evidence: JSON evidence requires a Git candidate identity.");
+  }
+  if (porcelain.stdout !== "") {
+    throw new Error("capture-evidence: JSON evidence requires a clean worktree.");
+  }
+  return Object.freeze({ commit: commit.stdout.trim(), tree: tree.stdout.trim() });
+}
+
+export function formatJsonArtifact({ command, label, exitCode, stdout, stderr, candidate }) {
+  return JSON.stringify({
+    schema: "pipeline.command-evidence.v1",
+    label,
+    command,
+    exitCode,
+    stdout: stdout ?? "",
+    stderr: stderr ?? "",
+    candidate,
+  }, null, 2) + "\n";
+}
+
+/**
  * Run `command` (an argv array), capture and redact its stdout/stderr, and write the artifact to
  * `out`. Returns `{ exitCode, out }`; `exitCode` is always the wrapped command's own exit code
  * (0 for a signal-terminated child is never reported -- a killed child reports exit code 1, since
@@ -196,14 +228,17 @@ export function captureEvidence({
   repoRoot,
   homeDir = homedir(),
   maxBuffer = 64 * 1024 * 1024,
+  format = "text",
 }) {
   if (!Array.isArray(command) || command.length === 0) {
     throw new Error("capture-evidence: command must be a non-empty argv array");
   }
   if (!label) throw new Error("capture-evidence: label is required");
   if (!out) throw new Error("capture-evidence: out is required");
+  if (!["text", "json"].includes(format)) throw new Error("capture-evidence: format must be text or json");
 
   const root = repoRoot ?? findRepoRoot(cwd);
+  const startedCandidate = format === "json" ? cleanCandidateIdentity(cwd) : null;
   const result = spawnSync(command[0], command.slice(1), { cwd, encoding: "utf8", maxBuffer });
   if (result.error) {
     // The wrapped command never produced a real exit code -- a spawn failure (e.g. ENOENT), or a
@@ -218,7 +253,13 @@ export function captureEvidence({
   const stdout = redactText(result.stdout ?? "", root, homeDir);
   const stderr = redactText(result.stderr ?? "", root, homeDir);
   const commandLine = redactText(command.map(quoteIfNeeded).join(" "), root, homeDir);
-  const assembledArtifact = formatArtifact({ command: commandLine, label, exitCode, stdout, stderr });
+  const finishedCandidate = format === "json" ? cleanCandidateIdentity(cwd) : null;
+  if (format === "json" && (startedCandidate.commit !== finishedCandidate.commit || startedCandidate.tree !== finishedCandidate.tree)) {
+    throw new Error("capture-evidence: JSON evidence candidate changed while the command ran.");
+  }
+  const assembledArtifact = format === "json"
+    ? formatJsonArtifact({ command: commandLine, label, exitCode, stdout, stderr, candidate: startedCandidate })
+    : formatArtifact({ command: commandLine, label, exitCode, stdout, stderr });
   const artifactText = redactResidualHostPaths(assembledArtifact);
 
   // Fail-closed backstop (sibling of the spawn-failure throw above): both exact-root redaction
@@ -258,6 +299,7 @@ export function parseArgs(argv) {
   }
   let out;
   let label;
+  let format = "text";
   for (let i = 0; i < flags.length; i += 1) {
     if (flags[i] === "--out") {
       out = flags[i + 1];
@@ -265,13 +307,17 @@ export function parseArgs(argv) {
     } else if (flags[i] === "--label") {
       label = flags[i + 1];
       i += 1;
+    } else if (flags[i] === "--format") {
+      format = flags[i + 1];
+      i += 1;
     } else {
       throw new Error(`usage: capture-evidence.mjs --out <path> --label <label> -- <command> [args...] (unrecognized flag ${flags[i]})`);
     }
   }
   if (!out) throw new Error("usage: capture-evidence.mjs requires --out <path>");
   if (!label) throw new Error("usage: capture-evidence.mjs requires --label <label>");
-  return { out, label, command };
+  if (!["text", "json"].includes(format)) throw new Error("usage: capture-evidence.mjs --format must be text or json");
+  return { out, label, command, format };
 }
 
 /**

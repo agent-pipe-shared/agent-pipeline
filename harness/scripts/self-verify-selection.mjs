@@ -73,6 +73,25 @@ export function resolveSelfVerifySelection({ repoRoot, candidateCommit, register
   }
   const baseline = ids.filter((id) => /(?:verify-selection|verify-suite-registration|doc-contract|artifact-lifecycle|backlog-state|validate-manifest|security-scan)/u.test(id));
   const documentation = ids.filter((id) => /(?:doc|adr|backlog|artifact|spec|reader|markdown|link|inventory|state|handover|release|verify-selection|verify-suite-registration|validate-manifest|security-scan)/u.test(id));
+  // Every registered suite owns its test file and its conventional sibling
+  // implementation file.  The old `plugins/** -> ids` catch-all made the
+  // normal work mode indistinguishable from a release run for any plugin
+  // change.  Keeping this mapping generated from the registry makes new
+  // unpaired files fail closed to a full run, while an established component
+  // gets its bounded, directly-associated suite plus the baseline.
+  const suiteLocalAreas = registeredSuites.map((suite) => {
+    const normalizedFile = suite.file.replaceAll("\\", "/");
+    const normalizedRoot = repoRoot.replaceAll("\\", "/").replace(/\/$/u, "");
+    const testPath = normalizedFile.startsWith(`${normalizedRoot}/`)
+      ? normalizedFile.slice(normalizedRoot.length + 1)
+      : normalizedFile.replace(/^\.\//u, "");
+    const sourcePath = testPath.endsWith(".test.mjs") ? testPath.slice(0, -".test.mjs".length) + ".mjs" : null;
+    return {
+      id: `suite:${suite.name}`,
+      paths: sourcePath === null ? [testPath] : [testPath, sourcePath],
+      suites: [suite.name],
+    };
+  });
   const selection = planVerifySelection({
     mode: invocation.mode, baseCommit, candidateCommit, changedPaths, registeredSuiteIds: ids, forceFullReason,
     policy: {
@@ -109,7 +128,7 @@ export function resolveSelfVerifySelection({ repoRoot, candidateCommit, register
             "settings-allowlist-merge-tests",
           ],
         },
-        { id: "implementation", paths: [".claude/**", ".github/**", "guardrails/**", "harness/**", "plugins/**", "project/**", "templates/**", "package.json", "setup.mjs", "setup.test.mjs"], suites: ids },
+        ...suiteLocalAreas,
       ],
     },
   });

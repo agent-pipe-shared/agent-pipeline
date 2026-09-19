@@ -31,7 +31,8 @@
  * git calls ran with `cwd: repoRoot` (the invoking worktree) as before this fix, never a
  * new `primaryRoot`.
  *
- * The evidence written at the PRIMARY root's `evidence/verify-latest.json` is backed up
+ * The final-boundary (`candidate`) evidence written at the PRIMARY root's
+ * `evidence/verify-latest.json` is backed up
  * before the run and restored (or removed, if absent before) in a `finally` block, since
  * this shared repository may run concurrent dispatches that read that file's content.
  *
@@ -79,6 +80,7 @@ const gitCommonDir = tryGit(repoRoot, ["rev-parse", "--path-format=absolute", "-
 const primaryRoot = gitCommonDir !== null ? dirname(gitCommonDir) : repoRoot;
 const realEvidenceDir = join(primaryRoot, "evidence");
 const realEvidencePath = join(realEvidenceDir, "verify-latest.json");
+const realWorkEvidencePath = join(realEvidenceDir, "verify-work-latest.json");
 
 const primaryHeadCommit = tryGit(repoRoot, ["rev-parse", "HEAD"]);
 const fixtureCommit = tryGit(repoRoot, ["rev-parse", "HEAD~1"]);
@@ -89,6 +91,7 @@ test(
   { skip: fixtureAvailable ? false : "primary repository lacks a distinguishable HEAD~1 fixture commit" },
   () => {
     const originalEvidence = existsSync(realEvidencePath) ? readFileSync(realEvidencePath) : null;
+    const originalWorkEvidence = existsSync(realWorkEvidencePath) ? readFileSync(realWorkEvidencePath) : null;
     const parent = mkdtempSync(join(tmpdir(), "verify-evidence-root-"));
     const worktreeDir = join(parent, "invoking-worktree"); // git creates this; must not pre-exist
     try {
@@ -114,7 +117,7 @@ test(
       const worktreeEvidenceDir = join(worktreeDir, "evidence");
       const evidenceEntriesBefore = existsSync(worktreeEvidenceDir) ? readdirSync(worktreeEvidenceDir).sort() : null;
 
-      const run = spawnSync(process.execPath, [join(worktreeDir, "harness", "scripts", "verify.mjs")], {
+      const run = spawnSync(process.execPath, [join(worktreeDir, "harness", "scripts", "verify.mjs"), "--mode", "candidate"], {
         cwd: worktreeDir,
         encoding: "utf8",
         shell: false,
@@ -155,6 +158,19 @@ test(
       assert.notEqual(evidence.candidate.start.commit, primaryHeadCommit, "candidate identity must not silently fall back to the primary worktree's HEAD");
       assert.equal(evidence.commit, fixtureCommit);
 
+      // A routine work invocation records its own red preflight result without
+      // invalidating the final-boundary candidate record above.
+      const finalEvidenceBeforeWork = readFileSync(realEvidencePath);
+      const workRun = spawnSync(process.execPath, [join(worktreeDir, "harness", "scripts", "verify.mjs")], {
+        cwd: worktreeDir,
+        encoding: "utf8",
+        shell: false,
+        timeout: 30000,
+      });
+      assert.equal(workRun.status, 1);
+      assert.deepEqual(readFileSync(realEvidencePath), finalEvidenceBeforeWork, "work mode must not replace final candidate evidence");
+      assert.ok(existsSync(realWorkEvidencePath), "work mode must write a separate development evidence slot");
+
       // An explicitly requested governance action changes the dirty-candidate
       // boundary: source and target preflight must reject before replacing the
       // public evidence that the ordinary invocation just wrote.
@@ -184,6 +200,8 @@ test(
       try {
         if (originalEvidence === null) { if (existsSync(realEvidencePath)) rmSync(realEvidencePath, { force: true }); }
         else writeFileSync(realEvidencePath, originalEvidence);
+        if (originalWorkEvidence === null) { if (existsSync(realWorkEvidencePath)) rmSync(realWorkEvidencePath, { force: true }); }
+        else writeFileSync(realWorkEvidencePath, originalWorkEvidence);
       } catch { /* best-effort restore; a stale evidence file is a non-durable status snapshot */ }
     }
   },

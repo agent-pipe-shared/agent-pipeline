@@ -36,10 +36,11 @@
  * Markdown link/anchor and calibrated handover-authority contracts; it does not
  * judge prose semantics or fetch external URLs).
  *
- * Evidence artifact: written to `evidence/verify-latest.json` (git-ignored — see
- * root .gitignore; a fresh, regenerated-every-run status snapshot is not a durable
- * audit trail like the override ledger, and committing it would create stale-diff
- * noise on every run). ONE canonical path, overwritten each run — no registry (#2 CUT).
+ * Evidence artifact: final-boundary modes (`candidate`, `push`, `release`) write
+ * `evidence/verify-latest.json`.  Development modes (`work`, `critic`) write a
+ * mode-local latest slot instead, so a focused check cannot invalidate a valid
+ * final-candidate proof.  Candidate and release are full-registry boundaries;
+ * work and critic are impact-selected development evidence.
  *
  * Exit code: 0 iff every step exited 0; the first non-zero step's code otherwise
  * (mirrors `npm run`-style aggregation). Complete suite stdout/stderr stays in
@@ -131,7 +132,8 @@ const command = renderVerifyCommand(invocation);
 // by this repo's own convention, and would fail the prescribed route forever.
 const primaryRoot = dirname(gitCommonDirectory());
 const evidenceDir = join(primaryRoot, "evidence");
-const evidencePath = join(evidenceDir, "verify-latest.json");
+const finalEvidenceMode = new Set(["candidate", "push", "release"]).has(invocation.mode);
+const evidencePath = join(evidenceDir, finalEvidenceMode ? "verify-latest.json" : `verify-${invocation.mode}-latest.json`);
 const runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`;
 const runEvidencePath = join(evidenceDir, `${runId}.json`);
 const verifyStartedAt = new Date().toISOString();

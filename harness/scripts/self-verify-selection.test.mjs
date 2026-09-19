@@ -65,6 +65,16 @@ assert.deepEqual(lifecycle.suites.map((suite) => suite.name), [
   "settings-allowlist-merge-tests",
 ]);
 
+const localSourceSpawn = (command, args) => {
+  if (args[0] === "rev-parse") return { status: 0, stdout: "basecommit\n" };
+  if (args[0] === "merge-base") return { status: 0, stdout: "" };
+  if (args[0] === "diff") return { status: 0, stdout: "source.mjs\0" };
+  throw new Error("unexpected git call");
+};
+const localSource = resolveSelfVerifySelection({ repoRoot: "/repo", candidateCommit: "candidate", registeredSuites: suites, invocation: { mode: "work", base: "main" }, spawn: localSourceSpawn });
+assert.equal(localSource.selection.execution, "impacted");
+assert.deepEqual(localSource.suites.map((suite) => suite.name), ["doc-contract-tests", "source-tests"]);
+
 const unknownSpawn = (command, args) => args[0] === "rev-parse"
   ? { status: 0, stdout: "basecommit\n" }
   : args[0] === "merge-base" ? { status: 0, stdout: "" } : { status: 0, stdout: "unknown.bin\0" };
@@ -91,4 +101,8 @@ const release = resolveSelfVerifySelection({ repoRoot: "/repo", candidateCommit:
 assert.equal(release.selection.execution, "full");
 assert.equal(release.suites.length, suites.length);
 
-console.log("self-verify-selection: 23 tests passed");
+const candidate = resolveSelfVerifySelection({ repoRoot: "/repo", candidateCommit: "candidate", registeredSuites: suites, invocation: { mode: "candidate", base: "main" }, spawn: localSourceSpawn });
+assert.equal(candidate.selection.execution, "full");
+assert.equal(candidate.suites.length, suites.length);
+
+console.log("self-verify-selection: 28 tests passed");
