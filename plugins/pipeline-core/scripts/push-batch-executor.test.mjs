@@ -4,14 +4,14 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 
 import { createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
 import { createGovernanceExportOutbox } from "../lib/governance-export-outbox.mjs";
 import { pushBatchMemberId, pushBatchSubjectSha256 } from "../lib/push-batch-contract.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
-import { run } from "./push-batch-executor.mjs";
+import { isOutsideRepository, run } from "./push-batch-executor.mjs";
 
 const git = (cwd, args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 const sha = (value) => createHash("sha256").update(value).digest("hex");
@@ -27,6 +27,11 @@ const cases = [{ id: "PBE01", name: "executes the fixed local Git batch, journal
   const paths = { subject: join(external, "subject.json"), request: join(external, "request.json"), trust: join(external, "trust.json"), proof: join(external, "proof.json"), outbox: join(external, "outbox.json"), profile: join(external, "profile.json"), journal: join(external, "journal") }; mkdirSync(external, { recursive: true }); json(paths.subject, subject); json(paths.request, request); json(paths.trust, trust); json(paths.proof, proof); json(paths.outbox, createGovernanceExportOutbox({ destinationProfile: "governance", policyRevision: sha("policy") })); json(paths.profile, { destinationProfile: "governance", policyRevision: sha("policy") });
   const result = await run(["--repo-root", repo, "--subject", paths.subject, "--request", paths.request, "--trust-policy", paths.trust, "--proof", paths.proof, "--journal-root", paths.journal, "--outbox", paths.outbox, "--export-profile", paths.profile]);
   assert.equal(result.status, "readback-verified"); assert.equal(git(repo, ["ls-remote", "--refs", "origin", "refs/heads/test"]).split(/\s+/u)[0], candidate.commit); const journalPath = join(paths.journal, `${action.subjectSha256}.ndjson`); assert.equal(existsSync(journalPath), true); assert.deepEqual(readFileSync(journalPath, "utf8").trim().split("\n").map((line) => JSON.parse(line).state), ["attempted", "readback-verified"]); assert.equal(JSON.parse(readFileSync(paths.outbox, "utf8")).entries.length, 1);
+} }, { id: "PBE02", name: "rejects repository-contained Windows paths while accepting a genuinely external path", run: async () => {
+  const root = win32.join("C:", "pipeline", "repo");
+  assert.equal(isOutsideRepository(root, win32.join(root, "outbox.json"), win32), false);
+  assert.equal(isOutsideRepository(root, win32.join("C:", "pipeline", "repo-sibling", "outbox.json"), win32), true);
+  assert.equal(isOutsideRepository(root, win32.join("C:", "pipeline", "external", "outbox.json"), win32), true);
 } }];
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
