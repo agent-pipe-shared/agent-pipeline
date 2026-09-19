@@ -215,6 +215,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       overallStatus: fitness.overallStatus,
       blockingOverallStatus: fitnessProjection.blockingOverallStatus,
       reportOnly: fitnessProjection.reportOnly,
+      outcomes: fitness.outcomes,
       summary: fitness.summary,
       planningSurface: surface,
     });
@@ -228,7 +229,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     message: "physical architecture map, fitness evidence, and scoped adoption disposition are ready",
     artifacts,
     disposition,
-    fitness: { overallStatus: fitness.overallStatus, blockingOverallStatus: fitnessProjection.blockingOverallStatus, reportOnly: fitnessProjection.reportOnly, summary: fitness.summary },
+    fitness: { overallStatus: fitness.overallStatus, blockingOverallStatus: fitnessProjection.blockingOverallStatus, reportOnly: fitnessProjection.reportOnly, outcomes: fitness.outcomes, summary: fitness.summary },
     nextAction: null,
   };
 }

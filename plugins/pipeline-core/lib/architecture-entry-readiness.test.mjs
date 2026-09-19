@@ -98,12 +98,17 @@ test("real signed approved-scoped adoption reaches the physical readiness gate",
   const root = fixture();
   try {
     cpSync(join(repoRoot, "architecture"), join(root, "architecture"), { recursive: true });
+    cpSync(join(repoRoot, "backlog"), join(root, "backlog"), { recursive: true });
+    cpSync(join(repoRoot, "harness"), join(root, "harness"), { recursive: true });
+    cpSync(join(repoRoot, "plugins/pipeline-core"), join(root, "plugins/pipeline-core"), { recursive: true });
+    cpSync(join(repoRoot, "schemas"), join(root, "schemas"), { recursive: true });
     mkdirSync(join(root, "project"), { recursive: true });
-    writeFileSync(join(root, "specs-plan.md"), "Implement plugins/pipeline-core/lib/architecture-entry-readiness.mjs\n", "utf8");
-    writeFileSync(join(root, "project/pipeline-state.json"), JSON.stringify({ activeFeature: { planPath: "specs-plan.md" } }) + "\n", "utf8");
-    fixtureAdoption({ rootDir: root, decision: "approved-scoped", scope: ["plugins/pipeline-core/"], rationale: "fixture architecture entry" });
+    writeFileSync(join(root, "plugins/pipeline-core/architecture-entry-plan.md"), "Implement plugins/pipeline-core/lib/architecture-entry-readiness.mjs\n", "utf8");
+    writeFileSync(join(root, "project/pipeline.json"), JSON.stringify({ schema: "pipeline.project.v1", verify: "node --test" }) + "\n", "utf8");
+    writeFileSync(join(root, "project/pipeline-state.json"), JSON.stringify({ activeFeature: { planPath: "plugins/pipeline-core/architecture-entry-plan.md" } }) + "\n", "utf8");
+    fixtureAdoption({ rootDir: root, decision: "approved-scoped", scope: ["plugins/pipeline-core/", "architecture/map/", "project/pipeline.json", "pipeline.user.yaml"], rationale: "fixture architecture entry" });
     const result = inspectArchitectureEntryReadiness({ rootDir: root });
-    assert.notEqual(result.code, "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED", JSON.stringify(result));
+    assert.equal(result.status, "ready", JSON.stringify(result));
     assert.equal(result.disposition.ok, true, JSON.stringify(result));
     assert.equal(result.artifacts.map.status, "current");
   } finally { rmSync(root, { recursive: true, force: true }); }
