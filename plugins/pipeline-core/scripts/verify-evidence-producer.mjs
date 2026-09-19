@@ -65,6 +65,7 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource } from "../lib/worktree-lifecycle.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
@@ -126,7 +127,6 @@ function git(root, args) {
   if (!isSuccessfulSpawn(result)) fail("VEP-GIT", `Git observation failed for ${args[0]}.`);
   return String(result.stdout).trim();
 }
-
 /** Same "clean iff no porcelain output" reading this repository's own verify entry point uses. */
 function candidateIdentity(root) {
   const porcelain = git(root, ["status", "--porcelain=v1"]);
@@ -182,7 +182,7 @@ function writeEvidence(root, target, evidence) {
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
  */
-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null }) {
   const root = resolve(rootDir);
   const target = safeOutPath(root, outPath);
   const canonicalTarget = safeOutPath(root, VERIFY_EVIDENCE_DEFAULT_PATH);
@@ -350,18 +350,35 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     exitCode: 0,
   };
   writeEvidence(root, target, evidence);
-  if (eventPlan === null) return { status: "passed", evidence, outPath: target };
+  // A critic packet is optional for ordinary Verify consumers.  The governed
+  // close lane supplies one and therefore gains a private, revalidated receipt
+  // rather than relying on a caller-provided green status object.
+  let criticLifecycle = null;
+  if (criticPacketId !== null) {
+    try {
+      criticLifecycle = recordCriticVerifyLifecycle({
+        gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
+        criticPacketId,
+        candidate: evidence.candidate,
+        evidencePath: relative(root, target).replaceAll("\\", "/"),
+        evidence,
+      });
+    } catch (error) {
+      fail(error?.code ?? "VEP-CRITIC-LIFECYCLE", error?.message ?? "Critic/Verify lifecycle receipt could not be persisted.");
+    }
+  }
+  if (eventPlan === null) return { status: "passed", evidence, outPath: target, ...(criticLifecycle === null ? {} : { criticLifecycle }) };
   // The event follows source persistence and a physical source readback.
   let observed;
   try { observed = JSON.parse(readFileSync(target, "utf8")); } catch { fail("VEP-SOURCE-READBACK", "Verify evidence could not be read back after persistence."); }
   if (JSON.stringify(observed) !== JSON.stringify(evidence)) fail("VEP-SOURCE-READBACK", "Verify evidence readback did not match the terminal source.");
   try {
     const eventWrite = writeGovernanceVerificationAction({ rootDir: root, eventOutPath: eventPlan.eventOutPath, event: actionEvent });
-    return { status: "passed", evidence, outPath: target, actionEvent, eventOutPath: eventWrite.outPath };
+    return { status: "passed", evidence, outPath: target, actionEvent, eventOutPath: eventWrite.outPath, ...(criticLifecycle === null ? {} : { criticLifecycle }) };
   } catch {
     return {
       status: "source-complete/event-unavailable", sourceStatus: "passed", evidence, outPath: target,
-      actionEvent, eventRetry: buildGovernanceVerificationRetry({ eventOutPath: eventPlan.eventOutPath, event: actionEvent }),
+      actionEvent, eventRetry: buildGovernanceVerificationRetry({ eventOutPath: eventPlan.eventOutPath, event: actionEvent }), ...(criticLifecycle === null ? {} : { criticLifecycle }),
     };
   }
 }
@@ -372,7 +389,7 @@ function parseArgs(argv) {
     const flag = argv[index];
     if (flag === "--prepare") { value.prepare = true; continue; }
     if (flag === "--no-reuse") { value.reuseReceipts = false; continue; }
-    if (!["--root", "--out", "--event-out", "--mode", "--base"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
+    if (!["--root", "--out", "--event-out", "--mode", "--base", "--critic-packet-id"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
     const next = argv[++index];
     if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) {
       fail("VEP-USAGE", "Usage: verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]");
@@ -381,7 +398,7 @@ function parseArgs(argv) {
   }
   const mode = value["--mode"] ?? "candidate";
   if (!["work", "critic", "push", "candidate", "release"].includes(mode)) fail("VEP-USAGE", `Unknown Verify mode: ${mode}`);
-  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath: value["--event-out"] ?? null, mode, base: value["--base"] ?? null, reuseReceipts: value.reuseReceipts !== false };
+  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath: value["--event-out"] ?? null, mode, base: value["--base"] ?? null, reuseReceipts: value.reuseReceipts !== false, criticPacketId: value["--critic-packet-id"] ?? null };
 }
 
 if (isDirectInvocation(import.meta.url)) {
