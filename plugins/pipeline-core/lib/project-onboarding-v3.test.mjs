@@ -49,7 +49,7 @@ import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-mig
 import { planInstall as planPrePushHookInstall } from "../scripts/pre-push-hook-install.mjs";
 import { applyInstall as applyPreCommitHookInstall, planInstall as planPreCommitHookInstall } from "../scripts/pre-commit-hook-install.mjs";
 import { planInstall as planCommitMsgHookInstall } from "../scripts/commit-msg-hook-install.mjs";
-import { applySettingsAllowlistMerge } from "../scripts/settings-allowlist-merge.mjs";
+import { applySettingsAllowlistMerge, planSettingsAllowlistMerge } from "../scripts/settings-allowlist-merge.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -1532,21 +1532,9 @@ test("runner-permission drift is repaired before a neutral PO authority decision
       },
     };
 
-    const drifted = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
-    assert.equal(drifted.status, "projection-drift");
-    assertDiagnostic(drifted, "runner_permissions_drift");
-    assert.equal(drifted.nextAction.argv[1], "apply-runner-permissions");
-    const planDigest = drifted.nextAction.argv.at(-2);
-    const merged = applySettingsAllowlistMerge({
-      rootDir: path,
-      candidateSet: "runner-permissions",
-      planSha256: planDigest,
-      activate: true,
-    });
-    assert.equal(merged.status, "ready", JSON.stringify(merged));
-
     const afterRepair = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(afterRepair.status, "partial");
+    assert.equal(afterRepair.runnerPermissions.status, "not-applicable");
     assertDiagnostic(afterRepair, "po_authority_decision_required");
     assert.deepEqual(afterRepair.nextAction?.argv, [writer, "po-authority-decision-plan"]);
   } finally { dispose(path); }
@@ -9084,13 +9072,22 @@ test("a ready one-entry consumer receives and completes the authenticated runner
     writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify(partial, null, 2)}\n`);
 
     const drifted = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
-    assert.equal(drifted.status, "projection-drift");
+    assert.equal(drifted.status, "ready");
     assert.equal(drifted.runnerPermissions.status, "drifted");
     assert.equal(drifted.nextAction.executable, "node");
-    assert.equal(drifted.nextAction.argv[1], "apply-runner-permissions");
-    const applied = spawnSync(process.execPath, drifted.nextAction.argv, { encoding: "utf8" });
-    assert.equal(applied.status, 0, applied.stderr);
-    assert.equal(JSON.parse(applied.stdout).status, "ready");
+    assert.equal(drifted.nextAction.argv[1], "plan-runner-permissions");
+    assert.equal(drifted.nextAction.mutation, false);
+    const planned = spawnSync(process.execPath, drifted.nextAction.argv, { encoding: "utf8" });
+    assert.equal(planned.status, 0, planned.stderr);
+    assert.equal(JSON.parse(planned.stdout).status, "ready");
+    const optionalPlan = planSettingsAllowlistMerge({ rootDir: path, candidateSet: "runner-permissions" });
+    const applied = applySettingsAllowlistMerge({
+      rootDir: path,
+      candidateSet: "runner-permissions",
+      planSha256: optionalPlan.planSha256,
+      activate: true,
+    });
+    assert.equal(applied.status, "ready", JSON.stringify(applied));
 
     assert.equal(readFileSync(join(path, ".claude", "settings.json"), "utf8"), projectSettingsBytes);
     const merged = JSON.parse(readFileSync(join(path, ".claude", "settings.local.json"), "utf8"));
@@ -9115,7 +9112,7 @@ test("a ready consumer with malformed permission shapes receives only the typed 
       writeFileSync(settings, bytes);
       const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
       assert.equal(observed.status, "projection-drift");
-      assert.equal(observed.runnerPermissions.status, "drifted");
+      assert.equal(observed.runnerPermissions.status, "unavailable");
       assert.equal(observed.nextAction.executable, "node");
       assert.equal(observed.nextAction.argv[1], "plan-runner-permissions");
       assert.equal(observed.nextAction.mutation, false);
@@ -9135,15 +9132,17 @@ test("runner-permission projection drift removes ready-only fields before the re
 
     for (const intent of ["bootstrap", "session"]) {
       const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent, runner: "claude" });
-      assert.equal(observed.status, "projection-drift");
-      assert.equal(Object.prototype.hasOwnProperty.call(observed, "pushApprovalMode"), false);
-      assert.equal(Object.prototype.hasOwnProperty.call(observed, "trustAnchorAvailability"), false);
-      assert.throws(() => requireProjectOnboardingReady({
+      assert.equal(observed.status, "ready");
+      assert.equal(observed.runnerPermissions.status, "drifted");
+      assert.equal(observed.nextAction.argv[1], "plan-runner-permissions");
+      assert.equal(Object.prototype.hasOwnProperty.call(observed, "pushApprovalMode"), true);
+      assert.equal(Object.prototype.hasOwnProperty.call(observed, "trustAnchorAvailability"), true);
+      assert.deepEqual(requireProjectOnboardingReady({
         rootDir: path,
         intent,
         runner: "claude",
         inspect: () => observed,
-      }), (error) => error?.code === "PORG-NOT-READY" && error.lifecycleStatus === "projection-drift");
+      }), { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent });
     }
   } finally { dispose(path); }
 });

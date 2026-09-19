@@ -81,6 +81,7 @@ import {
   pipelineScriptsRunnerAllowlistEntries as registeredPipelineScriptsRunnerAllowlistEntries,
   planSettingsAllowlistMerge,
   RUNNER_PERMISSIONS_TARGET_RELATIVE,
+  SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA,
   SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA,
 } from "../scripts/settings-allowlist-merge.mjs";
 import { applySessionCleanupRecovery, planSessionCleanupRecovery, SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
@@ -1238,7 +1239,11 @@ const LEGACY_RUNNER_PERMISSIONS_TARGET = ".claude/settings.json";
 const RUNNER_PERMISSION_LANES = Object.freeze(["Bash", "PowerShell"]);
 
 function runnerPermissionsReadback({ root = null, runner = null, repository = null, fs = null } = {}) {
-  if (runner === "codex" && repository?.mode === "host-managed") {
+  // These runners do not consume Claude Code's project settings layer through
+  // a Pipeline-owned bridge.  Their host permission prompts remain effective;
+  // this readback simply must not turn a foreign settings file into a false
+  // Pipeline readiness prerequisite.
+  if (runner === "codex" || runner === "antigravity") {
     return {
       target: RUNNER_PERMISSIONS_TARGET,
       status: "not-applicable",
@@ -1272,7 +1277,14 @@ function runnerPermissionsReadback({ root = null, runner = null, repository = nu
       return { ...base, status: "pending-runtime-initialization" };
     }
     const bytes = decodeUtf8Strict(readBoundPhysicalFile(target, fs), "runner permissions target");
-    const allow = JSON.parse(bytes)?.permissions?.allow;
+    const parsed = JSON.parse(bytes);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)
+      || (Object.hasOwn(parsed, "permissions")
+        && (parsed.permissions === null || typeof parsed.permissions !== "object" || Array.isArray(parsed.permissions)))
+      || (parsed.permissions && Object.hasOwn(parsed.permissions, "allow") && !Array.isArray(parsed.permissions.allow))) {
+      return { ...base, status: "unavailable" };
+    }
+    const allow = parsed.permissions?.allow;
     if (!Array.isArray(allow)) return { ...base, status: "drifted" };
     return { ...base, status: exactEntries.every((entry) => allow.includes(entry)) ? "current" : "drifted" };
   } catch {
@@ -1307,6 +1319,7 @@ function withRunnerPermissionsReadback(result, fs) {
   const runnerPermissionsPrecedeAuthorityDecision = result.status === "partial"
     && Array.isArray(result.diagnostics)
     && result.diagnostics.some((entry) => entry?.code === "po_authority_decision_required");
+  const optionalPreauthorization = ["drifted", "pending-runtime-initialization"].includes(runnerPermissions.status);
   if ((result.status !== "ready" && !runnerPermissionsPrecedeAuthorityDecision)
     || runnerPermissions.status === "current"
     || runnerPermissions.status === "not-applicable") return observed;
@@ -1330,6 +1343,20 @@ function withRunnerPermissionsReadback(result, fs) {
       "pipeline.settings-allowlist-merge-plan.v1",
       ["ready", "no-op", "unrepairable"],
     );
+  // A valid, absent/stale Claude preauthorization is optional host prompt
+  // state, not Pipeline governance drift. Keep the exact read-only planner
+  // visible on a ready result, while malformed/unreadable settings retain the
+  // existing fail-closed projection-drift path below.
+  if (result.status === "ready" && optionalPreauthorization) {
+    const planner = commandAction(
+      [SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", result.root],
+      false,
+      false,
+      SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA,
+      ["ready", "no-op", "unrepairable"],
+    );
+    return { ...observed, nextAction: planner };
+  }
   // Ready-only fields describe capabilities that have been authenticated only
   // by a ready observation. Once this readback downgrades that observation to
   // projection-drift, remove them from the envelope before the ready gate

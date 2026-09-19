@@ -10,13 +10,15 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
   applySettingsAllowlistMerge,
   main as settingsAllowlistMergeCli,
   PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES,
+  pipelineScriptsRunnerAllowlistEntries,
   planSettingsAllowlistMerge,
 } from "./settings-allowlist-merge.mjs";
 
@@ -117,6 +119,27 @@ test("plan reports no-op once both candidates are already present", () => {
     assert.deepEqual(plan.added, []);
     assert.deepEqual(plan.skipped.sort(), ["pipeline-state-approve-push", "project-onboarding-v3"]);
     assert.equal(plan.after, null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("installed cache version A to B is additive, preserves unrelated entries, and never grants a future wildcard", () => {
+  const dir = freshDir("cache-version-a-to-b");
+  try {
+    const oldEntries = pipelineScriptsRunnerAllowlistEntries("/cache/pipeline-core/0.6.0/scripts");
+    const newEntries = pipelineScriptsRunnerAllowlistEntries("/cache/pipeline-core/0.7.0/scripts");
+    assert.notDeepEqual(oldEntries, newEntries);
+    const unrelated = "Bash(node user-tool.mjs *)";
+    writeFileSync(localSettingsPath(dir), `${JSON.stringify({ permissions: { allow: [unrelated, ...oldEntries] } }, null, 2)}\n`, "utf8");
+    const plan = planSettingsAllowlistMerge({ rootDir: dir, candidateSet: "runner-permissions" });
+    assert.equal(plan.status, "ready");
+    const after = JSON.parse(plan.after.bytes);
+    assert.equal(after.permissions.allow.includes(unrelated), true);
+    const currentEntries = pipelineScriptsRunnerAllowlistEntries(dirname(fileURLToPath(import.meta.url)));
+    for (const entry of currentEntries) assert.equal(after.permissions.allow.includes(entry), true, entry);
+    for (const entry of oldEntries) assert.equal(after.permissions.allow.includes(entry), true, entry);
+    assert.equal(after.permissions.allow.some((entry) => entry.includes("/cache/pipeline-core/*")), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

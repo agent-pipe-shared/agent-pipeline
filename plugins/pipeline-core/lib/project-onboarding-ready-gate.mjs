@@ -12,6 +12,7 @@ import {
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
   RUNNER_PERMISSIONS_TARGET,
 } from "./project-onboarding-v3.mjs";
+import { SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA } from "../scripts/settings-allowlist-merge.mjs";
 import { isSessionCapabilityFailurePhase } from "./codex-onboarding-capabilities.mjs";
 
 export const PROJECT_ONBOARDING_READY_GATE_SCHEMA = "pipeline.project-onboarding-ready-gate.v1";
@@ -95,6 +96,7 @@ const READY_ONLY_RESULT_KEYS = PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS;
 const READY_RESULT_KEYS = Object.freeze([...BASE_RESULT_KEYS, ...READY_ONLY_RESULT_KEYS]);
 const SAFE_STATUS = /^[a-z][a-z0-9-]{0,79}$/u;
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const SETTINGS_ALLOWLIST_MERGE_SCRIPT = fileURLToPath(new URL("../scripts/settings-allowlist-merge.mjs", import.meta.url));
 
 export class ProjectOnboardingReadyError extends Error {
   constructor(code, message, { intent = null, lifecycleStatus = null, sessionCapabilityFailurePhase = null } = {}) {
@@ -130,15 +132,18 @@ function validRunnerPermissions(value, runner, repository) {
     || !Array.isArray(value.lanes)
     || !Array.isArray(value.exactEntries)) return false;
   if (value.status === "not-applicable") {
-    return runner === "codex"
-      && repository?.mode === "host-managed"
+    return ["codex", "antigravity"].includes(runner)
       && value.lanes.length === 0
       && value.exactEntries.length === 0;
   }
-  if (value.status !== "current"
-    || JSON.stringify(value.lanes) !== JSON.stringify(["Bash", "PowerShell"])
-    || JSON.stringify(value.exactEntries) !== JSON.stringify(expectedPipelineScriptsRunnerAllowlistEntries())) return false;
-  return true;
+  if (value.status === "current") {
+    return JSON.stringify(value.lanes) === JSON.stringify(["Bash", "PowerShell"])
+      && JSON.stringify(value.exactEntries) === JSON.stringify(expectedPipelineScriptsRunnerAllowlistEntries());
+  }
+  return ["drifted", "pending-runtime-initialization"].includes(value.status)
+    && runner === "claude"
+    && JSON.stringify(value.lanes) === JSON.stringify(["Bash", "PowerShell"])
+    && JSON.stringify(value.exactEntries) === JSON.stringify(expectedPipelineScriptsRunnerAllowlistEntries());
 }
 
 function validReadyExpected(value) {
@@ -188,10 +193,20 @@ function validVerifyCommandInput(value) {
     && value.rejectNul === true;
 }
 
-function validReadyNextAction(value) {
+function validReadyNextAction(value, root) {
   if (value === null) return true;
   if (validPlanLifecycleInspectCommand(value)) return true;
   if (validImplementationHandoverCommand(value)) return true;
+  if (exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && value.kind === "command"
+    && value.executable === "node"
+    && value.mutation === false
+    && value.requiresConfirmation === false
+    && Array.isArray(value.argv)
+    && JSON.stringify(value.argv) === JSON.stringify([SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", root])
+    && exactKeys(value.expected, ["schema", "statuses"])
+    && value.expected.schema === SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA
+    && JSON.stringify(value.expected.statuses) === JSON.stringify(["ready", "no-op", "unrepairable"])) return true;
   return exactKeys(value, [
     "kind", "input", "mutation", "requiresConfirmation", "guidance", "applyAction", "expected",
   ])
@@ -311,7 +326,7 @@ export function requireProjectOnboardingReady({
     || !plainObject(observed.continuity)
     || !plainObject(observed.appServer)
     || !validRunnerPermissions(observed.runnerPermissions, resolvedRunner, observed.repository)
-    || !validReadyNextAction(observed.nextAction)
+    || !validReadyNextAction(observed.nextAction, physicalRoot)
     || !Array.isArray(observed.diagnostics)
     || observed.diagnostics.length !== 0) {
     fail(

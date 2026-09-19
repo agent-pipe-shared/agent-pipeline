@@ -273,6 +273,42 @@ test("a real V4 ready observation carrying pushApprovalMode/trustAnchorAvailabil
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("ready gate keeps valid Claude cache drift optional while Codex and Antigravity stay settings-inapplicable", () => {
+  const path = root();
+  const settingsScript = fileURLToPath(new URL("../scripts/settings-allowlist-merge.mjs", import.meta.url));
+  try {
+    const claude = readyResultWithPushApprovalKeys(path, "session", "claude");
+    claude.runnerPermissions = {
+      ...claude.runnerPermissions,
+      status: "drifted",
+    };
+    claude.nextAction = {
+      kind: "command",
+      executable: "node",
+      argv: [settingsScript, "plan-runner-permissions", "--root", realpathSync(path)],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.settings-allowlist-merge-plan.v1",
+        statuses: ["ready", "no-op", "unrepairable"],
+      },
+    };
+    assert.deepEqual(requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "claude", inspect: () => claude }), {
+      schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session",
+    });
+
+    for (const runner of ["codex", "antigravity"]) {
+      const inapplicable = readyResultWithPushApprovalKeys(path, "session", runner);
+      inapplicable.runnerPermissions = {
+        target: ".claude/settings.local.json", status: "not-applicable", lanes: [], exactEntries: [],
+      };
+      assert.deepEqual(requireProjectOnboardingReady({ rootDir: path, intent: "session", runner, inspect: () => inapplicable }), {
+        schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session",
+      });
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("a ready observation may carry the producer's helpful design-to-implementation handover without becoming PORG-INVALID-OBSERVATION", () => {
   const path = root();
   try {
