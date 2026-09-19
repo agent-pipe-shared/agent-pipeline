@@ -15,6 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -311,6 +312,34 @@ test("v3 criticRequired is a valid pending lifecycle state but cannot mint autho
   const pending = verifyCommit(sha, deps);
   assert.equal(pending.verdict, VERDICT.unverifiable);
   assert.equal(pending.classification, "critic-evidence-pending");
+});
+
+test("v4 authored records preserve required-pending and reject non-authoring outcomes", () => {
+  const sha = "4".repeat(40);
+  const report = { text: "Done.", changedFiles: ["src/thing.mjs"] };
+  const authored = {
+    schema: "pipeline.dispatch-record.v4", taskId: "DOD-V4-REQUIRED", agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"), outcome: "completed",
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, commits: [sha], log: [], report,
+    criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" },
+  };
+  const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V4-REQUIRED (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  writeRecord("DOD-V4-REQUIRED", authored);
+  assert.equal(verifyCommit(sha, deps).classification, "critic-evidence-pending");
+
+  const readOnly = {
+    ...authored,
+    taskId: "DOD-V4-READONLY",
+    outcome: "read-only-completed",
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" },
+    commits: [],
+    criticSkip: skip(),
+  };
+  delete readOnly.criticRequired;
+  writeRecord("DOD-V4-READONLY", readOnly);
+  const readOnlyDeps = commit({ message: "feat(x): done\n\nDispatch: DOD-V4-READONLY (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  assert.equal(verifyCommit(sha, readOnlyDeps).classification, "record-outcome-does-not-attest-authorship");
 });
 
 test("actual paths reject false T5 and T0 while honest T1 required/evidence is accepted", () => {

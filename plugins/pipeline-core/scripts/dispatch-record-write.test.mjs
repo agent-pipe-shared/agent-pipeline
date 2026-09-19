@@ -3,20 +3,19 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { validateDispatchRecord } from "../lib/dispatch-record.mjs";
+import { reportSha256, validateDispatchRecord } from "../lib/dispatch-record.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { VERDICT, verifyCommit } from "./dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "./dispatch-record-write.mjs";
 import { CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 
 const SHA = "a".repeat(40);
-const RESULT_SHA = "d".repeat(64);
 const cases = [];
 function check(name, run) {
   cases.push({ id: `DRW${String(cases.length + 1).padStart(2, "0")}`, name, run });
 }
 const skip = { schema: CRITIC_SKIP_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T5", reason: "fast path" };
-function record(overrides = {}) { return { schema: "pipeline.dispatch-record.v3", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: RESULT_SHA, outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report: { text: "Done.", changedFiles: ["src/x.mjs"] }, criticSkip: skip, ...overrides }; }
+function record(overrides = {}) { const report = { text: "Done.", changedFiles: ["src/x.mjs"] }; return { schema: "pipeline.dispatch-record.v4", taskId: "NVA-WRITE-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: "b".repeat(40), resultSha256: reportSha256(report.text), outcome: "completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, commits: ["b".repeat(40)], log: [{ phase: "done", toolUseCount: 4 }], report, criticSkip: skip, ...overrides }; }
 function fixture(value = record(), target = `evidence/dispatch-record-${value.taskId}.json`) {
   const root = mkdtempSync(join(tmpdir(), "dispatch-record-write-"));
   mkdirSync(join(root, "evidence")); mkdirSync(join(root, "requests"));
@@ -26,7 +25,7 @@ function fixture(value = record(), target = `evidence/dispatch-record-${value.ta
 
 check("writer validates, atomically publishes exclusively, and returns matching readback digest", () => {
   const reportText = `  1. Result\n${"é".repeat(600)}\n\n2. Evidence\r\n\tcommand and output\r\n\n3. Changed files\n4. Deliberately NOT changed\n5. Deviations\n6. Open items  `;
-  const expected = record({ report: { text: reportText, changedFiles: ["src/x.mjs"] } });
+  const expected = record({ report: { text: reportText, changedFiles: ["src/x.mjs"] }, resultSha256: reportSha256(reportText) });
   const root = fixture(expected);
   try {
     const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" });
@@ -73,6 +72,23 @@ check("malformed, missing, computed and mismatched records fail before publicati
       assert.equal(existsSync(join(root, "evidence", "dispatch-record-NVA-WRITE-1.json")), false);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
+});
+
+check("writer emits a valid zero-commit read-only terminal record that authorship verification rejects", () => {
+  const report = { text: "Inspection complete; no files were authored.", changedFiles: [] };
+  const readOnly = record({ taskId: "NVA-WRITE-READONLY", outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], report, resultSha256: reportSha256(report.text) });
+  const root = fixture(readOnly);
+  try {
+    const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" });
+    const persisted = validateDispatchRecord(JSON.parse(readFileSync(join(root, receipt.target), "utf8")));
+    assert.deepEqual(persisted, readOnly);
+    const authorship = verifyCommit("b".repeat(40), {
+      readCommitMessage: () => "feat(x): done\n\nDispatch: NVA-WRITE-READONLY (goldfish)\nAI-Assisted: true\n",
+      readChangedPaths: () => [], readRecord: () => persisted,
+    });
+    assert.equal(authorship.verdict, VERDICT.fail);
+    assert.equal(authorship.classification, "record-outcome-does-not-attest-authorship");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 check("request and target aliases are rejected without following them", (t) => {
@@ -190,7 +206,7 @@ check("target replacement after hard-link admission is detected without reading 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 10, "the complete dispatch-record writer corpus must be registered before execution begins");
+assert.equal(cases.length, 11, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

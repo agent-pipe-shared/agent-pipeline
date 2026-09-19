@@ -30,6 +30,14 @@ function v3(taskId, disposition) {
     outcome: "in-progress", commits: [], log: [], report: null, ...disposition,
   };
 }
+function v4(taskId, disposition) {
+  return {
+    schema: "pipeline.dispatch-record.v4", taskId, agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+    rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null,
+    outcome: "in-progress", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    commits: [], log: [], report: null, ...disposition,
+  };
+}
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const evaluate = (root, paths = ["generated/output.json"]) => evaluateRepositoryCriticSkipCoverage({ root, readChangedPaths: () => paths });
 
@@ -82,6 +90,40 @@ test("required disposition remains valid but blocks coverage until evidence repl
   assert.equal(reviewed.ok, true);
   assert.equal(reviewed.requiredRecordCount, 0);
   assert.equal(reviewed.criticEvidenceRecordCount, 1);
+});
+
+test("v4 pending, skipped and evidenced records remain actual coverage consumers, while malformed v4 fails closed", () => {
+  const bytes = Buffer.from("Critic PASS for v4\n");
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const pendingRoot = fixture({
+    "evidence/dispatch-record-PENDING.json": json(v4("PENDING", { criticRequired: required() })),
+    "evidence/dispatch-record-SKIPPED.json": json(v4("SKIPPED", { criticSkip: skip() })),
+  });
+  const pending = evaluate(pendingRoot);
+  assert.equal(pending.ok, false);
+  assert.equal(pending.applicableRecordCount, 2);
+  assert.equal(pending.requiredRecordCount, 1);
+  assert.equal(pending.skipRecordCount, 1);
+
+  const coveredRoot = fixture({
+    "evidence/critic-V4.md": bytes,
+    "evidence/dispatch-record-SKIPPED.json": json(v4("SKIPPED", { criticSkip: skip() })),
+    "evidence/dispatch-record-EVIDENCED.json": json(v4("EVIDENCED", {
+      criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "EVIDENCED", candidateCommit: SHA, path: "evidence/critic-V4.md", sha256: digest },
+    })),
+  });
+  const covered = evaluate(coveredRoot);
+  assert.equal(covered.ok, true);
+  assert.equal(covered.applicableRecordCount, 2);
+  assert.equal(covered.skipRecordCount, 1);
+  assert.equal(covered.criticEvidenceRecordCount, 1);
+
+  const malformed = v4("MALFORMED", { criticSkip: skip() });
+  delete malformed.outcomeClassification;
+  const malformedRoot = fixture({ "evidence/dispatch-record-MALFORMED.json": json(malformed) });
+  const malformedResult = evaluate(malformedRoot);
+  assert.equal(malformedResult.ok, false);
+  assert.match(malformedResult.readFindings.join("\n"), /invalid v4 dispatch record/u);
 });
 
 test("false T5 decisions fail validation for A/G/S, high-risk and rigor triggers", () => {

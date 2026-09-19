@@ -8,7 +8,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CRITIC_SKIP_SCHEMA, criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
-import { DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, validateDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
+import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -84,13 +84,15 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
       }
       continue;
     }
-    if (record?.schema !== DISPATCH_RECORD_SCHEMA) {
+    const isV4 = record?.schema === DISPATCH_RECORD_SCHEMA;
+    const isV3 = record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA;
+    if (!isV3 && !isV4) {
       findings.push(`${path}: unsupported dispatch record schema ${JSON.stringify(record?.schema)}`);
       continue;
     }
     applicableRecordCount += 1;
-    try { validateDispatchRecord(record); }
-    catch (error) { findings.push(`${path}: invalid v3 dispatch record (${error.message})`); continue; }
+    try { isV4 ? validateDispatchRecord(record) : validatePreviousDispatchRecord(record); }
+    catch (error) { findings.push(`${path}: invalid ${isV4 ? "v4" : "v3"} dispatch record (${error.message})`); continue; }
     const disposition = criticDisposition(record);
     if (disposition === "skipped") {
       try {
@@ -121,10 +123,10 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     ok,
     finding: !ok,
     reason: ok
-      ? `${skipRecordCount} skipped and ${criticEvidenceRecordCount} evidenced v3 dispatch record(s); ${legacyRecordCount} pre-cutover record(s) preserved as legacy`
+      ? `${skipRecordCount} skipped and ${criticEvidenceRecordCount} evidenced v3/v4 dispatch record(s); ${legacyRecordCount} pre-cutover record(s) preserved as legacy`
       : findings.length > 0
-        ? `${findings.length} dispatch/evidence validation finding(s); ${uncoveredRecordCount} applicable v3 record(s) remain uncovered`
-        : `${uncoveredRecordCount} of ${applicableRecordCount} applicable v3 dispatch record(s) lack a valid per-record Critic disposition`,
+        ? `${findings.length} dispatch/evidence validation finding(s); ${uncoveredRecordCount} applicable v3/v4 record(s) remain uncovered`
+        : `${uncoveredRecordCount} of ${applicableRecordCount} applicable v3/v4 dispatch record(s) lack a valid per-record Critic disposition`,
     dispatchedWorkCount: applicableRecordCount,
     applicableRecordCount,
     legacyRecordCount,
@@ -145,7 +147,7 @@ function runCli() {
   }
   const result = evaluateRepositoryCriticSkipCoverage({ root: rootIndex === 0 ? args[1] : DEFAULT_ROOT });
   for (const finding of result.readFindings) process.stderr.write(`CRITIC-SKIP-COVERAGE ${finding}\n`);
-  process.stdout.write(`Critic-skip coverage: ${result.applicableRecordCount} applicable v3, ${result.skipRecordCount} skipped, ${result.requiredRecordCount} required-pending, ${result.criticEvidenceRecordCount} evidenced, ${result.legacyRecordCount} legacy (schema ${CRITIC_SKIP_SCHEMA}) -- ${result.reason}\n`);
+  process.stdout.write(`Critic-skip coverage: ${result.applicableRecordCount} applicable v3/v4, ${result.skipRecordCount} skipped, ${result.requiredRecordCount} required-pending, ${result.criticEvidenceRecordCount} evidenced, ${result.legacyRecordCount} legacy (schema ${CRITIC_SKIP_SCHEMA}) -- ${result.reason}\n`);
   if (!result.ok) process.exitCode = result.readFindings.some((finding) => /unreadable|invalid JSON/u.test(finding)) ? 2 : 1;
 }
 

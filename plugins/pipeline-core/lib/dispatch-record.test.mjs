@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { openSync } from "node:fs";
-import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, validateDispatchRecord, validateLegacyDispatchRecord } from "./dispatch-record.mjs";
+import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, reportSha256, validateDispatchRecord, validateLegacyDispatchRecord } from "./dispatch-record.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "./critic-skip-decision.mjs";
 
 const SHA = "a".repeat(40);
 const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
 const skip = () => ({ schema: CRITIC_SKIP_SCHEMA, trigger: trigger(), appliedRow: "T5", reason: "no mandatory review trigger" });
-const opening = () => ({ schema: "pipeline.dispatch-record.v3", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null, outcome: "in-progress", commits: [], log: [], report: null, criticSkip: skip() });
-const terminal = () => ({ ...opening(), candidateCommit: "b".repeat(40), resultSha256: "d".repeat(64), outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "verify", toolUseCount: 12, note: "focused checks passed" }], report: { text: "Done.", changedFiles: ["plugins/pipeline-core/lib/x.mjs - implementation", { path: "plugins/pipeline-core/lib/x.test.mjs" }] } });
+const opening = () => ({ schema: "pipeline.dispatch-record.v4", taskId: "NVA-B-1", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null, outcome: "in-progress", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, commits: [], log: [], report: null, criticSkip: skip() });
+const terminal = () => { const report = { text: "Done.", changedFiles: ["plugins/pipeline-core/lib/x.mjs - implementation", { path: "plugins/pipeline-core/lib/x.test.mjs" }] }; return { ...opening(), candidateCommit: "b".repeat(40), resultSha256: reportSha256(report.text), outcome: "completed", commits: ["b".repeat(40)], log: [{ phase: "verify", toolUseCount: 12, note: "focused checks passed" }], report }; };
+const withReport = (record, report) => ({ ...record, report, resultSha256: reportSha256(report.text) });
 
 const cases = [];
 function check(name, run) {
@@ -21,15 +22,15 @@ check("opening and terminal records share the strict closed contract", () => {
   assert.deepEqual(validateDispatchRecord(terminal()), terminal());
   assert.match(dispatchRecordSha256(terminal()), /^[a-f0-9]{64}$/u);
   const prose = `  1. Result\n${"é".repeat(600)}\n\n2. Evidence\r\n\tcommand and output\r\n\n3. Changed files\n4. Deliberately NOT changed\n5. Deviations\n6. Open items  `;
-  const record = terminal(); record.report = { ...record.report, text: prose };
+  const record = withReport(terminal(), { ...terminal().report, text: prose });
   assert.deepEqual(validateDispatchRecord(record), record);
   const exactUtf8Limit = "x".repeat(65_536);
   const multibyteAtLimit = "é".repeat(32_768);
   assert.equal(Buffer.byteLength(exactUtf8Limit, "utf8"), 65_536);
   assert.equal(Buffer.byteLength(multibyteAtLimit, "utf8"), 65_536);
   assert.equal(multibyteAtLimit.length < 65_536, true);
-  assert.deepEqual(validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: exactUtf8Limit } }).report.text, exactUtf8Limit);
-  assert.deepEqual(validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: multibyteAtLimit } }).report.text, multibyteAtLimit);
+  assert.deepEqual(validateDispatchRecord(withReport(terminal(), { ...terminal().report, text: exactUtf8Limit })).report.text, exactUtf8Limit);
+  assert.deepEqual(validateDispatchRecord(withReport(terminal(), { ...terminal().report, text: multibyteAtLimit })).report.text, multibyteAtLimit);
   const unsafeC0 = [...Array.from({ length: 9 }, (_, index) => index), 11, 12, ...Array.from({ length: 18 }, (_, index) => index + 14)];
   for (const text of ["", "   ", "bare\rreturn", "x".repeat(65_537), "é".repeat(32_769), ...unsafeC0.map((index) => `before${String.fromCharCode(index)}after`)]) {
     assert.throws(() => validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text } }));
@@ -38,12 +39,13 @@ check("opening and terminal records share the strict closed contract", () => {
 });
 check("v2 is explicit read-only legacy evidence while v3 requires exactly one Critic disposition", () => {
   const legacy = { ...opening(), schema: "pipeline.dispatch-record.v2" };
+  delete legacy.outcomeClassification;
   delete legacy.criticSkip;
   assert.deepEqual(validateLegacyDispatchRecord(legacy), legacy);
   for (const text of ["legacy\nmultiline", "x".repeat(1_025)]) {
     assert.throws(() => validateLegacyDispatchRecord({ ...terminal(), schema: "pipeline.dispatch-record.v2", report: { ...terminal().report, text } }));
   }
-  assert.throws(() => validateDispatchRecord(legacy), (error) => error?.code === "record-schema");
+  assert.throws(() => validateDispatchRecord(legacy));
   const missing = opening(); delete missing.criticSkip;
   assert.throws(() => validateDispatchRecord(missing), (error) => error?.code === "record-critic-disposition");
   assert.throws(() => validateDispatchRecord({ ...opening(), criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "NVA-B-1", candidateCommit: SHA, path: "evidence/critic-NVA-B-1.json", sha256: "e".repeat(64) } }), (error) => error?.code === "record-critic-disposition");
@@ -84,6 +86,28 @@ check("terminality and legacy briefing/path extraction retain verifier semantics
   assert.deepEqual(missingBriefingFields({ model: "x", rulesetSha: "y", report: {} }), ["report"]);
   assert.deepEqual(declaredPaths(terminal()), ["plugins/pipeline-core/lib/x.mjs", "plugins/pipeline-core/lib/x.test.mjs"]);
 });
+
+check("a truthful terminal read-only record may bind its inspected candidate without inventing a commit", () => {
+  const readOnly = terminal();
+  readOnly.outcomeClassification = { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" };
+  readOnly.commits = [];
+  readOnly.outcome = "read-only-completed";
+  assert.doesNotThrow(() => validateDispatchRecord(readOnly));
+});
+
+check("v4 outcome classification rejects fiction, contradictions and stale report bindings", () => {
+  const readOnly = terminal();
+  readOnly.outcomeClassification = { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" };
+  readOnly.commits = [];
+  readOnly.outcome = "read-only-completed";
+  for (const value of [
+    { ...readOnly, commits: [readOnly.candidateCommit] },
+    { ...readOnly, outcome: "completed" },
+    { ...readOnly, resultSha256: "d".repeat(64) },
+    { ...readOnly, outcomeClassification: undefined },
+    { ...readOnly, outcomeClassification: { schema: "bad", kind: "read-only" } },
+  ]) assert.throws(() => validateDispatchRecord(value));
+});
 check("missing, unknown and malformed fields fail closed", () => {
   for (const value of [
     { ...opening(), model: "" }, { ...opening(), effort: "" }, { ...opening(), candidateCommit: "abc" },
@@ -115,9 +139,10 @@ check("durable prose rejects private Unix, Windows and WSL absolute paths", () =
   assert.doesNotThrow(() => validateDispatchRecord({
     ...terminal(),
     report: { text: "repo-relative neighbors root, rooted, private/var, and private/variant are fine", changedFiles: ["root/private/file.mjs", "rooted/file.mjs", "private/var/cache.txt", "private/variant/cache.txt"] },
+    resultSha256: reportSha256("repo-relative neighbors root, rooted, private/var, and private/variant are fine"),
   }));
   const safe = "  leading\tcontent\r\ntrailing  ";
-  assert.equal(validateDispatchRecord({ ...terminal(), report: { ...terminal().report, text: safe } }).report.text, safe);
+  assert.equal(validateDispatchRecord(withReport(terminal(), { ...terminal().report, text: safe })).report.text, safe);
   for (const text of ["log\nnote", "x".repeat(1_025)]) {
     assert.throws(() => validateDispatchRecord({ ...terminal(), log: [{ phase: "done", toolUseCount: 1, note: text }] }));
   }
@@ -175,7 +200,7 @@ check("every persisted string lane rejects Unix, Windows, WSL and UNC private pa
   }
 });
 
-assert.equal(cases.length, 10, "the complete dispatch-record corpus must be registered before execution begins");
+assert.equal(cases.length, 12, "the complete dispatch-record corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

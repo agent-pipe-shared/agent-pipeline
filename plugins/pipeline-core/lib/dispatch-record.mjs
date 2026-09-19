@@ -2,8 +2,11 @@
 import { createHash } from "node:crypto";
 import { CRITIC_EVIDENCE_SCHEMA, CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, validateCriticDecision } from "./critic-skip-decision.mjs";
 
-export const DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v3";
+export const DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v4";
+export const PREVIOUS_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v3";
 export const LEGACY_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v2";
+export const OUTCOME_CLASSIFICATION_SCHEMA = "pipeline.dispatch-outcome-classification.v1";
+export const OUTCOME_CLASSIFICATIONS = Object.freeze(["authored-commit", "read-only", "stopped-without-commit"]);
 export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
 export const SAFE_TASK_ID = /^[A-Za-z0-9._-]+$/u;
 const FULL_COMMIT = /^[a-f0-9]{40}$/u;
@@ -13,6 +16,7 @@ const TOP_LEVEL_KEYS = Object.freeze([
   "schema", "taskId", "agentType", "model", "effort", "rulesetSha", "dispatcher", "candidateCommit",
   "resultSha256", "outcome", "commits", "log", "report", "modelOverride", "criticSkip", "criticRequired", "criticEvidence", "orchestratorAddedFiles",
 ]);
+const V4_TOP_LEVEL_KEYS = Object.freeze([...TOP_LEVEL_KEYS, "outcomeClassification"]);
 
 function fail(code, message) {
   const error = new Error(message); error.code = code; throw error;
@@ -54,6 +58,8 @@ export function isTerminalOutcome(outcome) {
   const normalized = outcome.trim().toLowerCase();
   return normalized !== "" && !NON_TERMINAL_OUTCOMES.includes(normalized);
 }
+export function reportSha256(text) { return createHash("sha256").update(text, "utf8").digest("hex"); }
+export function isCommitAuthorshipOutcome(record) { return record?.outcomeClassification?.kind === "authored-commit"; }
 export function isNonEmptyValue(value) {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.trim() !== "";
@@ -121,15 +127,16 @@ function strictPathList(value, label) {
   if (new Set(paths).size !== paths.length) fail("record-path", `${label} contains duplicate paths`);
 }
 
-function validateRecord(record, { legacy }) {
+function validateRecord(record, { legacy, v3 = false }) {
   const required = TOP_LEVEL_KEYS.slice(0, 13);
-  const allowed = legacy ? TOP_LEVEL_KEYS.filter((key) => !["criticRequired", "criticEvidence"].includes(key)) : TOP_LEVEL_KEYS;
-  exactKeys(record, allowed, "dispatch record", required);
+  const allowed = legacy ? TOP_LEVEL_KEYS.filter((key) => !["criticRequired", "criticEvidence"].includes(key)) : v3 ? TOP_LEVEL_KEYS : V4_TOP_LEVEL_KEYS;
+  const requiredKeys = legacy || v3 ? required : [...required, "outcomeClassification"];
+  exactKeys(record, allowed, "dispatch record", requiredKeys);
   // This record is durable evidence. Apply the privacy invariant to every
   // persisted string before field-specific syntax and compatibility checks so
   // no newly added or annotation-bearing string lane can bypass it.
   denyPrivateAbsolutePaths(record, "dispatch record");
-  const expectedSchema = legacy ? LEGACY_DISPATCH_RECORD_SCHEMA : DISPATCH_RECORD_SCHEMA;
+  const expectedSchema = legacy ? LEGACY_DISPATCH_RECORD_SCHEMA : v3 ? PREVIOUS_DISPATCH_RECORD_SCHEMA : DISPATCH_RECORD_SCHEMA;
   if (record.schema !== expectedSchema) fail("record-schema", `dispatch record schema must be ${expectedSchema}`);
   if (!isSafeTaskId(record.taskId)) fail("record-task-id", "dispatch record taskId is unsafe");
   for (const [key, value] of [["agentType", record.agentType], ["model", record.model], ["effort", record.effort], ["rulesetSha", record.rulesetSha], ["dispatcher", record.dispatcher]]) nonempty(value, key);
@@ -138,10 +145,10 @@ function validateRecord(record, { legacy }) {
   if (record.resultSha256 !== null && (typeof record.resultSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(record.resultSha256))) fail("record-result", "resultSha256 must be null or a lowercase SHA-256 digest");
   if (typeof record.outcome !== "string" || !/^[a-z][a-z0-9-]*$/u.test(record.outcome)) fail("record-outcome", "outcome must be a lowercase slug");
   if (!Array.isArray(record.commits) || record.commits.length > 256 || record.commits.some((sha) => !FULL_COMMIT.test(sha)) || new Set(record.commits).size !== record.commits.length) fail("record-commit", "commits must be unique full lowercase commit SHAs");
-  if (isTerminalOutcome(record.outcome) && (record.commits.length === 0 || record.commits.at(-1) !== record.candidateCommit)) {
+  if ((legacy || v3) && isTerminalOutcome(record.outcome) && (record.commits.length === 0 || record.commits.at(-1) !== record.candidateCommit)) {
     fail("record-commit-binding", "terminal dispatch record requires candidateCommit as the final commits entry");
   }
-  if (isTerminalOutcome(record.outcome) && record.resultSha256 === null) fail("record-result", "terminal dispatch record requires resultSha256");
+  if ((legacy || v3) && isTerminalOutcome(record.outcome) && record.resultSha256 === null) fail("record-result", "terminal dispatch record requires resultSha256");
   if (!Array.isArray(record.log) || record.log.length > 2048) fail("record-log", "log must be a bounded array");
   record.log.forEach((entry, index) => {
     exactKeys(entry, ["phase", "toolUseCount", "note"], `log[${index}]`, ["phase", "toolUseCount"]);
@@ -155,7 +162,22 @@ function validateRecord(record, { legacy }) {
     else reportText(record.report.text, "report.text");
     strictPathList(record.report.changedFiles, "report.changedFiles");
     if (Object.hasOwn(record.report, "orchestratorAddedFiles")) strictPathList(record.report.orchestratorAddedFiles, "report.orchestratorAddedFiles");
-  } else if (isTerminalOutcome(record.outcome)) fail("record-report", "terminal dispatch record requires report");
+  } else if ((legacy || v3) && isTerminalOutcome(record.outcome)) fail("record-report", "terminal dispatch record requires report");
+  if (!legacy && !v3) {
+    exactKeys(record.outcomeClassification, ["schema", "kind"], "outcomeClassification");
+    if (record.outcomeClassification.schema !== OUTCOME_CLASSIFICATION_SCHEMA || !OUTCOME_CLASSIFICATIONS.includes(record.outcomeClassification.kind)) fail("record-outcome-classification", "outcomeClassification is invalid");
+    const terminal = isTerminalOutcome(record.outcome);
+    const kind = record.outcomeClassification.kind;
+    if (kind === "authored-commit") {
+      if (terminal && (record.commits.length === 0 || record.commits.at(-1) !== record.candidateCommit)) fail("record-commit-binding", "authored-commit terminal record requires candidateCommit as the final commits entry");
+    } else {
+      const expectedOutcome = kind === "read-only" ? "read-only-completed" : "stopped-without-commit";
+      if (!terminal || record.outcome !== expectedOutcome) fail("record-outcome-classification", `${kind} classification requires outcome ${expectedOutcome}`);
+      if (record.commits.length !== 0) fail("record-commit-binding", `${kind} record must not declare commits`);
+    }
+    if (terminal && (record.resultSha256 === null || record.report === null)) fail("record-result", "terminal dispatch record requires resultSha256 and report");
+    if (terminal && record.resultSha256 !== reportSha256(record.report.text)) fail("record-result-binding", "resultSha256 must bind the exact report.text UTF-8 bytes");
+  }
   if (Object.hasOwn(record, "orchestratorAddedFiles")) strictPathList(record.orchestratorAddedFiles, "orchestratorAddedFiles");
   if (Object.hasOwn(record, "modelOverride")) {
     exactKeys(record.modelOverride, ["model", "effort", "rationale"], "modelOverride");
@@ -192,7 +214,13 @@ function validateRecord(record, { legacy }) {
   return structuredClone(record);
 }
 
-export function validateDispatchRecord(record) { return validateRecord(record, { legacy: false }); }
+export function validateDispatchRecord(record) {
+  return record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA
+    ? validateRecord(record, { legacy: false, v3: true })
+    : validateRecord(record, { legacy: false });
+}
+
+export function validatePreviousDispatchRecord(record) { return validateRecord(record, { legacy: false, v3: true }); }
 
 export function validateLegacyDispatchRecord(record) {
   return validateRecord(record, { legacy: true });

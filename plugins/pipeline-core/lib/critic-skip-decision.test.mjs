@@ -125,11 +125,11 @@ test("numeric coverage requires the sum of individually evidenced and skipped re
   assert.equal(evaluateCriticSkipCoverage({ dispatchedWorkCount: 0, criticArtifactCount: 0, skipRecordCount: 0 }).finding, false);
 });
 
-test("records-based coverage uses only v3 as the forward cutover and preserves v2 as legacy", () => {
+test("records-based coverage includes v3 and v4 while preserving v2 as legacy", () => {
   const records = [
     { schema: "pipeline.dispatch-record.v2", taskId: "LEGACY" },
     { schema: "pipeline.dispatch-record.v3", taskId: "A", criticSkip: skip },
-    { schema: "pipeline.dispatch-record.v3", taskId: "B", criticEvidence: evidence },
+    { schema: "pipeline.dispatch-record.v4", taskId: "B", criticEvidence: evidence },
   ];
   assert.equal(evaluateCriticSkipCoverageFromRecords({ records }).finding, false);
   const uncovered = [...records, { schema: "pipeline.dispatch-record.v3", taskId: "C" }];
