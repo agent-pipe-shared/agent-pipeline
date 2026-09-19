@@ -246,6 +246,71 @@ test("normal bootstrap reports a real greenfield scaffold as design-pending rath
   assert.equal(result.architectureOrientation.nextAction.mutation, false);
 });
 
+// Architecture orientation is carried by the one normal preflight envelope,
+// not by a runner-specific prose hint.  Re-entering an existing project must
+// therefore preserve the same non-mutating Brownfield proposal for every
+// supported session carrier.  The two passes model a first SessionStart and a
+// later resume: preflight has no event-specific escape hatch, so either pass
+// becoming different would strand one entry route without the proposal.
+test("Brownfield architecture orientation is identical and actionable on fresh entry and resume for Claude, Codex, and Antigravity", () => {
+  const cwd = "/projects/current";
+  const orientation = {
+    schema: "pipeline.architecture-adoption-orientation.v1",
+    status: "adoption-required",
+    root: cwd,
+    adoption: { state: "adoption-required", scope: null, decisionRef: null, coverageClass: "unavailable", confidence: "estimated" },
+    physicalMap: { greenfieldScaffold: false, status: "not-classified" },
+    guidance: "Review the staged read-only adoption proposal with the PO before implementation.",
+  };
+  const runners = [
+    { name: "codex", env: { CODEX_SESSION_ID: "codex-entry" }, list: pluginList() },
+    { name: "claude", env: { CLAUDECODE: "1" }, list: claudePluginList("0.4.5+test") },
+    {
+      name: "antigravity",
+      env: { ANTIGRAVITY_AGENT: "1" },
+      list: pluginList(),
+      antigravity: () => ({
+        schema: "pipeline.antigravity-hard-enforcement-observation.v1",
+        observed: true,
+        freshWindowMs: 1,
+        warning: null,
+      }),
+    },
+  ];
+  const proposals = [];
+  for (const entry of ["fresh", "resume"]) {
+    for (const runner of runners) {
+      let observedCalls = 0;
+      assert.equal(resolveActiveRunner({ env: runner.env }), runner.name);
+      const result = preflight({
+        env: { ...runner.env, PIPELINE_TEST_ENTRY: entry },
+        pluginList: runner.list,
+        read: () => manifest,
+        cwd,
+        observeAntigravityHardEnforcementFn: runner.antigravity,
+        requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }),
+        observeArchitectureAdoptionOrientationFn: ({ rootDir }) => {
+          observedCalls += 1;
+          assert.equal(rootDir, cwd);
+          return orientation;
+        },
+      });
+      assert.equal(observedCalls, 1, `${runner.name}/${entry}: orientation is read exactly once from the normal entry envelope`);
+      // Runner distribution checks may legitimately differ (the Antigravity
+      // adapter has its own enforcement attestation), but an unresolved
+      // architecture estate must never become a bootstrap status. It is an
+      // orientation plus a later implementation-boundary concern.
+      assert.ok(["ready", "plugin-refresh-required"].includes(result.status), `${runner.name}/${entry}: ${result.status}`);
+      assert.equal(result.architectureOrientation.status, "adoption-required");
+      assert.equal(result.architectureOrientation.nextAction.mutation, false);
+      assert.equal(result.architectureOrientation.nextAction.requiresConfirmation, false);
+      assert.deepEqual(result.architectureOrientation.nextAction.expected, { schema: "pipeline.adoption-proposal.v1" });
+      proposals.push(result.architectureOrientation.nextAction);
+    }
+  }
+  for (const proposal of proposals.slice(1)) assert.deepEqual(proposal, proposals[0]);
+});
+
 // NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
 // runnable.md). Before this dispatch the bootstrap's own `nextAction` named the bare
 // `inspect` for a not-yet-onboarded project too -- the one place the pipeline-start skill
