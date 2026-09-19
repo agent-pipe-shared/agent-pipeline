@@ -90,15 +90,17 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
   return Object.freeze({ schema: "pipeline.audit-bundle-build-receipt.v1", status: "built", bundleId: plan.bundleId, outputPath, manifestSha256: digest(bytes), candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256 });
 }
 
-export async function verifyAuditBundle({ bundleRoot } = {}) {
+export function verifyAuditBundleSync({ bundleRoot } = {}) {
   const root = resolve(bundleRoot ?? ""); let manifest;
-  try { manifest = parseStrictJson(await readFile(join(root, "manifest.json"))); } catch { return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: "invalid", findings: Object.freeze(["AB-MANIFEST"]) }); }
+  try { manifest = parseStrictJson(readFileSync(join(root, "manifest.json"))); } catch { return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: "invalid", findings: Object.freeze(["AB-MANIFEST"]) }); }
   const findings = []; const hasExport = hasExportMetadata(manifest); const hasReadme = Object.hasOwn(manifest, "readmeSha256");
   if (!exact(manifest, hasExport ? (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"]) : (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"])) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || !Array.isArray(manifest.artifacts) || (hasExport && !exportMetadataShape(manifest.exportMetadata)) || (hasReadme && !SHA.test(manifest.readmeSha256))) findings.push("AB-MANIFEST");
-  if (hasReadme) { try { if (digest(await readFile(join(root, "README.md"))) !== manifest.readmeSha256) findings.push("AB-README-DIGEST"); } catch { findings.push("AB-README"); } }
-  for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(await readFile(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
+  if (hasReadme) { try { if (digest(readFileSync(join(root, "README.md"))) !== manifest.readmeSha256) findings.push("AB-README-DIGEST"); } catch { findings.push("AB-README"); } }
+  for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(readFileSync(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
   return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: findings.length ? "invalid" : "verified", candidate: manifest.candidate ?? null, findings: Object.freeze(findings) });
 }
+
+export async function verifyAuditBundle(options = {}) { return verifyAuditBundleSync(options); }
 
 async function signatureRequest(bundleRoot) {
   const root = resolve(bundleRoot ?? ""); let bytes; let manifest;
