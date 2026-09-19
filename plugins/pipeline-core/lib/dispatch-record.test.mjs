@@ -50,6 +50,20 @@ check("required Critic disposition is valid while pending and must be replaced b
   complete.criticEvidence = { schema: "pipeline.critic-evidence-reference.v1", taskId: complete.taskId, candidateCommit: complete.candidateCommit, path: "evidence/critic-NVA-B-1.json", sha256: "e".repeat(64) };
   assert.deepEqual(validateDispatchRecord(complete), complete);
 });
+check("no-delivery is terminal observation only and cannot claim delivery or automatic Critic skip", () => {
+  const noDelivery = terminal();
+  noDelivery.outcome = "completed-no-delivery";
+  noDelivery.commits = [];
+  noDelivery.report = { text: "Observed no delivered changes.", changedFiles: [], orchestratorAddedFiles: [] };
+  delete noDelivery.criticSkip;
+  noDelivery.criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" };
+  assert.deepEqual(validateDispatchRecord(noDelivery), noDelivery);
+  assert.throws(() => validateDispatchRecord({ ...noDelivery, commits: ["b".repeat(40)] }), (error) => error?.code === "record-no-delivery");
+  assert.throws(() => validateDispatchRecord({ ...noDelivery, report: { ...noDelivery.report, changedFiles: ["src/x.mjs"] } }), (error) => error?.code === "record-no-delivery");
+  const automaticSkip = { ...noDelivery, criticSkip: skip() };
+  delete automaticSkip.criticRequired;
+  assert.throws(() => validateDispatchRecord(automaticSkip), (error) => error?.code === "record-no-delivery");
+});
 check("skip cannot falsely claim T5 when A/G/S, high-risk or rigor triggers require review", () => {
   for (const triggerInput of [
     trigger({ diff: { mechanical: false, architecture: true, guardrails: false, security: false } }),
@@ -158,7 +172,7 @@ check("every persisted string lane rejects Unix, Windows, WSL and UNC private pa
   }
 });
 
-assert.equal(cases.length, 10, "the complete dispatch-record corpus must be registered before execution begins");
+assert.equal(cases.length, 11, "the complete dispatch-record corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

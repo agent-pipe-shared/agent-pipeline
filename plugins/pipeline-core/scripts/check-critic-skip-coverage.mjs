@@ -8,7 +8,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CRITIC_SKIP_SCHEMA, criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
-import { DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, validateDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
+import { DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, isNoDeliveryOutcome, validateDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -75,6 +75,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
   let skipRecordCount = 0;
   let requiredRecordCount = 0;
   let criticEvidenceRecordCount = 0;
+  let noDeliveryRecordCount = 0;
   for (const entry of scan.records) {
     const { path, record } = entry;
     if (legacySchema(record)) {
@@ -92,6 +93,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     try { validateDispatchRecord(record); }
     catch (error) { findings.push(`${path}: invalid v3 dispatch record (${error.message})`); continue; }
     const disposition = criticDisposition(record);
+    if (isNoDeliveryOutcome(record.outcome)) noDeliveryRecordCount += 1;
     if (disposition === "skipped") {
       try {
         const pathFinding = criticDecisionPathFinding(record.criticSkip, readChangedPaths(record));
@@ -121,7 +123,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     ok,
     finding: !ok,
     reason: ok
-      ? `${skipRecordCount} skipped and ${criticEvidenceRecordCount} evidenced v3 dispatch record(s); ${legacyRecordCount} pre-cutover record(s) preserved as legacy`
+      ? `${skipRecordCount} skipped and ${criticEvidenceRecordCount} evidenced v3 dispatch record(s); ${noDeliveryRecordCount} no-delivery record(s) remain separately classified; ${legacyRecordCount} pre-cutover record(s) preserved as legacy`
       : findings.length > 0
         ? `${findings.length} dispatch/evidence validation finding(s); ${uncoveredRecordCount} applicable v3 record(s) remain uncovered`
         : `${uncoveredRecordCount} of ${applicableRecordCount} applicable v3 dispatch record(s) lack a valid per-record Critic disposition`,
@@ -130,6 +132,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     legacyRecordCount,
     criticArtifactCount: criticEvidenceRecordCount,
     criticEvidenceRecordCount,
+    noDeliveryRecordCount,
     requiredRecordCount,
     skipRecordCount,
     readFindings: findings,

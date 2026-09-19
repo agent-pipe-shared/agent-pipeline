@@ -116,12 +116,12 @@ import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import {
   DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
-  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
+  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, isNoDeliveryOutcome, missingBriefingFields,
   validateDispatchRecord, validateLegacyDispatchRecord,
 } from "../lib/dispatch-record.mjs";
 export {
   NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
-  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
+  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, isNoDeliveryOutcome, missingBriefingFields,
 };
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -529,6 +529,16 @@ export function verifyCommit(sha, deps) {
       "record-v2-nonbinding",
       `record for \`${taskId}\` is readable legacy v2 evidence but cannot bind a newly verified delivery; a v3 disposition is required`,
       { taskId },
+    );
+  }
+  const noDelivery = isV3 && isNoDeliveryOutcome(record.outcome);
+  if (noDelivery) {
+    return result(
+      sha,
+      VERDICT.unverifiable,
+      "no-delivery-no-authorship",
+      `record for \`${taskId}\` is a truthful no-delivery terminal outcome and cannot attribute authorship to commit \`${sha}\``,
+      { taskId, declaredShas: [] },
     );
   }
   if (isV3 && criticDisposition(record) === "required") {

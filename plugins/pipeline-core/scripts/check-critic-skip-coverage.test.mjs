@@ -84,6 +84,19 @@ test("required disposition remains valid but blocks coverage until evidence repl
   assert.equal(reviewed.criticEvidenceRecordCount, 1);
 });
 
+test("no-delivery is counted separately and pending Critic still blocks coverage", () => {
+  const record = {
+    ...v3("NO-DELIVERY", { criticRequired: required() }),
+    outcome: "completed-no-delivery", resultSha256: "d".repeat(64), commits: [],
+    report: { text: "No delivered changes.", changedFiles: [], orchestratorAddedFiles: [] },
+  };
+  const result = evaluate(fixture({ "evidence/dispatch-record-NO-DELIVERY.json": json(record) }));
+  assert.equal(result.ok, false);
+  assert.equal(result.noDeliveryRecordCount, 1);
+  assert.equal(result.requiredRecordCount, 1);
+  assert.match(result.readFindings.join("\n"), /Critic is required/u);
+});
+
 test("false T5 decisions fail validation for A/G/S, high-risk and rigor triggers", () => {
   const variants = [
     trigger({ diff: { mechanical: false, architecture: true, guardrails: false, security: false } }),

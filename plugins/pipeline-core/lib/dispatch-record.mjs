@@ -6,6 +6,7 @@ export const DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v3";
 export const CLOSING_ALLOWANCE_SCHEMA = "pipeline.dispatch-closing-allowance.v1";
 export const LEGACY_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v2";
 export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
+export const NO_DELIVERY_OUTCOME = "completed-no-delivery";
 export const SAFE_TASK_ID = /^[A-Za-z0-9._-]+$/u;
 const FULL_COMMIT = /^[a-f0-9]{40}$/u;
 const SAFE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:+/@-]{0,255}$/u;
@@ -51,6 +52,7 @@ export function isTerminalOutcome(outcome) {
   const normalized = outcome.trim().toLowerCase();
   return normalized !== "" && !NON_TERMINAL_OUTCOMES.includes(normalized);
 }
+export function isNoDeliveryOutcome(outcome) { return outcome === NO_DELIVERY_OUTCOME; }
 export function isNonEmptyValue(value) {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.trim() !== "";
@@ -135,7 +137,8 @@ function validateRecord(record, { legacy }) {
   if (record.resultSha256 !== null && (typeof record.resultSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(record.resultSha256))) fail("record-result", "resultSha256 must be null or a lowercase SHA-256 digest");
   if (typeof record.outcome !== "string" || !/^[a-z][a-z0-9-]*$/u.test(record.outcome)) fail("record-outcome", "outcome must be a lowercase slug");
   if (!Array.isArray(record.commits) || record.commits.length > 256 || record.commits.some((sha) => !FULL_COMMIT.test(sha)) || new Set(record.commits).size !== record.commits.length) fail("record-commit", "commits must be unique full lowercase commit SHAs");
-  if (isTerminalOutcome(record.outcome) && (record.commits.length === 0 || record.commits.at(-1) !== record.candidateCommit)) {
+  if (isNoDeliveryOutcome(record.outcome) && record.commits.length !== 0) fail("record-no-delivery", "no-delivery terminal record must not claim authored commits");
+  if (isTerminalOutcome(record.outcome) && !isNoDeliveryOutcome(record.outcome) && (record.commits.length === 0 || record.commits.at(-1) !== record.candidateCommit)) {
     fail("record-commit-binding", "terminal dispatch record requires candidateCommit as the final commits entry");
   }
   if (isTerminalOutcome(record.outcome) && record.resultSha256 === null) fail("record-result", "terminal dispatch record requires resultSha256");
@@ -151,6 +154,11 @@ function validateRecord(record, { legacy }) {
     durableText(record.report.text, "report.text");
     strictPathList(record.report.changedFiles, "report.changedFiles");
     if (Object.hasOwn(record.report, "orchestratorAddedFiles")) strictPathList(record.report.orchestratorAddedFiles, "report.orchestratorAddedFiles");
+    if (isNoDeliveryOutcome(record.outcome)
+      && (record.report.changedFiles.length !== 0
+        || (Object.hasOwn(record.report, "orchestratorAddedFiles") && record.report.orchestratorAddedFiles.length !== 0))) {
+      fail("record-no-delivery", "no-delivery terminal record must have empty delivered and orchestrator paths");
+    }
   } else if (isTerminalOutcome(record.outcome)) fail("record-report", "terminal dispatch record requires report");
   if (Object.hasOwn(record, "orchestratorAddedFiles")) strictPathList(record.orchestratorAddedFiles, "orchestratorAddedFiles");
   if (Object.hasOwn(record, "closingAllowance")) {
@@ -195,6 +203,9 @@ function validateRecord(record, { legacy }) {
   if (!legacy) {
     const dispositions = Number(Object.hasOwn(record, "criticSkip")) + Number(Object.hasOwn(record, "criticRequired")) + Number(Object.hasOwn(record, "criticEvidence"));
     if (dispositions !== 1) fail("record-critic-disposition", "dispatch record v3 requires exactly one of criticSkip, criticRequired or criticEvidence");
+    if (isNoDeliveryOutcome(record.outcome) && Object.hasOwn(record, "criticSkip")) {
+      fail("record-no-delivery", "no-delivery terminal record cannot claim an automatic criticSkip");
+    }
   }
   return structuredClone(record);
 }

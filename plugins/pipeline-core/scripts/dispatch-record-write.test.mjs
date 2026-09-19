@@ -7,7 +7,7 @@ import { validateDispatchRecord } from "../lib/dispatch-record.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { VERDICT, verifyCommit } from "./dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "./dispatch-record-write.mjs";
-import { CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 
 const SHA = "a".repeat(40);
 const RESULT_SHA = "d".repeat(64);
@@ -41,6 +41,21 @@ check("writer validates, atomically publishes exclusively, and returns matching 
     assert.equal(authorship.verdict, VERDICT.pass);
     assert.equal(authorship.classification, "bound");
     assert.throws(() => writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" }), /already exists/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("writer persists no-delivery without manufacturing a commit or delivery path", () => {
+  const value = record({ taskId: "NVA-NO-DELIVERY", outcome: "completed-no-delivery", commits: [], report: { text: "No delivery.", changedFiles: [], orchestratorAddedFiles: [] }, criticSkip: undefined, criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" } });
+  const root = fixture(value);
+  try {
+    const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" });
+    const persisted = validateDispatchRecord(JSON.parse(readFileSync(join(root, receipt.target))));
+    assert.equal(persisted.outcome, "completed-no-delivery");
+    assert.deepEqual(persisted.commits, []);
+    assert.deepEqual(persisted.report.changedFiles, []);
+    const authorship = verifyCommit(value.candidateCommit, { readCommitMessage: () => "docs(x): diagnostic\n\nDispatch: NVA-NO-DELIVERY (goldfish)\nAI-Assisted: true\n", readChangedPaths: () => ["src/x.mjs"], readRecord: () => persisted });
+    assert.equal(authorship.verdict, VERDICT.unverifiable);
+    assert.equal(authorship.classification, "no-delivery-no-authorship");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -187,7 +202,7 @@ check("target replacement after hard-link admission is detected without reading 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 10, "the complete dispatch-record writer corpus must be registered before execution begins");
+assert.equal(cases.length, 11, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

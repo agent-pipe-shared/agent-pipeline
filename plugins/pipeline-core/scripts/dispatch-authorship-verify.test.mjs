@@ -343,6 +343,22 @@ test("v3 criticRequired is a valid pending lifecycle state but cannot mint autho
   assert.equal(pending.classification, "critic-evidence-pending");
 });
 
+test("no-delivery terminal records never attribute a commit", () => {
+  const sha = "6".repeat(40);
+  const record = {
+    schema: "pipeline.dispatch-record.v3", taskId: "DOD-NO-DELIVERY", agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed-no-delivery", commits: [], log: [],
+    report: { text: "No delivered changes.", changedFiles: [], orchestratorAddedFiles: [] },
+    criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" },
+  };
+  writeRecord("DOD-NO-DELIVERY", record);
+  const deps = commit({ message: "docs(x): diagnostic only\n\nDispatch: DOD-NO-DELIVERY (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  const verdict = verifyCommit(sha, deps);
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "no-delivery-no-authorship");
+});
+
 test("actual paths reject false T5 and T0 while honest T1 required/evidence is accepted", () => {
   const sha = "7".repeat(40);
   const base = {
