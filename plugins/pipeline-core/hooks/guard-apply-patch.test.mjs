@@ -400,16 +400,14 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
     assert.equal(readFileSync(scratchPath, "utf8"), scratchBytes);
     const postAuthoring = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
     assert.equal(postAuthoring.status, "bootstrap-binding-required", JSON.stringify(postAuthoring));
-    assert.equal(postAuthoring.nextAction?.kind, "command", JSON.stringify(postAuthoring));
-    assert.equal(postAuthoring.nextAction.argv[1], "bootstrap-acknowledge-plan");
-    assert.deepEqual(postAuthoring.nextAction.argv.slice(2, 4), ["--root", created.root], JSON.stringify(postAuthoring));
-    assert.deepEqual(postAuthoring.nextAction.argv.slice(4), ["--activate", "--runner", "codex"]);
-    assert.equal(postAuthoring.nextAction.requiresConfirmation, false);
-    assert.equal(postAuthoring.nextAction.expected?.schema, "pipeline.bootstrap-plan-acknowledgement-plan.v1");
-    assert.deepEqual(postAuthoring.nextAction.expected?.statuses, ["signature-required"]);
-    // Bootstrap binding is deliberately earlier than plan approval. This test
-    // proves its bounded authoring window and returns only the signature
-    // planner; it never fabricates the marker or a binding approval.
+    assert.equal(postAuthoring.nextAction?.kind, "architecture-design-required", JSON.stringify(postAuthoring));
+    assert.equal(postAuthoring.nextAction.code, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", JSON.stringify(postAuthoring));
+    assert.equal(postAuthoring.nextAction.prdPath, prd, JSON.stringify(postAuthoring));
+    assert.equal(postAuthoring.nextAction.specPath, spec, JSON.stringify(postAuthoring));
+    // Staging authoring is deliberately earlier than architecture design,
+    // acknowledgement, binding and plan approval. This native path must keep
+    // admitting the bounded draft writes while returning the current explicit
+    // design stop; it never fabricates a design package or PO acknowledgement.
     assert.notEqual(postAuthoring.status, "ready");
     const markerDenial = nativeDenial(
       runNativeCodexPatchGuard(
