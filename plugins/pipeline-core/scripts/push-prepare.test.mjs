@@ -173,14 +173,15 @@ test("resolveVerifyRemedy (D1): resolves from the project's own calibration veri
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
     readFile: () => JSON.stringify({ verify: "node custom/verify.mjs" }),
   });
-  assert.equal(remedy, "node custom/verify.mjs  # regenerates evidence/verify-latest.json");
+  assert.match(remedy, /verify-evidence-producer\.mjs.*--prepare/u);
+  assert.match(remedy, /node custom\/verify\.mjs --mode push --base <verified-base>/u);
 });
 
 test("resolveVerifyRemedy (D2): no calibration resolves -> honest degradation, never a source-only path", () => {
   const remedy = resolveVerifyRemedy(FIXTURE_DIR, "evidence/verify-latest.json", {
     resolveAuthorityArtifactPath: () => ({ exists: false }),
   });
-  assert.match(remedy, /calibrated verify command/);
+  assert.match(remedy, /calibrated verify/);
   assert.match(remedy, /does not define one/);
   assert.doesNotMatch(remedy, /harness\//);
 });
@@ -190,7 +191,7 @@ test("resolveVerifyRemedy (D2): calibration present but no verify key -> honest 
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
     readFile: () => JSON.stringify({ project: "consumer-project" }),
   });
-  assert.match(remedy, /calibrated verify command/);
+  assert.match(remedy, /calibrated verify/);
   assert.doesNotMatch(remedy, /harness\//);
 });
 
@@ -199,7 +200,7 @@ test("resolveVerifyRemedy (D2): unreadable calibration -> honest degradation, ne
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
     readFile: () => { throw new Error("ENOENT"); },
   });
-  assert.match(remedy, /calibrated verify command/);
+  assert.match(remedy, /calibrated verify/);
   assert.doesNotMatch(remedy, /harness\//);
 });
 
@@ -212,7 +213,8 @@ test("checkEvidenceFreshness (D1): remedy comes from the injected calibration re
     resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
   });
   assert.equal(result.ok, false);
-  assert.equal(result.remedy, "node custom/verify.mjs  # regenerates evidence/verify-latest.json");
+  assert.match(result.remedy, /verify-evidence-producer\.mjs.*--prepare/u);
+  assert.match(result.remedy, /node custom\/verify\.mjs --mode push --base <verified-base>/u);
 });
 
 test("checkPushThreatModel: absent -> ok:false with materialize remedy; present -> ok:true", () => {

@@ -150,13 +150,14 @@ export function resolveVerifyRemedy(dir, relPath, deps = {}) {
       const raw = (deps.readFile ?? readFileSync)(artifact.path, "utf8");
       const parsed = JSON.parse(raw);
       if (typeof parsed?.verify === "string" && parsed.verify.trim() !== "") {
-        return `${parsed.verify}  # regenerates ${relPath}`;
+        const producer = `node ${JSON.stringify(new URL("./verify-evidence-producer.mjs", import.meta.url).pathname)} --root ${JSON.stringify(dir)} --prepare`;
+        return `${producer}  # review and commit the generated adapter, then run: ${parsed.verify} --mode push --base <verified-base> to regenerate ${relPath}`;
       }
     }
   } catch {
     // absent/unreadable/malformed calibration -- fall through to the honest degradation below.
   }
-  return `run this project's own calibrated verify command  # its calibration does not define one; regenerates ${relPath}`;
+  return `node ${JSON.stringify(new URL("./verify-evidence-producer.mjs", import.meta.url).pathname)} --root ${JSON.stringify(dir)} --prepare  # review and commit the generated adapter; then run this project's calibrated verify with --mode push --base <verified-base> to regenerate ${relPath}`;
 }
 
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
