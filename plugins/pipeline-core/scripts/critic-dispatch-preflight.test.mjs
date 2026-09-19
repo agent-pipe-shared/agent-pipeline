@@ -15,6 +15,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
+import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { produceCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
+
+function verifyValue(commit, tree, exitCode = 0) {
+  return { schema: "pipeline.verify-evidence.v0", commit, tree, exitCode, steps: [{ name: "fixture-check", exitCode }], selection: planVerifySelection({ mode: "critic", candidateCommit: commit, registeredSuiteIds: ["fixture-check"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["fixture-check"], areas: [{ id: "all", paths: ["**"], suites: ["fixture-check"] }] } }) };
+}
 
 function git(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
@@ -43,9 +49,9 @@ function fixture() {
   writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nchanged\n");
   const candidate = commit(root, "candidate");
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
-  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
-  writeFileSync(join(root, "evidence", "verify-root.json"), `${JSON.stringify({ commit: candidate, tree })}\n`);
-  writeFileSync(join(root, "evidence", "verify-canonical.json"), `${JSON.stringify({ commit: candidate, tree, candidate: { start: { status: "clean" }, finish: { status: "clean" }, binding: "exact" } })}\n`);
+  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
+  writeFileSync(join(root, "evidence", "verify-root.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
+  writeFileSync(join(root, "evidence", "verify-canonical.json"), `${JSON.stringify({ ...verifyValue(candidate, tree), candidate: { start: { status: "clean" }, finish: { status: "clean" }, binding: "exact" } })}\n`);
   writeFileSync(join(root, "evidence", "prior-critic.json"), `${JSON.stringify({ candidate: { commit: base, tree: git(root, ["rev-parse", `${base}^{tree}`]) } })}\n`);
   return { root, base, candidate, tree };
 }
@@ -94,7 +100,7 @@ test("reviewer input uses an empty governance-directory list when the manifest d
   writeFileSync(join(fx.root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
   const candidate = commit(fx.root, "remove optional governance block");
   const tree = git(fx.root, ["rev-parse", "HEAD^{tree}"]);
-  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
   const result = preflightCriticDispatch(input(fx, { base: fx.candidate, candidate }));
   assert.equal(result.dispatch.reviewerInput.rulesetSha, candidate);
   assert.deepEqual(result.dispatch.reviewerInput.governanceConstraintPaths, []);
@@ -118,7 +124,7 @@ function traceabilityCandidate(fx, { soundToggle = true, mapOverride = null } = 
   writeFileSync(join(fx.root, "specs", "spec.requirements.json"), `${JSON.stringify(map)}\n`);
   const candidate = commit(fx.root, "traceable candidate");
   const tree = git(fx.root, ["rev-parse", `${candidate}^{tree}`]);
-  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
   return { candidate, tree };
 }
 
@@ -188,7 +194,7 @@ test("current-artifact preflight binds an unchanged artifact to the later candid
   writeFileSync(join(fx.root, "governance", "policies", "checklist.md"), "- verify\n- later correction\n");
   const candidate = commit(fx.root, "later unrelated correction");
   const tree = git(fx.root, ["rev-parse", "HEAD^{tree}"]);
-  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
   const result = preflightCriticDispatch({
     root: fx.root, candidate, reviewScope: { kind: "current-artifacts", paths: ["specs/spec.md"] },
     specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"],
@@ -214,7 +220,7 @@ test("current-artifact preflight keeps evidence small while admitting bounded la
   writeFileSync(join(fx.root, "specs", "large.md"), "x".repeat((1024 * 1024) + 1));
   const candidate = commit(fx.root, "large candidate source");
   const tree = git(fx.root, ["rev-parse", "HEAD^{tree}"]);
-  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
   const result = preflightCriticDispatch({
     root: fx.root, candidate, reviewScope: { kind: "current-artifacts", paths: ["specs/large.md"] },
     specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"],
@@ -248,6 +254,42 @@ test("accepts canonical Verify evidence whose candidate field is only a run-stat
   assert.equal(result.evidence[0].candidate.commit, fx.candidate);
 });
 
+test("first Critic admits actual failed targeted diagnostics with full Verify not-run; arbitrary JSON and tampering fail", () => {
+  const fx = fixture();
+  try {
+    const value = produceCriticDiagnostic({ root: fx.root, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"], command: [process.execPath, "-e", "console.log('targeted failure detail'); process.exit(1)"], logPath: "evidence/targeted.log" });
+    const evidencePath = join(fx.root, "evidence/diagnostics.json");
+    writeFileSync(evidencePath, JSON.stringify(value));
+    const call = () => preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/diagnostics.json"] }));
+    const result = call();
+    assert.equal(result.status, "packet-ready");
+    assert.equal(result.evidence[0].diagnostic.fullVerify, "not-run");
+    assert.equal(result.evidence[0].diagnostic.targeted.status, "failed");
+    for (const mutate of [v => { v.candidate.tree = "f".repeat(40); }, v => { v.spec.sha256 = "f".repeat(64); }, v => { v.targeted.log.sha256 = "f".repeat(64); }, v => { v.guardrails = []; }]) {
+      const altered = structuredClone(value); mutate(altered); writeFileSync(evidencePath, JSON.stringify(altered));
+      assert.throws(call);
+    }
+    writeFileSync(evidencePath, JSON.stringify({ candidate: value.candidate }));
+    assert.throws(call, error => error.code === "CDP-EVIDENCE-SCHEMA");
+    writeFileSync(evidencePath, JSON.stringify(value));
+    rmSync(join(fx.root, value.targeted.log.path));
+    assert.throws(call);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("failed canonical Verify admits review without satisfying final qualification", () => {
+  const fx = fixture();
+  try {
+    const failed = verifyValue(fx.candidate, fx.tree, 1);
+    writeFileSync(join(fx.root, "evidence/verify.json"), JSON.stringify(failed));
+    assert.equal(preflightCriticDispatch(input(fx)).evidence[0].diagnostic.status, "failed");
+    for (const boundary of ["candidate", "push", "release"]) assert.equal(verifyEvidenceSatisfiesBoundary(failed, boundary), false);
+    failed.selection = { ...failed.selection, selectionSha256: "f".repeat(64) };
+    writeFileSync(join(fx.root, "evidence/verify.json"), JSON.stringify(failed));
+    assert.throws(() => preflightCriticDispatch(input(fx)), error => error.code === "CDP-EVIDENCE-MODE");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 /**
  * A repository whose entire history is one commit -- the normal state of a
  * project that just adopted the Pipeline and produced its first feature
@@ -269,7 +311,7 @@ function singleCommitFixture() {
   writeFileSync(join(root, "specs", "spec.md"), "# Spec\n");
   const candidate = commit(root, "root commit");
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
-  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
   const emptyTree = spawnSync("git", ["-C", root, "hash-object", "-t", "tree", "--stdin"], { input: "", encoding: "utf8" });
   assert.equal(isSuccessfulSpawn(emptyTree), true, `git hash-object: ${String(emptyTree.stderr)}`);
   const base = String(emptyTree.stdout).trim();

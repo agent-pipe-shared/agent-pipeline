@@ -11,7 +11,7 @@
  * runner, so a packet-ready result is deliberately not a spawn authorization.
  */
 import { createHash } from "node:crypto";
-import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { CRITIC_DIAGNOSTIC_SCHEMA, inspectCriticVerifyDiagnostic, validateCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
 import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -224,7 +224,7 @@ function localEvidence(root, path) {
   return readFileSync(absolute);
 }
 
-function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path) {
+function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path, root, spec, guardrails) {
   let value;
   try { value = JSON.parse(bytes); } catch { fail("CDP-EVIDENCE-JSON", `Evidence is not JSON: ${path}`); }
   // Verify evidence uses the candidate at its root, whereas Security and gate
@@ -237,10 +237,17 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path) 
   if (!isObject(binding) || binding.commit !== candidateCommit || binding.tree !== candidateTree) {
     fail("CDP-EVIDENCE-BINDING", `Evidence is missing or stale for the exact candidate: ${path}`);
   }
-  if (value?.schema === "pipeline.verify-evidence.v0" && !verifyEvidenceSatisfiesBoundary(value, "critic")) {
-    fail("CDP-EVIDENCE-MODE", `Verify evidence was not produced for the Critic boundary: ${path}`);
+  let diagnostic;
+  try {
+    const candidate = { commit: candidateCommit, tree: candidateTree };
+    if (value?.schema === "pipeline.verify-evidence.v0") diagnostic = inspectCriticVerifyDiagnostic(value, candidate);
+    else if (value?.schema === CRITIC_DIAGNOSTIC_SCHEMA) diagnostic = validateCriticDiagnostic(value, { root, candidate, spec, guardrails });
+    else fail("CDP-EVIDENCE-SCHEMA", `Unsupported evidence schema: ${path}`);
+  } catch (error) {
+    if (error instanceof CriticDispatchPreflightError) throw error;
+    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode: error.code ?? "CDI-INVALID" });
   }
-  return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree } };
+  return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree }, diagnostic };
 }
 
 function requiredCandidateReadback(root, candidate, byPath, paths, label) {
@@ -335,7 +342,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   sourceSpecSha256 = specReadback.sha256;
   const guardrailReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, allGuardrails, "guardrail");
   stage = "evidence";
-  const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path));
+  const evidenceReadback = evidence.map((path) => matchingCandidateEvidence(localEvidence(realRoot, path), candidateCommit, candidateTree, path, realRoot, specReadback, guardrailReadback));
   stage = "prior-evidence";
   const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
   const sourceCoverage = scope === null ? null : currentArtifactCoverage(realRoot, candidateCommit, byPath, scope);
