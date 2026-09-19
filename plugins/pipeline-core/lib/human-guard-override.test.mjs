@@ -841,9 +841,15 @@ test("WP-B2-1: createBriefedTestChangeAuthorization lifecycle, query, and eligib
     assert.equal(matched.admitted, true);
     assert.equal(matched.authorization.briefingDigest, briefingDigest);
 
-    // Admission check without briefingDigest: admitted for active target
+    // A brief must carry its exact mandatory digest; omission is fail-closed.
     const admittedNoDigest = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest: null });
-    assert.equal(admittedNoDigest.admitted, true);
+    assert.equal(admittedNoDigest.admitted, false);
+    assert.equal(admittedNoDigest.code, "BRIEFING-DIGEST-REQUIRED");
+
+    // Malformed and different digests are both fail-closed.
+    const malformedDigest = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest: "not-a-digest" });
+    assert.equal(malformedDigest.admitted, false);
+    assert.equal(malformedDigest.code, "BRIEFING-DIGEST-INVALID");
 
     // Admission check with mismatching briefingDigest: refused
     const mismatched = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest: "b".repeat(64) });
@@ -853,6 +859,29 @@ test("WP-B2-1: createBriefedTestChangeAuthorization lifecycle, query, and eligib
     // Admission check with different target: refused
     const differentTarget = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath: "plugins/pipeline-core/hooks/guard-testpath.test.mjs", briefingDigest });
     assert.equal(differentTarget.admitted, false);
+
+    // Prefix/suffix lookalikes must never match the exact canonical target.
+    const prefixTarget = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath: "plugins/pipeline-core/hooks/prefix-guard-git.test.mjs", briefingDigest });
+    assert.equal(prefixTarget.admitted, false);
+    const nestedTarget = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath: "nested/plugins/pipeline-core/hooks/guard-git.test.mjs", briefingDigest });
+    assert.equal(nestedTarget.admitted, false);
+
+    // The same in-repository file admits through its absolute spelling too.
+    const absoluteTarget = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath: join(root, targetPath), briefingDigest });
+    assert.equal(absoluteTarget.admitted, true);
+    const traversalTarget = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath: "plugins/pipeline-core/hooks/../../../../outside.test.mjs", briefingDigest });
+    assert.equal(traversalTarget.admitted, false);
+    const outsideTarget = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath: join(dirname(root), "outside.test.mjs"), briefingDigest });
+    assert.equal(outsideTarget.admitted, false);
+
+    // A malformed expiry cannot grant an otherwise matching authorization.
+    const records = readdirSync(join(root, ".git", "agent-pipeline", "human-guard-overrides", "briefed-authorizations"));
+    const recordPath = join(root, ".git", "agent-pipeline", "human-guard-overrides", "briefed-authorizations", records[0]);
+    const record = JSON.parse(readFileSync(recordPath, "utf8"));
+    record.expiry = "not-a-date";
+    writeFileSync(recordPath, JSON.stringify(record));
+    const malformedExpiry = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest });
+    assert.equal(malformedExpiry.admitted, false);
 
     // Expired check: not admitted
     const expiredCheck = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest, nowMs: Date.now() + 1000000 });

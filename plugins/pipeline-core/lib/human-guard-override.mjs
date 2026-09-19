@@ -4443,6 +4443,31 @@ export function briefedAuthorizationId(targetPath, briefingDigest) {
   return sha(`${norm}:${briefingDigest}`);
 }
 
+function canonicalBriefedTarget(rootDir, targetPath, spawn = spawnSync) {
+  if (typeof targetPath !== "string" || targetPath.trim() === "" || targetPath.includes("\0")) return null;
+  let repo;
+  try { repo = topology(rootDir, spawn); }
+  catch {
+    try { repo = controlPathTopology(rootDir); }
+    catch { return null; }
+  }
+  const raw = targetPath.replace(/\\/g, "/");
+  const absolute = resolve(repo.root, raw);
+  const rel = relative(repo.root, absolute).replace(/\\/g, "/");
+  if (rel === "" || rel === "." || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return null;
+  // Existing symlinks are resolved before admission so an in-root spelling cannot
+  // authorize a target that actually escapes the repository.
+  try {
+    const physical = realpathSync(absolute);
+    const physicalRel = relative(repo.root, physical).replace(/\\/g, "/");
+    if (physicalRel === ".." || physicalRel.startsWith("../") || isAbsolute(physicalRel)) return null;
+  } catch {
+    // A brief may name a not-yet-created test file; its lexical in-root path is
+    // still canonical and remains exact-match bound.
+  }
+  return rel;
+}
+
 export function createBriefedTestChangeAuthorization({
   rootDir,
   targetPath,
@@ -4466,7 +4491,10 @@ export function createBriefedTestChangeAuthorization({
     fail("HGO-BRIEFED-EXPIRY-INVALID", "expiry must be a future timestamp or ISO date string");
   }
 
-  const normTarget = targetPath.replace(/\\/g, "/");
+  const normTarget = canonicalBriefedTarget(rootDir, targetPath, spawn);
+  if (normTarget === null) {
+    fail("HGO-BRIEFED-TARGET-INVALID", "targetPath must resolve to an in-repository path");
+  }
   let repo;
   try { repo = topology(rootDir, spawn); }
   catch {
@@ -4578,11 +4606,12 @@ export function readActiveBriefedTestAuthorizations({
         const content = readFileSync(join(paths.briefedAuthorizations, name), "utf8");
         const rec = JSON.parse(content);
         if (rec?.schema !== BRIEFED_TEST_AUTHORIZATION_SCHEMA || rec?.kind !== BRIEFED_TEST_CHANGE_KIND) continue;
-        if (typeof rec.expiresAtMs === "number" && rec.expiresAtMs <= nowMs) continue;
-        if (typeof rec.expiry === "string" && Date.parse(rec.expiry) <= nowMs) continue;
+        if (typeof rec.expiresAtMs !== "number" || !Number.isFinite(rec.expiresAtMs)) continue;
+        if (typeof rec.expiry !== "string" || !Number.isFinite(Date.parse(rec.expiry))) continue;
+        if (rec.expiresAtMs <= nowMs || Date.parse(rec.expiry) <= nowMs) continue;
         if (normTarget !== null) {
-          const recNorm = String(rec.targetPath ?? "").replace(/\\/g, "/");
-          if (recNorm !== normTarget && !normTarget.endsWith(recNorm) && !recNorm.endsWith(normTarget)) continue;
+          const recNorm = canonicalBriefedTarget(rootDir, rec.targetPath, spawn);
+          if (recNorm === null || recNorm !== normTarget) continue;
         }
         if (briefingDigest !== null && rec.briefingDigest !== briefingDigest) continue;
         results.push(rec);
@@ -4600,17 +4629,21 @@ export function checkBriefedTestChangeAdmitted({
   spawn = spawnSync,
 } = {}) {
   if (!targetPath) return { admitted: false, code: "NO-TARGET" };
-  const norm = targetPath.replace(/\\/g, "/");
+  if (typeof briefingDigest !== "string" || briefingDigest.length === 0) {
+    return { admitted: false, code: "BRIEFING-DIGEST-REQUIRED" };
+  }
+  if (!SHA256.test(briefingDigest)) {
+    return { admitted: false, code: "BRIEFING-DIGEST-INVALID" };
+  }
+  const norm = canonicalBriefedTarget(rootDir, targetPath, spawn);
+  if (norm === null) return { admitted: false, code: "TARGET-INVALID" };
   const active = readActiveBriefedTestAuthorizations({ rootDir, targetPath: norm, nowMs, spawn });
   if (active.length === 0) {
     return { admitted: false, code: "NO-AUTHORIZATION" };
   }
-  if (briefingDigest !== null && typeof briefingDigest === "string") {
-    const match = active.find((a) => a.briefingDigest === briefingDigest);
-    if (match) return { admitted: true, authorization: match };
-    return { admitted: false, code: "BRIEFING-DIGEST-MISMATCH" };
-  }
-  return { admitted: true, authorization: active[0] };
+  const match = active.find((a) => a.briefingDigest === briefingDigest);
+  if (match) return { admitted: true, authorization: match };
+  return { admitted: false, code: "BRIEFING-DIGEST-MISMATCH" };
 }
 
 export function isBriefedTestChangeEligible(filePath, { rootDir = null, livePluginRoot = null } = {}) {
