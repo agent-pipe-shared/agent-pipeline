@@ -86,6 +86,8 @@ import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER, validatePoGateAuthorityForRepositor
 import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 import { isDirectInvocation } from "./entrypoint.mjs";
 import { requireProjectOnboardingReady } from "./project-onboarding-ready-gate.mjs";
+import { materializeArchitectureDesignFixture } from "./architecture-design-test-fixture.mjs";
+import { inspectArchitectureEntryReadiness } from "./architecture-entry-readiness.mjs";
 
 // CLI-shaped cases use the same production PATH discovery as onboarding.
 // Publish an explicit physical test runtime so the hermetic five-tool CI PATH
@@ -263,6 +265,7 @@ export const fakeDeps = {
     };
   },
 };
+
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
@@ -4418,6 +4421,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
       rootDir: path, profile: "feature", featureId: "gated-work", planPath: prdPath,
       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
     };
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-GATED-DESIGN" });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");
@@ -4519,9 +4523,12 @@ test("the public onboarding handover is executable for every runner with baselin
         rootDir: path, profile: "feature", featureId: `handover-${runner}`, planPath: prdPath,
         prdPath, specPath, designInputPath, runner, deps: localDeps,
       };
+      materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}` });
       const planned = planProjectOnboardingKickoffPromotionV4(promotion);
       const promoted = applyProjectOnboardingKickoffPromotionV4({ ...promotion, planSha256: planned.planSha256, activate: true });
       assert.equal(promoted.status, "ready");
+      const architectureReadiness = inspectArchitectureEntryReadiness({ rootDir: path });
+      assert.equal(architectureReadiness.status, "ready", `${runner}: design materialization must satisfy the real entry gate: ${JSON.stringify(architectureReadiness)}`);
 
       let tick = 0;
       const state = (argv) => {
@@ -4617,10 +4624,16 @@ test("the public onboarding handover is executable for every runner with baselin
       // again, and prove configured verify retains the exact historical command.
       const reopened = state(["reopen-design", "--by", "po"]);
       assert.equal(reopened.code, 0, `${runner}: reopen: ${reopened.stderr}`);
+      // Reopening design changes the governed lifecycle projection.  Re-bind
+      // the real architecture adoption authority to that new projection; do
+      // not weaken the production profile-drift check to accommodate a stale
+      // fixture receipt.
+      materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}-CONFIGURED` });
       approve();
       const configuredPhase = state(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand]);
       assert.equal(configuredPhase.code, 0, `${runner}: configure verify: ${configuredPhase.stderr}`);
       assert.equal(state(["reopen-design", "--by", "po"]).code, 0);
+      materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}-REENTRY` });
       approve();
       const configured = publicInspect();
       assert.equal(configured.nextAction?.kind, "command");
@@ -4628,6 +4641,8 @@ test("the public onboarding handover is executable for every runner with baselin
       assert.deepEqual(configured.nextAction.argv, [PIPELINE_STATE_SCRIPT, "set-phase", "--phase", "implementation"]);
       assert.equal(configured.nextAction.mutation, true);
       assert.equal(configured.nextAction.requiresConfirmation, true);
+      const configuredArchitectureReadiness = inspectArchitectureEntryReadiness({ rootDir: path });
+      assert.equal(configuredArchitectureReadiness.status, "ready", `${runner}: re-entered design must retain architecture readiness: ${JSON.stringify(configuredArchitectureReadiness)}`);
       const secondPhase = state(configured.nextAction.argv.slice(1));
       assert.equal(secondPhase.code, 0, `${runner}: configured apply: ${secondPhase.stderr}`);
       assert.equal(reenterDriver().outcome, "ready", `${runner}: configured re-entry`);
@@ -4700,6 +4715,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
       rootDir: path, profile: "feature", featureId: "projdrift-work", planPath: prdPath,
       prdPath, specPath, designInputPath, runner, deps: localDeps,
     };
+    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROJDRIFT-DESIGN" });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner, ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");
@@ -6624,7 +6640,7 @@ test("shared close-evidence continuity damage self-repairs end to end through th
   } finally { dispose(path); }
 });
 
-test("closed feature re-entry stays ready through the sanctioned set-feature transition", () => {
+test("legacy close-feature refusal preserves a ready feature for the coordinator-backed finish-feature lifecycle", () => {
   const path = root();
   try {
     const barrier = initializeRestartRequiredRoot(path);
@@ -6645,32 +6661,6 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
       shell: false,
       env: { ...process.env, CLAUDE_PROJECT_DIR: path },
     });
-    const startWithoutDescriptor = () => {
-      let output = "";
-      let descriptorStarts = 0;
-      const status = sessionCleanupCli(["start", "--repo", path], {}, {
-        requireProjectOnboardingReadyFn() {
-          return {
-            schema: "pipeline.project-onboarding-ready-gate.v1",
-            status: "ready",
-            intent: "session",
-          };
-        },
-        readOnboardingSessionCleanupBindingFn(options) {
-          return readOnboardingSessionCleanupBinding({ ...options, spawn: fakeGit });
-        },
-        listActiveSessionDescriptorsFn() { return []; },
-        startSessionDescriptorFn() {
-          descriptorStarts += 1;
-          throw new Error("transition boundary must not create a descriptor");
-        },
-        writeFn(value) { output += value; },
-      });
-      assert.equal(status, 0);
-      assert.equal(descriptorStarts, 0);
-      return JSON.parse(output);
-    };
-
     const initial = runStateCommand(
       "set-feature",
       "--id", "previous-feature",
@@ -6685,34 +6675,20 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
     assert.equal(designBeforeClose.status, "ready");
     assert.equal(designBeforeClose.continuity.status, "valid");
 
-    const closedByWriter = runStateCommand("close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact");
-    assert.equal(closedByWriter.status, 0, closedByWriter.stderr);
-    const closed = inspectProjectOnboardingV3({ runner: "codex",
+    const statePath = join(path, "project", "pipeline-state.json");
+    const beforeLegacyClose = readFileSync(statePath, "utf8");
+    const legacyClose = runStateCommand("close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact");
+    assert.equal(legacyClose.status, 2, legacyClose.stderr);
+    assert.match(legacyClose.stderr, /CLOSE-AUDIT-MIGRATION-REQUIRED/u);
+    assert.equal(readFileSync(statePath, "utf8"), beforeLegacyClose,
+      "the legacy close path must not mutate State while finish-feature owns the coordinator-backed close lifecycle");
+    const afterLegacyRefusal = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: fakeDeps,
     });
-    assert.equal(closed.status, "ready");
-    assert.equal(closed.continuity.status, "valid");
-    assert.deepEqual(startWithoutDescriptor(), {
-      ok: true,
-      code: "WT-SESSION-NOT-REQUIRED",
-      bindingStatus: "closed-unbound",
-    });
-
-    const selected = runStateCommand(
-      "set-feature",
-      "--id", "next-feature",
-      "--plan-path", "specs/next/prd.md",
-    );
-    assert.equal(selected.status, 0, selected.stderr);
-    const design = inspectProjectOnboardingV3({ runner: "codex",
-      rootDir: path,
-      intent: "bootstrap",
-      deps: fakeDeps,
-    });
-    assert.equal(design.status, "ready");
-    assert.equal(design.continuity.status, "valid");
+    assert.equal(afterLegacyRefusal.status, "ready");
+    assert.equal(afterLegacyRefusal.continuity.status, "valid");
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: path, spawn: fakeGit }).status, "unbound");
   } finally {
     dispose(path);
