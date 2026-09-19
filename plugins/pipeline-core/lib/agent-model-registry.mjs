@@ -90,7 +90,10 @@ export function modelBelongsToFamily(concreteModel, tierAlias) {
   const normalizedTier = String(tierAlias ?? "").trim().toLowerCase();
   if (normalizedModel === "" || normalizedTier === "") return false;
   const prefixes = MODEL_FAMILY_ALIASES[normalizedTier] ?? [normalizedTier];
-  return prefixes.some((prefix) => normalizedModel.includes(prefix));
+  return prefixes.some((prefix) => {
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    return new RegExp(`^${escapedPrefix}(?:$|[-_.:])`, "u").test(normalizedModel);
+  });
 }
 
 /**

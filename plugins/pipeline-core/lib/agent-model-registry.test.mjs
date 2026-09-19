@@ -48,6 +48,15 @@ test("modelBelongsToFamily: a concrete claude-sonnet-* identifier belongs to the
   assert.equal(modelBelongsToFamily("claude-opus-5", "sonnet"), false);
 });
 
+test("modelBelongsToFamily: supported aliases and concrete forms require a token boundary", () => {
+  for (const family of ["sonnet", "opus", "haiku"]) {
+    assert.equal(modelBelongsToFamily(family, family), true);
+    assert.equal(modelBelongsToFamily(`claude-${family}-5`, family), true);
+    assert.equal(modelBelongsToFamily(`not-a-model-${family}`, family), false);
+    assert.equal(modelBelongsToFamily(`claude-${family}ish`, family), false);
+  }
+});
+
 test("modelBelongsToFamily is the discriminating check the incident needed: opus vs. sonnet, xhigh unchanged", () => {
   // The exact incident shape: briefed "claude-opus-5 at xhigh" against a sonnet/xhigh agent.
   // Effort (xhigh) matches on both sides; model family is what silently diverged.
