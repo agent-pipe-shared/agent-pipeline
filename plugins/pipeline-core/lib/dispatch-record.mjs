@@ -7,6 +7,7 @@ export const PREVIOUS_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v3";
 export const LEGACY_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v2";
 export const OUTCOME_CLASSIFICATION_SCHEMA = "pipeline.dispatch-outcome-classification.v1";
 export const OUTCOME_CLASSIFICATIONS = Object.freeze(["authored-commit", "read-only", "stopped-without-commit"]);
+const RESERVED_NON_AUTHORING_OUTCOMES = Object.freeze({ "read-only-completed": "read-only", "stopped-without-commit": "stopped-without-commit" });
 export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
 export const SAFE_TASK_ID = /^[A-Za-z0-9._-]+$/u;
 const FULL_COMMIT = /^[a-f0-9]{40}$/u;
@@ -169,9 +170,10 @@ function validateRecord(record, { legacy, v3 = false }) {
     const terminal = isTerminalOutcome(record.outcome);
     const kind = record.outcomeClassification.kind;
     if (kind === "authored-commit") {
+      if (Object.hasOwn(RESERVED_NON_AUTHORING_OUTCOMES, record.outcome)) fail("record-outcome-classification", `authored-commit classification must not use reserved outcome ${record.outcome}`);
       if (terminal && (record.commits.length === 0 || record.commits.at(-1) !== record.candidateCommit)) fail("record-commit-binding", "authored-commit terminal record requires candidateCommit as the final commits entry");
     } else {
-      const expectedOutcome = kind === "read-only" ? "read-only-completed" : "stopped-without-commit";
+      const expectedOutcome = Object.entries(RESERVED_NON_AUTHORING_OUTCOMES).find(([, classification]) => classification === kind)?.[0];
       if (!terminal || record.outcome !== expectedOutcome) fail("record-outcome-classification", `${kind} classification requires outcome ${expectedOutcome}`);
       if (record.commits.length !== 0) fail("record-commit-binding", `${kind} record must not declare commits`);
     }

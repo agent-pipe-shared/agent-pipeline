@@ -87,15 +87,19 @@ check("terminality and legacy briefing/path extraction retain verifier semantics
   assert.deepEqual(declaredPaths(terminal()), ["plugins/pipeline-core/lib/x.mjs", "plugins/pipeline-core/lib/x.test.mjs"]);
 });
 
-check("a truthful terminal read-only record may bind its inspected candidate without inventing a commit", () => {
-  const readOnly = terminal();
-  readOnly.outcomeClassification = { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" };
-  readOnly.commits = [];
-  readOnly.outcome = "read-only-completed";
-  assert.doesNotThrow(() => validateDispatchRecord(readOnly));
+check("truthful terminal non-authoring records may bind their inspected candidate without inventing a commit", () => {
+  for (const [kind, outcome] of [["read-only", "read-only-completed"], ["stopped-without-commit", "stopped-without-commit"]]) {
+    const record = terminal();
+    record.outcomeClassification = { schema: "pipeline.dispatch-outcome-classification.v1", kind };
+    record.commits = [];
+    record.outcome = outcome;
+    assert.doesNotThrow(() => validateDispatchRecord(record));
+  }
 });
 
 check("v4 outcome classification rejects fiction, contradictions and stale report bindings", () => {
+  for (const outcome of ["read-only-completed", "stopped-without-commit"])
+    assert.throws(() => validateDispatchRecord({ ...terminal(), outcome }));
   const readOnly = terminal();
   readOnly.outcomeClassification = { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" };
   readOnly.commits = [];
