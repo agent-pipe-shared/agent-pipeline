@@ -926,12 +926,12 @@ function writeState(dir, state, expectedState, options = {}) {
 
 function stateWriteSucceeded(result) {
   if (result.ok) return true;
-  if (result.externalMutation === true) {
-    console.error(`Error: state replacement did not commit (${result.code}), but a companion mutation may have occurred; inspect persisted files before retrying.`);
-  } else if (result.committed) {
+  if (result.committed) {
     console.error(`Error: state replacement committed, but durability is indeterminate (${result.code}); mutation is NOT reported as zero.`);
   } else if (result.committed === null) {
     console.error(`Error: state replacement disposition is indeterminate (${result.code}); inspect persisted state before retry.`);
+  } else if (result.externalMutation === true) {
+    console.error(`Error: state replacement did not commit (${result.code}), but a companion mutation may have occurred; inspect persisted files before retrying.`);
   } else {
     console.error(`Error: serialized state write failed before commit (${result.code}); zero mutation.`);
   }
@@ -3457,11 +3457,10 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
  * actually exists (`project/pipeline.json` AND its legacy `.claude/pipeline.json`
  * compatibility copy, seeded byte-identical on day one) so this never introduces
  * the silent PA-CALIBRATION-DRIFT gap `project-authority.mjs`'s
- * `calibrationDriftDiagnostics()` warns about. Skips a tier that does not exist or
- * is not a JSON object -- a malformed pre-existing calibration is not this
- * transition's problem to repair. Returns the repository-relative paths actually
- * written. The caller must validate the complete write set before invoking this
- * writer; malformed peers are refused, never skipped.
+ * `calibrationDriftDiagnostics()` warns about. The caller validates the complete
+ * write set before invoking this writer; absent layouts are preserved while every
+ * present malformed or non-object peer is refused. Returns the repository-relative
+ * paths actually written.
  */
 function writeCalibrationVerifyCommand(dir, command) {
   const prepared = prepareCalibrationVerifyWrite(dir);
