@@ -417,6 +417,7 @@ import {
 } from "../lib/external-push-ledger.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+import { inspectArchitectureEntryReadiness } from "../lib/architecture-entry-readiness.mjs";
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import {
   applyLegacyV2RevocationRecovery,
@@ -3885,6 +3886,12 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     };
   }
   if (lifecycle.status === "approved") {
+    const architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
+      rootDir: dir,
+      taskScope: state.activeFeature?.planPath ?? null,
+      now: new Date(),
+    });
+    if (architecture.status !== "ready") return architecture.nextAction;
     const verifyStatus = readCalibrationVerifyStatus(dir);
     if (!new Set(["configured", "baseline-only"]).has(verifyStatus.status)) {
       const scriptPath = fileURLToPath(import.meta.url);
@@ -9377,6 +9384,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         }
         console.log('Phase already "design"; zero-write replay accepted.');
         return 0;
+      }
+      const architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
+        rootDir: dir,
+        taskScope: base.activeFeature?.planPath ?? null,
+        now: new Date(now()),
+      });
+      if (architecture.status !== "ready") {
+        console.error(`Error: set-phase implementation refused (${architecture.code}); ${architecture.message}`);
+        return 2;
       }
       // NVA-CF-VERIFYDEADLOCK: the design->implementation transition is the one
       // sanctioned moment that may write project/pipeline.json's `verify` field --
