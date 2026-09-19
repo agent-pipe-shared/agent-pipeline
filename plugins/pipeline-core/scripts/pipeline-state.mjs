@@ -3471,7 +3471,11 @@ function writeCalibrationVerifyCommand(dir, command) {
       writeFileSync(join(dir, relPath), `${JSON.stringify({ ...value, verify: command }, null, 2)}\n`);
       written.push(relPath);
     } catch {
-      return { ok: false, code: "PS-CALIBRATION-WRITE", written, externalMutation: written.length > 0 };
+      // A throwing write can have changed its target before reporting an I/O
+      // failure (for example, truncation followed by ENOSPC). A completed
+      // prior write is certain mutation; this attempted write is conservatively
+      // possible mutation, so callers must not report a zero-mutation failure.
+      return { ok: false, code: "PS-CALIBRATION-WRITE", written, externalMutation: true };
     }
   }
   return { ok: true, written, externalMutation: written.length > 0 };
