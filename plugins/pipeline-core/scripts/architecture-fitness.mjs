@@ -766,12 +766,12 @@ export function evaluateCalibratedFrictionThresholds({ windowDays, telemetryUnav
     };
   }
 
-  if (windowDays !== undefined && windowDays < 14) {
+  if (typeof windowDays !== "number" || !Number.isFinite(windowDays) || windowDays < 14) {
     return {
       classId: 10,
       propertyId: "calibrated-friction-thresholds",
       outcome: OUTCOME_UNAVAILABLE,
-      details: `Dogfood window (${windowDays} days) < 14 days; friction thresholds uncalibrated.`,
+      details: `Calibration window (${String(windowDays)} days) is absent, invalid, or < 14 days; friction thresholds uncalibrated.`,
       violations: [],
       evidence: { windowDays, minRequired: 14 }
     };
@@ -1004,6 +1004,8 @@ export function evaluateArchitectureFitness(options = {}) {
   let overallStatus = OUTCOME_PASS;
   if (findingCount > 0) {
     overallStatus = "blocked";
+  } else if (unavailableCount > 0) {
+    overallStatus = OUTCOME_UNAVAILABLE;
   } else if (exceptedCount > 0) {
     overallStatus = OUTCOME_EXCEPTED;
   } else if (unknownCount > 0) {

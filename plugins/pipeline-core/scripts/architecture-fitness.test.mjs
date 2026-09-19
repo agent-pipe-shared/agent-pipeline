@@ -268,6 +268,13 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       const calibrated = evaluateCalibratedFrictionThresholds({ windowDays: 15, highFriction: false });
       assert.equal(calibrated.outcome, OUTCOME_PASS);
     });
+
+    it("Class 10: absent or invalid calibration windows never claim calibrated pass", () => {
+      for (const windowDays of [undefined, null, Number.NaN, Number.POSITIVE_INFINITY, "14", -1]) {
+        const result = evaluateCalibratedFrictionThresholds({ windowDays });
+        assert.equal(result.outcome, OUTCOME_UNAVAILABLE, `windowDays=${String(windowDays)}`);
+      }
+    });
   });
 
   describe("2. AC-10 Fixture: Deterministic-pass rule enforcement", () => {
@@ -322,6 +329,38 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       assert.equal(nav.outcome, OUTCOME_FINDING);
       assert.ok(res.stalenessDebt.length > 0);
       assert.equal(res.stalenessDebt[0].type, "architecture-map-stale");
+    });
+  });
+
+  describe("3a. Calibration availability propagates to aggregate fitness", () => {
+    it("reports unavailable when telemetry is unavailable and no findings block", () => {
+      const res = evaluateArchitectureFitness({ rootDir: REPO_ROOT, telemetryUnavailable: true });
+      assert.equal(res.overallStatus, OUTCOME_UNAVAILABLE);
+      assert.equal(res.summary.unavailableCount, 1);
+    });
+
+    it("keeps real findings blocking when calibration is unavailable", () => {
+      const res = evaluateArchitectureFitness({ rootDir: REPO_ROOT, telemetryUnavailable: true, mapStale: true });
+      assert.equal(res.overallStatus, "blocked");
+      assert.equal(res.summary.unavailableCount, 1);
+      assert.ok(res.summary.findingCount > 0);
+    });
+
+    it("does not hide unavailable status behind unrelated excepted rows", () => {
+      const baseline = {
+        acceptedViolations: [
+          { ruleId: "misleading-tiny-module-optimization", module: "micro", target: "micro", rationale: "test", acceptedAt: "2026-09-01" }
+        ]
+      };
+      const res = evaluateArchitectureFitness({
+        rootDir: REPO_ROOT,
+        telemetryUnavailable: true,
+        baseline,
+        candidateModules: [{ id: "micro", shredTopology: true }]
+      });
+      assert.equal(res.overallStatus, OUTCOME_UNAVAILABLE);
+      assert.equal(res.summary.unavailableCount, 1);
+      assert.equal(res.summary.exceptedCount, 1);
     });
   });
 
@@ -444,10 +483,11 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
       assert.equal(res.profileSource, "accepted-custom-security");
     });
 
-    it("Fixture 3: clean architecture passes all checks", () => {
+    it("Fixture 3: clean architecture reports unavailable without calibration telemetry", () => {
       const res = evaluateArchitectureFitness({ rootDir: REPO_ROOT });
-      assert.equal(res.overallStatus, OUTCOME_PASS);
+      assert.equal(res.overallStatus, OUTCOME_UNAVAILABLE);
       assert.equal(res.summary.findingCount, 0);
+      assert.equal(res.summary.unavailableCount, 1);
     });
 
     it("Fixture 4: missing/stale contract produces finding", () => {
