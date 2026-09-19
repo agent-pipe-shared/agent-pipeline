@@ -9063,6 +9063,7 @@ test("a ready one-entry consumer receives and completes the authenticated runner
   try {
     initializeClaudeOnboardedRoot(path);
     completeKickoff(path, "Repair runner permissions", fakeDeps, "ready", "claude");
+    const originalAction = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" }).nextAction;
     const expectedEntries = expectedPipelineScriptsRunnerAllowlistEntries();
     const partial = {
       statusLine: { type: "command", command: "node user-statusline.mjs" },
@@ -9074,10 +9075,11 @@ test("a ready one-entry consumer receives and completes the authenticated runner
     const drifted = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
     assert.equal(drifted.status, "ready");
     assert.equal(drifted.runnerPermissions.status, "drifted");
-    assert.equal(drifted.nextAction.executable, "node");
-    assert.equal(drifted.nextAction.argv[1], "plan-runner-permissions");
-    assert.equal(drifted.nextAction.mutation, false);
-    const planned = spawnSync(process.execPath, drifted.nextAction.argv, { encoding: "utf8" });
+    assert.deepEqual(drifted.nextAction, originalAction);
+    assert.equal(drifted.runnerPermissions.optionalPlan.executable, "node");
+    assert.equal(drifted.runnerPermissions.optionalPlan.argv[1], "plan-runner-permissions");
+    assert.equal(drifted.runnerPermissions.optionalPlan.mutation, false);
+    const planned = spawnSync(process.execPath, drifted.runnerPermissions.optionalPlan.argv, { encoding: "utf8" });
     assert.equal(planned.status, 0, planned.stderr);
     assert.equal(JSON.parse(planned.stdout).status, "ready");
     const optionalPlan = planSettingsAllowlistMerge({ rootDir: path, candidateSet: "runner-permissions" });
@@ -9121,11 +9123,13 @@ test("a ready consumer with malformed permission shapes receives only the typed 
   }
 });
 
-test("runner-permission projection drift removes ready-only fields before the ready gate", () => {
+test("optional runner permissions preserve lifecycle actions and ready-only fields", () => {
   const path = root();
   try {
     initializeClaudeOnboardedRoot(path);
     completeKickoff(path, "Reject stale runner permissions", fakeDeps, "ready", "claude");
+    const originalActions = Object.fromEntries(["bootstrap", "session"].map((intent) => [intent,
+      inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent, runner: "claude" }).nextAction]));
     writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify({
       permissions: { allow: ["Bash(git status *)"] },
     }, null, 2)}\n`);
@@ -9134,7 +9138,8 @@ test("runner-permission projection drift removes ready-only fields before the re
       const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent, runner: "claude" });
       assert.equal(observed.status, "ready");
       assert.equal(observed.runnerPermissions.status, "drifted");
-      assert.equal(observed.nextAction.argv[1], "plan-runner-permissions");
+      assert.deepEqual(observed.nextAction, originalActions[intent]);
+      assert.equal(observed.runnerPermissions.optionalPlan.argv[1], "plan-runner-permissions");
       assert.equal(Object.prototype.hasOwnProperty.call(observed, "pushApprovalMode"), true);
       assert.equal(Object.prototype.hasOwnProperty.call(observed, "trustAnchorAvailability"), true);
       assert.deepEqual(requireProjectOnboardingReady({

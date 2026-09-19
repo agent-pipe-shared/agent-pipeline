@@ -1323,6 +1323,19 @@ function withRunnerPermissionsReadback(result, fs) {
   if ((result.status !== "ready" && !runnerPermissionsPrecedeAuthorityDecision)
     || runnerPermissions.status === "current"
     || runnerPermissions.status === "not-applicable") return observed;
+  // Optional host preauthorization never displaces a lifecycle transition.
+  // Only ready results carry the offer; partial authority decisions retain
+  // their own action and closed non-ready envelope unchanged.
+  if (optionalPreauthorization) {
+    if (result.status !== "ready") return observed;
+    return { ...observed, runnerPermissions: { ...runnerPermissions, optionalPlan: commandAction(
+      [SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", result.root],
+      false,
+      false,
+      SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA,
+      ["ready", "no-op", "unrepairable"],
+    ) } };
+  }
   const plan = planSettingsAllowlistMerge({
     rootDir: result.root,
     candidateSet: "runner-permissions",
@@ -1343,20 +1356,6 @@ function withRunnerPermissionsReadback(result, fs) {
       "pipeline.settings-allowlist-merge-plan.v1",
       ["ready", "no-op", "unrepairable"],
     );
-  // A valid, absent/stale Claude preauthorization is optional host prompt
-  // state, not Pipeline governance drift. Keep the exact read-only planner
-  // visible on a ready result, while malformed/unreadable settings retain the
-  // existing fail-closed projection-drift path below.
-  if (result.status === "ready" && optionalPreauthorization) {
-    const planner = commandAction(
-      [SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", result.root],
-      false,
-      false,
-      SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA,
-      ["ready", "no-op", "unrepairable"],
-    );
-    return { ...observed, nextAction: planner };
-  }
   // Ready-only fields describe capabilities that have been authenticated only
   // by a ready observation. Once this readback downgrades that observation to
   // projection-drift, remove them from the envelope before the ready gate

@@ -282,7 +282,7 @@ test("ready gate keeps valid Claude cache drift optional while Codex and Antigra
       ...claude.runnerPermissions,
       status: "drifted",
     };
-    claude.nextAction = {
+    claude.runnerPermissions.optionalPlan = {
       kind: "command",
       executable: "node",
       argv: [settingsScript, "plan-runner-permissions", "--root", realpathSync(path)],
@@ -296,6 +296,28 @@ test("ready gate keeps valid Claude cache drift optional while Codex and Antigra
     assert.deepEqual(requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "claude", inspect: () => claude }), {
       schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session",
     });
+    for (const status of ["drifted", "pending-runtime-initialization"]) {
+      for (const nextAction of [null, implementationHandoverAction()]) {
+        const offered = structuredClone(claude);
+        offered.runnerPermissions.status = status;
+        offered.nextAction = nextAction;
+        assert.equal(requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "claude", inspect: () => offered }).status, "ready");
+      }
+    }
+    for (const mutate of [
+      (v) => { v.runnerPermissions.optionalPlan.argv[3] = "/wrong-root"; },
+      (v) => { v.runnerPermissions.optionalPlan.argv[0] = "/wrong-script.mjs"; },
+      (v) => { v.runnerPermissions.optionalPlan.mutation = true; },
+      (v) => { v.runnerPermissions.optionalPlan.requiresConfirmation = true; },
+      (v) => { v.runnerPermissions.optionalPlan.extra = true; },
+      (v) => { v.runnerPermissions.optionalPlan.expected.statuses = ["ready"]; },
+      (v) => { v.runnerPermissions.status = "current"; },
+      (v) => { v.nextAction = v.runnerPermissions.optionalPlan; },
+    ]) {
+      const forged = structuredClone(claude);
+      mutate(forged);
+      assert.throws(() => requireProjectOnboardingReady({ rootDir: path, intent: "session", runner: "claude", inspect: () => forged }), { code: "PORG-INVALID-OBSERVATION" });
+    }
 
     for (const runner of ["codex", "antigravity"]) {
       const inapplicable = readyResultWithPushApprovalKeys(path, "session", runner);

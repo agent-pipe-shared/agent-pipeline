@@ -126,22 +126,24 @@ function safeLifecycleStatus(value) {
   return typeof value === "string" && SAFE_STATUS.test(value) ? value : null;
 }
 
-function validRunnerPermissions(value, runner, repository) {
-  if (!exactKeys(value, ["target", "status", "lanes", "exactEntries"])
+function validRunnerPermissions(value, runner, root) {
+  const optional = plainObject(value) && Object.hasOwn(value, "optionalPlan");
+  if (!exactKeys(value, ["target", "status", "lanes", "exactEntries", ...(optional ? ["optionalPlan"] : [])])
     || ![RUNNER_PERMISSIONS_TARGET, ".claude/settings.json"].includes(value.target)
     || !Array.isArray(value.lanes)
     || !Array.isArray(value.exactEntries)) return false;
   if (value.status === "not-applicable") {
-    return ["codex", "antigravity"].includes(runner)
+    return !optional && ["codex", "antigravity"].includes(runner)
       && value.lanes.length === 0
       && value.exactEntries.length === 0;
   }
   if (value.status === "current") {
-    return JSON.stringify(value.lanes) === JSON.stringify(["Bash", "PowerShell"])
+    return !optional && JSON.stringify(value.lanes) === JSON.stringify(["Bash", "PowerShell"])
       && JSON.stringify(value.exactEntries) === JSON.stringify(expectedPipelineScriptsRunnerAllowlistEntries());
   }
   return ["drifted", "pending-runtime-initialization"].includes(value.status)
     && runner === "claude"
+    && optional && validRunnerPermissionsPlanner(value.optionalPlan, root)
     && JSON.stringify(value.lanes) === JSON.stringify(["Bash", "PowerShell"])
     && JSON.stringify(value.exactEntries) === JSON.stringify(expectedPipelineScriptsRunnerAllowlistEntries());
 }
@@ -193,11 +195,8 @@ function validVerifyCommandInput(value) {
     && value.rejectNul === true;
 }
 
-function validReadyNextAction(value, root) {
-  if (value === null) return true;
-  if (validPlanLifecycleInspectCommand(value)) return true;
-  if (validImplementationHandoverCommand(value)) return true;
-  if (exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+function validRunnerPermissionsPlanner(value, root) {
+  return exactKeys(value, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
     && value.kind === "command"
     && value.executable === "node"
     && value.mutation === false
@@ -206,7 +205,13 @@ function validReadyNextAction(value, root) {
     && JSON.stringify(value.argv) === JSON.stringify([SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", root])
     && exactKeys(value.expected, ["schema", "statuses"])
     && value.expected.schema === SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA
-    && JSON.stringify(value.expected.statuses) === JSON.stringify(["ready", "no-op", "unrepairable"])) return true;
+    && JSON.stringify(value.expected.statuses) === JSON.stringify(["ready", "no-op", "unrepairable"]);
+}
+
+function validReadyNextAction(value, root) {
+  if (value === null) return true;
+  if (validPlanLifecycleInspectCommand(value)) return true;
+  if (validImplementationHandoverCommand(value)) return true;
   return exactKeys(value, [
     "kind", "input", "mutation", "requiresConfirmation", "guidance", "applyAction", "expected",
   ])
@@ -325,7 +330,7 @@ export function requireProjectOnboardingReady({
     || !plainObject(observed.runtime)
     || !plainObject(observed.continuity)
     || !plainObject(observed.appServer)
-    || !validRunnerPermissions(observed.runnerPermissions, resolvedRunner, observed.repository)
+    || !validRunnerPermissions(observed.runnerPermissions, resolvedRunner, physicalRoot)
     || !validReadyNextAction(observed.nextAction, physicalRoot)
     || !Array.isArray(observed.diagnostics)
     || observed.diagnostics.length !== 0) {

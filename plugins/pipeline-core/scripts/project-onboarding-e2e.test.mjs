@@ -374,15 +374,9 @@ function makeReady(path) {
   });
   assert.equal(ready.status, "ready");
   const permissionsDrift = run(onboarding, ["inspect", "--root", path], path);
-  assert.equal(permissionsDrift.json.status, "projection-drift");
-  assert.equal(permissionsDrift.json.runnerPermissions.status, "pending-runtime-initialization");
-  const permissionsAction = permissionsDrift.json.nextAction;
-  assert.equal(permissionsAction.kind, "command");
-  assert.equal(permissionsAction.argv[0].split(/[\\/]/u).at(-1), "settings-allowlist-merge.mjs");
-  assert.equal(permissionsAction.argv[1], "apply-runner-permissions");
-  const applied = publicDriverRun(path, [])(permissionsAction.executable, permissionsAction.argv);
-  assert.equal(applied.status, 0, applied.stderr);
-  assert.equal(JSON.parse(applied.stdout).status, "ready");
+  assert.equal(permissionsDrift.json.status, "ready");
+  assert.equal(permissionsDrift.json.runnerPermissions.status, "not-applicable");
+  assert.equal(Object.hasOwn(permissionsDrift.json.runnerPermissions, "optionalPlan"), false);
   assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
 }
 function git(args, cwd) {
@@ -907,6 +901,8 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(approval.outcome, "ready", `${runner}: ${JSON.stringify(approval)}`);
       assert.equal(approval.final.status, "ready");
       const planSteps = approval.steps.map((step) => step.argv);
+      assert.equal(planSteps.some((argv) => argv[1] === "plan-runner-permissions" || argv[1] === "apply-runner-permissions"), false,
+        `${runner}: optional preauthorization must not enter the required lifecycle driver`);
       assert.ok(planSteps.some((argv) => argv[0]?.endsWith("pipeline-state.mjs") && argv[1] === "inspect"),
         `${runner}: ready must enter the returned public pipeline-state inspect driver`);
       assert.ok(planSteps.some((argv) => argv[1] === "submit-plan"),
@@ -940,6 +936,10 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(implementing.outcome, "ready", `${runner}: ${JSON.stringify(implementing)}`);
       assert.equal(implementing.final.status, "ready");
       assert.equal(implementing.final.nextAction, null);
+      if (runner === "claude") {
+        assert.equal(implementing.final.runnerPermissions.status, "pending-runtime-initialization");
+        assert.equal(implementing.final.runnerPermissions.optionalPlan.argv[1], "plan-runner-permissions");
+      }
       const admitted = productProbe();
       assert.equal(admitted.status, 0, `${runner}: ${admitted.stderr}`);
       writeFileSync(join(path, "game.js"), "export const playable = true;\n");
