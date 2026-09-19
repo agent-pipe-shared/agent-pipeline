@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+import { diagnosticReviewerReferences } from "../lib/critic-diagnostic-packet.mjs";
 import {
   canonicalJson,
   claimCandidatePacket,
@@ -125,7 +126,7 @@ export function prepareCodexPacketDispatch(options, deps = {}) {
         effortTier: packet.route.effortTier,
         projectionDigest: packet.route.projectionDigest,
       },
-      promptPayload: { packetId: packet.packetId, candidate: { ...packet.candidate }, diff: { ...packet.diff }, references },
+      promptPayload: { packetId: packet.packetId, candidate: { ...packet.candidate }, diff: { ...packet.diff }, references, ...(packet.diagnostics === undefined ? {} : { diagnostics: diagnosticReviewerReferences(packet.diagnostics) }) },
     },
     exportAuthorization: authorization.receipt,
     cleanupCapability: packet.cleanupCapability,

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { produceCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -30,7 +31,7 @@ function commit(root, message) {
   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
   return git(root, ["rev-parse", "HEAD"]);
 }
-function fixture({ rootCandidate = false } = {}) {
+function fixture({ rootCandidate = false, targetedExitCode = 0 } = {}) {
   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-"));
   git(root, ["init", "-q"]);
   mkdirSync(join(root, ".claude"));
@@ -43,7 +44,7 @@ function fixture({ rootCandidate = false } = {}) {
     const candidate = commit(root, "root candidate");
     base = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
     const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
-    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
     return { root, base, candidate, tree };
   }
   base = commit(root, "base");
@@ -52,7 +53,7 @@ function fixture({ rootCandidate = false } = {}) {
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
   // Deliberately untracked: the normal session preflight admits this local,
   // candidate-bound machine evidence without fabricating a candidate blob.
-  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
   return { root, base, candidate, tree };
 }
 function verdict(overrides = {}) {
@@ -118,7 +119,7 @@ function cliRequest(fx, overrides = {}) {
 }
 
 test("normal fresh-session finalization automatically prepares, claims, records, consumes, reads back, and emits", () => {
-  const fx = fixture();
+  const fx = fixture({ targetedExitCode: 1 });
   try {
     let consumeCalls = 0;
     const result = finalizeSessionCriticReview(options(fx, { eventOutPath: "evidence/review-action.json", featureId: "nova-b" }), {
@@ -128,6 +129,9 @@ test("normal fresh-session finalization automatically prepares, claims, records,
     assert.equal(result.receipt.schema, SESSION_CRITIC_RECEIPT_SCHEMA);
     assert.equal(result.receipt.assurance, SESSION_CRITIC_ASSURANCE);
     assert.equal(result.receipt.reviewPass, true);
+    const packet = JSON.parse(readFileSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "1".repeat(32), "packet.json")));
+    assert.equal(packet.diagnostics.items[0].status.fullVerify, "not-run");
+    assert.equal(packet.diagnostics.items[0].status.targeted, "failed");
     assert.equal(result.event.reasonCode, "REVIEW_PASSED");
     assert.match(result.event.correlation.requestId, /^[a-f0-9]{64}$/u);
     assert.equal(consumeCalls, 2, "accepted means first durable consume plus identical replay readback");

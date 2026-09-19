@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { isAbsolute } from "node:path";
 
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+import { diagnosticReviewerReferences, validateDiagnosticBundleShape } from "./critic-diagnostic-packet.mjs";
 
 export const CRITIC_EXPORT_RECEIPT_SCHEMA = "pipeline.critic-export-receipt.v1";
 export const CRITIC_EXPORT_DATA_CLASS = "repository-candidate";
@@ -70,7 +71,9 @@ function validTimestamp(value) {
 }
 
 function validPacketBoundary(packet) {
-  if (!exactKeys(packet, PACKET_KEYS) || packet.schema !== "pipeline.critic-candidate-packet.v1"
+  const withDiagnostics = Object.hasOwn(packet ?? {}, "diagnostics");
+  if (!exactKeys(packet, withDiagnostics ? [...PACKET_KEYS, "diagnostics"] : PACKET_KEYS) || packet.schema !== "pipeline.critic-candidate-packet.v1"
+    || (withDiagnostics && !validateDiagnosticBundleShape(packet.diagnostics))
     || !/^[a-f0-9]{32}$/u.test(packet.packetId ?? "")
     || !validTimestamp(packet.createdAt) || !validTimestamp(packet.expiresAt)
     || Date.parse(packet.expiresAt) <= Date.parse(packet.createdAt)
@@ -107,7 +110,7 @@ function validPacketBoundary(packet) {
     || packet.checkout.candidateOid !== packet.candidate.commit || packet.checkout.candidateTree !== packet.candidate.tree
     || !/^[a-f0-9]{64}$/u.test(packet.checkout.creatorNonce ?? "")
     || !/^[a-f0-9]{64}$/u.test(packet.cleanupCapability ?? "")
-    || !exactKeys(packet.bindings, ["requestSha256", "diffPathsSha256", "governanceSha256"])) return false;
+    || !exactKeys(packet.bindings, ["requestSha256", "diffPathsSha256", "governanceSha256", ...(withDiagnostics ? ["diagnosticsSha256"] : [])])) return false;
   const references = packet.references.map((entry) => exactKeys(entry, ["kind", "path", "candidateBlobOid"])
     && REFERENCE_KINDS.has(entry.kind) && validPath(entry.path) && validOid(entry.candidateBlobOid));
   if (references.some((valid) => !valid)) return false;
@@ -128,6 +131,7 @@ function validPacketBoundary(packet) {
     requestSha256: bindingDigest(packet.request),
     diffPathsSha256: bindingDigest(packet.diffPaths),
     governanceSha256: bindingDigest(packet.governance),
+    ...(withDiagnostics ? { diagnosticsSha256: bindingDigest(packet.diagnostics) } : {}),
   };
   return JSON.stringify(packet.bindings) === JSON.stringify(expectedBindings);
 }
@@ -142,6 +146,7 @@ export function deriveCriticExportView(packet) {
     diffPaths: structuredClone(packet.diffPaths),
     references: structuredClone(packet.references),
     governanceReferences: structuredClone(packet.governance.required),
+    ...(packet.diagnostics === undefined ? {} : { diagnostics: diagnosticReviewerReferences(packet.diagnostics) }),
   };
 }
 

@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+import { produceCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
 import { prepareCandidatePacket } from "./critic-packet-preflight.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { buildNativeBareArgv, preflightNativeBare, runNativeBare, NativeBareError } from "./critic-native-bare.mjs";
@@ -34,7 +35,7 @@ function files() {
   writeFileSync(schema, JSON.stringify({ type: "object", required: ["findings", "deliberately_not_flagged", "trajectory_verdict", "trajectory_evidence", "briefing_violations", "pass"], additionalProperties: false, properties: { findings: { type: "array", items: { type: "object" } }, deliberately_not_flagged: { type: "array", items: { type: "string" } }, trajectory_verdict: { type: "string", enum: ["consistent", "inconsistent", "not verifiable"] }, trajectory_evidence: { type: "string" }, briefing_violations: { type: "array", items: { type: "string" } }, pass: { type: "boolean" } } }));
   return { root, executable, contract, schema };
 }
-function repository({ references = [{ kind: "spec", path: "specs/work.md" }] } = {}) {
+function repository({ references = [{ kind: "spec", path: "specs/work.md" }], diagnostic = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "claude-packet-"));
   git(root, ["init", "--quiet"]); git(root, ["config", "user.email", "test@example.invalid"]); git(root, ["config", "user.name", "Test"]);
   mkdirSync(join(root, "specs")); writeFileSync(join(root, "specs", "work.md"), "base\n"); git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "base"]); const base = git(root, ["rev-parse", "HEAD"]);
@@ -43,7 +44,12 @@ function repository({ references = [{ kind: "spec", path: "specs/work.md" }] } =
   // On native Windows, mkdir/chmod cannot establish the owner-only DACL the control
   // root contract requires; harden it the way a real caller's private root would be (no-op on POSIX).
   if (process.platform === "win32") hardenWindowsPrivateDirectory(control);
+  if (diagnostic) {
+    const value = produceCriticDiagnostic({ root, specPath: "specs/work.md", command: [process.execPath, "-e", "console.log('actual failure'); process.exit(1)"], logPath: "evidence/targeted.log" });
+    writeFileSync(join(root, "evidence/diagnostic.json"), JSON.stringify(value));
+  }
   const prepared = prepareCandidatePacket({ repoRoot: root, controlRoot: control, packetId: "7".repeat(32), taskId: "batman-claude", projectId: "pipeline", baseCommit: base, candidateCommit: candidate, rulesetOid: candidate,
+    ...(diagnostic ? { evidencePaths: ["evidence/diagnostic.json"] } : {}),
     route: { routeId: "claude-critic", runner: "claude", adapter: "claude-host", provider: "anthropic", modelTier: "sonnet", effortTier: "max", assurance: "native-preferred", projectionDigest: "8".repeat(64) }, references },
   { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 15) });
   return { root, control, prepared };
@@ -172,10 +178,12 @@ check("rechecks the result destination immediately before the real native review
 });
 
 check("uses exactly one explicitly weak fresh fallback for an allowlisted pre-verdict failure", () => {
-  const repo = repository(); const f = files();
+  const repo = repository({ diagnostic: true }); const f = files();
   try {
     const prepared = prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId, adapter: "claude-host", claimantNonce: "b".repeat(64), executablePath: join(f.root, "missing"), contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, { now: new Date("2026-07-18T12:01:00.000Z") });
     assert.equal(prepared.mode, "fallback"); assert.equal(prepared.fallback.assurance, CLAUDE_FALLBACK_ASSURANCE); assert.equal(prepared.fallback.freshContext, true);
+    assert.equal(prepared.fallback.diagnostics.items[0].status.targeted, "failed");
+    assert.equal(prepared.fallback.diagnostics.items[0].status.fullVerify, "not-run");
     assert.equal(JSON.parse(readFileSync(join(repo.control, repo.prepared.packet.packetId, "export-fallback.json"), "utf8")).pipelineDecision, "authorized");
     const result = acceptClaudeFallback(prepared, { schema: "pipeline.claude-functional-fallback-return.v1", packetId: prepared.packet.packetId, packetDigest: prepared.packetDigest, assurance: CLAUDE_FALLBACK_ASSURANCE, freshContext: true, delegated: false, verdict: verdict() });
     const finalized = finalizeClaudePacketReview({ controlRoot: repo.control, prepared, result }, { now: new Date("2026-07-18T12:02:00.000Z") });
@@ -184,10 +192,14 @@ check("uses exactly one explicitly weak fresh fallback for an allowlisted pre-ve
 });
 
 check("keeps a successful native result in the stronger native class", () => {
-  const repo = repository(); const f = files();
+  const repo = repository({ diagnostic: true }); const f = files();
   try {
     const spawnFn = () => ({ status: 0, stdout: stream(), stderr: "" });
     const prepared = prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId, adapter: "claude-host", claimantNonce: "c".repeat(64), executablePath: f.executable, contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, { spawnFn, now: new Date("2026-07-18T12:01:00.000Z") });
+    const prompt = JSON.parse(prepared.prompt.slice(prepared.prompt.indexOf("{")));
+    assert.equal(prompt.diagnostics.items[0].status.targeted, "failed");
+    assert.equal(prompt.diagnostics.items[0].status.fullVerify, "not-run");
+    for (const ref of prompt.diagnostics.references) assert.ok(readFileSync(join(prepared.packet.checkout.realPath, ref.path)).length > 0);
     assert.equal(JSON.parse(readFileSync(join(repo.control, repo.prepared.packet.packetId, "export-native.json"), "utf8")).assuranceClass, CLAUDE_NATIVE_ASSURANCE);
     const result = executeClaudeNative(prepared, { spawnFn, now: new Date("2026-07-18T12:01:30.000Z") }); assert.equal(result.assurance, CLAUDE_NATIVE_ASSURANCE);
     const finalized = finalizeClaudePacketReview({ controlRoot: repo.control, prepared, result }, { now: new Date("2026-07-18T12:02:00.000Z") });

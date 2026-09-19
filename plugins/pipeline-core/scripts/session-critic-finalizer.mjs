@@ -248,6 +248,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     trigger: options.trigger ?? "T1",
     route: routeFor(options.route, preflightSha256),
     references,
+    evidencePaths: options.preflightInput.evidencePaths,
     sessionBinding: {
       schema: SESSION_PACKET_BINDING_SCHEMA,
       sessionId: id,

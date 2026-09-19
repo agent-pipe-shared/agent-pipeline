@@ -62,7 +62,7 @@ function validateReference(value) {
   if (!exact(value, ["path", "sha256"]) || !SHA.test(value.sha256)) fail("CDI-REFERENCE");
   diagnosticPath(value.path);
 }
-export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null } = {}) {
+export function validateCriticDiagnostic(value, { root, candidate, spec = null, guardrails = null, readArtifact = path => readDiagnosticArtifact(root, path) } = {}) {
   if (!exact(value, ["schema", "producer", "assurance", "candidate", "spec", "guardrails", "fullVerify", "targeted", "pending"]) || value.schema !== CRITIC_DIAGNOSTIC_SCHEMA || value.producer !== "critic-diagnostic-evidence" || value.assurance !== "captured-process-output-not-host-attested" || !exact(value.candidate, ["commit", "tree"]) || !OID.test(value.candidate.commit) || !OID.test(value.candidate.tree) || value.candidate.commit !== candidate.commit || value.candidate.tree !== candidate.tree) fail("CDI-BINDING");
   validateReference(value.spec);
   if (!Array.isArray(value.guardrails) || value.guardrails.length > 128 || new Set(value.guardrails.map(row => row?.path)).size !== value.guardrails.length) fail("CDI-GUARDRAILS");
@@ -74,7 +74,7 @@ export function validateCriticDiagnostic(value, { root, candidate, spec = null, 
   if (value.fullVerify.status === "not-run") { if (value.fullVerify.evidence !== null) fail("CDI-FULL-VERIFY"); }
   else {
     validateReference(value.fullVerify.evidence);
-    const bytes = readDiagnosticArtifact(root, value.fullVerify.evidence.path);
+    const bytes = readArtifact(value.fullVerify.evidence.path);
     if (diagnosticDigest(bytes) !== value.fullVerify.evidence.sha256) fail("CDI-DIGEST");
     const observed = inspectCriticVerifyDiagnostic(JSON.parse(bytes), candidate);
     if (observed.execution !== "full" || observed.status !== value.fullVerify.status) fail("CDI-FULL-VERIFY");
@@ -82,7 +82,7 @@ export function validateCriticDiagnostic(value, { root, candidate, spec = null, 
   const t = value.targeted;
   if (!exact(t, ["label", "status", "exitCode", "log"]) || typeof t.label !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(t.label) || !Number.isInteger(t.exitCode) || t.exitCode < 0 || t.status !== (t.exitCode === 0 ? "passed" : "failed")) fail("CDI-TARGETED");
   validateReference(t.log);
-  const log = readDiagnosticArtifact(root, t.log.path);
+  const log = readArtifact(t.log.path);
   if (diagnosticDigest(log) !== t.log.sha256 || !log.toString("utf8").startsWith("command: ") || !log.toString("utf8").includes(`\nlabel: ${t.label}\nexitCode: ${t.exitCode}\n--- stdout ---\n`) || !log.toString("utf8").includes("\n--- stderr ---\n")) fail("CDI-DIGEST");
   if (!Array.isArray(value.pending) || value.pending.some(id => typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(id)) || new Set(value.pending).size !== value.pending.length || (value.fullVerify.status === "not-run" && !value.pending.includes("full-verify"))) fail("CDI-PENDING");
   return { kind: "critic-diagnostic", fullVerify: value.fullVerify.status, targeted: { status: t.status, exitCode: t.exitCode, log: t.log }, pending: value.pending };

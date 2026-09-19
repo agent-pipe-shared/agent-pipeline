@@ -11,6 +11,7 @@ import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+import { diagnosticReviewerReferences } from "../lib/critic-diagnostic-packet.mjs";
 import {
   canonicalJson,
   claimCandidatePacket,
@@ -77,6 +78,7 @@ function promptFor(packet) {
     candidate: { ...packet.candidate },
     diff: { ...packet.diff },
     references: refs(packet),
+    ...(packet.diagnostics === undefined ? {} : { diagnostics: diagnosticReviewerReferences(packet.diagnostics) }),
   })}`;
 }
 function referenceBlobSha256(packet, reference) {
@@ -144,6 +146,7 @@ function fallbackDispatch(packet, reasonCode, exportAuthorizationSha256) {
     candidate: { ...packet.candidate },
     diff: { ...packet.diff },
     references: refs(packet),
+    ...(packet.diagnostics === undefined ? {} : { diagnostics: diagnosticReviewerReferences(packet.diagnostics) }),
     reasonCode,
     assurance: CLAUDE_FALLBACK_ASSURANCE,
   };
@@ -272,14 +275,16 @@ export function executeClaudeNative(prepared, deps = {}) {
 export function acceptClaudeFallback(prepared, hostReturn) {
   const dispatch = prepared.mode === "fallback" ? prepared.fallback : hostReturn?.dispatch;
   const expectedReturnKeys = prepared.mode === "fallback" ? FALLBACK_RETURN_KEYS : [...FALLBACK_RETURN_KEYS, "dispatch"];
-  if (!exactKeys(dispatch, FALLBACK_DISPATCH_KEYS)
+  const diagnosticKeys = prepared.packet.diagnostics === undefined ? [] : ["diagnostics"];
+  if (!exactKeys(dispatch, [...FALLBACK_DISPATCH_KEYS, ...diagnosticKeys])
     || dispatch.schema !== "pipeline.claude-functional-fallback-dispatch.v1"
     || dispatch.packetId !== prepared.packet.packetId || dispatch.packetDigest !== prepared.packetDigest
     || dispatch.runner !== "claude" || dispatch.freshContext !== true || dispatch.mayDelegate !== false
     || !CLAUDE_FALLBACK_CODES.has(dispatch.reasonCode) || dispatch.assurance !== CLAUDE_FALLBACK_ASSURANCE
     || canonicalJson(dispatch.candidate) !== canonicalJson(prepared.packet.candidate)
     || canonicalJson(dispatch.diff) !== canonicalJson(prepared.packet.diff)
-    || canonicalJson(dispatch.references) !== canonicalJson(refs(prepared.packet))) {
+    || canonicalJson(dispatch.references) !== canonicalJson(refs(prepared.packet))
+    || (diagnosticKeys.length > 0 && canonicalJson(dispatch.diagnostics) !== canonicalJson(diagnosticReviewerReferences(prepared.packet.diagnostics)))) {
     fail("CLH-FALLBACK", "Fallback dispatch binding is invalid.");
   }
   if (!exactKeys(hostReturn, expectedReturnKeys) || hostReturn.schema !== "pipeline.claude-functional-fallback-return.v1"
