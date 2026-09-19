@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import { discoverAgyPath } from "../lib/antigravity-execution-host.mjs";
 import { dispatchAgySession } from "../lib/agy-session-dispatch.mjs";
-import { digest, loadLiveSession, validateConsentRecord } from "../lib/agy-session-authority.mjs";
+import { digest, loadLiveSession, loadStoredConsent, validateConsentRecord, validateDispatchBinding } from "../lib/agy-session-authority.mjs";
 
 export const LIVE_REQUEST_SCHEMA = "pipeline.agy-session-live-request.v1";
 
@@ -34,12 +34,18 @@ export async function runGoldfishAntigravityLiveHost(request, dependencies = {})
   const agyPath = dependencies.agyPath ?? discoverAgyPath(dependencies.env ?? process.env);
   if (!agyPath) return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: "AGY-NOT-INSTALLED", modelCalls: 0, launcherCalls: 0 };
   if (request.consent === null) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-SESSION-CONSENT-REQUIRED", modelCalls: 0, launcherCalls: 0 };
+  if (request.consent !== "stored") return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-SESSION-CONSENT-SUPPLIED", modelCalls: 0, launcherCalls: 0 };
   let live;
   try { live = loadLiveSession(request.root, request.sessionId, request.descriptorSha256); } catch { return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: "AGY-SESSION-OWNER-UNAVAILABLE", modelCalls: 0, launcherCalls: 0 }; }
   if (!live.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: live.code, modelCalls: 0, launcherCalls: 0 };
-  const authority = validateConsentRecord(request.consent, { root: request.root, session: live.session, nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
+  let stored;
+  try { stored = loadStoredConsent(request.root, request.sessionId, request.descriptorSha256); } catch { return { schema: LIVE_REQUEST_SCHEMA, status: "unavailable", code: "AGY-SESSION-CONSENT-UNAVAILABLE", modelCalls: 0, launcherCalls: 0 }; }
+  if (!stored.record) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: "AGY-SESSION-CONSENT-REQUIRED", modelCalls: 0, launcherCalls: 0 };
+  const authority = validateConsentRecord(stored.record, { root: request.root, repository: stored.descriptor.repo, session: live.session, nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
   if (!authority.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: authority.code, modelCalls: 0, launcherCalls: 0 };
-  const dispatchConsent = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: request.consent.decisionId, sessionId: live.session.id, runner: "antigravity", provider: "google", model: request.requestedModel, role: request.packet.role, scope: request.scope, subjectSha256: digest(request.scope), approvedAtMs: request.consent.approvedAtMs ?? 0, expiresAtMs: request.consent.expiresAtMs };
+  const binding = validateDispatchBinding(stored.record, { requestedModel: request.requestedModel, role: request.packet.role, scope: request.scope, requiredPaths: request.packet.requiredPaths ?? [], nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
+  if (!binding.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: binding.code, modelCalls: 0, launcherCalls: 0 };
+  const dispatchConsent = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: stored.record.decisionId, sessionId: live.session.id, runner: "antigravity", provider: "google", model: stored.record.model, role: request.packet.role, scope: request.scope, subjectSha256: digest(request.scope), approvedAtMs: stored.record.approvedAtMs ?? 0, expiresAtMs: stored.record.expiresAtMs };
   return dispatchAgySession({ ...request, session: { id: live.session.id, source: "runtime", observed: true }, consent: dispatchConsent, verifyAuthority: () => true, agyPath, env: dependencies.env ?? process.env, nowEpochMs: dependencies.nowEpochMs ?? Date.now(), signal: dependencies.signal });
 }
 
