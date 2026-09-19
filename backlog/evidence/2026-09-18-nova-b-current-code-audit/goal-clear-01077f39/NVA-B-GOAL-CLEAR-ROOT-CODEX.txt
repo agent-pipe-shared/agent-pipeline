@@ -1,0 +1,27 @@
+command: node plugins/pipeline-core/scripts/codex-goal-host.test.mjs
+label: NVA-B-GOAL-CLEAR-ROOT-CODEX
+exitCode: 0
+--- stdout ---
+ok 1 - set performs a mandatory matching get readback
+ok 2 - matching active goal is read back without a duplicate set
+ok 3 - a named PO gate pauses only the matching active Goal and reads the pause back
+ok 4 - a recorded PO resolution restores the same paused Goal without replacing it
+ok 5 - blocked native goal stops automation and gives an explicit CLI-resume notice
+ok 6 - a blocked goal with another objective cannot impersonate the requested generation
+ok 7 - a stale active Pipeline goal cannot impersonate the current continuation
+ok 8 - an active user-controlled goal is never overwritten by Pipeline activation
+ok 9 - a paused user-controlled goal is never overwritten by Pipeline activation or pause
+ok 10 - wrong readback never claims protected continuation
+ok 11 - clear refuses foreign objective, generation, and thread goals before destructive control
+ok 12 - clear refuses malformed or unavailable initial observations before destructive control
+ok 13 - matching goal clear is followed by an actual null readback
+ok 14 - already absent clear is idempotent after a valid null observation
+ok 15 - failed clear and non-null final readback never claim success
+ok 16 - continuity host binding uses only the supplied current thread client
+ok 17 - app-server resolution accepts exactly one active thread in the current project
+ok 18 - app-server resolution rejects ambiguous active project threads
+ok 19 - app-server bridge never overwrites the resolved active user goal
+ok 20 - private Unix WebSocket client initializes then makes bounded app-server calls
+1..20
+
+--- stderr ---

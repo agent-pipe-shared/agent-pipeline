@@ -1,15 +1,17 @@
 {
   "schema": "pipeline.dispatch-record.v3",
   "taskId": "NVA-B-GOAL-CLEAR-IDENTITY",
-  "agentType": "goldfish",
+  "agentType": "default",
   "model": "gpt-5.6-terra",
   "effort": "medium",
   "rulesetSha": "0.7.0+codex.20260918192112.f2963473",
   "dispatcher": "Elephant",
-  "candidateCommit": "ae6c667ecf52b8932da53eddbc46ef09e3adf0ba",
-  "resultSha256": null,
-  "outcome": "in-progress",
-  "commits": [],
+  "candidateCommit": "01077f397080cdc0cac0857a7a8c88f21cff9165",
+  "resultSha256": "2fe2b3ebf078c564803d52ba115d4d4b181a0c567d8e9d4377e252c921a0e76a",
+  "outcome": "implemented-pending-review",
+  "commits": [
+    "01077f397080cdc0cac0857a7a8c88f21cff9165"
+  ],
   "log": [
     {
       "phase": "bootstrap",
@@ -23,15 +25,27 @@
     },
     {
       "phase": "implementation",
-      "toolUseCount": 6,
+      "toolUseCount": 7,
       "note": "Added bounded clear identity observation and focused regressions."
+    },
+    {
+      "phase": "validation",
+      "toolUseCount": 6,
+      "note": "Captured Codex, Claude, runner-native-continuation, and original probe GREEN evidence."
     }
   ],
-  "report": null,
-  "modelOverride": {
-    "model": "gpt-5.6-terra",
-    "effort": "medium",
-    "rationale": "Calibrated deep override for identity-preserving native-goal control."
+  "report": {
+    "text": "Codex clear now reads the existing goal first, refuses malformed or foreign observations without issuing clear, treats a valid null observation as idempotent success, and requires a null final readback after clearing a matching rendered objective. Synthetic Codex, Claude, runner-native-continuation, and original in-memory cross-runner probe captures are green. The host has no atomic compare-and-clear API, so a concurrent replacement between observation and clear remains a residual race. Independent Critic review and PO acceptance remain pending; this correction does not provide an ordinary production caller or complete B0 acceptance.",
+    "changedFiles": [
+      "plugins/pipeline-core/scripts/codex-goal-host.mjs",
+      "plugins/pipeline-core/scripts/codex-goal-host.test.mjs",
+      "evidence/NVA-B-GOAL-CLEAR-IDENTITY-RED.txt",
+      "evidence/NVA-B-GOAL-CLEAR-IDENTITY-CODEX-GREEN.txt",
+      "evidence/NVA-B-GOAL-CLEAR-IDENTITY-CLAUDE-GREEN.txt",
+      "evidence/NVA-B-GOAL-CLEAR-IDENTITY-RNC-GREEN.txt",
+      "evidence/NVA-B-GOAL-CLEAR-IDENTITY-PROBE-GREEN.txt",
+      "evidence/dispatch-record-NVA-B-GOAL-CLEAR-IDENTITY.json"
+    ]
   },
   "criticRequired": {
     "schema": "pipeline.critic-required-decision.v1",

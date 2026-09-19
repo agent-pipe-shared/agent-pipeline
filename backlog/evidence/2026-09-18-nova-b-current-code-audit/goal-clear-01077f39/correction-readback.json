@@ -1,0 +1,41 @@
+{
+  "schema": "nova-b-audit.goal-clear-evidence-correction.v1",
+  "sourceCommit": "01077f397080cdc0cac0857a7a8c88f21cff9165",
+  "sourceRecord": "evidence/dispatch-record-NVA-B-GOAL-CLEAR-IDENTITY.json",
+  "historicalSnapshot": "backlog/evidence/2026-09-18-nova-b-current-code-audit/goal-clear-01077f39/original-dispatch-record.json",
+  "correctedLocalRecord": "evidence/dispatch-record-NVA-B-GOAL-CLEAR-IDENTITY.json",
+  "corrections": {
+    "agentType": {
+      "historical": "goldfish",
+      "corrected": "default",
+      "basis": "original tool invocation used collaboration.spawn_agent with agent_type default"
+    },
+    "modelOverride": {
+      "historical": "self-declared gpt-5.6-terra medium override",
+      "corrected": "absent",
+      "basis": "no trusted override receipt was established"
+    },
+    "resultSha256": {
+      "historical": "6a7f9a0a98e9877ff1e6b040cf31d41a1cf8ef58c66e1fcd04f7af9a1e3158dd",
+      "corrected": "2fe2b3ebf078c564803d52ba115d4d4b181a0c567d8e9d4377e252c921a0e76a",
+      "basis": "SHA-256 of current record report.text UTF-8 bytes"
+    }
+  },
+  "preservedNonMonotonicLogCounts": [2, 9, 7, 6],
+  "captureReadback": {
+    "identityRed": "82f57549fb48b355853959e1f39f4209ef350f8128ca7bd21fe601dfcd110b54",
+    "identityCodexGreen": "712f25c03942dbccc357507e35f68d6f8cc9ef71c81670c2d1c834aa389d817c",
+    "identityClaudeGreen": "9180a62bfe7957fb4b5c5c6bea58019efdb70395ddceecab79d39d2fd614640f",
+    "identityRncGreen": "3e3378a4cef464b713a52d65d8250af908de2593054ea673ad38f0367a3f801d",
+    "identityProbeGreen": "6a7f9a0a98e9877ff1e6b040cf31d41a1cf8ef58c66e1fcd04f7af9a1e3158dd",
+    "rootCodex": "64e9aad56faa6b7ff21c7dcda73b5d64a4956dbbfcd2e478198209f2ed3c619f",
+    "rootClaude": "a1afee7f9cfcb02bfd267e784427ac10654bae5f2d268b727da4794a612d79d5",
+    "rootRnc": "351a923bbddf743861d88976cd0719e242960dc41c803d50ec27024d46f3d23c",
+    "rootProbe": "1165500fe2d6e2d486c8dda45d4bc1088277d132f62e87009358c6e6d87fdb04"
+  },
+  "limits": [
+    "The earlier scratch reference to SHA-256 031e3ab791cfbec403aea5a3bfc27591de5d4b9746449e8f6dabd9f44e72f39e does not identify the current RED bytes; no historical capture was manufactured.",
+    "Local schema validation is not registry-bound writer admission or independent review.",
+    "No full qualification or native execution was run or claimed."
+  ]
+}
