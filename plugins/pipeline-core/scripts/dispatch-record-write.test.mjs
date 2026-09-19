@@ -87,6 +87,20 @@ check("malformed, missing, computed and mismatched records fail before publicati
   }
 });
 
+check("writer rejects no-delivery with top-level paths or closing committed claims before publication", () => {
+  const value = record({ outcome: "completed-no-delivery", commits: [], report: { text: "No delivery.", changedFiles: [], orchestratorAddedFiles: [] }, criticSkip: undefined, criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" } });
+  for (const extra of [
+    { orchestratorAddedFiles: ["src/claimed-delivery.mjs"] },
+    { closingAllowance: { schema: "pipeline.dispatch-closing-allowance.v1", taskId: value.taskId, committed: ["b".repeat(40)], verifiedGreen: [], remainsUndone: [], nextBriefingAdjustments: [] } },
+  ]) {
+    const root = fixture({ ...value, ...extra });
+    try {
+      assert.throws(() => writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" }), error => error.code === "record-no-delivery");
+      assert.equal(existsSync(join(root, "evidence/dispatch-record-NVA-WRITE-1.json")), false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+});
+
 check("request and target aliases are rejected without following them", (t) => {
   const root = fixture();
   try {
@@ -202,7 +216,7 @@ check("target replacement after hard-link admission is detected without reading 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 11, "the complete dispatch-record writer corpus must be registered before execution begins");
+assert.equal(cases.length, 12, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

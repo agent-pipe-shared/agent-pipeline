@@ -161,6 +161,7 @@ function validateRecord(record, { legacy }) {
     }
   } else if (isTerminalOutcome(record.outcome)) fail("record-report", "terminal dispatch record requires report");
   if (Object.hasOwn(record, "orchestratorAddedFiles")) strictPathList(record.orchestratorAddedFiles, "orchestratorAddedFiles");
+  if (isNoDeliveryOutcome(record.outcome) && (record.orchestratorAddedFiles?.length ?? 0) !== 0) fail("record-no-delivery", "no-delivery terminal record must not claim top-level orchestrator paths");
   if (Object.hasOwn(record, "closingAllowance")) {
     if (legacy) fail("record-shape", "legacy dispatch record does not support closingAllowance");
     const ca = record.closingAllowance;
@@ -168,6 +169,7 @@ function validateRecord(record, { legacy }) {
     if (ca.schema !== CLOSING_ALLOWANCE_SCHEMA) fail("record-field", "closingAllowance schema is invalid");
     if (ca.taskId !== record.taskId) fail("record-field", "closingAllowance taskId must match dispatch record taskId");
     if (!Array.isArray(ca.committed) || ca.committed.some((c) => typeof c !== "string")) fail("record-field", "closingAllowance.committed must be an array of strings");
+    if (isNoDeliveryOutcome(record.outcome) && ca.committed.length !== 0) fail("record-no-delivery", "no-delivery terminal record must not claim committed work in its closing allowance");
     if (!Array.isArray(ca.verifiedGreen) || ca.verifiedGreen.some((v) => !v || typeof v !== "object" || Array.isArray(v))) fail("record-field", "closingAllowance.verifiedGreen must be an array of objects");
     if (!Array.isArray(ca.remainsUndone) || ca.remainsUndone.some((r) => typeof r !== "string")) fail("record-field", "closingAllowance.remainsUndone must be an array of strings");
     if (!Array.isArray(ca.nextBriefingAdjustments) || ca.nextBriefingAdjustments.some((a) => typeof a !== "string")) fail("record-field", "closingAllowance.nextBriefingAdjustments must be an array of strings");

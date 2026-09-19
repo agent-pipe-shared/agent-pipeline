@@ -60,6 +60,14 @@ check("no-delivery is terminal observation only and cannot claim delivery or aut
   assert.deepEqual(validateDispatchRecord(noDelivery), noDelivery);
   assert.throws(() => validateDispatchRecord({ ...noDelivery, commits: ["b".repeat(40)] }), (error) => error?.code === "record-no-delivery");
   assert.throws(() => validateDispatchRecord({ ...noDelivery, report: { ...noDelivery.report, changedFiles: ["src/x.mjs"] } }), (error) => error?.code === "record-no-delivery");
+  // Neither legacy top-level claims nor nested claims may hide behind the other.
+  for (const orchestratorAddedFiles of [["src/x.mjs"], [{ path: "src/x.mjs" }]]) {
+    assert.throws(() => validateDispatchRecord({ ...noDelivery, orchestratorAddedFiles }), (error) => error?.code === "record-no-delivery");
+    assert.throws(() => validateDispatchRecord({ ...noDelivery, orchestratorAddedFiles: [], report: { ...noDelivery.report, orchestratorAddedFiles } }), (error) => error?.code === "record-no-delivery");
+  }
+  const closingAllowance = { schema: "pipeline.dispatch-closing-allowance.v1", taskId: noDelivery.taskId, committed: [], verifiedGreen: [], remainsUndone: [], nextBriefingAdjustments: [] };
+  assert.deepEqual(validateDispatchRecord({ ...noDelivery, orchestratorAddedFiles: [], closingAllowance }), { ...noDelivery, orchestratorAddedFiles: [], closingAllowance });
+  for (const committed of [["b".repeat(40)], ["claimed authored work"]]) assert.throws(() => validateDispatchRecord({ ...noDelivery, closingAllowance: { ...closingAllowance, committed } }), (error) => error?.code === "record-no-delivery");
   const automaticSkip = { ...noDelivery, criticSkip: skip() };
   delete automaticSkip.criticRequired;
   assert.throws(() => validateDispatchRecord(automaticSkip), (error) => error?.code === "record-no-delivery");
