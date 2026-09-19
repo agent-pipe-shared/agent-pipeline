@@ -14,7 +14,7 @@ for the detailed backlog records or an authority to publish changes.
 | P1 | Human-terminal signing classification must not drift from the CLI. | Local candidate `bf05188b` makes the lifecycle guard consume the CLI-owned attended-signing catalog and covers `approve-fork-disposition`; PO-CLI tests passed 112/112 and the final correction Critic passed at `280bb309`. The existing [signing-command backlog item](items/2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md) contains the reversible recovery sequence. | Publish only through the normal immutable plugin path with installed-runtime readback; do not treat the current cache as containing this local source fix. |
 | P1 | Release governance must stop re-running the same evidence under several names. | PO decision D1 adopts `release-satisfies-push` only for the identical qualified source candidate; the relation is one-way and never permits a push qualification to satisfy release. The prepared S→R envelope remains non-executing until its validator and allowlist owner exist. | Implement and verify the bounded envelope; a changed source, policy, environment class or unallowlisted path must force a new qualification. |
 | P1 | A root-owned, locally tested Quickfix must not require a fictional dispatch or a fresh PO signature merely to create its ordinary commit. | PO decision D3: ordinary commits require genuine delegated Dispatch/record provenance, never a PO signature. This local candidate is therefore committed only from its actual bounded implementation dispatch and terminal record. | Keep GIT-03 fail-closed for missing/fictional trailers; use a real dispatch record for ordinary implementation commits. |
-| P1 | A push ceremony should require the PO only for the external signature. | The Nova-B [push-intent lifecycle item](items/2026-09-17-push-artifacts-precede-operator-intent.md) now defines disjoint read-only readiness/candidate-bound intent and a single push transaction with audit-fold and exact remote-readback outcomes. | PO/ADR review of intent lifetime, invalidation, audit-fold and remote-readback result semantics before code changes. |
+| P1 | A push ceremony should require the PO only for the external signature. | The Nova-B [push-intent lifecycle item](items/2026-09-17-push-artifacts-precede-operator-intent.md) defines read-only readiness, candidate-bound intent and exact remote-readback outcomes. The PO approved private journaling during signed batches on 2026-09-19 (audit contract 3). | Implement the approved journal/export contract while retaining candidate, destination and invalidation checks; do not request that storage/timing decision again. |
 | P1 | Codex test runs that create Git fixtures need an explicit sandbox boundary. | The apparent pre-commit test failure was reclassified: restricted sandbox child spawning returned `EPERM` before hook execution; the authorized local path passed 51/51. Existing item `pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn` remains the single owner. | Use narrowly scoped elevated execution only for affected local Git/child-process suites; defer native-sandbox redesign to the existing future Windows work package. |
 | P1 | Baseline-only Verify needs a late, typed recovery when push readiness discovers it. | Local implementation candidate `9a18c3b3` exposes the same confirmation-gated recovery through `inspect` and `push-init`; the protected-twin backstop uses canonical plan-authority validation. Focused recheck on 2026-09-18: late-recovery suite passed and `push-init` passed 26/26; final correction-diff Critic is green. | Keep it local until a clean full candidate Verify and the normal immutable plugin publication path; no retrospective release edit or PO signature is implied. |
 | P1 | Greenfield late-Verify registration has been reconciled. | `harness/scripts/verify.mjs` already registers `pipeline-state-late-verify-tests`; the no-reuse full runs at `f3f79edf` and `04052891` executed it successfully. The historical missing-entry claim is superseded. | No further signature is needed for this existing registration. Keep the separate prepared publication-observer correction under its actual TP-3 boundary and the existing [suite-registration ceremony](items/2026-08-08-a-hardening-round-cannot-register-the-suites-it-writes.md) owner. |
@@ -22,14 +22,16 @@ for the detailed backlog records or an authority to publish changes.
 | P1 | Workflow-tool dispatch record production reaches proprietary host boundary. | The repository-owned trustworthy producer core and return coordinator are implemented (commits 3801105d, 50a80e51), providing v2/v3 record validation, atomic publication, and return binding. The proprietary Workflow host has no repository-visible return callback. | PO to decide whether to close the backlog item as implemented up to the repository boundary or retain as an external host blocker. |
 | P2 | Calibration twins must not turn one logical change into two protected ceremonies. | `project/pipeline.json` and `.claude/pipeline.json` are kept in sync today but still appear as separate user-facing authorities. The existing [calibration-twins item](items/2026-09-13-calibration-twins-should-have-one-canonical-writer-and-a-derived-copy.md) owns the migration design; no source behavior has changed. | Choose the canonical representation, derived-copy provenance, and consumer migration/readback before changing either protected calibration path. |
 | P2 | PO-facing commands must remain copy-safe across every runner. | The Greenfield-driven audit reconciled `onboarding-init.mjs` with the central renderer on 2026-09-18; a follow-up static import inventory found no remaining production direct import of the opaque renderer from its legacy module. The renderer and onboarding focused suites pass. | Design a durable emitter-conformance boundary; do not treat an import inventory as proof of the broader “every emitter” criterion. |
-| P2 | The release flow should be fast enough for ordinary releases. | Closed in 8fa47d91: PO decision D1 implemented via release-promotion-envelope with isRecordOnlyPath allowlist and one-way release-satisfies-push admission. | None required for Nova B; envelope active. |
+| P2 | The release flow should be fast enough for ordinary releases. | D1's one-way reuse decision remains approved; the historical envelope closure does not prove the complete producer/input/Security flow. The PO approved the explicit promotion contract on 2026-09-19 (audit contract 4). | Finish and verify the approved flow. Retain full candidate qualification until input independence and deterministic record proof are demonstrated; no optimized-flow acceptance yet. |
 | P1 | Marketplace attestation compares more than the property it protects. | Closed: PO decision D4 adopts Option A (complete decoupling ratified). The push-time marketplace attestation check was decoupled in 6fafa912; closure evidence recorded in `backlog/evidence/2026-09-18-marketplace-attestation-closure.md`. | Completed. |
 | P1 | Shipped AI hardening gate has no work package in approved epic spec. | PO decision D5: retain code state (`ai-assisted-hardening.mjs`, `ai-assisted-hardening-gate.mjs`, `verify-topology-preflight.mjs`); defer spec reconciliation ceremony to formal candidate acceptance. | Candidate acceptance ceremony. |
 | P2 | Audit-evidence overview needed for external/independent review. | Closed: PO decision D6 published `docs/audit-evidence-overview.md`, doc governance entry, and `check-audit-evidence-overview.test.mjs`; closure evidence in `backlog/evidence/2026-09-18-audit-evidence-overview-closure.md`. | Completed. |
 | P2 | Restricted-store files and privacy sign-off bound to superseded candidate. | PO decision D7: retain 2026-08-31 PO ruling; preserve closed Phoenix epic digests without rewriting; privacy authority unified under Nova B candidate review. | Candidate privacy review. |
 | P2 | Push approval occupies a single slot, serializing multi-destination releases. | PO decision D8: accepted batch-destination approval direction in P1 Push-Lifecycle packet, eliminating serial re-signing loops. | Incorporate in Push-Lifecycle packet implementation. |
 
-## Deferred PO decision packet — release-promotion simplification
+## Historical PO decision packet — release-promotion simplification
+
+Superseded where overlapping by the [2026-09-19 approved audit contracts](../specs/sprint-nova-epic/design/2026-09-19-po-approved-audit-contracts.md), especially decision 4. D1 was already approved. Do not re-ask those choices; implementation and verification remain open.
 
 No release or push behavior changes through this packet. It turns the already
 accepted S→R design into the smallest later PO/ADR decision, so the next
@@ -130,9 +132,9 @@ remaining problem rather than re-opening a corrected one.
 | First-session input and read-only prior-session recovery were unreliable. | Implemented and rechecked locally: a >10 KiB first-input E2E is 13/13 through the Git-capable host boundary, and bounded transcript recovery is 4/4; retain the current scope until a live runner disproves it. |
 | Native Windows path, adapter identity, and runtime-hook assertions. | Not promoted without a native, sanitized reproduction; existing platform/runner owners remain authoritative. |
 
-## Nova B audit: unresolved review lifecycle contract — 2026-09-19
+## Nova B audit: approved review lifecycle correction — 2026-09-19
 
-**Decision pending; no gate exception adopted.** The ordinary source-change
+**PO approved implementation; no gate exception is active yet.** The [approved four-contract record](../specs/sprint-nova-epic/design/2026-09-19-po-approved-audit-contracts.md) covers review admission, no-commit terminal records, private push journaling and explicit promotion Security/input contracts. The ordinary source-change
 selection in `critic` mode includes `critic-skip-coverage-check`. That check
 rejects an otherwise valid pending Critic disposition, while the
 [Operating Model](../docs/operating-model.md) requires the applicable
@@ -141,24 +143,27 @@ deterministic chain to be green before Critic. At candidate
 555/555 suites, and the actual coverage CLI rejected an isolated valid pending
 T1 record. This reproduces a sequencing conflict, not an independent review.
 
-Proposed resolution: distinguish admission to the specifically bound current
+Approved resolution: distinguish admission to the specifically bound current
 review from final completion. Validate records and existing evidence at both
 boundaries; require genuine task/candidate/path/digest-bound Critic evidence
 at final completion. Any pre-review pending allowance needs an explicit
 authenticated target and separate qualification/cache semantics. Unrelated
 pending records and malformed or stale evidence must remain blocking. This
-changes the accepted sequencing contract and requires review before adoption;
+changes the sequencing contract and requires independent implementation review;
 removing the check, fabricating receipts or treating a pre-review result as
 release qualification is not a resolution.
 
-A separate record contract prevents truthful terminal records for analysis-only
-dispatches or stopped work with no commit: the validator requires a nonempty
-commit list for every terminal outcome. Define an explicit no-commit lifecycle
-bound to the inspected candidate and report digest, while preserving the
-authorship verifier's rejection of commit-authorship claims without an actual
-authored commit. Existing records must not acquire invented commits or a false
-in-progress status. The multiline report repair in `69c2c66d` does not resolve
-this lifecycle issue, model attestation or the review-ordering conflict.
+The separate no-commit lifecycle correction is implemented locally in
+`7babea80`: v4 admits explicit read-only and stopped-without-commit outcomes,
+binds the exact report digest, and preserves authorship rejection and v3
+compatibility. Root reruns of record, writer, authorship, Critic disposition
+and coverage suites pass. This is not complete pipeline qualification: the
+actual completion streams contain 12 record cases and 11 writer cases while
+Verify still registers 10 each, so its receipt parser rejects both declarations.
+The protected registration patch is being prepared. The ordinary writer also
+still rejects the unresolved Codex `default` adapter; local schema-valid records
+are not model-bound writer receipts. Existing records must not acquire invented
+commits or false in-progress status. Independent review remains pending.
 
 ## Current Nova-B audit checkpoint — 2026-09-19
 
@@ -167,7 +172,7 @@ and failed with 548/555 steps; Security passed. Later phase-fixture and loaded
 commit-guidance corrections have focused green checks, not a new full
 qualification. Publication TP-3 and harness-fixture TP-5 patches are prepared
 but unapplied; no valid maintenance window is installed. Independent review,
-the review-ordering contract above, and candidate acceptance remain open.
+implementation of the approved review-ordering contract above, and candidate acceptance remain open.
 
 The Antigravity timeout investigation found no overlapping registered suites
 during the failed suite. A measured isolated run instead observed sixteen
