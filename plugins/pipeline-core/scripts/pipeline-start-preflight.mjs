@@ -10,6 +10,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+import { observeArchitectureAdoptionOrientation } from "../lib/architecture-adoption-orientation.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 // NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
 // runnable.md): the same typed readiness check the readiness guard itself uses
@@ -145,6 +146,7 @@ const NORMAL_BOOTSTRAP_CHECKS = Object.freeze([
   "handover",
   "verify",
   "continuation",
+  "architecture",
 ]);
 
 export function normalBootstrapPayloadReceipt(payload) {
@@ -1011,6 +1013,7 @@ export function observePipelineStartPreflight({
   observePrePushHookInstallationFn = observePrePushHookInstallation,
   observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
+  observeArchitectureAdoptionOrientationFn = observeArchitectureAdoptionOrientation,
   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
   resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
   antigravityPluginRegistries = () => [
@@ -1337,6 +1340,46 @@ export function observePipelineStartPreflight({
         && error.code === "PORG-NOT-READY";
     }
   }
+  // Bootstrap may never make architecture adoption a precondition: the PO must
+  // first be able to see and choose the proposal.  This compact readback is
+  // nonetheless part of every runner's normal entry envelope, so a missing
+  // physical map is neither hidden behind an AGENTS.md pointer nor left to an
+  // optional prose instruction.  The implementation transition remains the
+  // later authority boundary enforced by guard-lifecycle-ready.
+  let architectureOrientation;
+  try {
+    architectureOrientation = observeArchitectureAdoptionOrientationFn({ rootDir: cwd });
+  } catch {
+    architectureOrientation = {
+      schema: "pipeline.architecture-adoption-orientation.v1",
+      status: "unavailable",
+      root: resolve(cwd),
+      adoption: { state: "adoption-required", scope: null, decisionRef: null, coverageClass: "unavailable", confidence: "estimated" },
+      physicalMap: { greenfieldScaffold: false, status: "not-classified" },
+      guidance: "Architecture orientation could not be observed. Do not claim an architecture map is present; retry the read-only orientation before implementation.",
+    };
+  }
+  const architectureOrientationAction = architectureOrientation.status === "adoption-required"
+    ? {
+        kind: "command",
+        executable: "node",
+        argv: [resolve(pluginRoot, "scripts/architecture-adoption.mjs"), "propose", "--root", resolve(cwd), "--json"],
+        mutation: false,
+        requiresConfirmation: false,
+        executionBoundary,
+        expected: { schema: "pipeline.adoption-proposal.v1" },
+      }
+    : architectureOrientation.status === "design-pending"
+      ? {
+          kind: "advisory",
+          executable: null,
+          argv: [],
+          mutation: false,
+          requiresConfirmation: false,
+          executionBoundary,
+          expected: { schema: "pipeline.architecture-adoption-orientation.v1", status: "design-pending" },
+        }
+      : null;
   const result = {
     schema: SCHEMA,
     status,
@@ -1350,6 +1393,10 @@ export function observePipelineStartPreflight({
     rulesetSource,
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
     concurrentSessionWarning,
+    architectureOrientation: {
+      ...architectureOrientation,
+      nextAction: architectureOrientationAction,
+    },
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
     nextAction: status === "plugin-attestation-required"
       ? installedPluginAttestation.setupAction ?? null

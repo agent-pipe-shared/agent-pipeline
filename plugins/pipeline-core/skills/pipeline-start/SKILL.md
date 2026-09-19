@@ -229,24 +229,22 @@ recommendation.
    source checkout runs `node harness/scripts/check-observation-governance.mjs`,
    and a `failed` one is case **F6** → `references/failure-cases.md`.
 
-6. **Architecture orientation, never a bootstrap prerequisite:** after a
-   ready readback, first check whether the repository has both
-   `architecture/map/index.md` and
-   `project/architecture-decisions.compiled.json`. When present, read them in
-   the declared AGENTS re-entry order, then only the concept files for the
-   module(s) the task touches. When either artifact is absent, do **not**
-   invent, generate, or require architecture documentation merely to finish
-   bootstrap. Instead run the read-only command
-   `node "${PIPELINE_PLUGIN_ROOT}/scripts/architecture-adoption.mjs" status --root "$PWD" --json`.
-   Surface its typed state to the user: `adoption-required` means the session
-   should next obtain the read-only, staged proposal with
-   `architecture-adoption.mjs propose --root "$PWD" --json`; an approved,
-   deferred, or partial decision names the scope to respect. The proposal and
-   its missing-map result are orientation, not authority to write a map or a
-   PO decision. A fresh session therefore receives a concrete architecture
-   route even in a brownfield repository with no architecture estate. The
-   later implementation-authority boundary, not bootstrap, refuses an
-   unresolved or out-of-scope adoption disposition.
+6. **Architecture orientation, never a bootstrap prerequisite:** consume the
+   mandatory `architectureOrientation` readback in the ready preflight
+   envelope. It is runner-neutral and is produced by the same normal entry
+   point for Claude, Codex and Antigravity; do not replace it with a guess from
+   an `AGENTS.md` pointer. When its status is `adoption-required`, execute its
+   nested, read-only `nextAction` verbatim to obtain the staged proposal and
+   surface it to the PO. When it is `design-pending`, state that the physical
+   greenfield scaffold exists but is not an adopted baseline; finish initial
+   design before asking the PO for a scoped disposition. When it is
+   `decision-recorded`, read the declared architecture map and compiled
+   decision summary in the AGENTS re-entry order, then only concepts for the
+   touched modules. `unavailable` is an honest retry/diagnosis, never a claim
+   that a map exists. The orientation and proposal are not authority to write
+   a map or make a PO decision. The later implementation-authority boundary,
+   not bootstrap, refuses an unresolved, out-of-scope, or physically unready
+   architecture estate.
 
 7. **Restart hint for material session input:** before a first kickoff **and
    before proposing, displaying, or performing any restart, session cut or

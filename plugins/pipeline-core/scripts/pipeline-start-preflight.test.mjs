@@ -154,7 +154,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "executionBoundary", "handoff", "installedPluginAttestation",
+    "architectureOrientation", "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "executionBoundary", "handoff", "installedPluginAttestation",
     "installedSource", "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
     "version",
   ]);
@@ -173,7 +173,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   assert.equal(result.bootstrapPayload.schema, "pipeline.bootstrap-payload-receipt.v1");
   assert.equal(result.bootstrapPayload.mode, "normal");
   assert.deepEqual(result.bootstrapPayload.retainedChecks, [
-    "lifecycle", "authority", "calibration", "handover", "verify", "continuation",
+    "lifecycle", "authority", "calibration", "handover", "verify", "continuation", "architecture",
   ]);
   assert.equal(result.bootstrapPayload.originalMeasurement.withinBudget, true);
   assert.match(result.bootstrapPayload.originalMeasurement.digestSha256, /^[a-f0-9]{64}$/u);
@@ -197,6 +197,53 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
       schema: "pipeline.project-onboarding.v4",
     },
   });
+});
+
+test("normal bootstrap surfaces brownfield architecture adoption as a read-only actionable proposal without changing readiness", () => {
+  const cwd = "/projects/current";
+  const result = preflight({
+    env: {}, pluginList: pluginList(), read: () => manifest, cwd,
+    requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
+    observeArchitectureAdoptionOrientationFn: () => ({
+      schema: "pipeline.architecture-adoption-orientation.v1",
+      status: "adoption-required",
+      root: cwd,
+      adoption: { state: "adoption-required", scope: null, decisionRef: null, coverageClass: "unavailable", confidence: "estimated" },
+      physicalMap: { greenfieldScaffold: false, status: "not-classified" },
+      guidance: "review proposal",
+    }),
+  });
+  assert.equal(result.status, "ready", "plugin identity status remains narrowly scoped");
+  assert.equal(result.architectureOrientation.status, "adoption-required");
+  assert.deepEqual(result.architectureOrientation.nextAction, {
+    kind: "command",
+    executable: "node",
+    argv: [
+      `${result.pluginRoot}/scripts/architecture-adoption.mjs`, "propose", "--root", cwd, "--json",
+    ],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "default",
+    expected: { schema: "pipeline.adoption-proposal.v1" },
+  });
+});
+
+test("normal bootstrap reports a real greenfield scaffold as design-pending rather than falsely adopted", () => {
+  const cwd = "/projects/current";
+  const result = preflight({
+    env: {}, pluginList: pluginList(), read: () => manifest, cwd,
+    observeArchitectureAdoptionOrientationFn: () => ({
+      schema: "pipeline.architecture-adoption-orientation.v1",
+      status: "design-pending",
+      root: cwd,
+      adoption: { state: "adoption-required", scope: null, decisionRef: null, coverageClass: "unavailable", confidence: "estimated" },
+      physicalMap: { greenfieldScaffold: true, status: "design-pending" },
+      guidance: "complete initial design",
+    }),
+  });
+  assert.equal(result.architectureOrientation.status, "design-pending");
+  assert.equal(result.architectureOrientation.nextAction.kind, "advisory");
+  assert.equal(result.architectureOrientation.nextAction.mutation, false);
 });
 
 // NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
