@@ -836,6 +836,7 @@ function writeState(dir, state, expectedState, options = {}) {
   const reusedLock = options.reuseLock;
   const lock = reusedLock ?? acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
   if (!lock.ok) return { ok: false, committed: false, code: lock.code };
+  let externalMutation = false;
   try {
     const observed = readState(dir);
     const observedBase = observed.status === "ok" ? observed.state : observed.status === "absent" ? { schema: SCHEMA_ID } : null;
@@ -897,6 +898,7 @@ function writeState(dir, state, expectedState, options = {}) {
         code: gate?.code ?? "PS-AFTER-VALIDATION",
         externalMutation: gate?.externalMutation === true,
       };
+      externalMutation = gate.externalMutation === true;
     }
     if (transition?.replay) return { ok: true, committed: true, code: "PS-STATE-REPLAY", replay: true, transition };
     const written = atomicWriteContinuityState(dir, nextState, lock, {
@@ -915,7 +917,8 @@ function writeState(dir, state, expectedState, options = {}) {
         return transition === undefined ? failed : { ...failed, transition };
       }
     }
-    return transition === undefined ? written : { ...written, transition };
+    const result = externalMutation && !written.ok ? { ...written, externalMutation: true } : written;
+    return transition === undefined ? result : { ...result, transition };
   } finally {
     if (!reusedLock) releaseContinuityLock(lock);
   }
@@ -3457,7 +3460,8 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
  * `calibrationDriftDiagnostics()` warns about. Skips a tier that does not exist or
  * is not a JSON object -- a malformed pre-existing calibration is not this
  * transition's problem to repair. Returns the repository-relative paths actually
- * written.
+ * written. The caller must validate the complete write set before invoking this
+ * writer; malformed peers are refused, never skipped.
  */
 function writeCalibrationVerifyCommand(dir, command) {
   const prepared = prepareCalibrationVerifyWrite(dir);
@@ -3471,7 +3475,7 @@ function writeCalibrationVerifyCommand(dir, command) {
       return { ok: false, code: "PS-CALIBRATION-WRITE", written, externalMutation: written.length > 0 };
     }
   }
-  return { ok: true, written };
+  return { ok: true, written, externalMutation: written.length > 0 };
 }
 
 /**
