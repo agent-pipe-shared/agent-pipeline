@@ -862,7 +862,6 @@ function writeState(dir, state, expectedState, options = {}) {
       }
       if (!gate?.ok) return { ok: false, committed: false, code: gate?.code ?? "PS-BEFORE-COMMIT" };
     }
-    if (transition?.replay) return { ok: true, committed: true, code: "PS-STATE-REPLAY", replay: true, transition };
     if (statePath(dir) === join(dir, NEUTRAL_STATE)) {
       const portability = validatePortablePipelineState(nextState);
       if (!portability.ok) return { ok: false, committed: false, code: portability.code };
@@ -880,6 +879,26 @@ function writeState(dir, state, expectedState, options = {}) {
         return { ok: false, committed: false, code: "PS-STATE-CONTINUITY" };
       }
     }
+    // Callers that couple a protected companion write to a State transition
+    // must run it only after the lock-held CAS, lifecycle transition, and all
+    // State validation above have succeeded. This remains before the State
+    // replacement, so a State I/O failure can still leave that companion write
+    // durable; callers must report that disposition truthfully.
+    if (options.afterValidation) {
+      let gate;
+      try {
+        gate = options.afterValidation();
+      } catch {
+        return { ok: false, committed: false, code: "PS-AFTER-VALIDATION" };
+      }
+      if (!gate?.ok) return {
+        ok: false,
+        committed: false,
+        code: gate?.code ?? "PS-AFTER-VALIDATION",
+        externalMutation: gate?.externalMutation === true,
+      };
+    }
+    if (transition?.replay) return { ok: true, committed: true, code: "PS-STATE-REPLAY", replay: true, transition };
     const written = atomicWriteContinuityState(dir, nextState, lock, {
       preserveGateEstimate: options.preserveGateEstimate === true,
     });
@@ -904,7 +923,9 @@ function writeState(dir, state, expectedState, options = {}) {
 
 function stateWriteSucceeded(result) {
   if (result.ok) return true;
-  if (result.committed) {
+  if (result.externalMutation === true) {
+    console.error(`Error: state replacement did not commit (${result.code}), but a companion mutation may have occurred; inspect persisted files before retrying.`);
+  } else if (result.committed) {
     console.error(`Error: state replacement committed, but durability is indeterminate (${result.code}); mutation is NOT reported as zero.`);
   } else if (result.committed === null) {
     console.error(`Error: state replacement disposition is indeterminate (${result.code}); inspect persisted state before retry.`);
@@ -3439,21 +3460,42 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
  * written.
  */
 function writeCalibrationVerifyCommand(dir, command) {
+  const prepared = prepareCalibrationVerifyWrite(dir);
+  if (!prepared.ok) return prepared;
   const written = [];
+  for (const { relPath, value } of prepared.entries) {
+    try {
+      writeFileSync(join(dir, relPath), `${JSON.stringify({ ...value, verify: command }, null, 2)}\n`);
+      written.push(relPath);
+    } catch {
+      return { ok: false, code: "PS-CALIBRATION-WRITE", written, externalMutation: written.length > 0 };
+    }
+  }
+  return { ok: true, written };
+}
+
+/**
+ * Validate every present calibration before the first write. Supported projects
+ * may have one tier or matching twins; a missing, malformed, non-object, or
+ * divergent present peer is never silently skipped or reconciled here.
+ */
+function prepareCalibrationVerifyWrite(dir) {
+  const entries = [];
   for (const relPath of [AUTHORITY_ARTIFACTS.calibration.neutral, AUTHORITY_ARTIFACTS.calibration.legacy]) {
     const path = join(dir, relPath);
     if (!existsSync(path)) continue;
-    let parsed;
+    let value;
     try {
-      parsed = JSON.parse(readFileSync(path, "utf8"));
+      value = JSON.parse(readFileSync(path, "utf8"));
     } catch {
-      continue;
+      return { ok: false, code: "PS-CALIBRATION-MALFORMED" };
     }
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) continue;
-    writeFileSync(path, `${JSON.stringify({ ...parsed, verify: command }, null, 2)}\n`);
-    written.push(relPath);
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return { ok: false, code: "PS-CALIBRATION-MALFORMED" };
+    entries.push({ relPath, value });
   }
-  return written;
+  if (entries.length === 0) return { ok: false, code: "PS-CALIBRATION-MISSING" };
+  if (entries.length === 2 && !sameJson(entries[0].value, entries[1].value)) return { ok: false, code: "PS-CALIBRATION-DRIFTED" };
+  return { ok: true, entries };
 }
 
 /**
@@ -8535,15 +8577,6 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           return 2;
         }
       }
-      if (requestedVerifyCommand !== undefined) {
-        // Written BEFORE the state transition below, deliberately: if the state
-        // write then failed for an unrelated reason (a stale CAS, a concurrent
-        // edit), leaving the calibration already-configured is harmless and
-        // idempotent on retry -- the reverse order would risk landing in
-        // "implementation" phase with the verify contract still unconfigured,
-        // which is exactly the deadlock this closes.
-        writeCalibrationVerifyCommand(dir, requestedVerifyCommand);
-      }
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           const transition = enterPlanImplementation({
@@ -8555,8 +8588,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             ? { ...transition, state: { ...transition.state, updatedAt: now() } }
             : transition;
         },
+        afterValidation: requestedVerifyCommand === undefined ? undefined : () => writeCalibrationVerifyCommand(dir, requestedVerifyCommand),
       });
       if (!stateWriteSucceeded(written)) {
+        if (written.externalMutation === true) {
+          console.error(`Error: set-phase implementation failed after calibration mutation (${written.code}); inspect calibration and State before retrying.`);
+          return 2;
+        } else if (written.code?.startsWith("PS-CALIBRATION-")) {
+          console.error(`Error: set-phase implementation refused invalid calibration (${written.code}); zero mutation.`);
+          return 2;
+        }
         console.error(`Error: set-phase implementation requires an exact approved submission (${written.code}).`);
         return 2;
       }
@@ -8593,9 +8634,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const written = writeCalibrationVerifyCommand(dir, command);
-      if (written.length !== 2
-        || written[0] !== AUTHORITY_ARTIFACTS.calibration.neutral
-        || written[1] !== AUTHORITY_ARTIFACTS.calibration.legacy) {
+      if (!written.ok
+        || written.written.length !== 2
+        || written.written[0] !== AUTHORITY_ARTIFACTS.calibration.neutral
+        || written.written[1] !== AUTHORITY_ARTIFACTS.calibration.legacy) {
         // The full write set was validated immediately above. This defensive
         // failure is retained for an unexpected filesystem race; callers must
         // inspect the durable files rather than treating an incomplete result

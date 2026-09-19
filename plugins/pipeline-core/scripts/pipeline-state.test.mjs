@@ -1524,6 +1524,66 @@ function awaitingApprovalFixture() {
   assert.ok(handover.includes(expectedMarker), `docs/state.md must carry the marker verbatim; got:\n${handover}`);
 }
 
+// NVA-B-CALIBRATION-PREFLIGHT-FIX-R2: ordinary set-phase is the sanctioned
+// calibration writer. A rejected State transition or an invalid present
+// calibration must leave every pre-existing byte untouched; a requested command
+// must still support each healthy layout that project authority admits.
+{
+  const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
+  const baseline = { project: "calibration-preflight", verify: "node -e \"process.exit(1)\"", handover: "docs/state.md" };
+  const approvedState = {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "calibration-preflight", planPath: "specs/calibration-preflight/prd.md", phase: "design" },
+    planApproved: true,
+    planApproval: { approvedBy: "PO", approvedAt: now },
+  };
+  const draftState = { ...approvedState, planApproved: false };
+  const invalidState = { schema: "pipeline.state.v0", activeFeature: null, planApproved: true };
+  const fixture = (options = {}) => {
+    const state = options.state ?? approvedState;
+    const neutral = Object.hasOwn(options, "neutral") ? options.neutral : baseline;
+    const legacy = Object.hasOwn(options, "legacy") ? options.legacy : baseline;
+    const root = mktempProjectDir();
+    mkdirSync(join(root, "project"), { recursive: true });
+    if (neutral !== undefined) writeFileSync(join(root, "project", "pipeline.json"), typeof neutral === "string" ? neutral : `${JSON.stringify(neutral, null, 2)}\n`);
+    if (legacy !== undefined) {
+      mkdirSync(join(root, ".claude"), { recursive: true });
+      writeFileSync(join(root, ".claude", "pipeline.json"), typeof legacy === "string" ? legacy : `${JSON.stringify(legacy, null, 2)}\n`);
+    }
+    writeFileSync(join(root, "project", "pipeline-state.json"), `${JSON.stringify(state, null, 2)}\n`);
+    return root;
+  };
+  const snapshot = (root) => ["project/pipeline.json", ".claude/pipeline.json", "project/pipeline-state.json"].map((path) => {
+    const full = join(root, path);
+    return existsSync(full) ? readFileSync(full, "utf8") : null;
+  });
+  const refused = (options, label) => {
+    const root = fixture(options);
+    const before = snapshot(root);
+    assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir: root, now: () => now }), 2, label);
+    assert.deepEqual(snapshot(root), before, `${label}: State and every present calibration must remain byte-identical`);
+  };
+
+  refused({ state: draftState }, "draft or unapproved lifecycle must reject before calibration mutation");
+  refused({ state: invalidState }, "a second invalid lifecycle must reject before calibration mutation");
+  refused({ neutral: "{not json", legacy: baseline }, "malformed neutral calibration must reject before any write");
+  refused({ neutral: baseline, legacy: "{not json" }, "malformed legacy calibration must reject before any write");
+  refused({ neutral: [], legacy: baseline }, "a present non-object calibration must reject before any write");
+  refused({ neutral: baseline, legacy: { ...baseline, handover: "docs/other-state.md" } }, "unequal valid calibration twins must reject before any write");
+
+  for (const [label, options, expectedPaths] of [
+    ["neutral-only", { legacy: undefined }, ["project/pipeline.json"]],
+    ["legacy-only", { neutral: undefined }, [".claude/pipeline.json"]],
+    ["matching-dual", {}, ["project/pipeline.json", ".claude/pipeline.json"]],
+  ]) {
+    const root = fixture(options);
+    assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir: root, now: () => now }), 0, `${label} layout must remain supported`);
+    for (const path of expectedPaths) assert.equal(JSON.parse(readFileSync(join(root, path), "utf8")).verify, verifyCommand, `${label} must configure ${path}`);
+  }
+
+  refused({ neutral: undefined, legacy: undefined }, "missing all calibrations with a requested command must not report implementation success");
+}
+
 // NVA-CF-VERIFYDEADLOCK (backlog: pipeline.verify-contract-fails-until-configured-
 // but-gs-10-blocks-configuring-it). Live reproduction: a fresh onboarded project
 // (calibration seeded with the exact UNCONFIGURED_VERIFY placeholder text, twin
