@@ -34,6 +34,7 @@ check("writer validates, atomically publishes exclusively, and returns matching 
     assert.deepEqual(persisted, expected);
     assert.equal(persisted.report.text, reportText);
     assert.equal(receipt.bytes, raw.length); assert.match(receipt.sha256, /^[a-f0-9]{64}$/u);
+    assert.equal(receipt.schema, "pipeline.dispatch-record-write-receipt.v1");
     assert.equal(receipt.taskId, persisted.taskId); assert.equal(receipt.candidateCommit, persisted.candidateCommit);
     assert.equal(receipt.resultSha256, persisted.resultSha256);
     const authorship = verifyCommit("b".repeat(40), {
@@ -80,6 +81,8 @@ check("writer emits a valid zero-commit read-only terminal record that authorshi
   const root = fixture(readOnly);
   try {
     const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" });
+    assert.deepEqual(receipt.outcomeClassification, readOnly.outcomeClassification);
+    assert.equal(receipt.schema, "pipeline.dispatch-record-write-receipt.v2");
     const persisted = validateDispatchRecord(JSON.parse(readFileSync(join(root, receipt.target), "utf8")));
     assert.deepEqual(persisted, readOnly);
     const authorship = verifyCommit("b".repeat(40), {
@@ -88,6 +91,20 @@ check("writer emits a valid zero-commit read-only terminal record that authorshi
     });
     assert.equal(authorship.verdict, VERDICT.fail);
     assert.equal(authorship.classification, "record-outcome-does-not-attest-authorship");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("writer emits a closed nonauthoring receipt for a stopped v4 terminal record", () => {
+  const report = { text: "Work stopped before an authored commit.", changedFiles: [] };
+  const stopped = record({ taskId: "NVA-WRITE-STOPPED", outcome: "stopped-without-commit", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "stopped-without-commit" }, commits: [], report, resultSha256: reportSha256(report.text) });
+  const root = fixture(stopped);
+  try {
+    const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" });
+    assert.deepEqual(receipt, {
+      schema: "pipeline.dispatch-record-write-receipt.v2", target: "evidence/dispatch-record-NVA-WRITE-STOPPED.json",
+      sha256: receipt.sha256, bytes: receipt.bytes, taskId: stopped.taskId, candidateCommit: stopped.candidateCommit,
+      resultSha256: stopped.resultSha256, outcomeClassification: stopped.outcomeClassification,
+    });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -206,7 +223,7 @@ check("target replacement after hard-link admission is detected without reading 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 11, "the complete dispatch-record writer corpus must be registered before execution begins");
+assert.equal(cases.length, 12, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

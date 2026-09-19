@@ -7,6 +7,8 @@ import { join } from "node:path";
 import { coordinateWorkflowRunnerReturn, normalizeWorkflowRunnerOutcome, runSyntheticWorkflowDispatch, runSyntheticWorkflowDispatchBatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
 import { gitDeps, verifyCommit } from "../scripts/dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "../scripts/dispatch-record-write.mjs";
+import { reportSha256 } from "./dispatch-record.mjs";
+import { CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "./critic-skip-decision.mjs";
 
 let passed = 0;
 const A = "a".repeat(64);
@@ -221,6 +223,21 @@ check("schema-valid succeeded final exposes only its digest", () => {
   const result = normalizeWorkflowRunnerOutcome(expected, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }));
   assert.equal(result.code, "WR-OUTCOME-FINAL"); assert.equal(result.resultSha256, A); assert.equal(result.faultDomain, "unknown");
 });
+check("only a real acknowledged digest can suppress terminal return publication", () => {
+  const succeeded = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
+  const blockedWithoutResult = observation("failed", { schemaValid: true, outcome: "blocked", resultSha256: null });
+  assert.equal(normalizeWorkflowRunnerOutcome(expected, succeeded).code, "WR-OUTCOME-FINAL");
+  assert.equal(normalizeWorkflowRunnerOutcome({ ...expected, acknowledgedResultSha256: A }, succeeded).code, "WR-OUTCOME-DUPLICATE");
+  assert.equal(normalizeWorkflowRunnerOutcome({ ...expected, acknowledgedResultSha256: B }, succeeded).code, "WR-OUTCOME-CONFLICT");
+  assert.equal(normalizeWorkflowRunnerOutcome(expected, blockedWithoutResult).code, "WR-OUTCOME-PRODUCT-BLOCKED");
+  let calls = 0;
+  const completion = { identity, taskId: "P5B-RETURN-1", resultSha256: null, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" };
+  const result = coordinateWorkflowRunnerReturn(recordExpected, blockedWithoutResult, completion, {
+    writeDispatchRecord() { calls += 1; }, verifyCommit() { calls += 1; },
+  });
+  assert.equal(result.code, "WR-OUTCOME-PRODUCT-BLOCKED"); assert.equal(result.adapterInvocations, 0); assert.equal(calls, 0);
+  assert.equal(normalizeWorkflowRunnerOutcome({ ...expected, acknowledgedResultSha256: A }, observation("completed")).code, "WR-OUTCOME-COMPLETED-UNDELIVERED");
+});
 
 check("final native return writes canonical v3 evidence and passes authorship verification", () => {
   const root = mkdtempSync(join(tmpdir(), "workflow-return-record-"));
@@ -267,6 +284,46 @@ check("final native return writes canonical v3 evidence and passes authorship ve
     });
     assert.equal(result.ok, true); assert.equal(result.code, "WR-OUTCOME-FINAL-RECORDED");
     assert.equal(result.record.authorship, "bound"); assert.equal(result.adapterInvocations, 2);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("real writer publishes v4 nonauthoring terminal returns without commit verification", () => {
+  const root = mkdtempSync(join(tmpdir(), "workflow-return-nonauthoring-"));
+  try {
+    mkdirSync(join(root, "evidence")); mkdirSync(join(root, "requests")); mkdirSync(join(root, "src"));
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Workflow Test"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "workflow@example.test"], { cwd: root });
+    writeFileSync(join(root, "src", "x.mjs"), "export const x = 1;\n");
+    execFileSync("git", ["add", "src/x.mjs"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "chore(test): candidate"], { cwd: root });
+    const candidateCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    for (const [taskId, kind, state, outcome] of [
+      ["P5B-READONLY-1", "read-only", "completed", "succeeded"],
+      ["P5B-STOPPED-1", "stopped-without-commit", "failed", "blocked"],
+    ]) {
+      const report = { text: `${kind} terminal report.`, changedFiles: [] };
+      const resultSha256 = reportSha256(report.text);
+      const record = {
+        schema: "pipeline.dispatch-record.v4", taskId, agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+        rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit, resultSha256,
+        outcome: kind === "read-only" ? "read-only-completed" : "stopped-without-commit",
+        outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind }, commits: [], log: [{ phase: "done", toolUseCount: 4 }], report,
+        criticSkip: { schema: CRITIC_SKIP_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T5", reason: "fixture exercises writer receipt" },
+      };
+      const requestPath = `requests/${taskId}.json`;
+      writeFileSync(join(root, requestPath), `${JSON.stringify({ schema: "pipeline.dispatch-record-write-request.v1", target: `evidence/dispatch-record-${taskId}.json`, record })}\n`);
+      let verificationCalls = 0;
+      const result = coordinateWorkflowRunnerReturn({ identity, acknowledgedResultSha256: null, taskId, candidateCommit },
+        observation(state, { schemaValid: true, outcome, resultSha256 }),
+        { identity, taskId, resultSha256, candidateCommit, requestPath }, {
+          writeDispatchRecord: ({ requestPath: path }) => writeDispatchRecord({ repoRoot: root, requestPath: path }),
+          verifyCommit: () => { verificationCalls += 1; throw new Error("nonauthoring receipts must not verify commits"); },
+        });
+      assert.equal(result.ok, true); assert.equal(result.code, "WR-OUTCOME-NONAUTHORING-RECORDED");
+      assert.equal(result.record.authorship, "not-applicable"); assert.equal(result.record.outcomeClassification, kind);
+      assert.equal(result.adapterInvocations, 1); assert.equal(verificationCalls, 0);
+    }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -329,6 +386,27 @@ check("non-final and duplicate native returns never invoke record I/O", () => {
   assert.equal(calls, 0);
 });
 
+check("nonauthoring receipts reject unknown, mismatched, and wrong-lifecycle classifications without commit verification", () => {
+  const completion = { identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" };
+  const receipt = {
+    schema: "pipeline.dispatch-record-write-receipt.v2", target: "evidence/dispatch-record-P5B-RETURN-1.json", sha256: B, bytes: 300,
+    taskId: completion.taskId, candidateCommit: completion.candidateCommit, resultSha256: A,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" },
+  };
+  for (const [written, observed, code] of [
+    [{ ...receipt, outcomeClassification: { ...receipt.outcomeClassification, kind: "unknown" } }, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }), "WR-RECORD-WRITE-FAILED"],
+    [{ ...receipt, taskId: "FOREIGN-TASK" }, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }), "WR-RECORD-UNVERIFIED"],
+    [receipt, observation("failed", { schemaValid: true, outcome: "blocked", resultSha256: A }), "WR-RECORD-UNVERIFIED"],
+  ]) {
+    let verificationCalls = 0;
+    const result = coordinateWorkflowRunnerReturn(recordExpected, observed, completion, {
+      writeDispatchRecord: () => written,
+      verifyCommit: () => { verificationCalls += 1; },
+    });
+    assert.equal(result.ok, false); assert.equal(result.code, code); assert.equal(verificationCalls, 0);
+  }
+});
+
 check("return coordinator never reports success when post-write authorship is not bound", () => {
   const finalObservation = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
   const result = coordinateWorkflowRunnerReturn(recordExpected, finalObservation, {
@@ -365,6 +443,17 @@ check("already acknowledged digest is a duplicate", () => {
 check("different digest after acknowledgement is a null-final conflict", () => {
   const result = normalizeWorkflowRunnerOutcome({ ...expected, acknowledgedResultSha256: B }, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }));
   assert.equal(result.ok, false); assert.equal(result.code, "WR-OUTCOME-CONFLICT"); assert.equal(result.resultSha256, null);
+});
+check("acknowledged stopped terminal results suppress record I/O", () => {
+  const completion = { identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" };
+  let calls = 0;
+  const adapter = { writeDispatchRecord() { calls += 1; }, verifyCommit() { calls += 1; } };
+  const stopped = observation("failed", { schemaValid: true, outcome: "blocked", resultSha256: A });
+  const duplicate = coordinateWorkflowRunnerReturn({ ...recordExpected, acknowledgedResultSha256: A }, stopped, completion, adapter);
+  assert.equal(duplicate.ok, false); assert.equal(duplicate.code, "WR-OUTCOME-DUPLICATE"); assert.equal(duplicate.adapterInvocations, 0);
+  const conflict = coordinateWorkflowRunnerReturn({ ...recordExpected, acknowledgedResultSha256: B }, stopped, completion, adapter);
+  assert.equal(conflict.ok, false); assert.equal(conflict.code, "WR-OUTCOME-CONFLICT"); assert.equal(conflict.resultSha256, null); assert.equal(conflict.adapterInvocations, 0);
+  assert.equal(calls, 0);
 });
 check("mismatched dispatch identity is stale and null-final", () => {
   const input = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
