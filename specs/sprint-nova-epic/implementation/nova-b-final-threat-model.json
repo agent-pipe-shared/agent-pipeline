@@ -4,16 +4,17 @@
     "commit": "31d8fc52c222111b875d2290411fdd92453531a3",
     "tree": "00f1442b98bec3d4936bfbf0cd4f8dd2d10090e7"
   },
-  "policyRevision": "nova-b-final-boundaries-v2",
+  "policyRevision": "nova-b-final-boundaries-v3",
   "classification": "public",
   "entities": [
-    { "id": "asset-823b69e2162ce6cf", "kind": "asset", "label": "nova-b-local-candidate", "relationships": ["boundary-fe0e2538855b6330", "boundary-932d1147536a5b10", "boundary-12b8e4351cc9eb06", "boundary-4604b3360e50db9d", "boundary-ff1787f198b5e118", "boundary-5ed8eb5dddc41323"] },
+    { "id": "asset-823b69e2162ce6cf", "kind": "asset", "label": "nova-b-local-candidate", "relationships": ["boundary-fe0e2538855b6330", "boundary-932d1147536a5b10", "boundary-12b8e4351cc9eb06", "boundary-4604b3360e50db9d", "boundary-ff1787f198b5e118", "boundary-5ed8eb5dddc41323", "boundary-b4a086568d592fc4"] },
     { "id": "boundary-fe0e2538855b6330", "kind": "boundary", "label": "public-governance-events", "relationships": ["threat-a51ae676cd88edd6"] },
     { "id": "boundary-932d1147536a5b10", "kind": "boundary", "label": "private-human-authority", "relationships": ["threat-3abef5b7c8da6e6d"] },
     { "id": "boundary-12b8e4351cc9eb06", "kind": "boundary", "label": "runner-role-dispatch", "relationships": ["threat-f1b7ea38a3ec0d8c", "threat-520dda3287812951", "threat-1e078f4049bb2446"] },
     { "id": "boundary-4604b3360e50db9d", "kind": "boundary", "label": "ci-public-failure-log", "relationships": ["threat-a51ae676cd88edd6", "threat-cd11843329aa8537"] },
     { "id": "boundary-ff1787f198b5e118", "kind": "boundary", "label": "continuity-self-repair", "relationships": ["threat-fcf2cb30d7c7e563"] },
     { "id": "boundary-5ed8eb5dddc41323", "kind": "boundary", "label": "maintenance-window-commit-enforcement", "relationships": ["threat-f2789d7f36234957"] },
+    { "id": "boundary-b4a086568d592fc4", "kind": "boundary", "label": "critic-review-admission", "relationships": ["threat-4b98eb8739e7c3a1", "threat-7bd2b20c9ab6d9d4"] },
     { "id": "threat-a51ae676cd88edd6", "kind": "threat", "label": "public-detail-disclosure", "relationships": ["mitigation-82fe799eb0a26572", "mitigation-95a0539332d719fc"] },
     { "id": "threat-3abef5b7c8da6e6d", "kind": "threat", "label": "audit-authority-forgery", "relationships": ["mitigation-17e04ab43d5260d4"] },
     { "id": "threat-f1b7ea38a3ec0d8c", "kind": "threat", "label": "unauthorized-advisor-egress", "relationships": ["mitigation-2b3e2c0500b4b0e2"] },
@@ -22,6 +23,8 @@
     { "id": "threat-1e078f4049bb2446", "kind": "threat", "label": "unbounded-preparation-latency", "relationships": ["mitigation-d8b1000c26ab594e"] },
     { "id": "threat-fcf2cb30d7c7e563", "kind": "threat", "label": "unsafe-continuity-write", "relationships": ["mitigation-4cbc05f330223a06"] },
     { "id": "threat-f2789d7f36234957", "kind": "threat", "label": "signed-window-lifts-never-liftable-kernel", "relationships": ["mitigation-74624db79ad539cd"] },
+    { "id": "threat-4b98eb8739e7c3a1", "kind": "threat", "label": "unrelated-or-stale-critic-review-admission", "relationships": ["mitigation-8d4c711ce69f9423"] },
+    { "id": "threat-7bd2b20c9ab6d9d4", "kind": "threat", "label": "malformed-dispatch-record-bypasses-review-gate", "relationships": ["mitigation-b1e3b4a9471e4c48"] },
     { "id": "mitigation-82fe799eb0a26572", "kind": "mitigation", "label": "closed-digest-only-event-schema", "relationships": [] },
     { "id": "mitigation-17e04ab43d5260d4", "kind": "mitigation", "label": "signed-candidate-bound-human-authority", "relationships": [] },
     { "id": "mitigation-2b3e2c0500b4b0e2", "kind": "mitigation", "label": "dispatch-bound-advisor-denial", "relationships": [] },
@@ -29,7 +32,9 @@
     { "id": "mitigation-95a0539332d719fc", "kind": "mitigation", "label": "inventory-bound-redacted-unique-failure-rows", "relationships": [] },
     { "id": "mitigation-d8b1000c26ab594e", "kind": "mitigation", "label": "shared-five-second-preflight-deadline", "relationships": [] },
     { "id": "mitigation-4cbc05f330223a06", "kind": "mitigation", "label": "transactional-readback-and-rollback", "relationships": [] },
-    { "id": "mitigation-74624db79ad539cd", "kind": "mitigation", "label": "kernel-first-pretool-and-precommit-evaluation", "relationships": [] }
+    { "id": "mitigation-74624db79ad539cd", "kind": "mitigation", "label": "kernel-first-pretool-and-precommit-evaluation", "relationships": [] },
+    { "id": "mitigation-8d4c711ce69f9423", "kind": "mitigation", "label": "one-exact-pending-candidate-bound-admission", "relationships": [] },
+    { "id": "mitigation-b1e3b4a9471e4c48", "kind": "mitigation", "label": "fail-closed-full-dispatch-corpus-validation", "relationships": [] }
   ],
   "lifecycle": "verified"
 }
