@@ -138,6 +138,71 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
   };
 }
 
+/**
+ * Admit exactly one current dispatch record to independent review without
+ * treating the pending Critic disposition as completion. This is deliberately
+ * separate from coverage: every other v3/v4 record still has to be skipped or
+ * evidenced, and malformed or stale corpus entries remain blocking.
+ */
+export function evaluateReviewAdmission(options = {}) {
+  const root = options.root ?? DEFAULT_ROOT;
+  const taskId = options.taskId;
+  const candidateCommit = options.candidateCommit;
+  const readChangedPaths = options.readChangedPaths ?? ((record) => readCommitChangedPaths(root, record.commits));
+  const scan = walkDispatchRecords(root);
+  const findings = [...scan.findings];
+  let admittedCount = 0;
+  let applicableRecordCount = 0;
+  let coveredRecordCount = 0;
+  if (typeof taskId !== "string" || taskId.trim() === "") findings.push("review admission taskId is required");
+  if (typeof candidateCommit !== "string" || !/^[a-f0-9]{40}$/u.test(candidateCommit)) findings.push("review admission candidateCommit must be a full lowercase Git SHA");
+
+  for (const { path, record } of scan.records) {
+    if (legacySchema(record)) {
+      if (record?.schema === LEGACY_DISPATCH_RECORD_SCHEMA) {
+        try { validateLegacyDispatchRecord(record); } catch (error) { findings.push(`${path}: invalid legacy v2 record (${error.message})`); }
+      }
+      continue;
+    }
+    const isV4 = record?.schema === DISPATCH_RECORD_SCHEMA;
+    const isV3 = record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA;
+    if (!isV3 && !isV4) {
+      findings.push(`${path}: unsupported dispatch record schema ${JSON.stringify(record?.schema)}`);
+      continue;
+    }
+    applicableRecordCount += 1;
+    try { isV4 ? validateDispatchRecord(record) : validatePreviousDispatchRecord(record); }
+    catch (error) { findings.push(`${path}: invalid ${isV4 ? "v4" : "v3"} dispatch record (${error.message})`); continue; }
+    const disposition = criticDisposition(record);
+    if (disposition === "required") {
+      if (record.taskId === taskId && record.candidateCommit === candidateCommit) {
+        admittedCount += 1;
+      } else {
+        findings.push(`${path}: Critic is required by ${record.criticRequired.appliedRow}; only the exact review target may remain pending`);
+      }
+      continue;
+    }
+    if (disposition === "skipped") {
+      try {
+        const pathFinding = criticDecisionPathFinding(record.criticSkip, readChangedPaths(record));
+        if (pathFinding) findings.push(`${path}: ${pathFinding.reason}`);
+        else coveredRecordCount += 1;
+      } catch (error) { findings.push(`${path}: actual changed paths could not be derived (${error.message})`); }
+      continue;
+    }
+    if (disposition === "evidenced") {
+      const evidenceFinding = verifyCriticEvidence(root, path, record.criticEvidence);
+      if (evidenceFinding) findings.push(evidenceFinding);
+      else coveredRecordCount += 1;
+      continue;
+    }
+    findings.push(`${path}: requires exactly one Critic disposition`);
+  }
+  if (admittedCount !== 1) findings.push(`review admission requires exactly one pending record for ${taskId}@${candidateCommit}; found ${admittedCount}`);
+  const ok = findings.length === 0 && admittedCount === 1 && coveredRecordCount + admittedCount === applicableRecordCount;
+  return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount, readFindings: findings };
+}
+
 function runCli() {
   const args = process.argv.slice(2);
   const rootIndex = args.indexOf("--root");

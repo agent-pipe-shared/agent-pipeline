@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { evaluateRepositoryCriticSkipCoverage, readCommitChangedPaths, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+import { evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 
 const SHA = "a".repeat(40);
@@ -90,6 +90,36 @@ test("required disposition remains valid but blocks coverage until evidence repl
   assert.equal(reviewed.ok, true);
   assert.equal(reviewed.requiredRecordCount, 0);
   assert.equal(reviewed.criticEvidenceRecordCount, 1);
+});
+
+test("review admission permits exactly its current pending target while retaining full corpus validation", () => {
+  const root = fixture({
+    "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })),
+    "evidence/dispatch-record-COVERED.json": json(v4("COVERED", { criticSkip: skip() })),
+  });
+  const admitted = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(admitted.ok, true);
+  assert.equal(admitted.admittedCount, 1);
+  assert.equal(admitted.coveredRecordCount, 1);
+});
+
+test("review admission rejects candidate drift, a second pending record, and malformed corpus evidence", () => {
+  const root = fixture({
+    "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })),
+    "evidence/dispatch-record-OTHER.json": json(v4("OTHER", { criticRequired: required() })),
+  });
+  const extraPending = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(extraPending.ok, false);
+  assert.match(extraPending.readFindings.join("\n"), /only the exact review target may remain pending/u);
+
+  const drifted = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: "b".repeat(40), readChangedPaths: () => [] });
+  assert.equal(drifted.ok, false);
+  assert.match(drifted.readFindings.join("\n"), /found 0/u);
+
+  writeFileSync(join(root, "evidence", "dispatch-record-BROKEN.json"), "{");
+  const malformed = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(malformed.ok, false);
+  assert.match(malformed.readFindings.join("\n"), /could not be read as valid JSON/u);
 });
 
 test("v4 pending, skipped and evidenced records remain actual coverage consumers, while malformed v4 fails closed", () => {
