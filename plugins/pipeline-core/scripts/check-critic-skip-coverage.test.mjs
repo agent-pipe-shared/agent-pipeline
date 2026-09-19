@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+import { DEFAULT_LEGACY_RECONCILE_INDEX_PATH, LEGACY_RECONCILE_SCHEMA, evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 
 const SHA = "a".repeat(40);
@@ -40,6 +40,11 @@ function v4(taskId, disposition) {
 }
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const evaluate = (root, paths = ["generated/output.json"]) => evaluateRepositoryCriticSkipCoverage({ root, readChangedPaths: () => paths });
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+function reconcileIndex(entry) { return json({ schema: LEGACY_RECONCILE_SCHEMA, entries: [entry] }); }
+function reconciledNoCommitRecord(taskId = "HISTORICAL") {
+  return v3(taskId, { outcome: "partial-analysis-only", commits: [], criticRequired: required() });
+}
 
 test("walkDispatchRecords retains source paths and reports malformed JSON", () => {
   const root = fixture({ "evidence/dispatch-record-A.json": json({ taskId: "A" }), "evidence/dispatch-record-B.json": "{" });
@@ -59,6 +64,62 @@ test("v2 and unversioned dispatch records remain explicit pre-cutover legacy", (
   assert.equal(result.ok, true);
   assert.equal(result.legacyRecordCount, 2);
   assert.equal(result.applicableRecordCount, 0);
+});
+
+test("a byte-bound reconciliation preserves a truthful terminal no-commit record as legacy", () => {
+  const recordPath = "evidence/dispatch-record-HISTORICAL.json";
+  const recordBytes = json(reconciledNoCommitRecord());
+  const evidencePath = "evidence/historical-HISTORICAL-report.md";
+  const evidenceBytes = Buffer.from("Historical stop report; no commit was authored.\n");
+  const indexBytes = reconcileIndex({
+    recordPath, recordSha256: sha256(recordBytes), terminalKind: "read-only",
+    disposition: { kind: "evidence", path: evidencePath, sha256: sha256(evidenceBytes) },
+  });
+  const root = fixture({ [recordPath]: recordBytes, [evidencePath]: evidenceBytes, [DEFAULT_LEGACY_RECONCILE_INDEX_PATH]: indexBytes });
+  const result = evaluate(root);
+  assert.equal(result.ok, true);
+  assert.equal(result.reconciledLegacyRecordCount, 1);
+  assert.equal(result.applicableRecordCount, 0);
+});
+
+test("legacy reconciliation fails closed on source drift, duplicate record paths, and disposition digest drift", () => {
+  const recordPath = "evidence/dispatch-record-HISTORICAL.json";
+  const recordBytes = json(reconciledNoCommitRecord());
+  const evidencePath = "evidence/historical-HISTORICAL-report.md";
+  const evidenceBytes = Buffer.from("Historical stop report; no commit was authored.\n");
+  const entry = { recordPath, recordSha256: sha256(recordBytes), terminalKind: "read-only", disposition: { kind: "evidence", path: evidencePath, sha256: sha256(evidenceBytes) } };
+  const root = fixture({ [recordPath]: recordBytes, [evidencePath]: evidenceBytes, [DEFAULT_LEGACY_RECONCILE_INDEX_PATH]: reconcileIndex(entry) });
+
+  writeFileSync(join(root, recordPath), `${recordBytes}\n`);
+  const sourceDrift = evaluate(root);
+  assert.equal(sourceDrift.ok, false);
+  assert.match(sourceDrift.readFindings.join("\n"), /recordSha256: SHA-256 digest mismatch/u);
+
+  writeFileSync(join(root, recordPath), recordBytes);
+  writeFileSync(join(root, DEFAULT_LEGACY_RECONCILE_INDEX_PATH), json({ schema: LEGACY_RECONCILE_SCHEMA, entries: [entry, entry] }));
+  const duplicate = evaluate(root);
+  assert.equal(duplicate.ok, false);
+  assert.match(duplicate.readFindings.join("\n"), /duplicates an earlier reconciliation entry/u);
+
+  writeFileSync(join(root, DEFAULT_LEGACY_RECONCILE_INDEX_PATH), reconcileIndex({ ...entry, disposition: { ...entry.disposition, sha256: "f".repeat(64) } }));
+  const evidenceDrift = evaluate(root);
+  assert.equal(evidenceDrift.ok, false);
+  assert.match(evidenceDrift.readFindings.join("\n"), /disposition\.sha256: SHA-256 digest mismatch/u);
+});
+
+test("review admission also excludes only a valid byte-bound historical no-commit record", () => {
+  const recordPath = "evidence/dispatch-record-HISTORICAL.json";
+  const recordBytes = json(reconciledNoCommitRecord());
+  const evidencePath = "evidence/historical-HISTORICAL-report.md";
+  const evidenceBytes = Buffer.from("Historical stop report; no commit was authored.\n");
+  const indexBytes = reconcileIndex({ recordPath, recordSha256: sha256(recordBytes), terminalKind: "read-only", disposition: { kind: "evidence", path: evidencePath, sha256: sha256(evidenceBytes) } });
+  const root = fixture({
+    [recordPath]: recordBytes, [evidencePath]: evidenceBytes, [DEFAULT_LEGACY_RECONCILE_INDEX_PATH]: indexBytes,
+    "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })),
+  });
+  const result = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(result.ok, true);
+  assert.equal(result.applicableRecordCount, 1);
 });
 
 test("each v3 dispatch may carry a structured skip decision", () => {

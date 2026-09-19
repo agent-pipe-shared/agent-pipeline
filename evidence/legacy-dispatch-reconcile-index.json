@@ -1,0 +1,245 @@
+{
+  "schema": "pipeline.legacy-dispatch-reconcile-index.v1",
+  "entries": [
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-01V4.json",
+      "recordSha256": "8ea2bdb3d3b5f23e567ad5b21933c0865259d4862167b812d2191d274bbe194a",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-02V4.json",
+      "recordSha256": "c3136ed572d0e1813d49021261b7ae3857e8756568380aca46025480a290a113",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-03V4.json",
+      "recordSha256": "c706d3c7c13692375ffaf3360bd02859bd506e9a7fac1c268b8edc64bfa5bedf",
+      "terminalKind": "stopped-without-commit",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-04.json",
+      "recordSha256": "f4e3f089615721f6a24b03f96352f992cd51af25b8aabe8b0cef58674f4dacb4",
+      "terminalKind": "stopped-without-commit",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-05.json",
+      "recordSha256": "67cfa12695e1a14c2fab7395a5d17697e1afa826b8aa6526346da9bd41d4cdb7",
+      "terminalKind": "stopped-without-commit",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-06.json",
+      "recordSha256": "56416a3e121285a2b851e7d668b7a01d035af382537072a49dd2e0f6674a6ead",
+      "terminalKind": "stopped-without-commit",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-07.json",
+      "recordSha256": "b62504655822883ddb85ba565b678cc679014b0729ed43dd997741923c8c07d6",
+      "terminalKind": "stopped-without-commit",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-08.json",
+      "recordSha256": "fa790c11cb7ba3b8f93dec1289722fde7876a224e528ecc4d9a40e039279e5c6",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-09.json",
+      "recordSha256": "25d5b32ae920345c31370b4fd203d69f0b573b1a4cd2cd9e738cd1ced06a1df9",
+      "terminalKind": "stopped-without-commit",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-10.json",
+      "recordSha256": "70e2fc105ff6f2f21e09c99a316097e345ae94d6075ff93508ecb5af8a2b992c",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC1R3.json",
+      "recordSha256": "61e33d616fd69a808386acff751b30c107df0b4dd1f7702115aafbbf19df89a1",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC2.json",
+      "recordSha256": "faacd481508077312b7e76b9933b6920f64788f0abdafaf3d77d40efa6d15a72",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC3.json",
+      "recordSha256": "e377fdee5b97e7bae55fbc2fe7938868807169a9af6488a9f9f9d4145910f1f0",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC4R2.json",
+      "recordSha256": "2ff59e53562d0f2bc20cb6774b0a1af2aa60c2169deaaa6c4a26cd1a237dfc12",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC5.json",
+      "recordSha256": "8709bb003248f5f4d19d2d7bcf9f9b92393c29365ddc84ab8024ee497bbc23b4",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC6.json",
+      "recordSha256": "98c733941d5ee49d4fe71f91397b0750f5cf9fedd850004c45026a07d86b2c04",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AUTHORITY-THREE.json",
+      "recordSha256": "c88599c4f9660836a5ca2c8c161f9a41c0160e0230c2003ec85522f91275e227",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-CALIBRATION-R2.json",
+      "recordSha256": "49effd07ecb29be7f0a30913141e1fdc9e9ddf0e0c1c6bcb5c3811dd8ddabf39",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-MISSING-THREE-R2.json",
+      "recordSha256": "a3103fc2795689fe3f745df695e2537de2fdc9cb22179622b24840ad4a313fa3",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-R1.json",
+      "recordSha256": "5dfdcb99a69df15796a627e0f6d7f8e1ea4ad2229512cbfba58d124574d33fad",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-CALIBRATION-DESIGN-R2.json",
+      "recordSha256": "948099ff391fa37974b102a10626a860df18c1bdb2c81cc6bfb78f2267e3cc62",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-PROMOTION-MAP.json",
+      "recordSha256": "e9acfe05750056dbf2c8e6abb9d2ee53a752e564681843906817adb4930a3651",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-PROMOTION-Q0.json",
+      "recordSha256": "94b5601a8e23b018cfbe098a96a3fb4a59c0f856aadd4b263e67a0154a8572e7",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-PUSH-LIFECYCLE-DESIGN-R3.json",
+      "recordSha256": "360f9d9dcda03268ceb8aba5035379c26f4cbd272e8b0f39bd8ef8fb385a3048",
+      "terminalKind": "read-only",
+      "disposition": {
+        "kind": "evidence",
+        "path": "evidence/legacy-dispatch-reconcile-evidence.json",
+        "sha256": "134feea6e0fd87ade3db3c99d2b27ad0d711d79422ab99169c7012d74abf4399"
+      }
+    }
+  ]
+}
