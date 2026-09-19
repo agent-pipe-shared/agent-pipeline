@@ -188,7 +188,7 @@ test("refusePlanAuthorityStagingPath refuses staging directory paths", () => {
   }
 });
 
-test("refusePlanAuthorityStagingPath does not treat a legacy banner in canonical specs as staging evidence", () => {
+test("refusePlanAuthorityStagingPath refuses a generated banner in either canonical authority document", () => {
   const root = tempProjectDir();
   try {
     const bannerContent = `# My PRD\n\n${PRE_AUTHORITY_BANNER_LINE}\n\nRequirements.\n`;
@@ -200,7 +200,29 @@ test("refusePlanAuthorityStagingPath does not treat a legacy banner in canonical
       specPath: "specs/feat/spec.md",
       readFileFn: (path) => path.includes("prd.md") ? bannerContent : cleanSpecContent,
     });
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, PLAN_BINDS_PRE_AUTHORITY_DRAFT);
+    assert.ok(result.message.includes("plan"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("refusePlanAuthorityStagingPath covers absolute paths and both authority banners", () => {
+  const root = tempProjectDir();
+  try {
+    const planPath = join(root, "specs", "feat", "prd.md");
+    const specPath = join(root, "specs", "feat", "spec.md");
+    const banner = `<!-- ${PRE_AUTHORITY_BANNER_SNIPPET} -->`;
+    const result = refusePlanAuthorityStagingPath({
+      rootDir: root,
+      planPath,
+      specPath,
+      readFileFn: (path) => path === planPath || path === specPath ? banner : "",
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, PLAN_BINDS_PRE_AUTHORITY_DRAFT);
+    assert.ok(result.message.includes("plan and spec authority document"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -216,6 +238,23 @@ test("refusePlanAuthorityStagingPath passes for clean promoted files", () => {
       readFileFn: () => "# Clean document without banner\n\nRequirements.\n",
     });
     assert.equal(result.ok, true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("refusePlanAuthorityStagingPath fails closed for unreadable authority files", () => {
+  const root = tempProjectDir();
+  try {
+    const result = refusePlanAuthorityStagingPath({
+      rootDir: root,
+      planPath: "specs/feat/prd.md",
+      specPath: "specs/feat/spec.md",
+      readFileFn: () => { throw new Error("EACCES"); },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, PLAN_BINDS_PRE_AUTHORITY_DRAFT);
+    assert.ok(result.message.includes("could not be read"));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -238,8 +277,7 @@ test("submit-plan refuses legacy staging drafts and admits canonical legacy-bann
     }
   }
 
-  // Scenario 2: a canonical path retaining an old banner is admitted only
-  // after the fixture's active feature and PO-gate authority agree exactly.
+  // Scenario 2: a canonical path retaining an old banner is refused.
   {
     const featureId = "banner-sub";
     const planPath = `specs/${featureId}/prd_${featureId}.md`;
@@ -248,8 +286,8 @@ test("submit-plan refuses legacy staging drafts and admits canonical legacy-bann
     const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, planContent });
     try {
       const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
-      assert.equal(attempt.result, 0);
-      assert.equal(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)), false);
+      assert.equal(attempt.result, 2);
+      assert.ok(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -299,8 +337,8 @@ test("approve-plan independently refuses legacy staging drafts and does not misc
       const presented = run(["present-plan", "--by", "coordinator"], deps);
       assert.equal(presented, 0, "canonical authority must still require a real presentation before approval");
       const attempt = capturedStderr(() => run(["approve-plan", "--by", "po-test"], deps));
-      assert.equal(attempt.result, 2, "the fixture has no human approval signature, but must pass the staging check");
-      assert.equal(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)), false);
+      assert.equal(attempt.result, 2, "banner refusal must run before the human approval signature check");
+      assert.ok(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -1,0 +1,22 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "ALF-BANNER-FIX",
+  "agentType": "implementor",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "rulesetSha": "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "commits": [],
+  "log": [
+    {"phase":"opening-record","toolUses":1},
+    {"phase":"red-regression","command":"node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","exitCode":1,"evidence":"evidence/alf-banner-red.json"},
+    {"phase":"focused-green","command":"node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","exitCode":0,"evidence":"evidence/alf-banner-green.json"}
+  ],
+  "report": {"text":"", "changedFiles":[]},
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {"schema":"pipeline.critic-trigger-input.v1","rigorLevel":2,"riskClass":"low","riskFlag":false,"diff":{"mechanical":false,"architecture":false,"guardrails":false,"security":false}},
+    "appliedRow": "T3"
+  }
+}

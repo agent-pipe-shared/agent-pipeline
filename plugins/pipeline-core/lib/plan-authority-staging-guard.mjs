@@ -20,8 +20,10 @@
  *   not a migration — a project already in the bad state is unaffected beyond
  *   the refusal becoming legible for its NEXT submit-plan/approve-plan call.
  *   Canonical `specs/<feature>/` documents are structurally bound by the
- *   PO-gate authority validation before this helper is called. An old copied
- *   banner in that canonical location is therefore not staging evidence.
+ *   PO-gate authority validation before this helper is called. A generated
+ *   pre-authority banner in either authority document remains a refusal even
+ *   after promotion, because the document has not crossed the authority
+ *   boundary until that banner is removed.
  *
  * WHERE THE NAMES COME FROM
  *   The staging directory name is `INTAKE_STAGING_DIRNAME`
@@ -87,21 +89,18 @@ export function pathIsInsideOnboardingStaging(rootDir, relativePath) {
 }
 
 /**
- * Refuse a plan-submission/plan-approval authority binding whose plan path or
- * spec path resolves inside the onboarding staging directory. The caller has
- * already established that the active, matching PO-gate authority is valid;
- * this helper adds only the legacy-path fail-closed condition. Returns
- * `{ ok: true }` when neither path is staged, else `{ ok: false, code,
- * message }` naming which path(s) triggered the refusal and the exact
- * promotion action to run instead.
+ * Refuse a plan-submission/plan-approval authority binding whose plan/spec
+ * path resolves inside onboarding staging, or whose authority file still
+ * carries the generated pre-authority banner. The caller has already
+ * established that the active, matching PO-gate authority is valid; this
+ * helper adds the entry-boundary fail-closed conditions. Unreadable authority
+ * files are refused rather than treated as clean. Returns `{ ok: true }` only
+ * when both paths are readable, non-staged, and banner-free.
  */
 export function refusePlanAuthorityStagingPath({ rootDir, planPath, specPath, readFileFn = readFileSync }) {
-  void readFileFn;
   const staged = [];
   if (pathIsInsideOnboardingStaging(rootDir, planPath)) staged.push("plan");
   if (pathIsInsideOnboardingStaging(rootDir, specPath)) staged.push("spec");
-
-  if (staged.length === 0) return { ok: true };
 
   const reasons = [];
   if (staged.length > 0) {
@@ -109,6 +108,26 @@ export function refusePlanAuthorityStagingPath({ rootDir, planPath, specPath, re
       `the ${staged.join(" and ")} path resolves inside ${INTAKE_STAGING_DIRNAME}, the onboarding staging directory`
     );
   }
+
+  const bannerPaths = [];
+  const unreadablePaths = [];
+  for (const [label, relativePath] of [["plan", planPath], ["spec", specPath]]) {
+    if (typeof relativePath !== "string" || relativePath === "" || pathIsInsideOnboardingStaging(rootDir, relativePath)) continue;
+    try {
+      const content = readFileFn(resolve(rootDir, relativePath), "utf8");
+      if (typeof content !== "string" || content.includes(PRE_AUTHORITY_BANNER_SNIPPET)) bannerPaths.push(label);
+    } catch {
+      unreadablePaths.push(label);
+    }
+  }
+  if (bannerPaths.length > 0) {
+    reasons.push(`the ${bannerPaths.join(" and ")} authority document carries the generated pre-authority banner`);
+  }
+  if (unreadablePaths.length > 0) {
+    reasons.push(`the ${unreadablePaths.join(" and ")} authority document could not be read`);
+  }
+  if (reasons.length === 0) return { ok: true };
+
   return {
     ok: false,
     code: PLAN_BINDS_PRE_AUTHORITY_DRAFT,

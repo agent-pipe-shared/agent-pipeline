@@ -1,0 +1,117 @@
+command: node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs
+label: alf-banner-red
+exitCode: 1
+--- stdout ---
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/banner-sub/prd_banner-sub.md(b5dabe0886c8...)+specs/banner-sub/spec.md(603c828a0338...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 0563d148ccaa....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Feature "auto-continuity-feat" set. Plan path: specs/auto-continuity-feat/prd.md. planApproved=false, phase="design".
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/auto-continuity-feat/prd.md(069b8e3677d5...)+specs/auto-continuity-feat/spec.md(2ea7fc7e9cf5...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+✔ constants and backwards-compatibility aliases are correctly wired (0.577278ms)
+✔ pathIsInsideOnboardingStaging identifies staging paths accurately (0.11956ms)
+✔ refusePlanAuthorityStagingPath refuses staging directory paths (0.341029ms)
+✖ refusePlanAuthorityStagingPath refuses a generated banner in either canonical authority document (0.626288ms)
+✔ refusePlanAuthorityStagingPath passes for clean promoted files (0.193119ms)
+✖ refusePlanAuthorityStagingPath fails closed for unreadable authority files (0.246789ms)
+✖ submit-plan refuses legacy staging drafts and admits canonical legacy-banner compatibility with valid authority (8.911713ms)
+✖ approve-plan independently refuses legacy staging drafts and does not misclassify canonical legacy-banner compatibility (13.04672ms)
+✔ set-feature initializes revision-0 continuity so submit-plan succeeds without continuity-init (6.301861ms)
+✔ authority documents are editable during design phase, and frozen during implementation (8.161156ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 6
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 161.744334
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs:191:1
+✖ refusePlanAuthorityStagingPath refuses a generated banner in either canonical authority document (0.626288ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs:203:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs:226:1
+✖ refusePlanAuthorityStagingPath fails closed for unreadable authority files (0.246789ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs:235:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs:243:1
+✖ submit-plan refuses legacy staging drafts and admits canonical legacy-banner compatibility with valid authority (8.911713ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs:269:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs:277:1
+✖ approve-plan independently refuses legacy staging drafts and does not misclassify canonical legacy-banner compatibility (13.04672ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(attempt.lines.some((l) => l.includes(PLAN_BINDS_PRE_AUTHORITY_DRAFT)))
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs:321:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

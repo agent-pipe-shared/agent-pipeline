@@ -1,0 +1,30 @@
+command: node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs
+label: alf-banner-green
+exitCode: 0
+--- stdout ---
+Plan presentation recorded by "coordinator" on 2026-08-27T10:00:00.000Z; bound to submission 0563d148ccaa....
+Next: run `approve-plan --by <name>` once the PO has confirmed 'approved'.
+Feature "auto-continuity-feat" set. Plan path: specs/auto-continuity-feat/prd.md. planApproved=false, phase="design".
+Plan submitted by "coordinator" on 2026-08-27T10:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/auto-continuity-feat/prd.md(069b8e3677d5...)+specs/auto-continuity-feat/spec.md(2ea7fc7e9cf5...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+✔ constants and backwards-compatibility aliases are correctly wired (0.617928ms)
+✔ pathIsInsideOnboardingStaging identifies staging paths accurately (0.11981ms)
+✔ refusePlanAuthorityStagingPath refuses staging directory paths (0.386599ms)
+✔ refusePlanAuthorityStagingPath refuses a generated banner in either canonical authority document (0.181939ms)
+✔ refusePlanAuthorityStagingPath covers absolute paths and both authority banners (0.238109ms)
+✔ refusePlanAuthorityStagingPath passes for clean promoted files (0.15815ms)
+✔ refusePlanAuthorityStagingPath fails closed for unreadable authority files (0.220859ms)
+✔ submit-plan refuses legacy staging drafts and admits canonical legacy-banner compatibility with valid authority (3.807058ms)
+✔ approve-plan independently refuses legacy staging drafts and does not misclassify canonical legacy-banner compatibility (8.210415ms)
+✔ set-feature initializes revision-0 continuity so submit-plan succeeds without continuity-init (5.556303ms)
+✔ authority documents are editable during design phase, and frozen during implementation (8.205734ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 143.739189
+
+--- stderr ---
