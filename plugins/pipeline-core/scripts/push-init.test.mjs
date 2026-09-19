@@ -238,7 +238,18 @@ test("drivePushInit: baseline-only implementation publishes configure-verify and
   const root = freshFixtureRoot();
   try {
     writeLateVerifyFixture(root);
-    const stateDeps = { dir: root, now: () => "2026-09-18T12:00:00.000Z" };
+    const missingReadiness = pipelineStateRun(["set-phase", "--phase", "implementation"], {
+      dir: root,
+      now: () => "2026-09-18T12:00:00.000Z",
+    });
+    assert.equal(missingReadiness, 2, "a late-verify fixture without architecture evidence must fail closed");
+    const stateDeps = {
+      dir: root,
+      now: () => "2026-09-18T12:00:00.000Z",
+      // This test isolates the verify deadlock; architecture readiness has its
+      // own physical-map and signed-authority coverage in pipeline-state tests.
+      architectureEntryReadiness: () => ({ status: "ready" }),
+    };
     assert.equal(pipelineStateRun(["set-phase", "--phase", "implementation"], stateDeps), 0);
 
     const blocked = drivePushInit({
