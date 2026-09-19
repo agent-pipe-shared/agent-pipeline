@@ -6,14 +6,19 @@
   "effort": "medium",
   "rulesetSha": "b7797309cf6abe175fd52b0a8749d82b43714ea0",
   "dispatcher": "elephant",
-  "outcome": "in-progress",
-  "commits": [],
+  "outcome": "completed",
+  "commits": ["b32445ea0"],
   "log": [
     {"phase":"opening-record","toolUses":1},
     {"phase":"red-regression","command":"node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","exitCode":1,"evidence":"evidence/alf-banner-red.json"},
-    {"phase":"focused-green","command":"node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","exitCode":0,"evidence":"evidence/alf-banner-green.json"}
+    {"phase":"focused-green","command":"node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","exitCode":0,"evidence":"evidence/alf-banner-green.json"},
+    {"phase":"consumer-green","command":"node --test harness/scripts/check-consumer-safe-paths.test.mjs","exitCode":0,"evidence":"evidence/alf-banner-consumer.json"},
+    {"phase":"commit-checkpoint","commit":"b32445ea0","changedFiles":["plugins/pipeline-core/lib/plan-authority-staging-guard.mjs","plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","evidence/alf-banner-red.json","evidence/alf-banner-green.json","evidence/alf-banner-consumer.json","evidence/dispatch-record-ALF-BANNER-FIX.json"]}
   ],
-  "report": {"text":"", "changedFiles":[]},
+  "report": {
+    "text":"Implemented ALF-CODE-CRITIC-1 finding 6. submit-plan and approve-plan now refuse generated pre-authority banners in either authority document, regardless of staging location or absolute/relative path form; unreadable authority files fail closed. RED was reproduced before implementation, then the focused guard suite and consumer-safe-paths suite passed. git diff --check passed. Full Verify remains independently blocked by the existing record; no clearance claim. Independent review: pending.",
+    "changedFiles":["plugins/pipeline-core/lib/plan-authority-staging-guard.mjs","plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","evidence/alf-banner-red.json","evidence/alf-banner-green.json","evidence/alf-banner-consumer.json","evidence/dispatch-record-ALF-BANNER-FIX.json"]
+  },
   "criticRequired": {
     "schema": "pipeline.critic-required-decision.v1",
     "trigger": {"schema":"pipeline.critic-trigger-input.v1","rigorLevel":2,"riskClass":"low","riskFlag":false,"diff":{"mechanical":false,"architecture":false,"guardrails":false,"security":false}},
