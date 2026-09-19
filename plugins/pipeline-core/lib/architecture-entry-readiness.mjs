@@ -19,6 +19,7 @@ import {
 } from "../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
 import { loadMapBundle } from "../scripts/module-inventory.mjs";
+import { inspectArchitectureDesign } from "./architecture-design.mjs";
 
 export const ARCHITECTURE_ENTRY_SCHEMA = "pipeline.architecture-entry-readiness.v1";
 export const ARCHITECTURE_ENTRY_SCOPE = "architecture/map/";
@@ -64,12 +65,20 @@ function physicalJson(root, relativePath, expectedSchema, validShape) {
 }
 
 function proposalAction(root) {
+  const design = inspectArchitectureDesign(root);
+  if (design.ok && design.status === "materialization-required") return {
+    kind: "command", executable: "node",
+    argv: [fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url)), "materialize-architecture"],
+    mutation: true, requiresConfirmation: false,
+    expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
+  };
   let proposal = null;
   try { proposal = generateAdoptionProposal(root); } catch { /* the primary refusal remains authoritative */ }
   return {
     kind: "collect-input",
     input: { name: "architecture-adoption-disposition", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true },
-    guidance: "architecture entry is not ready; review the attached staged read-only proposal, then provide the required scoped PO disposition and physical map/baseline artifacts",
+    guidance: "Complete the governed architecture design before approval. A greenfield PRD includes one explicit pipeline-architecture-design package and scoped disposition in the normal PO decision. Existing repositories require the attached read-only adoption proposal and explicit PO disposition; bootstrap never invents or adopts their map.",
+    designCode: design.code ?? null,
     proposal,
     proposalSchema: "pipeline.adoption-proposal.v1",
     proposalSource: ARCHITECTURE_ADOPTION_SCRIPT,
@@ -129,7 +138,10 @@ function projectPlanningFitness(fitness) {
 export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), taskScope = null, planningSurface = undefined, now = new Date(), deps = {} } = {}) {
   const root = resolve(rootDir);
   const adoption = (deps.resolveAdoptionState ?? resolveAdoptionState)(root, now);
-  const disposition = (deps.checkPlanningAdoptionDisposition ?? checkPlanningAdoptionDisposition)(root, taskScope, now);
+  const design = inspectArchitectureDesign(root, taskScope);
+  const disposition = design.ok && design.status === "materialized"
+    ? { ok: true, disposition: design.disposition, scope: design.scope, authority: design.authority }
+    : (deps.checkPlanningAdoptionDisposition ?? checkPlanningAdoptionDisposition)(root, taskScope, now);
   const map = loadMapBundle(root);
   const fitnessModel = physicalJson(root, "architecture/fitness-model.json", "pipeline.fitness-model.v1", (value) =>
     typeof value.profileId === "string"
@@ -166,6 +178,9 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     adoption: { state: adoption.state, coverageClass: adoption.coverageClass, confidence: adoption.confidence },
   };
 
+  if (existsSync(resolve(root, "architecture/design-materialization.json")) && !design.ok) {
+    return failure(root, design.code, "The architecture design no longer matches its current PO-bound package", artifacts, disposition);
+  }
   if (!map.ok || !map.indexFileExists || !indexValid) {
     return failure(root, map.indexFileExists ? "ARCHITECTURE-MAP-INVALID" : "ARCHITECTURE-MAP-MISSING",
       map.indexFileExists ? "the physical architecture map is malformed or has invalid module contracts"
@@ -182,10 +197,27 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     return failure(root, "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED", disposition.error ?? "a valid scoped architecture adoption disposition is required", artifacts, disposition);
   }
 
-  const surface = planningSurface === undefined ? deriveArchitecturePlanningSurface(root) : planningSurface;
+  const surface = planningSurface === undefined
+    ? (design.ok && design.status === "materialized" ? design.planningSurface : deriveArchitecturePlanningSurface(root))
+    : planningSurface;
   if (surface === null) {
     return failure(root, "ARCHITECTURE-PLAN-SURFACE-MISSING", "the active PO-bound plan has no valid declared implementation surface", artifacts, disposition);
   }
+
+  // A greenfield package already carries its PO-bound fitness model and zero-debt
+  // baseline. Do not send it through retrospective adoption calibration, which
+  // a new repository cannot honestly possess and which would reopen that path.
+  if (design.ok && design.status === "materialized") return {
+    schema: ARCHITECTURE_ENTRY_SCHEMA,
+    status: "ready",
+    root,
+    code: null,
+    message: "the PO-bound greenfield architecture design is materialized and ready",
+    artifacts,
+    disposition,
+    fitness: { overallStatus: "pass", blockingOverallStatus: "pass", source: "approved-design-package", planningSurface: surface },
+    nextAction: null,
+  };
 
   let fitness;
   try {

@@ -4455,15 +4455,25 @@ function canonicalBriefedTarget(rootDir, targetPath, spawn = spawnSync) {
   const absolute = resolve(repo.root, raw);
   const rel = relative(repo.root, absolute).replace(/\\/g, "/");
   if (rel === "" || rel === "." || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return null;
-  // Existing symlinks are resolved before admission so an in-root spelling cannot
-  // authorize a target that actually escapes the repository.
-  try {
-    const physical = realpathSync(absolute);
+  // Resolve the target when it exists, or the nearest existing ancestor when the
+  // leaf is not yet created. This preserves legitimate missing leaves while still
+  // validating every existing parent (including symlinks) against the repository.
+  let cursor = absolute;
+  while (true) {
+    try {
+      lstatSync(cursor);
+    } catch (error) {
+      if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return null;
+      const parent = dirname(cursor);
+      if (parent === cursor) return null;
+      cursor = parent;
+      continue;
+    }
+    let physical;
+    try { physical = realpathSync(cursor); } catch { return null; }
     const physicalRel = relative(repo.root, physical).replace(/\\/g, "/");
     if (physicalRel === ".." || physicalRel.startsWith("../") || isAbsolute(physicalRel)) return null;
-  } catch {
-    // A brief may name a not-yet-created test file; its lexical in-root path is
-    // still canonical and remains exact-match bound.
+    break;
   }
   return rel;
 }
@@ -4597,7 +4607,10 @@ export function readActiveBriefedTestAuthorizations({
     catch { return []; }
   }
   const paths = storage(repo.common);
-  const normTarget = typeof targetPath === "string" ? targetPath.replace(/\\/g, "/") : null;
+  const normTarget = typeof targetPath === "string"
+    ? canonicalBriefedTarget(rootDir, targetPath, spawn)
+    : null;
+  if (typeof targetPath === "string" && normTarget === null) return [];
   const results = [];
   try {
     const entries = readdirSync(paths.briefedAuthorizations).filter((n) => n.endsWith(".json"));

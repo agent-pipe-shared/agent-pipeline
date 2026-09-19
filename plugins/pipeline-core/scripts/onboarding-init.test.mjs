@@ -29,7 +29,7 @@ import test, { after } from "node:test";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-import { DEFAULT_STEP_CAP, SCHEMA, applyTrustAnchorBootstrap, driveOnboardingInit } from "./onboarding-init.mjs";
+import { DEFAULT_STEP_CAP, SCHEMA, applyInitialOnboardingAnswers, applyTrustAnchorBootstrap, driveOnboardingInit } from "./onboarding-init.mjs";
 
 const PROJECT_ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 
@@ -284,8 +284,20 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
       });
       assertPinnedRunner(result, runner, `${runner}/post-bootstrap`);
 
-      assert.equal(spawnSync("git", ["-C", root, "config", "--local", "user.name"], { encoding: "utf8" }).stdout.trim(), "Greenfield Anchor PO");
-      assert.equal(spawnSync("git", ["-C", root, "config", "--local", "user.email"], { encoding: "utf8" }).stdout.trim(), "greenfield-anchor@example.invalid");
+      assert.equal(spawnSync("git", ["-C", root, "config", "--local", "user.name"], { encoding: "utf8" }).status, 1);
+      assert.equal(spawnSync("git", ["-C", root, "config", "--local", "user.email"], { encoding: "utf8" }).status, 1);
+      const held = JSON.parse(readFileSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json"), "utf8"));
+      assert.equal(held.root, root);
+      assert.equal(held.gitAuthorName, "Greenfield Anchor PO");
+      assert.equal(held.gitAuthorEmail, "greenfield-anchor@example.invalid");
+      const gitCalls = [];
+      const replay = applyInitialOnboardingAnswers({
+        rootDir: root, runner, env, pushApproval,
+        gitAuthorName: held.gitAuthorName, gitAuthorEmail: held.gitAuthorEmail,
+        runGit: (...args) => { gitCalls.push(args); throw new Error("initial answers must never invoke Git config"); },
+      });
+      assert.equal(replay.ok, true, JSON.stringify(replay));
+      assert.deepEqual(gitCalls, [], "the actual apply function persists answers without any Git config invocation");
       assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`^\\s*push_approval:\\s*"${pushApproval}"\\s*$`, "mu"));
       assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`^\\s*human_approval:\\s*"${pushApproval}"\\s*$`, "mu"));
       assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
@@ -305,6 +317,8 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
         ...actionInputNames(reentered.collectInput),
       ];
       assert.equal(names.includes("humanApprovalMode"), false, `${runner}: durable receipt prevents a repeated shared-approval ask`);
+      assert.equal(names.includes("gitAuthorName"), false, `${runner}: held name suppresses repeated author ask`);
+      assert.equal(names.includes("gitAuthorEmail"), false, `${runner}: held email suppresses repeated author ask`);
       if (pushApproval === "chat") {
         assert.equal(names.includes("trustAnchorSetupMode"), false, `${runner}: chat never asks for a signing key`);
         assert.equal(existsSync(join(root, ".git", "agent-pipeline", "po-key-directory.json")), false,
@@ -383,9 +397,13 @@ test("a failed separate signature-anchor action preserves the completed initial 
     const result = JSON.parse(failed.stdout);
     assert.equal(result.outcome, "error");
     assert.equal(result.bootstrap.code, "TRUST-ANCHOR-SETUP-FAILED");
-    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
-    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.name"], { encoding: "utf8" }).stdout.trim(), "Rollback PO");
-    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.email"], { encoding: "utf8" }).stdout.trim(), "rollback@example.invalid");
+    const initialAnswersPath = join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json");
+    assert.equal(existsSync(initialAnswersPath), true);
+    const initialAnswers = JSON.parse(readFileSync(initialAnswersPath, "utf8"));
+    assert.equal(initialAnswers.gitAuthorName, "Rollback PO");
+    assert.equal(initialAnswers.gitAuthorEmail, "rollback@example.invalid");
+    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.name"], { encoding: "utf8" }).status, 1);
+    assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.email"], { encoding: "utf8" }).status, 1);
     assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*push_approval:\s*"signature"\s*$/mu);
     assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*human_approval:\s*"signature"\s*$/mu);
     assert.equal(JSON.parse(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8")).poKeyDirectory, null);

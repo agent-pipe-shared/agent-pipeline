@@ -4387,9 +4387,8 @@ test("a kickoff with the seed-default (unchanged) language still repairs genuine
 // are the contract: a promoted `feature` whose plan nobody approved is REFUSED
 // an implementation write (exit 2 -- exit 1 would let the write proceed, which
 // is the reported defect: implementation beginning without the human ever being
-// asked), and the exact same write is admitted once the plan is approved and
-// the phase switched. A blocking gate with no path through it would be worse
-// than the `warn` seed it replaces, so neither half may be dropped.
+// asked). The final path now also requires the separately bound private Advisor
+// admission; its positive matrix is exercised in guard-devplan.test.mjs.
 test("the seeded dev-plan gate refuses implementation before approval and admits it after", () => {
   const path = root();
   try {
@@ -4468,8 +4467,10 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
     const phased = state(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`]);
     assert.equal(phased.code, 0, phased.stderr);
 
-    const admitted = attemptWrite("src/index.html");
-    assert.equal(admitted.status, 0, `the approved plan must admit the same write: ${admitted.stderr}`);
+    const awaitingAdvisor = attemptWrite("src/index.html");
+    assert.equal(awaitingAdvisor.status, 2, `the approved plan without Advisor admission must remain closed: ${awaitingAdvisor.stderr}`);
+    assert.match(String(awaitingAdvisor.stderr), /DAA-PUBLIC-UNAVAILABLE/u);
+    assert.match(String(awaitingAdvisor.stderr), /design-advisory-admission\.mjs inspect/u);
   } finally { dispose(path); }
 });
 

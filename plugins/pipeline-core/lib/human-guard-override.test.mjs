@@ -60,6 +60,7 @@ import { probeSymlinkCapability, symlinkCapability, symlinkSkip } from "./symlin
 import { planVerifySelection } from "./verify-selection.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const DIRECTORY_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: "dir" }));
 
 function git(root, ...args) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
@@ -835,6 +836,8 @@ test("WP-B2-1: createBriefedTestChangeAuthorization lifecycle, query, and eligib
     const active = readActiveBriefedTestAuthorizations({ rootDir: root, targetPath });
     assert.equal(active.length, 1);
     assert.equal(active[0].kind, BRIEFED_TEST_CHANGE_KIND);
+    const activeAbsolute = readActiveBriefedTestAuthorizations({ rootDir: root, targetPath: join(root, targetPath) });
+    assert.equal(activeAbsolute.length, 1);
 
     // Admission check with matching briefingDigest: admitted
     const matched = checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest });
@@ -888,6 +891,55 @@ test("WP-B2-1: createBriefedTestChangeAuthorization lifecycle, query, and eligib
     assert.equal(expiredCheck.admitted, false);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("WP-B2-1 physical target: missing leaf beneath an external symlink is rejected", { skip: symlinkSkip(symlinkCapability({ type: "dir" })) }, () => {
+  const root = fixture();
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "human-guard-physical-outside-")));
+  try {
+    const linkedParent = join(root, "plugins", "external-parent");
+    mkdirSync(join(root, "plugins"), { recursive: true });
+    symlinkSync(outside, linkedParent, "dir");
+    assert.throws(
+      () => createBriefedTestChangeAuthorization({
+        rootDir: root,
+        targetPath: "plugins/external-parent/not-yet-created.test.mjs",
+        briefingDigest: "c".repeat(64),
+        expiry: Date.now() + 600000,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-BRIEFED-TARGET-INVALID",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("WP-B2-1 physical target: an in-root symlink grant is void after retargeting outside", { skip: DIRECTORY_SYMLINK_SKIP }, () => {
+  const root = fixture();
+  const outside = realpathSync(mkdtempSync(join(tmpdir(), "human-guard-physical-retarget-")));
+  try {
+    const plugins = join(root, "plugins");
+    const realParent = join(plugins, "real-parent");
+    const linkedParent = join(plugins, "linked-parent");
+    mkdirSync(realParent, { recursive: true });
+    symlinkSync(realParent, linkedParent, "dir");
+    const targetPath = "plugins/linked-parent/not-yet-created.test.mjs";
+    const briefingDigest = "d".repeat(64);
+    const granted = createBriefedTestChangeAuthorization({
+      rootDir: root, targetPath, briefingDigest, expiry: Date.now() + 600000,
+    });
+    assert.equal(granted.status, "granted");
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, true);
+
+    unlinkSync(linkedParent);
+    symlinkSync(outside, linkedParent, "dir");
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, false);
+    assert.equal(readActiveBriefedTestAuthorizations({ rootDir: root, targetPath: join(root, targetPath) }).length, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
 

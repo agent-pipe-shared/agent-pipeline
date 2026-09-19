@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-content-bound-review-before-full-verify",
+  "title": "Content-bound review before final verification",
+  "status": "proposed",
+  "digest": "c18811df68e6f0f50ed634e008d313d4237982f28a392eeec0b62d30a8b5519d",
+  "scope": "project",
+  "date": "2026-09-19"
+}

@@ -10,6 +10,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+import { inspectArchitectureDesign, parseArchitectureDesign } from "./architecture-design.mjs";
 import {
   accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
   linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
@@ -2585,6 +2586,19 @@ function bootstrapBindPlanAction(root, runner, intent) {
 // policy uses the existing detached proof. Neither path asks a PO to edit a
 // marker by hand, and neither delegates a second confirmation to the PO.
 function collectPrdAcknowledgementAction(root, runner, intent, prd, spec, signatureObservation, signatureMode, spawn) {
+  const seed = initialGreenfieldMapTargets("fresh");
+  const greenfield = seed.every(target => {
+    try { return readFileSync(join(root, target.path), "utf8") === target.bytes; } catch { return false; }
+  });
+  if (greenfield) {
+    try { parseArchitectureDesign(readFileSync(join(root, prd.path), "utf8")); }
+    catch (error) {
+      return { kind: "architecture-design-required", mutation: false, requiresConfirmation: false,
+        schema: "pipeline.architecture-design-remediation.v1", code: error.message,
+        prdPath: prd.path, specPath: spec.path,
+        guidance: "Agent design work is required before the single PO approval: author an explicit pipeline-architecture-design block in the staging PRD with module responsibilities, ownership, contracts, verification entry points, implementation surface, fitness model, zero-debt initial baseline, and scoped disposition. Review the whole design with the PO; do not sign a scaffold or infer approval." };
+  }
+}
   if (signatureMode) {
     if (signatureObservation?.requestStatus === "present" && signatureObservation.proofVerificationStatus === "verified") {
       // The only attended external action in signature mode is `sign-intent`.
@@ -2860,6 +2874,17 @@ export const PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS = [
 function designToImplementationHandoverAction(root, fs) {
   const authority = persistedPoAuthority(root, fs);
   if (authority.status !== "observed" || authority.lifecycleStatus !== "approved") return null;
+  // The approved PRD is the sole human decision. Its closed greenfield design
+  // package may now be rendered deterministically before implementation; the
+  // driver follows this published action and re-enters before it can offer set-phase.
+  const architecture = inspectArchitectureDesign(root, authority.planPath);
+  if (architecture.ok && architecture.status === "materialization-required") return commandAction(
+    [PO_AUTHORITY_REBIND_WRITER, "materialize-architecture"],
+    true,
+    false,
+    "pipeline.architecture-design-materialization.v1",
+    ["materialized"],
+  );
   // NVA-GF-GREENFIELD-UNBORNHEAD-1: set-phase deliberately refuses a fresh
   // project's missing/UNCONFIGURED_VERIFY calibration unless the real command
   // is supplied in the SAME transaction. Publishing the historical bare
@@ -5026,6 +5051,12 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
  */
 function unresolvedAuthorIdentityKeys(root, hostManaged, fs) {
   if (hostManaged) return [];
+  // A complete root-bound answer is durable consent to hold these values,
+  // not evidence that Git config has already been written. Use this same
+  // reader for the initial side-channel ask AND the later intake ask.
+  const receipt = initialAnswersReceipt(root, fs);
+  if ([receipt?.gitAuthorName, receipt?.gitAuthorEmail].every((value) => typeof value === "string"
+    && value.trim().length > 0 && value.length <= 320 && !/[\r\n\0]/u.test(value))) return [];
   const configured = (key) => {
     try {
       // Only repository-local identity satisfies this check.  A global or

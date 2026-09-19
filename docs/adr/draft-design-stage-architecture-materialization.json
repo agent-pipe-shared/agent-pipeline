@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-design-stage-architecture-materialization",
+  "title": "Explicit design-stage architecture materialization",
+  "status": "proposed",
+  "digest": "c89fb37261dca2e7383da27592badc03e2374ea158f95b68262671b8e1ccedd4",
+  "scope": "global",
+  "date": "2026-09-19"
+}

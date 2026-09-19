@@ -30,6 +30,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const INSTALLER_VERSION = "2";
 export const MARKER_SCHEMA = "pipeline.commit-msg-hook-install.v1";
+export const DECLINE_MARKER_SCHEMA = "pipeline.commit-msg-hook-decline.v1";
 
 const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const DEFAULT_PLUGIN_LIB_DIR = join(PLUGIN_ROOT, "lib");
@@ -63,6 +64,21 @@ function markerPath(commonDir) {
 }
 function implPath(commonDir) {
   return join(stateDir(commonDir), "impl.mjs");
+}
+function declineMarkerPath(commonDir) {
+  return join(stateDir(commonDir), "decline-marker.json");
+}
+
+function readDeclineMarker(commonDir) {
+  const path = declineMarkerPath(commonDir);
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    if (parsed?.schema !== DECLINE_MARKER_SCHEMA || typeof parsed.declinedAt !== "string") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 function readManagedMarker(commonDir) {
@@ -256,12 +272,31 @@ export function planInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } =
   if (!paths) return { status: "repository-unresolved" };
   const inspected = inspectManagedInstall(paths.commonDir, paths.hookPath);
   if (inspected.status === "absent") {
+    const decline = readDeclineMarker(paths.commonDir);
+    if (decline) return { status: "declined", ...paths, pluginLibDir, declinedAt: decline.declinedAt };
     return { status: "ready", ...paths, pluginLibDir };
   }
   if (inspected.status === "verified") {
     return { status: "ready-to-upgrade", ...paths, pluginLibDir };
   }
   return inspected;
+}
+
+/** Records a reversible local decision not to install this optional hook.  The
+ * marker never wins over an actual hook: `planInstall` inspects the hook first,
+ * so a later managed or foreign hook remains visible and is never overwritten. */
+export function planDecline({ rootDir } = {}) {
+  const paths = resolveGitPaths(rootDir);
+  if (!paths) return { status: "repository-unresolved" };
+  return { status: "ready", commonDir: paths.commonDir };
+}
+
+export function applyDecline({ rootDir } = {}) {
+  const plan = planDecline({ rootDir });
+  if (plan.status !== "ready") return plan;
+  const marker = { schema: DECLINE_MARKER_SCHEMA, declinedAt: new Date().toISOString() };
+  atomicWrite(declineMarkerPath(plan.commonDir), `${JSON.stringify(marker, null, 2)}\n`, 0o600);
+  return { status: "declined", declinedAt: marker.declinedAt };
 }
 
 function atomicWrite(path, content, mode) {
@@ -278,7 +313,12 @@ function atomicWrite(path, content, mode) {
 
 export function applyInstall({ rootDir, pluginLibDir = DEFAULT_PLUGIN_LIB_DIR } = {}) {
   const plan = planInstall({ rootDir, pluginLibDir });
-  if (plan.status !== "ready" && plan.status !== "ready-to-upgrade") {
+  if (![
+    "ready",
+    "ready-to-upgrade",
+    // A decline is a reversible local preference, not a permanent refusal.
+    "declined",
+  ].includes(plan.status)) {
     return { ...plan, status: plan.status === "foreign-hook-present" ? "refused-foreign-hook" : `refused-${plan.status}` };
   }
   const impl = implPath(plan.commonDir);
@@ -335,13 +375,15 @@ if (isDirectInvocation(import.meta.url)) {
       ? applyRemoval({ rootDir })
       : verb === "--plan-install"
         ? planInstall({ rootDir })
-        : verb === "--plan-remove"
-          ? planRemoval({ rootDir })
-          : null;
+    : verb === "--plan-remove"
+      ? planRemoval({ rootDir })
+      : verb === "--decline"
+        ? applyDecline({ rootDir })
+      : null;
   if (!result) {
-    console.error("usage: commit-msg-hook-install.mjs --plan-install|--install|--plan-remove|--remove");
+    console.error("usage: commit-msg-hook-install.mjs --plan-install|--install|--plan-remove|--remove|--decline");
     process.exit(2);
   }
   console.log(JSON.stringify(result, null, 2));
-  if ((verb === "--install" && !["installed", "upgraded"].includes(result.status)) || (verb === "--remove" && result.status !== "removed")) process.exitCode = 1;
+  if ((verb === "--install" && !["installed", "upgraded"].includes(result.status)) || (verb === "--remove" && result.status !== "removed") || (verb === "--decline" && result.status !== "declined")) process.exitCode = 1;
 }

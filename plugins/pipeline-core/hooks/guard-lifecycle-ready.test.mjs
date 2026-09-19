@@ -20,6 +20,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { fixtureAdoption } from "../scripts/architecture-adoption-test-fixture.mjs";
 
 import {
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
@@ -477,9 +478,9 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
     assert.match(noDecision.stderr, /adoption-required/u);
 
     mkdirSync(join(path, "architecture"), { recursive: true });
-    writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
-      schema: "pipeline.adoption-state.v1",
-      state: "approved-scoped",
+    fixtureAdoption({
+      rootDir: path,
+      decision: "approved-scoped",
       scope: "specs/d4-authority/",
       decidedAt: "2026-09-15T00:00:00.000Z",
       expiresAt: null,
@@ -489,7 +490,7 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
       coverageClass: "evaluated",
       confidence: "measured",
       by: "PO",
-    }) + "\n");
+    });
     let observedPlanningFitness;
     const allowed = evaluateLifecycleReadyGuard(bash(command), {
       projectDir: path,
@@ -538,9 +539,9 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
     assert.match(malformedRigor.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
     assert.match(malformedRigor.stderr, /derived unavailable floor/u);
 
-    writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
-      schema: "pipeline.adoption-state.v1",
-      state: "approved-scoped",
+    fixtureAdoption({
+      rootDir: path,
+      decision: "approved-scoped",
       scope: "specs/other-work-package/",
       decidedAt: "2026-09-15T00:00:00.000Z",
       expiresAt: null,
@@ -550,7 +551,7 @@ test("D4 / AC-17: the implementation-authority transition consumes the active pl
       coverageClass: "evaluated",
       confidence: "measured",
       by: "PO",
-    }) + "\n");
+    });
     const wrongScope = evaluateLifecycleReadyGuard(bash(command), {
       projectDir: path,
       requireProjectOnboardingReadyFn: readyStub,
@@ -578,9 +579,9 @@ test("implementation authority derives rigor from the PO-bound plan surface whil
       planSubmission: { profile: "mini" },
       planApproved: true,
     }) + "\n");
-    writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
-      schema: "pipeline.adoption-state.v1",
-      state: "approved-scoped",
+    fixtureAdoption({
+      rootDir: path,
+      decision: "approved-scoped",
       scope: "specs/plan-surface/",
       decidedAt: "2026-09-15T00:00:00.000Z",
       expiresAt: null,
@@ -590,7 +591,7 @@ test("implementation authority derives rigor from the PO-bound plan surface whil
       coverageClass: "evaluated",
       confidence: "measured",
       by: "PO",
-    }) + "\n");
+    });
 
     const result = evaluateLifecycleReadyGuard(bash(command), {
       projectDir: path,
@@ -621,9 +622,9 @@ test("implementation authority treats root contract files named by the PO-bound 
       planSubmission: { profile: "mini" },
       planApproved: true,
     }) + "\n");
-    writeFileSync(join(path, "architecture", "adoption-state.json"), JSON.stringify({
-      schema: "pipeline.adoption-state.v1",
-      state: "approved-scoped",
+    fixtureAdoption({
+      rootDir: path,
+      decision: "approved-scoped",
       scope: "specs/root-contract/",
       decidedAt: "2026-09-15T00:00:00.000Z",
       expiresAt: null,
@@ -633,7 +634,7 @@ test("implementation authority treats root contract files named by the PO-bound 
       coverageClass: "evaluated",
       confidence: "measured",
       by: "PO",
-    }) + "\n");
+    });
 
     const result = evaluateLifecycleReadyGuard(bash(command), {
       projectDir: path,
@@ -1514,11 +1515,9 @@ test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survive
     ).exitCode, 2, "the repair remains unavailable for every other non-ready lifecycle state");
     assert.equal(run(`node ${[...argv.slice(0, 5), "b".repeat(64), ...argv.slice(6)].join(" ")}`).exitCode, 2);
     assert.equal(run(`node ${argv.join(" ")}`, { ...observation, status: "ready" }).exitCode, 2);
-    assert.equal(run(`node ${argv.join(" ")}`, {
-      ...observation,
-      nextAction: { ...observation.nextAction, argv: [argv[0], "plan-runner-permissions", "--root", path] },
-    }).exitCode, 2);
     const plannerArgv = [argv[0], "plan-runner-permissions", "--root", path];
+    assert.equal(run(`node ${plannerArgv.join(" ")}`, observation).exitCode, 0,
+      "the exact read-only planner derived from the observed apply action is admitted");
     const plannerObservation = {
       ...observation,
       runnerPermissions: { status: "unavailable" },
@@ -1535,10 +1534,10 @@ test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survive
       },
     };
     assert.equal(run(`node ${plannerArgv.join(" ")}`, plannerObservation).exitCode, 0,
-      "the producer's exact read-only planner remains reachable when no safe merge can be planned");
+      "the exact read-only planner derived from the producer's apply action remains reachable");
     assert.equal(run(`node ${[...plannerArgv, "--activate"].join(" ")}`, plannerObservation).exitCode, 2);
-    assert.equal(run(`node ${plannerArgv.join(" ")}`).exitCode, 2,
-      "an unobserved planner command is never admitted");
+    assert.equal(run(`node ${plannerArgv.join(" ")}`, { ...observation, nextAction: null }).exitCode, 2,
+      "a planner command without an observed producer action is never admitted");
     assert.equal(run(`node ${argv.join(" ")}`, {
       ...observation,
       nextAction: { ...observation.nextAction, requiresConfirmation: false },
@@ -2669,6 +2668,23 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
       }).exitCode, 2, command);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("architecture materialization admits only the bare sanctioned writer command", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonReady = { projectDir: path, requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); } };
+    const bare = `node '${PIPELINE_STATE_SCRIPT}' materialize-architecture`;
+    assert.equal(isSanctionedLifecycleCommand(bare, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(bare), nonReady), { exitCode: 0, stderr: "" });
+    for (const suffix of ["--help", "--activate", "--bypass", "--root .", "--runner codex", "--by PO", "--", "extra", "--phase implementation", "materialize-architecture", "--unknown=value"]) {
+      const command = `${bare} ${suffix}`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
+    }
+    assert.equal(isSanctionedLifecycleCommand("node ./foreign-writer.mjs materialize-architecture", path), false);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -5317,7 +5333,8 @@ test("NVA-GF-COPYSAFE: the bounded 'plan' rendering uses the variable-assembled 
     assert.equal(lines[planIndex + 1], "POSIX:");
     const planBlock = lines.slice(planIndex, lines.indexOf("Then, in this session", planIndex)).join("\n");
     assert.match(planBlock, /^CMD='/mu);
-    assert.match(planBlock, /guard-human-override\.mjs plan --repo/u);
+    assert.match(planBlock, /CMD=\$\{CMD\}'[^']*guard-human-override\.mjs plan '/u);
+    assert.match(planBlock, /CMD=\$\{CMD\}'--repo /u);
     assert.match(planBlock, /eval "\$CMD"/u);
   } finally { rmSync(sigRoot, { recursive: true, force: true }); }
 });

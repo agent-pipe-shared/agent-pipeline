@@ -1,27 +1,50 @@
 {
   "schema": "pipeline.dispatch-record.v3",
   "taskId": "ALF-BANNER-FIX",
-  "agentType": "implementor",
+  "agentType": "default",
   "model": "gpt-5.6-luna",
   "effort": "medium",
   "rulesetSha": "b7797309cf6abe175fd52b0a8749d82b43714ea0",
   "dispatcher": "elephant",
   "outcome": "completed",
-  "commits": ["b32445ea0"],
+  "commits": [
+    "b32445ea063a30b7b10905151702a8b085853690",
+    "abf45e1a48763f4ceadeb5ccd06ac2cd9be1cc80"
+  ],
   "log": [
-    {"phase":"opening-record","toolUses":1},
-    {"phase":"red-regression","command":"node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","exitCode":1,"evidence":"evidence/alf-banner-red.json"},
-    {"phase":"focused-green","command":"node --test plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","exitCode":0,"evidence":"evidence/alf-banner-green.json"},
-    {"phase":"consumer-green","command":"node --test harness/scripts/check-consumer-safe-paths.test.mjs","exitCode":0,"evidence":"evidence/alf-banner-consumer.json"},
-    {"phase":"commit-checkpoint","commit":"b32445ea0","changedFiles":["plugins/pipeline-core/lib/plan-authority-staging-guard.mjs","plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","evidence/alf-banner-red.json","evidence/alf-banner-green.json","evidence/alf-banner-consumer.json","evidence/dispatch-record-ALF-BANNER-FIX.json"]}
+    {
+      "phase": "coordinator-schema-reconciliation",
+      "toolUseCount": 0,
+      "note": "Original worker log preserved in evidence/alf-banner-fix-raw-record.json; full commit IDs resolved from Git; result digest binds returned report JSON; requested host agent type was default; effective identity not asserted."
+    }
   ],
   "report": {
-    "text":"Implemented ALF-CODE-CRITIC-1 finding 6. submit-plan and approve-plan now refuse generated pre-authority banners in either authority document, regardless of staging location or absolute/relative path form; unreadable authority files fail closed. RED was reproduced before implementation, then the focused guard suite and consumer-safe-paths suite passed. git diff --check passed. Full Verify remains independently blocked by the existing record; no clearance claim. Independent review: pending.",
-    "changedFiles":["plugins/pipeline-core/lib/plan-authority-staging-guard.mjs","plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs","evidence/alf-banner-red.json","evidence/alf-banner-green.json","evidence/alf-banner-consumer.json","evidence/dispatch-record-ALF-BANNER-FIX.json"]
+    "text": "Implemented ALF-CODE-CRITIC-1 finding 6. submit-plan and approve-plan now refuse generated pre-authority banners in either authority document, regardless of staging location or absolute/relative path form; unreadable authority files fail closed. RED was reproduced before implementation, then the focused guard suite and consumer-safe-paths suite passed. git diff --check passed. Full Verify remains independently blocked by the existing record; no clearance claim. Independent review: pending.",
+    "changedFiles": [
+      "plugins/pipeline-core/lib/plan-authority-staging-guard.mjs",
+      "plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs",
+      "evidence/alf-banner-red.json",
+      "evidence/alf-banner-green.json",
+      "evidence/alf-banner-consumer.json",
+      "evidence/dispatch-record-ALF-BANNER-FIX.json"
+    ]
   },
   "criticRequired": {
     "schema": "pipeline.critic-required-decision.v1",
-    "trigger": {"schema":"pipeline.critic-trigger-input.v1","rigorLevel":2,"riskClass":"low","riskFlag":false,"diff":{"mechanical":false,"architecture":false,"guardrails":false,"security":false}},
-    "appliedRow": "T3"
-  }
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 2,
+      "riskClass": "high",
+      "riskFlag": true,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": true,
+        "security": false
+      }
+    },
+    "appliedRow": "T1"
+  },
+  "candidateCommit": "abf45e1a48763f4ceadeb5ccd06ac2cd9be1cc80",
+  "resultSha256": "758f5013e6bb571f67f2341937be7b10d74b64424c3ac9a7830b1f9decdf3232"
 }

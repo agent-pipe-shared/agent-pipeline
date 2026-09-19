@@ -349,6 +349,20 @@ test("push mode cannot turn an equal base into empty impacted evidence", async (
   });
 });
 
+test("push/release Verify refuses to mint boundary evidence for an unbacked blocking push gate", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    for (const mode of ["push", "release"]) {
+      await assert.rejects(
+        () => produceVerifyEvidence({
+          rootDir: root, mode,
+          assessPushHookBackstop: () => ({ blocking: true, backed: false, message: "UNBACKED_GATE: fixture", remedy: "install fixture", hook: { status: "decline" } }),
+        }),
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-UNBACKED_GATE",
+      );
+    }
+  });
+});
+
 test("consumer full fallback preserves the changed and unmatched paths", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
     const calibrationPath = join(root, ".claude", "pipeline.json");

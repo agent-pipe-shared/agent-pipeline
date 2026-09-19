@@ -28,7 +28,8 @@
  * `extractShellWriteTargets()`) — so the two lanes can never independently
  * decide a path's dev-plan-gate fate differently from each other.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +47,73 @@ import {
   rebaseAuthorityRetryActions,
   resolveRebaseAuthority,
 } from "./rebase-authority.mjs";
+import { readDesignAdvisoryTransaction } from "./design-advisory-transaction.mjs";
+import { hasExactDesignAdvisorFinalApproval } from "./design-advisory-final-approval.mjs";
+import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
+
+// Validate before hashing: the final authority reader must never read a state-
+// selected path outside the physical package, or follow a symlink.
+function advisorPackageSha256(root, relativePath) {
+  const invalid = () => Object.assign(new Error("Advisor package path is not a physical repository file"), { code: "DAA-PATH" });
+  if (typeof relativePath !== "string" || !relativePath || isAbsolute(relativePath)
+    || relativePath.includes("\\") || relativePath.split("/").some((part) => ["", ".", ".."].includes(part))) throw invalid();
+  const target = resolve(root, relativePath);
+  const rel = relative(root, target);
+  if (!rel || isAbsolute(rel) || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\")) throw invalid();
+  if (realpathSync(target) !== target || !lstatSync(target).isFile()) throw invalid();
+  return createHash("sha256").update(readFileSync(target)).digest("hex");
+}
+
+/** Read both the package projection and its actual repository-private transaction.
+ * Git environment overrides must not redirect this authority read to another repo.
+ * Neither public flags nor the legacy planApproved projection grant the exception.
+ */
+export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
+  const featureId = state?.activeFeature?.id;
+  if (typeof featureId !== "string" || !featureId || typeof planPath !== "string" || typeof specPath !== "string") {
+    return { ok: false, code: "DAA-BINDING" };
+  }
+  try {
+    const root = realpathSync(projectDir);
+    const planSha256 = advisorPackageSha256(root, planPath);
+    const specSha256 = advisorPackageSha256(root, specPath);
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+    const git = spawnSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"],
+      { encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000 });
+    if (git.status !== 0) return { ok: false, code: "DAA-COMMON-UNAVAILABLE" };
+    const lines = String(git.stdout ?? "").trim().split(/\r?\n/u);
+    if (lines.length !== 2 || realpathSync(lines[0]) !== root) return { ok: false, code: "DAA-COMMON-INVALID" };
+    const common = realpathSync(lines[1]);
+    let record;
+    try { record = JSON.parse(readFileSync(join(root, DESIGN_ADVISORY_RECORD_PATH), "utf8")); }
+    catch (error) { return { ok: false, code: error.code === "ENOENT" ? "DAA-PUBLIC-UNAVAILABLE" : "DAA-PUBLIC-INVALID" }; }
+    const unavailable = record?.admission?.advisor?.status === "unavailable";
+    const workflow = record?.admission?.workflow;
+    const finalApprovalValid = unavailable && hasExactDesignAdvisorFinalApproval({
+      state, projectDir: root, featureId, planPath, specPath,
+      planSha256, specSha256,
+      candidateCommit: workflow?.candidateCommit, candidateTree: workflow?.candidateTree,
+    });
+    if (unavailable && !finalApprovalValid) return { ok: false, code: "DAA-UNAVAILABLE-FINAL-APPROVAL" };
+    const result = readDesignAdvisoryTransaction({
+      repoRoot: root, gitCommonDir: common, featureId, planPath, specPath, finalApprovalValid,
+    });
+    return { ok: true, id: result.id, mode: result.mode };
+  } catch (error) {
+    return { ok: false, code: typeof error?.code === "string" && error.code.startsWith("DAA-") ? error.code : "DAA-PRIVATE-INVALID" };
+  }
+}
+
+export function designAdvisoryRemediation(code) {
+  return [
+    `[guard-devplan] implementation requires a valid private design Advisor transaction (${code}).`,
+    "Existing implementing features must migrate through the existing lifecycle: run pipeline-state.mjs reopen-design --by <human attribution>,",
+    "complete design-advisory-coordinator.mjs for the current Plan/Spec, then submit-plan, obtain the configured final PO approval and set-phase --phase implementation.",
+    "Use design-advisory-admission.mjs inspect --repo-root <root> --feature <id> --plan <plan> --spec <spec> for read-only diagnosis.",
+    "An unavailable Advisor requires the exact package/candidate final PO approval; public projections or hand-written private files are not recovery.",
+  ].join("\n");
+}
+
 
 /**
  * Why `scratch/` is here, and why it is the safest of the five rather than the
@@ -241,6 +309,12 @@ export function devPlanGateVerdict({ filePath, projectDir }) {
     ...(typeof specPath === "string" ? { specSha256: fileSha256(specPath) } : {}),
   });
   if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
+    const admission = designAdvisoryAdmission(state, projectDir, planPath, specPath);
+    if (!admission.ok) return {
+      verdict: gate.mode === "warn" ? "warn" : "block",
+      reason: designAdvisoryRemediation(admission.code),
+      feature: activeFeature.id, lifecycleStatus: lifecycle.status,
+    };
     return { verdict: "allow" };
   }
 

@@ -295,13 +295,25 @@
         "paths": [
           "docs/adr/0083-governance-action-events.md",
           "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md",
+          "docs/adr/draft-content-bound-review-before-full-verify.md",
           "docs/adr/draft-critic-report-durable-write-location.md",
+          "docs/adr/draft-design-advisory-admission-storage.md",
+          "docs/adr/draft-design-stage-architecture-materialization.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-session-cut-recommended-by-readiness.md",
           "docs/codex-isolated-critic-foundation.md",
           "docs/handover-0.5.2-findings.md",
           "docs/human-authorization-inventory.md",
           "docs/known-issues.md"
+        ]
+      },
+      {
+        "audience": "machine",
+        "lifecycle": "review-candidate",
+        "paths": [
+          "docs/adr/draft-content-bound-review-before-full-verify.json",
+          "docs/adr/draft-design-advisory-admission-storage.json",
+          "docs/adr/draft-design-stage-architecture-materialization.json"
         ]
       },
       {

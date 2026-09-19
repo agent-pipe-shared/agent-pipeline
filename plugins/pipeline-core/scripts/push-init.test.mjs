@@ -314,6 +314,29 @@ test("drivePushInit: chains all three steps (reconciliation, gate-satisfiability
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("drivePushInit: blocking push with a declined, foreign, or absent pre-push backstop fails before approval preparation", () => {
+  const root = freshFixtureRoot();
+  try {
+    for (const hookStatus of ["install", "decline", "foreign-owner", "unresolved"]) {
+      let prepareCalls = 0;
+      const result = drivePushInit({
+        rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+        assessPushHookBackstop: () => ({
+          blocking: true, backed: false, code: "UNBACKED_GATE",
+          message: "UNBACKED_GATE: gates.push is blocking, but the generated pre-push backstop is not current.",
+          remedy: "install or resolve ownership", hook: { status: hookStatus },
+        }),
+        pushPrepareReport: () => { prepareCalls += 1; throw new Error("must not prepare approval"); },
+      });
+      assert.equal(result.outcome, "precondition-unmet", hookStatus);
+      assert.deepEqual(result.steps.map((step) => step.id), ["push-hook-backstop"]);
+      assert.equal(result.checks[0].status, "UNBACKED_GATE");
+      assert.equal(result.checks[0].hook.status, hookStatus);
+      assert.equal(prepareCalls, 0, hookStatus);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("drivePushInit: terminal-free global chat preparation returns chat-ready without signature ceremony", () => {
   const root = freshFixtureRoot();
   try {

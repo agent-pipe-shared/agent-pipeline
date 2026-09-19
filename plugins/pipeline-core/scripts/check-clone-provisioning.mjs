@@ -10,20 +10,78 @@ import { fileURLToPath } from "node:url";
 
 import { validatePoGateProfileReceipt, poGateReceiptFingerprintMatches, poGateProfileReceiptPath } from "../lib/po-gate-authority.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { gateConfig, loadManifest } from "../lib/manifest.mjs";
+import { planInstall as planPrePushHookInstall } from "./pre-push-hook-install.mjs";
+import { planInstall as planPreCommitHookInstall } from "./pre-commit-hook-install.mjs";
+import { planInstall as planCommitMsgHookInstall } from "./commit-msg-hook-install.mjs";
 
 export const CLONE_PROVISIONING_REPORT_SCHEMA = "pipeline.clone-provisioning-report.v1";
+
+const HOOK_SPECS = Object.freeze([
+  { id: "pre-push-hook", name: "pre-push", planInstall: planPrePushHookInstall, installer: "pre-push-hook-install.mjs", pushBackstop: true },
+  { id: "pre-commit-hook", name: "pre-commit", planInstall: planPreCommitHookInstall, installer: "pre-commit-hook-install.mjs" },
+  { id: "commit-msg-hook", name: "commit-msg", planInstall: planCommitMsgHookInstall, installer: "commit-msg-hook-install.mjs" },
+]);
+
+/** A deliberately small projection over each installer's authoritative plan.
+ * The installer keeps ownership/mutation rules; this function merely gives all
+ * three hooks one vocabulary for bootstrap, clone and release surfaces. */
+export function projectHookProvisioning({ spec, rootDir, commonDir = null } = {}) {
+  let plan;
+  try { plan = spec.planInstall({ rootDir }); } catch { plan = { status: "repository-unresolved" }; }
+  const repairAction = `node plugins/pipeline-core/scripts/${spec.installer} --install`;
+  switch (plan.status) {
+    case "ready-to-upgrade":
+      // pre-push additionally distinguishes a valid but stale plugin binding.
+      // That still needs an explicit reinstall, not a misleading "current".
+      if (plan.current === false) return { id: spec.id, status: "install", path: plan.hookPath, repairAction };
+      return { id: spec.id, status: "current", path: plan.hookPath, repairAction: null };
+    case "ready":
+      return { id: spec.id, status: "install", path: plan.hookPath || join(commonDir || "", "hooks", spec.name), repairAction };
+    case "declined":
+      return { id: spec.id, status: "decline", path: plan.hookPath || join(commonDir || "", "hooks", spec.name), repairAction, declinedAt: plan.declinedAt };
+    case "foreign-hook-present":
+    case "modified-or-unreadable-managed-install":
+    case "orphan-managed-file":
+    case "unreadable-managed-state":
+      // Do not present an installer command as a repair: it must never overwrite this.
+      return { id: spec.id, status: "foreign-owner", path: plan.hookPath || join(commonDir || "", "hooks", spec.name), repairAction: null, detail: plan.detail };
+    default:
+      return { id: spec.id, status: "unresolved", path: plan.hookPath || join(commonDir || "", "hooks", spec.name), repairAction: null, detail: plan.status };
+  }
+}
+
+/** Shared release-boundary reading.  A blocking push declaration is only backed
+ * by the generated, verified pre-push hook.  A decline, foreign hook, modified
+ * hook, unresolved repository, or stale binding remains explicitly unbacked;
+ * no caller may infer security merely from a file being present. */
+export function assessPushHookBackstop(rootDir = process.cwd(), { load = loadManifest, project = projectHookProvisioning } = {}) {
+  const root = resolve(rootDir);
+  let manifest = null;
+  try { manifest = load(root); } catch { /* an unrelated manifest error belongs to its native validator */ }
+  const blocking = gateConfig(manifest, "push")?.mode === "blocking";
+  const spec = HOOK_SPECS[0];
+  const hook = project({ spec, rootDir: root });
+  const backed = !blocking || hook.status === "current";
+  return {
+    blocking,
+    backed,
+    hook,
+    code: backed ? null : "UNBACKED_GATE",
+    message: backed ? null : "UNBACKED_GATE: gates.push is blocking, but the generated pre-push backstop is not current.",
+    remedy: backed ? null : hook.status === "foreign-owner"
+      ? "A foreign pre-push hook owns this path; do not overwrite it. Resolve ownership, then install the generated backstop."
+      : `Install the generated pre-push backstop: ${hook.repairAction ?? "inspect hook provisioning"}`,
+  };
+}
 
 export function checkCloneProvisioning(rootDir = process.cwd()) {
   const resolvedRoot = resolve(rootDir);
   const checks = [];
 
   let commonDir = null;
-  let hookPath = null;
   try {
     commonDir = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
-      cwd: resolvedRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    hookPath = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-push"], {
       cwd: resolvedRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
     }).trim();
   } catch {
@@ -32,29 +90,16 @@ export function checkCloneProvisioning(rootDir = process.cwd()) {
       schema: CLONE_PROVISIONING_REPORT_SCHEMA,
       status: "provisioning-required",
       checks: [
-        { id: "pre-push-hook", status: "absent", path: "hooks/pre-push", repairAction: "git init" },
+        ...HOOK_SPECS.map((spec) => ({ id: spec.id, status: "unresolved", path: `hooks/${spec.name}`, repairAction: "git init" })),
         { id: "po-profile-receipt", status: "absent", path: "agent-pipeline/po-gate/profile-receipt.json", repairAction: "node setup.mjs --publish-po-profile" },
         { id: "private-state-directory", status: "absent", path: "agent-pipeline", repairAction: "mkdir -p .git/agent-pipeline" },
       ],
     };
   }
 
-  // 1. Pre-push hook check
-  if (hookPath && existsSync(hookPath)) {
-    checks.push({
-      id: "pre-push-hook",
-      status: "present",
-      path: hookPath,
-      repairAction: null,
-    });
-  } else {
-    checks.push({
-      id: "pre-push-hook",
-      status: "absent",
-      path: hookPath || join(commonDir, "hooks", "pre-push"),
-      repairAction: "node plugins/pipeline-core/scripts/pre-push-hook-install.mjs",
-    });
-  }
+  // Hook provisioning is intentionally projected via the installers, not merely
+  // existsSync(): a present foreign/modified hook is not a usable pipeline hook.
+  for (const spec of HOOK_SPECS) checks.push(projectHookProvisioning({ spec, rootDir: resolvedRoot, commonDir }));
 
   // 2. PO-profile receipt validity check
   let receiptPath = join(commonDir, "agent-pipeline", "po-gate", "profile-receipt.json");
@@ -122,7 +167,7 @@ export function checkCloneProvisioning(rootDir = process.cwd()) {
     });
   }
 
-  const allReady = checks.every((c) => c.status === "present");
+  const allReady = checks.every((c) => c.status === "present" || c.status === "current");
   return {
     schema: CLONE_PROVISIONING_REPORT_SCHEMA,
     status: allReady ? "ready" : "provisioning-required",

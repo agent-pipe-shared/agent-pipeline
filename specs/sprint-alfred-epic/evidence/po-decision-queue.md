@@ -22,6 +22,133 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## PO decisions
 
+### 2026-09-19 — Dispatched design, Advisor and independent readiness
+
+The PO selected this next-candidate workflow: user input → dispatched initial
+design draft → Advisor improvement proposals → Elephant decisions and revisions
+→ independent readiness comparison against original user input, PRD and Spec
+→ the final package presented for PO review → implementation. The Elephant
+retains design ownership and records why advisory proposals are accepted or
+rejected. Material unresolved product choices remain PO decisions. This amends
+the design-authoring workflow; it is not permission to skip readiness or PO review.
+
+The existing Claude native Advisor is preferred when available, with the
+existing fresh read-only consult fallback otherwise. Reuse that fallback's
+contracts for a runner-neutral Codex/Antigravity design rather than inventing a
+second advisory system. Verify actual runner execution and report unavailable
+honestly. Current Codex/WSL selected-sandbox consultation is explicitly deferred;
+do not silently reinterpret it as a working native route or bypass that policy.
+Any new functional-equivalent route must be explicit about its assurance and
+must retain demand, consent, bounded evidence and no-auto-application controls.
+
+The reported Windows/Claude run was a resume. Its missing architecture-adoption
+question is not confirmed as a fresh-session defect; the PO plans a separate
+fresh test. No acceptance or installed-runtime success is implied here.
+
+### 2026-09-19 — Plugin update recovery and content-bound Critic reuse
+
+The PO explicitly approved the four local runner-permission entries for installed
+Pipeline `0.7.0+codex.20260918192112.f2963473`. The digest-bound merge
+`7a3db1cfc5d6d5835b83707b04d17dd635268be6f57493a30dcb097a2af060b8`
+returned `ready`; subsequent onboarding inspection returned `ready` with
+runner permissions `current`. This resolves this specific permission request,
+not a blanket authorization for future permission widening.
+
+The next local Alfred candidate must repair ordinary plugin-update recovery so
+versioned script paths do not repeatedly block the pipeline and require manual
+PO intervention. Preserve narrowly bounded permissions and host security gates;
+do not solve this with an unrestricted wildcard. A handover from another session
+is announced and must be reconciled before implementing that repair. This is
+approved agent work, not another pending PO decision. Implementation and
+regression evidence remain open.
+
+The PO also selected the regular sequence: Critic → fix → diff Critic → full
+Verify → fix → full Verify. A Critic PASS binds the reviewed substantive content;
+another Verify run alone does not invalidate it. Substantive changes require
+appropriate diff review; evidence-only repairs do not automatically require a
+fresh full review. Implement and test this as the regular flow, not a temporary
+review exception. Release and final Verify remain unqualified until their actual
+requirements pass.
+
+### Finding repair continuation — 2026-09-19
+
+The PO explicitly rejected a further pre-green review exception: "Nein,
+zuerst den Ablauf regulär reparieren". The regular readiness-versus-completion
+dependency and truthful interrupted/no-delivery record contract must be
+repaired; no further exception-based Critic dispatch is authorized.
+
+The PO now requests implementation of the findings, concrete signature
+requests wherever actually necessary, and a fully checked local 0.7.0
+candidate. This supersedes collecting every approval need without presenting
+it. No installation, push, signing on the PO's behalf, or release clearance
+is inferred.
+
+Four bounded repair commits exist; independent review is still pending:
+
+- F6 banner refusal: `b32445ea063a30b7b10905151702a8b085853690`.
+  Canonical onboarding generation is preserved. Additional caller integration
+  passed 294 tests: `evidence/alf-banner-integration.json` (captured text log).
+- F1 plugin-only baseline: `6291bd4e1aecd20c863b6189f5601ed0a49032f9`.
+  Plugin-local schema is byte-identical to the canonical schema; load failure
+  denies writes. Additional unchanged guard/loader integration passed 46 tests
+  plus 18 guard cases: `evidence/alf-baseline-integration.log`.
+- F4 unavailable fitness: `deb76ccd5e1feff656be6c0d2fdd71b1040960d4`.
+  45 focused tests passed. This fixes missing/invalid input and aggregate
+  status, not the still-pending sanctioned removal of the obsolete 14-day
+  normative threshold. The worker's expanded SHA was erroneous; the SHA here
+  and in the normalized dispatch record was resolved from Git.
+- F2 exact target/digest: `92e2500e554d5d099a1763425f2c6179da54def7`.
+  A further bounded repair is in progress for absent files under symlinked
+  parents; the first patch's broad realpath catch is not accepted as complete.
+
+Coordinator schema reconciliation preserved raw worker records in local
+`evidence/alf-*-raw-record.json` files and corrected incomplete record shapes,
+actual requested host type, full commit IDs and report digests. These are
+administrative corrections from observed data, not new verification claims.
+`evidence/alf-repair-authorship-check.log` still reports all four as
+`critic-evidence-pending`. No effective model identity is asserted.
+
+F3 adoption authorization is in active bounded implementation; F5 digest-based
+profile drift remains open and must consume an actual accepted reference,
+not automatically bless the current state. The existing no-delivery dispatch
+record, review ordering, documentation review, real AGY delivery and final
+candidate qualification remain open. The prior one-run exception remains
+consumed and is not silently extended by this status entry.
+
+### One-run code Critic exception — consumed, partial review, 2026-09-18
+
+The PO explicitly permitted one review before green Verify and subsequently
+limited its target scope to code, tests, schemas and configuration. That run
+has returned and the exception is consumed; it authorizes no additional run.
+Candidate: `b7797309cf6abe175fd52b0a8749d82b43714ea0`, tree
+`3c81f49019fb3412cd0efe0cd8fa938b7972c7c7`; base Nova `55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1`.
+Current full Verify `verify-1789765298391-c829827c5bcc90bc` remains failed,
+572/573 passed, with the interrupted-dispatch evidence blocker described below.
+
+ALF-CODE-CRITIC-1 returned six major findings and `pass: false`:
+
+1. Plugin-only installation can lose the protected-baseline schema and fail open.
+2. Briefed-test grants omit mandatory dispatch-digest and exact-target binding.
+3. Architecture adoption records PO authority without the human ceremony.
+4. Missing calibration and unavailable fitness outcomes can become green.
+5. Profile drift uses an optional boolean instead of accepted digest comparison.
+6. Plan staging admits pre-authority banners outside the staging directory.
+
+These are open Critic findings, not applied fixes or new policy approvals.
+Semantic coverage was incomplete across 157 source targets; 161 other paths
+were explicitly deferred. Documentation, remaining source coverage and the
+requested complete 1+1 review remain open. The trajectory verdict is
+`not verifiable`; underlying check receipts were not independently reviewed.
+
+Local report: `evidence/alfred-code-critic-round1-report.md`; exact verdict:
+`evidence/alfred-code-critic-round1-verdict.json`. The installed sanctioned
+session finalizer completed and its durable consumed receipt was read back:
+packet `c1c0b81f88162c0eb1bbb86622da5c0c`, verdict SHA-256
+`37ac7ae63734141a6a378bbb814f290685c9747f4340a5700c82341e2cecd724`.
+This records a failed partial review, not gate clearance. Verify and release
+remain blocked. Protected-surface repairs still require their applicable
+authorizations; the ordering exception does not grant them.
+
 ### Latest continuation readback — 2026-09-18, 20:46 UTC
 
 This entry supersedes the current-status wording below, not its historical evidence.

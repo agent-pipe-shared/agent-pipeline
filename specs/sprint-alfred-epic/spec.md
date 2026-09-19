@@ -284,7 +284,7 @@ submission and pre-close + fixtures per #105's list.
   surface is admitted but recomputation against the *actual* candidate
   before close may only retain or escalate (#105 §4 verbatim).
 - **Rollout:** report-only rows in verify evidence + a disagreement log
-  (`selected vs derived`) until the C1 dogfood window completes; promotion
+  (`selected vs derived`) until sufficient C1 calibration evidence exists; promotion
   to enforcing is a Wave-4/5 PO decision with the disagreement log as its
   evidence. Mini (#11) consumes the derivation as a special case, not a
   second classifier.
@@ -374,10 +374,13 @@ A1 subagent-hook finding.
   `design/issue-intake.md` #103) so dogfood starts on real codes.
 - Privacy: no prompts/transcripts/secrets/private paths; receipts live under
   the ignored `evidence/` root, aggregates under `telemetry/`.
-- **Dogfood clock:** first wave lands it; `interruption-baseline.json`
-  records window start; B1 promotion and D2 thresholds mechanically require
-  `windowDays >= 14` from that artifact (#103's rule as a check, not a
-  memory).
+- **Dogfood evidence:** first wave lands it; `interruption-baseline.json`
+  records the actual collection window and evidence coverage. Per the PO
+  decision of 2026-09-13, no fixed 14-day release or promotion wait applies.
+  B1 promotion and D2 thresholds require sufficient measured calibration
+  evidence and the existing PO promotion decision; elapsed days alone prove
+  neither. Missing or insufficient evidence remains explicitly unavailable
+  or report-only, never calibrated PASS.
 
 ### 6.2 C2 — Dispatch and Verify economics
 
@@ -407,10 +410,11 @@ A1 subagent-hook finding.
 
 ### 6.3 C3 — Cadence validation
 
-After ≥14 dogfood days: report over C1 receipts + Verify durations
+With sufficient measured coverage: report over C1 receipts + Verify durations
 comparing per-dispatch vs collection-block cadence cost for the sprint's own
 waves; close the cadence item per its own acceptance text (evidence-backed
-recommendation, policy already encoded).
+recommendation, policy already encoded). Report the actual collection window
+and limitations; no fixed calendar wait replaces the evidence-quality check.
 
 ## 7. Track D — Agent-first architecture capability
 
@@ -647,7 +651,8 @@ for every 21-item #106 fixture list entry.
   write-surface intersection), authority/effect ownership + verification
   locality (declaration-presence first, semantic depth explicitly
   `unsupported` where not mechanical), calibrated friction thresholds
-  (armed only post-C1-window).
+  (armed only with sufficient measured C1 calibration and the required promotion
+  approval, not merely after a fixed elapsed window).
 - **Baseline-and-ratchet:** `architecture-baseline.json` per repo (accepted
   violations, unknown coverage), net-new/worsened blocking at configured
   boundaries, deterministic reduction, PO-only transitions — #106 §4
@@ -896,9 +901,10 @@ pathway; §5 → §7.2 active optimization and §7.4 artifact orientation; §6 �
 6. **Auto-repair of drifted closed evidence:** rejected — repair is PO-gated
    by construction; an agent-auto-repair would be the same class of silent
    authority mutation this sprint exists to end.
-7. **Postponing C1 to a later wave:** rejected — its 14-day window is the
-   critical path for every threshold-dependent promotion; landing it late
-   forces either waiting or waiving #103's rule.
+7. **Postponing C1 to a later wave:** rejected — collecting useful calibration
+   evidence early remains necessary for threshold-dependent promotion. The
+   PO decision of 2026-09-13 removes the former fixed 14-day wait, not the
+   evidence-quality requirement or explicit promotion decision.
 8. **One merged property list for #104 and #106** (collapsing the nine
    declared properties and the ten evaluated classes into a single
    enumeration): rejected — declaration and evaluation are distinct views of

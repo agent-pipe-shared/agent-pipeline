@@ -418,6 +418,7 @@ import {
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import { inspectArchitectureEntryReadiness } from "../lib/architecture-entry-readiness.mjs";
+import { materializeArchitectureDesign } from "../lib/architecture-design.mjs";
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import {
   applyLegacyV2RevocationRecovery,
@@ -684,6 +685,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // `materialize-push-threat-model` was absent from it while another refusal named
 // that exact command as the way out of a stuck approval.
 const PIPELINE_STATE_COMMANDS = Object.freeze([
+  "materialize-architecture",
   "inspect",
   "set-feature", "submit-plan", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
@@ -9369,6 +9371,18 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return 0;
     }
 
+    case "materialize-architecture": {
+      if (rest.length !== 0) { console.error("materialize-architecture accepts no arguments"); return 2; }
+      const lock = acquireContinuityLock(dir, "architecture-design-materialization");
+      if (!lock.ok) { console.error(JSON.stringify(lock)); return 2; }
+      try {
+        const result = materializeArchitectureDesign(dir, { lock });
+        console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
+          code: result.code ?? null, receipt: result.receipt ?? null }));
+        return result.ok && result.status === "materialized" ? 0 : 2;
+      } finally { releaseContinuityLock(lock); }
+    }
+
     case "set-phase": {
       const phase = flags.phase;
       if (!new Set(["design", "implementation"]).has(phase)) {
@@ -9395,6 +9409,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       });
       if (architecture.status !== "ready") {
         console.error(`Error: set-phase implementation refused (${architecture.code}); ${architecture.message}`);
+        console.error(JSON.stringify({ schema: architecture.schema, code: architecture.code, nextAction: architecture.nextAction }));
         return 2;
       }
       // NVA-CF-VERIFYDEADLOCK: the design->implementation transition is the one

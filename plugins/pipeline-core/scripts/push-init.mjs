@@ -118,6 +118,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { assessPushGateSatisfiability as realAssessPushGateSatisfiability } from "./push-gate-satisfiability.mjs";
 import { pushPrepareReport as realPushPrepareReport } from "./push-prepare.mjs";
 import { buildLateVerifyRecoveryAction } from "./pipeline-state.mjs";
+import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
 
 export const SCHEMA = "pipeline.push-init.v1";
 export const RECOVERY_SCHEMA = "pipeline.push-init-recovery.v1";
@@ -306,6 +307,7 @@ export function drivePushInit({
   satisfiabilityDeps = {},
   pushPrepareReport = realPushPrepareReport,
   prepareDeps = {},
+  assessPushHookBackstop = realAssessPushHookBackstop,
 } = {}) {
   const root = resolve(rootDir);
   for (const [name, value] of [["by", by], ["remote", remote], ["destination", destination]]) {
@@ -317,6 +319,20 @@ export function drivePushInit({
 
   const steps = [];
   const failedChecks = [];
+
+  // Layer 0: a manifest that declares a blocking push gate must have the
+  // corresponding git-layer backstop. This deliberately precedes human
+  // approval preparation: chat/signature approval cannot compensate for an
+  // unbacked boundary that scripts and direct git can bypass.
+  const hookBackstop = assessPushHookBackstop(root);
+  if (hookBackstop.blocking) steps.push({ id: "push-hook-backstop", inProcess: true, ok: hookBackstop.backed });
+  if (hookBackstop.blocking && !hookBackstop.backed) {
+    const check = { id: "push-hook-backstop", ok: false, status: hookBackstop.code, message: hookBackstop.message, remedy: hookBackstop.remedy, hook: hookBackstop.hook };
+    return {
+      schema: SCHEMA, root, outcome: "precondition-unmet", steps, checks: [check],
+      recovery: buildPreconditionRecovery({ root, by, remote, destination, base, candidate, recordRef, checks: [check] }),
+    };
+  }
 
   // Layer 1b -- conditional, see header comment "WHY LAYER 1b IS CONDITIONAL".
   const reconciliationScriptPath = join(root, RECONCILIATION_SCRIPT_RELATIVE_PATH);

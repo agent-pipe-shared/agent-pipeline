@@ -213,9 +213,12 @@ Goldfish/Critic sessions on any supported runner; hosted projects
   covers it, and honest typed debt where it cannot.
 - S3. Every sanctioned `pipeline-state.mjs` verb's output state is accepted
   by every readiness observer (writer/observer conformance suite green).
-- S4. Two weeks of interruption receipts (C1) exist before any
-  threshold-dependent policy lands; the receipts distinguish planned gates
-  from interruptions and record blocked wall time.
+- S4. Sufficient measured interruption receipts (C1) support any
+  threshold-dependent policy promotion; the receipts distinguish planned
+  gates from interruptions and record blocked wall time and actual coverage.
+  Per the PO decision of 2026-09-13 there is no fixed two-week release or
+  promotion wait. Insufficient evidence remains report-only or unavailable;
+  elapsed time alone cannot establish calibration.
 - S5. A greenfield project resolves to the inherited agent-first profile and
   produces a machine-readable architecture disposition before implementation
   authority; this repository completes the brownfield adoption flow end to
@@ -552,10 +555,11 @@ named in `spec.md` §12 and `acceptance.md`:
 - **A-3:** OKF v0.1 remains available and digest-pinnable. *Fallback:* the
   representation contract is pluggable by construction; the pin decision is
   an ADR that can be superseded through D1's own machinery.
-- **A-4:** C1's two-week dogfood window fits the sprint's calendar. *Risk:*
-  if the sprint must close earlier, threshold-dependent D2/B1 calibration
-  ships report-only with the window's completion as recorded debt — the
-  #103 rule (no thresholds from a short baseline) is honored, not waived.
+- **A-4:** C1 collection yields sufficient evidence for defensible calibration.
+  *Risk:* if coverage is insufficient, threshold-dependent D2/B1 calibration
+  remains report-only with explicit evidence debt, never a calibrated PASS.
+  The PO decision of 2026-09-13 removes only the fixed calendar wait; evidence
+  quality and explicit promotion approval remain required.
 - **A-5:** Epic scale. 18 WPs across 5 tracks is large; the design keeps
   C2's range-mode tail and parts of B2 explicitly droppable, and every wave
   ends PO-visible, so scope can be cut at wave boundaries without breaking

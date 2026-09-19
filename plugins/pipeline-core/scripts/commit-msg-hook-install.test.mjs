@@ -10,8 +10,11 @@ import { fileURLToPath } from "node:url";
 
 import {
   applyInstall,
+  applyDecline,
   applyRemoval,
+  DECLINE_MARKER_SCHEMA,
   planInstall,
+  planDecline,
   planRemoval,
 } from "./commit-msg-hook-install.mjs";
 
@@ -237,4 +240,20 @@ test("generated hook fails closed when its install-bound policy module is unavai
   const result = commitWithMessage(dir, git, "feat: cannot be evaluated\n");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /policy could not be loaded/);
+});
+
+test("decline marker has the same reversible, non-overwriting contract as the other hook installers", () => {
+  const { dir } = freshRepo("decline");
+  assert.equal(planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "ready");
+  const declined = applyDecline({ rootDir: dir });
+  assert.equal(declined.status, "declined");
+  assert.match(declined.declinedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "declined");
+  const marker = JSON.parse(readFileSync(join(dir, ".git", "agent-pipeline", "commit-msg-hook", "decline-marker.json"), "utf8"));
+  assert.equal(marker.schema, DECLINE_MARKER_SCHEMA);
+  assert.deepEqual(Object.keys(marker).sort(), ["declinedAt", "schema"]);
+  assert.equal(planDecline({ rootDir: dir }).status, "ready");
+  const installed = applyInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR });
+  assert.equal(installed.status, "installed", "a decline must not make installation permanently impossible");
+  assert.equal(planInstall({ rootDir: dir, pluginLibDir: PLUGIN_LIB_DIR }).status, "ready-to-upgrade");
 });

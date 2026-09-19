@@ -545,36 +545,11 @@ export function applyTrustAnchorBootstrap({
   return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE", mode };
 }
 
-function readLocalGitConfig(root, key, env, runGit = spawnSync) {
-  const result = runGit("git", ["-C", root, "config", "--local", "--get", key], {
-    encoding: "utf8", shell: false, env,
-  });
-  if (result?.status === 1 && (result?.error === undefined || result?.error === null)) {
-    return { present: false, value: null };
-  }
-  if (!isSuccessfulSpawn(result)) return null;
-  return { present: true, value: String(result.stdout ?? "").replace(/[\r\n]+$/u, "") };
-}
-
-function writeLocalGitConfig(root, key, value, env, runGit = spawnSync) {
-  const result = runGit("git", ["-C", root, "config", "--local", key, value], {
-    encoding: "utf8", shell: false, env,
-  });
-  return isSuccessfulSpawn(result);
-}
-
-function restoreLocalGitConfig(root, key, snapshot, env, runGit = spawnSync) {
-  if (snapshot.present) return writeLocalGitConfig(root, key, snapshot.value, env, runGit);
-  const result = runGit("git", ["-C", root, "config", "--local", "--unset-all", key], {
-    encoding: "utf8", shell: false, env,
-  });
-  return hasExpectedSpawnStatus(result, [0, 5]);
-}
-
 /**
  * Applies the first driver question as one bounded, replayable transaction. The values
- * remain argv data throughout: no shell string is assembled, Git identity is repository
- * local, the generated source is changed only at its one validated push-approval scalar,
+ * remain argv data throughout: no shell string is assembled. Git identity is held in
+ * the root-bound private receipt until the first commit, never written to Git config here.
+ * The generated source is changed only at its validated approval scalars,
  * and a repo-private receipt makes the per-repository confirmation durable across restart.
  */
 export function applyInitialOnboardingAnswers({
@@ -611,20 +586,9 @@ export function applyInitialOnboardingAnswers({
   const snapshots = [sourcePath, machinePath, receiptPath]
     .map((path) => fileSnapshot(path, { exists: existsSync, lstat: lstatSync, read: readFileSync }));
   if (snapshots.some((snapshot) => snapshot === null)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-UNSAFE" };
-  const gitSnapshots = gitAuthorName === null ? null : {
-    name: readLocalGitConfig(root, "user.name", effectiveEnv, runGit),
-    email: readLocalGitConfig(root, "user.email", effectiveEnv, runGit),
-  };
-  if (gitSnapshots && (gitSnapshots.name === null || gitSnapshots.email === null)) {
-    return { ok: false, code: "INITIAL-ANSWERS-GIT-PREIMAGE-UNREADABLE" };
-  }
   const rollback = (code) => {
     const filesRestored = restoreSnapshots(snapshots, existsSync);
-    const gitRestored = gitSnapshots === null || (
-      restoreLocalGitConfig(root, "user.name", gitSnapshots.name, effectiveEnv, runGit)
-      && restoreLocalGitConfig(root, "user.email", gitSnapshots.email, effectiveEnv, runGit)
-    );
-    return filesRestored && gitRestored ? { ok: false, code } : { ok: false, code: `${code}-ROLLBACK-FAILED` };
+    return filesRestored ? { ok: false, code } : { ok: false, code: `${code}-ROLLBACK-FAILED` };
   };
 
   const currentPlane = readMachinePlane(machineDependencies);
@@ -657,10 +621,6 @@ export function applyInitialOnboardingAnswers({
 
   try { atomicReplaceFile(sourcePath, nextSource, lstatSync(sourcePath).mode & 0o777); }
   catch { return rollback("INITIAL-ANSWERS-SOURCE-WRITE-FAILED"); }
-  if (gitSnapshots && (!writeLocalGitConfig(root, "user.name", gitAuthorName, effectiveEnv, runGit)
-    || !writeLocalGitConfig(root, "user.email", gitAuthorEmail, effectiveEnv, runGit))) {
-    return rollback("INITIAL-ANSWERS-GIT-WRITE-FAILED");
-  }
   const nextPlane = currentPlane.status === "valid"
     ? { ...currentPlane.plane, pushApprovalDefault: pushApproval, updatedAt: new Date().toISOString() }
     : {
@@ -681,6 +641,8 @@ export function applyInitialOnboardingAnswers({
       root,
       runner,
       pushApprovalPreference: pushApproval,
+      gitAuthorName,
+      gitAuthorEmail,
       updatedAt: new Date().toISOString(),
     }, null, 2)}\n`);
   } catch {

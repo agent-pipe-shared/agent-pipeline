@@ -11,7 +11,7 @@
  * the real nested-process apply transactions.
  */
 import assert from "node:assert/strict";
-import { createPublicKey, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -47,6 +47,9 @@ import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-re
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
+import { coordinateDesignAdvisory } from "../lib/design-advisory-coordinator.mjs";
+import { checkPlanningAdoptionDisposition, resolveAdoptionState } from "./architecture-adoption.mjs";
 import {
   CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
   CODEX_HOST_REPOSITORY_INIT_INTENT,
@@ -683,7 +686,7 @@ test("ready roots recover a missing manifest and a governed V3 registry checkout
   } finally { dispose(path); }
 });
 
-test("in-process driver contract: Claude, Codex, and Antigravity follow only returned actions from an empty folder to the first implementation file", () => {
+test("in-process driver contract: Claude, Codex, and Antigravity follow only returned actions from an empty folder to the first implementation file", async () => {
   const fixtures = [];
   const runners = ["claude", "codex", "antigravity"];
   const materialize = (action, replacements) => {
@@ -805,7 +808,20 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       ]), path, env);
       assert.equal(initial.json.initialAnswers?.code, "INITIAL-ANSWERS-APPLIED", `${runner}: ${JSON.stringify(initial.json)}`);
       assert.equal(initial.json.initialAnswers?.trustAnchor, "not-requested");
-      assert.equal(existsSync(join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
+      const answersPath = join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json");
+      const answersBytes = readFileSync(answersPath, "utf8");
+      const heldInitialAnswers = JSON.parse(answersBytes);
+      assert.equal(heldInitialAnswers.root, path);
+      assert.equal(heldInitialAnswers.gitAuthorName, "Greenfield E2E PO");
+      assert.equal(heldInitialAnswers.gitAuthorEmail, "greenfield-e2e@example.invalid");
+      assert.equal(fixtureGitConfig.has(`${path}\u0000user.name`), false);
+      assert.equal(fixtureGitConfig.has(`${path}\u0000user.email`), false);
+      const readback = run(onboarding, ["inspect", "--root", path, "--runner", runner], path);
+      assert.equal(readback.status, 0, readback.stdout);
+      const authorFields = (readback.json.authorIdentityAction?.inputs ?? []).map((input) => input.name);
+      assert.equal(authorFields.includes("gitAuthorName"), false, `${runner}: complete receipt suppresses name re-ask`);
+      assert.equal(authorFields.includes("gitAuthorEmail"), false, `${runner}: complete receipt suppresses email re-ask`);
+      assert.equal(existsSync(answersPath), true);
       const initialPolicy = readFileSync(join(path, "pipeline.user.yaml"), "utf8");
       assert.match(initialPolicy, /^\s*human_approval:\s*"signature"\s*$/mu,
         `${runner}: initial decision records the shared human-approval policy`);
@@ -845,7 +861,12 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         // exercised independently in codex-onboarding-launch.test.mjs.
         completeRuntimeReadback(path, 80_000);
       } else {
+        // The complete root-bound initial-answer receipt already holds the
+        // author values, so after anchoring the driver may expose the real
+        // remaining intake request directly rather than wrapping it as a
+        // second author-related pending-asks envelope.
         assert.equal(anchored.json.outcome, "collect-input", `${runner}: ${JSON.stringify(anchored.json)}`);
+        assert.deepEqual(anchored.json.collectInput?.inputs?.map((input) => input.name), ["language", "profile", "projectDescription"]);
       }
 
       let intake = freshDriver(path, runner, env);
@@ -870,6 +891,33 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         ["<PO_INTAKE_DESIGN_ANSWERS_JSON>", answers],
       ]), path, env);
 
+      const designStop = freshDriver(path, runner, env);
+      assert.equal(designStop.outcome, "unsupported-next-action", JSON.stringify(designStop));
+      assert.equal(designStop.final.nextAction.kind, "architecture-design-required");
+      assert.equal(existsSync(join(path, "architecture/baseline.json")), false);
+      const prdPath = designStop.final.nextAction.prdPath;
+      assert.equal(typeof prdPath, "string", "the remediation names its exact generated PRD");
+      const prdFile = join(path, prdPath);
+      assert.equal(existsSync(prdFile), true, "the named generated PRD exists before it may be edited");
+      const contract = "docs/game-contract.md";
+      const verification = "tests/game.test.mjs";
+      mkdirSync(join(path, "docs"), { recursive: true });
+      mkdirSync(join(path, "tests"), { recursive: true });
+      writeFileSync(join(path, contract), "# Game contract\nExport playable=true from game.js after keyboard interaction is implemented.\n");
+      writeFileSync(join(path, verification), "import assert from 'node:assert/strict';\nimport { playable } from '../game.js';\nassert.equal(playable, true);\n");
+      const module = { id: "game", responsibility: "Local keyboard game and its acceptance contract.", nonResponsibilities: ["Network services"],
+        ownedPaths: ["game.js", "docs/game-contract.md", "tests/game.test.mjs"], publicContracts: [contract], allowedDependencies: [],
+        authorityEffects: [], verificationEntryPoints: [verification], adrReferences: [] };
+      const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+        disposition: { decision: "approved-scoped", scope: ["specs/", "architecture/", "game.js", "docs/game-contract.md", "tests/game.test.mjs"],
+          rationale: "Approve this explicit local game design within the same complete PRD decision." },
+        modules: [module], implementationSurface: ["game.js"],
+        fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "local-game", revision: 1,
+          modules: [{ id: module.id, ownedPaths: module.ownedPaths, allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [verification] }],
+          allowedBoundaryCrossings: [], antiFragmentationPolicy: { rejectTrivialFacades: true, rejectDuplicatedFacades: true, minStatementsPerModule: 1 } },
+        baseline: { schema: "pipeline.architecture-baseline.v1", baselineRevision: 1, acceptedViolations: [],
+          ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 } } };
+      writeFileSync(prdFile, readFileSync(prdFile, "utf8") + "\n\n```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n");
       const signatureRequest = freshDriver(path, runner, env);
       assert.equal(signatureRequest.outcome, "external-operator", `${runner}: ${JSON.stringify(signatureRequest)}`);
       assert.equal(signatureRequest.final.status, "signature-required");
@@ -916,6 +964,51 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         `${runner}: signature mode must not regress to the legacy --by approval route`);
       const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
       assert.equal(state.planApproved, true, `${runner}: the receipt must complete the one approved transition`);
+      assert.equal(state.activeFeature.phase, "implementation");
+      assert.equal(checkPlanningAdoptionDisposition(path, state.activeFeature.planPath).ok, true);
+      assert.equal(resolveAdoptionState(path).state, "approved-scoped");
+      assert.ok(planSteps.some(argv => argv[1] === "materialize-architecture"));
+      assert.equal(existsSync(join(path, "architecture/design-materialization.json")), true);
+      assert.equal(existsSync(join(path, "architecture/adoption-state.json")), false,
+        "The explicit disposition belongs to the approved PRD; no second approval is fabricated");
+      const activePrd = join(path, state.activeFeature.planPath);
+      const approvedBytes = readFileSync(activePrd, "utf8");
+      writeFileSync(activePrd, approvedBytes + "\nUnapproved architecture change.\n");
+      assert.equal(inspectArchitectureDesign(path).ok, false, "PRD drift revokes architecture authority immediately");
+      writeFileSync(activePrd, approvedBytes);
+      const receiptPath = join(path, "architecture/design-materialization.json");
+      const receiptBytes = readFileSync(receiptPath, "utf8");
+      writeFileSync(receiptPath, receiptBytes.replace('"designSha256": "', '"designSha256": "changed-'));
+      assert.equal(inspectArchitectureDesign(path).code, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
+      writeFileSync(receiptPath, receiptBytes);
+      assert.equal(inspectArchitectureDesign(path).status, "materialized");
+
+      const stagedDesign = spawnSync("git", ["add", "--", "."], { cwd: path, encoding: "utf8" });
+      assert.equal(stagedDesign.status, 0, stagedDesign.stderr);
+      const committedDesign = spawnSync("git", ["-c", "user.name=Greenfield E2E PO", "-c", "user.email=greenfield-e2e@example.invalid", "commit", "-m", "test: bind greenfield design package\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)"], { cwd: path, encoding: "utf8" });
+      assert.equal(committedDesign.status, 0, committedDesign.stderr);
+
+      const advisory = await coordinateDesignAdvisory({
+        repoRoot: path,
+        runtime: { runner, profile: "feature" },
+        featureId: state.activeFeature.id,
+        planPath: state.activeFeature.planPath,
+        specPath: state.planApproval.poGateAuthority.specPath,
+        disposition: { decision: "accept", rationale: "The independent design review is bounded and accepted." },
+        invokeBridge: async ({ receiptPath, input }) => {
+          const selector = { kind: "model-id", value: runner === "claude" ? "claude-sonnet" : runner === "antigravity" ? "gemini-3-flash" : "gpt-5.6-sol" };
+          const receipt = { schema: "pipeline.advisory-receipt.v1", receiptId: input.receiptId,
+            dispatch: structuredClone(input.dispatch), duty: "advisory", profile: input.profile,
+            configuredRoute: { runner, selector, effort: "high" }, adapter: "consult",
+            observed: { status: "answered", identity: { provider: runner === "claude" ? "anthropic" : runner === "antigravity" ? "google" : "openai", modelId: selector.value, effort: "high" } },
+            questionSha256: createHash("sha256").update(input.question).digest("hex"),
+            answerSha256: createHash("sha256").update("Use a bounded review.").digest("hex"),
+            fallback: { reason: "none", redactedErrorClass: null }, emittedAtMs: 1 };
+          writeFileSync(receiptPath, JSON.stringify(receipt) + "\n", { mode: 0o600 });
+          return 0;
+        },
+      });
+      assert.equal(advisory.status, "admitted", `${runner}: the mandatory Advisor transaction must bind before implementation`);
 
       const externalInventory = evaluateLifecycleReadyGuard({
         tool_name: "Bash",

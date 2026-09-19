@@ -71,6 +71,7 @@ import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResou
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify, readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
+import { assessPushHookBackstop as realAssessPushHookBackstop } from "./check-clone-provisioning.mjs";
 import {
   GOVERNANCE_VERIFICATION_TERMINAL_SCHEMA,
   buildGovernanceVerificationAction,
@@ -228,8 +229,14 @@ function preflightReleaseCriticAdmission({ root, candidate: sourceCandidate, cri
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
  */
-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, assessPushHookBackstop = realAssessPushHookBackstop }) {
   const root = resolve(rootDir);
+  // Release/push evidence is used to clear the push boundary. Do not mint it
+  // while a manifest-declared blocking gate lacks its git-level backstop.
+  if (mode === "release" || mode === "push") {
+    const backstop = assessPushHookBackstop(root);
+    if (backstop.blocking && !backstop.backed) fail("VEP-UNBACKED_GATE", `${backstop.message} ${backstop.remedy}`);
+  }
   const target = safeOutPath(root, outPath);
   const canonicalTarget = safeOutPath(root, VERIFY_EVIDENCE_DEFAULT_PATH);
   let eventPlan = null;

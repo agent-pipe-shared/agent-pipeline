@@ -9,9 +9,10 @@
  * Hermetics: every spawn sets CLAUDE_PROJECT_DIR to a fresh temp dir so this machine's
  * real .claude/pipeline.yaml / pipeline-state.json can never leak into these cases.
  */
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, rmSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
@@ -21,6 +22,51 @@ import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
 import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
 import { readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
+import { writeDesignAdvisoryTransaction, DESIGN_ADVISORY_RECEIPT_DIRECTORY, DESIGN_ADVISORY_TRANSACTION_DIRECTORY } from "../lib/design-advisory-transaction.mjs";
+import { designAdvisoryAdmission } from "../lib/guard-devplan-policy.mjs";
+import { evaluateLifecycleReadyGuard } from "./guard-lifecycle-ready.mjs";
+
+function writeAdvisorTransaction(dir, { unavailable = false } = {}) {
+  const args = {
+    repoRoot: dir, gitCommonDir: join(dir, ".git"), featureId: "authority-feature",
+    planPath: AUTHORITY_PLAN_PATH, specPath: AUTHORITY_SPEC_PATH,
+    receiptId: "advisor-1", nativeAvailable: false,
+    disposition: unavailable ? null : { decision: "accept", rationale: "The plan remains bounded." },
+    finalApprovalValid: unavailable, expectedPublicSha256: null,
+  };
+  const receipt = {
+    schema: "pipeline.advisory-receipt.v1", receiptId: "advisor-1",
+    dispatch: { dispatchId: "design-1", queueRevision: 0, candidateCommit: V2_CANDIDATE.commit, candidateTree: V2_CANDIDATE.tree },
+    duty: "advisory", profile: "feature",
+    configuredRoute: { runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-sol" }, effort: "high" },
+    adapter: "consult",
+    observed: unavailable ? { status: "unavailable", identity: null } : { status: "answered", identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "high" } },
+    questionSha256: sha256(AUTHORITY_PLAN_BYTES), answerSha256: unavailable ? null : "b".repeat(64),
+    fallback: unavailable ? { reason: "consult-unavailable", redactedErrorClass: "unavailable" } : { reason: "none", redactedErrorClass: null },
+    emittedAtMs: 1,
+  };
+  mkdirSync(join(dir, ".git", DESIGN_ADVISORY_RECEIPT_DIRECTORY), { recursive: true });
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, ".git", DESIGN_ADVISORY_RECEIPT_DIRECTORY, "advisor-1.json"), JSON.stringify(receipt));
+  return writeDesignAdvisoryTransaction(args);
+}
+
+function assertAdvisorLanes(dir, allowed, code = null) {
+  const direct = runGuard("Edit", "src/foo.ts", dir);
+  const shell = evaluateLifecycleReadyGuard(
+    { tool_name: "Bash", tool_input: { command: "cp scratch/change.ts src/foo.ts" } },
+    { projectDir: dir, requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }) },
+  );
+  assert.equal(direct.code, allowed ? 0 : 2, direct.stderr);
+  assert.equal(shell.exitCode, allowed ? 0 : 2, shell.stderr);
+  if (code !== null) {
+    assert.ok(direct.stderr.includes(code), direct.stderr);
+    assert.ok(shell.stderr.includes(code), shell.stderr);
+    assert.ok(direct.stderr.includes("reopen-design"), direct.stderr);
+    assert.ok(shell.stderr.includes("design-advisory-admission.mjs inspect"), shell.stderr);
+  }
+}
+
 
 const GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
 
@@ -94,6 +140,7 @@ const AUTHORITY_PLAN_PATH = "specs/feature/prd.md";
 const AUTHORITY_SPEC_PATH = "specs/feature/spec.md";
 const AUTHORITY_PLAN_BYTES = "# PRD\n";
 const AUTHORITY_SPEC_BYTES = "# Spec\n";
+const V2_CANDIDATE = { commit: "b".repeat(40), tree: "c".repeat(40) };
 const PLAN_SUBMISSION = {
   schema: "pipeline.plan-submission.v1",
   featureId: "authority-feature",
@@ -188,10 +235,11 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
     projectDir: dir,
     stderrIncludes: ["approved", "set-phase"],
   });
-  writeState(dir, {
-    ...APPROVED_STATE,
-    activeFeature: { ...APPROVED_STATE.activeFeature, phase: "implementation" },
-  });
+  const initialized = spawnSync("git", ["init", "--quiet", dir], { encoding: "utf8" });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  writeAuthorityDocs(dir);
+  writeState(dir, v2AuthorityState({ repositoryFingerprint: "7".repeat(64) }));
+  writeAdvisorTransaction(dir);
   check("DP06b allow exact approved implementation", "Edit", "src/foo.ts", ALLOW, {
     projectDir: dir,
     stderrEmpty: true,
@@ -544,7 +592,6 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
 // carrying an OPTIONAL top-level `state.planApprovalDecisionReference`
 // (`pipeline.human-decision-reference.v1`) and prove the dual-evaluation primitive now
 // governs it: unresolved/mismatched -> BLOCK (fail closed), genuinely ledger-granted -> ALLOW.
-const V2_CANDIDATE = { commit: "b".repeat(40), tree: "c".repeat(40) };
 const UNAVAILABLE = { state: "not-applicable" };
 
 function governanceRegistry(fingerprint) {
@@ -720,11 +767,80 @@ function decisionReference({ fingerprint, decisionId, decisionDigest, checkpoint
     }),
   };
   writeState(dir, state);
+  writeAdvisorTransaction(dir);
   check("DP28 allow  legacy/v2 approval + genuinely ledger-granted decision reference agrees", "Edit", "src/foo.ts", ALLOW, {
     projectDir: dir,
     stderrEmpty: true,
   });
 }
+
+// Both real guard lanes read the same repository-private transaction. The ledger
+// fixture above supplies genuine authority, including the unavailable exception.
+for (const variant of ["valid", "separate-common", "missing", "public-only", "malformed", "stale-private", "stale-package", "unavailable-approved", "unavailable-no-final", "unavailable-stale-candidate"]) {
+  const dir = freshDir(`advisor-${variant}`);
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeAuthorityDocs(dir);
+  const grant = await writeGovernanceLedgerGrant(dir, {
+    decisionId: "grant-1", packageId: "authority-feature",
+    artifacts: [
+      { path: AUTHORITY_PLAN_PATH, sha256: sha256(AUTHORITY_PLAN_BYTES) },
+      { path: AUTHORITY_SPEC_PATH, sha256: sha256(AUTHORITY_SPEC_BYTES) },
+    ],
+  });
+  const state = v2AuthorityState({ repositoryFingerprint: grant.fingerprint });
+  if (variant.startsWith("unavailable-") && variant !== "unavailable-no-final") {
+    state.planApproval.schema = "pipeline.plan-approval.v3";
+    state.planApproval.humanDecision = decisionReference({
+      fingerprint: grant.fingerprint, decisionId: "grant-1",
+      decisionDigest: grant.decisionDigest, checkpoint: grant.checkpoint,
+    });
+  }
+  writeState(dir, state);
+  const written = variant === "missing" ? null : writeAdvisorTransaction(dir, { unavailable: variant.startsWith("unavailable-") });
+  const privatePath = written && join(dir, ".git", DESIGN_ADVISORY_TRANSACTION_DIRECTORY, `${written.id}.json`);
+  if (variant === "public-only") rmSync(privatePath);
+  if (variant === "malformed") writeFileSync(privatePath, "{");
+  if (variant === "stale-private") {
+    const tx = JSON.parse(readFileSync(privatePath, "utf8"));
+    tx.package.planSha256 = "f".repeat(64);
+    writeFileSync(privatePath, JSON.stringify(tx));
+  }
+  if (variant === "stale-package") writeFileSync(join(dir, AUTHORITY_SPEC_PATH), "# Changed spec\n");
+  if (variant === "unavailable-stale-candidate") {
+    // Keep a valid ledger-backed lifecycle but change the Advisor candidate.
+    const publicPath = join(dir, "project/design-advisory-admission.json");
+    const record = JSON.parse(readFileSync(publicPath, "utf8"));
+    record.admission.workflow.candidateCommit = "a".repeat(40);
+    writeFileSync(publicPath, JSON.stringify(record));
+  }
+  if (variant === "separate-common") {
+    const moved = spawnSync("git", ["init", "--quiet", "--separate-git-dir", join(dir, "private-control"), dir], { encoding: "utf8" });
+    assert.equal(moved.status, 0, moved.stderr);
+  }
+  const allowed = ["valid", "separate-common", "unavailable-approved"].includes(variant);
+  const code = {
+    missing: "DAA-PUBLIC-UNAVAILABLE", "public-only": "DAA-PRIVATE-UNAVAILABLE",
+    malformed: "DAA-PRIVATE-INVALID", "stale-private": "DAA-PRIVATE-INVALID",
+    "unavailable-no-final": "DAA-UNAVAILABLE-FINAL-APPROVAL",
+    "unavailable-stale-candidate": "DAA-UNAVAILABLE-FINAL-APPROVAL",
+  }[variant] ?? null;
+  assertAdvisorLanes(dir, allowed, code);
+  const admission = designAdvisoryAdmission(state, dir, AUTHORITY_PLAN_PATH, AUTHORITY_SPEC_PATH);
+  assert.equal(admission.ok, allowed, JSON.stringify(admission));
+  if (variant === "stale-package") assert.equal(admission.code, "DAA-PUBLIC-INVALID");
+  if (variant === "valid") {
+    // A state path must be rejected before the final-authority/hash reader.
+    for (const badPath of ["../outside.md", "/outside.md", "specs/../feature/prd.md", "specs\\\\feature\\\\prd.md"]) {
+      assert.equal(designAdvisoryAdmission(state, dir, badPath, AUTHORITY_SPEC_PATH).code, "DAA-PATH");
+    }
+    if (process.platform !== "win32") {
+      symlinkSync(join(dir, AUTHORITY_PLAN_PATH), join(dir, "plan-link.md"));
+      assert.equal(designAdvisoryAdmission(state, dir, "plan-link.md", AUTHORITY_SPEC_PATH).code, "DAA-PATH");
+    }
+  }
+  pass++;
+}
+console.log("PASS  private Advisor transaction and exact final-approval matrix in direct and shell lanes");
 
 // ---- DP29 sanctioned close-artifact writer: HISTORY.md and telemetry/ -> allow ----------
 // backlog/items/2026-07-26-readonly-command-guard-classification.md;

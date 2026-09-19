@@ -10,6 +10,11 @@ acceptance, signature proof, installation or publication authority.
 - [ ] Truthful no-delivery dispatch completion preserving incident review.
 - [ ] Plugin bootstrap projection and exact recovery-plan fixes integrated;
   version updates do not repeatedly require manual per-version permission repair.
+- [ ] Nova guard-order correction: parallel `apply_patch` guard results retain
+  patch-input order despite asynchronous completion, so the resulting denial
+  and HGO binding are repeatable. Prove the installed candidate cache contains
+  the indexed assignment and run the Nova regression after the one shared
+  candidate installation; do not ship it as a separate interim package.
 - [ ] Chat mode consistency from policy/migration through driver, approval,
   GG-03, push guard and applicable release/deploy gates. Preserve exact authority
   bindings and signature-mode negative coverage.
@@ -64,6 +69,12 @@ acceptance, signature proof, installation or publication authority.
   rules. Derive Dispatch from actual runtime context, never invent attribution;
   preserve staged-only scope and all hooks. Test multiline messages, quoting,
   invalid inputs and hook rejection; no implicit staging or `--no-verify`.
+- [ ] Shell/dispatch economics followup: reduce avoidable `&&`/commit formatting
+  retries through safe generated commands and bounded orchestration; no blanket
+  shell grammar relaxation. Explain coherent feature scope versus independently
+  bounded parallel dispatches and existing risk-limited collection-block batching
+  in user-facing guidance. Measure fixed, per-tool and retry costs separately;
+  do not claim constant overhead or unmeasured token/time savings.
 - [ ] Greenfield onboarding defaults: collect identity, approval mode and
   language in one validated review/confirmation step. Read effective Git
   identity as a proposed default with provenance; do not mutate global config,
@@ -85,8 +96,26 @@ acceptance, signature proof, installation or publication authority.
 
 User installation and real Greenfield/brownfield/architecture/runner tests;
 repair resulting defects and refresh affected reviews/tests; final integration
-and full Alfred acceptance matrix; release documentation and distribution
-qualification; explicit PO acceptance and separately authorized publication.
+and full Alfred acceptance matrix. Then complete a dedicated user-documentation
+release pass for the actual 0.7.0 behavior: update feature guides, onboarding,
+architecture migration, audit-bundle/auditor handoff, approval modes, dispatch
+and troubleshooting instructions. Keep the entry README concise and
+orientation-first; link out to progressive-detail guides rather than embedding
+governance internals or runner-specific repair detail in the first-read path.
+Run the independent reader review against the final user-facing documents and
+bind it to the release candidate before distribution qualification; explicit PO
+acceptance and separately authorized publication follow.
+
+## After published 0.7.0, before seeking users
+
+An independent first-install trial on a fresh PC is the first post-release
+validation step: no prior Pipeline plugin cache, project configuration, local
+marketplace copy, or inherited runner permission state may be assumed. Record
+the OS/runner matrix, exact published installation steps, plugin
+identity/readback and a small fresh Greenfield bootstrap result. Treat any
+required pre-existing local path, stale cache, hidden permission, or
+undocumented manual repair as a release defect and issue a follow-up patch
+release before recruiting users; do not turn it into an implicit prerequisite.
 No known missing core function above is deferred merely to call a partial build
 the requested local candidate. This is one full Alfred release, not slice releases.
 

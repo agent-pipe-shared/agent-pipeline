@@ -4325,6 +4325,7 @@ function sanctionedPoAuthorityRebindArgs(args, root) {
 }
 
 function sanctionedPipelineStateArgs(args, root) {
+  if (args[0] === "materialize-architecture") return args.length === 1;
   const validBy = (value) => typeof value === "string"
     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
   if (args[0] === "plan-legacy-v2-revocation-recovery") {
@@ -4782,12 +4783,20 @@ function isExactObservedRunnerPermissionsPlannerAction(command, root, dependenci
   const expected = action?.expected;
   const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
     && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
-  return observed?.schema === "pipeline.project-onboarding.v4"
-    && observed?.status === "projection-drift"
-    && observed?.root === root
-    && observed?.intent === "session"
-    && ["drifted", "pending-runtime-initialization", "unavailable"].includes(observed?.runnerPermissions?.status)
-    && exactKeys(action, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+  const observedApplyAction = exactKeys(action, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
+    && action.kind === "command" && action.executable === "node"
+    && Array.isArray(action.argv) && action.argv.length === 7 && action.argv.every((value) => typeof value === "string")
+    && action.argv[0] === SETTINGS_ALLOWLIST_MERGE_SCRIPT
+    && action.argv[1] === "apply-runner-permissions"
+    && action.argv[2] === "--root" && action.argv[3] === root
+    && action.argv[4] === "--plan-sha256" && HEX.test(action.argv[5])
+    && action.argv[6] === "--activate"
+    && action.mutation === true && action.requiresConfirmation === true
+    && exactKeys(expected, ["schema", "statuses"])
+    && expected.schema === "pipeline.settings-allowlist-merge-apply.v1"
+    && Array.isArray(expected.statuses) && expected.statuses.length === 2
+    && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op";
+  const observedPlannerAction = exactKeys(action, ["kind", "executable", "argv", "mutation", "requiresConfirmation", "expected"])
     && action.kind === "command" && action.executable === "node"
     && Array.isArray(action.argv) && action.argv.length === 4 && action.argv.every((value) => typeof value === "string")
     && action.argv[0] === SETTINGS_ALLOWLIST_MERGE_SCRIPT
@@ -4797,10 +4806,20 @@ function isExactObservedRunnerPermissionsPlannerAction(command, root, dependenci
     && exactKeys(expected, ["schema", "statuses"])
     && expected.schema === "pipeline.settings-allowlist-merge-plan.v1"
     && Array.isArray(expected.statuses) && expected.statuses.length === 3
-    && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op" && expected.statuses[2] === "unrepairable"
-    && words.length === action.argv.length + 1
-    && words[0] === action.executable
-    && action.argv.every((value, index) => words[index + 1] === value);
+    && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op" && expected.statuses[2] === "unrepairable";
+  const expectedPlannerWords = ["node", SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", root];
+  return observed?.schema === "pipeline.project-onboarding.v4"
+    && observed?.status === "projection-drift"
+    && observed?.root === root
+    && observed?.intent === "session"
+    && ["drifted", "pending-runtime-initialization", "unavailable"].includes(observed?.runnerPermissions?.status)
+    && ((observedPlannerAction
+      && words.length === action.argv.length + 1
+      && words[0] === action.executable
+      && action.argv.every((value, index) => words[index + 1] === value))
+      || (observedApplyAction
+        && words.length === expectedPlannerWords.length
+        && words.every((value, index) => value === expectedPlannerWords[index])));
 }
 
 /**

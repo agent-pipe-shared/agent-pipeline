@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { loadBaseline } from "./architecture-fitness.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import stateSchema from "../schemas/pipeline.adoption-state.v1.json" with { type: "json" };
+import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
 import proposalSchema from "../schemas/pipeline.adoption-proposal.v1.json" with { type: "json" };
 import {
   buildAdoptionSubject,
@@ -53,6 +54,13 @@ function validateState(state) {
  * Re-raises adoption-required if a deferred state has expired.
  */
 export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
+  const design = inspectArchitectureDesign(rootDir);
+  if (design.ok && design.status === "materialized") return {
+    schema: SCHEMA_ADOPTION_STATE, state: STATE_APPROVED_SCOPED, scope: design.scope,
+    decidedAt: null, expiresAt: null, reviewDate: null,
+    decisionRef: "approved-design-package:" + design.receipt.designSha256,
+    rationale: design.input.disposition.rationale, coverageClass: "evaluated", confidence: "measured",
+  };
   const statePath = path.join(rootDir, "architecture/adoption-state.json");
   if (fs.existsSync(statePath)) {
     try {
@@ -179,23 +187,11 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
       stage: 2,
       name: "Core contracts by traversal frequency / priority",
       description: "Formalize public interface contracts for hottest modules by traversal frequency and preflight authority dependency.",
-      primaryDeliverables: allContracts.length > 0
-        ? allContracts.map((c) => c.path)
-        : [
-            "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
-            "plugins/pipeline-core/scripts/module-inventory.mjs",
-            "plugins/pipeline-core/scripts/architecture-fitness.mjs"
-          ],
+      primaryDeliverables: allContracts.map((c) => c.path),
       effort: stage2Effort,
-      coverageClass: "evaluated",
+      coverageClass: mapExists ? "evaluated" : "unknown",
       confidence: "estimated",
-      contracts: allContracts.length > 0
-        ? allContracts.map((c) => ({ path: c.path, priority: c.priority, status: c.status }))
-        : [
-            { path: "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs", priority: "high", status: "available" },
-            { path: "plugins/pipeline-core/scripts/module-inventory.mjs", priority: "high", status: "available" },
-            { path: "plugins/pipeline-core/scripts/architecture-fitness.mjs", priority: "high", status: "available" }
-          ]
+      contracts: allContracts.map((c) => ({ path: c.path, priority: c.priority, status: c.status }))
     },
     {
       stage: 3,
@@ -230,8 +226,8 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
     coverageClass: mapExists ? "evaluated" : "unknown",
     confidence: "estimated",
     inventorySummary: {
-      moduleCount: moduleCount || 4,
-      candidateModules: candidateModules.length > 0 ? candidateModules : ["pipeline-core", "harness", "schemas", "backlog"],
+      moduleCount,
+      candidateModules,
       uncoveredPaths: [],
       coverageGaps: [],
       unknownCoverageShare: mapExists ? 0.0 : 1.0
@@ -340,6 +336,13 @@ function scopeValueForState(scope) {
  * before implementation authority per AC-17.
  */
 export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskScope = null, now = new Date()) {
+  const design = inspectArchitectureDesign(rootDir, taskScope);
+  if (design.ok && design.status === "materialized") return {
+    ok: true, disposition: design.disposition, scope: design.scope, authority: design.authority,
+  };
+  if (fs.existsSync(path.join(rootDir, "architecture/design-materialization.json")) && !design.ok) return {
+    ok: false, disposition: "design-authority-stale", error: design.code,
+  };
   const stateObj = resolveAdoptionState(rootDir, now);
 
   if (stateObj.expired) {
