@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -27,6 +28,13 @@ test("builds and offline-verifies a candidate-bound bundle from a valid package"
 });
 test("detects tampered or missing bundle bytes", async () => {
   const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); writeFileSync(join(input.root, "bundle", "artifacts", "001-prd"), "changed"); const verified = await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") }); assert.equal(verified.status, "invalid"); assert.ok(verified.findings.some((finding) => finding.startsWith("AB-DIGEST")));
+});
+test("detects a modified generated auditor README", async () => {
+  const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); writeFileSync(join(input.root, "bundle", "README.md"), "tampered\n"); const verified = await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") }); assert.equal(verified.status, "invalid"); assert.ok(verified.findings.includes("AB-README-DIGEST"));
+});
+test("keeps old bundles verifiable and CLI returns nonzero for invalid output", async () => {
+  const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); const bundle = join(input.root, "bundle"); const manifest = JSON.parse(readFileSync(join(bundle, "manifest.json"), "utf8")); delete manifest.readmeSha256; writeFileSync(join(bundle, "manifest.json"), `${JSON.stringify(manifest)}\n`); rmSync(join(bundle, "README.md")); assert.equal((await verifyAuditBundle({ bundleRoot: bundle })).status, "verified");
+  const invalid = join(input.root, "invalid"); mkdirSync(invalid); writeFileSync(join(invalid, "manifest.json"), "{}\n"); assert.throws(() => execFileSync(process.execPath, ["plugins/pipeline-core/scripts/audit-bundle.mjs", "verify", "--bundle", invalid], { cwd: process.cwd(), encoding: "utf8", stdio: "pipe" }), (error) => error.status === 1);
 });
 test("signs and verifies only an unchanged manifest without identity or authority claims", async () => {
   const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] }); await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }); const request = await planAuditBundleSignature({ bundleRoot: join(input.root, "bundle"), algorithm: "test-ed25519", signerKeyId: "test-key" });
@@ -141,7 +149,7 @@ test("E-AC-20 leaves the plan and manifest unchanged when no export metadata is 
   const receipt = await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
   assert.equal(receipt.status, "built");
   const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
-  assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "schema"]);
+  assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "readmeSha256", "schema"]);
 });
 // E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
 // internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)

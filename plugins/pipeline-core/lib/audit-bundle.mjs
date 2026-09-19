@@ -13,6 +13,37 @@ const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u; const SIGNATURE = /^[A-Za
 function fail(code, message = "Audit bundle operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+function auditorReadme(manifest) {
+  const artifactLines = manifest.artifacts.map((artifact) => `- \`${artifact.path}\` (source: \`${artifact.sourcePath}\`, SHA-256: \`${artifact.sha256}\`)`).join("\n");
+  return `# Audit bundle: ${manifest.bundleId}
+
+This directory is a candidate-bound audit bundle. It contains the copied artifacts listed below and a manifest binding them to the candidate identifiers.
+
+## Candidate
+
+- Commit: \`${manifest.candidate.commit}\`
+- Tree: \`${manifest.candidate.tree}\`
+- Bundle directory convention: \`audit-bundles/${manifest.bundleId}/\` (the producer may choose another explicit output path).
+
+## Artifacts
+
+${artifactLines}
+
+## Offline verification
+
+Prerequisites: Node.js and a copy of the repository containing \`plugins/pipeline-core/scripts/audit-bundle.mjs\`; no network, provider, key, or deployment access is required.
+
+From that repository checkout, with this bundle copied to \`audit-bundles/${manifest.bundleId}\`:
+
+\`node plugins/pipeline-core/scripts/audit-bundle.mjs verify --bundle ./audit-bundles/${manifest.bundleId}\`
+
+The command exits 0 only for \`verified\` and nonzero for \`invalid\` or a command error. A verified result means the manifest shape, listed artifact bytes, and this README's recorded digest were internally consistent at verification time. An invalid result includes findings naming the failed check.
+
+## Assurance limits
+
+This bundle is not a claim that requirements are satisfied, that a review or PO approval occurred, that deployment or a push happened, or that the candidate is suitable for release. The unsigned manifest and its hashes are not independently trusted: an actor who can replace both an artifact and the manifest can preserve internal consistency. A separate optional signature, when present and independently verified through its provider, adds cryptographic binding only; signatures are not implied by this bundle. Supporting reports and state files are evidence supplied by the producer, not intrinsically tamper-proof proof.
+`;
+}
 function rootPath(root, path, code) { if (typeof path !== "string" || path.length === 0 || isAbsolute(path) || path.includes("\\")) fail(code); const target = resolve(root, path); const check = relative(root, target); if (check === "" || check === ".." || check.startsWith(`..${sep}`) || isAbsolute(check)) fail(code); return target; }
 const ACK_CLASSES = new Set(["none", "partial", "accepted"]); const TERMINAL_DISPOSITIONS = new Set(["pending", "delivered", "retryable-failure", "quarantined"]);
 const RECEIPT_KEYS = ["destinationProfile", "policyRevision", "projectionDigest", "batchId", "eventCount", "attempt", "acknowledgementClass", "terminalDisposition", "cursor", "lag"];
@@ -52,16 +83,19 @@ export async function buildAuditBundle({ repositoryRoot, outputPath, plan } = {}
   try { await lstat(output); fail("AB-OUTPUT-EXISTS"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
   await mkdir(output, { recursive: false }); await mkdir(join(output, "artifacts"));
   for (const artifact of plan.artifacts) { const source = rootPath(root, artifact.sourcePath, "AB-SOURCE"); const bytes = await readFile(source); if (digest(bytes) !== artifact.sha256) fail("AB-SOURCE-DIGEST"); await copyFile(source, join(output, artifact.bundlePath)); }
-  const manifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}) };
-  const bytes = `${canonicalizeJson(manifest)}\n`; await writeFile(join(output, "manifest.json"), bytes, { encoding: "utf8", flag: "wx", mode: 0o644 });
+  const baseManifest = { schema: "pipeline.audit-bundle-manifest.v1", bundleId: plan.bundleId, candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256, artifacts: plan.artifacts.map((entry) => ({ path: entry.bundlePath, sourcePath: entry.sourcePath, sha256: entry.sha256 })), ...(hasExportMetadata(plan) ? { exportMetadata: plan.exportMetadata } : {}) };
+  const readmeBytes = Buffer.from(auditorReadme(baseManifest), "utf8");
+  const manifest = { ...baseManifest, readmeSha256: digest(readmeBytes) };
+  const bytes = `${canonicalizeJson(manifest)}\n`; await writeFile(join(output, "manifest.json"), bytes, { encoding: "utf8", flag: "wx", mode: 0o644 }); await writeFile(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
   return Object.freeze({ schema: "pipeline.audit-bundle-build-receipt.v1", status: "built", bundleId: plan.bundleId, outputPath, manifestSha256: digest(bytes), candidate: plan.candidate, effectivePolicySha256: plan.effectivePolicySha256 });
 }
 
 export async function verifyAuditBundle({ bundleRoot } = {}) {
   const root = resolve(bundleRoot ?? ""); let manifest;
   try { manifest = parseStrictJson(await readFile(join(root, "manifest.json"))); } catch { return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: "invalid", findings: Object.freeze(["AB-MANIFEST"]) }); }
-  const findings = []; const hasExport = hasExportMetadata(manifest);
-  if (!exact(manifest, hasExport ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"]) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || !Array.isArray(manifest.artifacts) || (hasExport && !exportMetadataShape(manifest.exportMetadata))) findings.push("AB-MANIFEST");
+  const findings = []; const hasExport = hasExportMetadata(manifest); const hasReadme = Object.hasOwn(manifest, "readmeSha256");
+  if (!exact(manifest, hasExport ? (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"]) : (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"])) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || !Array.isArray(manifest.artifacts) || (hasExport && !exportMetadataShape(manifest.exportMetadata)) || (hasReadme && !SHA.test(manifest.readmeSha256))) findings.push("AB-MANIFEST");
+  if (hasReadme) { try { if (digest(await readFile(join(root, "README.md"))) !== manifest.readmeSha256) findings.push("AB-README-DIGEST"); } catch { findings.push("AB-README"); } }
   for (const artifact of manifest.artifacts ?? []) { if (!exact(artifact, ["path", "sourcePath", "sha256"]) || typeof artifact.sourcePath !== "string" || !/^artifacts\/[0-9]{3}-[a-z-]+$/u.test(artifact.path) || !SHA.test(artifact.sha256)) { findings.push("AB-ARTIFACT"); continue; } try { if (digest(await readFile(join(root, artifact.path))) !== artifact.sha256) findings.push(`AB-DIGEST ${artifact.path}`); } catch { findings.push(`AB-MISSING ${artifact.path}`); } }
   return Object.freeze({ schema: "pipeline.audit-bundle-verification.v1", status: findings.length ? "invalid" : "verified", candidate: manifest.candidate ?? null, findings: Object.freeze(findings) });
 }
@@ -70,7 +104,8 @@ async function signatureRequest(bundleRoot) {
   const root = resolve(bundleRoot ?? ""); let bytes; let manifest;
   try { bytes = await readFile(join(root, "manifest.json")); manifest = parseStrictJson(bytes); } catch { fail("AB-SIGNATURE-MANIFEST"); }
   const hasExport = hasExportMetadata(manifest);
-  if (!exact(manifest, hasExport ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"]) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || (hasExport && !exportMetadataShape(manifest.exportMetadata))) fail("AB-SIGNATURE-MANIFEST");
+  const hasReadme = Object.hasOwn(manifest, "readmeSha256");
+  if (!exact(manifest, hasExport ? (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "exportMetadata"]) : (hasReadme ? ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts", "readmeSha256"] : ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"])) || manifest.schema !== "pipeline.audit-bundle-manifest.v1" || !BUNDLE_ID.test(manifest.bundleId) || !exact(manifest.candidate, ["commit", "tree"]) || !OID.test(manifest.candidate.commit) || !OID.test(manifest.candidate.tree) || !SHA.test(manifest.effectivePolicySha256) || (hasReadme && !SHA.test(manifest.readmeSha256)) || (hasExport && !exportMetadataShape(manifest.exportMetadata))) fail("AB-SIGNATURE-MANIFEST");
   return Object.freeze({ schema: "pipeline.audit-bundle-signature-request.v1", bundleId: manifest.bundleId, manifestSha256: digest(bytes), candidate: Object.freeze({ ...manifest.candidate }), effectivePolicySha256: manifest.effectivePolicySha256 });
 }
 

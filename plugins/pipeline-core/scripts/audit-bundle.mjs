@@ -17,4 +17,4 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
   if (options.sub === "build") return (deps.build ?? buildAuditBundle)({ repositoryRoot: options.repositoryRoot, outputPath: options.outputPath, plan: await load(options.planFile) });
   return (deps.verify ?? verifyAuditBundle)({ bundleRoot: options.bundleRoot });
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { try { process.stdout.write(`${JSON.stringify(await main())}\n`); } catch (error) { process.stderr.write(`${error.code ?? "ABC-FAILED"}: ${error.message}\n`); process.exitCode = 2; } }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { try { const result = await main(); process.stdout.write(`${JSON.stringify(result)}\n`); if (result?.status === "invalid") process.exitCode = 1; } catch (error) { process.stderr.write(`${error.code ?? "ABC-FAILED"}: ${error.message}\n`); process.exitCode = 2; } }
