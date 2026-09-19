@@ -397,6 +397,8 @@ const TEST_SUITES = [
   { name: "dispatch-policy-tests", file: join(libDir, "dispatch-policy.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 34 }, (_, index) => `DPT${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "dispatch-record-tests", file: join(libDir, "dispatch-record.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 12 }, (_, index) => `DRC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "push-batch-contract-tests", file: join(libDir, "push-batch-contract.test.mjs") },
+  { name: "push-batch-execution-tests", file: join(libDir, "push-batch-execution.test.mjs") },
+  { name: "push-batch-executor-tests", file: join(pluginScriptsDir, "push-batch-executor.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["PBE01"], maxBytes: 65_536 } },
   { name: "installed-plugin-attestation-tests", file: join(libDir, "installed-plugin-attestation.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 9 }, (_, index) => `IPA${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "threat-model-approval-request-tests", file: join(libDir, "threat-model-approval-request.test.mjs") },
   { name: "sbom-lifecycle-tests", file: join(libDir, "sbom-lifecycle.test.mjs") },

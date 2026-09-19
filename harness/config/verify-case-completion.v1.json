@@ -812,6 +812,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "push-batch-executor-tests",
+      "path": "plugins/pipeline-core/scripts/push-batch-executor.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "recovery-bridge-approval-tests",
       "path": "harness/scripts/recovery-bridge-approval.test.mjs",
       "disposition": "legacy-process-only",
