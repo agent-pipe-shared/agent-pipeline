@@ -8,6 +8,7 @@
  * produced by those other surfaces.
  */
 import { createHash } from "node:crypto";
+import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
 
 export const DESIGN_ADVISORY_ADMISSION_SCHEMA = "pipeline.design-advisory-admission.v1";
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -42,6 +43,18 @@ function expectedRoute(runner, nativeAvailable) {
   return null;
 }
 
+function validReceipt(receipt, workflow, runner, route, status) {
+  if (!object(receipt) || !validateAdvisoryReceipt(receipt).ok
+    || receipt.dispatch.dispatchId !== workflow.dispatchId
+    || receipt.dispatch.candidateCommit !== workflow.candidateCommit
+    || receipt.dispatch.candidateTree !== workflow.candidateTree
+    || receipt.questionSha256 !== workflow.designSha256
+    || receipt.configuredRoute.runner !== runner
+    || receipt.adapter !== (route === "native" ? "native" : "consult")) return false;
+  if (status === "complete") return receipt.observed.status === "answered";
+  return receipt.observed.status !== "answered";
+}
+
 function validDisposition(value, workflow, receiptSha256) {
   if (!keys(value, ["decision", "rationale", "dispatchId", "designSha256", "evidenceSha256", "advisorReceiptSha256"])) return false;
   return ["accept", "decline"].includes(value.decision) && text(value.rationale)
@@ -61,8 +74,8 @@ function validFinalException(value, workflow, failure) {
  * @returns {{ok:true, mode:string, route:string, consumesFinalException:boolean}|{ok:false,code:string,detail?:string}}
  */
 export function evaluateDesignAdvisoryAdmission(input) {
-  if (!keys(input, ["workflow", "runner", "nativeAvailable", "advisor", "elephant", "finalException"])) return fail("input-shape");
-  const { workflow, runner, nativeAvailable, advisor, elephant, finalException } = input;
+  if (!keys(input, ["workflow", "runner", "nativeAvailable", "advisor", "advisorReceipt", "elephant", "finalException"])) return fail("input-shape");
+  const { workflow, runner, nativeAvailable, advisor, advisorReceipt, elephant, finalException } = input;
   if (!validWorkflow(workflow)) return fail("workflow-binding");
   if (!RUNNERS.includes(runner)) return fail("runner-invalid");
   if (typeof nativeAvailable !== "boolean") return fail("capability-unobserved");
@@ -73,13 +86,17 @@ export function evaluateDesignAdvisoryAdmission(input) {
     || advisor.designSha256 !== workflow.designSha256 || advisor.evidenceSha256 !== workflow.evidenceSha256) return fail("advisor-binding");
   if (advisor.status === "complete") {
     if (advisor.route !== route || advisor.mode !== "fresh-read-only" || advisor.readOnly !== true
-      || !SHA256.test(advisor.receiptSha256 ?? "") || advisor.failureCode !== null) return fail("advisor-not-fresh-read-only");
+      || !SHA256.test(advisor.receiptSha256 ?? "") || digest(advisorReceipt) !== advisor.receiptSha256
+      || !validReceipt(advisorReceipt, workflow, runner, route, "complete")
+      || advisor.failureCode !== null) return fail("advisor-not-fresh-read-only");
     if (!validDisposition(elephant, workflow, advisor.receiptSha256)) return fail("elephant-disposition-required");
     if (finalException !== null) return fail("unavailable-exception-unexpected");
     return { ok: true, mode: "consulted", route, consumesFinalException: false };
   }
   if (advisor.status !== "unavailable" || advisor.route !== route || advisor.mode !== "fresh-read-only"
     || advisor.readOnly !== true || !SHA256.test(advisor.receiptSha256 ?? "")
+    || digest(advisorReceipt) !== advisor.receiptSha256
+    || !validReceipt(advisorReceipt, workflow, runner, route, "unavailable")
     || !FAILURES.includes(advisor.failureCode)) return fail("advisor-unavailable-untyped");
   if (elephant !== null) return fail("elephant-disposition-without-advisor");
   if (!validFinalException(finalException, workflow, advisor.failureCode)) return fail("final-unavailable-approval-required");

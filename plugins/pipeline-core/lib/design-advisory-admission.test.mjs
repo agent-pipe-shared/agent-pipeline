@@ -14,18 +14,32 @@ const workflow = {
 };
 function packet({ runner = "codex", nativeAvailable = false, status = "complete" } = {}) {
   const route = runner === "claude" && nativeAvailable ? "native" : "generic-consult";
+  const advisorReceipt = {
+    schema: "pipeline.advisory-receipt.v1", receiptId: "advisor-1",
+    dispatch: { dispatchId: workflow.dispatchId, queueRevision: 0, candidateCommit: workflow.candidateCommit, candidateTree: workflow.candidateTree },
+    duty: "advisory", profile: "feature",
+    configuredRoute: { runner, selector: { kind: runner === "claude" ? "alias" : "model-id", value: runner === "claude" ? "opus" : "gpt-5.6-sol" }, effort: "high" },
+    adapter: route === "native" ? "native" : "consult",
+    observed: status === "complete"
+      ? { status: "answered", identity: { provider: runner === "claude" ? "anthropic" : runner === "antigravity" ? "google" : "openai", modelId: runner === "claude" ? "opus" : runner === "antigravity" ? "gemini-3.8-flash" : "gpt-5.6-sol", effort: "high" } }
+      : { status: "unavailable", identity: null },
+    questionSha256: workflow.designSha256,
+    answerSha256: status === "complete" ? "f".repeat(64) : null,
+    fallback: status === "complete" ? { reason: "none", redactedErrorClass: null } : { reason: "consult-unavailable", redactedErrorClass: "unavailable" },
+    emittedAtMs: 1,
+  };
   const advisor = {
     status, route, mode: "fresh-read-only", readOnly: true, dispatchId: workflow.dispatchId,
     candidateCommit: workflow.candidateCommit, candidateTree: workflow.candidateTree,
     designSha256: workflow.designSha256, evidenceSha256: workflow.evidenceSha256,
-    receiptSha256: "e".repeat(64), failureCode: null,
+    receiptSha256: designAdvisoryDigest(advisorReceipt), failureCode: null,
   };
   const elephant = status === "complete" ? {
     decision: "accept", rationale: "bounded proposal is adopted", dispatchId: workflow.dispatchId,
     designSha256: workflow.designSha256, evidenceSha256: workflow.evidenceSha256,
     advisorReceiptSha256: advisor.receiptSha256,
   } : null;
-  return { workflow, runner, nativeAvailable, advisor, elephant, finalException: null };
+  return { workflow, runner, nativeAvailable, advisor, advisorReceipt, elephant, finalException: null };
 }
 
 test("accepts fresh generic consultation and binds Elephant disposition", () => {
@@ -56,6 +70,8 @@ test("rejects stale, writable, mismatched, and missing disposition evidence", ()
   assert.equal(evaluateDesignAdvisoryAdmission(writable).code, "advisor-not-fresh-read-only");
   const missing = packet(); missing.elephant = null;
   assert.equal(evaluateDesignAdvisoryAdmission(missing).code, "elephant-disposition-required");
+  const forgedReceipt = packet(); forgedReceipt.advisorReceipt.dispatch.candidateTree = "a".repeat(40);
+  assert.equal(evaluateDesignAdvisoryAdmission(forgedReceipt).code, "advisor-not-fresh-read-only");
 });
 
 test("allows only typed unavailable exception with one final PO approval", () => {

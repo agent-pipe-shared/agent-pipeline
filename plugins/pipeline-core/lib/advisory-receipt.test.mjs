@@ -60,6 +60,14 @@ test("accepts common native and fresh-consult success receipts", () => {
   consult.adapter = "consult";
   consult.observed.identity = { provider: "openai", modelId: "gpt-5.6-sol", effort: "xhigh" };
   assert.deepEqual(validateAdvisoryReceipt(consult), { ok: true });
+  const antigravity = copy(consult);
+  antigravity.configuredRoute = {
+    runner: "antigravity",
+    selector: { kind: "model-id", value: "gemini-3.8-flash" },
+    effort: "high",
+  };
+  antigravity.observed.identity = { provider: "google", modelId: "gemini-3.8-flash", effort: "high" };
+  assert.deepEqual(validateAdvisoryReceipt(antigravity), { ok: true });
 });
 
 test("a recorded native failure can bind a later consult fallback without a route switch", () => {

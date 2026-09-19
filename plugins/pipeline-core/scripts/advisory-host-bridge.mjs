@@ -20,6 +20,7 @@ import { buildAdvisoryDecisionEvent } from "../lib/advisory-decision-event.mjs";
 import {
   advisoryEvidenceBundleSha256,
   advisoryConsultationDisposition,
+  buildAdvisoryEvidenceBundle,
   createAdvisoryConsultationRecord,
   sameAdvisoryEvidenceRepository,
   validateAdvisoryDemand,
@@ -30,6 +31,7 @@ import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/ad
 import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
 import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
 import { appendPortableGovernanceEvent, readLocalRepositoryFingerprint } from "../lib/governance-event-store.mjs";
+import { designAdvisoryReceiptBinding } from "../lib/design-advisory-coordinator.mjs";
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
@@ -78,10 +80,55 @@ function resolvedAdvisoryRoute(input, rootDir, resolveRoute = resolveV3DutyRoute
   } catch { return null; }
 }
 
+function receiptIdFor(input) {
+  const requested = input?.receiptId;
+  if (requested === undefined) return `advisory-${randomUUID()}`;
+  if (typeof requested !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(requested)) {
+    const error = new Error("requested advisory receipt id is invalid");
+    error.code = "ADVISORY-RECEIPT-ID";
+    throw error;
+  }
+  return requested;
+}
+
+/**
+ * A design coordinator may request a deterministic receipt id, but only after
+ * this bridge has recomputed it from physical package evidence.  This keeps
+ * the bridge from becoming a generic "write any receipt under any id" helper.
+ */
+function validateDesignReceiptTarget(input, rootDir) {
+  const binding = input?.designAdvisoryBinding;
+  const requested = input?.receiptId;
+  if (binding === undefined && requested === undefined) return;
+  if (!binding || typeof binding !== "object" || Array.isArray(binding)
+    || JSON.stringify(Object.keys(binding).sort()) !== JSON.stringify(["featureId", "planPath", "specPath", "planSha256", "specSha256", "packageSha256"].sort())) {
+    throw Object.assign(new Error("design Advisory receipt binding is invalid"), { code: "ADVISORY-DESIGN-BINDING" });
+  }
+  const evidence = buildAdvisoryEvidenceBundle(rootDir, [binding.planPath, binding.specPath]);
+  const derived = designAdvisoryReceiptBinding({
+    root: rootDir,
+    featureId: binding.featureId,
+    planPath: binding.planPath,
+    specPath: binding.specPath,
+    planSha256: binding.planSha256,
+    specSha256: binding.specSha256,
+    candidateCommit: input?.dispatch?.candidateCommit,
+    candidateTree: input?.dispatch?.candidateTree,
+    runner: input?.runner,
+  });
+  if (requested !== derived.receiptId || binding.packageSha256 !== derived.packageSha256
+    || evidence.references.length !== 2
+    || input?.evidenceBundle?.references?.length !== 2
+    || !equal(input.evidenceBundle.references, evidence.references)
+    || input?.dispatch?.dispatchId !== derived.receiptId) {
+    throw Object.assign(new Error("design Advisor receipt target does not bind the physical package"), { code: "ADVISORY-DESIGN-BINDING" });
+  }
+}
+
 function receiptFor(input, advisoryRoute, { status, identity = null, answer = null, fallbackReason = "none" }) {
   const receipt = {
     schema: "pipeline.advisory-receipt.v1",
-    receiptId: `advisory-${randomUUID()}`,
+    receiptId: receiptIdFor(input),
     dispatch: structuredClone(input.dispatch),
     duty: "advisory",
     profile: input.profile,
@@ -611,6 +658,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     const configuredRepositoryRoot = dependencies.repoRoot ?? process.cwd();
     let repositoryRoot = configuredRepositoryRoot;
     try { repositoryRoot = realpathSync(configuredRepositoryRoot); } catch { /* shared preflight returns RDP-ROOT */ }
+    validateDesignReceiptTarget(input, repositoryRoot);
     const preparation = advisoryDispatchPreparation(
       input,
       args,
@@ -652,7 +700,12 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       var sandboxBinding = outcome.sandboxBinding;
     } else {
       const adapter = dependencies.makeHostAdapter?.(iterator, args.timeoutMs) ?? makeHostAdapter(iterator, args.timeoutMs);
-      result = await coordinateAdvisory(input, { invokeNative: adapter, invokeConsult: adapter, advisorExport });
+      result = await coordinateAdvisory(input, {
+        invokeNative: adapter,
+        invokeConsult: adapter,
+        advisorExport,
+        makeReceiptId: () => receiptIdFor(input),
+      });
       // A-AC-05: only a coordinateAdvisory outcome that actually observed an
       // identity is translatable (buildAdvisoryDecisionEvent's own
       // ADE-RECEIPT-UNANSWERED refusal); every other outcome (disabled,

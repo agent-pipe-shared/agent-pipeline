@@ -40,7 +40,7 @@ function providerForRunner(runner) {
 
 function validIdentity(identity) {
   return exactKeys(identity, ["provider", "modelId", "effort"])
-    && ["anthropic", "openai"].includes(identity.provider)
+    && ["anthropic", "openai", "google"].includes(identity.provider)
     && MODEL_ID.test(identity.modelId ?? "")
     && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(identity.effort);
 }

@@ -55,7 +55,7 @@
               "required": ["provider", "modelId", "effort"],
               "additionalProperties": false,
               "properties": {
-                "provider": { "enum": ["anthropic", "openai"] },
+                "provider": { "enum": ["anthropic", "openai", "google"] },
                 "modelId": { "$ref": "#/$defs/modelId" },
                 "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] }
               }
