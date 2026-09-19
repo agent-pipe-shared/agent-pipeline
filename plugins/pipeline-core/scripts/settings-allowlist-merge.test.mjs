@@ -8,14 +8,15 @@
 // test itself.
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 import {
   applySettingsAllowlistMerge,
+  canonicalizeRunnerPermissionAllowlist,
   main as settingsAllowlistMergeCli,
   PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES,
   pipelineScriptsRunnerAllowlistEntries,
@@ -33,6 +34,17 @@ function freshDir(prefix) {
 
 function settingsPath(dir) { return join(dir, ".claude", "settings.json"); }
 function localSettingsPath(dir) { return join(dir, ".claude", "settings.local.json"); }
+const SOURCE_SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
+
+function installedCacheFixture(version) {
+  const base = mkdtempSync(join(tmpdir(), "settings-allowlist-installed-cache-"));
+  const plugin = join(base, ".claude", "plugins", "cache", "agent-pipeline", "pipeline-core", version);
+  mkdirSync(join(plugin, "scripts"), { recursive: true });
+  mkdirSync(join(plugin, "lib"), { recursive: true });
+  copyFileSync(join(SOURCE_SCRIPTS_DIR, "settings-allowlist-merge.mjs"), join(plugin, "scripts", "settings-allowlist-merge.mjs"));
+  copyFileSync(join(SOURCE_SCRIPTS_DIR, "..", "lib", "entrypoint.mjs"), join(plugin, "lib", "entrypoint.mjs"));
+  return { base, plugin, script: join(plugin, "scripts", "settings-allowlist-merge.mjs") };
+}
 
 function invoke(args) {
   let output = "";
@@ -124,24 +136,110 @@ test("plan reports no-op once both candidates are already present", () => {
   }
 });
 
-test("installed cache version A to B is additive, preserves unrelated entries, and never grants a future wildcard", () => {
-  const dir = freshDir("cache-version-a-to-b");
+test("installed cache version A to B canonically replaces only the complete historical family", () => {
+  const oldScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.6.0/scripts";
+  const newScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.7.0/scripts";
+  const oldEntries = pipelineScriptsRunnerAllowlistEntries(oldScripts);
+  const newEntries = pipelineScriptsRunnerAllowlistEntries(newScripts);
+  const unrelated = "Bash(node user-tool.mjs *)";
+  const result = canonicalizeRunnerPermissionAllowlist([unrelated, ...oldEntries], newScripts);
+  assert.equal(result.status, "ready");
+  assert.deepEqual(result.canonicalizedFamilies, ["0.6.0"]);
+  assert.deepEqual(result.removed, oldEntries);
+  assert.deepEqual(result.added, newEntries);
+  assert.deepEqual(result.mergedAllow, [unrelated, ...newEntries]);
+  assert.equal(result.mergedAllow.some((entry) => entry.includes("/pipeline-core/*")), false);
+});
+
+test("canonical runner permission replacement remains bounded across repeated cache upgrades", () => {
+  const scriptsA = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.6.0/scripts";
+  const scriptsB = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.7.0/scripts";
+  const scriptsC = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.7.1/scripts";
+  const unrelated = "PowerShell(node user-tool.mjs *)";
+  const first = canonicalizeRunnerPermissionAllowlist([unrelated, ...pipelineScriptsRunnerAllowlistEntries(scriptsA)], scriptsB);
+  const second = canonicalizeRunnerPermissionAllowlist(first.mergedAllow, scriptsC);
+  assert.equal(second.status, "ready");
+  assert.deepEqual(second.canonicalizedFamilies, ["0.7.0"]);
+  assert.deepEqual(second.mergedAllow, [unrelated, ...pipelineScriptsRunnerAllowlistEntries(scriptsC)]);
+  assert.equal(second.mergedAllow.length, 5, "each upgrade retains one current four-entry family only");
+});
+
+test("canonical runner permission replacement prunes a complete stale family when current entries already exist", () => {
+  const oldScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.6.0/scripts";
+  const currentScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.7.0/scripts";
+  const oldEntries = pipelineScriptsRunnerAllowlistEntries(oldScripts);
+  const currentEntries = pipelineScriptsRunnerAllowlistEntries(currentScripts);
+  const result = canonicalizeRunnerPermissionAllowlist(["Bash(git status)", ...currentEntries, ...oldEntries], currentScripts);
+  assert.equal(result.status, "ready");
+  assert.deepEqual(result.added, []);
+  assert.deepEqual(result.removed, oldEntries);
+  assert.deepEqual(result.mergedAllow, ["Bash(git status)", ...currentEntries]);
+});
+
+test("partial current or historical cache families fail closed without a proposed replacement", () => {
+  const oldScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.6.0/scripts";
+  const currentScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.7.0/scripts";
+  for (const entries of [
+    pipelineScriptsRunnerAllowlistEntries(oldScripts).slice(0, 3),
+    [...pipelineScriptsRunnerAllowlistEntries(oldScripts), pipelineScriptsRunnerAllowlistEntries(currentScripts)[0]],
+  ]) {
+    const result = canonicalizeRunnerPermissionAllowlist(entries, currentScripts);
+    assert.equal(result.status, "unrepairable");
+    assert.deepEqual(result.added, []);
+    assert.deepEqual(result.removed, []);
+  }
+});
+
+test("foreign-lineage and broadened lookalike grants are retained and never classified as historical Pipeline entries", () => {
+  const currentScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.7.0/scripts";
+  const foreignScripts = "/home/user/.claude/plugins/cache/another-marketplace/pipeline-core/0.6.0/scripts";
+  const foreign = pipelineScriptsRunnerAllowlistEntries(foreignScripts);
+  const broad = 'Bash(node "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/*")';
+  const nonString = { customPermission: true };
+  const result = canonicalizeRunnerPermissionAllowlist([...foreign, broad, nonString], currentScripts);
+  assert.equal(result.status, "ready");
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.mergedAllow, [...foreign, broad, nonString, ...pipelineScriptsRunnerAllowlistEntries(currentScripts)]);
+});
+
+test("a source checkout has no cache lineage and never retires cache-looking entries", () => {
+  const sourceScripts = "/work/agent-pipeline/plugins/pipeline-core/scripts";
+  const oldScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.6.0/scripts";
+  const oldEntries = pipelineScriptsRunnerAllowlistEntries(oldScripts);
+  const result = canonicalizeRunnerPermissionAllowlist(oldEntries, sourceScripts);
+  assert.equal(result.status, "ready");
+  assert.deepEqual(result.removed, []);
+  assert.deepEqual(result.mergedAllow, [...oldEntries, ...pipelineScriptsRunnerAllowlistEntries(sourceScripts)]);
+});
+
+test("installed-cache fixture replaces an old permission family through the closed plan/apply contract", async () => {
+  const fixture = installedCacheFixture("0.7.0-test");
+  const project = freshDir("installed-cache-cli");
   try {
-    const oldEntries = pipelineScriptsRunnerAllowlistEntries("/cache/pipeline-core/0.6.0/scripts");
-    const newEntries = pipelineScriptsRunnerAllowlistEntries("/cache/pipeline-core/0.7.0/scripts");
-    assert.notDeepEqual(oldEntries, newEntries);
+    const oldScripts = join(dirname(fixture.plugin), "0.6.0-test", "scripts");
+    const currentScripts = join(fixture.plugin, "scripts");
+    const oldEntries = pipelineScriptsRunnerAllowlistEntries(oldScripts);
     const unrelated = "Bash(node user-tool.mjs *)";
-    writeFileSync(localSettingsPath(dir), `${JSON.stringify({ permissions: { allow: [unrelated, ...oldEntries] } }, null, 2)}\n`, "utf8");
-    const plan = planSettingsAllowlistMerge({ rootDir: dir, candidateSet: "runner-permissions" });
+    writeFileSync(localSettingsPath(project), `${JSON.stringify({ permissions: { allow: [unrelated, ...oldEntries] } }, null, 2)}\n`);
+    const installed = await import(pathToFileURL(fixture.script).href);
+    let output = "";
+    const planStatus = installed.main(["plan-runner-permissions", "--root", project], { write: (chunk) => { output += chunk; } });
+    assert.equal(planStatus, 0);
+    const plan = JSON.parse(output);
     assert.equal(plan.status, "ready");
-    const after = JSON.parse(plan.after.bytes);
-    assert.equal(after.permissions.allow.includes(unrelated), true);
-    const currentEntries = pipelineScriptsRunnerAllowlistEntries(dirname(fileURLToPath(import.meta.url)));
-    for (const entry of currentEntries) assert.equal(after.permissions.allow.includes(entry), true, entry);
-    for (const entry of oldEntries) assert.equal(after.permissions.allow.includes(entry), true, entry);
-    assert.equal(after.permissions.allow.some((entry) => entry.includes("/cache/pipeline-core/*")), false);
+    assert.deepEqual(plan.canonicalizedFamilies, ["0.6.0-test"]);
+    assert.deepEqual(plan.removed, oldEntries);
+    output = "";
+    const applyStatus = installed.main(["apply-runner-permissions", "--root", project, "--plan-sha256", plan.planSha256, "--activate"], { write: (chunk) => { output += chunk; } });
+    assert.equal(applyStatus, 0);
+    const after = JSON.parse(readFileSync(localSettingsPath(project), "utf8"));
+    assert.deepEqual(after.permissions.allow, [unrelated, ...pipelineScriptsRunnerAllowlistEntries(currentScripts)]);
+    output = "";
+    assert.equal(installed.main(["plan-runner-permissions", "--root", project], { write: (chunk) => { output += chunk; } }), 0);
+    assert.equal(JSON.parse(output).status, "no-op");
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(project, { recursive: true, force: true });
+    rmSync(fixture.base, { recursive: true, force: true });
   }
 });
 
