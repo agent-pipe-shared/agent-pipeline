@@ -560,7 +560,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
     // identity. Productive implementation therefore enters only through the
     // sealed Elephant-owned dispatch script; never infer consent here.
     if (nativeImplementationRole) {
-      deny("BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding; use elephant-agy-implementation-dispatch.mjs.");
+      deny("BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding; use elephant-implementation-dispatch.mjs.");
     }
     const nativeVerdict = verifyAntigravityNativeDispatch({
       root: projectRoot,

@@ -59,6 +59,6 @@ export function parseArgs(argv) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   void readRequest;
   void parseArgs;
-  process.stderr.write("goldfish-antigravity-live-host: internal-only; use elephant-agy-implementation-dispatch.mjs\n");
+  process.stderr.write("goldfish-antigravity-live-host: internal-only; use elephant-implementation-dispatch.mjs\n");
   process.exitCode = 64;
 }

@@ -49,6 +49,22 @@ function routeAuthority(dependencies = {}) {
   return { runner: "antigravity", provider: "google", requestedModel: route.selector.value, effort: route.effort, routePolicySha256: digest(route) };
 }
 
+/*
+ * The default route is deliberately derived from the signed-in distribution,
+ * but tests may inject a route reader.  Do not turn that seam into an
+ * authority bypass: a changed provider, model, effort, or policy digest must
+ * stop before the live host is even considered.
+ */
+function validRouteAuthority(route) {
+  return route !== null && typeof route === "object"
+    && route.runner === "antigravity"
+    && route.provider === "google"
+    && route.requestedModel === "gemini-3.8-flash-high"
+    && route.effort === "high"
+    && SHA.test(route.routePolicySha256 ?? "")
+    && Object.keys(route).length === 5;
+}
+
 function empty(code, status = "rejected", extra = {}) {
   return {
     schema: ELEPHANT_AGY_IMPLEMENTATION_DISPATCH_SCHEMA,
@@ -105,6 +121,7 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
   if (packet.resultDestination?.kind !== "return" || Object.keys(packet.resultDestination).length !== 1) return empty("AGY-ELEPHANT-RESULT-DESTINATION");
   const route = (dependencies.routeAuthority ?? routeAuthority)(dependencies);
   if (!route) return empty("AGY-ELEPHANT-ROUTE-UNAVAILABLE", "unavailable");
+  if (!validRouteAuthority(route)) return empty("AGY-ELEPHANT-ROUTE-MISMATCH", "unavailable");
   const preflight = (dependencies.preflightRoleDispatch ?? preflightRoleDispatch)({ root: input.root, resultRoot: input.root, packet });
   if (preflight.status !== "prepared") return empty("AGY-ELEPHANT-PREFLIGHT-FAILED", "rejected", { preflight });
   const scope = {
@@ -133,6 +150,13 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
   return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record, scope, inputSha256, result: launched, status: launched.status === "succeeded" ? "succeeded" : launched.status === "unavailable" ? "unavailable" : "rejected", code: launched.code });
 }
 
+export const elephantAgyImplementationDispatchInternals = Object.freeze({
+  physicalUnderRoot,
+  safeNewRelativePath,
+  routeAuthority,
+  validRouteAuthority,
+});
+
 export function parseArgs(argv) {
   if (!Array.isArray(argv) || argv[0] !== "dispatch" || argv.length !== 11) throw new Error("usage: elephant-agy-implementation-dispatch.mjs dispatch --root <repo> --request <physical-file-under-root> --result-path <new-relative-output> --session-id <id> --descriptor-sha256 <sha256>");
   const out = {};
@@ -146,12 +170,9 @@ export function parseArgs(argv) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    const result = await dispatchElephantAgyImplementation(parseArgs(process.argv.slice(2)));
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-    process.exitCode = result.status === "succeeded" ? 0 : 2;
-  } catch {
-    process.stderr.write("elephant-agy-implementation-dispatch: request refused\n");
-    process.exitCode = 64;
-  }
+  // A bare invocation bypasses the canonical selector's explicit no-fallback
+  // receipt.  Keep this sealed worker import-only; the public entry is the
+  // Elephant selector in elephant-implementation-dispatch.mjs.
+  process.stderr.write("elephant-agy-implementation-dispatch: internal-only; use elephant-implementation-dispatch.mjs\n");
+  process.exitCode = 64;
 }
