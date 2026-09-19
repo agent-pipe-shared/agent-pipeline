@@ -9,6 +9,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
+import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import {
   accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
   linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
@@ -4961,6 +4962,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   // already owns a `.gitignore` is never touched -- it simply gets no such target.
   const seedsProjectIgnore = !(inspected.entries ?? []).includes(".gitignore");
   const internal = [
+    ...initialGreenfieldMapTargets(inspected.status),
     ...[
       NEUTRAL_CALIBRATION,
       NEUTRAL_MANIFEST,

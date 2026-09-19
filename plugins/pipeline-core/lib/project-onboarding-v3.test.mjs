@@ -2252,7 +2252,7 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      ".gitignore", "architecture/map/index.md", "architecture/map/inventory.json", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
     ]);
   } finally { dispose(path); }
@@ -6719,7 +6719,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.deepEqual(
       plan.targets.map((target) => target.path),
       [
-        ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+        ".gitignore", "architecture/map/index.md", "architecture/map/inventory.json", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
         "project/pipeline.json", "project/pipeline.yaml",
       ],
       "fresh onboarding seeds the canonical project authority and the ignore rules for the paths it writes into; runtime targets are initialized later",
@@ -6727,6 +6727,8 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: false, deps: fakeDeps }).status, "activation-required");
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
+    assert.match(readFileSync(join(path, "architecture/map/index.md"), "utf8"), /design-pending/u);
+    assert.deepEqual(JSON.parse(readFileSync(join(path, "architecture/map/inventory.json"), "utf8")).modules, []);
     // The ignore rules are ANCHORED. An unanchored `evidence/` also matches
     assert.match(readFileSync(join(path, "project/consumer-verify.mjs"), "utf8"), /runConsumerVerifyCheck/u);
     assert.equal(JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8")).verify, null);
@@ -6878,7 +6880,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      ".gitignore", "architecture/map/index.md", "architecture/map/inventory.json", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
