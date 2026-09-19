@@ -14,9 +14,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadMapBundle } from "./module-inventory.mjs";
 import { loadBaseline } from "./architecture-fitness.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import stateSchema from "../schemas/pipeline.adoption-state.v1.json" with { type: "json" };
+import proposalSchema from "../schemas/pipeline.adoption-proposal.v1.json" with { type: "json" };
+import {
+  buildAdoptionSubject,
+  prepareAdoptionAuthority,
+  verifyAdoptionAuthority,
+  atomicWriteAdoptionState,
+  scopeValue,
+  loadAdoptionMap,
+} from "../lib/architecture-adoption-authority.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = path.resolve(__dirname, "../../..");
@@ -29,18 +38,13 @@ export const STATE_APPROVED_SCOPED = "approved-scoped";
 export const STATE_DEFERRED = "deferred";
 export const STATE_PARTIAL = "partial";
 
-const ADOPTION_STATE_SCHEMA_PATH = path.join(DEFAULT_ROOT, "schemas/pipeline.adoption-state.v1.json");
-const ADOPTION_PROPOSAL_SCHEMA_PATH = path.join(DEFAULT_ROOT, "schemas/pipeline.adoption-proposal.v1.json");
-
-function loadSchema(schemaPath) {
-  if (fs.existsSync(schemaPath)) {
-    try {
-      return JSON.parse(fs.readFileSync(schemaPath, "utf8"));
-    } catch {
-      return null;
-    }
-  }
-  return null;
+// Shipped validation: never depend on a source checkout's root schemas.
+function validateState(state) {
+  const validation = validateAgainstSchema(state, stateSchema);
+  if (!validation.valid) throw new Error(`ADOPTION-STATE-INVALID: ${validation.errors.join("; ")}`);
+  const keys = ["schema", "state", "scope", "decidedAt", "expiresAt", "reviewDate", "decisionRef", "rationale", "coverageClass", "confidence", "by", "authority"];
+  if (!state || state.schema !== SCHEMA_ADOPTION_STATE || Object.keys(state).some(key => !keys.includes(key)) || ![STATE_APPROVED_SCOPED, STATE_DEFERRED, STATE_PARTIAL].includes(state.state) || typeof state.by !== "string" || !state.by.trim() || state.coverageClass !== "evaluated" || state.confidence !== "measured") throw new Error("ADOPTION-STATE-INVALID");
+  scopeValue(state.scope);
 }
 
 /**
@@ -53,11 +57,25 @@ export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
   if (fs.existsSync(statePath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(statePath, "utf8"));
+      if (parsed.state !== STATE_ADOPTION_REQUIRED) {
+        validateState(parsed);
+        const authority = parsed.authority;
+        if (!authority || !authority.request || !authority.request.subject) {
+          return { schema: SCHEMA_ADOPTION_STATE, state: STATE_ADOPTION_REQUIRED, scope: null, rationale: "Adoption authority proof is missing", coverageClass: "unavailable", confidence: "estimated", authorityError: "ADOPTION-AUTHORITY-MISSING" };
+        }
+        const subject = authority.request.subject;
+        const expected = { decision: parsed.state, scope: parsed.scope, rationale: parsed.rationale, decidedAt: parsed.decidedAt, expiresAt: parsed.expiresAt, reviewDate: parsed.reviewDate, decisionRef: parsed.decisionRef };
+        if (subject.decision !== expected.decision || JSON.stringify(subject.scope) !== JSON.stringify(Array.isArray(expected.scope) ? expected.scope : [expected.scope]) || subject.rationale !== expected.rationale || subject.decidedAt !== expected.decidedAt || subject.expiresAt !== expected.expiresAt || subject.reviewDate !== expected.reviewDate || subject.decisionRef !== expected.decisionRef) {
+          return { schema: SCHEMA_ADOPTION_STATE, state: STATE_ADOPTION_REQUIRED, scope: null, rationale: "Adoption authority subject does not match persisted decision", coverageClass: "unavailable", confidence: "estimated", authorityError: "ADOPTION-AUTHORITY-SUBJECT-MISMATCH" };
+        }
+        const checked = verifyAdoptionAuthority({ rootDir, request: authority.request, proof: authority.proof, chatApproval: authority.humanApproval });
+        if (!checked.ok || authority.mode !== checked.mode) return { schema: SCHEMA_ADOPTION_STATE, state: STATE_ADOPTION_REQUIRED, scope: null, rationale: `Adoption authority is not valid: ${checked.code}`, coverageClass: "unavailable", confidence: "estimated", authorityError: checked.code };
+      }
       // Check if deferred and expired
-      if (parsed.state === STATE_DEFERRED && parsed.expiresAt) {
+      if (parsed.expiresAt || parsed.reviewDate) {
         const nowDate = now instanceof Date ? now : new Date(now);
-        const expDate = new Date(parsed.expiresAt);
-        if (nowDate.getTime() > expDate.getTime()) {
+        const expDate = new Date([parsed.expiresAt, parsed.reviewDate].filter(Boolean).sort()[0]);
+        if (!Number.isFinite(nowDate.getTime()) || nowDate.getTime() >= expDate.getTime()) {
           return {
             schema: SCHEMA_ADOPTION_STATE,
             state: STATE_ADOPTION_REQUIRED,
@@ -110,7 +128,7 @@ export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
  * Invariant: Generated artifacts carry { coverageClass, confidence } and cannot pass (deterministic-pass rule).
  */
 export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
-  const mapBundle = loadMapBundle(rootDir);
+  const mapBundle = loadAdoptionMap(rootDir);
   const baseline = loadBaseline(rootDir);
 
   const modules = mapBundle.ok ? mapBundle.modules : [];
@@ -237,9 +255,8 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
     deterministicPassSafe: true
   };
 
-  const schema = loadSchema(ADOPTION_PROPOSAL_SCHEMA_PATH);
-  if (schema) {
-    const val = validateAgainstSchema(proposal, schema);
+  {
+    const val = validateAgainstSchema(proposal, proposalSchema);
     if (!val.valid) {
       throw new Error(`Adoption proposal violates schema: ${val.errors.join("; ")}`);
     }
@@ -254,12 +271,15 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
 export function applyAdoptionDecision({
   rootDir = DEFAULT_ROOT,
   decision,
-  scope = "architecture/map/",
+  scope,
   rationale,
   expiresAt = null,
   reviewDate = null,
   decisionRef = null,
-  by = "PO"
+  by = "PO",
+  approvalRequest = null,
+  proof = null,
+  chatApproval = null
 } = {}) {
   const validDecisions = [STATE_APPROVED_SCOPED, STATE_DEFERRED, STATE_PARTIAL];
   if (!decision || !validDecisions.includes(decision)) {
@@ -269,44 +289,50 @@ export function applyAdoptionDecision({
     throw new Error("Adoption decision requires a non-empty rationale");
   }
 
-  let finalExpiresAt = expiresAt;
-  let finalReviewDate = reviewDate;
-  if (decision === STATE_DEFERRED && !finalExpiresAt && !finalReviewDate) {
-    const defaultExp = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    finalExpiresAt = defaultExp;
-    finalReviewDate = defaultExp;
-  }
-
+  const finalExpiresAt = expiresAt;
+  const finalReviewDate = reviewDate;
+  const decidedAt = approvalRequest?.subject?.decidedAt;
+  const canonicalScope = scopeValueForState(scope);
+  const request = approvalRequest;
+  const checked = verifyAdoptionAuthority({ rootDir, request, proof, chatApproval, requireCurrent: true });
+  if (!checked.ok) throw new Error(`Adoption authority rejected: ${checked.code}`);
+  const expected = buildAdoptionSubject({ rootDir, decision, scope: canonicalScope, rationale, decidedAt, expiresAt, reviewDate, decisionRef });
+  if (expected.subjectSha256 !== request.subjectSha256) throw new Error("ADOPTION-AUTHORITY-SUBJECT-MISMATCH");
   const adoptionState = {
     schema: SCHEMA_ADOPTION_STATE,
     state: decision,
-    scope: scope || "architecture/map/",
-    decidedAt: new Date().toISOString(),
+    scope: canonicalScope,
+    decidedAt,
     expiresAt: finalExpiresAt || null,
-    reviewDate: finalReviewDate || finalExpiresAt || null,
-    decisionRef: decisionRef || `PO-DECISION-${decision.toUpperCase().replace(/-/g, "_")}`,
+    reviewDate: finalReviewDate,
+    decisionRef,
     rationale: rationale.trim(),
     coverageClass: "evaluated",
     confidence: "measured",
-    by: by || "PO"
+    by: by || "PO",
+    authority: {
+      mode: checked.mode,
+      request,
+      ...(checked.proof ? { proof: checked.proof } : {}),
+      ...(checked.humanApproval ? { humanApproval: checked.humanApproval } : {}),
+      ...(checked.signer ? { signer: checked.signer } : {})
+    }
   };
 
-  const schema = loadSchema(ADOPTION_STATE_SCHEMA_PATH);
-  if (schema) {
-    const val = validateAgainstSchema(adoptionState, schema);
-    if (!val.valid) {
-      throw new Error(`Adoption state violates schema: ${val.errors.join("; ")}`);
-    }
-  }
+  validateState(adoptionState);
 
   const stateDir = path.join(rootDir, "architecture");
   if (!fs.existsSync(stateDir)) {
     fs.mkdirSync(stateDir, { recursive: true });
   }
   const statePath = path.join(stateDir, "adoption-state.json");
-  fs.writeFileSync(statePath, JSON.stringify(adoptionState, null, 2) + "\n", "utf8");
+  atomicWriteAdoptionState(statePath, adoptionState);
 
   return adoptionState;
+}
+
+function scopeValueForState(scope) {
+  return scopeValue(scope);
 }
 
 /**
@@ -332,7 +358,7 @@ export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskSco
     };
   }
 
-  if (stateObj.state === STATE_DEFERRED) {
+  if (stateObj.state === STATE_DEFERRED && !taskScope) {
     if (stateObj.expired) {
       return {
         ok: false,
@@ -348,7 +374,7 @@ export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskSco
     };
   }
 
-  if (stateObj.state === STATE_APPROVED_SCOPED || stateObj.state === STATE_PARTIAL) {
+  if ([STATE_APPROVED_SCOPED, STATE_PARTIAL, STATE_DEFERRED].includes(stateObj.state)) {
     if (!taskScope) {
       return {
         ok: true,
@@ -357,11 +383,11 @@ export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskSco
       };
     }
 
-    const normTask = taskScope.replace(/\\/g, "/");
+    let normTask;
+    try { normTask = scopeValue(taskScope)[0]; } catch { return { ok: false, disposition: stateObj.state, error: "Invalid task scope" }; }
     const scopes = Array.isArray(stateObj.scope) ? stateObj.scope : [stateObj.scope];
 
     const matches = scopes.some((sc) => {
-      if (!sc || sc === "*") return true;
       const normSc = sc.replace(/\\/g, "/");
       if (normSc.endsWith("/")) {
         return normTask === normSc.slice(0, -1) || normTask.startsWith(normSc);
@@ -397,8 +423,14 @@ function runCli() {
   let rootDir = process.cwd();
   let command = "status";
   let decision = null;
-  let scope = "architecture/map/";
+  let scope = null;
   let expires = null;
+  let reviewDate = null;
+  let decisionRef = null;
+  let decidedAt = null;
+  let approvalRequest = null;
+  let proof = null;
+  let chatApproval = null;
   let by = "PO";
   let rationale = "Architecture adoption decision applied via CLI";
   let json = false;
@@ -415,6 +447,18 @@ function runCli() {
       taskScope = scope;
     } else if (arg === "--expires" && args[i + 1]) {
       expires = args[++i];
+    } else if (arg === "--review-date" && args[i + 1]) {
+      reviewDate = args[++i];
+    } else if (arg === "--decision-ref" && args[i + 1]) {
+      decisionRef = args[++i];
+    } else if (arg === "--decided-at" && args[i + 1]) {
+      decidedAt = args[++i];
+    } else if (arg === "--request" && args[i + 1]) {
+      approvalRequest = JSON.parse(fs.readFileSync(args[++i], "utf8"));
+    } else if (arg === "--proof" && args[i + 1]) {
+      proof = JSON.parse(fs.readFileSync(args[++i], "utf8"));
+    } else if (arg === "--chat-approval" && args[i + 1]) {
+      chatApproval = JSON.parse(fs.readFileSync(args[++i], "utf8"));
     } else if (arg === "--by" && args[i + 1]) {
       by = args[++i];
     } else if (arg === "--rationale" && args[i + 1]) {
@@ -423,10 +467,17 @@ function runCli() {
       json = true;
     } else if (!arg.startsWith("--")) {
       command = arg;
+    } else {
+      throw new Error(`Unknown or incomplete option: ${arg}`);
     }
   }
 
   switch (command) {
+    case "prepare": {
+      const request = prepareAdoptionAuthority({ rootDir, decision, scope, rationale, expiresAt: expires, reviewDate, decidedAt, decisionRef });
+      console.log(JSON.stringify(request, null, 2));
+      break;
+    }
     case "status": {
       const state = resolveAdoptionState(rootDir);
       if (json) {
@@ -474,7 +525,12 @@ function runCli() {
         scope,
         rationale,
         expiresAt: expires,
-        by
+        reviewDate,
+        decisionRef,
+        by,
+        approvalRequest,
+        proof,
+        chatApproval
       });
       if (json) {
         console.log(JSON.stringify(applied, null, 2));
@@ -504,7 +560,7 @@ function runCli() {
       break;
     }
     default: {
-      console.error(`Unknown command "${command}". Valid commands: status | propose | apply | check`);
+      console.error(`Unknown command "${command}". Valid commands: status | propose | prepare | apply | check`);
       process.exit(1);
     }
   }

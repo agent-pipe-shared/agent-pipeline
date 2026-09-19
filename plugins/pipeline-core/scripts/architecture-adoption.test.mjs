@@ -9,11 +9,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { spawnSync } from "node:child_process";
+import { applyAdoptionDecision as rawApply } from "./architecture-adoption.mjs";
+import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
+import { setupAdoptionFixture, signAdoptionRequest, fixtureGit } from "./architecture-adoption-test-fixture.mjs";
 
 import {
   resolveAdoptionState,
   generateAdoptionProposal,
-  applyAdoptionDecision,
   checkPlanningAdoptionDisposition,
   STATE_ADOPTION_REQUIRED,
   STATE_APPROVED_SCOPED,
@@ -22,6 +25,7 @@ import {
   SCHEMA_ADOPTION_STATE,
   SCHEMA_ADOPTION_PROPOSAL
 } from "./architecture-adoption.mjs";
+import { fixtureAdoption as applyAdoptionDecision } from "./architecture-adoption-test-fixture.mjs";
 
 describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
   let tempDir;
@@ -58,7 +62,7 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
       });
 
       assert.equal(decision.state, STATE_APPROVED_SCOPED);
-      assert.equal(decision.scope, "architecture/map/");
+      assert.deepEqual(decision.scope, ["architecture/map/"]);
       assert.equal(decision.coverageClass, "evaluated");
       assert.equal(decision.confidence, "measured");
       assert.ok(decision.decidedAt);
@@ -66,7 +70,7 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
 
       const resolved = resolveAdoptionState(tempDir);
       assert.equal(resolved.state, STATE_APPROVED_SCOPED);
-      assert.equal(resolved.scope, "architecture/map/");
+      assert.deepEqual(resolved.scope, ["architecture/map/"]);
     });
 
     it("applies and resolves deferred adoption decision with expiry", () => {
@@ -121,7 +125,7 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
 
     it("rejects invalid decision or empty rationale", () => {
       assert.throws(() => {
-        applyAdoptionDecision({
+        rawApply({
           rootDir: tempDir,
           decision: "invalid-state",
           rationale: "test"
@@ -129,7 +133,7 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
       }, /Invalid adoption decision/);
 
       assert.throws(() => {
-        applyAdoptionDecision({
+        rawApply({
           rootDir: tempDir,
           decision: STATE_APPROVED_SCOPED,
           rationale: ""
@@ -247,5 +251,128 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
       assert.equal(res.disposition, "expired-deferral");
       assert.ok(res.error.includes("expired"));
     });
+  });
+});
+
+describe("Adoption authority anti-forgery and durable readback", () => {
+  let root, key, input, request, proof;
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-authority-"));
+    key = setupAdoptionFixture(root);
+    input = { rootDir: root, decision: "approved-scoped", scope: "src/", rationale: "Fixture decision", decidedAt: "2026-01-01T00:00:00.000Z", expiresAt: null, reviewDate: null, decisionRef: "TEST-1" };
+    request = prepareAdoptionAuthority(input);
+    proof = signAdoptionRequest(request, key);
+  });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+  const statePath = root => path.join(root, "architecture/adoption-state.json");
+  const apply = (input, request, proof) => rawApply({ ...input, approvalRequest: request, proof });
+
+  it("ships all validation schemas with canonical source parity", () => {
+    for (const name of ["pipeline.adoption-state.v1.json", "pipeline.adoption-proposal.v1.json", "pipeline.module-inventory.v1.json"]) assert.deepEqual(JSON.parse(fs.readFileSync(path.join("plugins/pipeline-core/schemas", name))), JSON.parse(fs.readFileSync(path.join("schemas", name))));
+  });
+  it("fails closed on malformed trust policy and unsigned mutation of stored intent", () => {
+    apply(input, request, proof);
+    const persisted = JSON.parse(fs.readFileSync(statePath(root)));
+    persisted.authority.request.intent.value.candidate.commit = "b".repeat(40);
+    fs.writeFileSync(statePath(root), JSON.stringify(persisted));
+    assert.equal(resolveAdoptionState(root).state, "adoption-required");
+    fs.writeFileSync(path.join(root, "project/critical-human-proof.json"), "{");
+    assert.throws(() => apply(input, request, proof), /POLICY/);
+  });
+
+  it("refuses ordinary apply, then verifies a real detached signature and later legitimate commits", () => {
+    assert.throws(() => rawApply(input), /AUTHORITY/);
+    assert.equal(fs.existsSync(statePath(root)), false);
+    apply(input, request, proof);
+    assert.equal(resolveAdoptionState(root).state, "approved-scoped");
+    fixtureGit(root, ["commit", "--allow-empty", "-qm", "later legitimate work"]);
+    assert.equal(resolveAdoptionState(root).state, "approved-scoped");
+    assert.equal(checkPlanningAdoptionDisposition(root, "src/a.mjs").ok, true);
+    assert.equal(checkPlanningAdoptionDisposition(root, "src/../other/a.mjs").ok, false);
+  });
+  for (const field of ["scope", "decision", "rationale", "expiresAt", "reviewDate", "decisionRef", "decidedAt", "candidate", "profileSha256"]) {
+    it(`rejects signed-subject tamper: ${field}, preserving state`, () => {
+      apply(input, request, proof);
+      const before = fs.readFileSync(statePath(root), "utf8");
+      const altered = structuredClone(request);
+      altered.subject[field] = field === "scope" ? ["other/"] : field === "decision" ? "partial" : field === "candidate" ? { commit: "b".repeat(40), tree: "c".repeat(40) } : field === "profileSha256" ? "d".repeat(64) : field.endsWith("At") || field === "reviewDate" ? "2099-01-01" : "changed";
+      assert.throws(() => apply(input, altered, proof), /authority rejected/);
+      assert.equal(fs.readFileSync(statePath(root), "utf8"), before);
+    });
+  }
+  it("rejects edited intent bytes even when supplied digest and signature stay valid", () => {
+    request.intent.value.decision = "partial";
+    assert.throws(() => apply(input, request, proof), /INTENT-MISMATCH/);
+  });
+  it("rejects changed apply arguments, stale candidate and changed input", () => {
+    assert.throws(() => apply({ ...input, scope: "other/" }, request, proof), /SUBJECT-MISMATCH/);
+    fs.writeFileSync(path.join(root, "project/pipeline.json"), "{}");
+    assert.throws(() => apply(input, request, proof), /INPUT-CHANGED/);
+    fs.unlinkSync(path.join(root, "project/pipeline.json"));
+    fixtureGit(root, ["commit", "--allow-empty", "-qm", "changed candidate"]);
+    assert.throws(() => apply(input, request, proof), /INPUT-CHANGED/);
+  });
+  it("rejects missing/malformed proof and wrong key", () => {
+    for (const invalid of [null, {}, { ...proof, signatureBase64: "AA==" }, { ...proof, publicKey: "broken" }]) assert.throws(() => apply(input, request, invalid), /authority rejected/);
+    const other = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-other-"));
+    try {
+      const otherKey = setupAdoptionFixture(other);
+      assert.throws(() => apply(input, request, signAdoptionRequest(request, otherKey)), /TRUST-MISMATCH/);
+      assert.throws(() => apply({ ...input, rootDir: other }, request, proof), /REPOSITORY-MISMATCH/);
+    } finally { fs.rmSync(other, { recursive: true, force: true }); }
+  });
+  it("rejects forged legacy state and modified persisted authority", () => {
+    fs.mkdirSync(path.dirname(statePath(root)), { recursive: true });
+    fs.writeFileSync(statePath(root), JSON.stringify({ schema: SCHEMA_ADOPTION_STATE, state: "approved-scoped", scope: "src/", by: "PO" }));
+    assert.equal(resolveAdoptionState(root).state, "adoption-required");
+    apply(input, request, proof);
+    const state = JSON.parse(fs.readFileSync(statePath(root), "utf8"));
+    state.scope = ["other/"];
+    fs.writeFileSync(statePath(root), JSON.stringify(state));
+    assert.equal(resolveAdoptionState(root).state, "adoption-required");
+  });
+  it("validates scopes and dates; deferred scope is bounded and expires on review date", () => {
+    for (const scope of [null, [], "", "*", "../src", "/src", "src/../other", "src//x"]) assert.throws(() => prepareAdoptionAuthority({ ...input, scope }));
+    for (const expiresAt of ["invalid", "2026-02-30", ""]) assert.throws(() => prepareAdoptionAuthority({ ...input, expiresAt }));
+    const deferred = { ...input, decision: "deferred", reviewDate: "2027-01-01" };
+    const req = prepareAdoptionAuthority(deferred);
+    apply(deferred, req, signAdoptionRequest(req, key));
+    assert.equal(checkPlanningAdoptionDisposition(root, "other/a", new Date("2026-09-19")).ok, false);
+    assert.equal(checkPlanningAdoptionDisposition(root, "src/a", new Date("2026-09-19")).ok, true);
+    assert.equal(resolveAdoptionState(root, new Date("2027-01-01")).state, "adoption-required");
+  });
+  it("chat attribution is explicit, intent-bound and cannot satisfy signature-mode readback", () => {
+    setupAdoptionFixture(root, { mode: "chat" });
+    const req = prepareAdoptionAuthority(input);
+    assert.throws(() => rawApply({ ...input, approvalRequest: req, by: "PO" }), /ATTRIBUTION/);
+    const chatApproval = { mode: "chat-attributed-unattested", by: "Test PO", decisionRef: "chat approval fixture", intentSha256: req.intent.sha256 };
+    const state = rawApply({ ...input, approvalRequest: req, chatApproval });
+    assert.equal(state.authority.mode, "chat-attributed-unattested");
+    assert.equal(resolveAdoptionState(root).state, "approved-scoped");
+    setupAdoptionFixture(root);
+    assert.equal(resolveAdoptionState(root).state, "adoption-required");
+  });
+  it("actual CLI prepares, applies and reads back from a plugin-only installation", () => {
+    const plugin = path.join(root, "plugin");
+    fs.cpSync(path.resolve("plugins/pipeline-core"), plugin, { recursive: true });
+    const script = path.join(plugin, "scripts/architecture-adoption.mjs");
+    const args = ["--root", root, "--decision", input.decision, "--scope", input.scope, "--rationale", input.rationale, "--decision-ref", input.decisionRef, "--decided-at", input.decidedAt, "--json"];
+    const prepared = spawnSync(process.execPath, [script, "prepare", ...args], { encoding: "utf8" });
+    assert.equal(prepared.status, 0, prepared.stderr);
+    const req = JSON.parse(prepared.stdout);
+    fs.writeFileSync(path.join(root, "request.json"), JSON.stringify(req));
+    fs.writeFileSync(path.join(root, "proof.json"), JSON.stringify(signAdoptionRequest(req, key)));
+    const unsigned = spawnSync(process.execPath, [script, "apply", ...args], { encoding: "utf8" });
+    assert.notEqual(unsigned.status, 0);
+    const applied = spawnSync(process.execPath, [script, "apply", ...args, "--request", path.join(root, "request.json"), "--proof", path.join(root, "proof.json")], { encoding: "utf8" });
+    assert.equal(applied.status, 0, applied.stderr);
+    const observed = spawnSync(process.execPath, [script, "status", "--root", root, "--json"], { encoding: "utf8" });
+    assert.equal(observed.status, 0, observed.stderr);
+    assert.equal(JSON.parse(observed.stdout).state, "approved-scoped");
+    const proposed = spawnSync(process.execPath, [script, "propose", "--root", root, "--json"], { encoding: "utf8" });
+    assert.equal(proposed.status, 0, proposed.stderr);
+    fs.unlinkSync(path.join(plugin, "schemas/pipeline.adoption-state.v1.json"));
+    const missingSchema = spawnSync(process.execPath, [script, "status", "--root", root, "--json"], { encoding: "utf8" });
+    assert.notEqual(missingSchema.status, 0);
   });
 });

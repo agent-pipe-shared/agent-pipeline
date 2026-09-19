@@ -10,6 +10,18 @@
   ],
   "additionalProperties": false,
   "properties": {
+    "authority": {
+      "type": "object",
+      "required": ["mode", "request"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["signature", "chat-attributed-unattested"] },
+        "request": { "type": "object" },
+        "proof": { "type": "object" },
+        "signer": { "type": "object" },
+        "humanApproval": { "type": "object" }
+      }
+    },
     "schema": {
       "type": "string",
       "enum": [
