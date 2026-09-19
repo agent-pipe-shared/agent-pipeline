@@ -7,7 +7,7 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildSignatureIntent, consentStoragePath, digest, loadLiveSession, validateConsentRecord } from "../lib/agy-session-authority.mjs";
+import { buildSignatureIntent, configuredConsentMode, consentStoragePath, digest, loadLiveSession, validateConsentRecord } from "../lib/agy-session-authority.mjs";
 import { loadSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 
 const usage = "Usage: agy-session-consent.mjs <prepare|inspect|record|revoke> --root <repo> --session-id <id> [--descriptor-sha256 <sha>] [--record <external-json>]";
@@ -20,23 +20,29 @@ function values(argv) {
 }
 export async function runConsentCommand(argv, deps = {}) {
   const args = values(argv); const descriptor = loadSessionDescriptor(args.root, args.sessionId, { expectedDescriptorSha256: args.descriptorSha256 }); const path = consentStoragePath(args.root, args.sessionId);
+  const tombstone = `${path}.revoked`;
+  const directory = join(descriptor.repo.commonDir, "agent-pipeline", "run", "agy-session-consent");
+  for (const parent of [join(descriptor.repo.commonDir, "agent-pipeline"), join(descriptor.repo.commonDir, "agent-pipeline", "run")]) { if (existsSync(parent) && lstatSync(parent).isSymbolicLink()) throw new Error("AGY-CONSENT-STORAGE-UNSAFE"); }
   if (args.command === "prepare") {
     if (!args.subject || !args.featureId || !args.planSha256 || !args.specSha256 || !args.candidate) throw new Error(usage);
     const subject = JSON.parse(readFileSync(resolve(args.subject), "utf8"));
     const candidate = JSON.parse(readFileSync(resolve(args.candidate), "utf8"));
+    if (digest(subject?.session) !== digest({ id: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256 }) || digest(subject?.repository) !== digest({ primaryRoot: descriptor.repo.primaryRoot, commonDir: descriptor.repo.commonDir })) throw new Error("AGY-CONSENT-SUBJECT-MISMATCH");
     const subjectSha256 = digest(subject);
-    const intent = buildSignatureIntent({ featureId: args.featureId, planSha256: args.planSha256, specSha256: args.specSha256, candidate, subjectSha256 });
-    return { schema: "pipeline.agy-session-consent-preparation.v1", sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256, subject, subjectSha256, intent, status: "awaiting-human-signature" };
+    const mode = configuredConsentMode(args.root).mode;
+    const intent = mode === "signature" ? buildSignatureIntent({ featureId: args.featureId, planSha256: args.planSha256, specSha256: args.specSha256, candidate, subjectSha256 }) : null;
+    return { schema: "pipeline.agy-session-consent-preparation.v1", sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256, subject, subjectSha256, mode, ...(intent ? { intent } : {}), status: mode === "signature" ? "awaiting-human-signature" : "awaiting-human-chat-attribution" };
   }
   if (args.command === "inspect") return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { status: "missing", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 };
-  if (args.command === "revoke") { if (existsSync(path)) unlinkSync(path); return { status: "revoked", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 }; }
+  if (args.command === "revoke") { if (existsSync(path)) { const prior = JSON.parse(readFileSync(path, "utf8")); writeFileSync(tombstone, `${JSON.stringify({ decisionId: prior.decisionId, subjectSha256: prior.subjectSha256, revokedAtMs: Date.now() })}\n`, { flag: "wx", mode: 0o600 }); unlinkSync(path); } return { status: "revoked", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256 }; }
   if (!args.record) throw new Error(usage);
   const record = JSON.parse(readFileSync(resolve(args.record), "utf8"));
   const live = loadLiveSession(args.root, args.sessionId, descriptor.descriptorSha256);
   if (!live.ok) throw new Error(live.code);
   const checked = validateConsentRecord(record, { root: args.root, repository: descriptor.repo, session: live.session, policy: deps.policy });
   if (!checked.ok) throw new Error(checked.code);
-  mkdirSync(join(descriptor.repo.commonDir, "agent-pipeline", "run", "agy-session-consent"), { recursive: true, mode: 0o700 });
+  if (existsSync(tombstone)) { const prior = JSON.parse(readFileSync(tombstone, "utf8")); if (prior.decisionId === record.decisionId) throw new Error("AGY-CONSENT-REAUTH-REQUIRED"); unlinkSync(tombstone); }
+  mkdirSync(directory, { recursive: true, mode: 0o700 }); if (lstatSync(directory).isSymbolicLink()) throw new Error("AGY-CONSENT-STORAGE-UNSAFE");
   writeFileSync(path, `${JSON.stringify(record)}\n`, { flag: "wx", mode: 0o600 });
   return { status: "recorded", sessionId: args.sessionId, descriptorSha256: descriptor.descriptorSha256, mode: checked.mode };
 }

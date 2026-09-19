@@ -45,7 +45,7 @@ export async function runGoldfishAntigravityLiveHost(request, dependencies = {})
   if (!authority.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: authority.code, modelCalls: 0, launcherCalls: 0 };
   const binding = validateDispatchBinding(stored.record, { requestedModel: request.requestedModel, role: request.packet.role, scope: request.scope, requiredPaths: request.packet.requiredPaths ?? [], nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
   if (!binding.ok) return { schema: LIVE_REQUEST_SCHEMA, status: "rejected", code: binding.code, modelCalls: 0, launcherCalls: 0 };
-  const dispatchConsent = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: stored.record.decisionId, sessionId: live.session.id, runner: "antigravity", provider: "google", model: stored.record.model, role: request.packet.role, scope: request.scope, subjectSha256: digest(request.scope), approvedAtMs: stored.record.approvedAtMs ?? 0, expiresAtMs: stored.record.expiresAtMs };
+  const dispatchConsent = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: stored.record.decisionId, sessionId: live.session.id, runner: "antigravity", provider: "google", model: stored.record.model, role: request.packet.role, scope: request.scope, subjectSha256: stored.record.subjectSha256, approvedAtMs: stored.record.approvedAtMs ?? 0, expiresAtMs: stored.record.expiresAtMs };
   return dispatchAgySession({ ...request, session: { id: live.session.id, source: "runtime", observed: true }, consent: dispatchConsent, verifyAuthority: () => true, agyPath, env: dependencies.env ?? process.env, nowEpochMs: dependencies.nowEpochMs ?? Date.now(), signal: dependencies.signal });
 }
 
