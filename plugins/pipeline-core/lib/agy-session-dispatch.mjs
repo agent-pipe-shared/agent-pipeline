@@ -26,6 +26,7 @@ export const AGY_SESSION_DISPATCH_CODES = Object.freeze({
   INPUT_MISMATCH: "AGY-SESSION-INPUT-MISMATCH",
   RESULT_INVALID: "AGY-SESSION-RESULT-INVALID",
   RESULT_COLLISION: "AGY-SESSION-RESULT-COLLISION",
+  AUTHORITY_UNAVAILABLE: "AGY-SESSION-AUTHORITY-UNAVAILABLE",
   PREFLIGHT_FAILED: "AGY-SESSION-PREFLIGHT-FAILED",
 });
 
@@ -71,19 +72,21 @@ function safeResultPath(resultRoot, resultPath) {
   if (typeof resultPath !== "string" || resultPath.length === 0 || resultPath.includes("\\")
     || resultPath.startsWith("/") || resultPath.split("/").some((part) => !part || part === "." || part === "..")) return null;
   try {
-    const root = realpathSync(resolve(resultRoot));
+    const rootLexical = resolve(resultRoot);
+    const rootStat = lstatSync(rootLexical);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) return null;
+    const root = realpathSync(rootLexical);
     const target = resolve(root, resultPath);
     const rel = relative(root, target);
     if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`)) return null;
     const parent = dirname(target);
     const parentStat = lstatSync(parent);
     if (!parentStat.isDirectory() || parentStat.isSymbolicLink() || realpathSync(parent) !== parent) return null;
-    if (lstatSync(target)) return null;
+    try { lstatSync(target); return null; } catch (error) { if (error?.code !== "ENOENT") return null; }
   } catch (error) {
-    if (error?.code !== "ENOENT") return null;
-    return { root: resolve(resultRoot), target: resolve(resultRoot, resultPath), relative: resultPath };
+    return null;
   }
-  return null;
+  return { root: resolve(resultRoot), target: resolve(resultRoot, resultPath), relative: resultPath };
 }
 
 function writeExclusiveResult(resultRoot, resultPath, value) {
@@ -120,6 +123,7 @@ export async function dispatchAgySession({
   env = process.env,
   signal,
   nowEpochMs = Date.now(),
+  verifyAuthority,
 } = {}) {
   if (!validSessionIdentity(session)) return rejected(AGY_SESSION_DISPATCH_CODES.SESSION_MISMATCH, "session");
   if (!IMPLEMENTATION_ROLES.has(packet?.role)) return rejected(AGY_SESSION_DISPATCH_CODES.ROLE_FORBIDDEN, "packet.role");
@@ -127,7 +131,10 @@ export async function dispatchAgySession({
   if (typeof scope !== "string" || scope.trim() === "" || !SHA256.test(inputSha256 ?? "")) return rejected(AGY_SESSION_DISPATCH_CODES.INPUT_MISMATCH, "inputSha256");
   const consentCheck = validateConsent(consent, { sessionId: session.id, model: requestedModel, role: packet.role, scope, nowEpochMs });
   if (!consentCheck.ok) return rejected(consentCheck.code, "consent");
-  if (consent.subjectSha256 !== inputSha256) return rejected(AGY_SESSION_DISPATCH_CODES.INPUT_MISMATCH, "consent.subjectSha256");
+  if (typeof verifyAuthority !== "function") return rejected(AGY_SESSION_DISPATCH_CODES.AUTHORITY_UNAVAILABLE, "authority");
+  let authorityOk = false;
+  try { authorityOk = verifyAuthority({ consent: structuredClone(consent), session: structuredClone(session), scope, requestedModel, role: packet.role }) === true; } catch { authorityOk = false; }
+  if (!authorityOk) return rejected(AGY_SESSION_DISPATCH_CODES.AUTHORITY_UNAVAILABLE, "authority");
   if (packet.transport !== "antigravity") return rejected(AGY_SESSION_DISPATCH_CODES.PREFLIGHT_FAILED, "packet.transport");
 
   const prepared = preflightRoleDispatch({ root, resultRoot, packet });
@@ -160,4 +167,3 @@ export async function dispatchAgySession({
 }
 
 export const agySessionDispatchInternals = Object.freeze({ digest, validateConsent, safeResultPath, writeExclusiveResult });
-
