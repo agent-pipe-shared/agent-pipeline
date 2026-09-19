@@ -99,11 +99,13 @@ export function resolveGuardConfigPath(projectDir, { existsSyncFn = existsSync }
 export function loadProtectedTestPathRules({ rootDir, readFileSyncFn = readFileSync, existsSyncFn = existsSync } = {}) {
   const configPath = resolveGuardConfigPath(rootDir, { existsSyncFn });
   const baseline = resolveProtectedBaseline({ rootDir, readFileSyncFn, existsSyncFn });
-  const rules = baseline.entries.flatMap((entry) => {
+  const rules = baseline.status !== "ready"
+    ? [{ id: "PB-BASELINE-UNAVAILABLE", re: /./u, reason: "Shipped protected baseline unavailable; refuse writes fail-closed." }]
+    : baseline.entries.flatMap((entry) => {
     try {
       return [{ id: entry.id, re: new RegExp(entry.pathPattern, "i"), reason: entry.rationale }];
     } catch { return []; }
-  });
+    });
   const warnings = baseline.diagnostics.map((item) => `${item.code}: ${item.message}`);
   return { rules, warnings, configPath, identity: baseline.identity, dynamic: baseline.dynamic.status };
 }

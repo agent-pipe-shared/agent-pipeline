@@ -14,7 +14,10 @@ export const PB_DYNAMIC_UNAVAILABLE = "PB-DYNAMIC-UNAVAILABLE";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE_FILE = join(PLUGIN_ROOT, "protected-baseline.json");
-const SCHEMA_FILE = resolve(PLUGIN_ROOT, "..", "..", "schemas", "pipeline.protected-baseline.v1.json");
+// The schema ships with the plugin. Resolving through the repository root makes
+// an installed plugin fail open to an empty protected set when that parent tree
+// is not present.
+const SCHEMA_FILE = join(PLUGIN_ROOT, "schemas", "pipeline.protected-baseline.v1.json");
 const CLASSES = new Set(["config", "loader", "hook", "contract-test", "verify-registration", "sanctioned-writer"]);
 const REGEXP_META = /[\\^$.*+?()[\]{}|]/u;
 

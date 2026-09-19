@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
 import {
   PB_CONFIG_INVALID,
@@ -83,4 +84,23 @@ test("A3 keeps an unreadable lifecycle state fail-closed", () => {
   const baseline = resolveProtectedBaseline({ rootDir: root });
   assert.equal(baseline.dynamic.status, "unavailable");
   assert.ok(baseline.diagnostics.some((item) => item.code === PB_DYNAMIC_UNAVAILABLE));
+});
+
+test("A3 plugin-only install retains the shipped baseline without a parent schemas tree", async () => {
+  const installRoot = mkdtempSync(join(tmpdir(), "protected-baseline-install-"));
+  const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const installedPlugin = join(installRoot, "plugins", "pipeline-core");
+  cpSync(pluginRoot, installedPlugin, { recursive: true });
+  const installed = await import(`${pathToFileURL(join(installedPlugin, "lib/protected-baseline.mjs"))}?install-regression`);
+  const baseline = installed.resolveProtectedBaseline({ rootDir: installRoot });
+  assert.equal(baseline.status, "ready");
+  assert.ok(baseline.entries.length >= 6);
+  assert.ok(installed.protectedBaselineRuleFor(baseline.entries, "plugins/pipeline-core/lib/protected-baseline.mjs"));
+});
+
+test("A3 refuses all writes when the shipped baseline cannot be loaded", () => {
+  const root = fixture();
+  const rules = loadProtectedTestPathRules({ rootDir: root, readFileSyncFn: () => { throw new Error("schema unavailable"); } });
+  assert.equal(rules.rules[0]?.id, "PB-BASELINE-UNAVAILABLE");
+  assert.ok(rules.rules[0]?.re.test("an/arbitrary/project-file.mjs"));
 });
