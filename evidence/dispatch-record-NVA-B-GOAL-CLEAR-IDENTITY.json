@@ -1,0 +1,53 @@
+{
+  "schema": "pipeline.dispatch-record.v3",
+  "taskId": "NVA-B-GOAL-CLEAR-IDENTITY",
+  "agentType": "goldfish",
+  "model": "gpt-5.6-terra",
+  "effort": "medium",
+  "rulesetSha": "0.7.0+codex.20260918192112.f2963473",
+  "dispatcher": "Elephant",
+  "candidateCommit": "ae6c667ecf52b8932da53eddbc46ef09e3adf0ba",
+  "resultSha256": null,
+  "outcome": "in-progress",
+  "commits": [],
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUseCount": 2,
+      "note": "Goldfish bootstrap completed with the assigned closed briefing."
+    },
+    {
+      "phase": "reproduce",
+      "toolUseCount": 9,
+      "note": "Captured the required failing synthetic regression before the adapter fix."
+    },
+    {
+      "phase": "implementation",
+      "toolUseCount": 6,
+      "note": "Added bounded clear identity observation and focused regressions."
+    }
+  ],
+  "report": null,
+  "modelOverride": {
+    "model": "gpt-5.6-terra",
+    "effort": "medium",
+    "rationale": "Calibrated deep override for identity-preserving native-goal control."
+  },
+  "criticRequired": {
+    "schema": "pipeline.critic-required-decision.v1",
+    "trigger": {
+      "schema": "pipeline.critic-trigger-input.v1",
+      "rigorLevel": 1,
+      "riskClass": "high",
+      "riskFlag": true,
+      "diff": {
+        "mechanical": false,
+        "architecture": false,
+        "guardrails": false,
+        "security": true
+      }
+    },
+    "appliedRow": "T1",
+    "reason": "Identity-preserving native-goal control is security-sensitive."
+  }
+}

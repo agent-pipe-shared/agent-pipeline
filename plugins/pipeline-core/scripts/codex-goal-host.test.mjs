@@ -103,9 +103,74 @@ await check("wrong readback never claims protected continuation", async () => {
   } });
   assert.deepEqual(result, { ok: false, code: "CGH-READBACK", status: "unavailable", readback: null });
 });
-await check("clear requires a null goal readback", async () => {
-  const result = await reconcileCodexGoal({ ...input, action: "clear" }, { request: async (method) => method === "thread/goal/clear" ? { cleared: true } : { goal: null } });
-  assert.equal(result.status, "cleared");
+await check("clear refuses foreign objective, generation, and thread goals before destructive control", async () => {
+  const foreignGoals = [
+    { threadId: "thread-1", objective: "User objective", status: "active" },
+    { threadId: "thread-1", objective: objective.replace("generation=2", "generation=1"), status: "active" },
+    { threadId: "other-thread", objective, status: "active" },
+  ];
+  for (const goal of foreignGoals) {
+    const calls = [];
+    const result = await reconcileCodexGoal({ ...input, action: "clear" }, { request: async (method) => {
+      calls.push(method);
+      if (method === "thread/goal/get") return { goal };
+      throw new Error("clear must not be requested for a foreign goal");
+    } });
+    assert.deepEqual(calls, ["thread/goal/get"]);
+    assert.deepEqual(result, { ok: false, code: "CGH-CLEAR-IDENTITY-MISMATCH", status: "unavailable", readback: null });
+  }
+});
+await check("clear refuses malformed or unavailable initial observations before destructive control", async () => {
+  for (const observed of [undefined, {}, { goal: undefined }, { goal: { threadId: "thread-1", objective, status: "unknown" } }]) {
+    const calls = [];
+    const result = await reconcileCodexGoal({ ...input, action: "clear" }, { request: async (method) => {
+      calls.push(method);
+      if (method === "thread/goal/get") return observed;
+      throw new Error("clear must not be requested without a valid observation");
+    } });
+    assert.deepEqual(calls, ["thread/goal/get"]);
+    assert.deepEqual(result, { ok: false, code: "CGH-CLEAR-OBSERVATION", status: "unavailable", readback: null });
+  }
+});
+await check("matching goal clear is followed by an actual null readback", async () => {
+  let goal = { threadId: "thread-1", objective, status: "active" };
+  const calls = [];
+  const result = await reconcileCodexGoal({ ...input, action: "clear" }, { request: async (method) => {
+    calls.push(method);
+    if (method === "thread/goal/get") return { goal };
+    if (method === "thread/goal/clear") { goal = null; return { cleared: true }; }
+    throw new Error("unexpected method");
+  } });
+  assert.deepEqual(calls, ["thread/goal/get", "thread/goal/clear", "thread/goal/get"]);
+  assert.deepEqual(result, { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation: 2, status: "cleared" } });
+});
+await check("already absent clear is idempotent after a valid null observation", async () => {
+  const calls = [];
+  const result = await reconcileCodexGoal({ ...input, action: "clear" }, { request: async (method) => {
+    calls.push(method);
+    if (method === "thread/goal/get") return { goal: null };
+    throw new Error("clear must not be requested when the goal is absent");
+  } });
+  assert.deepEqual(calls, ["thread/goal/get"]);
+  assert.deepEqual(result, { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation: 2, status: "cleared" } });
+});
+await check("failed clear and non-null final readback never claim success", async () => {
+  for (const outcome of [{ cleared: false }, { cleared: true }]) {
+    let reads = 0;
+    const calls = [];
+    const result = await reconcileCodexGoal({ ...input, action: "clear" }, { request: async (method) => {
+      calls.push(method);
+      if (method === "thread/goal/get") {
+        reads += 1;
+        return { goal: reads === 1 ? { threadId: "thread-1", objective, status: "active" } : { threadId: "thread-1", objective, status: "active" } };
+      }
+      if (method === "thread/goal/clear") return outcome;
+      throw new Error("unexpected method");
+    } });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, outcome.cleared ? "CGH-CLEAR-READBACK" : "CGH-CLEAR");
+    assert.deepEqual(calls, outcome.cleared ? ["thread/goal/get", "thread/goal/clear", "thread/goal/get"] : ["thread/goal/get", "thread/goal/clear"]);
+  }
 });
 await check("continuity host binding uses only the supplied current thread client", async () => {
   let goal = null;

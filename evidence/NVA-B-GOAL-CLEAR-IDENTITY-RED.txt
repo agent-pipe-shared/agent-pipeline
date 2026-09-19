@@ -1,0 +1,39 @@
+command: node plugins/pipeline-core/scripts/codex-goal-host.test.mjs
+label: NVA-B-GOAL-CLEAR-IDENTITY-RED
+exitCode: 1
+--- stdout ---
+ok 1 - set performs a mandatory matching get readback
+ok 2 - matching active goal is read back without a duplicate set
+ok 3 - a named PO gate pauses only the matching active Goal and reads the pause back
+ok 4 - a recorded PO resolution restores the same paused Goal without replacing it
+ok 5 - blocked native goal stops automation and gives an explicit CLI-resume notice
+ok 6 - a blocked goal with another objective cannot impersonate the requested generation
+ok 7 - a stale active Pipeline goal cannot impersonate the current continuation
+ok 8 - an active user-controlled goal is never overwritten by Pipeline activation
+ok 9 - a paused user-controlled goal is never overwritten by Pipeline activation or pause
+ok 10 - wrong readback never claims protected continuation
+
+--- stderr ---
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
++   'thread/goal/clear'
+-   'thread/goal/get'
+  ]
+
+    at file://<repo-root>/plugins/pipeline-core/scripts/codex-goal-host.test.mjs:119:12
+    at async file://<repo-root>/plugins/pipeline-core/scripts/codex-goal-host.test.mjs:106:1 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [ 'thread/goal/clear' ],
+  expected: [ 'thread/goal/get' ],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0

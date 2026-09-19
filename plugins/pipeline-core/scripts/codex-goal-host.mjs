@@ -194,6 +194,15 @@ function sameNativeGoal(goal, threadId, objective) {
   return object(goal) && goal.threadId === threadId && goal.objective === objective;
 }
 
+function validNativeGoal(goal) {
+  return object(goal) && typeof goal.threadId === "string" && typeof goal.objective === "string" && GOAL_STATES.has(goal.status);
+}
+
+function readNativeGoal(response) {
+  if (!object(response) || !Object.hasOwn(response, "goal")) return { valid: false, goal: null };
+  return { valid: response.goal === null || validNativeGoal(response.goal), goal: response.goal ?? null };
+}
+
 /**
  * Execute exactly one requested native goal action followed by `thread/goal/get`.
  * `request` is the already-authenticated App Server JSON-RPC client; this adapter
@@ -237,13 +246,22 @@ export async function reconcileCodexGoal(input, { request } = {}) {
         if (!object(paused?.goal)) return unavailable("CGH-PAUSE");
       }
     } else {
+      const initial = readNativeGoal(await request("thread/goal/get", { threadId: input.threadId }));
+      if (!initial.valid) return unavailable("CGH-CLEAR-OBSERVATION");
+      if (initial.goal !== null && !sameNativeGoal(initial.goal, input.threadId, objective)) {
+        return unavailable("CGH-CLEAR-IDENTITY-MISMATCH");
+      }
+      if (initial.goal === null) {
+        return { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation: input.generation, status: "cleared" } };
+      }
       const cleared = await request("thread/goal/clear", { threadId: input.threadId });
       if (cleared?.cleared !== true) return unavailable("CGH-CLEAR");
     }
     const observed = await request("thread/goal/get", { threadId: input.threadId });
-    const goal = observed?.goal ?? null;
+    const readback = readNativeGoal(observed);
+    const goal = readback.goal;
     if (input.action === "clear") {
-      return goal === null ? { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation: input.generation, status: "cleared" } } : unavailable("CGH-CLEAR-READBACK");
+      return readback.valid && goal === null ? { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation: input.generation, status: "cleared" } } : unavailable("CGH-CLEAR-READBACK");
     }
     const expectedStatus = input.action === "pause" ? "paused" : "active";
     if (!object(goal) || !sameNativeGoal(goal, input.threadId, objective) || goal.status !== expectedStatus
