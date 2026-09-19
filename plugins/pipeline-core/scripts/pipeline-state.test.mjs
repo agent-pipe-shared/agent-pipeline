@@ -16,7 +16,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -32,6 +32,7 @@ import {
 import { ONBOARDING_SUBCOMMANDS } from "./project-onboarding-v3.mjs";
 import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
+import { fixtureAdoption } from "./architecture-adoption-test-fixture.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -976,8 +977,14 @@ for (const [name, prepare] of [
 function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27T10:00:00.000Z" }) {
   const root = mktempProjectDir();
   mkdirSync(join(root, "project"), { recursive: true });
-  const planSha256 = sha256Hex(`plan:${planPath}`);
-  const specSha256 = sha256Hex(`spec:${specPath}`);
+  mkdirSync(join(root, planPath, ".."), { recursive: true });
+  mkdirSync(join(root, specPath, ".."), { recursive: true });
+  const specBytes = Buffer.from("# Technical Spec\nOrdinary fixture authority.\n", "utf8");
+  const specSha256 = sha256Hex(specBytes);
+  const planBytes = Buffer.from(`<!-- po-language: en -->\n<!-- technical-spec-sha256: ${specSha256} -->\n# PRD\n${featureId}\n`, "utf8");
+  const planSha256 = sha256Hex(planBytes);
+  writeFileSync(join(root, specPath), specBytes);
+  writeFileSync(join(root, planPath), planBytes);
   const profile = {
     schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
     sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64),
@@ -1596,6 +1603,12 @@ function awaitingApprovalFixture() {
 // nor git are invoked by this test at all: `run()` is called in-process).
 {
   const root = mktempProjectDir();
+  const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
+  for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
+    cpSync(join(repositoryRoot, directory), join(root, directory), { recursive: true });
+  }
+  mkdirSync(join(root, "plugins/pipeline-core"), { recursive: true });
+  writeFileSync(join(root, "plugins/pipeline-core/architecture-entry-plan.md"), "Implement plugins/pipeline-core/scripts/pipeline-state.mjs\n", "utf8");
   const seededVerify = "node -e \"console.error('pipeline: the verify contract of this project is not configured. Replace the verify command in project/pipeline.json with the real verification command for this project (for example its test suite), then run verify again.'); process.exit(1)\"";
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, ".claude"), { recursive: true });
@@ -1604,11 +1617,21 @@ function awaitingApprovalFixture() {
   writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
   writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
     schema: "pipeline.state.v0",
-    activeFeature: { id: "verify-deadlock-repro", planPath: "specs/verify-deadlock-repro/prd.md", phase: "design" },
+    activeFeature: { id: "verify-deadlock-repro", planPath: "plugins/pipeline-core/architecture-entry-plan.md", phase: "design" },
     planApproved: true,
     planApproval: { approvedBy: "PO", approvedAt: now },
   }, null, 2));
-  const deps = { dir: root, now: () => now };
+  fixtureAdoption({
+    rootDir: root,
+    decision: "approved-scoped",
+    scope: ["plugins/pipeline-core/", "architecture/map/", "project/pipeline.json", "pipeline.user.yaml"],
+    rationale: "verify deadlock architecture-ready fixture",
+  });
+  // This scenario isolates the verify-command deadlock. Architecture-entry
+  // readiness has its own real-map/authority suite; inject that gate as ready
+  // here so changing calibration does not turn the test into a profile-drift
+  // test as well.
+  const deps = { dir: root, now: () => now, architectureEntryReadiness: () => ({ status: "ready" }) };
 
   // 1. A product-specific command is not a PO gate. The legacy placeholder is
   // interpreted as baseline-only and implementation can start without another
@@ -1681,7 +1704,7 @@ function awaitingApprovalFixture() {
     planApproved: true,
     planApproval: { approvedBy: "PO", approvedAt: now },
   }, null, 2));
-  const deps = { dir: root, now: () => now };
+  const deps = { dir: root, now: () => now, architectureEntryReadiness: () => ({ status: "ready" }) };
 
   assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
     "the fresh approved baseline seed must first enter implementation without inventing a command");

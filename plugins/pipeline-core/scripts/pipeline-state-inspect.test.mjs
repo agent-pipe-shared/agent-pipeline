@@ -21,7 +21,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,6 +29,7 @@ import { run, SCHEMA_ID, statePath as resolveStatePath } from "./pipeline-state.
 import { applyOnboardingIntakeConsent, nextActionSection } from "../lib/onboarding-continuity.mjs";
 import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+import { fixtureAdoption } from "./architecture-adoption-test-fixture.mjs";
 
 const roots = [];
 const NOW = "2026-08-18T12:00:00.000Z";
@@ -267,7 +268,11 @@ test("awaiting-approval re-surfaces present-plan when the existing presentation 
 
 function approvedFixture(name, verify) {
   const root = freshRoot(name);
+  for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
+    cpSync(join(fileURLToPath(new URL("../../..", import.meta.url)), directory), join(root, directory), { recursive: true });
+  }
   mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "plugins/pipeline-core/architecture-entry-plan.md"), "Implement plugins/pipeline-core/lib/architecture-entry-readiness.mjs\n", "utf8");
   writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({
     project: "new-project",
     verify,
@@ -275,10 +280,16 @@ function approvedFixture(name, verify) {
   }, null, 2) + "\n");
   writeFileSync(resolveStatePath(root), JSON.stringify({
     schema: SCHEMA_ID,
-    activeFeature: { id: "widget", planPath: "specs/widget/prd.md", phase: "design" },
+    activeFeature: { id: "widget", planPath: "plugins/pipeline-core/architecture-entry-plan.md", phase: "design" },
     planApproved: true,
     planApproval: { approvedBy: "PO", approvedAt: NOW },
   }, null, 2) + "\n");
+  fixtureAdoption({
+    rootDir: root,
+    decision: "approved-scoped",
+    scope: ["plugins/pipeline-core/", "architecture/map/", "project/pipeline.json", "pipeline.user.yaml"],
+    rationale: "pipeline-state inspect ready fixture",
+  });
   return root;
 }
 
@@ -327,6 +338,28 @@ test("approved next-action keeps the existing bare set-phase command when verify
     "the already-configured bare transition must remain runnable without --verify-command");
   assert.equal(JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8")).verify, "node --test",
     "the already-configured bare transition must leave verify unchanged");
+});
+
+test("approved next-action offers the typed architecture proposal when physical readiness is absent", () => {
+  const root = freshRoot("approved-architecture-unready");
+  mkdirSync(join(root, "project"), { recursive: true });
+  mkdirSync(join(root, "plugins/pipeline-core"), { recursive: true });
+  writeFileSync(join(root, "plugins/pipeline-core/architecture-entry-plan.md"), "Implement plugins/pipeline-core/lib/architecture-entry-readiness.mjs\n", "utf8");
+  writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({ project: "new-project", verify: "node --test" }) + "\n");
+  writeFileSync(resolveStatePath(root), JSON.stringify({
+    schema: SCHEMA_ID,
+    activeFeature: { id: "widget", planPath: "plugins/pipeline-core/architecture-entry-plan.md", phase: "design" },
+    planApproved: true,
+    planApproval: { approvedBy: "PO", approvedAt: NOW },
+  }, null, 2) + "\n");
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.status, "approved");
+  assert.equal(payload.nextAction.kind, "collect-input");
+  assert.equal(payload.nextAction.input.name, "architecture-adoption-disposition");
+  assert.equal(payload.nextAction.proposalSchema, "pipeline.adoption-proposal.v1");
+  assert.equal(payload.nextAction.mutation, undefined);
 });
 
 // NVA-CF-PUSHDRIVERFINISH: the `implementing` branch (once the push
