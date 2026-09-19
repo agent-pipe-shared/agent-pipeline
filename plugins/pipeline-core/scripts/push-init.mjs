@@ -251,7 +251,7 @@ export function buildPreconditionRecovery({ root, by, remote, destination, base,
       mutation: false,
       requiresConfirmation: false,
       executionBoundary: "local-process",
-      expected: { schema: SCHEMA, outcomes: ["precondition-unmet", "signature-required"] },
+      expected: { schema: SCHEMA, outcomes: ["precondition-unmet", "chat-ready", "signature-required"] },
     },
   };
 }
@@ -399,6 +399,20 @@ export function drivePushInit({
     };
   }
 
+  // push-prepare already resolved the effective approval posture. A ready chat
+  // report has no authorize-critical command: global chat is terminal-free and
+  // legacy push-local chat retains its attended in-session confirmation. Carry
+  // the mode through so the driver cannot relabel either valid result as a
+  // signature ceremony with empty signature lines.
+  if (["chat", "chat-attributed-unattested"].includes(prepare.report.humanApproval)) {
+    return {
+      schema: SCHEMA, root, by, remote, destination, base,
+      outcome: "chat-ready", humanApproval: prepare.report.humanApproval, steps,
+      approvePushLines: prepare.lines.approvePush,
+      gitPushLine: prepare.lines.gitPush,
+    };
+  }
+
   // Every precondition is green. Present the signature command; never execute it -- see the
   // header comment "THE SIGNATURE BOUNDARY". `executedByDriver: false` is not merely a label:
   // there is no code path above this line, or below it, that spawns or imports
@@ -425,6 +439,7 @@ export function drivePushInit({
 export function main(args = process.argv.slice(2), {
   write = process.stdout.write.bind(process.stdout),
   writeError = process.stderr.write.bind(process.stderr),
+  drive = drivePushInit,
 } = {}) {
   const options = parseArgs(args);
   if (options.help) {
@@ -435,12 +450,12 @@ export function main(args = process.argv.slice(2), {
     writeError(`${usage()}\n${options.error}\n`);
     return 2;
   }
-  const result = drivePushInit({
+  const result = drive({
     rootDir: options.root, by: options.by, remote: options.remote, destination: options.destination,
     base: options.base ?? null, candidate: options.candidate ?? null, recordRef: options["record-ref"] ?? null, checkpoint: options.checkpoint === true,
   });
   write(`${JSON.stringify(result, null, 2)}\n`);
-  return ["signature-required", "checkpoint-ready"].includes(result.outcome) ? 0 : 1;
+  return ["chat-ready", "signature-required", "checkpoint-ready"].includes(result.outcome) ? 0 : 1;
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main());

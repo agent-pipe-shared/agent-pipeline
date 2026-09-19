@@ -22,7 +22,7 @@ import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
+import { buildPushInitArgv, buildReconciliationArgv, driveCheckpointPushInit, drivePushInit, main, parseArgs, RECONCILIATION_SCRIPT_RELATIVE_PATH } from "./push-init.mjs";
 import { run as pipelineStateRun } from "./pipeline-state.mjs";
 import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
 import { verifyEvidenceFixture } from "../lib/verify-selection-fixture.mjs";
@@ -222,6 +222,14 @@ function pushInitGateReport() {
   };
 }
 
+function chatPrepareResult(humanApproval) {
+  return {
+    ok: true,
+    report: { ready: true, humanApproval, checks: [] },
+    lines: { authorize: [], approvePush: ["Step: agent approve-push", "chat confirmation"], gitPush: "Step: agent push" },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // DoD 1: chains consecutive command steps without a human turn between them
 // ---------------------------------------------------------------------------
@@ -293,6 +301,80 @@ test("drivePushInit: chains all three steps (reconciliation, gate-satisfiability
     assert.deepEqual(result.steps.map((step) => step.id), ["doc-reconciliation", "push-gate-satisfiability", "push-prepare"]);
     for (const step of result.steps) assert.equal(step.ok, true, JSON.stringify(step));
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit: terminal-free global chat preparation returns chat-ready without signature ceremony", () => {
+  const root = freshFixtureRoot();
+  try {
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(),
+      prepareDeps: prepareDepsAllGreen({ readHumanApprovalMode: () => ({ mode: "chat", scope: "global" }) }),
+      pushPrepareReport: () => chatPrepareResult("chat-attributed-unattested"),
+    });
+    assert.equal(result.outcome, "chat-ready", JSON.stringify(result));
+    assert.equal(result.humanApproval, "chat-attributed-unattested");
+    assert.deepEqual(result.approvePushLines, ["Step: agent approve-push", "chat confirmation"]);
+    assert.equal(result.gitPushLine, "Step: agent push");
+    assert.equal(Object.hasOwn(result, "signatureCommand"), false);
+    assert.equal(Object.hasOwn(result, "followOn"), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit: legacy attended chat preparation returns chat-ready and preserves chat mode", () => {
+  const root = freshFixtureRoot();
+  try {
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(),
+      pushPrepareReport: () => chatPrepareResult("chat"),
+    });
+    assert.equal(result.outcome, "chat-ready", JSON.stringify(result));
+    assert.equal(result.humanApproval, "chat");
+    assert.deepEqual(result.approvePushLines, ["Step: agent approve-push", "chat confirmation"]);
+    assert.equal(Object.hasOwn(result, "signatureCommand"), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit: signature preparation keeps the existing signature-required output", () => {
+  const root = freshFixtureRoot();
+  try {
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      satisfiabilityDeps: satisfiabilityDepsAllGreen(), prepareDeps: prepareDepsAllGreen(),
+    });
+    assert.equal(result.outcome, "signature-required", JSON.stringify(result));
+    assert.ok(result.signatureCommand.lines.length > 0);
+    assert.equal(Object.hasOwn(result, "approvePushLines"), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("drivePushInit: precondition failure remains precondition-unmet and has no chat or signature terminal output", () => {
+  const root = freshFixtureRoot();
+  try {
+    const result = drivePushInit({
+      rootDir: root, by: "tester", remote: "origin", destination: "refs/heads/main",
+      assessPushGateSatisfiability: () => ({ ok: true, report: { satisfiable: true, checks: [] } }),
+      pushPrepareReport: () => ({ ok: true, report: { ready: false, checks: [{ id: "working-tree-clean", ok: false, message: "dirty" }] } }),
+    });
+    assert.equal(result.outcome, "precondition-unmet", JSON.stringify(result));
+    assert.equal(Object.hasOwn(result, "signatureCommand"), false);
+    assert.equal(Object.hasOwn(result, "approvePushLines"), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("push-init CLI exit status accepts chat-ready and signature-required, but rejects precondition-unmet", () => {
+  const args = ["--root", "/fixture", "--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"];
+  for (const [outcome, expectedStatus] of [["chat-ready", 0], ["signature-required", 0], ["precondition-unmet", 1]]) {
+    let stdout = "";
+    const status = main(args, {
+      write: (value) => { stdout += value; },
+      writeError: () => {},
+      drive: () => ({ schema: "pipeline.push-init.v1", outcome }),
+    });
+    assert.equal(status, expectedStatus, `${outcome}: ${stdout}`);
+    assert.deepEqual(JSON.parse(stdout), { schema: "pipeline.push-init.v1", outcome });
+  }
 });
 
 test("drivePushInit: reconciliation accepts WSL EPERM only after status zero, while non-zero and status-less results stop fail-closed", () => {
