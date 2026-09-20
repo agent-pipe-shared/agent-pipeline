@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { validateDispatchRecord } from "../lib/dispatch-record.mjs";
+import { reportSha256, validateDispatchRecord } from "../lib/dispatch-record.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { VERDICT, verifyCommit } from "./dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "./dispatch-record-write.mjs";
@@ -59,6 +59,17 @@ check("writer persists no-delivery without manufacturing a commit or delivery pa
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+check("writer publishes a closed v4 read-only receipt without commit authorship", () => {
+  const report = { text: "Read-only inspection completed.", changedFiles: [] };
+  const value = record({ schema: "pipeline.dispatch-record.v4", taskId: "NVA-V4-READONLY", resultSha256: reportSha256(report.text), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], report });
+  const root = fixture(value);
+  try {
+    const receipt = writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" });
+    assert.equal(receipt.schema, "pipeline.dispatch-record-write-receipt.v2");
+    assert.deepEqual(receipt.outcomeClassification, value.outcomeClassification);
+    assert.deepEqual(validateDispatchRecord(JSON.parse(readFileSync(join(root, receipt.target)))), value);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 check("malformed, missing, computed and mismatched records fail before publication", () => {
   const cases = [
     [record({ schema: "pipeline.dispatch-record.v2" }), "evidence/dispatch-record-NVA-WRITE-1.json"],
@@ -216,7 +227,7 @@ check("target replacement after hard-link admission is detected without reading 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 12, "the complete dispatch-record writer corpus must be registered before execution begins");
+assert.equal(cases.length, 13, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

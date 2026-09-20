@@ -270,6 +270,20 @@ check("final native return writes canonical v3 evidence and passes authorship ve
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+check("v4 read-only return writes once and never invokes commit verification", () => {
+  let verifyCalls = 0;
+  const completion = { identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" };
+  const receipt = { schema: "pipeline.dispatch-record-write-receipt.v2", target: "evidence/dispatch-record-P5B-RETURN-1.json", sha256: B, bytes: 300, taskId: completion.taskId, candidateCommit: completion.candidateCommit, resultSha256: A, outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" } };
+  const result = coordinateWorkflowRunnerReturn(recordExpected, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }), completion, {
+    writeDispatchRecord: () => receipt,
+    verifyCommit: () => { verifyCalls += 1; throw new Error("must not verify a non-authoring return"); },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.code, "WR-OUTCOME-NONAUTHORING-RECORDED");
+  assert.equal(result.record.authorship, "not-applicable");
+  assert.equal(result.adapterInvocations, 1);
+  assert.equal(verifyCalls, 0);
+});
 check("return coordinator rejects stale bindings before record I/O", () => {
   let calls = 0;
   const result = coordinateWorkflowRunnerReturn(recordExpected,

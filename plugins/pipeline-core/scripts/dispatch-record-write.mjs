@@ -10,7 +10,8 @@ import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const REQUEST_SCHEMA = "pipeline.dispatch-record-write-request.v1";
-const RECEIPT_SCHEMA = "pipeline.dispatch-record-write-receipt.v1";
+const RECEIPT_SCHEMA_V1 = "pipeline.dispatch-record-write-receipt.v1";
+const RECEIPT_SCHEMA_V2 = "pipeline.dispatch-record-write-receipt.v2";
 
 function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
 function exactKeys(value, keys, label) {
@@ -180,8 +181,8 @@ export function writeDispatchRecord({ repoRoot, requestPath }, dependencies = {}
       throw error;
     }
   });
-  return {
-    schema: RECEIPT_SCHEMA,
+  const receipt = {
+    schema: RECEIPT_SCHEMA_V1,
     target: targetRelative,
     sha256: digest,
     bytes: bytes.length,
@@ -189,6 +190,15 @@ export function writeDispatchRecord({ repoRoot, requestPath }, dependencies = {}
     candidateCommit: record.candidateCommit,
     resultSha256: record.resultSha256,
   };
+  if (record.schema === "pipeline.dispatch-record.v4"
+    && ["read-only", "stopped-without-commit"].includes(record.outcomeClassification.kind)) {
+    return {
+      ...receipt,
+      schema: RECEIPT_SCHEMA_V2,
+      outcomeClassification: structuredClone(record.outcomeClassification),
+    };
+  }
+  return receipt;
 }
 
 function parseArgs(argv) {

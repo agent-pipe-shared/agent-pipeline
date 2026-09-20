@@ -168,7 +168,7 @@ export function evaluateCriticSkipCoverage({ dispatchedWorkCount, criticArtifact
 }
 
 export function evaluateCriticSkipCoverageFromRecords({ records }) {
-  const applicable = (Array.isArray(records) ? records : []).filter((record) => record?.schema === "pipeline.dispatch-record.v3");
+  const applicable = (Array.isArray(records) ? records : []).filter((record) => record?.schema === "pipeline.dispatch-record.v3" || record?.schema === "pipeline.dispatch-record.v4");
   const skipRecordCount = applicable.filter((record) => criticDisposition(record) === "skipped").length;
   const requiredRecordCount = applicable.filter((record) => criticDisposition(record) === "required").length;
   const criticArtifactCount = applicable.filter((record) => criticDisposition(record) === "evidenced").length;

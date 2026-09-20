@@ -44,6 +44,7 @@ const OUTCOME_STATES = new Set(["running", "completed", "completed-but-undeliver
 const RETURN_COMPLETION_KEYS = new Set(["identity", "taskId", "resultSha256", "candidateCommit", "requestPath"]);
 const RETURN_ADAPTER_KEYS = new Set(["writeDispatchRecord", "verifyCommit"]);
 const RETURN_RECEIPT_KEYS = new Set(["schema", "target", "sha256", "bytes", "taskId", "candidateCommit", "resultSha256"]);
+const RETURN_NONAUTHORING_RECEIPT_KEYS = new Set([...RETURN_RECEIPT_KEYS, "outcomeClassification"]);
 const RETURN_AUTHORSHIP_KEYS = new Set([
   "sha", "verdict", "classification", "reason", "taskId", "modelCheck", "orchestratorAddedFiles",
 ]);
@@ -52,6 +53,8 @@ const RETURN_AUTHORSHIP_REQUIRED_KEYS = new Set([
 ]);
 const FULL_COMMIT = /^[a-f0-9]{40}$/;
 const REPOSITORY_RELATIVE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\\)[A-Za-z0-9._/@:-]+$/;
+const NONAUTHORING_RECEIPT_SCHEMA = "pipeline.dispatch-record-write-receipt.v2";
+const OUTCOME_CLASSIFICATION_SCHEMA = "pipeline.dispatch-outcome-classification.v1";
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -86,6 +89,22 @@ function validReturnAuthorship(value) {
   return Array.isArray(paths) && paths.length <= 512
     && paths.every(normalizedRepositoryPath)
     && new Set(paths).size === paths.length;
+}
+
+function validReturnReceipt(value) {
+  const base = (allowed) => exactKeyCount(value, allowed)
+    && typeof value.target === "string"
+    && normalizedRepositoryPath(value.target)
+    && SHA256.test(value.sha256)
+    && Number.isSafeInteger(value.bytes) && value.bytes > 0
+    && typeof value.taskId === "string" && SAFE_ID.test(value.taskId)
+    && FULL_COMMIT.test(value.candidateCommit)
+    && SHA256.test(value.resultSha256);
+  if (value?.schema === "pipeline.dispatch-record-write-receipt.v1") return base(RETURN_RECEIPT_KEYS);
+  if (value?.schema !== NONAUTHORING_RECEIPT_SCHEMA || !base(RETURN_NONAUTHORING_RECEIPT_KEYS)
+    || !exactKeyCount(value.outcomeClassification, new Set(["schema", "kind"]))) return false;
+  return value.outcomeClassification.schema === OUTCOME_CLASSIFICATION_SCHEMA
+    && new Set(["read-only", "stopped-without-commit"]).has(value.outcomeClassification.kind);
 }
 
 function safeBooleanMap(value) {
@@ -280,7 +299,7 @@ export function normalizeWorkflowRunnerOutcome(expected, observation) {
     if (productVerdict?.schemaValid !== true || productVerdict.outcome !== "succeeded" || resultSha256 === null) {
       return { ok: false, code: "WR-OUTCOME-SCHEMA", ...base, faultDomain: "unknown", resultSha256: null };
     }
-    if (expected.acknowledgedResultSha256 === resultSha256) return { ok: true, code: "WR-OUTCOME-DUPLICATE", ...base, faultDomain: "unknown" };
+    if (expected.acknowledgedResultSha256 !== null && expected.acknowledgedResultSha256 === resultSha256) return { ok: true, code: "WR-OUTCOME-DUPLICATE", ...base, faultDomain: "unknown" };
     if (expected.acknowledgedResultSha256 !== null) {
       return { ok: false, code: "WR-OUTCOME-CONFLICT", ...base, faultDomain: "unknown", resultSha256: null };
     }
@@ -288,6 +307,15 @@ export function normalizeWorkflowRunnerOutcome(expected, observation) {
   }
   if (productVerdict?.schemaValid === true && productVerdict.outcome === "failed") {
     return { ok: true, code: "WR-OUTCOME-PRODUCT-FAILED", ...base, faultDomain: "product" };
+  }
+  if (productVerdict?.schemaValid === true && productVerdict.outcome === "blocked") {
+    if (expected.acknowledgedResultSha256 !== null && expected.acknowledgedResultSha256 === resultSha256) {
+      return { ok: true, code: "WR-OUTCOME-DUPLICATE", ...base, faultDomain: "unknown" };
+    }
+    if (expected.acknowledgedResultSha256 !== null) {
+      return { ok: false, code: "WR-OUTCOME-CONFLICT", ...base, faultDomain: "unknown", resultSha256: null };
+    }
+    return { ok: true, code: "WR-OUTCOME-PRODUCT-BLOCKED", ...base, faultDomain: "product" };
   }
   if (classification.faultDomain === "execution-environment") {
     const capture = environmentCapture(classification, observation.host);
@@ -328,7 +356,8 @@ export function coordinateWorkflowRunnerReturn(expected, observation, completion
     state: normalized.state,
     resultSha256: normalized.resultSha256,
   };
-  if (!normalized.ok || normalized.code !== "WR-OUTCOME-FINAL") {
+  const acceptedTerminalCodes = new Set(["WR-OUTCOME-FINAL", "WR-OUTCOME-PRODUCT-BLOCKED"]);
+  if (!normalized.ok || !acceptedTerminalCodes.has(normalized.code) || normalized.resultSha256 === null) {
     return { ok: false, code: normalized.code, ...base, record: null, adapterInvocations: 0 };
   }
   if (typeof expected?.taskId !== "string" || !SAFE_ID.test(expected.taskId)
@@ -347,7 +376,7 @@ export function coordinateWorkflowRunnerReturn(expected, observation, completion
   }
   if (!exactKeys(adapter, RETURN_ADAPTER_KEYS)
     || typeof adapter.writeDispatchRecord !== "function"
-    || typeof adapter.verifyCommit !== "function") {
+    || (Object.hasOwn(adapter, "verifyCommit") && typeof adapter.verifyCommit !== "function")) {
     return { ok: false, code: "WR-RECORD-ADAPTER", ...base, record: null, adapterInvocations: 0 };
   }
 
@@ -357,13 +386,32 @@ export function coordinateWorkflowRunnerReturn(expected, observation, completion
   } catch {
     return { ok: false, code: "WR-RECORD-WRITE-FAILED", ...base, record: null, adapterInvocations: 1 };
   }
-  if (!exactKeyCount(receipt, RETURN_RECEIPT_KEYS)
-    || receipt.schema !== "pipeline.dispatch-record-write-receipt.v1"
-    || typeof receipt.target !== "string"
-    || !normalizedRepositoryPath(receipt.target)
-    || !SHA256.test(receipt.sha256)
-    || !Number.isSafeInteger(receipt.bytes) || receipt.bytes <= 0) {
+  if (!validReturnReceipt(receipt)) {
     return { ok: false, code: "WR-RECORD-WRITE-FAILED", ...base, record: null, adapterInvocations: 1 };
+  }
+
+  if (receipt.taskId !== expected.taskId
+    || receipt.candidateCommit !== completion.candidateCommit
+    || receipt.resultSha256 !== normalized.resultSha256
+    || receipt.target !== `evidence/dispatch-record-${expected.taskId}.json`) {
+    return { ok: false, code: "WR-RECORD-UNVERIFIED", ...base, record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "unverified" }, adapterInvocations: 1 };
+  }
+  if (receipt.schema === NONAUTHORING_RECEIPT_SCHEMA) {
+    const kind = receipt.outcomeClassification.kind;
+    const expectedCode = kind === "read-only" ? "WR-OUTCOME-FINAL" : "WR-OUTCOME-PRODUCT-BLOCKED";
+    if (normalized.code !== expectedCode) {
+      return { ok: false, code: "WR-RECORD-UNVERIFIED", ...base, record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "not-applicable" }, adapterInvocations: 1 };
+    }
+    return {
+      ok: true,
+      code: "WR-OUTCOME-NONAUTHORING-RECORDED",
+      ...base,
+      record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "not-applicable", outcomeClassification: kind },
+      adapterInvocations: 1,
+    };
+  }
+  if (normalized.code !== "WR-OUTCOME-FINAL" || typeof adapter.verifyCommit !== "function") {
+    return { ok: false, code: "WR-RECORD-UNVERIFIED", ...base, record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "unverified" }, adapterInvocations: 1 };
   }
 
   let authorship;
@@ -372,10 +420,7 @@ export function coordinateWorkflowRunnerReturn(expected, observation, completion
   } catch {
     return { ok: false, code: "WR-RECORD-UNVERIFIED", ...base, record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "unverified" }, adapterInvocations: 2 };
   }
-  if (receipt.taskId !== expected.taskId
-    || receipt.candidateCommit !== completion.candidateCommit
-    || receipt.resultSha256 !== normalized.resultSha256
-    || !validReturnAuthorship(authorship)
+  if (!validReturnAuthorship(authorship)
     || authorship.sha !== completion.candidateCommit
     || authorship.verdict !== "PASS"
     || authorship.classification !== "bound"
@@ -396,8 +441,8 @@ export const WORKFLOW_RUNNER_CODES = Object.freeze([
   "WR-SCHEMA", "WR-ADAPTER-CAPABILITY", "WR-PREFLIGHT", "WR-ADAPTER-FAILED", "WR-ACCEPTED",
   "WR-OUTCOME-SCHEMA", "WR-OUTCOME-STALE", "WR-OUTCOME-RUNNING",
   "WR-OUTCOME-COMPLETED-UNDELIVERED", "WR-OUTCOME-DUPLICATE", "WR-OUTCOME-CONFLICT", "WR-OUTCOME-FINAL",
-  "WR-OUTCOME-PRODUCT-FAILED", "WR-OUTCOME-ENVIRONMENT-FAILED", "WR-OUTCOME-UNKNOWN-FAILED",
+  "WR-OUTCOME-PRODUCT-FAILED", "WR-OUTCOME-PRODUCT-BLOCKED", "WR-OUTCOME-ENVIRONMENT-FAILED", "WR-OUTCOME-UNKNOWN-FAILED",
   "WR-RECORD-BINDING", "WR-RECORD-ADAPTER", "WR-RECORD-WRITE-FAILED", "WR-RECORD-UNVERIFIED",
-  "WR-OUTCOME-FINAL-RECORDED",
+  "WR-OUTCOME-FINAL-RECORDED", "WR-OUTCOME-NONAUTHORING-RECORDED",
   ...Object.values(PREFLIGHT_CODE_MAP),
 ]);

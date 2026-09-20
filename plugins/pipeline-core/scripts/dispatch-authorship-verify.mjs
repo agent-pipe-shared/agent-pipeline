@@ -104,7 +104,7 @@
  *   node dispatch-authorship-verify.mjs --root <consumer-repo> --json <sha>
  *   node dispatch-authorship-verify.mjs --root <consumer-repo> --strict <sha>
  */
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -115,8 +115,8 @@ import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import {
-  DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
-  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, isNoDeliveryOutcome, missingBriefingFields,
+  DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
+  declaredPaths, isCommitAuthorshipOutcome, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, isNoDeliveryOutcome, missingBriefingFields,
   validateDispatchRecord, validateLegacyDispatchRecord,
 } from "../lib/dispatch-record.mjs";
 export {
@@ -508,21 +508,23 @@ export function verifyCommit(sha, deps) {
   if (typeof record.taskId === "string" && record.taskId.trim() !== "" && record.taskId.trim() !== taskId) {
     return result(sha, VERDICT.fail, "record-taskid-mismatch", `trailer names \`${taskId}\`, record's own taskId is \`${record.taskId}\``, { taskId });
   }
-  const isV3 = record.schema === DISPATCH_RECORD_SCHEMA;
+  const isV4 = record.schema === DISPATCH_RECORD_SCHEMA;
+  const isV3 = record.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA;
+  const isModern = isV3 || isV4;
   const isV2 = record.schema === LEGACY_DISPATCH_RECORD_SCHEMA;
   const isEarlierLegacy = record.schema === undefined || record.schema === "pipeline.dispatch-record.v1" || record.schema === "pipeline.dispatch-evidence.v1";
-  if (Object.hasOwn(record, "schema") && !isV2 && !isV3 && !isEarlierLegacy) {
+  if (Object.hasOwn(record, "schema") && !isV2 && !isModern && !isEarlierLegacy) {
     return result(sha, VERDICT.fail, "record-schema-unsupported", `record for \`${taskId}\` declares an unsupported schema`, { taskId });
   }
-  if (isV2 || isV3) {
+  if (isV2 || isModern) {
     try {
-      record = isV3 ? validateDispatchRecord(record) : validateLegacyDispatchRecord(record);
+      record = isModern ? validateDispatchRecord(record) : validateLegacyDispatchRecord(record);
     } catch (error) {
-      const version = isV3 ? "v3" : "v2";
+      const version = isV4 ? "v4" : isV3 ? "v3" : "v2";
       return result(sha, VERDICT.fail, `record-${version}-invalid`, `record for \`${taskId}\` fails the ${record.schema} contract: ${error.message}`, { taskId });
     }
   }
-  if (isV3) {
+  if (isModern) {
     const separator = record.agentType.indexOf("-");
     const recordRole = separator === -1 ? record.agentType : record.agentType.slice(0, separator);
     if (recordRole !== dispatch.role) {
@@ -538,7 +540,7 @@ export function verifyCommit(sha, deps) {
       { taskId },
     );
   }
-  const noDelivery = isV3 && isNoDeliveryOutcome(record.outcome);
+  const noDelivery = (isV3 && isNoDeliveryOutcome(record.outcome)) || (isV4 && !isCommitAuthorshipOutcome(record));
   if (noDelivery) {
     return result(
       sha,
@@ -548,7 +550,7 @@ export function verifyCommit(sha, deps) {
       { taskId, declaredShas: [] },
     );
   }
-  if (isV3 && criticDisposition(record) === "required") {
+  if (isModern && criticDisposition(record) === "required") {
     return result(
       sha,
       VERDICT.unverifiable,
@@ -570,10 +572,10 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.fail, "record-not-terminal", `record outcome \`${record.outcome ?? "(absent)"}\` is not terminal`, { taskId });
   }
   const declaredShas = declaredCommits(record);
-  if (isV3 && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
+  if (isModern && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
     return result(sha, VERDICT.fail, "record-names-different-commit", "v3 record is bound to a different candidate commit", { taskId, declaredShas });
   }
-  if (!isV2 && !isV3 && declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
+  if (!isV2 && !isModern && declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
     return result(sha, VERDICT.fail, "record-names-different-commit", `record names commit(s) \`${declaredShas.join("`, `")}\``, { taskId, declaredShas });
   }
 
@@ -584,7 +586,7 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId });
   }
 
-  if (isV3 && criticDisposition(record) === "skipped") {
+  if (isModern && criticDisposition(record) === "skipped") {
     const pathFinding = criticDecisionPathFinding(record.criticSkip, changed);
     if (pathFinding) {
       return result(sha, VERDICT.fail, pathFinding.code, pathFinding.reason, {

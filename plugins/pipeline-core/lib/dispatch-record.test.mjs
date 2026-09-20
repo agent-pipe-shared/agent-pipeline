@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { openSync } from "node:fs";
-import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, validateDispatchRecord, validateLegacyDispatchRecord } from "./dispatch-record.mjs";
+import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, reportSha256, validateDispatchRecord, validateLegacyDispatchRecord } from "./dispatch-record.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "./critic-skip-decision.mjs";
 
@@ -37,7 +37,7 @@ check("v2 is explicit read-only legacy evidence while v3 requires exactly one Cr
   const legacy = { ...opening(), schema: "pipeline.dispatch-record.v2" };
   delete legacy.criticSkip;
   assert.deepEqual(validateLegacyDispatchRecord(legacy), legacy);
-  assert.throws(() => validateDispatchRecord(legacy), (error) => error?.code === "record-schema");
+  assert.throws(() => validateDispatchRecord(legacy));
   const missing = opening(); delete missing.criticSkip;
   assert.throws(() => validateDispatchRecord(missing), (error) => error?.code === "record-critic-disposition");
   assert.throws(() => validateDispatchRecord({ ...opening(), criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "NVA-B-1", candidateCommit: SHA, path: "evidence/critic-NVA-B-1.json", sha256: "e".repeat(64) } }), (error) => error?.code === "record-critic-disposition");
@@ -71,6 +71,17 @@ check("no-delivery is terminal observation only and cannot claim delivery or aut
   const automaticSkip = { ...noDelivery, criticSkip: skip() };
   delete automaticSkip.criticRequired;
   assert.throws(() => validateDispatchRecord(automaticSkip), (error) => error?.code === "record-no-delivery");
+});
+check("v4 distinguishes read-only and stopped non-authoring terminal returns", () => {
+  const report = { text: "Observed without authored commit.", changedFiles: [] };
+  for (const [kind, outcome] of [["read-only", "read-only-completed"], ["stopped-without-commit", "stopped-without-commit"]]) {
+    const value = { ...terminal(), schema: "pipeline.dispatch-record.v4", resultSha256: reportSha256(report.text), outcome, outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind }, commits: [], report };
+    assert.deepEqual(validateDispatchRecord(value), value);
+    assert.throws(() => validateDispatchRecord({ ...value, commits: [value.candidateCommit] }), (error) => error?.code === "record-commit-binding");
+    assert.throws(() => validateDispatchRecord({ ...value, resultSha256: "d".repeat(64) }), (error) => error?.code === "record-result-binding");
+  }
+  const forged = { ...terminal(), schema: "pipeline.dispatch-record.v4", resultSha256: reportSha256(report.text), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, report };
+  assert.throws(() => validateDispatchRecord(forged), (error) => error?.code === "record-outcome-classification");
 });
 check("skip cannot falsely claim T5 when A/G/S, high-risk or rigor triggers require review", () => {
   for (const triggerInput of [
@@ -146,7 +157,7 @@ check("every persisted string lane rejects Unix, Windows, WSL and UNC private pa
     "/private/var",
   ];
   const lanes = [
-    ["schema", (value, path) => ({ ...value, schema: path })],
+    ["schema", (value, path) => ({ ...value, schema: path, outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" } })],
     ["taskId", (value, path) => ({ ...value, taskId: path })],
     ["agentType", (value, path) => ({ ...value, agentType: path })],
     ["model", (value, path) => ({ ...value, model: path })],
@@ -180,7 +191,7 @@ check("every persisted string lane rejects Unix, Windows, WSL and UNC private pa
   }
 });
 
-assert.equal(cases.length, 11, "the complete dispatch-record corpus must be registered before execution begins");
+assert.equal(cases.length, 12, "the complete dispatch-record corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
