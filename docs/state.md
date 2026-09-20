@@ -7,6 +7,7 @@
 
 | Date range | Summary | Archive |
 |---|---|---|
+| 2026-09-01 bis 2026-09-19 | Historischer Nova-Checkpoint; aktueller Alfred-Intake bleibt live. | [docs/state-archive/2026-09-20--nova-historical-checkpoint.md](state-archive/2026-09-20--nova-historical-checkpoint.md) |
 | 2026-09-09 | Archive superseded 2026-09-09 candidate and lifecycle checkpoints | [Archive](state-archive/2026-09-14--superseded-lifecycle-and-candidate-checkpoints.md) |
 | 2026-09-06 | Historical candidate assembly; current decisions and remaining rules retained in the live handover. | [Archive](state-archive/2026-09-07--nova-candidate-assembly-2026-09-06.md) |
 | 2026-09-06 | Closed Nova-B blocks 2026-09-02..06: rebase deadlock, evidence-slot fix, worktree liveness, read containment, full gate green, five Critic-cleared items | [Archive](state-archive/2026-09-06--closed-blocks-2026-09-02-06.md) |
@@ -24,132 +25,6 @@
 | through 2026-08-19 | First real rotation: everything from the 2026-08-08 restart checkpoint through the inherited Nova/Cyborg-release history and every older era down to the open-items tail — extraction pass completed first (original pre-rotation line range 4977–19155; see the archive file's own provenance section and the ADR-0064 addendum dated 2026-08-19) | [state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md](state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md) |
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [Archive](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | 2026-08-26 | 2026-08-25 Antigravity chat-gate-ceremony standardization, verify-tuner stage 2 acceptance, sprint-agy-runner delta4 Critic fix and candidate status | [Archive](state-archive/2026-08-26--agy-runner-2026-08-25-handover.md) |
-
-## Current handover — 2026-09-12: Nova-B implementation and deferred native Windows work
-
-### 2026-09-19 recovery: Nova-B audit
-
-129 items/99 AC rows; acceptance open. Latest full Verify `04052891`:
-RED 548/555, Security green. Later fixture/guidance fixes: focused green only.
-New red probes: AGY recovery consults Codex; Codex clear loses goal identity.
-Fix briefs ready; fresh dispatches hit `agent thread limit reached`.
-[PO queue](../backlog/PO-TOPICS.md): review/no-commit conflicts, protected
-patches, D5, calibration/push/promotion architecture and host reachability open.
-Three-runner/platform caller checks continue; retain native deferrals.
-No release approval or new full qualification.
-**Release state:** version `0.6.1` · tag `v0.6.1` · commit `6262d408aa616651232b46ab8ecbfd88ce4055b0` · tree `69b12f1d8714de57e22acb730a09f4bbac067360` · status `published`
-
-**Lifecycle phase:** feature `sprint-nova-epic` · phase `implementation`
-
-**Current native-Codex scope decision (reaffirmed 2026-09-12):** The ordinary
-fresh-session Critic remains the supported default. Native Codex sandbox and
-App-Server execution under WSL is deactivated and deferred to a separate future
-native-Windows package; it is neither Nova-B acceptance evidence nor a Nova-B
-blocker, and no WSL result establishes native readiness. Earlier WSL startup,
-preflight, smoke, receipt and review passages below are immutable diagnostic
-history rather than current operating instructions. Platform-neutral and
-offline contracts remain in scope. The deferred work reuses the existing
-`sprint: none` items for
-[worker sandbox selection](../backlog/items/2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md),
-[Selected-Critic contract binding](../backlog/items/2026-09-06-the-selected-critic-lane-briefs-contract-files-it-neither-pins-nor-binds.md),
-and [fallback routing](../backlog/items/2026-09-06-the-t1-fallback-waits-for-failure-codes-the-route-collapses-before-they-arrive.md).
-
-Continue the accepted local 0.6.2 test-candidate goal, then approved Nova work;
-collect actual human decisions in
-`backlog/evidence/2026-09-06-po-decision-queue.md`. Ordinary implementation,
-tests, local commits and reviews remain authorized. Do not repeat historical
-startup diagnosis, missing-record searches or completed review rounds.
-
-Nova-B status reconciliation is active. The pass began at 61 open and 54
-closed `nova-b` items; after the evidence-backed closures and scope
-dispositions through the Verify-runtime concentration closure on 2026-09-12,
-the canonical ledger projection contains 30 open and 83 closed. Every open item's
-`done_when` is being checked against the current code before that count is
-treated as remaining work. B3 and B4 are implemented:
-the later native Antigravity runner supersedes Nova's historical Alpha-only
-boundary, and the provider-neutral GitHub/GitLab forge adapter package is
-present and tested. The Nova-B plan now records that distinction without
-rewriting immutable historical candidate-freeze evidence.
-
-The latest exact clean baseline is Full Verify run
-`verify-1789190187745-453056d9cdc07532` on commit `1e667395`, tree
-`0293641ce576bba952317e172999b91e83ca4590`: 534/534 registered steps and a
-fresh Security exit 0. A later POSIX terminal-action audit corrected the
-published schema's missing `host` boundary but deliberately did not activate
-the public `run` command. A tool-created pseudo-terminal passed a proposed
-TTY-only provenance check, so that shortcut was rejected and the existing
-human-terminal template item remains open for a non-caller-asserted host
-adapter. Details:
-`backlog/evidence/2026-09-12-posix-terminal-launcher-gap-and-schema-correction.md`.
-
-The genuine migration correction review is retained in
-`backlog/evidence/2026-09-10-migration-correction-critic.json`. Final correction
-`712f2aa3` preserves required input after activation; the parent inspected the
-driver and reproduced `collect-input` on the formerly false-ready path. This
-direct self-verification closes the final correction under the two-round cap;
-it is not a Critic PASS. Full Verify at
-`712f2aa390d07423d802e2c53cb99a558f7345e5`, tree
-`561a26e14263a1ba3fb9f6a75d4e9229556a71ca`, passed 517/517 with no reuse and
-exact clean binding, including security. Run:
-`verify-1788995343057-eaf89c315d0e6573`. Later edits need their own final gate.
-
-Inventory review withheld substantive judgment because of historical review
-commentary in its input. The exact result is retained and the live reason is
-now neutral; the inventory remains pending with no receipt digest. The old
-reader-package candidate failed Verify outside its eleven unchanged source
-files. Main already has that guard repair. Neither attempt establishes reader
-or inventory clearance. Details and immutable references:
-`backlog/evidence/2026-09-10-review-progress-and-input-repair.md`.
-
-The native current-artifact adapter is implemented in `243dd1a0`. Its first
-independent review cleared the production contract and found one missing
-end-to-end fixture. Correction `dbd20a2f` passed the genuine correction review,
-with no findings. A preceding input refusal did not assess the correction;
-all three actual results are retained in `backlog/evidence/2026-09-10-native-artifact-adapter-*.json`.
-Full Verify at `dbd20a2ff1c0fbc6f853b14efb9fad528140a29f`, tree
-`02594b12f70f58573382a9941cbddc48e6652f25`, passed 517/517 exact/clean with
-zero reuse: `verify-1788997609815-26ee5b0e4bdce08a`.
-
-The genuine current-artifact review completed on `243dd1a0`; all nineteen
-reviewed files were byte-identical at `dbd20a2f`. Result:
-`backlog/evidence/2026-09-10-current-artifact-critic-round-1.json`.
-It found two major inventory defects (working-directory rather than committed
-baseline discovery, and comment-only public anchors) plus four documentation
-inconsistencies. Reader binding, release integration, compatibility schema pins
-and GG22 regression tests were explicitly cleared within that review's scope.
-These six findings were corrected in `f0e1f5b1`; focused checker tests passed
-27/27 and full Verify passed 517/517 exact/clean, with zero reuse, at that
-commit (`verify-1788999328347-b2ae127599874ff9`). The separate nineteen-artifact
-correction review has no completed verdict: two interrupted coordinator
-attempts produced neither a result nor a proven termination cause. Complete
-one substantive correction review; do not repeat the completed initial hunt.
-Inventory remains pending; no PASS or attestation is inferred from execution.
-
-The PO's external terminal run completed the remaining 54-artifact review
-process. Its actual report is retained in
-`backlog/evidence/2026-09-10-remaining-candidate-critic-partial.json`: partial,
-`pass: false`, three major and two minor findings. The packet exhausted its
-24-call budget and did not complete whole-scope coverage. Correct archive
-symlink containment, Claude Advisor route instructions, advisory message
-phase handling, pending-plan deduplication and close instructions. Split the
-remaining paths into bounded review packets instead of repeating the same
-54-file invocation. The external execution request is resolved; these
-technical corrections need no new PO decision. See the canonical PO queue's
-morning entry. No source review process was live when correction work began.
-
-The five findings are now corrected in `18a37515`, `ee7aa80c`, `3b47536a`,
-`d5764361`, `babdae8d`, `14c82b8a` and `c3de6d00`. Parent inspection exposed
-additional archive symlink variants before the correction review; permanent
-real CLI tests cover them. Focused tests passed. Full current-candidate
-Verify and independent correction/remaining coverage are still pending.
-Exact scope, actual evidence and the missing pre-edit captures are recorded
-in `backlog/evidence/2026-09-10-remaining-candidate-corrections.md`.
-
-After actual inventory attestation, run fresh two-stage reader review and
-binding, final build stamp, fresh Verify/security and reproducible local test
-handover. D.6's missing comparison remains an evidence dependency. Installed
-plugin and Alfred readiness are unchanged; push still needs its exact proof,
-and release/plugin replacement are outside the authorization.
 
 ## Durable rules carried forward — these have no other home
 
@@ -201,99 +76,6 @@ each still needs a real permanent home, not further compression.
 7. A Critic's input must be an authorship-only dispatch-record projection
    (`taskId`/`agentType`/`dispatcher`/`commits` only) — not stated in
    `CLAUDE.md`, `critic-review.md`, or `roles/critic.md`.
-
-## Nova B session log — 2026-09-01 through today
-
-### Still-live open questions carried forward
-
-Each was checked against `backlog/STATUS.md` and the git log; where liveness
-could not be positively established, that is said rather than glossed.
-
-- ~~`project-onboarding-v3-tests` fails in CI and is not explained.~~ **Closed
-  2026-09-02.** The cause was inode reuse on ext4 versus tmpfs, fixed at
-  `9a7c309b`; the suite reported zero in CI run `33595311782`. Struck rather
-  than deleted, because this line stood as "not explained" through several
-  handovers and a later reader should see that it was answered, not dropped.
-- Four defects re-verified as still present sit in terminal `deferred` status,
-  invisible to every mechanical sprint-gate check.
-- The privacy sweep FAIL is disposed of as disclosed-unremediated; both findings
-  (contract drift, a sign-off bound to a superseded candidate) remain open. A
-  privacy re-review covering the current candidate is recommended after the
-  freeze and would resolve both.
-- GWM has no chat-mode activation path. **No item was ever filed** for this.
-- AK-6 is recorded as ready to re-dispatch against
-  `pipeline-user-v3.schema.json`. Nothing shows it ran; liveness established
-  only by absence of evidence — the weakest entry here.
-- The standing Nova authorization in Spec §8 to lift TP-1/TP-3/TP-5 for an exact
-  task **cannot be honoured**: `guard-testpath` reads `gates.push_approval`,
-  this repo is `signature`, and that mode has no in-session activation step.
-  Recorded only here; no filed item.
-- BS25/BS26 durability: three positional ledger lookups remain in
-  `backlog-state.mjs`; two can bind by `entryHash`, `amendsSequence` needs an
-  additive `amendsEntryHash`. The cited line numbers were not re-verified.
-- Two of the four documented reasons for `security: off` are stale; what
-  actually blocks is the v2 verdict's three offending required capabilities plus
-  a license allowlist resolving only inside this repository. No filed item.
-- Codex restarts: whether `codex resume` re-reads `.codex/*` is **unmeasured**.
-  Measure before changing any instruction.
-- The sibling defect shape — a change to A creates an obligation at B, revealed
-  only by a later gate run — is still unfiled as a general pattern.
-- Also live, established by keyword search only: the PO's acceptance-bar
-  question ("nothing forces the authoring step"); retrospective follow-up items
-  #7 and #8, deferred to Nova B; the sandbox-quickfix Critic FAIL (1 major, 1
-  minor) left unresolved; the `f7ab9b42`/NVA-DOC060 gap with no independent
-  Critic review; and the two open NVA-CIVERIFY questions.
-
-Dropped on rotation as genuinely resolved: the Antigravity hard-enforcement
-layer's two fail-open paths, closed by `ab347a74`, which built the self-check
-the item's own proposal named.
-
-### 0.6.1 is released — 2026-09-02
-
-`main` moved `dd1eb9ee..6262d408`, tag `v0.6.1` (`CHANGELOG.md`, `f0290fe8`),
-under an explicit PO-decided `protect-main` bypass (bypass-free route for
-next release: dispatch `verify` on a feature branch first, then push that
-SHA to `main`). Two incidents from this release, each its own backlog item,
-not restated here: the torn audit-ledger append
-(`pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20`)
-and the LWSC04 CI red
-(`backlog/items/2026-09-02-worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel.md`).
-Full verify green at `7cc0b649`, 506 suites.
-
-### At the freeze — what the PO decides
-
-- **Seven local commits carry no recognised `AI-Assisted: true`.** Git's trailer
-  parser needs a blank line before the trailer block and none inside it; the
-  hand-composed stage-0 messages get one of those two right. All seven are
-  unpushed, so amending needs no force-push — but `CLAUDE.md` prohibits
-  rewriting history without an unpushed carve-out, so it was not done. Three
-  directions are in the item; the seventh instance, produced under an explicit
-  briefing warning, refutes the "fix the habit" direction outright.
-- **`GG-17` vs. the PO's `--no-verify` instruction — RESOLVED 2026-09-01**
-  ([ADR-0079](adr/0079-hook-bypass-is-never-agent-overridable.md)):
-  hook-bypass is never agent-overridable, no `OVERRIDE` route, following the
-  `GIT-03` precedent; the PO's own manual `--no-verify` push in their own
-  terminal stays a human exception outside Pipeline authority, never
-  retroactively legitimised. Worth keeping from how it was found: the
-  extraction pass read `guardrails/git.md` as the authority and reported a
-  contradiction — `CLAUDE.md` already carried the answer, and it was the
-  guardrail that disagreed with it, not the reverse. Implementation filed at
-  `backlog/items/2026-09-01-hook-bypass-rules-are-overridable-against-the-stated-policy.md`
-  (maintenance window).
-
-The most recent full-run result is in the machine-written
-`evidence/verify-latest.json`, which names its own candidate commit and tree —
-read that rather than trusting any prose claim about which HEAD was green.
-
-### Owed, not started
-
-- An **ADR and register entry** for the marketplace-attestation narrowing
-  decision (EL-04). Not written today on purpose: the decision stands, but its
-  implementation route was refuted this session, and an ADR whose mechanism is
-  known broken would record a plan nobody can follow. The refutation is filed as
-  its own item; the ADR waits for a workable enumeration.
-- The authorship-only dispatch-record projection, applied once by hand, is not
-  yet a mechanism.
 
 ## Open — 2026-09-06 design threads
 
@@ -437,3 +219,114 @@ line's own checkpoint 71).
 - specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md
 - specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md
 - specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md
+
+## 2026-09-19 — Nova-B Übergabe an Alfred
+
+**PO-Entscheidung:** Arbeit, die in diesem Abschnitt ausdrücklich an Alfred
+übergeben ist, gilt für Nova-B als erledigt. Sie bleibt als eigenständiger
+Alfred-Umfang nachverfolgbar; Nova-B darf daraus keine nicht vorhandene
+native Ausführung oder globale Evidenzheilung ableiten.
+
+### Alfred: nächster lokaler Kandidat
+
+1. **B9 / NVA-G19 — Awaiting-approval-Recovery:** Implementiere eine atomare,
+   replay-sichere `cancel-submitted-plan`-Transition für genau eine aktuelle,
+   unbestätigte Plan-Einreichung. Sie muss einen dauerhaften
+   `pipeline.plan-cancellation.v1`-Datensatz hinterlassen, die lebende
+   Einreichung entfernen, die Kontinuität genau einmal erhöhen und fremde,
+   stale, genehmigte oder wiederholte Anfragen verweigern. Keine manuelle
+   Änderung von `project/pipeline-state.json`, keine synthetische
+   Bootstrap-Quittung und keine Policy-Abschwächung. Der geprüfte Entwurf lag
+   bei Übergabe als `scratch/nova-b-audit/B9-repair-v7.diff` mit SHA-256
+   `d3c04b951b6e48ae3b4c39372c234c744ec3f1763144603417bced1405bb1800` vor;
+   der Vertrag, nicht diese Scratch-Datei, ist maßgeblich.
+2. **B9.1 / historischer v4-Mischzustand — eigene Recovery-Migration:** Nova
+   steht nach einem älteren `reopen-design` in einer Zustandsform, die B9
+   absichtlich nicht konsumieren darf: `activeFeature.phase="design"`,
+   `planApproved=false`, eine gültige aktuelle `planSubmission`, eine
+   historische `pipeline.plan-approval.v4` und eine ältere
+   `planInvalidation`. Die Lifecycle-Projektion ist deshalb `draft`, während
+   beide aktive Referenzen weiterhin physisch vorhanden sind. Die neue B9
+   Stornierung muss diese Form verweigern, weil sie ausschließlich eine
+   aktuelle, unfreigegebene `awaiting-approval`-Einreichung ohne
+   Approval-Referenz annimmt.
+
+   Implementiere deshalb **nicht** einen manuellen JSON-Eingriff und erweitere
+   B9 nicht stillschweigend. Füge eine eigene, plan-/apply-gebundene,
+   CAS-geschützte Recovery-Transition hinzu. Sie darf nur den exakt
+   nachgewiesenen v4-Mischzustand akzeptieren, muss die Hashes von
+   `planSubmission`, `planApproval` und `planInvalidation` in einem neuen
+   dauerhaften Recovery-Receipt binden, die historische Invalidation erhalten,
+   die lebende Submission und Approval-Referenz atomar entfernen und die
+   Continuity genau einmal erhöhen. Sie darf keine Approval-Evidenz erzeugen,
+   keinen Push-/Release-Status ändern und keinen generischen Shell- oder
+   Lifecycle-Bypass einführen. Ein Re-Run darf nur für denselben Receipt ein
+   Zero-write-Replay sein.
+
+   Negative Tests müssen mindestens normale B9-fähige `awaiting-approval`-
+   Zustände, aktuelle/genehmigte Approvals, fehlende oder fremde alte
+   Invalidation, nicht passende Hashes, malformed State und CAS-Drift
+   verweigern. Der positive CLI-Test bindet Plan und Apply, bestätigt die
+   einmalige Continuity-Erhöhung und zeigt anschließend den regulären Weg:
+   `po-authority-acknowledge-plan`, Submit, PO-Freigabe und
+   Implementierungsphase. Aktualisiere die Lifecycle-Guard-Admission nur für
+   diese geschlossene Befehlsform. Danach sind Full Verify, Security-Scan,
+   unabhängiger Critic und der wahrheitsgemäße Candidate-Close erneut möglich.
+3. **Native Ausführung:** Übernimm direkte Antigravity-Ausführung (`#69`) und
+   native Apple-Silicon-Lifecycle-/Evidenzarbeit (`#72`). Nova-B schließt nur
+   die vorhandenen Runner- und Plattformverträge; keine 3x3-Nativzertifizierung
+   wird behauptet.
+4. **Architektur:** Die Architekturadoption bleibt bis zu Alfreds Close
+   deferred. Alfred erfasst beim eigenen Abschluss eine neue Disposition samt
+   Review-Zeitpunkt.
+5. **Historischer Evidenzdrift:** Untersuche und repariere separat den Drift
+   von `specs/2026-07-27-agent-pipeline-0.4.7-hotfix/result.md` (erwartet
+   `d2367448d8b72d1466ff995dd7c8dfa54a470334643afd290aa12cb19ddd9cf2`,
+   beobachtet `41d2d6543407e75cc98bff6701225a8564ec6cccc833c240cc6f988e41642817`).
+   Das ist kein Nova-B-Abschlussbeweis und darf nicht nachträglich kaschiert
+   werden.
+
+### Nova-B Rest und Abschlussregel
+
+- Die unzugehörige AGY-Migrationsänderung in `pipeline.user.yaml` wird vor dem
+  Nova-B-Abschluss ausgeschlossen; Alfred verantwortet die AGY-Integration.
+- NVA-G20/B10 (kanonischer, bytegebundener Security-Eingabevertrag für
+  Promotionen) ist mit dieser Abschlussübergabe an Alfred übertragen. Die
+  vorhandenen Quell- und Teständerungen sind ein unfertiger Kandidat, kein
+  Abschlussbeweis.
+
+### Finaler Intake-Pfad für Alfred
+
+1. **Nova einfrieren und vollständig übernehmen:** Arbeite von
+   `/home/skar667/src/agent-pipeline-share_nova` aus einer eigenen Alfred-
+   Arbeitskopie bzw. einem eigenen Intake-Branch. Übernimm den vollständigen
+   aktuell getrackten Diff einschließlich `project/pipeline-state.json`,
+   `specs/sprint-nova-epic/`, `governance/events/` und der B10-Dateien unter
+   `plugins/pipeline-core/`. Bewahre die ungefilterten Governance-Ereignisse
+   als Audit-Spur. `pipeline.user.yaml` gehört nicht in den Nova-Kandidaten;
+   seine AGY-Migration ist Alfreds eigener Konfigurationsumfang.
+2. **Zustand zuerst reparieren:** Führe Alfreds regulären Pipeline-Start aus,
+   lese diese Übergabe, `project/pipeline-state.json` und die Nova-Spezifikation.
+   Implementiere und prüfe zuerst B9 und B9.1 aus diesem Abschnitt. Keine
+   direkte JSON-Manipulation und keine Wiederverwendung früherer PO-Signaturen.
+   Erst der neue, gebundene Recovery-Receipt darf den Mischzustand in einen
+   regulär fortsetzbaren Zustand überführen.
+3. **Eigene, frische Autorität herstellen:** Nach erfolgreicher Recovery
+   erstellt Alfred einen neuen Plan gegen den übernommenen Umfang, reicht ihn
+   ein und holt eine neue PO-Freigabe ein. Alte Freigaben, Push-Intentions oder
+   Security-Evidenz binden keinen Alfred-Kandidaten.
+4. **Nova-Bestand implementieren und verifizieren:** Übernimm B10 samt
+   `release-promotion-envelope`, `push-prepare` und `guard-push`-Tests sowie
+   die Punkte 3 bis 5 dieser Übergabe als Alfred-Arbeit. Erzeuge aus einem
+   sauberen, commitgebundenen Kandidaten Full Verify, Security-Scan und einen
+   frischen unabhängigen Critic. Repariere den historischen Evidenzdrift
+   getrennt und behaupte keine nicht ausgeführte 3x3-Nativzertifizierung.
+5. **Wahrheitsgemäß schließen:** Erst wenn diese Evidenz den exakten
+   Alfred-Kandidaten bindet, darf Alfred seinen Feature-Close durchführen und
+   einen neuen, exakt gebundenen Feature-Branch-Push vorbereiten. Merge,
+   Release, Deploy und Publication bleiben jeweils eigene spätere Aktionen.
+
+Nova führt nach dieser Übergabe keine weitere Implementierung, State-Recovery,
+Prüfung, Signaturzeremonie, Candidate-Close oder Push-Vorbereitung aus. Der
+gezeigte Nova-Status bleibt ein wahrheitsgemäßer eingefrorener Übergabestand,
+kein abgeschlossener Lifecycle.

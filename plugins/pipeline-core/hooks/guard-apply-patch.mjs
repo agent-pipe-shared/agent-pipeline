@@ -61,12 +61,13 @@ function runGuard({ path, args, input }) {
 }
 
 async function runGuardsInParallel(jobs) {
-  const results = [];
+  const results = new Array(jobs.length);
   let next = 0;
   async function worker() {
     while (next < jobs.length) {
-      const job = jobs[next++];
-      results.push({ job, result: await runGuard(job) });
+      const index = next++;
+      const job = jobs[index];
+      results[index] = { job, result: await runGuard(job) };
     }
   }
   await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL_GUARDS, jobs.length) }, worker));

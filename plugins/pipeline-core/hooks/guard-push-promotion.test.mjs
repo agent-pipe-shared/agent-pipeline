@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { planVerifySelection } from "../lib/verify-selection.mjs";
-import { createReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+import { createReleasePromotionEnvelope, SECURITY_EVIDENCE_DEFAULT_PATH } from "../lib/release-promotion-envelope.mjs";
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 
 function freshRepo(prefix) {
@@ -41,6 +41,12 @@ function writeFile(dir, relPath, body) {
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, typeof body === "string" ? body : JSON.stringify(body));
+}
+
+function exactSecurityInput(dir, commit, marker = "") {
+  const tree = gitAt(dir, "rev-parse", `${commit}^{tree}`).stdout.trim();
+  const data = { schema: "pipeline.security-evidence.v1", exitCode: 0, candidate: { status: "clean", commit, tree }, marker };
+  return { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: JSON.stringify(data), data };
 }
 
 function runGuard(cmd, repoDir) {
@@ -77,12 +83,15 @@ nodeTest("valid promotion envelope allows record-only commit", () => {
         });
         const verifyEvidence = { exitCode: 0, commit: commitS, selection: releaseSel };
         writeFile(dir, "evidence/verify-latest.json", verifyEvidence);
+        const securityEvidence = exactSecurityInput(dir, commitS);
+        writeFile(dir, SECURITY_EVIDENCE_DEFAULT_PATH, securityEvidence.raw);
 
         const envelopeResult = createReleasePromotionEnvelope({
           repoDir: dir,
           sourceCommit: commitS,
           recordCommit: commitR,
           verifyEvidence,
+          securityEvidence,
         });
         assert.equal(envelopeResult.ok, true);
         writeFile(dir, "evidence/release-promotion-latest.json", envelopeResult.envelope);
@@ -117,7 +126,9 @@ nodeTest("tampered promotion envelope is rejected", () => {
         });
         const verifyEvidence = { exitCode: 0, commit: commitS, selection: releaseSel };
         writeFile(dir, "evidence/verify-latest.json", verifyEvidence);
-        const envelopeResult = createReleasePromotionEnvelope({ repoDir: dir, sourceCommit: commitS, recordCommit: commitR, verifyEvidence });
+        const securityEvidence = exactSecurityInput(dir, commitS);
+        writeFile(dir, SECURITY_EVIDENCE_DEFAULT_PATH, securityEvidence.raw);
+        const envelopeResult = createReleasePromotionEnvelope({ repoDir: dir, sourceCommit: commitS, recordCommit: commitR, verifyEvidence, securityEvidence });
         assert.equal(envelopeResult.ok, true);
         writeFile(dir, "evidence/release-promotion-latest.json", { ...envelopeResult.envelope, envelopeSha256: "0".repeat(64) });
         const resTampered = runGuard("git push origin feature-1:refs/heads/feature-1", dir);
@@ -126,6 +137,32 @@ nodeTest("tampered promotion envelope is rejected", () => {
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
+});
+
+nodeTest("promotion rejects a substituted canonical Security file even when its JSON still has the same candidate", () => {
+  const dir = freshRepo("security-byte-substitution");
+  try {
+    const commitS = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+    writeFile(dir, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
+    writeFile(dir, "backlog/STATUS.md", "# Status\n");
+    assert.equal(gitAt(dir, "add", "backlog/STATUS.md").status, 0);
+    assert.equal(gitAt(dir, "commit", "-q", "-m", "docs: record").status, 0);
+    const commitR = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+    const selection = planVerifySelection({ mode: "release", candidateCommit: commitS, registeredSuiteIds: ["suite-a"], policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "doc", paths: ["README.md"], suites: ["suite-a"] }] }, changedPaths: ["README.md"] });
+    const verifyEvidence = { exitCode: 0, commit: commitS, selection };
+    const securityEvidence = exactSecurityInput(dir, commitS, "original");
+    const envelope = createReleasePromotionEnvelope({ repoDir: dir, sourceCommit: commitS, recordCommit: commitR, verifyEvidence, securityEvidence });
+    assert.equal(envelope.ok, true);
+    writeFile(dir, "evidence/verify-latest.json", verifyEvidence);
+    // Same semantic candidate, distinct bytes: only the post-envelope source changed.
+    writeFile(dir, SECURITY_EVIDENCE_DEFAULT_PATH, `${securityEvidence.raw}\n`);
+    writeFile(dir, "evidence/release-promotion-latest.json", envelope.envelope);
+    const result = runGuard("git push origin feature-1:refs/heads/feature-1", dir);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /stale/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 nodeTest("push-mode Verify cannot substitute for the release record bound by the envelope", () => {
@@ -140,9 +177,11 @@ nodeTest("push-mode Verify cannot substitute for the release record bound by the
     const inputs = { candidateCommit: commitS, registeredSuiteIds: ["suite-a"], policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "doc", paths: ["README.md"], suites: ["suite-a"] }] }, changedPaths: ["README.md"] };
     const releaseEvidence = { exitCode: 0, commit: commitS, selection: planVerifySelection({ ...inputs, mode: "release" }) };
     const pushEvidence = { exitCode: 0, commit: commitS, selection: planVerifySelection({ ...inputs, mode: "push" }) };
-    const envelope = createReleasePromotionEnvelope({ repoDir: dir, sourceCommit: commitS, recordCommit: commitR, verifyEvidence: releaseEvidence });
+    const securityEvidence = exactSecurityInput(dir, commitS);
+    const envelope = createReleasePromotionEnvelope({ repoDir: dir, sourceCommit: commitS, recordCommit: commitR, verifyEvidence: releaseEvidence, securityEvidence });
     assert.equal(envelope.ok, true);
     writeFile(dir, "evidence/verify-latest.json", pushEvidence);
+    writeFile(dir, SECURITY_EVIDENCE_DEFAULT_PATH, securityEvidence.raw);
     writeFile(dir, "evidence/release-promotion-latest.json", envelope.envelope);
     const result = runGuard("git push origin feature-1:refs/heads/feature-1", dir);
     assert.equal(result.status, 2, result.stderr);

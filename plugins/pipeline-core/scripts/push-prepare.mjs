@@ -51,7 +51,7 @@ import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHu
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
-import { RELEASE_PROMOTION_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
 export const PIPELINE_STATE_SCRIPT_PATH = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
@@ -115,6 +115,16 @@ function readJson(path, deps) {
   }
 }
 
+/** Returns the exact bytes and parsed projection of one consumer input. */
+function readEvidenceInput(path, deps) {
+  try {
+    const raw = (deps.readFile ?? readFileSync)(path, "utf8");
+    return { raw, data: JSON.parse(raw) };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Matches `checkEvidenceFreshness()` in `guard-push.mjs` (`exitCode === 0` and
  * `commit === sourceCommit`) exactly -- never a looser approximation. This is
@@ -161,7 +171,8 @@ export function resolveVerifyRemedy(dir, relPath, deps = {}) {
 
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
   const path = join(dir, relPath);
-  const data = readJson(path, deps);
+  const evidenceInput = readEvidenceInput(path, deps);
+  const data = evidenceInput?.data ?? null;
   const remedy = resolveVerifyRemedy(dir, relPath, deps);
   if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy };
   if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy };
@@ -170,15 +181,20 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
     const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
     if (promotionEnvelope !== null) {
       const validator = deps.validateReleasePromotionEnvelope ?? validateReleasePromotionEnvelope;
-      const verifyEvidence = id === "verify-evidence"
-        ? data
-        : readJson(join(dir, VERIFY_EVIDENCE_DEFAULT_PATH), deps);
-      const validation = validator(promotionEnvelope, {
+      const verifyInput = id === "verify-evidence"
+        ? evidenceInput
+        : readEvidenceInput(join(dir, VERIFY_EVIDENCE_DEFAULT_PATH), deps);
+      const securityInput = id === "security-evidence"
+        ? evidenceInput
+        : readEvidenceInput(join(dir, SECURITY_EVIDENCE_DEFAULT_PATH), deps);
+      const validation = verifyInput && securityInput ? validator(promotionEnvelope, {
         repoDir: dir,
         targetBoundary: "push",
-        verifyEvidence,
+        // Re-read and explicitly bind both canonical consumer inputs.
+        verifyEvidence: verifyInput.data,
+        securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityInput.raw, data: securityInput.data },
         deps,
-      });
+      }) : { ok: false, reason: "promotion-input-missing" };
       if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
         if (id === "verify-evidence") {
           if (!verifyEvidenceSatisfiesBoundary(data, "push")) {

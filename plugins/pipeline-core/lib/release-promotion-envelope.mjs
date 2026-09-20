@@ -20,8 +20,11 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { validateVerifySelection } from "./verify-selection.mjs";
 
-export const RELEASE_PROMOTION_SCHEMA = "pipeline.release-promotion-envelope.v1";
+// v2 closes the last promotion substitution seam: both records a consumer
+// relies on are now supplied explicitly and security is byte-bound.
+export const RELEASE_PROMOTION_SCHEMA = "pipeline.release-promotion-envelope.v2";
 export const RELEASE_PROMOTION_DEFAULT_PATH = "evidence/release-promotion-latest.json";
+export const SECURITY_EVIDENCE_DEFAULT_PATH = "evidence/security-latest.json";
 export const MODE_INCLUSION_RULE = "release-satisfies-push";
 export const MODE_INCLUSION_RULE_SHA256 = createHash("sha256").update(MODE_INCLUSION_RULE).digest("hex");
 
@@ -36,6 +39,39 @@ const SOURCE_QUALIFICATION_KEYS = Object.freeze([
 ]);
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SUITE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+
+function sha256Bytes(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function sameJson(left, right) {
+  return canonicalJson(left) === canonicalJson(right);
+}
+
+/**
+ * Security is deliberately an input envelope rather than a parsed object:
+ * the promotion binds the exact bytes a consumer re-read from its canonical
+ * path.  This prevents a same-shaped replacement after the envelope exists.
+ */
+export function securityEvidenceBindingFromInput(input, { sourceCommit, sourceTree } = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)
+      || Object.keys(input).some((key) => !["path", "raw", "data"].includes(key))
+      || input.path !== SECURITY_EVIDENCE_DEFAULT_PATH
+      || typeof input.raw !== "string" || input.raw.length === 0) return null;
+  let parsed;
+  try { parsed = JSON.parse(input.raw); } catch { return null; }
+  if (input.data !== undefined && !sameJson(input.data, parsed)) return null;
+  const candidate = parsed?.candidate;
+  if (parsed?.exitCode !== 0 || parsed?.schema !== "pipeline.security-evidence.v1"
+      || candidate?.status !== "clean" || candidate?.commit !== sourceCommit
+      || candidate?.tree !== sourceTree) return null;
+  return {
+    path: input.path,
+    commit: sourceCommit,
+    tree: sourceTree,
+    sha256: sha256Bytes(input.raw),
+  };
+}
 
 export const RECORD_ONLY_PATH_PATTERNS = Object.freeze([
   /^evidence\/.*$/u,
@@ -148,7 +184,7 @@ export function computeRecordOnlyDelta(sourceCommit, recordCommit, { repoDir, de
   return { ok: true, delta };
 }
 
-export function createReleasePromotionEnvelope({ repoDir, sourceCommit, recordCommit, verifyEvidence, securityEvidence = null, deps = {} }) {
+export function createReleasePromotionEnvelope({ repoDir, sourceCommit, recordCommit, verifyEvidence, securityEvidence, deps = {} }) {
   if (typeof sourceCommit !== "string" || !sourceCommit || typeof recordCommit !== "string" || !recordCommit) {
     return { ok: false, reason: "invalid-commit-binding" };
   }
@@ -187,12 +223,9 @@ export function createReleasePromotionEnvelope({ repoDir, sourceCommit, recordCo
   const sourceQualification = sourceQualificationFromVerifyEvidence(verifyEvidence, sourceOid);
   if (sourceQualification === null) return { ok: false, reason: "verify-evidence-not-full-release" };
 
-  // Validate optional security evidence
-  if (securityEvidence) {
-    if (securityEvidence.exitCode !== 0 || securityEvidence.commit !== sourceOid) {
-      return { ok: false, reason: "invalid-security-evidence" };
-    }
-  }
+  // Security is mandatory and exact-byte bound to the canonical input path.
+  const securityBinding = securityEvidenceBindingFromInput(securityEvidence, { sourceCommit: sourceOid, sourceTree });
+  if (securityBinding === null) return { ok: false, reason: "invalid-security-evidence" };
 
   const modeInclusion = {
     rule: MODE_INCLUSION_RULE,
@@ -208,18 +241,14 @@ export function createReleasePromotionEnvelope({ repoDir, sourceCommit, recordCo
     sourceQualification,
     recordOnlyDelta: deltaResult.delta,
     modeInclusion,
-    securityEvidence: securityEvidence ? {
-      path: securityEvidence.path ?? "evidence/security-latest.json",
-      commit: securityEvidence.commit,
-      exitCode: securityEvidence.exitCode,
-    } : null,
+    securityEvidence: securityBinding,
   };
 
   const envelopeSha256 = digestReleasePromotionEnvelope(body);
   return { ok: true, envelope: Object.freeze({ ...body, envelopeSha256 }) };
 }
 
-export function validateReleasePromotionEnvelope(envelope, { repoDir, targetBoundary = "push", verifyEvidence, deps = {} }) {
+export function validateReleasePromotionEnvelope(envelope, { repoDir, targetBoundary = "push", verifyEvidence, securityEvidence, deps = {} }) {
   if (!envelope || typeof envelope !== "object" || Array.isArray(envelope) || envelope.schema !== RELEASE_PROMOTION_SCHEMA) {
     return { ok: false, reason: "invalid-schema" };
   }
@@ -266,6 +295,11 @@ export function validateReleasePromotionEnvelope(envelope, { repoDir, targetBoun
   }
   if (canonicalJson(actualQualification) !== canonicalJson(envelope.sourceQualification)) {
     return { ok: false, reason: "source-qualification-mismatch" };
+  }
+  const actualSecurity = securityEvidenceBindingFromInput(securityEvidence, { sourceCommit: sourceOid, sourceTree });
+  if (actualSecurity === null) return { ok: false, reason: "invalid-security-evidence-context" };
+  if (!sameJson(actualSecurity, envelope.securityEvidence)) {
+    return { ok: false, reason: "security-evidence-mismatch" };
   }
 
   // Re-verify ancestry

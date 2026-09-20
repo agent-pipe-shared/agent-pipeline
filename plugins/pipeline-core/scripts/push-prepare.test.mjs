@@ -164,42 +164,54 @@ test("checkEvidenceFreshness: stale commit with valid promotion envelope -> ok:t
     }),
   };
   const mockEnvelope = {
-    schema: "pipeline.release-promotion-envelope.v1",
+    schema: "pipeline.release-promotion-envelope.v2",
     source: { commit: "commit-S", tree: "tree-S" },
     record: { commit: "commit-R", tree: "tree-R" },
   };
   let receivedVerifyEvidence = null;
+  let receivedSecurityEvidence = null;
   const mockValidate = (_envelope, options) => {
     receivedVerifyEvidence = options.verifyEvidence;
+    receivedSecurityEvidence = options.securityEvidence;
     return { ok: true, sourceCommit: "commit-S", recordCommit: "commit-R" };
   };
   const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, "commit-R", {
-    readFile: () => JSON.stringify(releaseEvidence),
+    readFile: (path) => JSON.stringify(String(path).endsWith("security-latest.json")
+      ? { schema: "pipeline.security-evidence.v1", exitCode: 0, candidate: { status: "clean", commit: "commit-S", tree: "tree-S" } }
+      : releaseEvidence),
     promotionEnvelope: mockEnvelope,
     validateReleasePromotionEnvelope: mockValidate,
   });
   assert.equal(result.ok, true);
   assert.match(result.message, /promoted from commit-S/);
   assert.deepEqual(receivedVerifyEvidence, releaseEvidence);
+  assert.equal(receivedSecurityEvidence.path, "evidence/security-latest.json");
+  assert.equal(receivedSecurityEvidence.data.candidate.commit, "commit-S");
+  assert.equal(typeof receivedSecurityEvidence.raw, "string");
 });
 
 test("checkEvidenceFreshness: Security promotion reads and binds canonical Verify evidence", () => {
   const releaseEvidence = { exitCode: 0, commit: "commit-S", selection: planVerifySelection({ mode: "release", candidateCommit: "commit-S", registeredSuiteIds: ["a"], policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "source", paths: ["src/**"], suites: ["a"] }] }, changedPaths: ["src/a.mjs"] }) };
   let receivedVerifyEvidence = null;
+  let receivedSecurityEvidence = null;
   const result = checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", FIXTURE_DIR, "commit-R", {
     readFile: (path) => JSON.stringify(String(path).endsWith("verify-latest.json") ? releaseEvidence : { exitCode: 0, commit: "commit-S" }),
-    promotionEnvelope: { schema: "pipeline.release-promotion-envelope.v1" },
+    promotionEnvelope: { schema: "pipeline.release-promotion-envelope.v2" },
     validateReleasePromotionEnvelope: (_envelope, options) => {
       receivedVerifyEvidence = options.verifyEvidence;
+      receivedSecurityEvidence = options.securityEvidence;
       return { ok: true, sourceCommit: "commit-S", recordCommit: "commit-R" };
     },
   });
   assert.equal(result.ok, true);
   assert.deepEqual(receivedVerifyEvidence, releaseEvidence);
+  assert.equal(receivedSecurityEvidence.path, "evidence/security-latest.json");
+  assert.equal(receivedSecurityEvidence.data.commit, "commit-S");
+  assert.equal(typeof receivedSecurityEvidence.raw, "string");
 });
 
 test("checkEvidenceFreshness: stale commit with invalid promotion envelope -> ok:false", () => {
-  const mockEnvelope = { schema: "pipeline.release-promotion-envelope.v1" };
+  const mockEnvelope = { schema: "pipeline.release-promotion-envelope.v2" };
   const mockValidate = () => ({ ok: false, reason: "reverse-inclusion-forbidden" });
   const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, "commit-R", {
     readFile: () => JSON.stringify({ exitCode: 0, commit: "commit-S" }),

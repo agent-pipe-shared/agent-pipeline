@@ -16,6 +16,8 @@ import {
   sourceQualificationFromVerifyEvidence,
   RELEASE_PROMOTION_SCHEMA,
   MODE_INCLUSION_RULE,
+  SECURITY_EVIDENCE_DEFAULT_PATH,
+  securityEvidenceBindingFromInput,
 } from "./release-promotion-envelope.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
 
@@ -50,6 +52,16 @@ function git(repo, args) {
   return result.stdout.trim();
 }
 
+function securityInput({ commit, tree, suffix = "" }) {
+  const data = {
+    schema: "pipeline.security-evidence.v1",
+    exitCode: 0,
+    candidate: { status: "clean", commit, tree },
+    marker: suffix,
+  };
+  return { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: JSON.stringify(data), data };
+}
+
 test("release promotion envelope lifecycle and adversarial matrix", async (t) => {
   const tempDir = mkdtempSync(join(tmpdir(), "rel-promo-test-"));
   try {
@@ -63,6 +75,7 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
     git(tempDir, ["add", "src/code.mjs"]);
     git(tempDir, ["commit", "-m", "feat: initial commit"]);
     const commitS = git(tempDir, ["rev-parse", "HEAD"]);
+    const treeS = git(tempDir, ["rev-parse", "HEAD^{tree}"]);
 
     // Plan full release verify on S
     const policy = {
@@ -84,10 +97,7 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
       exitCode: 0,
       selection,
     };
-    const securityEvidence = {
-      commit: commitS,
-      exitCode: 0,
-    };
+    const securityEvidence = securityInput({ commit: commitS, tree: treeS });
 
     // Create record-only commit R modifying backlog/STATUS.md and evidence/verify-latest.json
     mkdirSync(join(tempDir, "backlog"), { recursive: true });
@@ -117,6 +127,7 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
       repoDir: tempDir,
       targetBoundary: "push",
       verifyEvidence,
+      securityEvidence,
     });
     assert.equal(validation.ok, true);
     assert.equal(validation.sourceCommit, commitS);
@@ -151,7 +162,7 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
         const result = validateReleasePromotionEnvelope({ ...body, envelopeSha256: digestReleasePromotionEnvelope(body) }, {
           repoDir: tempDir,
           targetBoundary: "push",
-          verifyEvidence,
+          verifyEvidence, securityEvidence,
         });
         assert.deepEqual(result, { ok: false, reason: "invalid-source-qualification" }, name);
       }
@@ -162,7 +173,7 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
         source: structuredClone(created.envelope.record),
         recordOnlyDelta: [],
       });
-      const result = validateReleasePromotionEnvelope(equalObjects, { repoDir: tempDir, targetBoundary: "push", verifyEvidence });
+      const result = validateReleasePromotionEnvelope(equalObjects, { repoDir: tempDir, targetBoundary: "push", verifyEvidence, securityEvidence });
       assert.deepEqual(result, { ok: false, reason: "source-equals-record" });
     });
 
@@ -179,8 +190,12 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
         record: { commit: emptyRecord, tree: created.envelope.record.tree },
         recordOnlyDelta: [],
         sourceQualification: sourceQualificationFromVerifyEvidence(emptyVerifyEvidence, created.envelope.record.commit),
+        securityEvidence: securityEvidenceBindingFromInput(
+          securityInput({ commit: created.envelope.record.commit, tree: created.envelope.record.tree }),
+          { sourceCommit: created.envelope.record.commit, sourceTree: created.envelope.record.tree },
+        ),
       });
-      const result = validateReleasePromotionEnvelope(emptyDelta, { repoDir: tempDir, targetBoundary: "push", verifyEvidence: emptyVerifyEvidence });
+      const result = validateReleasePromotionEnvelope(emptyDelta, { repoDir: tempDir, targetBoundary: "push", verifyEvidence: emptyVerifyEvidence, securityEvidence: securityInput({ commit: created.envelope.record.commit, tree: created.envelope.record.tree }) });
       assert.deepEqual(result, { ok: false, reason: "empty-delta" });
     });
 
@@ -189,6 +204,7 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
       repoDir: tempDir,
       targetBoundary: "release",
       verifyEvidence,
+      securityEvidence,
     });
     assert.equal(reverse.ok, false);
     assert.equal(reverse.reason, "reverse-inclusion-forbidden");
@@ -201,18 +217,19 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
       repoDir: tempDir,
       targetBoundary: "push",
       verifyEvidence,
+      securityEvidence,
     });
     assert.equal(tampered.ok, false);
     assert.equal(tampered.reason, "tampered-envelope");
 
     await t.test("validator requires and binds the canonical Verify evidence context", () => {
-      const missing = validateReleasePromotionEnvelope(created.envelope, { repoDir: tempDir, targetBoundary: "push" });
+      const missing = validateReleasePromotionEnvelope(created.envelope, { repoDir: tempDir, targetBoundary: "push", securityEvidence });
       assert.deepEqual(missing, { ok: false, reason: "invalid-verify-evidence-context" });
       const pushSelection = planVerifySelection({
         mode: "push", candidateCommit: commitS, registeredSuiteIds: ["baseline", "source-test"], policy, changedPaths: ["src/code.mjs"],
       });
       const substituted = validateReleasePromotionEnvelope(created.envelope, {
-        repoDir: tempDir, targetBoundary: "push", verifyEvidence: { ...verifyEvidence, selection: pushSelection },
+        repoDir: tempDir, targetBoundary: "push", verifyEvidence: { ...verifyEvidence, selection: pushSelection }, securityEvidence,
       });
       assert.deepEqual(substituted, { ok: false, reason: "invalid-verify-evidence-context" });
       const changedSelection = planVerifySelection({
@@ -220,9 +237,41 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
         changedPaths: ["src/code.mjs", "src/other.mjs"],
       });
       const drifted = validateReleasePromotionEnvelope(created.envelope, {
-        repoDir: tempDir, targetBoundary: "push", verifyEvidence: { ...verifyEvidence, selection: changedSelection },
+        repoDir: tempDir, targetBoundary: "push", verifyEvidence: { ...verifyEvidence, selection: changedSelection }, securityEvidence,
       });
       assert.deepEqual(drifted, { ok: false, reason: "source-qualification-mismatch" });
+    });
+
+    await t.test("security input is required, canonical, current, and byte-bound", () => {
+      const missing = validateReleasePromotionEnvelope(created.envelope, {
+        repoDir: tempDir, targetBoundary: "push", verifyEvidence,
+      });
+      assert.deepEqual(missing, { ok: false, reason: "invalid-security-evidence-context" });
+      const malformed = validateReleasePromotionEnvelope(created.envelope, {
+        repoDir: tempDir, targetBoundary: "push", verifyEvidence,
+        securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: "{" },
+      });
+      assert.deepEqual(malformed, { ok: false, reason: "invalid-security-evidence-context" });
+      const foreignPath = validateReleasePromotionEnvelope(created.envelope, {
+        repoDir: tempDir, targetBoundary: "push", verifyEvidence,
+        securityEvidence: { ...securityEvidence, path: "evidence/other-security.json" },
+      });
+      assert.deepEqual(foreignPath, { ok: false, reason: "invalid-security-evidence-context" });
+      const stale = validateReleasePromotionEnvelope(created.envelope, {
+        repoDir: tempDir, targetBoundary: "push", verifyEvidence,
+        securityEvidence: securityInput({ commit: commitR, tree: created.envelope.record.tree }),
+      });
+      assert.deepEqual(stale, { ok: false, reason: "invalid-security-evidence-context" });
+      const byteDrift = validateReleasePromotionEnvelope(created.envelope, {
+        repoDir: tempDir, targetBoundary: "push", verifyEvidence,
+        securityEvidence: { ...securityEvidence, raw: `${securityEvidence.raw}\n` },
+      });
+      assert.deepEqual(byteDrift, { ok: false, reason: "security-evidence-mismatch" });
+      const substitutedData = validateReleasePromotionEnvelope(created.envelope, {
+        repoDir: tempDir, targetBoundary: "push", verifyEvidence,
+        securityEvidence: { ...securityEvidence, data: { ...securityEvidence.data, marker: "substituted" } },
+      });
+      assert.deepEqual(substitutedData, { ok: false, reason: "invalid-security-evidence-context" });
     });
 
     // 4. Adversarial case: S == R
@@ -253,7 +302,7 @@ test("release promotion envelope lifecycle and adversarial matrix", async (t) =>
       sourceCommit: commitR,
       recordCommit: commitS,
       verifyEvidence: { ...verifyEvidence, commit: commitR, selection: { ...selection, candidateCommit: commitR } },
-      securityEvidence: { ...securityEvidence, commit: commitR },
+      securityEvidence: securityInput({ commit: commitR, tree: git(tempDir, ["rev-parse", `${commitR}^{tree}`]) }),
     });
     assert.equal(backwards.ok, false);
     assert.equal(backwards.reason, "source-not-ancestor-of-record");
