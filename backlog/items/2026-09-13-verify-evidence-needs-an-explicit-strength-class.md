@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-evidence-needs-an-explicit-strength-class
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — a syntax/offline fallback can be honest and useful, but must not be treated as equivalent to the browser behavior evidence a product or release criterion implies."
 source: "evidence/pipeline-analysis-claude-session-2026-09-13.md §10.8; evidence/pipeline-retrospective-2026-09-13.md §§33–39, 95–112."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 02d8d1db47fb14555dc77b4d5b048fbbdbf814e0
+closure_evidence: backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md
 ---
 
 # Verify receipts record success but not the strength or coverage class of that success

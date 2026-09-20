@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-31
 source: "Independent Critic privacy-sweep review (F1), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md, candidate 4defe09ece85721747f039036356ef80aed1b084"
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 11564c5c3ca41e3ef6aa73af4dd90ca859c6047f
+closure_evidence: backlog/evidence/2026-09-18-privacy-inventory-and-signoff-closure.md
 ---
 
 # Restricted-store files exceed the Spec inventory the privacy contract asserts
@@ -192,3 +196,11 @@ fires on `mutability` rather than `state`, but it is a discrepancy in a
 digest-bound record. Separately, whether any already-persisted
 `restricted-machine-local` record encodes the file path rather than only the
 schema string was not checked; if it does, route 2 costs more than stated.
+
+## PO decision, 2026-09-18 — Retain 2026-08-31 acceptance ruling without rewriting closed epic digests
+
+The Product Owner confirmed retaining the 2026-08-31 acceptance ruling for Nova B.
+Retroactive edits to closed Phoenix epic authority (`specs/sprint-phoenix-epic/lifecycle.json` and `spec.md`)
+remain out of scope and rejected. The three restricted-store files remain disclosed and accepted unremediated;
+privacy authority is unified under Nova's candidate-level privacy review.
+

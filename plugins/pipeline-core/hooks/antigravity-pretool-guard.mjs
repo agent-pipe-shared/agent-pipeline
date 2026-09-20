@@ -26,7 +26,7 @@ import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.m
 // item measured as one of the inconsistent emitters, mirroring the identical
 // adoption already landed in guard-lifecycle-ready.mjs, guard-testpath.mjs
 // and guard-gate-strength.mjs (NVA-W12-COPYSAFE).
-import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder } from "../lib/copy-safe-command.mjs";
+import { boundedCopySafeCommand, boundedOpaqueCopyCommand, placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import {
   nativeHookSessionId,
   rememberedNativeHookFailure,
@@ -44,6 +44,7 @@ const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
 const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
 const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
+const AGY_NATIVE_DISPATCH_PREPARE = join(PLUGIN_ROOT, "scripts", "antigravity-native-dispatch-prepare.mjs");
 const HOOK_STARTED_AT = Date.now();
 const HOOK_BUDGET_MS = 42_000;
 const STDIN_TIMEOUT_MS = 1_000;
@@ -68,6 +69,30 @@ function humanOverrideFailureFields(error) {
     code: error?.code,
     ...(git ? { operation: git[1], outcome: git[2] } : {}),
   };
+}
+
+function nativeDispatchPreparationGuidance(projectRoot, code) {
+  if (code !== "AGY-NATIVE-ARTIFACT-MISSING") return "The failure is distinct; inspect its code before preparing a replacement.";
+  const action = renderHumanCopySafeCommand({
+    label: "prepare native Antigravity dispatch",
+    executable: process.execPath,
+    argv: [
+      AGY_NATIVE_DISPATCH_PREPARE,
+      "prepare",
+      "--root",
+      projectRoot,
+      "--request",
+      placeholder("<native-dispatch-request.json>"),
+    ],
+  });
+  return [
+    "If no invoke_subagent call has launched, create the closed request containing packets and Subagents, then prepare it with the loaded entrypoint.",
+    `Structured executable (tool/API, not a shell command): ${action.executable}`,
+    `Structured argv (tool/API, not a shell command): ${JSON.stringify(action.argv)}`,
+    "Copy one matching shell form:",
+    action.text,
+    "After prepared status and exit 0, pass only invocation.Subagents unchanged to invoke_subagent. Do not retry a launched job.",
+  ].join("\n");
 }
 
 export function allow() {
@@ -583,7 +608,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
       nativeSubagents: input?.toolCall?.args?.Subagents,
     });
     if (nativeVerdict.status !== "prepared") {
-      deny(`BLOCKED (Antigravity dispatch preflight): ${nativeVerdict.code}: the complete invoke_subagent batch must be prepared and candidate-bound before launch.`);
+      deny(`BLOCKED (Antigravity dispatch preflight): ${nativeVerdict.code}: the complete invoke_subagent batch must be prepared and candidate-bound before launch.\n${nativeDispatchPreparationGuidance(projectRoot, nativeVerdict.code)}`);
     }
   }
 

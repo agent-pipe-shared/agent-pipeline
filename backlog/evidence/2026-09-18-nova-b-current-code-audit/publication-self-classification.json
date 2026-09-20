@@ -1,0 +1,31 @@
+{
+  "schema": "nova.audit.own-sprint-publication-probe.v1",
+  "packageId": "sprint-nova-epic",
+  "candidate": {
+    "commit": "986f8f03b7ca737e93d2553be41d7877c5f84137",
+    "tree": "cce5739e609985784d5f46b88a0d4b2b899dd31c"
+  },
+  "siblingProvenance": {
+    "probe": "branch-contains",
+    "epics": [
+      "nova"
+    ]
+  },
+  "consumptions": [
+    {
+      "epic": "nova",
+      "commit": "cbbf54a60b92d2c830a26a7235c0c70373ecfa97",
+      "source": "candidate-commit-ancestry"
+    }
+  ],
+  "status": "verification-failed",
+  "code": "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT",
+  "findings": [
+    {
+      "code": "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT",
+      "epic": "nova",
+      "commit": "cbbf54a60b92d2c830a26a7235c0c70373ecfa97"
+    }
+  ],
+  "ownSprintMisclassified": true
+}

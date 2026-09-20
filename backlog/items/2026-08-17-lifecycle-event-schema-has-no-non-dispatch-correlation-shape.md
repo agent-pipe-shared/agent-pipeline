@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 sprint: nova-b
 tracking: "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova"
 source: "L-AC-01 investigation (PHX-WP-LAC01-REMAINING, 2026-08-17) plus this session's own re-check of validateLifecycleGovernanceEvent and the approve-push call site, specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['L-AC-01']. Migrated verbatim from the Phoenix checkout (agent-pipeline-share_phoenix, branch sprint_phoenix) into this Nova repository's backlog on 2026-08-19 per explicit PO instruction — see Migration note below."
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 820913465300402e39adec5ae955ae5a26f3a2e7
+closure_evidence: backlog/evidence/2026-09-18-lifecycle-event-schema-nondispatch-closure.md
 ---
 
 # Lifecycle event schema has no correlation shape for a non-dispatch governance action

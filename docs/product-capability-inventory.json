@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "f2963473cd5cd31f4a82fe59cae5aba65dd7bebd",
-    "tree": "eb2167a3c8b1e9b2e4ff8858ee2f1ded0ce118f8"
+    "commit": "2c6d82254d252ea332960491d169c5773a269b85",
+    "tree": "5a3e265a94335ccb9b61cb68986d64ad98c3842a"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -209,6 +209,7 @@
         "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
         "verify-phase:harness/scripts/verify.mjs:artifact-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:async-execution-tests",
+        "verify-phase:harness/scripts/verify.mjs:audit-evidence-overview-tests",
         "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-check",
         "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
@@ -230,15 +231,11 @@
         "verify-phase:harness/scripts/verify.mjs:check-adr-consistency-tests",
         "verify-phase:harness/scripts/verify.mjs:check-backlog-sprint-assignment-tests",
         "verify-phase:harness/scripts/verify.mjs:check-backlog-state-tests",
-        "verify-phase:harness/scripts/verify.mjs:check-clone-provisioning-tests",
         "verify-phase:harness/scripts/verify.mjs:check-close-security-completeness-tests",
-        "verify-phase:harness/scripts/verify.mjs:check-commit-type-range",
-        "verify-phase:harness/scripts/verify.mjs:check-commit-type-range-tests",
         "verify-phase:harness/scripts/verify.mjs:check-completeness-vocabulary-doclint-tests",
         "verify-phase:harness/scripts/verify.mjs:check-critic-contract-citations-tests",
         "verify-phase:harness/scripts/verify.mjs:check-critic-skip-coverage-tests",
         "verify-phase:harness/scripts/verify.mjs:check-directory-contract-tests",
-        "verify-phase:harness/scripts/verify.mjs:check-evidence-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:check-gitignore-anchoring-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:check-protected-path-integrity-tests",
@@ -285,7 +282,6 @@
         "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-install-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-baseline-verify-tests",
         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
-        "verify-phase:harness/scripts/verify.mjs:control-placement-tests",
         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
@@ -311,7 +307,6 @@
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-record-write-tests",
-        "verify-phase:harness/scripts/verify.mjs:enforcement-conformance-tests",
         "verify-phase:harness/scripts/verify.mjs:entrypoint-reachability-tests",
         "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:evidence-view-model-tests",
@@ -329,12 +324,10 @@
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
         "verify-phase:harness/scripts/verify.mjs:gitleaks-tests",
-        "verify-phase:harness/scripts/verify.mjs:goldfish-antigravity-host-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-authority-resolver-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
-        "verify-phase:harness/scripts/verify.mjs:guard-devplan-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
@@ -352,6 +345,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-push-attestation-diagnostics-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-decision-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-external-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-promotion-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-release-tag-ancestry-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-scratch-advisory-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
@@ -370,7 +364,6 @@
         "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
-        "verify-phase:harness/scripts/verify.mjs:interruption-receipts-tests",
         "verify-phase:harness/scripts/verify.mjs:language-canon-check",
         "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
         "verify-phase:harness/scripts/verify.mjs:lib-plan-spec-state-v2-tests",
@@ -418,7 +411,6 @@
         "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
-        "verify-phase:harness/scripts/verify.mjs:observe-critic-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
@@ -453,7 +445,6 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-user-v3-drift-tests",
-        "verify-phase:harness/scripts/verify.mjs:plan-authority-staging-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-legacy-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:po-approval-gate-tests",
@@ -487,8 +478,6 @@
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-unborn-head-tests",
         "verify-phase:harness/scripts/verify.mjs:project-reset-tests",
-        "verify-phase:harness/scripts/verify.mjs:protected-baseline-tests",
-        "verify-phase:harness/scripts/verify.mjs:protected-delta-check-tests",
         "verify-phase:harness/scripts/verify.mjs:protected-test-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:public-baseline-diagnose-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
@@ -503,6 +492,9 @@
         "verify-phase:harness/scripts/verify.mjs:publication-executor-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-batch-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-batch-execution-tests",
+        "verify-phase:harness/scripts/verify.mjs:push-batch-executor-tests",
         "verify-phase:harness/scripts/verify.mjs:push-destination-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:push-gate-satisfiability-tests",
         "verify-phase:harness/scripts/verify.mjs:push-init-tests",
@@ -516,6 +508,7 @@
         "verify-phase:harness/scripts/verify.mjs:reference-path-check",
         "verify-phase:harness/scripts/verify.mjs:reference-path-tests",
         "verify-phase:harness/scripts/verify.mjs:release-preflight-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:release-promotion-envelope-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:remote-provisional-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
@@ -524,7 +517,6 @@
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
         "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",
         "verify-phase:harness/scripts/verify.mjs:review-retry-planner-tests",
-        "verify-phase:harness/scripts/verify.mjs:rigor-floor-tests",
         "verify-phase:harness/scripts/verify.mjs:rotate-handover-sections-tests",
         "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
@@ -679,7 +671,6 @@
         "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
         "plugins/pipeline-core/lib/consumer-baseline-verify.test.mjs",
         "plugins/pipeline-core/lib/finding-lifecycle.test.mjs",
-        "plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs",
         "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
         "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
         "plugins/pipeline-core/lib/provenance-envelope.test.mjs",
@@ -1623,8 +1614,7 @@
         "verify-phase:harness/scripts/verify.mjs:governance-verification-action-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-schema-parity-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-governance-events-tests",
-        "verify-phase:harness/scripts/verify.mjs:pipeline-state-gate-action-event-tests",
-        "verify-phase:harness/scripts/verify.mjs:pipeline-state-observer-conformance-tests"
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-gate-action-event-tests"
       ],
       "runners": [
         "host-only"
@@ -1759,8 +1749,7 @@
         "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-core-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-view-tests",
-        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests",
-        "verify-phase:harness/scripts/verify.mjs:report-interruptions-tests"
+        "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests"
       ],
       "runners": [
         "host-only"
@@ -1797,16 +1786,14 @@
         "plugins/pipeline-core/scripts/capture-evidence.mjs",
         "plugins/pipeline-core/scripts/evidence-viewer.mjs",
         "plugins/pipeline-core/scripts/governance-export.mjs",
-        "plugins/pipeline-core/scripts/governance-replay.mjs",
-        "plugins/pipeline-core/scripts/report-interruptions.mjs"
+        "plugins/pipeline-core/scripts/governance-replay.mjs"
       ],
       "testEvidence": [
         "plugins/pipeline-core/scripts/audit-bundle.test.mjs",
         "plugins/pipeline-core/scripts/capture-evidence.test.mjs",
         "plugins/pipeline-core/scripts/evidence-viewer.test.mjs",
         "plugins/pipeline-core/scripts/governance-export.test.mjs",
-        "plugins/pipeline-core/scripts/governance-replay.test.mjs",
-        "plugins/pipeline-core/scripts/report-interruptions.test.mjs"
+        "plugins/pipeline-core/scripts/governance-replay.test.mjs"
       ],
       "targets": [
         {
@@ -2745,77 +2732,6 @@
         {
           "document": "OPERATING_MODEL",
           "anchorId": "capability-documentation-quality-gates",
-          "status": "pending"
-        }
-      ],
-      "configurationPath": "none",
-      "specializedOnlyReason": null
-    },
-    {
-      "id": "architecture-adoption-and-fitness",
-      "publicName": "Architecture decisions, adoption and fitness",
-      "problem": "Existing repositories need explicit architecture decisions and a staged path to machine-readable architecture evidence.",
-      "benefit": "Assess decision significance, inventory modules, propose scoped adoption, and evaluate architecture fitness against repository baselines.",
-      "status": "shipped",
-      "surfaceIds": [
-        "skill:plugins/pipeline-core/skills/architecture-decision/SKILL.md:architecture-decision",
-        "verify-phase:harness/scripts/verify.mjs:architecture-adoption-tests",
-        "verify-phase:harness/scripts/verify.mjs:architecture-baseline-tests",
-        "verify-phase:harness/scripts/verify.mjs:architecture-fitness-tests",
-        "verify-phase:harness/scripts/verify.mjs:architecture-remedy-tests",
-        "verify-phase:harness/scripts/verify.mjs:module-inventory-tests"
-      ],
-      "runners": [
-        "antigravity",
-        "claude",
-        "codex",
-        "runner-neutral"
-      ],
-      "runnerDispositions": {
-        "claude": {
-          "status": "supported",
-          "reasonCode": null
-        },
-        "codex": {
-          "status": "supported",
-          "reasonCode": null
-        },
-        "antigravity": {
-          "status": "supported",
-          "reasonCode": null
-        }
-      },
-      "platforms": [
-        "all"
-      ],
-      "operatingShapes": [
-        "multi-team",
-        "small-team",
-        "solo"
-      ],
-      "prerequisites": [
-        "Node.js runtime",
-        "explicit architecture adoption decision",
-        "local repository checkout"
-      ],
-      "productionEvidence": [
-        "plugins/pipeline-core/scripts/architecture-adoption.mjs",
-        "plugins/pipeline-core/scripts/architecture-baseline.mjs",
-        "plugins/pipeline-core/scripts/architecture-fitness.mjs",
-        "plugins/pipeline-core/scripts/architecture-remedy.mjs",
-        "plugins/pipeline-core/scripts/module-inventory.mjs"
-      ],
-      "testEvidence": [
-        "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
-        "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
-        "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
-        "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
-        "plugins/pipeline-core/scripts/module-inventory.test.mjs"
-      ],
-      "targets": [
-        {
-          "document": "README",
-          "anchorId": "capability-architecture-adoption-and-fitness",
           "status": "pending"
         }
       ],

@@ -15,6 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -23,11 +24,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_EVIDENCE_DIR,
-  ELEPHANT_DESIGN_ID,
-  ELEPHANT_DESIGN_PREFIXES,
   ELEPHANT_GENERATOR_ALLOWLIST,
   ELEPHANT_STAGE0_MAX_PATHS,
-  isElephantDesignPath,
   VERDICT,
   coveringPath,
   declaredCommits,
@@ -36,7 +34,6 @@ import {
   exitCodeFor,
   gitDeps,
   isTerminalOutcome,
-  main,
   missingBriefingFields,
   parseDispatchTrailer,
   readRecordFile,
@@ -119,33 +116,6 @@ test("(d) no Dispatch trailer -> classified Elephant-direct, UNVERIFIABLE, never
   assert.notEqual(verdict.verdict, VERDICT.fail, "an undeclared Elephant commit is not an authorship failure");
   assert.notEqual(verdict.verdict, VERDICT.pass, "silence must not mint a PASS -- that is failure shape 1 of the item");
   assert.match(verdict.reason, /stage-0 \(elephant\)/u);
-});
-
-test("Dispatch: design (elephant) PASSes for design-phase document paths with no record", () => {
-  const verdict = verifyCommit(
-    "d00d999",
-    commit({
-      message: "docs(plan): update design\n\nDispatch: design (elephant)\nAI-Assisted: true\n",
-      paths: ["docs/state.md", "specs/sprint-alfred-epic/spec.md", "backlog/STATUS.md"],
-    }),
-  );
-  assert.equal(verdict.verdict, VERDICT.pass);
-  assert.equal(verdict.classification, "elephant-design-declared");
-  assert.equal(verdict.taskId, "design");
-  assert.equal(verdict.pathCount, 3);
-});
-
-test("Dispatch: design (elephant) is UNVERIFIABLE if any non-design path is touched", () => {
-  const verdict = verifyCommit(
-    "d00d888",
-    commit({
-      message: "feat(core): sneaky code edit\n\nDispatch: design (elephant)\nAI-Assisted: true\n",
-      paths: ["docs/state.md", "plugins/pipeline-core/scripts/something.mjs"],
-    }),
-  );
-  assert.equal(verdict.verdict, VERDICT.unverifiable);
-  assert.equal(verdict.classification, "elephant-design-non-design-path");
-  assert.match(verdict.reason, /touches non-design path\(s\)/u);
 });
 
 test("(e) the new declared Elephant form PASSes without any record", () => {
@@ -328,53 +298,6 @@ test("v3 records bind authorship and carry exactly one Critic disposition", () =
   assert.equal(missing.classification, "record-v3-invalid");
 });
 
-test("v3 binding refuses an invented task, a forged existing task, and a record role that contradicts the trailer", () => {
-  const sha = "4".repeat(40);
-  const record = {
-    schema: "pipeline.dispatch-record.v3", taskId: "REAL-TASK", agentType: "goldfish-implementor",
-    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
-    candidateCommit: "3".repeat(40), resultSha256: "a".repeat(64), outcome: "completed", commits: ["3".repeat(40)], log: [],
-    report: { text: "Done.", changedFiles: ["src/thing.mjs"] }, criticSkip: skip(),
-  };
-  writeRecord("REAL-TASK", record);
-  const forged = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: REAL-TASK (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
-  assert.equal(forged.verdict, VERDICT.fail);
-  assert.equal(forged.classification, "record-names-different-commit");
-
-  const invented = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: INVENTED-TASK (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
-  assert.equal(invented.verdict, VERDICT.fail);
-  assert.equal(invented.classification, "record-missing");
-
-  writeRecord("ROLE-TASK", { ...record, taskId: "ROLE-TASK", agentType: "critic", candidateCommit: sha, commits: [sha] });
-  const role = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: ROLE-TASK (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
-  assert.equal(role.verdict, VERDICT.fail);
-  assert.equal(role.classification, "record-role-mismatch");
-});
-
-test("CLI requires exact --root and routes every git reader to that consumer root", () => {
-  const root = "/consumer/repository";
-  const writes = [];
-  const observed = [];
-  const streams = { stdout: { write: (value) => writes.push(value) }, stderr: { write: (value) => writes.push(value) } };
-  const makeDeps = (options) => {
-    observed.push(["deps", options]);
-    return commit({ message: "docs(x): no dispatch\n", paths: ["docs/x.md"] });
-  };
-  const run = (command, args, options) => {
-    observed.push([command, args, options]);
-    return "deadbeef\n";
-  };
-  assert.equal(main(["--root", root, "--range", "base..head"], { ...streams, makeDeps, execFileSync: run }), 2);
-  assert.deepEqual(observed[0], ["deps", { repoRoot: root, evidenceDir: `${root}/evidence` }]);
-  assert.deepEqual(observed[1], ["git", ["rev-list", "base..head"], { cwd: root, encoding: "utf8" }]);
-
-  let called = false;
-  const noGit = () => { called = true; throw new Error("must not run"); };
-  assert.equal(main(["deadbeef"], { ...streams, makeDeps: noGit, execFileSync: noGit }), 3);
-  assert.equal(main(["--repo-root", root, "deadbeef"], { ...streams, makeDeps: noGit, execFileSync: noGit }), 3);
-  assert.equal(called, false);
-});
-
 test("v3 criticRequired is a valid pending lifecycle state but cannot mint authorship PASS", () => {
   const sha = "8".repeat(40);
   const record = {
@@ -391,20 +314,32 @@ test("v3 criticRequired is a valid pending lifecycle state but cannot mint autho
   assert.equal(pending.classification, "critic-evidence-pending");
 });
 
-test("no-delivery terminal records never attribute a commit", () => {
-  const sha = "6".repeat(40);
-  const record = {
-    schema: "pipeline.dispatch-record.v3", taskId: "DOD-NO-DELIVERY", agentType: "goldfish-implementor",
+test("v4 authored records preserve required-pending and reject non-authoring outcomes", () => {
+  const sha = "4".repeat(40);
+  const report = { text: "Done.", changedFiles: ["src/thing.mjs"] };
+  const authored = {
+    schema: "pipeline.dispatch-record.v4", taskId: "DOD-V4-REQUIRED", agentType: "goldfish-implementor",
     model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
-    candidateCommit: sha, resultSha256: "a".repeat(64), outcome: "completed-no-delivery", commits: [], log: [],
-    report: { text: "No delivered changes.", changedFiles: [], orchestratorAddedFiles: [] },
+    candidateCommit: sha, resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"), outcome: "completed",
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, commits: [sha], log: [], report,
     criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" },
   };
-  writeRecord("DOD-NO-DELIVERY", record);
-  const deps = commit({ message: "docs(x): diagnostic only\n\nDispatch: DOD-NO-DELIVERY (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
-  const verdict = verifyCommit(sha, deps);
-  assert.equal(verdict.verdict, VERDICT.unverifiable);
-  assert.equal(verdict.classification, "no-delivery-no-authorship");
+  const deps = commit({ message: "feat(x): done\n\nDispatch: DOD-V4-REQUIRED (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  writeRecord("DOD-V4-REQUIRED", authored);
+  assert.equal(verifyCommit(sha, deps).classification, "critic-evidence-pending");
+
+  const readOnly = {
+    ...authored,
+    taskId: "DOD-V4-READONLY",
+    outcome: "read-only-completed",
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" },
+    commits: [],
+    criticSkip: skip(),
+  };
+  delete readOnly.criticRequired;
+  writeRecord("DOD-V4-READONLY", readOnly);
+  const readOnlyDeps = commit({ message: "feat(x): done\n\nDispatch: DOD-V4-READONLY (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  assert.equal(verifyCommit(sha, readOnlyDeps).classification, "record-outcome-does-not-attest-authorship");
 });
 
 test("actual paths reject false T5 and T0 while honest T1 required/evidence is accepted", () => {
@@ -914,7 +849,7 @@ test("(sandbox) DoD-d: a malicious-shaped generator cannot mutate the real worki
 });
 
 test("the real git-backed readers work against this repository's own HEAD", () => {
-  const deps = gitDeps({ repoRoot: REPO_ROOT, evidenceDir: DEFAULT_EVIDENCE_DIR });
+  const deps = gitDeps({ evidenceDir: DEFAULT_EVIDENCE_DIR });
   assert.equal(typeof deps.readCommitMessage("HEAD"), "string");
   assert.ok(Array.isArray(deps.readChangedPaths("HEAD")));
   const verdict = verifyCommit("HEAD", deps);

@@ -1,0 +1,11 @@
+command: node plugins/pipeline-core/scripts/claude-goal-host.test.mjs
+label: NVA-B-GOAL-CLEAR-ROOT-CLAUDE
+exitCode: 0
+--- stdout ---
+ok 1 - missing native capability is typed unavailable
+ok 2 - matching native readback activates the goal
+ok 3 - mismatched native readback is never success
+ok 4 - continuity host binding never substitutes missing Claude capability
+1..4
+
+--- stderr ---

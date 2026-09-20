@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
 source: "NVA-B-WIREAUDIT-1, a measured reachability audit of every non-test module under plugins/pipeline-core/{lib,scripts,hooks}; report backlog/evidence/2026-09-06-built-but-unwired-audit.md, machine output evidence/NVA-B-WIREAUDIT-1-graph.json. Commissioned by the PO on the suspicion that built-but-unwired is a pattern of agentic development rather than a set of accidents."
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 9ced16b44b03495cc62d34d0e0fbc7e56d61e78f
+closure_evidence: backlog/evidence/2026-09-18-capability-reachability-closure.md
 ---
 
 # Capability is built, tested and declared ahead of anything that could call it

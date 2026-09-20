@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.role-dispatch-payload-errors-fail-before-model-launch
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-10
 sprint: nova-b
 done_when: manual
 source: "PO observation during 0.6.2 candidate review: malformed or incomplete role dispatches repeatedly consumed roughly ten minutes before reporting a coordinator/payload failure. The requirement applies to every role, not only Critic."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: b3272edc25741fee42aaeda4913aa4b517fc531c
+closure_evidence: backlog/evidence/2026-09-18-role-dispatch-payload-preflight-closure.md
 ---
 
 # Role dispatch payload errors fail before model launch

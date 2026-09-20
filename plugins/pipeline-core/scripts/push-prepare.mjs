@@ -42,16 +42,17 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
-import { criticalProofWaiverFor, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { authorizeCriticalPushCommand, criticalPushScratchArtifactPaths, parseHumanArgs } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun, statePath } from "./pipeline-state.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
-
 import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
 export const PIPELINE_STATE_SCRIPT_PATH = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const REMOTE_RE = /^[A-Za-z0-9._-]{1,80}$/u;
@@ -114,6 +115,7 @@ function readJson(path, deps) {
   }
 }
 
+/** Returns the exact bytes and parsed projection of one consumer input. */
 function readEvidenceInput(path, deps) {
   try {
     const raw = (deps.readFile ?? readFileSync)(path, "utf8");
@@ -122,7 +124,6 @@ function readEvidenceInput(path, deps) {
     return null;
   }
 }
-
 
 /**
  * Matches `checkEvidenceFreshness()` in `guard-push.mjs` (`exitCode === 0` and
@@ -141,51 +142,76 @@ function readEvidenceInput(path, deps) {
  * than being demanded unconditionally regardless of the setting.
  */
 /**
- * Produce a typed preparation/production sequence using this distribution's
- * producer. The producer resolves project authority and calibrated commands;
- * those commands themselves are never advertised as evidence writers.
- * An unknown base is an explicit non-executable prerequisite, not a guessed ref.
+ * Resolves the remedy for a stale/missing evidence file to the PROJECT'S OWN
+ * calibrated `verify` command -- never a path hardcoded to this repository's
+ * own source-only tree layout (AC-11, the consumer-safe-path checker under
+ * this repository's own build tooling). Reuses the same calibration-tier
+ * resolver `security-scan.mjs` already routes
+ * through (`resolveAuthorityArtifactPath`, `../lib/project-authority.mjs`)
+ * rather than inventing a second calibration reader. An absent, unreadable, or
+ * malformed calibration -- or one with no `verify` key -- degrades honestly:
+ * it never invents a command and never falls back to a source-only path.
  */
-export function resolveVerifyRemedyPlan(dir, relPath, deps = {}) {
-  if (relPath !== "evidence/verify-latest.json") return { kind: "manual", reason: "Use the configured security evidence producer; Verify preparation does not regenerate security evidence." };
-  const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
-  const base = typeof deps.verifyBase === "string" && deps.verifyBase.trim() && !deps.verifyBase.startsWith("-") ? deps.verifyBase : null;
-  return {
-    kind: "verify-evidence-repair",
-    prepare: { executable: "node", argv: [script, "--root", dir, "--prepare"] },
-    prerequisite: "Review and commit the generated consumer adapter before producing evidence at the resulting candidate.",
-    produce: { executable: "node", argv: [script, "--root", dir, "--mode", "push", ...(base ? ["--base", base] : []), "--out", relPath], executableNow: base !== null, unresolvedInputs: base ? [] : ["verified-base"] },
-  };
-}
-
 export function resolveVerifyRemedy(dir, relPath, deps = {}) {
-  const plan = resolveVerifyRemedyPlan(dir, relPath, deps);
-  if (plan.kind === "manual") return plan.reason;
-  const render = action => [action.executable, ...action.argv.map(value => JSON.stringify(value))].join(" ");
-  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}`;
+  const resolveArtifact = deps.resolveAuthorityArtifactPath ?? resolveAuthorityArtifactPath;
+  try {
+    const artifact = resolveArtifact("calibration", { rootDir: dir });
+    if (artifact.exists) {
+      const raw = (deps.readFile ?? readFileSync)(artifact.path, "utf8");
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.verify === "string" && parsed.verify.trim() !== "") {
+        return `${parsed.verify}  # regenerates ${relPath}`;
+      }
+    }
+  } catch {
+    // absent/unreadable/malformed calibration -- fall through to the honest degradation below.
+  }
+  return `run this project's own calibrated verify command  # its calibration does not define one; regenerates ${relPath}`;
 }
 
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
-  const evidenceInput = readEvidenceInput(join(dir, relPath), deps);
+  const path = join(dir, relPath);
+  const evidenceInput = readEvidenceInput(path, deps);
   const data = evidenceInput?.data ?? null;
   const remedy = resolveVerifyRemedy(dir, relPath, deps);
-  const remedyPlan = resolveVerifyRemedyPlan(dir, relPath, deps);
-  if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy, remedyPlan };
-  if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
+  if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy };
+  if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy };
   if (data.commit !== headCommit) {
-    const envelope = deps.promotionEnvelope ?? readJson(join(dir, RELEASE_PROMOTION_DEFAULT_PATH), deps);
-    const verifyInput = id === "verify-evidence" ? evidenceInput : readEvidenceInput(join(dir, VERIFY_EVIDENCE_DEFAULT_PATH), deps);
-    const securityInput = id === "security-evidence" ? evidenceInput : readEvidenceInput(join(dir, SECURITY_EVIDENCE_DEFAULT_PATH), deps);
-    const validation = envelope && verifyInput && securityInput
-      ? (deps.validateReleasePromotionEnvelope ?? validateReleasePromotionEnvelope)(envelope, { repoDir: dir, targetBoundary: "push", verifyEvidence: verifyInput.data, securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityInput.raw, data: securityInput.data }, deps })
-      : { ok: false };
-    if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
-      if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy, remedyPlan };
-      return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
+    const promotionPath = join(dir, RELEASE_PROMOTION_DEFAULT_PATH);
+    const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
+    if (promotionEnvelope !== null) {
+      const validator = deps.validateReleasePromotionEnvelope ?? validateReleasePromotionEnvelope;
+      const verifyInput = id === "verify-evidence"
+        ? evidenceInput
+        : readEvidenceInput(join(dir, VERIFY_EVIDENCE_DEFAULT_PATH), deps);
+      const securityInput = id === "security-evidence"
+        ? evidenceInput
+        : readEvidenceInput(join(dir, SECURITY_EVIDENCE_DEFAULT_PATH), deps);
+      const validation = verifyInput && securityInput ? validator(promotionEnvelope, {
+        repoDir: dir,
+        targetBoundary: "push",
+        // Re-read and explicitly bind both canonical consumer inputs.
+        verifyEvidence: verifyInput.data,
+        securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityInput.raw, data: securityInput.data },
+        deps,
+      }) : { ok: false, reason: "promotion-input-missing" };
+      if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
+        if (id === "verify-evidence") {
+          if (!verifyEvidenceSatisfiesBoundary(data, "push")) {
+            return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push` };
+          }
+          return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
+        }
+        if (id === "security-evidence") {
+          return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
+        }
+      }
     }
-    return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
+    return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy };
   }
-  if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy, remedyPlan };
+  if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
+    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push` };
+  }
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
 }
 
@@ -352,29 +378,6 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
     };
   }
   return { id, ok: true, message: `posture: ${posture}; the key in the resolved approval directory IS a member.`, directory: resolved.directory };
-}
-
-/**
- * Reports the policy/source contradiction before any human-facing preparation.
- * `criticalProofWaiverFor()` is the authority for precedence and conflict
- * semantics; this function only gives its typed result an actionable preflight
- * shape shared by push preparation and the earlier satisfiability check.
- */
-export function checkCriticalProofModeConflict(dir, deps = {}) {
-  const waiverFor = deps.criticalProofWaiverFor ?? criticalProofWaiverFor;
-  const result = waiverFor(dir, "push");
-  if (result?.code !== "CRITICAL-PROOF-MODE-CONFLICT") return null;
-  const readApproval = deps.readHumanApprovalMode ?? readHumanApprovalMode;
-  const approval = readApproval(dir, { legacyKind: "push" });
-  const source = approval?.source ?? "unknown source";
-  const key = approval?.key ?? "gates.push_approval";
-  return {
-    id: "critical-proof-mode-conflict",
-    ok: false,
-    code: result.code,
-    message: `CRITICAL-PROOF-MODE-CONFLICT: committed ${key}: chat (${source}) conflicts with the committed push proof policy in project/critical-human-proof.json; this is a push-only chat waiver versus the broader global human_approval choice. Choose one authority and commit the matching source, or retain signature mode.`,
-    remedy: "commit a consistent push approval mode and critical-human-proof policy (do not delete the anchor or create a waiver automatically)",
-  };
 }
 
 /**
@@ -553,20 +556,6 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   const readHumanApproval = deps.readHumanApprovalMode ?? readHumanApprovalMode;
   const humanApproval = readHumanApproval(dir, { legacyKind: "push" });
   const chatMode = humanApproval.mode === "chat";
-  const modeConflict = checkCriticalProofModeConflict(dir, deps);
-  if (modeConflict) {
-    return {
-      ok: true,
-      report: {
-        schema: "pipeline.push-prepare-report.v1",
-        by, remote, destination, headCommit: resolveHeadCommit(dir, deps),
-        humanApproval: chatMode && humanApproval.scope === "global" ? "chat-attributed-unattested" : humanApproval.mode,
-        checks: [modeConflict],
-        ready: false,
-      },
-      lines: null,
-    };
-  }
 
   // Runs BEFORE anything below that assumes a clean tree (NVA-PUSHFOLD-1): a pending trailing
   // write from a prior `approve-push` is folded in here first, so `checkWorkingTreeClean`

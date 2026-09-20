@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { evaluateRepositoryCriticSkipCoverage, readCommitChangedPaths, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+import { DEFAULT_LEGACY_RECONCILE_INDEX_PATH, LEGACY_RECONCILE_SCHEMA, evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 
 const SHA = "a".repeat(40);
@@ -30,8 +30,21 @@ function v3(taskId, disposition) {
     outcome: "in-progress", commits: [], log: [], report: null, ...disposition,
   };
 }
+function v4(taskId, disposition) {
+  return {
+    schema: "pipeline.dispatch-record.v4", taskId, agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+    rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: SHA, resultSha256: null,
+    outcome: "in-progress", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    commits: [], log: [], report: null, ...disposition,
+  };
+}
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const evaluate = (root, paths = ["generated/output.json"]) => evaluateRepositoryCriticSkipCoverage({ root, readChangedPaths: () => paths });
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+function reconcileIndex(entry) { return json({ schema: LEGACY_RECONCILE_SCHEMA, entries: [entry] }); }
+function reconciledNoCommitRecord(taskId = "HISTORICAL") {
+  return v3(taskId, { outcome: "partial-analysis-only", commits: [], criticRequired: required() });
+}
 
 test("walkDispatchRecords retains source paths and reports malformed JSON", () => {
   const root = fixture({ "evidence/dispatch-record-A.json": json({ taskId: "A" }), "evidence/dispatch-record-B.json": "{" });
@@ -51,6 +64,62 @@ test("v2 and unversioned dispatch records remain explicit pre-cutover legacy", (
   assert.equal(result.ok, true);
   assert.equal(result.legacyRecordCount, 2);
   assert.equal(result.applicableRecordCount, 0);
+});
+
+test("a byte-bound reconciliation preserves a truthful terminal no-commit record as legacy", () => {
+  const recordPath = "evidence/dispatch-record-HISTORICAL.json";
+  const recordBytes = json(reconciledNoCommitRecord());
+  const evidencePath = "evidence/historical-HISTORICAL-report.md";
+  const evidenceBytes = Buffer.from("Historical stop report; no commit was authored.\n");
+  const indexBytes = reconcileIndex({
+    recordPath, recordSha256: sha256(recordBytes), terminalKind: "read-only",
+    disposition: { kind: "evidence", path: evidencePath, sha256: sha256(evidenceBytes) },
+  });
+  const root = fixture({ [recordPath]: recordBytes, [evidencePath]: evidenceBytes, [DEFAULT_LEGACY_RECONCILE_INDEX_PATH]: indexBytes });
+  const result = evaluate(root);
+  assert.equal(result.ok, true);
+  assert.equal(result.reconciledLegacyRecordCount, 1);
+  assert.equal(result.applicableRecordCount, 0);
+});
+
+test("legacy reconciliation fails closed on source drift, duplicate record paths, and disposition digest drift", () => {
+  const recordPath = "evidence/dispatch-record-HISTORICAL.json";
+  const recordBytes = json(reconciledNoCommitRecord());
+  const evidencePath = "evidence/historical-HISTORICAL-report.md";
+  const evidenceBytes = Buffer.from("Historical stop report; no commit was authored.\n");
+  const entry = { recordPath, recordSha256: sha256(recordBytes), terminalKind: "read-only", disposition: { kind: "evidence", path: evidencePath, sha256: sha256(evidenceBytes) } };
+  const root = fixture({ [recordPath]: recordBytes, [evidencePath]: evidenceBytes, [DEFAULT_LEGACY_RECONCILE_INDEX_PATH]: reconcileIndex(entry) });
+
+  writeFileSync(join(root, recordPath), `${recordBytes}\n`);
+  const sourceDrift = evaluate(root);
+  assert.equal(sourceDrift.ok, false);
+  assert.match(sourceDrift.readFindings.join("\n"), /recordSha256: SHA-256 digest mismatch/u);
+
+  writeFileSync(join(root, recordPath), recordBytes);
+  writeFileSync(join(root, DEFAULT_LEGACY_RECONCILE_INDEX_PATH), json({ schema: LEGACY_RECONCILE_SCHEMA, entries: [entry, entry] }));
+  const duplicate = evaluate(root);
+  assert.equal(duplicate.ok, false);
+  assert.match(duplicate.readFindings.join("\n"), /duplicates an earlier reconciliation entry/u);
+
+  writeFileSync(join(root, DEFAULT_LEGACY_RECONCILE_INDEX_PATH), reconcileIndex({ ...entry, disposition: { ...entry.disposition, sha256: "f".repeat(64) } }));
+  const evidenceDrift = evaluate(root);
+  assert.equal(evidenceDrift.ok, false);
+  assert.match(evidenceDrift.readFindings.join("\n"), /disposition\.sha256: SHA-256 digest mismatch/u);
+});
+
+test("review admission also excludes only a valid byte-bound historical no-commit record", () => {
+  const recordPath = "evidence/dispatch-record-HISTORICAL.json";
+  const recordBytes = json(reconciledNoCommitRecord());
+  const evidencePath = "evidence/historical-HISTORICAL-report.md";
+  const evidenceBytes = Buffer.from("Historical stop report; no commit was authored.\n");
+  const indexBytes = reconcileIndex({ recordPath, recordSha256: sha256(recordBytes), terminalKind: "read-only", disposition: { kind: "evidence", path: evidencePath, sha256: sha256(evidenceBytes) } });
+  const root = fixture({
+    [recordPath]: recordBytes, [evidencePath]: evidenceBytes, [DEFAULT_LEGACY_RECONCILE_INDEX_PATH]: indexBytes,
+    "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })),
+  });
+  const result = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(result.ok, true);
+  assert.equal(result.applicableRecordCount, 1);
 });
 
 test("each v3 dispatch may carry a structured skip decision", () => {
@@ -84,17 +153,68 @@ test("required disposition remains valid but blocks coverage until evidence repl
   assert.equal(reviewed.criticEvidenceRecordCount, 1);
 });
 
-test("no-delivery is counted separately and pending Critic still blocks coverage", () => {
-  const record = {
-    ...v3("NO-DELIVERY", { criticRequired: required() }),
-    outcome: "completed-no-delivery", resultSha256: "d".repeat(64), commits: [],
-    report: { text: "No delivered changes.", changedFiles: [], orchestratorAddedFiles: [] },
-  };
-  const result = evaluate(fixture({ "evidence/dispatch-record-NO-DELIVERY.json": json(record) }));
-  assert.equal(result.ok, false);
-  assert.equal(result.noDeliveryRecordCount, 1);
-  assert.equal(result.requiredRecordCount, 1);
-  assert.match(result.readFindings.join("\n"), /Critic is required/u);
+test("review admission permits exactly its current pending target while retaining full corpus validation", () => {
+  const root = fixture({
+    "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })),
+    "evidence/dispatch-record-COVERED.json": json(v4("COVERED", { criticSkip: skip() })),
+  });
+  const admitted = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(admitted.ok, true);
+  assert.equal(admitted.admittedCount, 1);
+  assert.equal(admitted.coveredRecordCount, 1);
+});
+
+test("review admission rejects candidate drift, a second pending record, and malformed corpus evidence", () => {
+  const root = fixture({
+    "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })),
+    "evidence/dispatch-record-OTHER.json": json(v4("OTHER", { criticRequired: required() })),
+  });
+  const extraPending = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(extraPending.ok, false);
+  assert.match(extraPending.readFindings.join("\n"), /only the exact review target may remain pending/u);
+
+  const drifted = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: "b".repeat(40), readChangedPaths: () => [] });
+  assert.equal(drifted.ok, false);
+  assert.match(drifted.readFindings.join("\n"), /found 0/u);
+
+  writeFileSync(join(root, "evidence", "dispatch-record-BROKEN.json"), "{");
+  const malformed = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(malformed.ok, false);
+  assert.match(malformed.readFindings.join("\n"), /could not be read as valid JSON/u);
+});
+
+test("v4 pending, skipped and evidenced records remain actual coverage consumers, while malformed v4 fails closed", () => {
+  const bytes = Buffer.from("Critic PASS for v4\n");
+  const digest = createHash("sha256").update(bytes).digest("hex");
+  const pendingRoot = fixture({
+    "evidence/dispatch-record-PENDING.json": json(v4("PENDING", { criticRequired: required() })),
+    "evidence/dispatch-record-SKIPPED.json": json(v4("SKIPPED", { criticSkip: skip() })),
+  });
+  const pending = evaluate(pendingRoot);
+  assert.equal(pending.ok, false);
+  assert.equal(pending.applicableRecordCount, 2);
+  assert.equal(pending.requiredRecordCount, 1);
+  assert.equal(pending.skipRecordCount, 1);
+
+  const coveredRoot = fixture({
+    "evidence/critic-V4.md": bytes,
+    "evidence/dispatch-record-SKIPPED.json": json(v4("SKIPPED", { criticSkip: skip() })),
+    "evidence/dispatch-record-EVIDENCED.json": json(v4("EVIDENCED", {
+      criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: "EVIDENCED", candidateCommit: SHA, path: "evidence/critic-V4.md", sha256: digest },
+    })),
+  });
+  const covered = evaluate(coveredRoot);
+  assert.equal(covered.ok, true);
+  assert.equal(covered.applicableRecordCount, 2);
+  assert.equal(covered.skipRecordCount, 1);
+  assert.equal(covered.criticEvidenceRecordCount, 1);
+
+  const malformed = v4("MALFORMED", { criticSkip: skip() });
+  delete malformed.outcomeClassification;
+  const malformedRoot = fixture({ "evidence/dispatch-record-MALFORMED.json": json(malformed) });
+  const malformedResult = evaluate(malformedRoot);
+  assert.equal(malformedResult.ok, false);
+  assert.match(malformedResult.readFindings.join("\n"), /invalid v4 dispatch record/u);
 });
 
 test("false T5 decisions fail validation for A/G/S, high-risk and rigor triggers", () => {

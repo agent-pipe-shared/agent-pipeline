@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 28ca87187ad96fc94d970fa20c178e954371fa25
+closure_evidence: backlog/evidence/2026-09-18-advisor-prohibition-closure.md
 sprint: nova-b
 done_when: manual
 source: "Observed twice in one session, 2026-09-01: dispatches NVA-B-WFRECORD and NVA-B-DENIALTRIM each called the advisor tool although field 4 of their briefings forbade it. Both disclosed the call unprompted."
@@ -239,3 +243,7 @@ These checks prove source and installed artifact presence, not a live Claude
 raw-`advisor` event or native Codex/Antigravity enforcement. The item's
 runner-native acceptance boundary therefore remains open; no host behavior is
 inferred from the byte comparison.
+
+## Closure — 2026-09-18
+
+The conditional blocking guard was integrated into `hooks.json` in commit `28ca87187ad96fc94d970fa20c178e954371fa25` under the `advisor` PreToolUse hook. All 43 tests in `guard-dispatch.test.mjs` and all 14 tests in `hooks-manifest-shape.test.mjs` passed. Evidence: `backlog/evidence/2026-09-18-advisor-prohibition-closure.md`. Item closed.

@@ -1,0 +1,27 @@
+{
+  "schema": "nova-b-audit.verify-binding-comparison.v1",
+  "publicArtifact": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
+  "claimedCandidate": {
+    "commit": "986f8f03b7ca737e93d2553be41d7877c5f84137",
+    "tree": "cce5739e609985784d5f46b88a0d4b2b899dd31c"
+  },
+  "claimedTimes": {
+    "start": "2026-09-18T20:07:06.170Z",
+    "finish": "2026-09-18T20:07:06.170Z"
+  },
+  "runId": "verify-1789750163303-d13f290fa57dc102",
+  "manifestCandidate": {
+    "commit": "03eeff5a1635597facff3a062bf2ffb15a0a176c",
+    "tree": "3066828e67f054cb4bdcdc8bc3c7e9945138fa53"
+  },
+  "manifestStartedAt": "2026-09-18T16:49:23.540Z",
+  "terminalCandidate": {
+    "commit": "03eeff5a1635597facff3a062bf2ffb15a0a176c",
+    "tree": "3066828e67f054cb4bdcdc8bc3c7e9945138fa53"
+  },
+  "terminalCompletedAt": "2026-09-18T16:53:26.683Z",
+  "claimedTerminalDigest": "52ada125c718a4dacfdf78701da383ca560afd590c8a1dc4e36be639505b378c",
+  "actualTerminalDigest": "52ada125c718a4dacfdf78701da383ca560afd590c8a1dc4e36be639505b378c",
+  "candidateMatch": false,
+  "terminalDigestMatch": true
+}

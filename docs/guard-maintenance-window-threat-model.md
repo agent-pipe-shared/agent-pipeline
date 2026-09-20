@@ -27,6 +27,25 @@ The model does not treat an agent instruction, an environment variable, a
 free-form guard prefix, or possession of a request digest as PO authority —
 identical to HGO's own boundary.
 
+## Checkpoint-push lane boundary
+
+The opt-in feature-branch checkpoint lane is documented in
+[`specs/sprint-nova-epic/implementation/feature-checkpoint-push-policy.md`](../specs/sprint-nova-epic/implementation/feature-checkpoint-push-policy.md).
+It is a separate, lower-rigor backup path, not a Guard Maintenance Window
+capability and not a signature or release authorization. Its eligibility
+boundary is deliberately narrow: a valid
+`pipeline.push-destination-policy.v1`, an explicit same-ref source and
+destination inside the configured `refs/heads/feat/` namespace, a clean
+candidate, and exactly one bounded `Checkpoint-Intent` trailer. The guard
+rechecks that binding and writes a local attempted-delivery audit before the
+network action; audit failure blocks the action.
+
+All other destinations and malformed or absent policies remain on the existing
+strict publication path. The checkpoint lane does not bypass publication,
+release, security, Verify, Critic, marketplace, approval, or signature gates
+when a feature branch is later promoted. The linked policy artifact records
+disablement/rollback and names an owner plus expiry for every deferred risk.
+
 ## What makes this different from HGO, and why that matters here
 
 HGO's activation step, once a request is planned, is an ordinary command a
@@ -40,37 +59,6 @@ below assumes it holds and is written to catch a change that would break it.
 
 ## Protected assets
 
-- The Alfred/Nova integration extends the same transitive trust closure with
-  `lib/checkpoint-push-audit.mjs`,
-  `lib/commit-message-policy.mjs`,
-  `lib/consumer-baseline-verify.mjs`,
-  `lib/critic-route-v3.mjs`,
-  `lib/dispatch-budget-binding.mjs`,
-  `lib/dispatch-budget-core.mjs`,
-  `lib/dispatch-policy.mjs`,
-  `lib/dispatch-record.mjs`,
-  `lib/governance-action-artifact.mjs`,
-  `lib/governance-action-events.mjs`,
-  `lib/governance-gate-action.mjs`,
-  `lib/governance-hgo-consumption-action.mjs`,
-  `lib/governance-hgo-consumption-source.mjs`,
-  `lib/installed-plugin-attestation.mjs`,
-  `lib/po-key-directory.mjs`,
-  `lib/protected-baseline.mjs`,
-  `lib/provenance-attestation.mjs`,
-  `lib/provenance-envelope.mjs`,
-  `lib/push-destination-policy.mjs`,
-  `lib/successful-spawn.mjs`,
-  `lib/verify-selection.mjs`,
-  `scripts/architecture-adoption.mjs`,
-  `scripts/architecture-fitness.mjs`,
-  `scripts/architecture-remedy.mjs`,
-  `scripts/check-clone-provisioning.mjs`,
-  `scripts/commit-msg-hook-install.mjs`,
-  `scripts/installed-plugin-attestation-host.mjs`,
-  `scripts/module-inventory.mjs`,
-  `scripts/rigor-floor.mjs`,
-  `scripts/settings-allowlist-merge.mjs`.
 - The unconditional-deny behavior of GS-1 through GS-5 and GS-7 — never
   reachable through this mechanism, regardless of what a signed payload
   claims to name.
@@ -100,14 +88,18 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/codex-onboarding-app-server.mjs`,
   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
-  `lib/continuity-status.mjs`, `lib/consumer-verify.mjs`,
-  `lib/critic-export-policy.mjs`, `lib/critic-skip-decision.mjs`,
+  `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
+  `lib/commit-message-policy.mjs`,
+  `lib/critic-route-v3.mjs`,
+  `lib/critic-skip-decision.mjs`,
   `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
+  `lib/dispatch-record.mjs`,
   `lib/entrypoint.mjs`, `lib/feature-package-topology.mjs`,
   `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,
   `lib/human-guard-override.mjs`, `lib/human-role-labels.mjs`,
   `lib/machine-plane.mjs`, `lib/manifest.mjs`, `lib/onboarding-continuity.mjs`,
-  `lib/plan-spec-state-v2.mjs`, `lib/po-gate-authority.mjs`,
+  `lib/plan-spec-state-v2.mjs`, `lib/po-key-directory.mjs`,
+  `lib/po-gate-authority.mjs`,
   `lib/po-gate-profile-publisher.mjs`, `lib/private-boundary.mjs`,
   `lib/project-authority.mjs`,
   `lib/project-onboarding-ready-gate.mjs`, `lib/project-onboarding-v3.mjs`,
@@ -122,18 +114,23 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/runner-profiles-v3.mjs`, `lib/runtime-projection-v2.mjs`,
   `lib/runtime-projection-v3.mjs`, `lib/schema-lite.mjs`,
   `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
-  `lib/windows-private-state.mjs`, `lib/worktree-lifecycle.mjs`,
+  `lib/successful-spawn.mjs`, `lib/windows-private-state.mjs`,
+  `lib/worktree-lifecycle.mjs`,
   `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`,
-  `scripts/consumer-verify-check.mjs`,
   `scripts/continuity-status.mjs`, `scripts/pipeline-state.mjs`,
   `scripts/po-gate-profile-repair.mjs`, `scripts/project-onboarding-v3.mjs`,
+  `scripts/settings-allowlist-merge.mjs`,
   `scripts/publication-close-journal.mjs`, and
   `scripts/v3-bootstrap-authority.mjs`. A second closure gap (VFX2-GMW,
   `sprint_phoenix` merge, 2026-08-26) added: `lib/agent-decision-journal.mjs`,
   `lib/authority-revision-proof.mjs`, `lib/control-execution-exchange.mjs`,
   `lib/control-execution-lifecycle-event.mjs`,
   `lib/decision-reference-dual-evaluation.mjs`, `lib/external-push-ledger.mjs`,
-  `lib/governance-event-store.mjs`, `lib/governance-event.mjs`,
+  `lib/governance-action-artifact.mjs`, `lib/governance-action-events.mjs`,
+  `lib/governance-gate-action.mjs`,
+  `lib/governance-recovery-reconciliation-action.mjs`,
+  `lib/governance-event-store.mjs`,
+  `lib/governance-event.mjs`,
   `lib/guard-authority-ledger-intake.mjs`, `lib/guard-handoff-offer.mjs`,
   `lib/human-decision-attribution.mjs`, `lib/human-governance-decision.mjs`,
   `lib/human-governance-ledger.mjs`, `lib/human-role-exception-decision.mjs`,
@@ -143,8 +140,11 @@ below assumes it holds and is written to catch a change that would break it.
   dynamic `import()` edges, resolved via a declared table rather than the
   static scanner, plus two unrelated pre-existing gaps GMWKC01 found already
   open) added: `hooks/guard-dispatch-budget.mjs`,
-  `lib/plan-authority-staging-guard.mjs`, `lib/security-completeness-gate.mjs`,
-  `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`, and
+  followed by `lib/dispatch-budget-core.mjs` in the 2026-09-11 closure refresh;
+  the original group continues with `lib/plan-authority-staging-guard.mjs`,
+  `lib/security-completeness-gate.mjs`,
+  `lib/security-evidence-evaluator.mjs`, `lib/verify-evidence-path.mjs`,
+  `lib/checkpoint-push-audit.mjs`, and
   `scripts/pre-push-hook-install.mjs`. A fourth closure gap (NVA-KERNELDOC-1,
   2026-08-27) added: `lib/onboarding-staging-authoring.mjs`, imported by both
   `guard-gate-strength.mjs` (GS-15) and `guard-lifecycle-ready.mjs` — it holds
@@ -165,7 +165,13 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/copy-safe-command.mjs`, `lib/public-core-observation.mjs`,
   `lib/public-core-origin-allowlist.mjs`, `lib/ruleset-source.mjs`,
   `lib/self-application-attestation-gate.mjs`,
-  `lib/trusted-tool-resolution.mjs`, `scripts/pipeline-start-preflight.mjs`,
+  followed in the 2026-09-11 closure refresh by
+  `lib/installed-plugin-attestation.mjs`, `lib/provenance-attestation.mjs`,
+  `lib/provenance-envelope.mjs`; the original group continues with
+  `lib/trusted-tool-resolution.mjs`,
+  `lib/verify-selection.mjs`, `scripts/pipeline-start-preflight.mjs`,
+  followed in that same refresh by
+  `scripts/installed-plugin-attestation-host.mjs`; then
   `scripts/pipeline-update-channel.mjs`, `scripts/po-approval-request.mjs`,
   `scripts/po-human-approval.mjs` (the script the human uses to sign),
   `scripts/push-gate-satisfiability.mjs`, `scripts/push-prepare.mjs`,
@@ -173,8 +179,9 @@ below assumes it holds and is written to catch a change that would break it.
   seventh gap (NVA-V25-DRIVERKERNEL, 2026-08-29) is a different shape than the
   six above: the closure walk only follows edges FROM a kernel file outward,
   so a module that instead IMPORTS a kernel module is structurally invisible
-  to it. `scripts/push-init.mjs` imports `scripts/push-gate-satisfiability.mjs`
-  and `scripts/push-prepare.mjs` (both already kernel) directly, and its own
+  to it. `scripts/push-init.mjs` imports `scripts/push-gate-satisfiability.mjs`,
+  `scripts/push-prepare.mjs`, and `lib/push-destination-policy.mjs` (all kernel)
+  directly, and its own
   code constructs the `signatureCommand` object handed to the PO as the exact
   text of the human-attended push-authorization signature command — the same
   class of artifact `scripts/po-human-approval.mjs` produces. An eighth gap
@@ -208,7 +215,11 @@ below assumes it holds and is written to catch a change that would break it.
   static imports (`guard-gate-strength.mjs`, `protected-test-paths.mjs`,
   `entrypoint.mjs`) are all already kernel above, so no further hops are needed.
   Added: `scripts/pre-commit-hook-install.mjs` and
-  `scripts/check-protected-path-integrity.mjs`. An unrelated pre-existing gap
+  `scripts/commit-msg-hook-install.mjs` and
+  `scripts/check-protected-path-integrity.mjs`. The commit-msg installer is
+  reached from the same onboarding kernel and dynamically imports the shared
+  commit-message policy plus project-authority resolver through install-time
+  paths declared in the closure test. An unrelated pre-existing gap
   GMWKC01 found already open at this dispatch's base commit --
   `lib/onboarding-continuity.mjs` and `lib/project-onboarding-v3.mjs` (both
   already kernel above) already imported `lib/onboarding-language-correction.mjs`
@@ -222,6 +233,25 @@ below assumes it holds and is written to catch a change that would break it.
   of the commit-size check. Its own only first-party import,
   `lib/project-authority.mjs`, is already kernel above, so no further hops are
   needed. Added: `lib/handover-rotation.mjs`.
+- Consumer Verify adds `lib/consumer-baseline-verify.mjs` and `lib/consumer-verify.mjs`, imported by the kernel evidence
+  producer, and `scripts/consumer-verify-check.mjs`, the generated adapter's
+  dynamic import target. The producer supplies that dispatcher's fixed URL from
+  the executing plugin. Both first-party modules are never liftable; the closure
+  suite binds the declared dynamic edge to the exported URL and continues to
+  reject unclassified dynamic imports. The generated consumer adapter is checked
+  byte-for-byte before evidence production; it is not an author-repository asset.
+- The 2026-09-12 Nova B closure refresh adds
+  `lib/dispatch-budget-binding.mjs`, `lib/dispatch-policy.mjs`,
+  `lib/governance-hgo-consumption-action.mjs`, and
+  `lib/governance-hgo-consumption-source.mjs`. Already-kernel dispatch-budget
+  and HGO enforcement modules import these delegates, so a maintenance window
+  cannot rewrite the delegated decision or its durable evidence.
+- The 2026-09-18 Nova B candidate promotion and evidence closure adds
+  `scripts/capture-evidence.mjs` and `lib/release-promotion-envelope.mjs`.
+  `guard-lifecycle-ready.mjs` imports `capture-evidence.mjs` and
+  `push-prepare.mjs` imports `release-promotion-envelope.mjs`, so neither
+  evidence capture nor candidate release promotion can be altered via a
+  maintenance window.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

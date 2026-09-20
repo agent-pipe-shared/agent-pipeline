@@ -1,13 +1,17 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit
-type: defect
-owner: pipeline
-status: open
-created: 2026-09-01
-sprint: nova-b
-done_when: manual
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-09-01"
 source: "Critic round I, finding F-2, 2026-09-01, reviewing commit 7bca7f5d. Measured against evidence/dispatch-record-NVA-B-HANDOVERPATH-FIX.json and then against the whole evidence corpus."
+sprint: "nova-b"
+done_when: "manual"
+closed_at: "2026-09-18"
+closure_repository: "self"
+closure_commit: "8f7b617d0f4c8d6834cfb73eabfb5e32c68ba83f"
+closure_evidence: "backlog/evidence/2026-09-18-dispatch-record-binding-and-collision-closure.md"
 ---
 
 # Roughly half the dispatch records omit `report.changedFiles`, so their commits' authorship cannot be established mechanically

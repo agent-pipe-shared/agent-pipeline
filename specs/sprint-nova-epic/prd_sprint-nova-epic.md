@@ -1,7 +1,7 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: ca00d3c3e7c43b7aa221d2d1728dd1c8cd0ecc38dc1dee138c49b123b6e2d3b8 -->
+<!-- technical-spec-sha256: a98b7d3f52208cd7638d11b19e8888f60044422dc795506934cf1261afe8e1fa -->
 <!-- po-plan-acknowledged: content-sound-and-spec-consistent -->
 
 **Feature ID:** `sprint-nova-epic`

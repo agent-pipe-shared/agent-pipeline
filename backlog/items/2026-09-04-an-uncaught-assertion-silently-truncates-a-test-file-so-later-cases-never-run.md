@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-04
 sprint: nova-b
 done_when: manual
 tracking: "Nova B — a failing suite reports one failure and hides an unknown number of cases that never executed. The gate cannot distinguish 'one case failed' from 'one case failed and eight never ran'."
 source: "Found while diagnosing the only genuine red in the full verify run at commit 2aeeaa68 (NVA-B-LWSRED-1, 2026-09-04): plugins/pipeline-core/lib/local-worker-supervisor.test.mjs reported one failing test, and LWS08 through LWS15 had not run at all for a day. Confirmed by the fix: the same file now reports 15/15."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: c18e1f184c894ce91569239b2d50b719ea5c5a00
+closure_evidence: backlog/evidence/2026-09-18-uncaught-assertion-truncation-protocol-closure.md
 ---
 
 # An uncaught assertion silently truncates a test file, so every later case never runs

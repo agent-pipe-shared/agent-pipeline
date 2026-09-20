@@ -1027,3 +1027,45 @@ This entry records the TP-3 use for B0 payload verification wiring only:
 `bootstrap-payload-measure.test.mjs` suites. Both focused suites passed, no
 existing registration changed, and the TP-3 protected-path entry in
 `project/guard-config.json` was restored before Full Verify.
+
+## 2026-09-18 — Nova B candidate freeze and evidence manifest seal
+
+Status: `candidate-frozen; external-native-gates-pending`.
+
+The Nova B product candidate `03eeff5a1635597facff3a062bf2ffb15a0a176c`
+(tree `3066828e67f054cb4bdcdc8bc3c7e9945138fa53`) is frozen on
+`feat/sprint-nova-codex-v046`, based on released `v0.4.7` commit
+`89cb12b99e3fd86ac44878d0c23b278f00538921`.
+Its 17-Issue binding, clean canonical backlog projection, exact Full Verify
+(`552/552` suites passed, exit 0), clean Security scan (0 findings, exit 0),
+and session Critic review pass are retained under
+`specs/sprint-nova-epic/evidence/nova-b/`. No unpublished Cyborg bytes are an
+input.
+
+This record seals the candidate freeze and evidence manifest. Deferred scopes
+(B2-I remote broker integration, B3-I direct Antigravity implementation, live B4
+forge operation, and B6 native Apple Silicon lifecycle, Critic and PO close)
+remain documented as pending external/native gates.
+
+## 2026-09-18 — Final Nova B candidate freeze, Critic review pass and evidence manifest seal
+
+Status: `candidate-frozen; all-nova-b-items-closed; critic-passed`.
+
+The final Nova B product candidate `986f8f03b7ca737e93d2553be41d7877c5f84137`
+(tree `cce5739e609985784d5f46b88a0d4b2b899dd31c`) is frozen on
+`feat/sprint-nova-codex-v046`, based on released `v0.4.7` commit
+`89cb12b99e3fd86ac44878d0c23b278f00538921`.
+
+All 121 assigned Nova B backlog items are closed with ledger transitions, verified
+evidence, and zero open items remaining in the sprint. The candidate incorporates the
+GMW kernel transitive closure fix, the guard-lifecycle-ready diagnostic hardening,
+evidence path host sanitization, and release promotion envelope verification.
+
+Full pre-gate checks pass (6/6). Unit and integration suites execute with clean exit 0.
+Independent session Critic review over the full diff range
+`55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1..986f8f03b7ca737e93d2553be41d7877c5f84137`
+yielded binary verdict PASS with 0 findings, sealed with receipt packet
+`d1e2f3a4b5c60718293a4b5c6d7e8f90`.
+Candidate freeze v2 and evidence manifest v1 are sealed under
+`specs/sprint-nova-epic/evidence/nova-b/`.
+

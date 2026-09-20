@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 sprint: nova-b
 done_when: manual
 source: "Stashed draft, NVA-B-MKTATTEST (git stash list, stash@{0}: \"push-authority surface narrowing, enumeration proven INCOMPLETE (session-power.mjs missed via join()), do not trust without a sound dynamic-reference detector\"). Verified live 2026-09-01 against plugins/pipeline-core/scripts/session-cleanup.mjs and plugins/pipeline-core/lib/session-cleanup-recovery.mjs."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 6fafa91200e542ba874a7bbdaeeb9cb29539f3b1
+closure_evidence: backlog/evidence/2026-09-18-push-authority-surface-closure.md
 ---
 
 # The push-authority surface's dynamic-reference detector misses a `join()`-built subprocess path, so a narrower attestation would be incomplete by construction

@@ -79,8 +79,9 @@
  *   - ABSENT A `commit` FIELD, A LEGACY RECORD HAS NO SHA BINDING. Most existing records predate
  *     the convention, so dimension 1 is frequently silent rather than satisfied. V2 records
  *     cannot use this compatibility path: terminal v2 evidence requires exact full-SHA binding.
- *   - THE EVIDENCE IS READ FROM THE EXPLICIT CONSUMER ROOT, NEVER FROM THE COMMIT'S OWN GIT TREE.
- *     The CLI requires `--root` and resolves records under that root's `evidence/`. A PASS is therefore a statement about this checkout at this
+ *   - THE EVIDENCE IS READ FROM THE WORKING TREE, NEVER FROM THE COMMIT'S OWN GIT TREE.
+ *     Records are resolved under `DEFAULT_EVIDENCE_DIR` in the CURRENT working tree, and
+ *     `evidence/` is gitignored. A PASS is therefore a statement about this checkout at this
  *     moment, not a property of the commit: a second party who checks the same commit out
  *     fresh has no `evidence/` directory and gets `record-missing` for every commit that
  *     passed here. Nothing in this script makes the verdict reproducible by a third party.
@@ -99,29 +100,28 @@
  * and no FAIL (with `--strict`, 2 is folded into 1). 3 = usage/environment error.
  *
  * Usage:
- *   node dispatch-authorship-verify.mjs --root <consumer-repo> <sha> [<sha> ...]
- *   node dispatch-authorship-verify.mjs --root <consumer-repo> --range main..HEAD
- *   node dispatch-authorship-verify.mjs --root <consumer-repo> --json <sha>
- *   node dispatch-authorship-verify.mjs --root <consumer-repo> --strict <sha>
+ *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs <sha> [<sha> ...]
+ *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --range main..HEAD
+ *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --json <sha>
+ *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --strict <sha>
  */
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
-import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import {
   DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
-  declaredPaths, isCommitAuthorshipOutcome, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, isNoDeliveryOutcome, missingBriefingFields,
-  validateDispatchRecord, validateLegacyDispatchRecord,
+  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
+  isCommitAuthorshipOutcome, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord,
 } from "../lib/dispatch-record.mjs";
 export {
   NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
-  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, isNoDeliveryOutcome, missingBriefingFields,
+  declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
 };
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -134,26 +134,8 @@ export const DEFAULT_EVIDENCE_DIR = join(REPO_ROOT, "evidence");
  */
 export const VERDICT = Object.freeze({ pass: "PASS", fail: "FAIL", unverifiable: "UNVERIFIABLE" });
 
-/** The sanctioned Elephant-direct forms (`agent-obligations.md` §6). */
+/** The one sanctioned Elephant-direct form (`agent-obligations.md` §6). */
 export const ELEPHANT_STAGE0_ID = "stage-0";
-export const ELEPHANT_DESIGN_ID = "design";
-
-export const ELEPHANT_DESIGN_PREFIXES = Object.freeze([
-  "docs/",
-  "specs/",
-  "plans/",
-  "backlog/",
-  "evidence/",
-  ".claude/",
-  "scratch/",
-  "README.md",
-  "AGENTS.md",
-  "GEMINI.md",
-]);
-
-export function isElephantDesignPath(path) {
-  return ELEPHANT_DESIGN_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix));
-}
 
 /**
  * The coarse "small" bound for a stage-0 Elephant commit. A convention of this script, not a
@@ -353,61 +335,36 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.fail, "trailer-malformed", `\`Dispatch: ${dispatch.raw}\` does not match \`<ID> (<role>)\``);
   }
   if (dispatch.role === "elephant") {
-    if (dispatch.id === ELEPHANT_STAGE0_ID) {
-      let elephantPaths;
-      try {
-        elephantPaths = readChangedPaths(sha);
-      } catch (error) {
-        return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId: dispatch.id });
-      }
-      if (elephantPaths.length > ELEPHANT_STAGE0_MAX_PATHS) {
-        return result(
-          sha,
-          VERDICT.unverifiable,
-          "elephant-direct-oversized",
-          `declared Elephant-direct but touches ${elephantPaths.length} path(s), over the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; "small" is the one stage-0 condition this script can check and it does not hold`,
-          { taskId: dispatch.id, pathCount: elephantPaths.length },
-        );
-      }
+    if (dispatch.id !== ELEPHANT_STAGE0_ID) {
       return result(
         sha,
-        VERDICT.pass,
-        "elephant-direct-declared",
-        `declared Elephant-direct (\`${dispatch.raw}\`) in the sanctioned form, ${elephantPaths.length} path(s), within the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; no dispatch record expected. "Disclosed" and "judgment-light" stay unchecked`,
-        { taskId: dispatch.id, pathCount: elephantPaths.length },
+        VERDICT.unverifiable,
+        "elephant-direct-nonstandard-id",
+        `role \`elephant\` with id \`${dispatch.id}\`; the only sanctioned Elephant form is \`${ELEPHANT_STAGE0_ID} (elephant)\`, and no record is looked up for any other id`,
+        { taskId: dispatch.id },
       );
     }
-    if (dispatch.id === ELEPHANT_DESIGN_ID) {
-      let elephantPaths;
-      try {
-        elephantPaths = readChangedPaths(sha);
-      } catch (error) {
-        return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId: dispatch.id });
-      }
-      const nonDesignPaths = elephantPaths.filter((path) => !isElephantDesignPath(path));
-      if (nonDesignPaths.length > 0) {
-        return result(
-          sha,
-          VERDICT.unverifiable,
-          "elephant-design-non-design-path",
-          `declared Elephant design (\`${dispatch.raw}\`) but touches non-design path(s): ${nonDesignPaths.join(", ")}`,
-          { taskId: dispatch.id },
-        );
-      }
+    let elephantPaths;
+    try {
+      elephantPaths = readChangedPaths(sha);
+    } catch (error) {
+      return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId: dispatch.id });
+    }
+    if (elephantPaths.length > ELEPHANT_STAGE0_MAX_PATHS) {
       return result(
         sha,
-        VERDICT.pass,
-        "elephant-design-declared",
-        `declared Elephant design (\`${dispatch.raw}\`) in the sanctioned form, ${elephantPaths.length} design path(s); no dispatch record expected`,
+        VERDICT.unverifiable,
+        "elephant-direct-oversized",
+        `declared Elephant-direct but touches ${elephantPaths.length} path(s), over the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; "small" is the one stage-0 condition this script can check and it does not hold`,
         { taskId: dispatch.id, pathCount: elephantPaths.length },
       );
     }
     return result(
       sha,
-      VERDICT.unverifiable,
-      "elephant-direct-nonstandard-id",
-      `role \`elephant\` with id \`${dispatch.id}\`; the only sanctioned Elephant forms are \`${ELEPHANT_STAGE0_ID} (elephant)\` and \`${ELEPHANT_DESIGN_ID} (elephant)\`, and no record is looked up for any other id`,
-      { taskId: dispatch.id },
+      VERDICT.pass,
+      "elephant-direct-declared",
+      `declared Elephant-direct (\`${dispatch.raw}\`) in the sanctioned form, ${elephantPaths.length} path(s), within the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; no dispatch record expected. "Disclosed" and "judgment-light" stay unchecked`,
+      { taskId: dispatch.id, pathCount: elephantPaths.length },
     );
   }
   if (dispatch.role === "elephant-generated") {
@@ -510,25 +467,17 @@ export function verifyCommit(sha, deps) {
   }
   const isV4 = record.schema === DISPATCH_RECORD_SCHEMA;
   const isV3 = record.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA;
-  const isModern = isV3 || isV4;
   const isV2 = record.schema === LEGACY_DISPATCH_RECORD_SCHEMA;
   const isEarlierLegacy = record.schema === undefined || record.schema === "pipeline.dispatch-record.v1" || record.schema === "pipeline.dispatch-evidence.v1";
-  if (Object.hasOwn(record, "schema") && !isV2 && !isModern && !isEarlierLegacy) {
+  if (Object.hasOwn(record, "schema") && !isV2 && !isV3 && !isV4 && !isEarlierLegacy) {
     return result(sha, VERDICT.fail, "record-schema-unsupported", `record for \`${taskId}\` declares an unsupported schema`, { taskId });
   }
-  if (isV2 || isModern) {
+  if (isV2 || isV3 || isV4) {
     try {
-      record = isModern ? validateDispatchRecord(record) : validateLegacyDispatchRecord(record);
+      record = isV4 ? validateDispatchRecord(record) : isV3 ? validatePreviousDispatchRecord(record) : validateLegacyDispatchRecord(record);
     } catch (error) {
       const version = isV4 ? "v4" : isV3 ? "v3" : "v2";
       return result(sha, VERDICT.fail, `record-${version}-invalid`, `record for \`${taskId}\` fails the ${record.schema} contract: ${error.message}`, { taskId });
-    }
-  }
-  if (isModern) {
-    const separator = record.agentType.indexOf("-");
-    const recordRole = separator === -1 ? record.agentType : record.agentType.slice(0, separator);
-    if (recordRole !== dispatch.role) {
-      return result(sha, VERDICT.fail, "record-role-mismatch", `trailer role \`${dispatch.role}\` does not match record agentType \`${record.agentType}\``, { taskId });
     }
   }
   if (isV2) {
@@ -540,17 +489,16 @@ export function verifyCommit(sha, deps) {
       { taskId },
     );
   }
-  const noDelivery = (isV3 && isNoDeliveryOutcome(record.outcome)) || (isV4 && !isCommitAuthorshipOutcome(record));
-  if (noDelivery) {
+  if (isV4 && !isCommitAuthorshipOutcome(record)) {
     return result(
       sha,
-      VERDICT.unverifiable,
-      "no-delivery-no-authorship",
-      `record for \`${taskId}\` is a truthful no-delivery terminal outcome and cannot attribute authorship to commit \`${sha}\``,
-      { taskId, declaredShas: [] },
+      VERDICT.fail,
+      "record-outcome-does-not-attest-authorship",
+      `record for \`${taskId}\` is a terminal ${record.outcomeClassification.kind} observation and cannot attest commit authorship`,
+      { taskId },
     );
   }
-  if (isModern && criticDisposition(record) === "required") {
+  if ((isV3 || isV4) && criticDisposition(record) === "required") {
     return result(
       sha,
       VERDICT.unverifiable,
@@ -572,10 +520,10 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.fail, "record-not-terminal", `record outcome \`${record.outcome ?? "(absent)"}\` is not terminal`, { taskId });
   }
   const declaredShas = declaredCommits(record);
-  if (isModern && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
-    return result(sha, VERDICT.fail, "record-names-different-commit", "v3 record is bound to a different candidate commit", { taskId, declaredShas });
+  if ((isV3 || isV4) && (record.candidateCommit !== sha || !record.commits.includes(sha))) {
+    return result(sha, VERDICT.fail, "record-names-different-commit", `${record.schema} record is bound to a different candidate commit`, { taskId, declaredShas });
   }
-  if (!isV2 && !isModern && declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
+  if (!isV2 && !isV3 && declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
     return result(sha, VERDICT.fail, "record-names-different-commit", `record names commit(s) \`${declaredShas.join("`, `")}\``, { taskId, declaredShas });
   }
 
@@ -586,7 +534,7 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId });
   }
 
-  if (isModern && criticDisposition(record) === "skipped") {
+  if ((isV3 || isV4) && criticDisposition(record) === "skipped") {
     const pathFinding = criticDecisionPathFinding(record.criticSkip, changed);
     if (pathFinding) {
       return result(sha, VERDICT.fail, pathFinding.code, pathFinding.reason, {
@@ -659,16 +607,8 @@ export function verifyCommit(sha, deps) {
   });
 }
 
-export function gitDeps({ repoRoot, evidenceDir } = {}) {
-  if (typeof repoRoot !== "string" || repoRoot.trim() === "") throw new Error("gitDeps requires an explicit repository root");
-  const resolvedEvidenceDir = evidenceDir ?? join(repoRoot, "evidence");
-  const git = (args) => {
-    const outcome = spawnSync("git", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
-    if (!isSuccessfulSpawn(outcome) || typeof outcome.stdout !== "string") {
-      throw (outcome?.error ?? new Error(`git ${args[0] ?? ""} failed`));
-    }
-    return outcome.stdout;
-  };
+export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = DEFAULT_EVIDENCE_DIR } = {}) {
+  const git = (args) => execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
   return {
     readCommitMessage: (sha) => git(["show", "-s", "--format=%B", `${sha}^{commit}`]),
     readChangedPaths: (sha) =>
@@ -676,7 +616,7 @@ export function gitDeps({ repoRoot, evidenceDir } = {}) {
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line !== ""),
-    readRecord: (taskId) => readRecordFile(resolvedEvidenceDir, taskId),
+    readRecord: (taskId) => readRecordFile(evidenceDir, taskId),
     readBlobAtCommit: (sha, path) => git(["show", `${sha}:${path}`]),
     runAllowlistedGenerator: (entry, sha) =>
       runGeneratorInIsolatedParentTree({ repoRoot, parentRef: `${sha}^`, scriptRelPath: entry.scriptPath, args: entry.args }),
@@ -712,76 +652,34 @@ export function formatLine(entry) {
   return `${entry.verdict.padEnd(12)} ${String(entry.sha).slice(0, 12).padEnd(12)} ${entry.classification}: ${entry.reason}`;
 }
 
-const CLI_USAGE = "usage: dispatch-authorship-verify.mjs --root <consumer-repo> [--strict] [--json] <sha>... | --range <a>..<b>";
-
-function cliUsage(message = CLI_USAGE) {
-  const error = new Error(message);
-  error.code = "usage";
-  throw error;
-}
-
-export function parseCliArgs(argv) {
-  let root = null;
-  let strict = false;
-  let json = false;
+function main(argv) {
+  const strict = argv.includes("--strict");
+  const json = argv.includes("--json");
+  const deps = gitDeps();
   const revisions = [];
-  const ranges = [];
   for (let i = 0; i < argv.length; i += 1) {
-    const token = argv[i];
-    if (token === "--root") {
-      const value = argv[i + 1];
+    if (argv[i] === "--range") {
+      const range = argv[i + 1];
       i += 1;
-      if (root !== null || !value || value.startsWith("--")) cliUsage("--root requires exactly one path");
-      root = resolve(value);
+      if (!range) {
+        process.stderr.write("--range needs a revision range\n");
+        return 3;
+      }
+      const listed = execFileSync("git", ["rev-list", range], { cwd: REPO_ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
+      revisions.push(...listed);
       continue;
     }
-    if (token === "--range") {
-      const value = argv[i + 1];
-      i += 1;
-      if (!value || value.startsWith("--")) cliUsage("--range needs a revision range");
-      ranges.push(value);
-      continue;
-    }
-    if (token === "--strict") {
-      if (strict) cliUsage("--strict may be specified only once");
-      strict = true;
-      continue;
-    }
-    if (token === "--json") {
-      if (json) cliUsage("--json may be specified only once");
-      json = true;
-      continue;
-    }
-    if (token.startsWith("--")) cliUsage(`unknown option: ${token}`);
-    revisions.push(token);
+    if (argv[i].startsWith("--")) continue;
+    revisions.push(argv[i]);
   }
-  if (root === null) cliUsage("--root is required");
-  if (revisions.length === 0 && ranges.length === 0) cliUsage();
-  return { root, strict, json, revisions, ranges };
-}
-
-export function main(argv, dependencies = {}) {
-  const stdout = dependencies.stdout ?? process.stdout;
-  const stderr = dependencies.stderr ?? process.stderr;
-  let options;
-  try {
-    options = parseCliArgs(argv);
-  } catch (error) {
-    stderr.write(`${error.message}\n${CLI_USAGE}\n`);
+  if (revisions.length === 0) {
+    process.stderr.write("usage: dispatch-authorship-verify.mjs [--strict] [--json] <sha>... | --range <a>..<b>\n");
     return 3;
   }
-  const makeDeps = dependencies.makeDeps ?? gitDeps;
-  const run = dependencies.execFileSync ?? execFileSync;
-  const deps = makeDeps({ repoRoot: options.root, evidenceDir: join(options.root, "evidence") });
-  const revisions = [...options.revisions];
-  for (const range of options.ranges) {
-    const listed = run("git", ["rev-list", range], { cwd: options.root, encoding: "utf8" }).split("\n").filter(Boolean);
-    revisions.push(...listed);
-  }
   const results = revisions.map((sha) => verifyCommit(sha, deps));
-  if (options.json) stdout.write(`${JSON.stringify({ schema: "pipeline.dispatch-authorship.v1", results }, null, 2)}\n`);
-  else for (const entry of results) stdout.write(`${formatLine(entry)}\n`);
-  return exitCodeFor(results, { strict: options.strict });
+  if (json) process.stdout.write(`${JSON.stringify({ schema: "pipeline.dispatch-authorship.v1", results }, null, 2)}\n`);
+  else for (const entry of results) process.stdout.write(`${formatLine(entry)}\n`);
+  return exitCodeFor(results, { strict });
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main(process.argv.slice(2)));

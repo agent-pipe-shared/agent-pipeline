@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-28
 sprint: nova-b
 done_when: contains specs/sprint-nova-epic/spec.md ai-assisted-hardening
 tracking: "Scheduled for Nova B (PO decision 2026-08-28)"
 source: "Re-Critic vtpgate2-368458af finding F5, re-measured and found wider than reported"
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 11564c5c3ca41e3ef6aa73af4dd90ca859c6047f
+closure_evidence: backlog/evidence/2026-09-18-ai-hardening-and-doc-obligations-closure.md
 ---
 
 # A shipped security control has no work package and no acceptance criterion in the approved feature package

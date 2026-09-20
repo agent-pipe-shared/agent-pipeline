@@ -3,13 +3,17 @@ schema: pipeline.backlog-item.v1
 id: pipeline.installed-plugin-copy-stale-vs-repo-source
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
 due: 2026-09-30
 sprint: nova-b
 tracking: "Nova B — a T1 Critic reviewing NVA-B-TILDEFIX-1 ran a live reachability probe (a synthetic marker path, never a real credential) and found the shell-expanded tilde was ADMITTED AND EXECUTED by the guard actually enforcing that dispatch's own session — even though the source fix is confirmed present and Critic-approved in the reviewed working tree. Traced by the Elephant: the enforcing hook is loaded from the installed marketplace copy (/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs), a plain regular file (not a symlink) last modified 2026-09-04 07:42, which diverges from the repo's own copy by roughly six commits and predates NVA-B-READCONTAIN-1 entirely, not only NVA-B-TILDEFIX-1."
 done_when: manual
 source: "T1 Critic review of NVA-B-TILDEFIX-1 (opus, max), 'Live reachability probe' disclosure section, 2026-09-06; confirmed independently by the Elephant via `stat`/`diff` against the installed marketplace copy."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: f1ce7417058ea95b8aa6646e3bc2388d2e127257
+closure_evidence: backlog/evidence/2026-09-18-installed-plugin-and-calibration-twins-closure.md
 ---
 
 # The installed plugin copy enforcing this session predates today's guard fixes

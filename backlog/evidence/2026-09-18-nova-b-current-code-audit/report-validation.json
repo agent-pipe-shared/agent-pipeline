@@ -1,0 +1,939 @@
+{
+  "schema": "nova-b-audit.report-validation.v1",
+  "expected": 129,
+  "represented": 129,
+  "problems": [],
+  "rows": [
+    {
+      "id": "pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches",
+      "batch": "01v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it",
+      "batch": "01v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
+      "batch": "01v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact",
+      "batch": "01v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.agent-binding-guards-are-not-os-level-sandboxing",
+      "batch": "01v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session",
+      "batch": "01v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.resolved-backlog-items-can-keep-status-open-indefinitely",
+      "batch": "01v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.consumer-must-allowlist-every-runner-lane",
+      "batch": "01v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.gate-should-not-demand-a-human-name",
+      "batch": "01v4",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.po-facing-commands-are-not-uniformly-rendered-break-safe",
+      "batch": "01v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.unenforced-process-rules-vary-by-runner",
+      "batch": "01v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package",
+      "batch": "01v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.runtime-projections-drift-after-v3-refresh",
+      "batch": "01v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook",
+      "batch": "02v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.codex-worker-subagent-dispatch-capability-is-broken",
+      "batch": "02v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.critic-skip-not-an-explicit-logged-decision",
+      "batch": "02v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.guard-denial-messages-repeat-70-lines-of-boilerplate",
+      "batch": "02v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.manifest-language-repair-demands-a-full-process-restart",
+      "batch": "02v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-names-missing-test:plugins/pipeline-core/scripts/project-onboarding-v3.test.mjs"
+      ]
+    },
+    {
+      "id": "pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code",
+      "batch": "02v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.no-technical-gate-enforces-critic-review-before-done",
+      "batch": "02v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.template-scripts-for-human-terminal-actions",
+      "batch": "02v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-names-missing-test:plugins/pipeline-core/lib/human-terminal-action-catalog.test.mjs",
+        "green-command-names-missing-test:plugins/pipeline-core/lib/human-terminal-action-instance.test.mjs"
+      ]
+    },
+    {
+      "id": "pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing",
+      "batch": "02v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.observerunner-has-no-test-coverage",
+      "batch": "02v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.project-audit-evidence-overview-for-external-review",
+      "batch": "02v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.trust-anchor-bootstrap-test-never-registered-in-verify",
+      "batch": "02v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it",
+      "batch": "02v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly",
+      "batch": "03v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive",
+      "batch": "03v4",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy",
+      "batch": "03v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts",
+      "batch": "03v4",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage",
+      "batch": "03v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate",
+      "batch": "03v4",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced",
+      "batch": "03v4",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.briefing-bundling-two-findings-asks-for-two-dispatches",
+      "batch": "03v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals",
+      "batch": "03v4",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-critic-has-no-writable-location-for-its-own-report",
+      "batch": "03v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-doc-edit-silently-obligates-its-vendored-copy",
+      "batch": "03v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.fresh-worktree-indistinguishable-from-abandoned",
+      "batch": "03v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair",
+      "batch": "03v4",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.invalid-channel-value-blocks-unrelated-alpha-ref-write",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.fourteen-evidence-files-are-tracked-inside-a-gitignored-directory",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.inode-identity-decides-deletion-in-a-second-rollback-path",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.push-init-cannot-satisfy-its-own-doc-reconciliation-check",
+      "batch": "04",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.read-containment-removed-with-no-recorded-decision",
+      "batch": "05",
+      "reportedStatus": "verified",
+      "criterionCount": 2,
+      "defects": []
+    },
+    {
+      "id": "pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert",
+      "batch": "05",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.ci-failure-reporter-has-no-recorded-requirement",
+      "batch": "05",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims",
+      "batch": "05",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires",
+      "batch": "05",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths",
+      "batch": "05",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration",
+      "batch": "05",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice",
+      "batch": "05",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects",
+      "batch": "05",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration",
+      "batch": "05",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step",
+      "batch": "05",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci",
+      "batch": "05",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.verify-runtime-concentrated-in-ten-suites",
+      "batch": "05",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published",
+      "batch": "06",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.red-evidence-from-node-test-embeds-the-absolute-repository-path",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names",
+      "batch": "06",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write",
+      "batch": "06",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name",
+      "batch": "06",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "missing-reference:plugins/pipeline-core/lib/local-worker-pool.schema.json",
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit",
+      "batch": "06",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-not-exact"
+      ]
+    },
+    {
+      "id": "pipeline.entry-point-reachability-check-substring-matches-whole-source-files",
+      "batch": "07",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.tool-budget-stop-condition-cannot-fire",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.read-scope-tilde-expansion-mismatch",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.strip-for-dispatch-misses-resolution-heading",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them",
+      "batch": "07",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it",
+      "batch": "07",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.commandpath-sibling-tilde-gap-and-test-pins",
+      "batch": "07",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.documentation-has-no-reader-facing-review-and-no-machine-binding-for-one",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": [
+        "green-command-names-missing-test:harness/scripts/check-doc-reader-binding.test.mjs"
+      ]
+    },
+    {
+      "id": "pipeline.gg22-pathspec-fix-lacks-permanent-test",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.isrealpathedwithinboundary-file-boundary-uncaveated",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.evslotfix-1-broke-verify-fixture-module-lists",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.critic-md-protected-preimage-drift",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.read-scope-denial-code-accuracy-f3",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.budget-guard-test-suite-silent-pass",
+      "batch": "08",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.capture-evidence-refuses-fixture-literal-as-host-path",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.transcript-root-child-path-admission",
+      "batch": "08",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.installed-plugin-copy-stale-vs-repo-source",
+      "batch": "08",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.rg-pipe-lexical-containment-gap",
+      "batch": "09",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-sandbox-preflight-app-server-handshake-is-a-race",
+      "batch": "09",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass",
+      "batch": "09",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.verify-cannot-rerun-fresh-at-unchanged-tree",
+      "batch": "09",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.complete-adr-governs-coverage-before-reader-review-binding",
+      "batch": "09",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.guard-override-message-misassigns-roles-and-omits-signing",
+      "batch": "09",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink",
+      "batch": "09",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.role-dispatch-payload-errors-fail-before-model-launch",
+      "batch": "09",
+      "reportedStatus": "gap",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock",
+      "batch": "09",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.gmw-precommit-kernel-precedence-diverges",
+      "batch": "09",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.baseline-only-verify-needs-an-actionable-release-recovery",
+      "batch": "09",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy",
+      "batch": "09",
+      "reportedStatus": "not-verifiable",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.commit-guards-reject-safe-literal-multiline-messages",
+      "batch": "09",
+      "reportedStatus": "verified",
+      "criterionCount": 1,
+      "defects": []
+    },
+    {
+      "id": "pipeline.commit-trailer-authoring-needs-a-typed-single-command-route",
+      "batch": "10",
+      "reportedStatus": "gap",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors",
+      "batch": "10",
+      "reportedStatus": "verified",
+      "criterionCount": 2,
+      "defects": []
+    },
+    {
+      "id": "pipeline.greenfield-browser-evidence-is-not-portably-provisioned",
+      "batch": "10",
+      "reportedStatus": "verified",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.identical-lifecycle-argv-must-have-shell-lane-parity",
+      "batch": "10",
+      "reportedStatus": "gap",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.push-flow-needs-one-remote-readback-transaction",
+      "batch": "10",
+      "reportedStatus": "verified",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.runner-native-subagent-tool-identity-is-not-portable",
+      "batch": "10",
+      "reportedStatus": "gap",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.verify-evidence-needs-an-explicit-strength-class",
+      "batch": "10",
+      "reportedStatus": "verified",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.git-commit-multiple-message-trailers-are-misparsed",
+      "batch": "10",
+      "reportedStatus": "gap",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.codex-runtime-fixture-assumes-wsl2-in-ci",
+      "batch": "10",
+      "reportedStatus": "gap",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.precommit-hook-refusal-diagnostics-are-not-observable-in-verify",
+      "batch": "10",
+      "reportedStatus": "verified",
+      "criterionCount": 2,
+      "defects": []
+    },
+    {
+      "id": "pipeline.push-artifacts-precede-operator-intent",
+      "batch": "10",
+      "reportedStatus": "gap",
+      "criterionCount": 3,
+      "defects": []
+    },
+    {
+      "id": "pipeline.release-evidence-promotion-repeats-full-qualification",
+      "batch": "10",
+      "reportedStatus": "verified",
+      "criterionCount": 3,
+      "defects": []
+    }
+  ]
+}

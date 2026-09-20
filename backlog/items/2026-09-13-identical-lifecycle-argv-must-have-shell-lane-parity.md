@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.identical-lifecycle-argv-must-have-shell-lane-parity
 type: defect
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — the Claude Windows run observed an exact `--push-approval signature` lifecycle invocation rejected as Bash parse-unsupported but admitted via PowerShell."
 source: "evidence/pipeline-analysis-claude-session-2026-09-13.md §5.2 and §10.3."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 0be90b61c431bba82a25e39b194c8e74289d024e
+closure_evidence: backlog/evidence/2026-09-18-shell-lane-parity-closure.md
 ---
 
 # Identical typed lifecycle commands do not have equivalent Bash and PowerShell admission

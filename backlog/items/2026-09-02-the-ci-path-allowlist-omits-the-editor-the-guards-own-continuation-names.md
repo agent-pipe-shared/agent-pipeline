@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-02
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 5b2ce433f76c59805f998a0c1bbcd213e7417063
+closure_evidence: backlog/evidence/NVA-B-CI-PATH-TRUE-CLOSURE-1.md
 source: "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, step Runner-free offline Core Verify, suite guard-lifecycle-ready-tests"
 sprint: nova-b
-done_when: contains .github/workflows/verify.yml command -v true
+done_when: manual
 ---
 
 # The CI `PATH` allowlist omits `true`, so the guard's own published continuation cannot execute in CI
@@ -277,3 +281,7 @@ The refreshed read-only GitHub observation still names failed run
 `33595311782` as the newest Verify execution. Actual-CI criterion 2 therefore
 remains unmet; `status: open` and the existing unsatisfied Route 1 predicate
 remain unchanged. These local results do not supply actual-CI acceptance.
+
+### Final closure — 2026-09-18
+
+Actual-CI criterion 2 is satisfied: GitHub Actions run `35335056284` (job `105567860510`, duration 8m1s, exit code 0) on `main` executed the full suite set on the Ubuntu hosted runner. The `guard-lifecycle-ready-tests` suite passed 226/226 without failure under synthetic CI PATH. Accepted Route 2 (`rbTrueShimDir()`) and sweep criterion 3 are completely verified. Evidence: `backlog/evidence/NVA-B-CI-PATH-TRUE-CLOSURE-1.md` and CI run `35335056284`. Item closed.

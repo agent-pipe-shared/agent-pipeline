@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors
 type: defect
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry."
 source: "evidence/pipeline-retrospective-2026-09-13.md §§37–39, 95–118."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: b1255de9755e6645deb4cd00bd65647761f060a7
+closure_evidence: backlog/evidence/2026-09-18-runner-usage-selectors-closure.md
 ---
 
 # A stopped release can strand feature close, while telemetry cannot select the active runner session

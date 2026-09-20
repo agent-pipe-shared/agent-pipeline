@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.greenfield-browser-evidence-is-not-portably-provisioned
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable."
 source: "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 02d8d1db47fb14555dc77b4d5b048fbbdbf814e0
+closure_evidence: backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md
 ---
 
 # Greenfield projects cannot reliably obtain the browser evidence their product claims invite

@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 sprint: nova-b
 source: "Measured live during the 2026-09-01 0.6.0 release: three-destination push (feat/sprint-nova-codex-v046, main, stable) required three fully separate sign -> approve-push -> push cycles."
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 11564c5c3ca41e3ef6aa73af4dd90ca859c6047f
+closure_evidence: backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md
 ---
 
 # A push approval occupies a single slot, so destinations cannot be prepared together
@@ -74,9 +78,9 @@ multi-destination approval does not by itself remove the fresh-verify-per-
 commit cost unless that binding is also revisited, which is out of scope for
 this item.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:** {{accepted | deferred | rejected | merged-into-<filename>}}
-- **Rationale:** {{mandatory for rejected/deferred; optional for accepted}}
-- **Assignment (if accepted):** {{phase/release}}
-- **Date:**
+- **Decision:** accepted, Nova B / P1 Push-Lifecycle packet
+- **Rationale:** Adopted batch-destination approval direction: allow an approval to cover an explicitly enumerated destination set within a single signed subject, or keyed destination approvals, eliminating serial re-signing and qualification loops. Incorporated into the P1 Push-Lifecycle architecture packet.
+- **Assignment:** nova-b
+- **Date:** 2026-09-18

@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ci-failure-reporter-has-no-recorded-requirement
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 sprint: nova-b
 tracking: "Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec."
 done_when: manual
 source: "Found on 2026-09-01 while constructing the Critic rounds for the day's wave: the round covering this component could not be dispatched."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: b22d6e2c54b1fde875d0280fc49d6555cc922073
+closure_evidence: backlog/evidence/2026-09-18-ci-failure-reporter-requirement-closure.md
 ---
 
 # The CI failure reporter has no recorded requirement, so it cannot be reviewed

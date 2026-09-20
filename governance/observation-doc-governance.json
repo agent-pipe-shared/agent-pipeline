@@ -71,6 +71,7 @@
           "docs/agent-decision-journal.md",
           "docs/audit-and-evidence.md",
           "docs/audit-bundles.md",
+          "docs/audit-evidence-overview.md",
           "docs/change-control.md",
           "docs/cost-and-measurement.md",
           "docs/deploy/README.md",
@@ -153,7 +154,6 @@
           "docs/security-incident-response.md",
           "docs/security-support-policy.md",
           "docs/sentinel-scope-extension-threat-model.md",
-          "docs/sprint-alfred-completion-report.md",
           "docs/sprint-cyborg-tp-waiver.md",
           "docs/state-archive/2026-08-18--nova-055-afk-block-through-sentinel-cyborg-reconciliation.md",
           "docs/state-archive/2026-08-18--oldest-nova-047-history.md",
@@ -166,10 +166,7 @@
           "docs/state-archive/2026-08-26--agy-runner-2026-08-25-handover.md",
           "docs/state-archive/2026-08-27--phoenix-checkpoints-61-71.md",
           "docs/state-archive/2026-08-27--prior-handover-sprint-agy-fetch-fast-forward-and-clean-local.md",
-          "docs/state-archive/2026-08-28--current-handover-alfred-clone-sprint-alfred-epic-opened-in-d.md",
           "docs/state-archive/2026-08-28--earlier-handover-ledger-merge-capability-adr-renumbering-han.md",
-          "docs/state-archive/2026-08-28--phoenix-line-history-superseded-by-the-nova-line-above-prese.md",
-          "docs/state-archive/2026-08-28--prior-handover-ledger-merge-capability-adr-renumbering-hando.md",
           "docs/state-archive/2026-08-28--prior-handover-verify-is-green-in-one-run-candidate-0-6-0-lo.md",
           "docs/state-archive/2026-08-31--ci-release-blocker-diagnosed-and-repaired.md",
           "docs/state-archive/2026-08-31--prior-current-handover-nova-0-6-0-local-candidate-stamped-re.md",
@@ -181,7 +178,7 @@
           "docs/state-archive/2026-09-06--closed-blocks-2026-09-02-06.md",
           "docs/state-archive/2026-09-07--nova-candidate-assembly-2026-09-06.md",
           "docs/state-archive/2026-09-14--superseded-lifecycle-and-candidate-checkpoints.md",
-          "docs/state-archive/2026-09-20--2026-09-12-nova-b-superseded-by-local-candidate.md",
+          "docs/state-archive/2026-09-20--nova-historical-checkpoint.md",
           "docs/state.md"
         ]
       },
@@ -296,25 +293,13 @@
         "paths": [
           "docs/adr/0083-governance-action-events.md",
           "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md",
-          "docs/adr/draft-content-bound-review-before-full-verify.md",
           "docs/adr/draft-critic-report-durable-write-location.md",
-          "docs/adr/draft-design-advisory-admission-storage.md",
-          "docs/adr/draft-design-stage-architecture-materialization.md",
           "docs/adr/draft-read-scope-containment-boundary.md",
           "docs/adr/draft-session-cut-recommended-by-readiness.md",
           "docs/codex-isolated-critic-foundation.md",
           "docs/handover-0.5.2-findings.md",
           "docs/human-authorization-inventory.md",
           "docs/known-issues.md"
-        ]
-      },
-      {
-        "audience": "machine",
-        "lifecycle": "review-candidate",
-        "paths": [
-          "docs/adr/draft-content-bound-review-before-full-verify.json",
-          "docs/adr/draft-design-advisory-admission-storage.json",
-          "docs/adr/draft-design-stage-architecture-materialization.json"
         ]
       },
       {

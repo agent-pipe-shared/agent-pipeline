@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-02
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 28ca87187ad96fc94d970fa20c178e954371fa25
+closure_evidence: backlog/evidence/2026-09-18-worktree-isolation-matcher-closure.md
 sprint: nova-b
 tracking: "Nova B — the worktree-isolation count check registers its baseline on the dispatch call itself, but its hooks.json matcher names Task and not Agent. guard-dispatch.mjs's own stanza names both and says in those words that naming the wrong tool is a silent no-op."
 source: "Elephant, 2026-09-02, while supplying the live-run observation that pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session is blocked on. hooks.json is TP-4 protected, so this is filed rather than fixed in session."
@@ -129,3 +133,7 @@ Git-child-process boundary. This confirms the former two red cases were an
 execution-boundary limitation, not a matcher or worktree-count regression.
 It is current-source evidence only: it neither substitutes for the required
 exact-candidate independent Critic nor claims live host-hook delivery.
+
+## Closure — 2026-09-18
+
+The `hooks.json` matcher was integrated in commit `28ca87187ad96fc94d970fa20c178e954371fa25` containing `Task|Agent|Workflow` alongside all other tools. The manifest-shape suite passed 14/14 and worktree-count-check passed 45/45. Evidence: `backlog/evidence/2026-09-18-worktree-isolation-matcher-closure.md`. Item closed.

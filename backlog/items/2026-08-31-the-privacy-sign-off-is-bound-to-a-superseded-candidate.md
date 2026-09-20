@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-31
 source: "Independent Critic privacy-sweep review (F2), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md, candidate 4defe09ece85721747f039036356ef80aed1b084"
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 11564c5c3ca41e3ef6aa73af4dd90ca859c6047f
+closure_evidence: backlog/evidence/2026-09-18-privacy-inventory-and-signoff-closure.md
 ---
 
 # The privacy sign-off is bound to a superseded candidate
@@ -55,3 +59,10 @@ Disclosed and accepted unremediated for the 0.6.0 release: 0.6.0 shipped with
 this gap disclosed rather than remediated, by explicit PO decision. No valid
 privacy sign-off covers the shipped candidate; remediation (a fresh bounded
 re-review and re-binding §5) is deferred to `nova-b`.
+
+## PO decision, 2026-09-18 — Retain 2026-08-31 acceptance ruling
+
+The Product Owner reaffirmed the 2026-08-31 ruling for Nova B: retain the disclosed,
+accepted state without rewriting closed Phoenix epic digest records. Full candidate privacy
+sign-off is performed at the Nova candidate boundary, not by mutating closed historical records.
+

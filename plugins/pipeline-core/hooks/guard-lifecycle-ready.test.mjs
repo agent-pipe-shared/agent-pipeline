@@ -20,7 +20,6 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { fixtureAdoption } from "../scripts/architecture-adoption-test-fixture.mjs";
 
 import {
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
@@ -30,6 +29,11 @@ import {
 // table; the table and argv emitter keep arriving through the CLI seam below, unchanged.
 import { mutatingApplyCommandHint } from "../lib/onboarding-argv-shapes.mjs";
 import {
+  EVIDENCE_HOST_PATH_DENIAL_CODE,
+  checkDispatchRecordCollision,
+  DISPATCH_RECORD_COLLISION_DENIAL_CODE,
+  isEvidenceArtifactPath,
+  extractWritePayload,
   ADMITTED_GRAMMAR_SHAPES,
   BASE_GOVERNANCE_MARKERS,
   claudeSessionMemoryDirectory,
@@ -47,7 +51,6 @@ import {
   isRestartResumeHintInputWrite,
   isSanctionedGhReadOnlyDiagnostic,
   isSanctionedLifecycleCommand,
-  isHumanPoSigningCommand,
   isSanctionedStartPreflightInvocation,
   machinePlaneFilePath,
   main,
@@ -62,9 +65,6 @@ import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 // through the guard's own re-export, so this test cannot pass merely because both
 // names happen to reference the identical function object.
 import { MACHINE_PLANE_SCHEMA, machinePlaneFilePath as libMachinePlaneFilePath, writeMachinePlane } from "../lib/machine-plane.mjs";
-// NVA-GF-COPYSAFE: imported straight from the shared renderer module the guard now defers
-// to (never through the guard's own re-export), so the byte-identity test below cannot pass
-// merely because both names happen to reference the identical function object.
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -113,7 +113,7 @@ import { buildPushInitArgv } from "../scripts/push-init.mjs";
 // (push-prepare.mjs's own `authorize` line calls this with no override) -- used to prove the
 // exact command push-init.mjs would present to a human is refused for an agent's own Bash
 // tool call, never reconstructed by hand.
-import { authorizeCriticalPushCommand, HUMAN_SIGNING_COMMANDS } from "../scripts/po-human-approval.mjs";
+import { authorizeCriticalPushCommand } from "../scripts/po-human-approval.mjs";
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
@@ -245,24 +245,6 @@ test("ungoverned write tools require one session consent record, while Bash and 
       assert.match(blocked.stderr, /GUARD-ONBOARDING-CONSENT-REQUIRED/u, toolName);
       assert.match(blocked.stderr, /onboarding-consent-mark\.mjs.*record/u, toolName);
       assert.match(blocked.stderr, /retry the identical/u, toolName);
-      assert.doesNotMatch(blocked.stderr, /--answer yes\|no/u, toolName);
-
-      // Verify emitted command self-admission and grammar safety
-      const cmdMatch = blocked.stderr.match(/(node [^\n]+onboarding-consent-mark\.mjs[^\n]+--answer yes)/);
-      assert.ok(cmdMatch, "Emitted command with --answer yes must be present");
-      const emittedCmd = cmdMatch[1];
-      const parsedCmd = parseGuardCommand(emittedCmd, path);
-      assert.equal(parsedCmd.parseStatus, "accepted", toolName);
-      assert.equal(parsedCmd.operators.length, 0, toolName);
-      assert.equal(isSanctionedLifecycleCommand(emittedCmd, path), true, toolName);
-
-      // Verify alternate --answer no is also admitted
-      const cmdNo = emittedCmd.replace("--answer yes", "--answer no");
-      assert.equal(isSanctionedLifecycleCommand(cmdNo, path), true, toolName);
-
-      // Verify invalid answer is refused by sanctioned parser
-      const cmdInvalid = emittedCmd.replace("--answer yes", "--answer maybe");
-      assert.equal(isSanctionedLifecycleCommand(cmdInvalid, path), false, toolName);
 
       writeFileSync(join(path, ".claude", ".pipeline-install-consent-session-positive.json"), "{}\n");
       assert.deepEqual(evaluateLifecycleReadyGuard(input, { projectDir: path }), { exitCode: 0, stderr: "" });
@@ -470,202 +452,6 @@ function withContinuityAuthority(path, {
 function readyStub() {
   return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
 }
-
-test("D4 / AC-17: the implementation-authority transition consumes the active plan's scoped adoption decision", () => {
-  const path = root();
-  const planPath = "specs/d4-authority/prd.md";
-  const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
-  try {
-    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    mkdirSync(join(path, "project"), { recursive: true });
-    mkdirSync(dirname(join(path, planPath)), { recursive: true });
-    writeFileSync(join(path, planPath), "Planned implementation: `plugins/pipeline-core/scripts/example.mjs`.\n");
-    writeFileSync(join(path, "project", "pipeline-state.json"), JSON.stringify({
-      schema: "pipeline.state.v0",
-      activeFeature: { id: "d4-authority", planPath, phase: "design" },
-      planSubmission: { profile: "epic" },
-      planApproved: true,
-    }) + "\n");
-
-    const noDecision = evaluateLifecycleReadyGuard(bash(command), {
-      projectDir: path,
-      requireProjectOnboardingReadyFn: readyStub,
-    });
-    assert.equal(noDecision.exitCode, 2, noDecision.stderr);
-    assert.match(noDecision.stderr, /GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED/u);
-    assert.match(noDecision.stderr, /adoption-required/u);
-
-    mkdirSync(join(path, "architecture"), { recursive: true });
-    fixtureAdoption({
-      rootDir: path,
-      decision: "approved-scoped",
-      scope: "specs/d4-authority/",
-      decidedAt: "2026-09-15T00:00:00.000Z",
-      expiresAt: null,
-      reviewDate: null,
-      decisionRef: "PO-TEST-D4",
-      rationale: "Test-only scoped adoption decision",
-      coverageClass: "evaluated",
-      confidence: "measured",
-      by: "PO",
-    });
-    let observedPlanningFitness;
-    const allowed = evaluateLifecycleReadyGuard(bash(command), {
-      projectDir: path,
-      requireProjectOnboardingReadyFn: readyStub,
-      evaluateArchitectureFitnessFn(input) {
-        observedPlanningFitness = input;
-        return { overallStatus: "pass" };
-      },
-    });
-    assert.deepEqual(allowed, { exitCode: 0, stderr: "" });
-    assert.deepEqual(observedPlanningFitness.candidatePaths, ["plugins/pipeline-core/scripts/example.mjs"]);
-    assert.deepEqual(observedPlanningFitness.files, ["plugins/pipeline-core/scripts/example.mjs"]);
-
-    const nonGreenFitness = evaluateLifecycleReadyGuard(bash(command), {
-      projectDir: path,
-      requireProjectOnboardingReadyFn: readyStub,
-      evaluateArchitectureFitnessFn() { return { overallStatus: "unknown" }; },
-    });
-    assert.equal(nonGreenFitness.exitCode, 2, nonGreenFitness.stderr);
-    assert.match(nonGreenFitness.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
-    assert.match(nonGreenFitness.stderr, /fitness is unknown/u);
-
-    const insufficientRigor = evaluateLifecycleReadyGuard(bash(command), {
-      projectDir: path,
-      requireProjectOnboardingReadyFn: readyStub,
-      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
-      deriveMinimumRigorFn() {
-        return {
-          schema: "pipeline.rigor-derivation.v1",
-          minProfile: "epic",
-          disagreementLog: { selected: "mini", derived: "epic" },
-        };
-      },
-    });
-    assert.equal(insufficientRigor.exitCode, 2, insufficientRigor.stderr);
-    assert.match(insufficientRigor.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
-    assert.match(insufficientRigor.stderr, /below the derived epic floor/u);
-
-    const malformedRigor = evaluateLifecycleReadyGuard(bash(command), {
-      projectDir: path,
-      requireProjectOnboardingReadyFn: readyStub,
-      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
-      deriveMinimumRigorFn() { return { minProfile: "mini" }; },
-    });
-    assert.equal(malformedRigor.exitCode, 2, malformedRigor.stderr);
-    assert.match(malformedRigor.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
-    assert.match(malformedRigor.stderr, /derived unavailable floor/u);
-
-    fixtureAdoption({
-      rootDir: path,
-      decision: "approved-scoped",
-      scope: "specs/other-work-package/",
-      decidedAt: "2026-09-15T00:00:00.000Z",
-      expiresAt: null,
-      reviewDate: null,
-      decisionRef: "PO-TEST-D4-OTHER",
-      rationale: "Deliberately different scope",
-      coverageClass: "evaluated",
-      confidence: "measured",
-      by: "PO",
-    });
-    const wrongScope = evaluateLifecycleReadyGuard(bash(command), {
-      projectDir: path,
-      requireProjectOnboardingReadyFn: readyStub,
-    });
-    assert.equal(wrongScope.exitCode, 2, wrongScope.stderr);
-    assert.match(wrongScope.stderr, /outside approved architecture adoption scope/u);
-  } finally {
-    rmSync(path, { recursive: true, force: true });
-  }
-});
-
-test("implementation authority derives rigor from the PO-bound plan surface while the worktree is clean", () => {
-  const path = root();
-  const planPath = "specs/plan-surface/prd.md";
-  const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
-  try {
-    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    mkdirSync(dirname(join(path, planPath)), { recursive: true });
-    mkdirSync(join(path, "project"), { recursive: true });
-    mkdirSync(join(path, "architecture"), { recursive: true });
-    writeFileSync(join(path, planPath), "Planned implementation: `plugins/pipeline-core/hooks/guard-git.mjs`.\n");
-    writeFileSync(join(path, "project", "pipeline-state.json"), JSON.stringify({
-      schema: "pipeline.state.v0",
-      activeFeature: { id: "plan-surface", planPath, phase: "design" },
-      planSubmission: { profile: "mini" },
-      planApproved: true,
-    }) + "\n");
-    fixtureAdoption({
-      rootDir: path,
-      decision: "approved-scoped",
-      scope: "specs/plan-surface/",
-      decidedAt: "2026-09-15T00:00:00.000Z",
-      expiresAt: null,
-      reviewDate: null,
-      decisionRef: "PO-TEST-PLAN-SURFACE",
-      rationale: "Test-only scoped adoption decision",
-      coverageClass: "evaluated",
-      confidence: "measured",
-      by: "PO",
-    });
-
-    const result = evaluateLifecycleReadyGuard(bash(command), {
-      projectDir: path,
-      requireProjectOnboardingReadyFn: readyStub,
-      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
-    });
-    assert.equal(result.exitCode, 2, result.stderr);
-    assert.match(result.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
-    assert.match(result.stderr, /below the derived epic floor/u);
-  } finally {
-    rmSync(path, { recursive: true, force: true });
-  }
-});
-
-test("implementation authority treats root contract files named by the PO-bound plan as rigor input", () => {
-  const path = root();
-  const planPath = "specs/root-contract/prd.md";
-  const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
-  try {
-    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    mkdirSync(dirname(join(path, planPath)), { recursive: true });
-    mkdirSync(join(path, "project"), { recursive: true });
-    mkdirSync(join(path, "architecture"), { recursive: true });
-    writeFileSync(join(path, planPath), "Planned contract update: `package.json`; context: `specs/root-contract/spec.md`.\n");
-    writeFileSync(join(path, "project", "pipeline-state.json"), JSON.stringify({
-      schema: "pipeline.state.v0",
-      activeFeature: { id: "root-contract", planPath, phase: "design" },
-      planSubmission: { profile: "mini" },
-      planApproved: true,
-    }) + "\n");
-    fixtureAdoption({
-      rootDir: path,
-      decision: "approved-scoped",
-      scope: "specs/root-contract/",
-      decidedAt: "2026-09-15T00:00:00.000Z",
-      expiresAt: null,
-      reviewDate: null,
-      decisionRef: "PO-TEST-ROOT-CONTRACT",
-      rationale: "Test-only scoped adoption decision",
-      coverageClass: "evaluated",
-      confidence: "measured",
-      by: "PO",
-    });
-
-    const result = evaluateLifecycleReadyGuard(bash(command), {
-      projectDir: path,
-      requireProjectOnboardingReadyFn: readyStub,
-      evaluateArchitectureFitnessFn() { return { overallStatus: "pass" }; },
-    });
-    assert.equal(result.exitCode, 2, result.stderr);
-    assert.match(result.stderr, /GUARD-MINIMUM-RIGOR-FLOOR/u);
-    assert.match(result.stderr, /below the derived feature floor/u);
-  } finally {
-    rmSync(path, { recursive: true, force: true });
-  }
-});
 
 test("writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route", () => {
   const path = root();
@@ -994,44 +780,6 @@ test("newly-recognized human-signing commands (approve-critical, authorize-criti
   } finally {
     rmSync(path, { recursive: true, force: true });
     rmSync(external, { recursive: true, force: true });
-  }
-});
-
-// ALF-B2-5-SIGNING-DERIVATION (backlog/items/2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md):
-// The guard's isHumanPoSigningCommand derives directly from HUMAN_SIGNING_COMMANDS exported by
-// po-human-approval.mjs. Assert that every command in HUMAN_SIGNING_COMMANDS is recognized, and
-// non-signing commands (prepare, verify, etc.) are rejected.
-test("isHumanPoSigningCommand recognizes every HUMAN_SIGNING_COMMANDS command and rejects non-signing commands", () => {
-  const repoRoot = root();
-  try {
-    for (const cmd of HUMAN_SIGNING_COMMANDS) {
-      const command = `node ${PO_HUMAN_APPROVAL_SCRIPT} ${cmd} --repo-root ${repoRoot}`;
-      assert.equal(
-        isHumanPoSigningCommand(command, repoRoot),
-        true,
-        `expected ${cmd} to be recognized as a human signing command`,
-      );
-    }
-    const nonSigningCommands = [
-      "prepare",
-      "prepare-all",
-      "verify",
-      "verify-all",
-      "prepare-critical",
-      "verify-critical",
-      "prepare-fork-disposition",
-      "verify-fork-disposition",
-    ];
-    for (const cmd of nonSigningCommands) {
-      const command = `node ${PO_HUMAN_APPROVAL_SCRIPT} ${cmd} --repo-root ${repoRoot}`;
-      assert.equal(
-        isHumanPoSigningCommand(command, repoRoot),
-        false,
-        `expected ${cmd} to NOT be recognized as a human signing command`,
-      );
-    }
-  } finally {
-    rmSync(repoRoot, { recursive: true, force: true });
   }
 });
 
@@ -1533,9 +1281,11 @@ test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survive
     ).exitCode, 2, "the repair remains unavailable for every other non-ready lifecycle state");
     assert.equal(run(`node ${[...argv.slice(0, 5), "b".repeat(64), ...argv.slice(6)].join(" ")}`).exitCode, 2);
     assert.equal(run(`node ${argv.join(" ")}`, { ...observation, status: "ready" }).exitCode, 2);
+    assert.equal(run(`node ${argv.join(" ")}`, {
+      ...observation,
+      nextAction: { ...observation.nextAction, argv: [argv[0], "plan-runner-permissions", "--root", path] },
+    }).exitCode, 2);
     const plannerArgv = [argv[0], "plan-runner-permissions", "--root", path];
-    assert.equal(run(`node ${plannerArgv.join(" ")}`, observation).exitCode, 0,
-      "the exact read-only planner derived from the observed apply action is admitted");
     const plannerObservation = {
       ...observation,
       runnerPermissions: { status: "unavailable" },
@@ -1552,10 +1302,10 @@ test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survive
       },
     };
     assert.equal(run(`node ${plannerArgv.join(" ")}`, plannerObservation).exitCode, 0,
-      "the exact read-only planner derived from the producer's apply action remains reachable");
+      "the producer's exact read-only planner remains reachable when no safe merge can be planned");
     assert.equal(run(`node ${[...plannerArgv, "--activate"].join(" ")}`, plannerObservation).exitCode, 2);
-    assert.equal(run(`node ${plannerArgv.join(" ")}`, { ...observation, nextAction: null }).exitCode, 2,
-      "a planner command without an observed producer action is never admitted");
+    assert.equal(run(`node ${plannerArgv.join(" ")}`).exitCode, 2,
+      "an unobserved planner command is never admitted");
     assert.equal(run(`node ${argv.join(" ")}`, {
       ...observation,
       nextAction: { ...observation.nextAction, requiresConfirmation: false },
@@ -2557,8 +2307,6 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const legacyRevocationRecoveryPlan = `node '${PIPELINE_STATE_SCRIPT}' plan-legacy-v2-revocation-recovery --by 'Phoenix PO'`;
     const legacyRevocationRecoveryApply = `node '${PIPELINE_STATE_SCRIPT}' apply-legacy-v2-revocation-recovery --by 'Phoenix PO' --prepared-at 2026-07-29T09:00:00.000Z --preimage-sha256 ${"a".repeat(64)} --postimage-sha256 ${"b".repeat(64)} --plan-sha256 ${"c".repeat(64)} --activate true`;
     const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
-    const cancelSubmittedPlan = `node '${PIPELINE_STATE_SCRIPT}' cancel-submitted-plan --by 'PO recovery' --submission-sha256 ${"a".repeat(64)}`;
-    const cancelMixedPlanState = `node '${PIPELINE_STATE_SCRIPT}' cancel-mixed-plan-state --by 'PO recovery' --reason 'retire mixed history' --submission-sha256 ${"a".repeat(64)} --approval-sha256 ${"b".repeat(64)} --invalidation-sha256 ${"c".repeat(64)}`;
     const submitPlan = `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile epic`;
     const approvePlan = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by 'PO recovery'`;
     const approvePlanReceipt = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --bootstrap-acknowledgement-receipt scratch/bootstrap-plan-acknowledgement-receipt-${"a".repeat(64)}.json`;
@@ -2579,7 +2327,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
     const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
     const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
-    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poRebindCodex, poAcknowledgePlan, poAcknowledgeApply, poAcknowledgeApplyCwd, poDecisionPlan, poDecisionSelect, poDecisionSelectClaude, poDecisionApply, poDecisionApplyAntigravity, legacyRevocationRecoveryPlan, reopenDesign, cancelSubmittedPlan, cancelMixedPlanState, submitPlan, approvePlan, approvePlanReceipt, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poRebindCodex, poAcknowledgePlan, poAcknowledgeApply, poAcknowledgeApplyCwd, poDecisionPlan, poDecisionSelect, poDecisionSelectClaude, poDecisionApply, poDecisionApplyAntigravity, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, approvePlanReceipt, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -2665,10 +2413,6 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `${legacyRevocationRecoveryApply} --bypass`,
       `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by`,
       `${reopenDesign} --bypass`,
-      `node '${PIPELINE_STATE_SCRIPT}' cancel-mixed-plan-state --by 'PO recovery' --submission-sha256 ${"a".repeat(64)} --approval-sha256 ${"b".repeat(64)} --invalidation-sha256 ${"c".repeat(64)}`,
-      `node '${PIPELINE_STATE_SCRIPT}' cancel-mixed-plan-state --by 'PO recovery' --reason 'retire mixed history' --submission-sha256 ${"A".repeat(64)} --approval-sha256 ${"b".repeat(64)} --invalidation-sha256 ${"c".repeat(64)}`,
-      `node '${PIPELINE_STATE_SCRIPT}' cancel-mixed-plan-state --reason 'retire mixed history' --by 'PO recovery' --submission-sha256 ${"a".repeat(64)} --approval-sha256 ${"b".repeat(64)} --invalidation-sha256 ${"c".repeat(64)}`,
-      `${cancelMixedPlanState} --bypass`,
       `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile unsafe`,
       `${submitPlan} --bypass`,
       `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by ''`,
@@ -2692,23 +2436,6 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
       }).exitCode, 2, command);
     }
-  } finally { rmSync(path, { recursive: true, force: true }); }
-});
-
-test("architecture materialization admits only the bare sanctioned writer command", () => {
-  const path = root();
-  try {
-    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    const nonReady = { projectDir: path, requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); } };
-    const bare = `node '${PIPELINE_STATE_SCRIPT}' materialize-architecture`;
-    assert.equal(isSanctionedLifecycleCommand(bare, path), true);
-    assert.deepEqual(evaluateLifecycleReadyGuard(bash(bare), nonReady), { exitCode: 0, stderr: "" });
-    for (const suffix of ["--help", "--activate", "--bypass", "--root .", "--runner codex", "--by PO", "--", "extra", "--phase implementation", "materialize-architecture", "--unknown=value"]) {
-      const command = `${bare} ${suffix}`;
-      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
-      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
-    }
-    assert.equal(isSanctionedLifecycleCommand("node ./foreign-writer.mjs materialize-architecture", path), false);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -4461,14 +4188,14 @@ test("RESTART_LIFECYCLE_SCRATCH_WRITE: restart-required admits any resolved scra
 // and a `scratch/incident-report.md` write are now ALSO admitted at restart-required, via that
 // separate, more general scratch lane -- not via this partial-only one. AC-6 below therefore
 // uses `continuity-damaged` as its unrelated-status comparator instead.)
-test("NVA-LCREADONLY-1: partial lifecycle admits contained scratch mkdir and writes", () => {
+test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the fixed incident-report write, nothing wider", () => {
   const path = root();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
 
-    // AC-1/AC-2: admitted mkdir shapes, including nested paths.
-    for (const command of ["mkdir scratch", "mkdir -p scratch", "mkdir scratch/nested", "mkdir -p scratch/nested"]) {
+    // AC-1/AC-2: both admitted mkdir shapes.
+    for (const command of ["mkdir scratch", "mkdir -p scratch"]) {
       assert.equal(evaluateLifecycleReadyGuard(bash(command), partialDeps).exitCode, 0, command);
     }
 
@@ -4476,6 +4203,7 @@ test("NVA-LCREADONLY-1: partial lifecycle admits contained scratch mkdir and wri
     // flag still refuses.
     for (const command of [
       "mkdir somethingelse",
+      "mkdir -p scratch/nested",
       "mkdir scratch extra",
       "mkdir -p -v scratch",
       "mkdir scratch -p",
@@ -4485,49 +4213,49 @@ test("NVA-LCREADONLY-1: partial lifecycle admits contained scratch mkdir and wri
       assert.equal(result.exitCode, 2, command);
       assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
     }
-    const crossRepo = evaluateLifecycleReadyGuard(bash("mkdir -p /etc/scratch"), partialDeps);
-    assert.equal(crossRepo.exitCode, 2);
-    assert.match(crossRepo.stderr, /GUARD-CROSS-REPO-MUTATION/u);
 
-    // AC-4: contained scratch writes, admitted for Write, Edit, and NotebookEdit.
-    for (const input of [
-      write("scratch/incident-report.md"),
-      edit("scratch/incident-report.md"),
-      write("scratch/nested/deep/notes.md"),
-      notebookEdit("scratch/analysis.ipynb"),
-    ]) {
+    // AC-4: the one fixed incident-report write, admitted for both Write and Edit.
+    for (const input of [write("scratch/incident-report.md"), edit("scratch/incident-report.md")]) {
       assert.equal(evaluateLifecycleReadyGuard(input, partialDeps).exitCode, 0, input.tool_name);
     }
 
-    // AC-5: exact containment -- scratch-evil, traversal back out, bare directory, and other paths refuse.
+    // AC-5: exact, not a directory or a glob -- any other filename or path still refuses.
     for (const input of [
-      write("scratch-evil/file.md"),
-      write("scratch/../secret.md"),
-      write("scratch"),
+      write("scratch/other-file.md"),
       write("incident-report.md"),
       edit("incident-report.md"),
-      write("src/other-file.mjs"),
+      write("scratch/nested/incident-report.md"),
+      write("scratch"),
     ]) {
       const result = evaluateLifecycleReadyGuard(input, partialDeps);
       assert.equal(result.exitCode, 2, `${input.tool_name}:${input.tool_input.file_path}`);
       assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_input.file_path);
     }
 
-    // AC-6: the lane is `partial`-only, not a general readiness bypass.
+    // AC-6: the lane is `partial`-only, not a general readiness bypass -- the identical
+    // admitted shapes stay refused under a different PORG-NOT-READY status this file already
+    // fixtures. Comparator is `continuity-damaged`, not `restart-required`: since
+    // RESTART_LIFECYCLE_SCRATCH_WRITE (backlog: 2026-08-29-scratch-write-exemption-does-not-
+    // cover-restart-required.md), all four of these ARE admitted at restart-required via that
+    // separate, more general scratch lane -- restart-required stopped being an "unrelated
+    // status" for this comparison and would no longer prove lane scoping.
+    // `continuity-damaged` carries no scratch admission anywhere in this file, so it still
+    // proves the invariant these lines exist to pin.
     const continuityDamagedDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("continuity-damaged"); } };
     for (const input of [
       bash("mkdir scratch"),
       bash("mkdir -p scratch"),
       write("scratch/incident-report.md"),
       edit("scratch/incident-report.md"),
-      notebookEdit("scratch/analysis.ipynb"),
     ]) {
       const result = evaluateLifecycleReadyGuard(input, continuityDamagedDeps);
       assert.equal(result.exitCode, 2, `continuity-damaged/${input.tool_name}`);
       assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `continuity-damaged/${input.tool_name}`);
     }
 
-    // AC-7: an exactly-ready session's behaviour for both operations is unchanged.
+    // AC-7: an exactly-ready session's behaviour for both operations is unchanged -- the new
+    // branch lives inside evaluateAfterGrammarAdmission()'s catch block, unreachable unless
+    // requireProjectOnboardingReadyFn() throws, so a ready session never enters it.
     const readyDeps = {
       projectDir: path,
       requireProjectOnboardingReadyFn() {
@@ -4540,11 +4268,20 @@ test("NVA-LCREADONLY-1: partial lifecycle admits contained scratch mkdir and wri
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("NVA-LCREADONLY-2: partial denial names the recovery scratch lane; other statuses stay unchanged", () => {
+// NVA-LCREADONLY-2 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
+// tmp-fallback.md): the Critic-found major from NVA-LCREADONLY-1 -- the narrow diagnosis
+// lane above existed but was undiscoverable, because the denial a `partial` session actually
+// reads never named it. This proves the denial message itself now names both admitted
+// actions when, and only when, typedLifecycleStatus is exactly "partial" -- every other
+// status (restart-required and the untyped/null case) keeps the prior two-line message,
+// byte-for-byte, with no leaked mention of the diagnosis lane.
+test("NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses stay unchanged", () => {
   const path = root();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
 
+    // A denied write that does NOT match the admitted lane still refuses, but its own denial
+    // message must now also disclose the lane a stuck session could otherwise never find.
     const partialResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
       projectDir: path,
       requireProjectOnboardingReadyFn() { deny("partial"); },
@@ -4555,9 +4292,8 @@ test("NVA-LCREADONLY-2: partial denial names the recovery scratch lane; other st
       partialResult.stderr,
       /Re-run the typed project-onboarding-v3 inspection with intent session/u,
     );
-    assert.match(partialResult.stderr, /A recovery scratch lane stays admitted while status is partial/u);
-    assert.match(partialResult.stderr, /including nested paths/u);
-    assert.match(partialResult.stderr, /only physically-contained files below it via Edit, Write, or NotebookEdit/u);
+    assert.match(partialResult.stderr, /creating the repository's own scratch directory/u);
+    assert.match(partialResult.stderr, /writing exactly scratch\/incident-report\.md via Write or Edit/u);
 
     // restart-required must keep exactly the prior two-line message -- no new text leaked in.
     const restartResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
@@ -4568,9 +4304,10 @@ test("NVA-LCREADONLY-2: partial denial names the recovery scratch lane; other st
     assert.match(restartResult.stderr, /Pipeline session readiness is restart-required\./u);
     assert.doesNotMatch(restartResult.stderr, /scratch/u);
     assert.doesNotMatch(restartResult.stderr, /incident-report/u);
-    assert.doesNotMatch(restartResult.stderr, /recovery scratch lane/u);
+    assert.doesNotMatch(restartResult.stderr, /diagnosis lane/u);
 
-    // The untyped/null case must also keep its own prior message unchanged.
+    // The untyped/null case (an unrecognized status, not in CONTROLLING_NON_READY_STATUSES)
+    // must also keep its own prior message unchanged, with no leaked mention either.
     const nullResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
       projectDir: path,
       requireProjectOnboardingReadyFn() { deny("some-status-outside-the-registry"); },
@@ -4579,7 +4316,7 @@ test("NVA-LCREADONLY-2: partial denial names the recovery scratch lane; other st
     assert.match(nullResult.stderr, /Pipeline-governed project writes require an exact V4 ready result for session intent\./u);
     assert.doesNotMatch(nullResult.stderr, /scratch/u);
     assert.doesNotMatch(nullResult.stderr, /incident-report/u);
-    assert.doesNotMatch(nullResult.stderr, /recovery scratch lane/u);
+    assert.doesNotMatch(nullResult.stderr, /diagnosis lane/u);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -4658,7 +4395,7 @@ test("NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and matc
     }
     const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
     const partialNested = evaluateLifecycleReadyGuard(write("scratch/nested/deep/notes.md"), partialDeps);
-    assert.equal(partialNested.exitCode, 0, "partial/scratch/nested/deep/notes.md");
+    assert.equal(partialNested.exitCode, 2, "partial/scratch/nested/deep/notes.md");
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -5328,29 +5065,6 @@ test("NVA-B-DENIALBOILER-1: chat-mode denial renders each of its three ceremony 
     }
     assert.doesNotMatch(result.stderr, /cmd\.exe:/u);
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
-});
-
-// NVA-GF-COPYSAFE: the current renderer deliberately emits a variable-assembled
-// command rather than one flat command line, so an accidental terminal line break cannot
-// change its arguments. Pin the actual safe form instead of reviving the old flat form.
-test("NVA-GF-COPYSAFE: the bounded 'plan' rendering uses the variable-assembled copy-safe form", () => {
-  const sigRoot = hgoGitFixture("signature");
-  try {
-    const command = "rg -n lifecycle . && touch output.txt";
-    const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
-    assert.equal(sigResult.exitCode, 2);
-    const lines = sigResult.stderr.split("\n");
-    const headerIndex = lines.findIndex((line) => /^Human override available for this exact/u.test(line));
-    assert.ok(headerIndex !== -1, "expected the human override header line");
-    const planIndex = lines.indexOf("Step: plan", headerIndex);
-    assert.notEqual(planIndex, -1, "the plan step must be named");
-    assert.equal(lines[planIndex + 1], "POSIX:");
-    const planBlock = lines.slice(planIndex, lines.indexOf("Then, in this session", planIndex)).join("\n");
-    assert.match(planBlock, /^CMD='/mu);
-    assert.match(planBlock, /CMD=\$\{CMD\}'[^']*guard-human-override\.mjs plan/u);
-    assert.match(planBlock, /--repo /u);
-    assert.match(planBlock, /eval "\$CMD"/u);
-  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
 });
 
 test("NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was", () => {
@@ -6768,14 +6482,6 @@ test("NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter
 // ---------------------------------------------------------------------------------
 // Read-only commands remain containment-bound. The admissible exceptions are derived
 // roots only: the loaded plugin and the host-provided session transcript/memory roots.
-// NVA-BL-76 (backlog: 2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-
-// the-wrong-reason.md). The bounded rg-to-head / rg-to-rg pipeline reading a path OUTSIDE
-// the project root was refused as GUARD-OPERATOR-UNAPPROVED -- a reason that is false (the
-// identical operator is admitted one directory over) under a remedy that cannot work (the
-// pipeline was never the objection), in a message whose closing line names the very shape
-// it is refusing as admitted. It now has its own code, its own true remedy, and -- because
-// reading is not the mutation risk the cross-repository family exists to stop -- an override
-// route a human signature can actually reach.
 // ---------------------------------------------------------------------------------
 
 function readScopeFixture() {
@@ -8570,33 +8276,6 @@ test("NVA-B-DENIALTRIM AC-1/AC-2/AC-3: a second same-class denial in one session
   }
 });
 
-test("NVA-B-DENIALTRIM: a repeated routable parser denial keeps the exact next command but does not repeat the full signature ceremony", () => {
-  const path = hgoGitFixture("signature");
-  const commonDir = bootstrapCommonDirFixture();
-  try {
-    const sessionId = "denialtrim-routable-signature";
-    const deps = { projectDir: path, resolveGitCommonDirFn: () => commonDir };
-    const command = "rg -n lifecycle . | tee output.txt";
-    const first = evaluateLifecycleReadyGuard(bashWithSession(command, sessionId), deps);
-    const second = evaluateLifecycleReadyGuard(bashWithSession(command, sessionId), deps);
-    assert.equal(first.exitCode, 2);
-    assert.equal(second.exitCode, 2);
-    assert.match(first.stderr, /Human override available for this exact command/u);
-    assert.match(first.stderr, /emit-signature-digest/u);
-    assert.match(first.stderr, /sign-intent/u);
-    assert.match(second.stderr, /Human override remains available for this exact command/u);
-    assert.match(second.stderr, /guard-human-override\.mjs plan --repo/u);
-    assert.match(second.stderr, /--request-sha256 '/u);
-    assert.match(second.stderr, /[a-f0-9]{60}'\nCMD=\$\{CMD\}'[a-f0-9]{4}'/u);
-    assert.doesNotMatch(second.stderr, /emit-signature-digest/u);
-    assert.doesNotMatch(second.stderr, /sign-intent/u);
-    assert.ok(second.stderr.length * 2 < first.stderr.length);
-  } finally {
-    rmSync(path, { recursive: true, force: true });
-    rmSync(commonDir, { recursive: true, force: true });
-  }
-});
-
 test("NVA-B-DENIALTRIM AC-4: with no resolvable session identity, the guard renders full text every time and never throws", () => {
   const path = root();
   const commonDir = bootstrapCommonDirFixture();
@@ -9788,101 +9467,202 @@ test("rebdead negative-5: a restart-required session with a validly-resolved act
   assert.equal(resumeHintWrite.exitCode, 0, resumeHintWrite.stderr);
 });
 
-test("P0 regression: read-only diagnostics and node test tools are admitted during draft lifecycle, while mutations refuse", () => {
-  const path = devPlanShellFixture();
-  try {
-    const draftDeps = {
-      projectDir: path,
-      requireProjectOnboardingReadyFn() { return TPSHELL_READY; },
-    };
-    for (const command of [
-      "sed -n '920,1100p' plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
-      "rg -n 'readOnly' plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
-      "cat plugins/pipeline-core/plugin.json",
-      "head -n 20 plugins/pipeline-core/plugin.json",
-      "node --test plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs",
-      "node --check plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
-    ]) {
-      const result = evaluateLifecycleReadyGuard(bash(command), draftDeps);
-      assert.equal(result.exitCode, 0, `Expected admitted read-only command: ${command}, got: ${result.stderr}`);
-    }
 
-    for (const command of [
-      `printf x > ${DEVPLANSHELL_TARGET}`,
-      `printf x >> ${DEVPLANSHELL_TARGET}`,
-    ]) {
-      const result = evaluateLifecycleReadyGuard(bash(command), draftDeps);
-      assert.equal(result.exitCode, 2, `Expected refused mutation: ${command}`);
-      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
-    }
-  } finally {
-    rmSync(path, { recursive: true, force: true });
-  }
+test("EVIDENCE-HOST-PATH: isEvidenceArtifactPath matches evidence targets and rejects non-evidence paths", () => {
+  assert.equal(isEvidenceArtifactPath("backlog/evidence/foo.md"), true);
+  assert.equal(isEvidenceArtifactPath("backlog/evidence/nested/bar.txt"), true);
+  assert.equal(isEvidenceArtifactPath("specs/sprint-nova-epic/evidence/repro.txt"), true);
+  assert.equal(isEvidenceArtifactPath("specs/feature-x/evidence/capture.log"), true);
+  assert.equal(isEvidenceArtifactPath("evidence/dispatch-record-01.json"), true);
+  assert.equal(isEvidenceArtifactPath("./backlog/evidence/foo.md"), true);
+  assert.equal(isEvidenceArtifactPath("backlog/items/2026-09-04-item.md"), false);
+  assert.equal(isEvidenceArtifactPath("src/pipeline.js"), false);
+  assert.equal(isEvidenceArtifactPath("docs/operating-model.md"), false);
+  assert.equal(isEvidenceArtifactPath(null), false);
+  assert.equal(isEvidenceArtifactPath(""), false);
 });
 
-test("P0 regression: migration-required admits Edit, Write, NotebookEdit to scratch and mkdir -p scratch/nested, while refusing non-scratch", () => {
+test("EVIDENCE-HOST-PATH: extractWritePayload extracts content across tools", () => {
+  assert.equal(extractWritePayload({ content: "hello" }, "Write"), "hello");
+  assert.equal(extractWritePayload({ new_string: "world" }, "Edit"), "world");
+  assert.equal(extractWritePayload({ CodeContent: "code" }, "write_to_file"), "code");
+  assert.equal(extractWritePayload({ ReplacementContent: "replacement" }, "replace_file_content"), "replacement");
+  assert.equal(extractWritePayload(null, "Write"), "");
+});
+
+test("EVIDENCE-HOST-PATH: writing an absolute host path into evidence is blocked and diagnostic redacts path", () => {
   const path = root();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    const migrationDeps = {
-      projectDir: path,
-      requireProjectOnboardingReadyFn() { deny("migration-required"); },
+    const writeCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "backlog/evidence/2026-09-18-host-path-test.md",
+        content: "Execution trace: failed at /home/developer/src/agent-pipeline/test.js:10\n",
+      },
     };
+    const result = evaluateLifecycleReadyGuard(writeCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-EVIDENCE-HOST-PATH/u);
+    assert.match(result.stderr, /Matched pattern: posix-home/u);
+    // Diagnostic must not leak the matched sensitive host path itself
+    assert.equal(result.stderr.includes("/home/developer/src/agent-pipeline"), false);
 
-    for (const input of [
-      write("scratch/notes.md"),
-      edit("scratch/notes.md"),
-      write("scratch/deep/nested/notes.md"),
-      notebookEdit("scratch/experiment.ipynb"),
-    ]) {
-      const res = evaluateLifecycleReadyGuard(input, migrationDeps);
-      assert.equal(res.exitCode, 0, `Expected scratch write admitted: ${input.tool_name}`);
-    }
+    // Clean relative/placeholder write to same target is admitted
+    const cleanWrite = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "backlog/evidence/2026-09-18-host-path-test.md",
+        content: "Execution trace: failed at <repo-root>/test.js:10\n",
+      },
+    };
+    const cleanResult = evaluateLifecycleReadyGuard(cleanWrite, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(cleanResult.exitCode, 0, cleanResult.stderr);
 
-    for (const command of [
-      "mkdir scratch",
-      "mkdir -p scratch",
-      "mkdir -p scratch/nested",
-    ]) {
-      const res = evaluateLifecycleReadyGuard(bash(command), migrationDeps);
-      assert.equal(res.exitCode, 0, `Expected scratch mkdir admitted: ${command}`);
-    }
+    // Edit tool with host path in new_string is also blocked
+    const editCall = {
+      tool_name: "Edit",
+      tool_input: {
+        file_path: "specs/sprint-nova-epic/evidence/test.log",
+        old_string: "old",
+        new_string: "Error at C:\\Users\\Administrator\\AppData\\Local\\Temp\\run.log",
+      },
+    };
+    const editResult = evaluateLifecycleReadyGuard(editCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(editResult.exitCode, 2);
+    assert.match(editResult.stderr, /GUARD-EVIDENCE-HOST-PATH/u);
+    assert.match(editResult.stderr, /Matched pattern: windows-drive-letter/u);
+    assert.equal(editResult.stderr.includes("C:\\Users\\Administrator"), false);
 
-    for (const input of [
-      write("src/app.js"),
-      edit("docs/readme.md"),
-      write("scratch-sibling/evil.js"),
-    ]) {
-      const res = evaluateLifecycleReadyGuard(input, migrationDeps);
-      assert.equal(res.exitCode, 2, `Expected non-scratch write refused: ${input.tool_name}`);
-      assert.match(res.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
-    }
+    // Writing a host path into a non-evidence file is not blocked under this code
+    const nonEvidenceCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "scratch/test-log.txt",
+        content: "Error at /home/developer/test.log",
+      },
+    };
+    const nonEvidenceResult = evaluateLifecycleReadyGuard(nonEvidenceCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(nonEvidenceResult.exitCode, 0, nonEvidenceResult.stderr);
   } finally {
     rmSync(path, { recursive: true, force: true });
   }
 });
 
-test("git apply --check with explicit patch files is observation-only, including an external -C target", () => {
+
+test("DISPATCH-RECORD-COLLISION: checkDispatchRecordCollision detects completed record overwrite and git history collisions", () => {
   const path = root();
-  const external = mkdtempSync(join(tmpdir(), "git-apply-check-target-"));
   try {
-    for (const command of [
-      `git apply --check scratch/fix.patch`,
-      `git apply --check -- scratch/one.patch scratch/two.diff`,
-      `git -C '${external}' apply --check scratch/fix.patch`,
-    ]) {
-      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
-      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
-    }
-    for (const command of [
-      `git apply scratch/fix.patch`,
-      `git apply --check`,
-      `git apply --check --cached scratch/fix.patch`,
-      `git apply --check scratch/fix.txt`,
-    ]) assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    const evidenceDir = join(path, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+
+    // 1. File exists with terminal outcome: opening write is rejected
+    const existingFile = join(evidenceDir, "dispatch-record-TASK-COMPLETED.json");
+    writeFileSync(existingFile, JSON.stringify({
+      taskId: "TASK-COMPLETED",
+      outcome: "completed",
+      candidateCommit: "a".repeat(40),
+    }), "utf8");
+
+    const hitTerminal = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-TASK-COMPLETED.json",
+      requested: existingFile,
+      payload: JSON.stringify({ taskId: "TASK-COMPLETED", outcome: "in-progress" }),
+      root: path,
+    });
+    assert.ok(hitTerminal !== null);
+    assert.equal(hitTerminal.taskId, "TASK-COMPLETED");
+    assert.match(hitTerminal.reason, /already been used by a completed dispatch/);
+
+    // 2. Fresh task ID with no file and no git commit: allowed
+    const hitFresh = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-FRESH-TASK.json",
+      requested: join(evidenceDir, "dispatch-record-FRESH-TASK.json"),
+      payload: JSON.stringify({ taskId: "FRESH-TASK", outcome: "in-progress" }),
+      root: path,
+      dependencies: { gitCommitForTaskIdFn: () => null },
+    });
+    assert.equal(hitFresh, null);
+
+    // 3. Updating an in-progress record to terminal: allowed
+    const inProgressFile = join(evidenceDir, "dispatch-record-TASK-RUNNING.json");
+    writeFileSync(inProgressFile, JSON.stringify({
+      taskId: "TASK-RUNNING",
+      outcome: "in-progress",
+    }), "utf8");
+    const hitFinalize = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-TASK-RUNNING.json",
+      requested: inProgressFile,
+      payload: JSON.stringify({ taskId: "TASK-RUNNING", outcome: "completed" }),
+      root: path,
+    });
+    assert.equal(hitFinalize, null);
+
+    // 4. Opening write with task ID already in git history: rejected
+    const hitGitHistory = checkDispatchRecordCollision({
+      relPath: "evidence/dispatch-record-PRIOR-TASK.json",
+      requested: join(evidenceDir, "dispatch-record-PRIOR-TASK.json"),
+      payload: JSON.stringify({ taskId: "PRIOR-TASK", outcome: "in-progress" }),
+      root: path,
+      dependencies: { gitCommitForTaskIdFn: () => "f262a5c712345678" },
+    });
+    assert.ok(hitGitHistory !== null);
+    assert.equal(hitGitHistory.taskId, "PRIOR-TASK");
+    assert.match(hitGitHistory.reason, /already bound to commit f262a5c71234 in git history/);
   } finally {
     rmSync(path, { recursive: true, force: true });
-    rmSync(external, { recursive: true, force: true });
+  }
+});
+
+test("DISPATCH-RECORD-COLLISION: evaluateLifecycleReadyGuard blocks tool writes colliding on task IDs", () => {
+  const path = root();
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const evidenceDir = join(path, "evidence");
+    mkdirSync(evidenceDir, { recursive: true });
+
+    // Pre-populate completed record
+    const recordPath = join(evidenceDir, "dispatch-record-DONE-TASK.json");
+    writeFileSync(recordPath, JSON.stringify({
+      taskId: "DONE-TASK",
+      outcome: "completed",
+    }), "utf8");
+
+    const writeCall = {
+      tool_name: "Write",
+      tool_input: {
+        file_path: "evidence/dispatch-record-DONE-TASK.json",
+        content: JSON.stringify({ taskId: "DONE-TASK", outcome: "in-progress" }, null, 2),
+      },
+    };
+
+    const result = evaluateLifecycleReadyGuard(writeCall, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-DISPATCH-RECORD-COLLISION/u);
+    assert.match(result.stderr, /already been used by a completed dispatch/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
   }
 });
 

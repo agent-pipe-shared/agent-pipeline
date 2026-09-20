@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-01
 due: 2026-09-30
 source: "Direct measurement, 2026-09-01: two dispatches independently fixed the same file, a third spent budget confirming a fix already committed by another agent, and a full verify.mjs run failed on candidate-binding drift because the orchestrator committed mid-run."
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: a4c77364b8b1fcfc122d19be71e8d7800c3d19a5
+closure_evidence: backlog/evidence/2026-09-18-process-rules-and-concurrent-dispatch-closure.md
 ---
 
 # Concurrent dispatches in one shared checkout collide in ways no guard catches

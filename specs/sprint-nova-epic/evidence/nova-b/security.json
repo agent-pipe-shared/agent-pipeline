@@ -1,16 +1,16 @@
 {
   "schema": "pipeline.security-evidence.v1",
   "project": "agent-pipeline",
-  "command": "node harness/scripts/security-scan.mjs",
-  "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+  "command": "node plugins/pipeline-core/scripts/security-scan.mjs",
+  "commit": "986f8f03b7ca737e93d2553be41d7877c5f84137",
   "candidate": {
     "status": "clean",
-    "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
-    "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1",
-    "inputSha256": "45817848e75f4c9fb11d8e978f348c904e112d73877f85c57484e2b3310b80d0",
+    "commit": "986f8f03b7ca737e93d2553be41d7877c5f84137",
+    "tree": "cce5739e609985784d5f46b88a0d4b2b899dd31c",
+    "inputSha256": "e535049c67184e15c309bc0a121eea826b939af0819627a44268cf299d658aa5",
     "repositorySha256": "b6137fe69f388c729e9c782159a75c7f1dbf9e3749281fda9f840031e72dfa85",
     "inventory": {
-      "entries": 944,
+      "entries": 3657,
       "symlinkPolicy": "reject",
       "submodulePolicy": "reject"
     },
@@ -20,7 +20,7 @@
       "verifiedBeforeAfter": true
     }
   },
-  "finishedAt": "2026-07-27T12:40:26.491Z",
+  "finishedAt": "2026-09-18T20:07:06.170Z",
   "thresholds": {
     "block_on": [
       "critical",
@@ -31,17 +31,27 @@
     "schema": "pipeline.security-policy-binding.v1",
     "configurationSha256": "fe9d1c31aca7bf7abeead315d3c4320062d589fd25234de5819532f9d2553728",
     "inputs": {
-      "manifestSha256": null,
-      "declaredLicensesSha256": null,
-      "licenseAllowlistSha256": null,
+      "authoritySource": "neutral",
+      "manifestPath": "project/pipeline.yaml",
+      "manifestSha256": "65fbb80895be7c31057cebb4b2aa5b38a468f3808d6ecc5caf47b55140820ee9",
+      "gitleaksIgnorePath": ".gitleaksignore",
+      "gitleaksIgnoreSha256": "bdc4fd5bf7f7a0d456e769421b0b5a39726748206ef2dc0228578d92e34a78a2",
+      "declaredLicensesPath": "third-party-licenses.json",
+      "declaredLicensesSha256": "137fd317197b1c9a9753679328944cef4ccfb7ad834efaaa26959e5470f05bd0",
+      "licenseAllowlistPath": "governance/examples/policies/license-allowlist.json",
+      "licenseAllowlistSha256": "8c9921cec73ce68ea9498b47b546820d36d0a63ef604bd39f24061d60b70b016",
       "semgrepRulesPath": "governance/examples/policies/semgrep"
     },
-    "sha256": "cd15b5f9c03aad2451d90a8853797b28763e6d0490d3ac05cc25f6c5b556e16a"
+    "sha256": "1ae2c3a12436f989982c4f8014b8ed9dd615b2ae46852e724ccb9ec40a235471"
   },
   "execution": {
     "childProcessPreflight": {
       "status": "PASS",
       "classification": "success"
+    },
+    "projectAuthority": {
+      "status": "ready",
+      "source": "neutral"
     },
     "snapshotCleanup": {
       "status": "removed"
@@ -58,12 +68,19 @@
       "coverage": {
         "subject": "candidate-tree",
         "exclusions": []
-      }
+      },
+      "ignored": {
+        "policy": "pipeline.gitleaks-content-fingerprint.v1",
+        "authorityPath": ".gitleaksignore",
+        "authoritySha256": "bdc4fd5bf7f7a0d456e769421b0b5a39726748206ef2dc0228578d92e34a78a2",
+        "findingCount": 26
+      },
+      "reportStatus": "passed"
     },
     {
       "tool": "osv-scanner",
       "adapter": "pipeline.security-adapter.v1",
-      "executableSha256": "5b67ba474cd164104f04c4de4d575131a827cdff32155bb8930f55700ea2ba12",
+      "executableSha256": "4c5d3ca1a8c242f8fca6bb588584bf317b27c1fcec6055c62e431dd734f481f9",
       "status": "SKIPPED",
       "classification": "success",
       "findingCount": 0,
@@ -71,7 +88,8 @@
         "subject": "candidate-tree",
         "exclusions": []
       },
-      "reason": "no package sources in project (osv-scanner: \"No package sources found\", exit 128)"
+      "reason": "no package sources in project (osv-scanner: \"No package sources found\", exit 128)",
+      "reportStatus": "not-applicable"
     },
     {
       "tool": "semgrep",
@@ -83,7 +101,8 @@
       "coverage": {
         "subject": "candidate-tree",
         "exclusions": []
-      }
+      },
+      "reportStatus": "passed"
     },
     {
       "tool": "license-check",
@@ -95,10 +114,11 @@
       "coverage": {
         "subject": "candidate-tree",
         "exclusions": []
-      }
+      },
+      "reportStatus": "passed"
     }
   ],
   "findings": [],
   "exitCode": 0,
-  "payloadSha256": "dd5285a424800e7afd9f9050f1d07ac416741006061421177c555d2fc385d2c6"
+  "payloadSha256": "fcf1d8696d20ef45a6286eae155e05c52d03f2ce50968f8f0e20aa62e582da48"
 }

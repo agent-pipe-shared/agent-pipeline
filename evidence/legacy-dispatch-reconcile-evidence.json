@@ -1,0 +1,174 @@
+{
+  "schema": "pipeline.legacy-dispatch-reconcile-evidence.v1",
+  "purpose": "Byte-bound evidence for historical Nova-B terminal records that truthfully have no authored commit.",
+  "records": [
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-01V4.json",
+      "taskId": "NVA-B-AUDIT-01V4",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-02V4.json",
+      "taskId": "NVA-B-AUDIT-02V4",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-03V4.json",
+      "taskId": "NVA-B-AUDIT-03V4",
+      "outcome": "partial",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-04.json",
+      "taskId": "NVA-B-AUDIT-04",
+      "outcome": "partial",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-05.json",
+      "taskId": "NVA-B-AUDIT-05",
+      "outcome": "partial",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-06.json",
+      "taskId": "NVA-B-AUDIT-06",
+      "outcome": "partial",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-07.json",
+      "taskId": "NVA-B-AUDIT-07",
+      "outcome": "partial",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-08.json",
+      "taskId": "NVA-B-AUDIT-08",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-09.json",
+      "taskId": "NVA-B-AUDIT-09",
+      "outcome": "partial",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-10.json",
+      "taskId": "NVA-B-AUDIT-10",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC1R3.json",
+      "taskId": "NVA-B-AUDIT-AC1R3",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC2.json",
+      "taskId": "NVA-B-AUDIT-AC2",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC3.json",
+      "taskId": "NVA-B-AUDIT-AC3",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC4R2.json",
+      "taskId": "NVA-B-AUDIT-AC4R2",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC5.json",
+      "taskId": "NVA-B-AUDIT-AC5",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AC6.json",
+      "taskId": "NVA-B-AUDIT-AC6",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-AUTHORITY-THREE.json",
+      "taskId": "NVA-B-AUDIT-AUTHORITY-THREE",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-CALIBRATION-R2.json",
+      "taskId": "NVA-B-AUDIT-CALIBRATION-R2",
+      "outcome": "completed-analysis-only",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-MISSING-THREE-R2.json",
+      "taskId": "NVA-B-AUDIT-MISSING-THREE-R2",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-AUDIT-R1.json",
+      "taskId": "NVA-B-AUDIT-R1",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-CALIBRATION-DESIGN-R2.json",
+      "taskId": "NVA-B-CALIBRATION-DESIGN-R2",
+      "outcome": "analysis-complete",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-PROMOTION-MAP.json",
+      "taskId": "NVA-B-PROMOTION-MAP",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-PROMOTION-Q0.json",
+      "taskId": "NVA-B-PROMOTION-Q0",
+      "outcome": "completed",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    },
+    {
+      "recordPath": "evidence/dispatch-record-NVA-B-PUSH-LIFECYCLE-DESIGN-R3.json",
+      "taskId": "NVA-B-PUSH-LIFECYCLE-DESIGN-R3",
+      "outcome": "completed-analysis-only",
+      "commits": 0,
+      "statement": "Historical terminal record; no authored commit was recorded. The original record is preserved and remains non-qualifying for code review."
+    }
+  ]
+}

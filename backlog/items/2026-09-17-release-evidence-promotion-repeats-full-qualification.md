@@ -1,13 +1,17 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.release-evidence-promotion-repeats-full-qualification
-type: requirement
-owner: pipeline
-status: open
-created: 2026-09-17
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.release-evidence-promotion-repeats-full-qualification"
+type: "requirement"
+owner: "pipeline"
+status: "closed"
+created: "2026-09-17"
 source: "PO release observation, 2026-09-17: the 0.6.2 release/push path generated equivalent evidence under multiple names; independently measured in the 0.6.2 release session against harness/scripts/verify.mjs, scripts/push-init.mjs and scripts/push-prepare.mjs."
-sprint: nova-b
-done_when: manual
+sprint: "nova-b"
+done_when: "manual"
+closed_at: "2026-09-18"
+closure_repository: "self"
+closure_commit: "9dc5b8e5407491ffccf85d304f111571c192b199"
+closure_evidence: "backlog/evidence/2026-09-18-release-promotion-simplification-closure.md"
 ---
 
 # A release promotion repeats full qualification when only an evidence record changes

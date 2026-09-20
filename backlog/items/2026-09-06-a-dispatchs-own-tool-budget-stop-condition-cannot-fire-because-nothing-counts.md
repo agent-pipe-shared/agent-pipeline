@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.tool-budget-stop-condition-cannot-fire
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
 sprint: nova-b
 done_when: manual
 tracking: "Nova B -- every Goldfish briefing carries 'tool budget reached or clearly about to be exceeded' as a stop condition, but an agent has no counter to read: it must estimate its own tool-call count from memory of its own turn. Measured twice on 2026-09-06 in one session: both dispatches overran and neither stop condition fired. This is a sibling of the closed maxTurns-cliff item, not a duplicate -- that one was about the hard limit being unannounced, this one is about the soft limit being unobservable to the agent expected to honour it."
 source: "Direct measurement, 2026-09-06: NVA-B-VERIFYLANE-2 used ~59-61 tool calls against a briefed 45+5 and reported the overrun only after an advisor consult flagged it retroactively; NVA-B-DENIALCODE-1 reached the harness turn limit at 80 against a briefed 40+5, losing its report entirely."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 1bfe7fe57d978f12bf8790606e232dcb7cdc09a2
+closure_evidence: backlog/evidence/2026-09-18-dispatch-tool-budget-enforcement-closure.md
 ---
 
 # A dispatch's own tool-budget stop condition cannot fire, because nothing counts the tool calls

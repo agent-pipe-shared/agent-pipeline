@@ -3,25 +3,29 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b9b01afbe4c8ebd624094b4943d036921fdf80bb92fb3f0d874c1de50e6c1e1d"
+    "transitionHead": "e7d357a85d8e896b418e3d3b5703b638c08b59c3b2b6e60847fdbceaf5f62135"
   },
   "counts": {
-    "open": 68,
-    "in_progress": 1,
-    "closed": 599,
+    "open": 29,
+    "in_progress": 0,
+    "closed": 639,
     "rejected": 3,
     "deferred": 11
   },
   "items": [
     {
       "id": "pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Observed twice in one session, 2026-09-01: dispatches NVA-B-WFRECORD and NVA-B-DENIALTRIM each called the advisor tool although field 4 of their briefings forbade it. Both disclosed the call unprompted.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "28ca87187ad96fc94d970fa20c178e954371fa25",
+      "closureEvidence": "backlog/evidence/2026-09-18-advisor-prohibition-closure.md"
     },
     {
       "id": "pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it",
@@ -167,13 +171,17 @@
     },
     {
       "id": "pipeline.a-doc-edit-silently-obligates-its-vendored-copy",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Measured live, twice, in the 2026-09-01 0.6.0 release range: docs/push-release-flow.md drift caught in commit 62ba638b, docs/adr/0076-global-chat-attributed-unattested-approval-mode.md drift caught in commit 56e91858.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "a64b09eafb3986ae1259806f01d7321b638897e2",
+      "closureEvidence": "backlog/evidence/2026-09-18-ai-hardening-and-doc-obligations-closure.md"
     },
     {
       "id": "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback",
@@ -191,14 +199,18 @@
     },
     {
       "id": "pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-04",
       "source": "Split out of backlog/items/2026-09-02-red-evidence-captured-from-node-test-embeds-the-absolute-repository-path.md, whose 'Direction to evaluate' section named two directions and whose remedy dispatch (NVA-B-REDCAPTURE-1, 2026-09-03/04) was scoped to the first one only. Filed so the parent item's closure does not bury the second.",
       "deferred": false,
       "tracking": "Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "d0e04f13936314a770fb7fc617fd552a58763a18",
+      "closureEvidence": "backlog/evidence/2026-09-18-evidence-host-path-guard-closure.md"
     },
     {
       "id": "pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair",
@@ -244,13 +256,17 @@
     },
     {
       "id": "pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Measured live during the 2026-09-01 0.6.0 release: three-destination push (feat/sprint-nova-codex-v046, main, stable) required three fully separate sign -> approve-push -> push cycles.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
+      "closureEvidence": "backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md"
     },
     {
       "id": "pipeline.a-read-only-command-is-refused-for-naming-a-protected-path",
@@ -698,13 +714,17 @@
     },
     {
       "id": "pipeline.all-three-runners-should-install-against-the-stable-branch",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-27",
       "source": "PO decision 2026-08-27, confirmed in session; distribution mapping performed the same day against the live installers and the update-channel resolver",
       "deferred": false,
-      "sprint": "nightwing"
+      "sprint": "nightwing",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "3ede9d0dec4d506b06bb1825826785fd57bd717a",
+      "closureEvidence": "backlog/evidence/2026-09-18-all-three-runners-install-closure.md"
     },
     {
       "id": "pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict",
@@ -760,14 +780,18 @@
     },
     {
       "id": "pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-04",
       "source": "Found while diagnosing the only genuine red in the full verify run at commit 2aeeaa68 (NVA-B-LWSRED-1, 2026-09-04): plugins/pipeline-core/lib/local-worker-supervisor.test.mjs reported one failing test, and LWS08 through LWS15 had not run at all for a day. Confirmed by the fix: the same file now reports 15/15.",
       "deferred": false,
       "tracking": "Nova B — a failing suite reports one failure and hides an unknown number of cases that never executed. The gate cannot distinguish 'one case failed' from 'one case failed and eight never ran'.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "c18e1f184c894ce91569239b2d50b719ea5c5a00",
+      "closureEvidence": "backlog/evidence/2026-09-18-uncaught-assertion-truncation-protocol-closure.md"
     },
     {
       "id": "pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed",
@@ -1199,14 +1223,18 @@
     },
     {
       "id": "pipeline.baseline-only-verify-needs-an-actionable-release-recovery",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-retrospective-2026-09-13.md.",
       "deferred": false,
       "tracking": "Nova B — the intentionally permitted baseline-only verify state becomes expensive when it is discovered late at push time and a runner cannot discover the exact recovery through its normal driver.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "3daeb7be99d2e1d534396b7ccdc8892ab0198be7",
+      "closureEvidence": "backlog/evidence/2026-09-18-baseline-only-verify-recovery-closure.md"
     },
     {
       "id": "pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code",
@@ -1316,13 +1344,17 @@
     },
     {
       "id": "pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "four dispatches measured on 2026-09-06 against their own briefed caps; one was cut at the harness maxTurns limit mid-verification. Second instance of the class in backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "1bfe7fe57d978f12bf8790606e232dcb7cdc09a2",
+      "closureEvidence": "backlog/evidence/2026-09-18-dispatch-tool-budget-enforcement-closure.md"
     },
     {
       "id": "pipeline.briefing-bundling-two-findings-asks-for-two-dispatches",
@@ -1370,14 +1402,18 @@
     },
     {
       "id": "pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md §§55–89.",
       "deferred": false,
       "tracking": "Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
+      "closureEvidence": "backlog/evidence/2026-09-18-installed-plugin-and-calibration-twins-closure.md"
     },
     {
       "id": "pipeline.canonical-verify-evidence-path",
@@ -1421,13 +1457,17 @@
     },
     {
       "id": "pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "NVA-B-WIREAUDIT-1, a measured reachability audit of every non-test module under plugins/pipeline-core/{lib,scripts,hooks}; report backlog/evidence/2026-09-06-built-but-unwired-audit.md, machine output evidence/NVA-B-WIREAUDIT-1-graph.json. Commissioned by the PO on the suspicion that built-but-unwired is a pattern of agentic development rather than a set of accidents.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "9ced16b44b03495cc62d34d0e0fbc7e56d61e78f",
+      "closureEvidence": "backlog/evidence/2026-09-18-capability-reachability-closure.md"
     },
     {
       "id": "pipeline.capture-evidence-refuses-fixture-literal-as-host-path",
@@ -1474,24 +1514,32 @@
     },
     {
       "id": "pipeline.ci-failure-reporter-has-no-recorded-requirement",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Found on 2026-09-01 while constructing the Critic rounds for the day's wave: the round covering this component could not be dispatched.",
       "deferred": false,
       "tracking": "Nova B — print-verify-failures.mjs decides what a failing CI run writes into a public log, and no artifact anywhere states what it is required to do. A Critic dispatch against it is refused by its own fail-closed boundary for want of a spec.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "b22d6e2c54b1fde875d0280fc49d6555cc922073",
+      "closureEvidence": "backlog/evidence/2026-09-18-ci-failure-reporter-requirement-closure.md"
     },
     {
       "id": "pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "GitHub Actions run 33595311782 (push to main, commit 6262d408), job verify, step Runner-free offline Core Verify, suite guard-lifecycle-ready-tests",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "5b2ce433f76c59805f998a0c1bbcd213e7417063",
+      "closureEvidence": "backlog/evidence/NVA-B-CI-PATH-TRUE-CLOSURE-1.md"
     },
     {
       "id": "pipeline.ci-topology-preflight-cannot-pass-on-this-branch",
@@ -1759,13 +1807,17 @@
     },
     {
       "id": "pipeline.codex-runtime-fixture-assumes-wsl2-in-ci",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-17",
       "source": "GitHub Actions Verify run 35263935526 for released commit f8cc1b2297b5b6a2ef2d64a2dd43f4a76ec37f31: only codex-sandbox-runtime-tests failed. Local source inspection and the targeted 15/15 regression run identified the WSL2-only fixture assumption.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "8b4aa6aa98c73654fd21703ea8143d26e4dcd2f5",
+      "closureEvidence": "backlog/evidence/2026-09-18-codex-runtime-fixture-ci-verification.md"
     },
     {
       "id": "pipeline.codex-sandbox-critic-longterm",
@@ -1986,14 +2038,18 @@
     },
     {
       "id": "pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Direct measurement, 2026-09-01: two dispatches independently fixed the same file, a third spent budget confirming a fix already committed by another agent, and a full verify.mjs run failed on candidate-binding drift because the orchestrator committed mid-run.",
       "deferred": false,
       "due": "2026-09-30",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "a4c77364b8b1fcfc122d19be71e8d7800c3d19a5",
+      "closureEvidence": "backlog/evidence/2026-09-18-process-rules-and-concurrent-dispatch-closure.md"
     },
     {
       "id": "pipeline.concurrent-dispatches-share-one-index",
@@ -2988,14 +3044,18 @@
     },
     {
       "id": "pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-retrospective-2026-09-13.md §§37–39, 95–118.",
       "deferred": false,
       "tracking": "Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "b1255de9755e6645deb4cd00bd65647761f060a7",
+      "closureEvidence": "backlog/evidence/2026-09-18-runner-usage-selectors-closure.md"
     },
     {
       "id": "pipeline.first-verify-run-is-red-with-four-failures",
@@ -3039,13 +3099,17 @@
     },
     {
       "id": "pipeline.fourteen-evidence-files-are-tracked-inside-a-gitignored-directory",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Surfaced during the 2026-09-01 pre-release cleanup attempt for the 0.6.0 release: the dispatcher moved files out of evidence/ by wildcard without first checking which were tracked, and restored them on discovering closure_evidence citations pointed at four of them.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "f8937f15a74a5a2a697fa325354c2958d574b9af",
+      "closureEvidence": "backlog/evidence/2026-09-18-tracked-evidence-cleanup-closure.md"
     },
     {
       "id": "pipeline.fresh-repo-onboarding-intake-first-transaction",
@@ -3503,14 +3567,18 @@
     },
     {
       "id": "pipeline.greenfield-browser-evidence-is-not-portably-provisioned",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-analysis-claude-session-2026-09-13.md; evidence/pipeline-retrospective-2026-09-13.md.",
       "deferred": false,
       "tracking": "Nova B — all three reports distinguish valid static/offline verification from unavailable browser evidence, but the consumer path does not make that capability gap early and actionable.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "02d8d1db47fb14555dc77b4d5b048fbbdbf814e0",
+      "closureEvidence": "backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md"
     },
     {
       "id": "pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference",
@@ -3989,13 +4057,17 @@
     },
     {
       "id": "pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Critic round I, finding F-2, 2026-09-01, reviewing commit 7bca7f5d. Measured against evidence/dispatch-record-NVA-B-HANDOVERPATH-FIX.json and then against the whole evidence corpus.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "8f7b617d0f4c8d6834cfb73eabfb5e32c68ba83f",
+      "closureEvidence": "backlog/evidence/2026-09-18-dispatch-record-binding-and-collision-closure.md"
     },
     {
       "id": "pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge",
@@ -4311,14 +4383,18 @@
     },
     {
       "id": "pipeline.identical-lifecycle-argv-must-have-shell-lane-parity",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md §5.2 and §10.3.",
       "deferred": false,
       "tracking": "Nova B — the Claude Windows run observed an exact `--push-approval signature` lifecycle invocation rejected as Bash parse-unsupported but admitted via PowerShell.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "0be90b61c431bba82a25e39b194c8e74289d024e",
+      "closureEvidence": "backlog/evidence/2026-09-18-shell-lane-parity-closure.md"
     },
     {
       "id": "pipeline.identity-attestation-fails-open-on-unresolved-transcript-path",
@@ -4392,7 +4468,7 @@
     },
     {
       "id": "pipeline.installed-plugin-copy-stale-vs-repo-source",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
@@ -4400,7 +4476,11 @@
       "deferred": false,
       "tracking": "Nova B — a T1 Critic reviewing NVA-B-TILDEFIX-1 ran a live reachability probe (a synthetic marker path, never a real credential) and found the shell-expanded tilde was ADMITTED AND EXECUTED by the guard actually enforcing that dispatch's own session — even though the source fix is confirmed present and Critic-approved in the reviewed working tree. Traced by the Elephant: the enforcing hook is loaded from the installed marketplace copy (/home/skar667/agent-pipeline-local-marketplace/plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs), a plain regular file (not a symlink) last modified 2026-09-04 07:42, which diverges from the repo's own copy by roughly six commits and predates NVA-B-READCONTAIN-1 entirely, not only NVA-B-TILDEFIX-1.",
       "due": "2026-09-30",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "f1ce7417058ea95b8aa6646e3bc2388d2e127257",
+      "closureEvidence": "backlog/evidence/2026-09-18-installed-plugin-and-calibration-twins-closure.md"
     },
     {
       "id": "pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits",
@@ -4648,14 +4728,18 @@
     },
     {
       "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
       "source": "L-AC-01 investigation (PHX-WP-LAC01-REMAINING, 2026-08-17) plus this session's own re-check of validateLifecycleGovernanceEvent and the approve-push call site, specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['L-AC-01']. Migrated verbatim from the Phoenix checkout (agent-pipeline-share_phoenix, branch sprint_phoenix) into this Nova repository's backlog on 2026-08-19 per explicit PO instruction — see Migration note below.",
       "deferred": true,
       "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "820913465300402e39adec5ae955ae5a26f3a2e7",
+      "closureEvidence": "backlog/evidence/2026-09-18-lifecycle-event-schema-nondispatch-closure.md"
     },
     {
       "id": "pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote",
@@ -5077,13 +5161,17 @@
     },
     {
       "id": "pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO judgment plus Claude/Windows audit section 3.1 from the 2026-08-29 three-runner greenfield test (finding F30 of scratch/greenfield-triage-2026-08-29.md), Antigravity/WSL run.",
       "deferred": true,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "7adbf8d55668a1978b41e106a2728e485a72bf60",
+      "closureEvidence": "backlog/evidence/2026-09-18-requirement-traceability-gate-closure.md"
     },
     {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
@@ -6318,14 +6406,18 @@
     },
     {
       "id": "pipeline.project-audit-evidence-overview-for-external-review",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-30",
       "source": "PO observation during the 0.6.0 greenfield evaluation, 2026-08-30. Direct inspection confirmed that durable project artifacts and private runtime ledgers are intentionally split across the tracked project tree and .git/agent-pipeline/, but no reviewer-facing map explains or links the split.",
       "deferred": false,
       "tracking": "Nova B — PO requirement from the 0.6.0 three-runner greenfield evaluation: a reviewer of an independently developed project must be able to locate the Pipeline's applicable controls, human gates, exceptions, and evidence without relying on an operator's private local knowledge.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "848d85b7f6d2ba9b63224d67e98099b197fdffe8",
+      "closureEvidence": "backlog/evidence/2026-09-18-audit-evidence-overview-closure.md"
     },
     {
       "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
@@ -6548,24 +6640,32 @@
     },
     {
       "id": "pipeline.push-artifacts-precede-operator-intent",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-17",
       "source": "evidence/codex-pipeline-session-analysis.md and evidence/pipeline-analysis-claude-session.md, independently compared with the 0.6.2 push-init experience on 2026-09-17.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
+      "closureEvidence": "backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md"
     },
     {
       "id": "pipeline.push-flow-needs-one-remote-readback-transaction",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-retrospective-2026-09-13.md §4 and recommendations.",
       "deferred": false,
       "tracking": "Nova B — a generic push can leave pendingAuditWrite and no remote readback; testers need one canonical success/failure boundary rather than a sequence of inferred follow-up steps.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
+      "closureEvidence": "backlog/evidence/2026-09-18-push-lifecycle-and-intent-architecture-closure.md"
     },
     {
       "id": "pipeline.push-gate-is-silent-in-every-consumer-project",
@@ -6988,13 +7088,17 @@
     },
     {
       "id": "pipeline.release-evidence-promotion-repeats-full-qualification",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-17",
       "source": "PO release observation, 2026-09-17: the 0.6.2 release/push path generated equivalent evidence under multiple names; independently measured in the 0.6.2 release session against harness/scripts/verify.mjs, scripts/push-init.mjs and scripts/push-prepare.mjs.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "9dc5b8e5407491ffccf85d304f111571c192b199",
+      "closureEvidence": "backlog/evidence/2026-09-18-release-promotion-simplification-closure.md"
     },
     {
       "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
@@ -7129,13 +7233,17 @@
     },
     {
       "id": "pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-31",
       "source": "Independent Critic privacy-sweep review (F1), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md, candidate 4defe09ece85721747f039036356ef80aed1b084",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
+      "closureEvidence": "backlog/evidence/2026-09-18-privacy-inventory-and-signoff-closure.md"
     },
     {
       "id": "pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage",
@@ -7210,13 +7318,17 @@
     },
     {
       "id": "pipeline.role-dispatch-payload-errors-fail-before-model-launch",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-10",
       "source": "PO observation during 0.6.2 candidate review: malformed or incomplete role dispatches repeatedly consumed roughly ten minutes before reporting a coordinator/payload failure. The requirement applies to every role, not only Critic.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "b3272edc25741fee42aaeda4913aa4b517fc531c",
+      "closureEvidence": "backlog/evidence/2026-09-18-role-dispatch-payload-preflight-closure.md"
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
@@ -7263,14 +7375,18 @@
     },
     {
       "id": "pipeline.runner-native-subagent-tool-identity-is-not-portable",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-agy-062-103.md.",
       "deferred": false,
       "tracking": "Nova B — Antigravity reports DBB-PARENT-TOOL-USE-ID-MISSING for ordinary roles; do not weaken dispatch binding before collecting the native sanitized payload.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "f5d93d5d96564a993860671312e0c171fd4d80f8",
+      "closureEvidence": "backlog/evidence/2026-09-18-runner-native-subagent-tool-identity-closure.md"
     },
     {
       "id": "pipeline.runner-neutrality-before-third-runner",
@@ -8003,14 +8119,18 @@
     },
     {
       "id": "pipeline.template-scripts-for-human-terminal-actions",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-29",
       "source": "PO inline observation (2026-08-29, 3-runner greenfield synthesis): Antigravity was the only runner to move quickly through the first 2 phases, in part because it built its OWN scripts to confirm the PRD faster. PO suggests: pre-built template scripts (that runners lightly rewrite, with clear placeholders) for fixed gates/installs/anything the human must run in a terminal, so what needs filling in is always clear.",
       "deferred": true,
       "tracking": "Nova B -- runner-neutral design reviewed; catalog, POSIX runner, and first producer adoption implemented; native Windows launcher hardening is deferred.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "e4d7539d5684f59f3f817670e8a52f70e06e8b3a",
+      "closureEvidence": "backlog/evidence/2026-09-18-human-terminal-templates-closure.md"
     },
     {
       "id": "pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route",
@@ -8042,14 +8162,18 @@
     },
     {
       "id": "pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
       "source": "Re-Critic vtpgate2-368458af finding F5, re-measured and found wider than reported",
       "deferred": false,
       "tracking": "Scheduled for Nova B (PO decision 2026-08-28)",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
+      "closureEvidence": "backlog/evidence/2026-09-18-ai-hardening-and-doc-obligations-closure.md"
     },
     {
       "id": "pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink",
@@ -8161,13 +8285,17 @@
     },
     {
       "id": "pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "PO observation during the 0.6.0 release push, 2026-09-01: the AGY-MKTATTEST-1 push-time check fired on eight unrelated files immediately after `approve-push` signature consumption, forcing a manual external-marketplace sync inside the one window the documented ordering rule forbids any other change.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "6fafa91200e542ba874a7bbdaeeb9cb29539f3b1",
+      "closureEvidence": "backlog/evidence/2026-09-18-marketplace-attestation-closure.md"
     },
     {
       "id": "pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write",
@@ -8198,23 +8326,31 @@
     },
     {
       "id": "pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-31",
       "source": "Independent Critic privacy-sweep review (F2), specs/sprint-phoenix-epic/evidence/privacy-sweep-critic-review-4defe09e.md, candidate 4defe09ece85721747f039036356ef80aed1b084",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "11564c5c3ca41e3ef6aa73af4dd90ca859c6047f",
+      "closureEvidence": "backlog/evidence/2026-09-18-privacy-inventory-and-signoff-closure.md"
     },
     {
       "id": "pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-01",
       "source": "Stashed draft, NVA-B-MKTATTEST (git stash list, stash@{0}: \"push-authority surface narrowing, enumeration proven INCOMPLETE (session-power.mjs missed via join()), do not trust without a sound dynamic-reference detector\"). Verified live 2026-09-01 against plugins/pipeline-core/scripts/session-cleanup.mjs and plugins/pipeline-core/lib/session-cleanup-recovery.mjs.",
       "deferred": false,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "6fafa91200e542ba874a7bbdaeeb9cb29539f3b1",
+      "closureEvidence": "backlog/evidence/2026-09-18-push-authority-surface-closure.md"
     },
     {
       "id": "pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable",
@@ -8372,14 +8508,18 @@
     },
     {
       "id": "pipeline.tool-budget-stop-condition-cannot-fire",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-06",
       "source": "Direct measurement, 2026-09-06: NVA-B-VERIFYLANE-2 used ~59-61 tool calls against a briefed 45+5 and reported the overrun only after an advisor consult flagged it retroactively; NVA-B-DENIALCODE-1 reached the harness turn limit at 80 against a briefed 40+5, losing its report entirely.",
       "deferred": false,
       "tracking": "Nova B -- every Goldfish briefing carries 'tool budget reached or clearly about to be exceeded' as a stop condition, but an agent has no counter to read: it must estimate its own tool-call count from memory of its own turn. Measured twice on 2026-09-06 in one session: both dispatches overran and neither stop condition fired. This is a sibling of the closed maxTurns-cliff item, not a duplicate -- that one was about the hard limit being unannounced, this one is about the soft limit being unobservable to the agent expected to honour it.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "1bfe7fe57d978f12bf8790606e232dcb7cdc09a2",
+      "closureEvidence": "backlog/evidence/2026-09-18-dispatch-tool-budget-enforcement-closure.md"
     },
     {
       "id": "pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default",
@@ -8653,7 +8793,7 @@
     },
     {
       "id": "pipeline.unenforced-process-rules-vary-by-runner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-28",
@@ -8661,7 +8801,11 @@
       "deferred": false,
       "tracking": "Nova B",
       "due": "2026-09-30",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "0be90b61c431bba82a25e39b194c8e74289d024e",
+      "closureEvidence": "backlog/evidence/2026-09-18-process-rules-and-concurrent-dispatch-closure.md"
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
@@ -8802,14 +8946,18 @@
     },
     {
       "id": "pipeline.verify-evidence-needs-an-explicit-strength-class",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-13",
       "source": "evidence/pipeline-analysis-claude-session-2026-09-13.md §10.8; evidence/pipeline-retrospective-2026-09-13.md §§33–39, 95–112.",
       "deferred": false,
       "tracking": "Nova B — a syntax/offline fallback can be honest and useful, but must not be treated as equivalent to the browser behavior evidence a product or release criterion implies.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "02d8d1db47fb14555dc77b4d5b048fbbdbf814e0",
+      "closureEvidence": "backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md"
     },
     {
       "id": "pipeline.verify-gate-scoped-registration",
@@ -9118,7 +9266,7 @@
     },
     {
       "id": "pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-24",
@@ -9126,17 +9274,25 @@
       "deferred": false,
       "tracking": "Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova",
       "due": "2026-08-31",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "50a80e5110715af5b855ee693aabb49e1db749b5",
+      "closureEvidence": "backlog/evidence/2026-09-18-workflow-dispatch-record-closure.md"
     },
     {
       "id": "pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-25",
       "source": "Elephant, 2026-08-25, live incident this session: three parallel Agent-tool dispatches with isolation: \"worktree\" all wrote into the SAME shared checkout, causing zero-commit truncations and a detached-HEAD incident; root-caused and recovered same session",
       "deferred": true,
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "b4e50da519fffb0d74c571d1c829f3f045ec3ed1",
+      "closureEvidence": "backlog/evidence/2026-09-18-workflow-tool-isolation-worktree-closure.md"
     },
     {
       "id": "pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty",
@@ -9166,14 +9322,18 @@
     },
     {
       "id": "pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-02",
       "source": "Elephant, 2026-09-02, while supplying the live-run observation that pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session is blocked on. hooks.json is TP-4 protected, so this is filed rather than fixed in session.",
       "deferred": false,
       "tracking": "Nova B — the worktree-isolation count check registers its baseline on the dispatch call itself, but its hooks.json matcher names Task and not Agent. guard-dispatch.mjs's own stanza names both and says in those words that naming the wrong tool is a silent no-op.",
-      "sprint": "nova-b"
+      "sprint": "nova-b",
+      "closedAt": "2026-09-18",
+      "closureRepository": "self",
+      "closureCommit": "28ca87187ad96fc94d970fa20c178e954371fa25",
+      "closureEvidence": "backlog/evidence/2026-09-18-worktree-isolation-matcher-closure.md"
     },
     {
       "id": "pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass",

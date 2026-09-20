@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code
 type: workflow-improvement
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-29
 sprint: nova-b
 done_when: manual
 source: "PO judgment plus Claude/Windows audit section 3.1 from the 2026-08-29 three-runner greenfield test (finding F30 of scratch/greenfield-triage-2026-08-29.md), Antigravity/WSL run."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 7adbf8d55668a1978b41e106a2728e485a72bf60
+closure_evidence: backlog/evidence/2026-09-18-requirement-traceability-gate-closure.md
 ---
 
 # No gate catches a design document's named requirement being silently absent from the delivered artifact

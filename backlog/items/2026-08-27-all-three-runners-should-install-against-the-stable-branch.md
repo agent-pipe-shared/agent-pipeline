@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.all-three-runners-should-install-against-the-stable-branch
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-27
 sprint: nightwing
 done_when: manual
 source: "PO decision 2026-08-27, confirmed in session; distribution mapping performed the same day against the live installers and the update-channel resolver"
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 3ede9d0dec4d506b06bb1825826785fd57bd717a
+closure_evidence: backlog/evidence/2026-09-18-all-three-runners-install-closure.md
 ---
 
 # All three runners should install against `stable` by default, and check freshness fail-open against it

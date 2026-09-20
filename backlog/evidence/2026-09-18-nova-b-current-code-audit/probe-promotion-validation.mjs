@@ -1,0 +1,21 @@
+import {writeFileSync} from 'node:fs';
+import {computeRecordOnlyDelta,digestReleasePromotionEnvelope,validateReleasePromotionEnvelope,MODE_INCLUSION_RULE,MODE_INCLUSION_RULE_SHA256,RELEASE_PROMOTION_SCHEMA} from '../../../plugins/pipeline-core/lib/release-promotion-envelope.mjs';
+// Read-only Git observation. Synthetic envelope remains exclusively in scratch;
+// never invoke push or write any public gate evidence slot.
+const source={commit:'9c179fc74b2766b95766d15299015424f7a623d9',tree:'REPLACE_FROM_GIT'};
+const record={commit:'396f9b7c366fd874bf7e7d1317074271e68d466e',tree:'221b4deec840854210b1706c3d62f7d8f71eaecb'};
+import {spawnSync} from 'node:child_process';
+const tree=spawnSync('git',['rev-parse',`${source.commit}^{tree}`],{encoding:'utf8'});
+if(tree.status!==0)throw Error('source tree read failed');
+source.tree=tree.stdout.trim();
+const delta=computeRecordOnlyDelta(source.commit,record.commit,{repoDir:process.cwd()});
+if(!delta.ok)throw Error(delta.reason);
+const body={schema:RELEASE_PROMOTION_SCHEMA,source,record,recordOnlyDelta:delta.delta,modeInclusion:{rule:MODE_INCLUSION_RULE,ruleSha256:MODE_INCLUSION_RULE_SHA256,requiredBoundary:'release',satisfiedBoundary:'push'},securityEvidence:null};
+const absent={...body,envelopeSha256:digestReleasePromotionEnvelope(body)};
+const missing=validateReleasePromotionEnvelope(absent,{repoDir:process.cwd()});
+const incompleteBody={...body,sourceQualification:{mode:'candidate',execution:'impacted',selectedSuiteIds:[],omittedSuiteIds:['all']}};
+const incomplete=validateReleasePromotionEnvelope({...incompleteBody,envelopeSha256:digestReleasePromotionEnvelope(incompleteBody)},{repoDir:process.cwd()});
+const result={schema:'nova-b-audit.promotion-negative-probe.v1',synthetic:true,source,record,changedPaths:delta.delta.map(x=>x.path),missingQualification:{expectedOk:false,actualOk:missing.ok},invalidQualification:{expectedOk:false,actualOk:incomplete.ok},scope:'Validator API only; no external mutation, no push, no live evidence slot written'};
+writeFileSync('scratch/nova-b-audit/NVA-B-AUDIT-RECORD-promotion-negative-probe.json',JSON.stringify(result,null,2)+'\n');
+console.log(JSON.stringify(result));
+process.exitCode=missing.ok||incomplete.ok?1:0;

@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.runner-native-subagent-tool-identity-is-not-portable
 type: defect
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
 sprint: nova-b
 tracking: "Nova B — Antigravity reports DBB-PARENT-TOOL-USE-ID-MISSING for ordinary roles; do not weaken dispatch binding before collecting the native sanitized payload."
 source: "evidence/pipeline-analysis-agy-062-103.md."
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: f5d93d5d96564a993860671312e0c171fd4d80f8
+closure_evidence: backlog/evidence/2026-09-18-runner-native-subagent-tool-identity-closure.md
 ---
 
 # Dispatch-budget identity assumes a tool-use field not supplied by every runner

@@ -1,0 +1,50 @@
+command: node --test harness/scripts/check-verify-case-completion.test.mjs
+label: case-completion-audit
+exitCode: 1
+--- stdout ---
+✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (402.173068ms)
+✔ VCR02 the closed classifier distinguishes vulnerable and separately registered cases (1.921365ms)
+✔ VCR03 missing, new, duplicate, and stale registry entries fail closed (0.986777ms)
+✔ VCR04 unknown fields and missing backlog reasons cannot widen the registry (0.878688ms)
+✔ VCR05 a touched legacy suite must migrate in the same candidate (1.353816ms)
+✔ VCR06 base/candidate mode reads the candidate registry and enforces same-candidate migration (149.714563ms)
+✔ VCR07 required needs both the suite protocol and the Verify-side completion policy (4.688415ms)
+✔ VCR08 required cannot claim an unreachable helper call as normal suite setup (2.775112ms)
+✔ VCR09 required cannot alias a recorder or use an open registration configuration (1.860705ms)
+✔ VCR10 required must resolve the import to the shipped completion helper (0.780498ms)
+✔ VCR11 every Verify array entry must use the closed literal registration grammar (1.971344ms)
+✔ VCR12 the candidate schema is loaded and enforced in worktree and Git blob modes (85.023486ms)
+✔ VCR13 a newly registered existing suite cannot enter as legacy (92.097245ms)
+✔ VCR14 the CLI rejects unpaired refs and unknown arguments (45.776413ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 848.345454
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:196:5
+✖ VCR01 the repository registry covers all arrays and pins the observed required-descriptor counts (402.173068ms)
+  AssertionError [ERR_ASSERTION]: VULNERABLE-UNREGISTERED guard-push-promotion-tests plugins/pipeline-core/hooks/guard-push-promotion.test.mjs
+  
+  false !== true
+  
+      at Object.run (file://<repo-root>/harness/scripts/check-verify-case-completion.test.mjs:107:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:214:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

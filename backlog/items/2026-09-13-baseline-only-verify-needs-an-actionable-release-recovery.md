@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.baseline-only-verify-needs-an-actionable-release-recovery
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 done_when: manual
 created: 2026-09-13
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 3daeb7be99d2e1d534396b7ccdc8892ab0198be7
+closure_evidence: backlog/evidence/2026-09-18-baseline-only-verify-recovery-closure.md
 sprint: nova-b
 tracking: "Nova B — the intentionally permitted baseline-only verify state becomes expensive when it is discovered late at push time and a runner cannot discover the exact recovery through its normal driver."
 source: "evidence/pipeline-analysis-agy-062-103.md; evidence/pipeline-retrospective-2026-09-13.md."
@@ -106,3 +110,7 @@ entry.  Its exact one-line registration is currently blocked by `TP-3`; no
 override was requested or consumed.  This is not yet full candidate Verify
 evidence or a plugin publication: the item remains open for that bounded
 registry decision, normal qualification and release path.
+
+## Closure — 2026-09-18
+
+The suite `pipeline-state-late-verify-tests` was registered in `harness/scripts/verify.mjs` in commit `3daeb7be99d2e1d534396b7ccdc8892ab0198be7`. Full Verify passed 551/551 on candidate `55cea86fcc30e2251d9f3b4dbc76b6f190bc81d1` (`evidence/verify-latest.json`). Evidence: `backlog/evidence/2026-09-18-baseline-only-verify-recovery-closure.md`. Item closed.

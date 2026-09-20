@@ -1,0 +1,44 @@
+command: node --test plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs
+label: publication-audit
+exitCode: 1
+--- stdout ---
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: [{"id":"sprint-nova-epic","path":"<repo-root>/specs/sprint-nova-epic/lifecycle.json","receipt":{"schema":"pipeline.parallel-sprint-publication-gate-receipt.v1","status":"verification-failed","code":"PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT","requestSha256":"52796a183dc63920d046d741dbbc2e7bd92ea848b65f671e45d95b0f72e85278","packageId":"sprint-nova-epic","boundCommit":"986f8f03b7ca737e93d2553be41d7877c5f84137","publishedConsumptions":[],"findings":[{"code":"PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT","epic":"nova","commit":"cbbf54a60b92d2c830a26a7235c0c70373ecfa97"}],"receiptSha256":"7278ea2c976f9c30d46c4ed52c5a8c365bb0c1492c185e5724a916e4ce8a1fda"}}]
+
+false !== true
+
+    at file://<repo-root>/plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs:132:10
+    at check (file://<repo-root>/plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs:13:3)
+    at file://<repo-root>/plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs:128:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs (257.323811ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 262.116506
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs:1:1
+✖ plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs (257.323811ms)
+  'test failed'
+
+--- stderr ---

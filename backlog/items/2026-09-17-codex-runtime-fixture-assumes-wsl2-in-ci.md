@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-runtime-fixture-assumes-wsl2-in-ci
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-17
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 8b4aa6aa98c73654fd21703ea8143d26e4dcd2f5
+closure_evidence: backlog/evidence/2026-09-18-codex-runtime-fixture-ci-verification.md
 source: "GitHub Actions Verify run 35263935526 for released commit f8cc1b2297b5b6a2ef2d64a2dd43f4a76ec37f31: only codex-sandbox-runtime-tests failed. Local source inspection and the targeted 15/15 regression run identified the WSL2-only fixture assumption."
 sprint: nova-b
 done_when: manual
@@ -67,3 +71,7 @@ disabled passes 551/551 for candidate tree
 This is local qualification, not a GitHub result.  The item remains open until
 the exact candidate receives a fresh, authorized push and an external Verify
 readback confirms the original Ubuntu-host failure is gone.
+
+## Closure — 2026-09-18
+
+Confirmed green in GitHub Actions Verify run `35335056284` (job `105567860510`, duration 8m1s, exit code 0) for ancestor commit `bca8f61571f8f6ce9bdae740bc1ecb11ca6dba6d` on GitHub Ubuntu runner. The synthetic Ubuntu host tuple fixture and `/tmp` scratch corrections resolved the non-portable runner failure. Evidence: `backlog/evidence/2026-09-18-codex-runtime-fixture-ci-verification.md`. Item closed.

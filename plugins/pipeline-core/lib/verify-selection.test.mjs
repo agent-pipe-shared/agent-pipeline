@@ -47,7 +47,7 @@ for (const [label, input, reason] of [
   ["missing base is full", { ...common, mode: "work", baseCommit: null, changedPaths: ["src/a.mjs"] }, "missing-binding"],
   ["equal base is full", { ...common, mode: "push", baseCommit: "b", changedPaths: [] }, "invalid-base"],
   ["unknown path is full", { ...common, mode: "push", changedPaths: ["secrets/new.bin"] }, "unclassified-change"],
-  ["candidate is always full", { ...common, mode: "candidate", registeredSuiteIds: [...common.registeredSuiteIds, "orphan"], changedPaths: ["src/a.mjs"] }, "full-boundary"],
+  ["unclassified suite is full", { ...common, mode: "candidate", registeredSuiteIds: [...common.registeredSuiteIds, "orphan"], changedPaths: ["src/a.mjs"] }, "unclassified-suite"],
 ]) {
   const result = planVerifySelection(input);
   assert.equal(result.execution, "full", label);
@@ -61,9 +61,11 @@ assert.deepEqual(forced.changedPaths, ["src/a.mjs", "unknown/new.bin"]);
 assert.deepEqual(forced.unmatchedPaths, ["unknown/new.bin"]);
 
 const release = planVerifySelection({ ...common, mode: "release", changedPaths: [] });
-const candidate = planVerifySelection({ ...common, mode: "candidate", changedPaths: ["src/a.mjs"] });
 assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: release }, "release"), true);
-assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: candidate }, "candidate"), true);
+assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: release }, "push"), true);
+const pushEvidence = planVerifySelection({ ...common, mode: "push", changedPaths: [] });
+assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: pushEvidence }, "release"), false);
+assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: pushEvidence }, "push"), true);
 assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selection: impacted }, "release"), false);
 assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "other", exitCode: 0, selection: impacted }, "critic"), false);
 const conservativeCritic = planVerifySelection({ ...common, mode: "critic", changedPaths: ["unknown/new.bin"] });
@@ -74,4 +76,4 @@ assert.equal(verifyEvidenceSatisfiesBoundary({ commit: "b", exitCode: 0, selecti
 assert.equal(validateVerifySelection({ ...impacted, omittedSuiteIds: [] }), false);
 assert.equal(validateVerifySelection({ ...impacted, selectionSha256: "0".repeat(64) }), false);
 
-console.log("verify-selection: 19 tests passed");
+console.log("verify-selection: tests passed");

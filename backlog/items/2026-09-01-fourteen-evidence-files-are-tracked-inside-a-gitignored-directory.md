@@ -1,13 +1,17 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.fourteen-evidence-files-are-tracked-inside-a-gitignored-directory
-type: defect
-owner: pipeline
-status: open
-created: 2026-09-01
-sprint: nova-b
-done_when: manual
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.fourteen-evidence-files-are-tracked-inside-a-gitignored-directory"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-09-01"
 source: "Surfaced during the 2026-09-01 pre-release cleanup attempt for the 0.6.0 release: the dispatcher moved files out of evidence/ by wildcard without first checking which were tracked, and restored them on discovering closure_evidence citations pointed at four of them."
+sprint: "nova-b"
+done_when: "manual"
+closed_at: "2026-09-18"
+closure_repository: "self"
+closure_commit: "f8937f15a74a5a2a697fa325354c2958d574b9af"
+closure_evidence: "backlog/evidence/2026-09-18-tracked-evidence-cleanup-closure.md"
 ---
 
 # Fourteen files are tracked by git inside `evidence/`, a directory `.gitignore` declares ignored

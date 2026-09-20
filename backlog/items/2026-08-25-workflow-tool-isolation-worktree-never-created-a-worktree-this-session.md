@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-25
 sprint: nova-b
 source: "Elephant, 2026-08-25, live incident this session: three parallel Agent-tool dispatches with isolation: \"worktree\" all wrote into the SAME shared checkout, causing zero-commit truncations and a detached-HEAD incident; root-caused and recovered same session"
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: b4e50da519fffb0d74c571d1c829f3f045ec3ed1
+closure_evidence: backlog/evidence/2026-09-18-workflow-tool-isolation-worktree-closure.md
 ---
 
 # `isolation: "worktree"` (Agent tool) did not create separate worktrees this session — three parallel dispatches raced on one shared checkout

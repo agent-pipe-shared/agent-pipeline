@@ -1,0 +1,14 @@
+command: node plugins/pipeline-core/scripts/check-backlog-done-predicate.mjs
+label: closed-item-regression
+exitCode: 1
+--- stdout ---
+backlog items enumerated: 673
+- malformed: 0
+- stale-open (status open/in_progress, predicate already satisfied): 0
+- regression (status closed, predicate not satisfied): 1
+- undeclared (no done_when at all, any status): 430
+- undeclared and open/in_progress (fatal): 0
+Findings (1):
+  - REGRESSION backlog/items/2026-08-28-the-ai-hardening-gate-has-no-home-in-any-approved-feature-package.md: expected contains specs/sprint-nova-epic/spec.md "ai-assisted-hardening" to hold (status is closed); observed unsatisfied
+
+--- stderr ---

@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-06
 source: "four dispatches measured on 2026-09-06 against their own briefed caps; one was cut at the harness maxTurns limit mid-verification. Second instance of the class in backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md"
 sprint: nova-b
 done_when: manual
+closed_at: 2026-09-18
+closure_repository: self
+closure_commit: 1bfe7fe57d978f12bf8790606e232dcb7cdc09a2
+closure_evidence: backlog/evidence/2026-09-18-dispatch-tool-budget-enforcement-closure.md
 ---
 
 # Briefed tool budgets are estimated too low, and enforcement remains incomplete
