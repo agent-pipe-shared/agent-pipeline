@@ -524,7 +524,7 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
     assert.equal(result.signer.keyReference, authority.keyReference);
     assert.equal(result.signer.publicKeySha256, authority.publicKeySha256);
     assert.equal(result.signer.humanName, "Test Operator");
-    const signerOnDisk = JSON.parse(readFileSync(join(dirs.directory, "signer-manual.json"), "utf8"));
+    const signerOnDisk = JSON.parse(readFileSync(result.paths.signer, "utf8"));
     assert.deepEqual(signerOnDisk, result.signer);
 
     assert.equal(confirmationPrompts.length, 1, "sign-intent must ask for exactly one explicit confirmation before signing");
@@ -532,10 +532,10 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
     assert.match(confirmationPrompts[0], /guard-lift\/guard-override/u, "the confirmation prompt must state the generic consequence class");
     assert.match(confirmationPrompts[0], /type exactly "approve"/iu, "the confirmation prompt must require an explicit typed token, not a bare y/n");
 
-    const proofPath = join(dirs.directory, "proof-manual.json");
+    const proofPath = join(dirs.directory, `proof-${intentSha256}.json`);
     // NVA-CLI-FEEDBACK-1: the success result states the absolute paths it just
     // wrote, so an operator/agent never has to guess or poll for them.
-    assert.deepEqual(result.paths, { proof: proofPath, signer: join(dirs.directory, "signer-manual.json") });
+    assert.deepEqual(result.paths, { proof: proofPath, signer: join(dirs.directory, `signer-${intentSha256}.json`) });
     assert.equal(existsSync(proofPath), true);
     const proof = JSON.parse(readFileSync(proofPath, "utf8"));
     assert.equal(proof.schema, PO_APPROVAL_PROOF_SCHEMA);
@@ -549,14 +549,17 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
     assert.equal(verified.code, "PO-APPROVAL-PROOF-VERIFIED");
 
     // Temp signing artifacts are cleaned up in a `finally`; only the durable proof remains.
-    assert.equal(existsSync(join(dirs.directory, "intent-manual.txt")), false);
-    assert.equal(existsSync(join(dirs.directory, "signature-manual.bin")), false);
+    assert.equal(existsSync(join(dirs.directory, `intent-${intentSha256}.txt`)), false);
+    assert.equal(existsSync(join(dirs.directory, `signature-${intentSha256}.bin`)), false);
 
-    // A second, distinct digest re-signs cleanly into the same fixed artifact name and
-    // does not disturb the shared key material this run already produced.
+    // A second, distinct digest creates a new immutable artifact pair and does
+    // not disturb the first proof or the shared key material.
     const otherIntentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-fixture-2").digest("hex");
-    runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", otherIntentSha256], dependencies);
-    const secondProof = JSON.parse(readFileSync(proofPath, "utf8"));
+    const secondResult = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", otherIntentSha256], dependencies);
+    assert.notEqual(secondResult.paths.proof, proofPath);
+    const firstProofAfterSecondSignature = JSON.parse(readFileSync(proofPath, "utf8"));
+    assert.deepEqual(firstProofAfterSecondSignature, proof);
+    const secondProof = JSON.parse(readFileSync(secondResult.paths.proof, "utf8"));
     assert.equal(secondProof.intentSha256, otherIntentSha256);
     const secondVerified = verifyPoApprovalProof({ intent: { sha256: otherIntentSha256 }, trustPolicy: authority, proof: secondProof });
     assert.equal(secondVerified.verified, true);
@@ -589,8 +592,8 @@ test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scra
     assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
     assert.equal(result.intentSha256, intentSha256);
 
-    const externalProof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
-    const externalSigner = JSON.parse(readFileSync(join(dirs.directory, "signer-manual.json"), "utf8"));
+    const externalProof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
+    const externalSigner = JSON.parse(readFileSync(result.paths.signer, "utf8"));
 
     const scratchProofPath = join(scratchDir, "reconcile-proof-42.json");
     const scratchSignerPath = join(scratchDir, "reconcile-signer-42.json");
@@ -600,8 +603,8 @@ test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scra
     // information as the pre-existing top-level fields, plus the external
     // durable proof/signer paths -- additive, never a replacement.
     assert.deepEqual(result.paths, {
-      proof: join(dirs.directory, "proof-manual.json"),
-      signer: join(dirs.directory, "signer-manual.json"),
+      proof: join(dirs.directory, `proof-${intentSha256}.json`),
+      signer: join(dirs.directory, `signer-${intentSha256}.json`),
       scratchProofPath,
       scratchSignerPath,
     });
@@ -922,7 +925,7 @@ test("sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked
     assert.equal(spawnCalled, false, "OpenSSL must never be invoked once confirmation is cancelled");
     assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
     assert.equal(existsSync(join(dirs.directory, "signature-manual.bin")), false);
-    assert.equal(existsSync(join(dirs.directory, "intent-manual.txt")), false);
+    assert.equal(existsSync(join(dirs.directory, `intent-${intentSha256}.txt`)), false);
   } finally {
     cleanup(dirs);
   }
@@ -964,7 +967,7 @@ test("NVA-SIGNONCE-1: sign-intent skips the typed confirmation for a passphrase-
     assert.match(output, new RegExp(intentSha256, "u"), "the digest being signed must still be disclosed");
     assert.match(output, /guard-lift\/guard-override/u, "the generic consequence class must still be disclosed");
 
-    const proofPath = join(dirs.directory, "proof-manual.json");
+    const proofPath = result.paths.proof;
     const proof = JSON.parse(readFileSync(proofPath, "utf8"));
     assert.equal(proof.intentSha256, intentSha256);
     const verified = verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof });
@@ -1593,7 +1596,7 @@ test("sign-intent accepts a 3-key trust policy carrying humanName", { skip: REQU
     const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-humanname-fixture").digest("hex");
     const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], { readConfirmation: () => "approve" });
     assert.equal(result.ok, true);
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
     assert.equal(proof.keyReference, authority.keyReference);
   } finally {
     cleanup(dirs);
@@ -2348,7 +2351,7 @@ test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest a
     assert.match(prompt, /expires at/iu, "the recorded expiry must be shown");
     assert.doesNotMatch(prompt, /no recorded request/iu, "must not fall into the cannot-describe fallback");
 
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
     assert.equal(proof.intentSha256, armed.intent.sha256, "the signature still covers the digest, nothing the summary said");
   } finally {
     cleanup(dirs);
@@ -2402,7 +2405,7 @@ test("sign-intent states the reason, scope and expiry of the request recorded be
     assert.ok(prompt.includes("guard-lift"), "the recorded action kind must be shown");
     assert.match(prompt, /type exactly "approve"/iu, "the typed-token gate stays the last thing asked");
 
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
     assert.equal(proof.intentSha256, prepared.intent.sha256, "the signature still covers the digest, nothing the summary said");
   } finally {
     cleanupWindow(dirs);
@@ -2451,7 +2454,7 @@ test("a tampered record cannot change what is signed: the summary disappears, th
     assert.equal(prompt.includes("a much smaller change than it really is"), false, "an edited record must not be displayed at all");
     assert.match(prompt, /no recorded request/iu, "a record that no longer re-derives to the digest counts as no record");
     assert.equal(result.intentSha256, prepared.intent.sha256);
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
     assert.equal(proof.intentSha256, prepared.intent.sha256, "the tampered text changed nothing about what was signed");
     assert.equal(verifyPoApprovalProof({ intent: { sha256: prepared.intent.sha256 }, trustPolicy: authority, proof }).verified, true);
   } finally {
@@ -2616,8 +2619,8 @@ test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly li
     assert.equal(viaEnv.code, "PO-HUMAN-SIGN-INTENT-READY");
     assert.equal(viaEnv.intentSha256, intentSha256Env);
 
-    const proofFlag = JSON.parse(readFileSync(join(dirsFlag.directory, "proof-manual.json"), "utf8"));
-    const proofEnv = JSON.parse(readFileSync(join(dirsEnv.directory, "proof-manual.json"), "utf8"));
+    const proofFlag = JSON.parse(readFileSync(viaFlag.paths.proof, "utf8"));
+    const proofEnv = JSON.parse(readFileSync(viaEnv.paths.proof, "utf8"));
     assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256Flag }, trustPolicy: authorityFlag, proof: proofFlag }).verified, true);
     assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256Env }, trustPolicy: authorityEnv, proof: proofEnv }).verified, true);
   } finally {
@@ -2741,7 +2744,7 @@ test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machin
     );
     assert.equal(result.ok, true);
     assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
     assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof }).verified, true);
   } finally {
     cleanup(dirs);
@@ -3367,7 +3370,7 @@ test("NVA-BL-74: a repository configured for `de` gets the German prompt frame, 
     assert.match(prompts[0], new RegExp(intentSha256, "u"), "the digest must be named in every language");
     assert.match(prompts[0], /guard-lift\/guard-override/u, "the data lines are untranslated by design");
     // ... and the ceremony itself is unchanged: a real proof, verifiable as before.
-    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(result.paths.proof, "utf8"));
     assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof }).verified, true);
   } finally {
     cleanup(dirs);
@@ -3391,7 +3394,7 @@ test("NVA-BL-74: cancellation semantics are unchanged under the German prompt --
         `${JSON.stringify(answer)} must cancel under the German prompt`,
       );
       assert.equal(spawnCalled, false, `${JSON.stringify(answer)}: OpenSSL must never be invoked once confirmation is cancelled`);
-      for (const artifact of ["proof-manual.json", "signature-manual.bin", "intent-manual.txt"]) {
+      for (const artifact of [`proof-${intentSha256}.json`, `signature-${intentSha256}.bin`, `intent-${intentSha256}.txt`]) {
         assert.equal(existsSync(join(dirs.directory, artifact)), false, `${JSON.stringify(answer)}: no ${artifact} may exist after a cancelled confirmation`);
       }
     } finally {

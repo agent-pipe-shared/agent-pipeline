@@ -1479,11 +1479,16 @@ function executeHumanApproval(args, dependencies = {}) {
     } else {
       requireExplicitConfirmation(disclosureLines, dependencies, humanFacingLanguage);
     }
+    // A shared external key directory is normal: it must never make one
+    // ceremony overwrite the proof returned by an earlier ceremony.  The
+    // digest is already the signed identity, so use it in every authoritative
+    // artifact name.  `intent` and `signature` remain short-lived, whereas
+    // proof and signer are durable, independently consumable records.
     const manual = {
-      intent: artifactPath(directory, "intent-manual.txt"),
-      signature: artifactPath(directory, "signature-manual.bin"),
-      proof: artifactPath(directory, "proof-manual.json"),
-      signer: artifactPath(directory, "signer-manual.json"),
+      intent: artifactPath(directory, `intent-${intentSha256}.txt`),
+      signature: artifactPath(directory, `signature-${intentSha256}.bin`),
+      proof: artifactPath(directory, `proof-${intentSha256}.json`),
+      signer: artifactPath(directory, `signer-${intentSha256}.json`),
     };
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: manual, io: { write, read }, dependencies });
     // NVA-SWEEP-F2: this is the "write the proof" half -- the durable proof written to
@@ -1503,7 +1508,7 @@ function executeHumanApproval(args, dependencies = {}) {
       write(scratchSignerPath, `${JSON.stringify(signed.signer, null, 2)}\n`, { mode: 0o600 });
     }
     // NVA-CLI-FEEDBACK-1: state the paths this call just wrote -- the external
-    // manual proof/signer (durable, read by every verifier) and, when --request
+    // intent-specific proof/signer (durable, read by every verifier) and, when --request
     // was used, the additional repo-scratch mirror. The pre-existing top-level
     // scratchProofPath/scratchSignerPath fields are kept unchanged for callers
     // that already read them; `paths` is purely additive.

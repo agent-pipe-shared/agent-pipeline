@@ -33,6 +33,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import {
+  hasCodexExistingGitControlMount,
   hasCodexGitControlMount,
   hasCodexHostControlLayout,
   hasCodexInitializedGitControlMount,
@@ -732,6 +733,24 @@ export function observeCodexOnboardingCapabilities({
   }
   if (repositoryError) {
     component.status = "control-path-invalid";
+    return component;
+  }
+
+  const existingControlOpts = {
+    access: deps.accessSync ?? deps.access,
+    lstat: deps.lstatSync ?? deps.lstat,
+    readFile: deps.readFileSync ?? deps.readFile,
+    readdir: deps.readdirSync ?? deps.readdir,
+  };
+  const existingHostControlMount = repositoryMode === "auto"
+    && (deps.hasCodexExistingGitControlMountFn
+      ? deps.hasCodexExistingGitControlMountFn(root, existingControlOpts)
+      : hasCodexExistingGitControlMount(root, existingControlOpts));
+  if (existingHostControlMount) {
+    component.status = "host-managed";
+    component.mode = "host-managed";
+    component.rootWritable = "passed";
+    if (intent === "session" || intent === "dispatch") component.sessionCapability = "passed";
     return component;
   }
 

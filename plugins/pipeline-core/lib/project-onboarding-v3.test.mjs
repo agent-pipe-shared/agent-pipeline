@@ -794,7 +794,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     // action -- never the raw apply command.
     const observed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
-      intent: "bootstrap",
+      intent: "session",
       deps: {
         ...fakeDeps,
         observeOnboardingAppServer() {
@@ -907,6 +907,34 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(unavailable.status, "partial");
     assert.deepEqual(unavailable.nextAction, humanRecoveryAction);
     assertDiagnostic(unavailable, "cleanup_recovery_unavailable");
+
+    const orphanReleaseAction = {
+      kind: "command",
+      executable: "node",
+      argv: [SESSION_CLEANUP_SCRIPT, "release-orphan-binding", "--repo", path, "--by", "PO", "--reason", "release discarded binding"],
+      mutation: true,
+      requiresConfirmation: true,
+    };
+    const orphanRelease = inspectProjectOnboardingV3({ runner: "codex",
+      rootDir: path,
+      intent: "bootstrap",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer() {
+          throw new Error("orphan release recovery must precede App Server observation");
+        },
+        planSessionCleanupRecovery() {
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "orphan-cleanup-required",
+            nextAction: orphanReleaseAction,
+          };
+        },
+      },
+    });
+    assert.equal(orphanRelease.status, "partial");
+    assert.deepEqual(orphanRelease.nextAction, orphanReleaseAction);
+    assertDiagnostic(orphanRelease, "cleanup_recovery_required");
 
     const unobserved = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
@@ -8601,6 +8629,11 @@ test("bootstrap-binding-required routes a hand-authored staging PRD through its 
     // acknowledgement receipt must survive binding without normalizing that
     // preimage away.
     writeFileSync(prdAbsolutePath, `${readFileSync(prdAbsolutePath, "utf8")}\nOne line of prose nobody reviewed.\n\n\n`, "utf8");
+    materializeArchitectureDesignFixture({
+      rootDir: path,
+      planPath: exemptObservation.prd.path,
+      decisionRef: "TEST-BOOTSTRAP-BIND-ACKNOWLEDGEMENT",
+    });
 
     // Chat posture has exactly one PO decision: the in-chat confirmation.  Its
     // digest-bound apply is then ordinary agent work, consistently for every

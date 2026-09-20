@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-09-18T15:33:53.791Z",
+  "updatedAt": "2026-09-20T14:30:49.651Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -61,172 +61,6 @@
       }
     }
   ],
-  "activeFeature": {
-    "id": "sprint-nova-epic",
-    "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "phase": "implementation",
-    "phaseHistory": [
-      {
-        "phase": "design",
-        "at": "2026-09-13T07:30:08.435Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-13T07:36:15.418Z"
-      },
-      {
-        "phase": "design",
-        "at": "2026-09-13T08:06:07.566Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-13T08:10:37.673Z"
-      },
-      {
-        "phase": "design",
-        "at": "2026-09-13T08:12:37.582Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-13T08:15:53.592Z"
-      },
-      {
-        "phase": "design",
-        "at": "2026-09-13T09:02:39.695Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-13T09:04:46.147Z"
-      },
-      {
-        "phase": "design",
-        "at": "2026-09-13T09:15:14.382Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-13T09:16:55.623Z"
-      },
-      {
-        "phase": "design",
-        "at": "2026-09-13T09:54:59.442Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-13T09:58:06.824Z"
-      },
-      {
-        "phase": "design",
-        "at": "2026-09-13T10:00:56.668Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-13T10:01:47.622Z"
-      },
-      {
-        "phase": "design",
-        "at": "2026-09-14T06:27:56.301Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-14T06:31:35.165Z"
-      },
-      {
-        "phase": "design",
-        "at": "2026-09-14T11:07:50.218Z"
-      },
-      {
-        "phase": "implementation",
-        "at": "2026-09-14T11:09:29.450Z"
-      }
-    ]
-  },
-  "planApproval": {
-    "schema": "pipeline.plan-approval.v4",
-    "approvedBy": "André",
-    "approvedAt": "2026-09-14T11:09:24.221Z",
-    "submissionSha256": "93fb976e75bb33f75851be35a2e7488736bfdb6b9d0adf60792a9dac8d6ee013",
-    "profileSha256": "e3f62cf8685063aa2297b2766e858e2a0ef1bdcfe9e426d32193b4057af61d79",
-    "poGateAuthority": {
-      "schema": "pipeline.po-gate-authority.v2",
-      "humanFacing": "en",
-      "sourceSha256": "3ab5f44e6fb471432e243adc1f8a83f9f3b9057d253389c87e79453d808511d0",
-      "runtimeSha256": "1c73ccf3dd28fa5887ace8bec64391a968b47ecf9a5aa6f24566a4cb91946bb0",
-      "receiptSha256": "d4c8445ea2e1c847caa8cc298cf4d2f4fedda59b6bd270d30e5b0cb43c16c56e",
-      "repositoryFingerprint": "5172c023ad31e8e1c82402e4d0a657cc6db16c0ba5538a432d48e8d477f2b16d",
-      "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "ab3ec05c48f3413cd44c34e3e8f3d7082884b3c28b1ee621800ab773676bb3c8",
-      "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "ca00d3c3e7c43b7aa221d2d1728dd1c8cd0ecc38dc1dee138c49b123b6e2d3b8"
-    },
-    "priorInvalidationSha256": "533dd8838a7763a7725863658411d9361fb9956e808c3be123f7bca6044d1e5f"
-  },
-  "continuity": {
-    "schema": "pipeline.continuity.v0",
-    "featureId": "sprint-nova-epic",
-    "revision": 38,
-    "runtime": {
-      "humanFacingLanguage": "en",
-      "activeDuty": "Elephant",
-      "sessionCleanup": null
-    },
-    "authority": {
-      "prd": {
-        "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-        "sha256": "ab3ec05c48f3413cd44c34e3e8f3d7082884b3c28b1ee621800ab773676bb3c8"
-      },
-      "spec": {
-        "path": "specs/sprint-nova-epic/spec.md",
-        "sha256": "ca00d3c3e7c43b7aa221d2d1728dd1c8cd0ecc38dc1dee138c49b123b6e2d3b8"
-      },
-      "result": null
-    },
-    "queueHead": {
-      "packageId": "nova-b0",
-      "actionId": "runner-native-continuation",
-      "nextAction": "dispatch",
-      "productRetryCount": 0,
-      "environmentRerouteCount": 0,
-      "dispatch": null
-    },
-    "blocker": null,
-    "acknowledgedFinal": null,
-    "resume": {
-      "mode": "immediate",
-      "sourceRevision": 38,
-      "reasonCode": "active-turn"
-    },
-    "recovery": null,
-    "decisionTxn": null,
-    "capacity": {
-      "concurrencyLimit": 2,
-      "reservedCriticSlots": 1,
-      "reservedRecoverySlots": 1,
-      "fallbackPolicy": "defer"
-    },
-    "closeTransition": null,
-    "nativeContinuation": null
-  },
-  "planSubmission": {
-    "schema": "pipeline.plan-submission.v1",
-    "featureId": "sprint-nova-epic",
-    "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "planSha256": "ab3ec05c48f3413cd44c34e3e8f3d7082884b3c28b1ee621800ab773676bb3c8",
-    "specPath": "specs/sprint-nova-epic/spec.md",
-    "specSha256": "ca00d3c3e7c43b7aa221d2d1728dd1c8cd0ecc38dc1dee138c49b123b6e2d3b8",
-    "profile": "epic",
-    "profileSha256": "e3f62cf8685063aa2297b2766e858e2a0ef1bdcfe9e426d32193b4057af61d79",
-    "submittedBy": "André",
-    "submittedAt": "2026-09-14T11:09:12.906Z"
-  },
-  "planInvalidation": {
-    "schema": "pipeline.plan-invalidation.v1",
-    "featureId": "sprint-nova-epic",
-    "invalidatedSubmissionSha256": "23106db01a56ff405604b71d675695afa40601262a76f3d2bdfce609299e6c1d",
-    "invalidatedApprovalSha256": "a855f3f033cfe62ac595d0b8236ebb70130cd959a9c999b3da48fa2d3513f588",
-    "invalidatedBy": "André",
-    "invalidatedAt": "2026-09-14T11:07:50.218Z",
-    "reason": "reopen-design"
-  },
   "pushApproval": {
     "lastApproved": {
       "approvedBy": "André",
@@ -551,19 +385,110 @@
       }
     }
   },
+  "discardedFeatures": [
+    {
+      "id": "sprint-nova-epic",
+      "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+      "phaseAtDiscard": "implementation",
+      "discardedAt": "2026-09-19T15:56:09.298Z",
+      "discardedBy": "André",
+      "reason": "Superseded by Sprint Alfred 0.7 candidate work; preserve prior Nova lifecycle record.",
+      "forCommit": "297d5d06959f29fb36d8c68c5e675298be364dce"
+    }
+  ],
+  "activeFeature": {
+    "id": "sprint-alfred-epic",
+    "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+    "phase": "implementation",
+    "phaseHistory": [
+      {
+        "phase": "implementation",
+        "at": "2026-09-20T14:30:49.650Z"
+      }
+    ]
+  },
+  "continuity": {
+    "schema": "pipeline.continuity.v0",
+    "featureId": "sprint-alfred-epic",
+    "revision": 4,
+    "runtime": {
+      "humanFacingLanguage": "en",
+      "activeDuty": "Coordinator",
+      "sessionCleanup": null
+    },
+    "authority": {
+      "prd": {
+        "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+        "sha256": "2fcb058f99b28ef780fbd39455e71f32dcaae5bc4a04b6c73e572f919a4d12f5"
+      },
+      "spec": {
+        "path": "specs/sprint-alfred-epic/spec.md",
+        "sha256": "28c4d00aee6259dba1344104dd432277701183faa906f1be65f3513f50122e4d"
+      },
+      "result": null
+    },
+    "queueHead": {
+      "packageId": "continuity-adoption",
+      "actionId": "review-active-feature",
+      "nextAction": "review",
+      "productRetryCount": 0,
+      "environmentRerouteCount": 0,
+      "dispatch": null
+    },
+    "blocker": null,
+    "acknowledgedFinal": null,
+    "resume": {
+      "mode": "immediate",
+      "sourceRevision": 4,
+      "reasonCode": "active-turn"
+    },
+    "recovery": null,
+    "decisionTxn": null,
+    "closeTransition": null,
+    "capacity": {
+      "concurrencyLimit": 4,
+      "reservedCriticSlots": 1,
+      "reservedRecoverySlots": 1,
+      "fallbackPolicy": "defer"
+    },
+    "nativeContinuation": null
+  },
+  "poGateAcknowledgement": {
+    "by": "André",
+    "at": "2026-09-20T13:36:20.788Z"
+  },
+  "planCancellation": {
+    "schema": "pipeline.plan-cancellation.v1",
+    "featureId": "sprint-alfred-epic",
+    "submissionSha256": "84541715e760abec51dd455c5c9a49f2dad89e489d3b335c81a3d422640b151c",
+    "cancelledBy": "André",
+    "cancelledAt": "2026-09-20T13:46:25.534Z"
+  },
+  "planSubmission": {
+    "schema": "pipeline.plan-submission.v1",
+    "featureId": "sprint-alfred-epic",
+    "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+    "planSha256": "2fcb058f99b28ef780fbd39455e71f32dcaae5bc4a04b6c73e572f919a4d12f5",
+    "specPath": "specs/sprint-alfred-epic/spec.md",
+    "specSha256": "28c4d00aee6259dba1344104dd432277701183faa906f1be65f3513f50122e4d",
+    "profile": "epic",
+    "profileSha256": "f6ad7c907efee3c673189c28b718f7e645b0e0d1c2a6d462ac46d7f59e88202d",
+    "submittedBy": "The Agent-Pipeline Contributors",
+    "submittedAt": "2026-09-20T13:46:38.985Z"
+  },
   "planApprovalBriefing": {
     "schema": "pipeline.plan-approval-briefing.v1",
     "scope": {
-      "featureId": "sprint-nova-epic",
-      "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "ab3ec05c48f3413cd44c34e3e8f3d7082884b3c28b1ee621800ab773676bb3c8",
-      "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "ca00d3c3e7c43b7aa221d2d1728dd1c8cd0ecc38dc1dee138c49b123b6e2d3b8",
+      "featureId": "sprint-alfred-epic",
+      "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "planSha256": "2fcb058f99b28ef780fbd39455e71f32dcaae5bc4a04b6c73e572f919a4d12f5",
+      "specPath": "specs/sprint-alfred-epic/spec.md",
+      "specSha256": "28c4d00aee6259dba1344104dd432277701183faa906f1be65f3513f50122e4d",
       "profile": "epic"
     },
     "change": {
-      "kind": "plan-and-spec-changed",
-      "previousApprovalSha256": "a855f3f033cfe62ac595d0b8236ebb70130cd959a9c999b3da48fa2d3513f588"
+      "kind": "initial-submission",
+      "previousApprovalSha256": null
     },
     "authorizes": [
       "design-to-implementation-transition"
@@ -577,8 +502,28 @@
   },
   "planPresentation": {
     "schema": "pipeline.plan-presentation.v1",
-    "submissionSha256": "93fb976e75bb33f75851be35a2e7488736bfdb6b9d0adf60792a9dac8d6ee013",
-    "presentedBy": "André",
-    "presentedAt": "2026-09-14T11:09:19.036Z"
+    "submissionSha256": "883fa442895df31ca939fe8d16aa567afe48e5d402b15846b4ce97eea5a1b8c0",
+    "presentedBy": "The Agent-Pipeline Contributors",
+    "presentedAt": "2026-09-20T13:49:37.702Z"
+  },
+  "planApproval": {
+    "schema": "pipeline.plan-approval.v4",
+    "approvedBy": "André",
+    "approvedAt": "2026-09-20T13:50:21.109Z",
+    "submissionSha256": "883fa442895df31ca939fe8d16aa567afe48e5d402b15846b4ce97eea5a1b8c0",
+    "profileSha256": "f6ad7c907efee3c673189c28b718f7e645b0e0d1c2a6d462ac46d7f59e88202d",
+    "poGateAuthority": {
+      "schema": "pipeline.po-gate-authority.v2",
+      "humanFacing": "en",
+      "sourceSha256": "d09bcc73949e41d77fb5427af18d91e99165df9abc04722856e94fb60e628b8b",
+      "runtimeSha256": "65fbb80895be7c31057cebb4b2aa5b38a468f3808d6ecc5caf47b55140820ee9",
+      "receiptSha256": "06386d9fc5894b5e99e7958f4ced18134975f7d73252fd3450dc99a492f15d98",
+      "repositoryFingerprint": "c21a7dc8f280983fa7016324b7c701334df1fad9cfc5294fbb3fa15995c4f912",
+      "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "planSha256": "2fcb058f99b28ef780fbd39455e71f32dcaae5bc4a04b6c73e572f919a4d12f5",
+      "specPath": "specs/sprint-alfred-epic/spec.md",
+      "specSha256": "28c4d00aee6259dba1344104dd432277701183faa906f1be65f3513f50122e4d"
+    },
+    "priorInvalidationSha256": null
   }
 }

@@ -51,6 +51,7 @@ import { projectDir, readState, run as pipelineStateRun, statePath } from "./pip
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 
+import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
 export const PIPELINE_STATE_SCRIPT_PATH = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const REMOTE_RE = /^[A-Za-z0-9._-]{1,80}$/u;
@@ -113,6 +114,16 @@ function readJson(path, deps) {
   }
 }
 
+function readEvidenceInput(path, deps) {
+  try {
+    const raw = (deps.readFile ?? readFileSync)(path, "utf8");
+    return { raw, data: JSON.parse(raw) };
+  } catch {
+    return null;
+  }
+}
+
+
 /**
  * Matches `checkEvidenceFreshness()` in `guard-push.mjs` (`exitCode === 0` and
  * `commit === sourceCommit`) exactly -- never a looser approximation. This is
@@ -155,18 +166,26 @@ export function resolveVerifyRemedy(dir, relPath, deps = {}) {
 }
 
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
-  const path = join(dir, relPath);
-  const data = readJson(path, deps);
+  const evidenceInput = readEvidenceInput(join(dir, relPath), deps);
+  const data = evidenceInput?.data ?? null;
   const remedy = resolveVerifyRemedy(dir, relPath, deps);
   const remedyPlan = resolveVerifyRemedyPlan(dir, relPath, deps);
   if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy, remedyPlan };
   if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
   if (data.commit !== headCommit) {
+    const envelope = deps.promotionEnvelope ?? readJson(join(dir, RELEASE_PROMOTION_DEFAULT_PATH), deps);
+    const verifyInput = id === "verify-evidence" ? evidenceInput : readEvidenceInput(join(dir, VERIFY_EVIDENCE_DEFAULT_PATH), deps);
+    const securityInput = id === "security-evidence" ? evidenceInput : readEvidenceInput(join(dir, SECURITY_EVIDENCE_DEFAULT_PATH), deps);
+    const validation = envelope && verifyInput && securityInput
+      ? (deps.validateReleasePromotionEnvelope ?? validateReleasePromotionEnvelope)(envelope, { repoDir: dir, targetBoundary: "push", verifyEvidence: verifyInput.data, securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityInput.raw, data: securityInput.data }, deps })
+      : { ok: false };
+    if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
+      if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy, remedyPlan };
+      return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
+    }
     return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
   }
-  if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
-    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy, remedyPlan: resolveVerifyRemedyPlan(dir, relPath, deps) };
-  }
+  if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy, remedyPlan };
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
 }
 

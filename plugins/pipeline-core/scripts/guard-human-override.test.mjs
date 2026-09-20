@@ -248,7 +248,7 @@ test("authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() an
     ], captured);
     assert.equal(status, 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
-    assert.equal(value.schema, "pipeline.human-guard-override-capability.v2");
+    assert.equal(value.schema, "pipeline.human-guard-override-capability.v3");
     assert.equal(value.status, "armed");
     assert.equal(value.planSha256, planSha256);
     assert.equal(value.requestSha256, requestSha256);
@@ -277,7 +277,7 @@ test("plan prints a candidate-drift advisory on stderr without altering the plan
     const status = main(["plan", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
     assert.equal(status, 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
-    assert.equal(value.schema, "pipeline.human-guard-override-plan.v2");
+    assert.equal(value.schema, "pipeline.human-guard-override-plan.v3");
     assert.match(captured.stderr, /^ADVISORY: this ceremony's signature will bind to the exact repository HEAD/);
     assert.ok(captured.stderr.includes(value.repository.head), "advisory should name the exact bound HEAD");
     assert.match(captured.stderr, /HGO-CANDIDATE-DRIFT/);

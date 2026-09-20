@@ -1333,9 +1333,10 @@ function sanitizedCleanupReceipt(sessionId, resources, status, now) {
     resourceId: resource.resourceId,
     type: resource.type,
     classification: resource.contentClass,
-    status: resource.status === "removed" ? "removed" : "blocked",
-    code: resource.reason ?? (resource.status === "removed" ? "removed" : "WT-CLEANUP-INCOMPLETE"),
+    status: resource.status === "removed" ? "removed" : resource.status === "retained" ? "retained" : "blocked",
+    code: resource.reason ?? (resource.status === "removed" ? "removed" : resource.status === "retained" ? "WT-VERIFY-RUN-RETAINED" : "WT-CLEANUP-INCOMPLETE"),
   }));
+  const retained = outcomes.filter((entry) => entry.status === "retained").length;
   return {
     schema: CLEANUP_RECEIPT_SCHEMA,
     sessionSha256: rawSha256(Buffer.from(sessionId)),
@@ -1344,6 +1345,7 @@ function sanitizedCleanupReceipt(sessionId, resources, status, now) {
       registered: outcomes.length,
       removed: outcomes.filter((entry) => entry.status === "removed").length,
       blocked: outcomes.filter((entry) => entry.status === "blocked").length,
+      ...(retained === 0 ? {} : { retained }),
     },
     outcomes,
     completedAt: nowIso(now),
@@ -1382,6 +1384,12 @@ export function cleanupSession(startPath, fields, options = {}) {
     return { ok: true, receipt, receiptPath };
   }
   const loaded = loadManifest(repo, fields.sessionId, fields.ownerNonce);
+  const retainCompletedVerifyRun = options.retainCompletedVerifyRun === true;
+  if (retainCompletedVerifyRun && (loaded.manifest.resources.length !== 1
+    || loaded.manifest.resources[0].type !== "verify-run-directory"
+    || !["ready", "sealed"].includes(loaded.manifest.resources[0].status))) {
+    fail("WT-VERIFY-RUN-RETAIN-INELIGIBLE", "only one finalized verify-run directory may be retained while closing a session");
+  }
   const preflight = [];
   for (const resource of loaded.manifest.resources) {
     if (resource.status === "removed") continue;
@@ -1422,6 +1430,13 @@ export function cleanupSession(startPath, fields, options = {}) {
   for (let index = 0; index < manifest.resources.length; index += 1) {
     let resource = manifest.resources[index];
     if (resource.status === "removed") continue;
+    if (retainCompletedVerifyRun && resource.type === "verify-run-directory") {
+      const resources = [...manifest.resources];
+      resources[index] = { ...resource, status: "retained", reason: "WT-VERIFY-RUN-RETAINED", objectIdentity: null };
+      manifest = writeManifest(loaded.path, { ...manifest, resources }, options.now);
+      inject(`resource-retained:${resource.resourceId}`);
+      continue;
+    }
     if (resource.status !== "cleanup-intent") {
       const resources = [...manifest.resources];
       resource = { ...resource, status: "cleanup-intent", reason: null };
@@ -1446,6 +1461,14 @@ export function cleanupSession(startPath, fields, options = {}) {
   } finally {
     releaseLock();
   }
+}
+
+/**
+ * Close the owning session for one completed Verify journal while retaining the
+ * immutable journal directory for receipt reuse and failure diagnostics.
+ */
+export function releaseCompletedVerifyRunSession(startPath, fields, options = {}) {
+  return cleanupSession(startPath, fields, { ...options, retainCompletedVerifyRun: true });
 }
 
 export function classifyCanonicalWorktree(repo, record) {

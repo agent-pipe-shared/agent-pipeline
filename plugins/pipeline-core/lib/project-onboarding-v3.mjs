@@ -102,7 +102,7 @@ import {
   resolveProjectAuthorityPaths,
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
-import { discoverRepository } from "./worktree-lifecycle.mjs";
+import { discoverRepository, listActiveSessionDescriptors } from "./worktree-lifecycle.mjs";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3, readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
@@ -1629,9 +1629,20 @@ function partialCleanupRecoveryResult({
         });
       }
     }
-    const nextAction = new Set(["cleanup-required", "release-ready"]).has(recovery.status)
+    // An orphan binding already has a bounded, CAS-backed release command.
+    // Do not hide it behind the generic human-recovery planner: that forces a
+    // PO into a no-op choice while the exact remediation is available.
+    let nextAction = new Set(["cleanup-required", "release-ready", "orphan-cleanup-required"]).has(recovery.status)
       ? recovery.nextAction ?? null
       : null;
+    if (intent === "session" && recovery.status === "cleanup-required") {
+      const listDescriptors = deps.listActiveSessionDescriptors ?? listActiveSessionDescriptors;
+      let descriptorCount = 0;
+      try { descriptorCount = listDescriptors(root).length; } catch {}
+      if (descriptorCount <= 1) {
+        nextAction = cleanupHumanRecoveryAction(root);
+      }
+    }
     if (nextAction !== null) {
       return lifecycleResult({
         status: "partial",

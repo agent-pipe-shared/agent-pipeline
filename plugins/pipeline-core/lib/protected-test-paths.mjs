@@ -846,9 +846,16 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
   // narrower than the gate-strength lane's unconditional name match, for the reason in this
   // module's header — a protected suite is meant to be run.
   const lowered = command.replace(/\\/gu, "/").toLowerCase();
-  const writerNamed = />[^>]/u.test(command)
-    || [...WRITE_EXECUTABLES, ...IN_PLACE_EXECUTABLES].some((name) => containsWholeToken(lowered, name))
-    || [...OPAQUE_CODE_FLAGS.keys()].some((name) => containsWholeToken(lowered, name));
+  const inPlaceNamed = [...IN_PLACE_EXECUTABLES].some((name) =>
+    containsWholeToken(lowered, name) && (/(?:^|\s)-(?:[a-z]*i[a-z]*|-[a-z]*in-place)(?:[\s=]|$)/u.test(lowered))
+  );
+  const opaqueCodeNamed = [...OPAQUE_CODE_FLAGS.entries()].some(([name, flags]) =>
+    containsWholeToken(lowered, name) && flags.some((flag) => (new RegExp(`(?:^|\\s)${flag}(?:[\\s=]|$)`, "u")).test(lowered))
+  );
+  const writerNamed = />/u.test(command)
+    || [...WRITE_EXECUTABLES].some((name) => containsWholeToken(lowered, name))
+    || inPlaceNamed
+    || opaqueCodeNamed;
   if (!writerNamed) return [];
   for (const token of command.match(PATH_TOKEN) ?? []) {
     targets.push({ candidate: token, lane: "unparsed-command", classification: "conservative-possible-write" });

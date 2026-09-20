@@ -99,7 +99,7 @@ function failure(root, code, message, artifacts, disposition, fitness = null) {
   };
 }
 
-function projectPlanningFitness(fitness) {
+function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
   const outcomes = Array.isArray(fitness?.outcomes) ? fitness.outcomes : [];
   const expectedClasses = new Set(Array.from({ length: 10 }, (_, index) => index + 1));
   const seenClasses = new Set();
@@ -113,12 +113,23 @@ function projectPlanningFitness(fitness) {
   if (malformed || seenClasses.size !== 10) {
     return { blockingOverallStatus: "unavailable", reportOnly: [], malformed: true };
   }
-  const reportOnly = outcomes.filter((outcome) => outcome.classId === 10
-    && outcome.outcome === "unavailable"
-    && outcome.evidence?.status === "unavailable"
-    && Array.isArray(outcome.evidence?.required)
-    && outcome.evidence.required.includes("measured-calibration")
-    && outcome.evidence.required.includes("explicit-threshold-promotion"));
+  const reportOnly = outcomes.filter((outcome) => (
+    outcome.classId === 10
+      && outcome.outcome === "unavailable"
+      && outcome.evidence?.status === "unavailable"
+      && Array.isArray(outcome.evidence?.required)
+      && outcome.evidence.required.includes("measured-calibration")
+      && outcome.evidence.required.includes("explicit-threshold-promotion")
+  ) || (
+    // A PO-authorized deferral honestly has no approved-scoped snapshot to
+    // compare.  That makes profile-drift observation unavailable, not a
+    // reason to negate the PO's explicit deferral.  Findings remain blocking.
+    adoptionDisposition === "deferred"
+      && outcome.classId === 9
+      && outcome.outcome === "unavailable"
+      && outcome.evidence?.status === "unavailable"
+      && outcome.details === "Valid approved-scoped authority is unavailable"
+  ));
   const blocking = outcomes.filter((outcome) => !reportOnly.includes(outcome));
   let blockingOverallStatus = "pass";
   if (blocking.some((outcome) => outcome.outcome === "finding")) blockingOverallStatus = "blocked";
@@ -232,7 +243,9 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   } catch (error) {
     return failure(root, "ARCHITECTURE-FITNESS-UNAVAILABLE", `architecture fitness evaluation failed: ${error.message}`, artifacts, disposition);
   }
-  const fitnessProjection = projectPlanningFitness(fitness);
+  const fitnessProjection = projectPlanningFitness(fitness, {
+    adoptionDisposition: disposition.disposition,
+  });
   if (fitnessProjection.malformed) {
     return failure(root, "ARCHITECTURE-FITNESS-UNAVAILABLE", "planning architecture fitness returned an incomplete or malformed outcome set", artifacts, disposition, {
       overallStatus: fitness.overallStatus,
@@ -241,6 +254,29 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       summary: fitness.summary,
       planningSurface: surface,
     });
+  }
+  // A deliberate PO deferral means architecture fitness is observed but not
+  // enforced until the recorded review. Physical artifacts and the signed
+  // disposition above remain mandatory; this never fabricates a passing
+  // fitness result and keeps every outcome visible for the later adoption.
+  if (disposition.disposition === "deferred") {
+    return {
+      schema: ARCHITECTURE_ENTRY_SCHEMA,
+      status: "ready",
+      root,
+      code: null,
+      message: "physical architecture artifacts are valid; PO-approved architecture enforcement is deferred",
+      artifacts,
+      disposition,
+      fitness: {
+        overallStatus: fitness.overallStatus,
+        blockingOverallStatus: "deferred",
+        reportOnly: fitness.outcomes,
+        outcomes: fitness.outcomes,
+        summary: fitness.summary,
+      },
+      nextAction: null,
+    };
   }
   if (!(fitnessProjection.blockingOverallStatus === "pass" || fitnessProjection.blockingOverallStatus === "excepted")) {
     return failure(root, "ARCHITECTURE-FITNESS-NOT-READY", `planning architecture fitness is ${fitnessProjection.blockingOverallStatus}`, artifacts, disposition, {

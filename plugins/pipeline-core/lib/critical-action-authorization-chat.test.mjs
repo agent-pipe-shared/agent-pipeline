@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
 import { authorizeRecordedChatPush, authorizeRecordedPush } from "./critical-action-authorization.mjs";
 
-const ROOT = mkdtempSync(join(process.cwd(), "scratch", "ha-chat-gg03-helper-"));
+const ROOT = mkdtempSync(join(tmpdir(), "ha-chat-gg03-helper-"));
 after(() => rmSync(ROOT, { recursive: true, force: true }));
 
 function git(root, ...args) {

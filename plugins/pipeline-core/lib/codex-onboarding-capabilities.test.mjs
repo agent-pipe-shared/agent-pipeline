@@ -1104,3 +1104,73 @@ test("NVA-B-INODE2-1 root capability probe cleanup preserves foreign content wri
   assert.equal(ordinary.rootWritable, "passed", JSON.stringify(ordinary));
   assert.deepEqual(treeSnapshot(owned), before);
 });
+
+
+test("P0 repair: existing protected Codex Git projection reports host-managed with passed session/dispatch capability", (t) => {
+  if (process.platform === "win32") return t.skip("POSIX protected-mount fixture");
+  const existing = localRepository("existing protected Git mount session");
+  mkdirSync(join(existing, ".codex"));
+  chmodSync(join(existing, ".codex"), 0o500);
+  chmodSync(join(existing, ".git"), 0o500);
+  assert.equal(hasCodexExistingGitControlMount(existing), true);
+
+  // 1. Session intent returns host-managed and sessionCapability passed without writing into .git
+  const session = observeCodexOnboardingCapabilities({ rootDir: existing, intent: "session" });
+  assert.equal(session.status, "host-managed");
+  assert.equal(session.mode, "host-managed");
+  assert.equal(session.rootWritable, "passed");
+  assert.match(session.gitVersion, /^\d+\.\d+\.\d+/u);
+  assert.equal(session.sessionCapability, "passed");
+  assert.equal(session.worktreeCapability, "not-required");
+
+  // 2. Dispatch intent gets sessionCapability passed
+  const dispatch = observeCodexOnboardingCapabilities({ rootDir: existing, intent: "dispatch" });
+  assert.equal(dispatch.status, "host-managed");
+  assert.equal(dispatch.mode, "host-managed");
+  assert.equal(dispatch.rootWritable, "passed");
+  assert.match(dispatch.gitVersion, /^\d+\.\d+\.\d+/u);
+  assert.equal(dispatch.sessionCapability, "passed");
+  assert.equal(dispatch.worktreeCapability, "not-observed");
+
+  // 3. Normal writable local repo remains local-valid-writable and still runs probes
+  const normal = localRepository("normal writable repo");
+  const normalSession = observeCodexOnboardingCapabilities({ rootDir: normal, intent: "session" });
+  assert.equal(normalSession.status, "local-valid-writable");
+  assert.equal(normalSession.mode, "local");
+  assert.equal(normalSession.sessionCapability, "passed");
+
+  // 4. Nonempty/malformed/read-only .git near-misses remain refused
+  const malformedCodex = localRepository("malformed codex");
+  mkdirSync(join(malformedCodex, ".codex"));
+  writeFileSync(join(malformedCodex, ".codex", "unexpected.txt"), "data\n");
+  chmodSync(join(malformedCodex, ".git"), 0o500);
+  const malformedObserved = observeCodexOnboardingCapabilities({ rootDir: malformedCodex, intent: "session" });
+  assert.equal(malformedObserved.status, "control-path-read-only");
+  assert.equal(malformedObserved.mode, "local");
+
+  // 5. No receipt invented; no private Git write occurred
+  assert.equal(existsSync(join(existing, ".claude", ".runtime", "agent-pipeline")), false);
+  assert.equal(existsSync(join(existing, ".git", "agent-pipeline")), false);
+
+  chmodSync(join(existing, ".git"), 0o700);
+  chmodSync(join(existing, ".codex"), 0o700);
+  chmodSync(join(malformedCodex, ".git"), 0o700);
+});
+
+test("P0 regression: a normal exact Codex project runtime layout does not hide a protected existing Git projection", (t) => {
+  if (process.platform === "win32") return t.skip("POSIX protected-mount fixture");
+  const existing = localRepository("existing protected Git mount with project Codex runtime");
+  mkdirSync(join(existing, ".codex", "agents"), { recursive: true });
+  writeFileSync(join(existing, ".codex", "config.toml"), "");
+  for (const name of ["consult-advisor.toml", "critic.toml", "implementor.toml"]) {
+    writeFileSync(join(existing, ".codex", "agents", name), "");
+  }
+  chmodSync(join(existing, ".git"), 0o500);
+  assert.equal(hasCodexExistingGitControlMount(existing), true);
+
+  const observed = observeCodexOnboardingCapabilities({ rootDir: existing, intent: "session" });
+  assert.equal(observed.status, "host-managed");
+  assert.equal(observed.sessionCapability, "passed");
+
+  chmodSync(join(existing, ".git"), 0o700);
+});

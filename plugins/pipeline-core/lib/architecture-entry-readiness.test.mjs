@@ -46,13 +46,14 @@ test("malformed physical map blocks even with an authorized adoption disposition
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("physical validated map and fitness baseline remain independently visible while planning fitness gates entry", () => {
+test("a PO-deferred adoption reports complete fitness observations without enforcing them", () => {
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,
     deps: { checkPlanningAdoptionDisposition: readyDisposition },
   });
-  assert.equal(result.status, "blocked", JSON.stringify(result));
-  assert.equal(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  assert.equal(result.fitness.blockingOverallStatus, "deferred");
+  assert.equal(result.fitness.reportOnly.length, 10);
   assert.equal(result.artifacts.map.status, "current");
   assert.equal(result.artifacts.fitnessModel.status, "current");
   assert.equal(result.artifacts.baseline.status, "current");

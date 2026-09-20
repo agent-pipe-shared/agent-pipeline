@@ -488,6 +488,62 @@ function baseDiscardEntry() {
   };
 }
 
+function archivedPlanCancellation(featureId = "abandoned-feature") {
+  return {
+    schema: "pipeline.plan-cancellation.v1",
+    featureId,
+    submissionSha256: "a".repeat(64),
+    cancelledBy: "PO",
+    cancelledAt: "2026-07-29T08:58:00.000Z",
+  };
+}
+
+function archivedMixedPlanRecovery(featureId = "abandoned-feature") {
+  return {
+    schema: "pipeline.plan-mixed-state-recovery.v1",
+    featureId,
+    submissionSha256: "b".repeat(64),
+    approvalSha256: "c".repeat(64),
+    invalidationSha256: "d".repeat(64),
+    recoveredBy: "PO",
+    recoveredAt: "2026-07-29T08:59:00.000Z",
+    reason: "retire mixed plan history",
+  };
+}
+
+check("discard transition accepts exact feature-bound archived plan receipts", () => {
+  const root = fixture("discard-archived-plan-receipts");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [{
+      ...baseDiscardEntry(),
+      planCancellation: archivedPlanCancellation(),
+      planMixedStateRecovery: archivedMixedPlanRecovery(),
+    }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+});
+
+check("discard transition rejects malformed or foreign archived plan receipts", () => {
+  for (const [name, mutate] of [
+    ["cancellation-feature", (entry) => { entry.planCancellation.featureId = "foreign-feature"; }],
+    ["mixed-feature", (entry) => { entry.planMixedStateRecovery.featureId = "foreign-feature"; }],
+    ["cancellation-extra-key", (entry) => { entry.planCancellation.extra = true; }],
+    ["mixed-extra-key", (entry) => { entry.planMixedStateRecovery.extra = true; }],
+  ]) {
+    const root = fixture(`discard-archived-plan-receipts-${name}`);
+    const entry = { ...baseDiscardEntry(), planCancellation: archivedPlanCancellation(), planMixedStateRecovery: archivedMixedPlanRecovery() };
+    mutate(entry);
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0", planApproved: false,
+      updatedAt: "2026-07-29T09:00:00.000Z", discardedFeatures: [entry],
+    }, null, 2)}\n`);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged", name);
+  }
+});
+
 check("discard transition with a stale updatedAt remains damaged", () => {
   const root = fixture("discard-stale-updated-at");
   writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
@@ -4707,7 +4763,7 @@ check("applyOnboardingBootstrapBind: a content language outside {de, en} (fr) st
   assert.notEqual(authority.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
 });
 
-assert.equal(cases.length, 284, "the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 286, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -577,6 +577,15 @@ export function rotateHandover({
 // -- CLI --
 
 const CLI_USAGE_CODE = "HANDOVER-ROTATION-CLI-USAGE";
+const CLI_HELP = [
+  "Usage: handover-rotate.mjs --root <repository-root> --check-size [--handover-path <path>]",
+  "       handover-rotate.mjs --root <repository-root> --status [--section-heading <title>] [--handover-path <path>]",
+  "       handover-rotate.mjs --root <repository-root> --acknowledge-extraction-done --section-heading <title> [--handover-path <path>]",
+  "       handover-rotate.mjs --root <repository-root> [--dry-run] --section-heading <title> --summary <text> [--date-range <range>] [--slug <slug>] [--rotation-date <date>] [--handover-path <path>]",
+  "       handover-rotate.mjs --help",
+  "",
+  "Measures, acknowledges, previews, or rotates bounded handover sections.",
+].join("\n");
 
 function cliUsage(message) {
   return new HandoverRotationError(CLI_USAGE_CODE, message);
@@ -646,8 +655,11 @@ function parseArgs(argv) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  try {
-    const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  if (argv.length === 1 && argv[0] === "--help") {
+    process.stdout.write(`${CLI_HELP}\n`);
+  } else try {
+    const args = parseArgs(argv);
     if (!args.root) throw cliUsage("--root <repository-root> is required.");
     const root = resolve(args.root);
     if (args.mode === "check-size") {

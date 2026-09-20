@@ -9,8 +9,9 @@ import { createHash } from "node:crypto";
 import { validateContinuityState } from "./continuity-state.mjs";
 
 const APPROVAL_SCHEMA = "pipeline.plan-approval.v2";
-const PREVIOUS_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
-export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v4";
+const LEGACY_SUBMISSION_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
+const PREVIOUS_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v4";
+export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v5";
 // Schema-identifier collision, resolved additively and deliberately NOT merged:
 // "pipeline.plan-approval.v3" denotes two disjoint historical record shapes.
 //   - PREVIOUS_CURRENT_APPROVAL_SCHEMA (above): the submission-bound approval
@@ -27,6 +28,8 @@ const HUMAN_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
 const HUMAN_REFERENCE_SCHEMA = "pipeline.human-decision-reference.v1";
 export const PLAN_SUBMISSION_SCHEMA = "pipeline.plan-submission.v1";
 export const PLAN_INVALIDATION_SCHEMA = "pipeline.plan-invalidation.v1";
+export const PLAN_CANCELLATION_SCHEMA = "pipeline.plan-cancellation.v1";
+export const PLAN_MIXED_STATE_RECOVERY_SCHEMA = "pipeline.plan-mixed-state-recovery.v1";
 const AUTHORITY_SCHEMA = "pipeline.po-gate-authority.v2";
 const REVOCATION_SCHEMA = "pipeline.plan-revocation.v2";
 export const LEGACY_V2_REVOCATION_RECOVERY_SCHEMA = "pipeline.plan-legacy-v2-revocation-recovery.v1";
@@ -117,8 +120,10 @@ const CURRENT_APPROVAL_KEYS = [
   "profileSha256",
   "poGateAuthority",
   "priorInvalidationSha256",
+  "designAdvisorAdmissionSha256",
 ];
-const PREVIOUS_CURRENT_APPROVAL_KEYS = CURRENT_APPROVAL_KEYS.filter((key) => key !== "priorInvalidationSha256");
+const PREVIOUS_CURRENT_APPROVAL_KEYS = CURRENT_APPROVAL_KEYS.filter((key) => key !== "designAdvisorAdmissionSha256");
+const LEGACY_SUBMISSION_APPROVAL_KEYS = PREVIOUS_CURRENT_APPROVAL_KEYS.filter((key) => key !== "priorInvalidationSha256");
 const INVALIDATION_KEYS = [
   "schema",
   "featureId",
@@ -126,6 +131,23 @@ const INVALIDATION_KEYS = [
   "invalidatedApprovalSha256",
   "invalidatedBy",
   "invalidatedAt",
+  "reason",
+];
+const CANCELLATION_KEYS = [
+  "schema",
+  "featureId",
+  "submissionSha256",
+  "cancelledBy",
+  "cancelledAt",
+];
+const MIXED_STATE_RECOVERY_KEYS = [
+  "schema",
+  "featureId",
+  "submissionSha256",
+  "approvalSha256",
+  "invalidationSha256",
+  "recoveredBy",
+  "recoveredAt",
   "reason",
 ];
 const PROFILES = new Set(["epic", "feature", "mini"]);
@@ -321,17 +343,21 @@ export function validCurrentPlanApproval(value) {
     && SHA256.test(value.submissionSha256)
     && SHA256.test(value.profileSha256)
     && (value.priorInvalidationSha256 === null || SHA256.test(value.priorInvalidationSha256))
+    && (value.designAdvisorAdmissionSha256 === null || SHA256.test(value.designAdvisorAdmissionSha256))
     && validAuthority(value.poGateAuthority);
 }
 
 function validPreviousCurrentPlanApproval(value) {
-  return hasExactKeys(value, PREVIOUS_CURRENT_APPROVAL_KEYS)
-    && value.schema === PREVIOUS_CURRENT_APPROVAL_SCHEMA
-    && isNonBlankString(value.approvedBy)
-    && isCanonicalIso(value.approvedAt)
-    && SHA256.test(value.submissionSha256)
-    && SHA256.test(value.profileSha256)
-    && validAuthority(value.poGateAuthority);
+  const shared = isNonBlankString(value?.approvedBy)
+    && isCanonicalIso(value?.approvedAt)
+    && SHA256.test(value?.submissionSha256 ?? "")
+    && SHA256.test(value?.profileSha256 ?? "")
+    && validAuthority(value?.poGateAuthority);
+  return shared && ((hasExactKeys(value, PREVIOUS_CURRENT_APPROVAL_KEYS)
+      && value.schema === PREVIOUS_CURRENT_APPROVAL_SCHEMA
+      && (value.priorInvalidationSha256 === null || SHA256.test(value.priorInvalidationSha256)))
+    || (hasExactKeys(value, LEGACY_SUBMISSION_APPROVAL_KEYS)
+      && value.schema === LEGACY_SUBMISSION_APPROVAL_SCHEMA))
 }
 
 export function validPlanInvalidation(value) {
@@ -354,6 +380,37 @@ export function validPlanInvalidation(value) {
     && isNonBlankString(value.invalidatedBy)
     && isCanonicalIso(value.invalidatedAt)
     && INVALIDATION_REASONS.has(value.reason);
+}
+
+/**
+ * A cancellation is historical evidence, never an approval substitute.  It
+ * deliberately contains the exact submission digest the PO withdrew and no
+ * mutable document/authority object that a later submission could overwrite.
+ */
+export function validPlanCancellation(value) {
+  return hasExactKeys(value, CANCELLATION_KEYS)
+    && value.schema === PLAN_CANCELLATION_SCHEMA
+    && isNonBlankString(value.featureId)
+    && SHA256.test(value.submissionSha256)
+    && isNonBlankString(value.cancelledBy)
+    && isCanonicalIso(value.cancelledAt);
+}
+
+/**
+ * Audit receipt for the one narrow historical mixed-state recovery. The
+ * three digests bind the complete observed records, and attribution is part
+ * of the exact replay identity.
+ */
+export function validPlanMixedStateRecovery(value) {
+  return hasExactKeys(value, MIXED_STATE_RECOVERY_KEYS)
+    && value.schema === PLAN_MIXED_STATE_RECOVERY_SCHEMA
+    && isNonBlankString(value.featureId)
+    && SHA256.test(value.submissionSha256)
+    && SHA256.test(value.approvalSha256)
+    && SHA256.test(value.invalidationSha256)
+    && isNonBlankString(value.recoveredBy)
+    && isCanonicalIso(value.recoveredAt)
+    && isNonBlankString(value.reason);
 }
 
 function submissionMatchesObservation(submission, observation = {}) {
@@ -381,7 +438,11 @@ function currentApproval(state, submission, observation) {
     const authority = approval.poGateAuthority;
     const invalidation = state.planInvalidation;
     const requiredSeal = invalidation === undefined ? null : sha256CanonicalJson(invalidation);
-    const sealed = approval.schema === CURRENT_APPROVAL_SCHEMA
+    const advisorBindingMatchesProfile = approval.schema !== CURRENT_APPROVAL_SCHEMA
+      || (submission.profile === "mini"
+        ? approval.designAdvisorAdmissionSha256 === null
+        : SHA256.test(approval.designAdvisorAdmissionSha256 ?? ""));
+    const sealed = (approval.schema === CURRENT_APPROVAL_SCHEMA || approval.schema === PREVIOUS_CURRENT_APPROVAL_SCHEMA)
       ? approval.priorInvalidationSha256 === requiredSeal
       : invalidation === undefined;
     return approval.submissionSha256 === sha256CanonicalJson(submission)
@@ -391,6 +452,7 @@ function currentApproval(state, submission, observation) {
       && authority.specPath === submission.specPath
       && authority.specSha256 === submission.specSha256
       && submissionMatchesObservation(submission, observation)
+      && advisorBindingMatchesProfile
       && sealed
       ? approval
       : null;
@@ -438,6 +500,16 @@ export function derivePlanLifecycle(state, observation = {}) {
   }
   if (state.planInvalidation !== undefined && !validPlanInvalidation(state.planInvalidation)) {
     return { ok: false, code: "PLAN-LIFECYCLE-INVALIDATION-INVALID", status: null, phase: state.activeFeature.phase, nextAction: null };
+  }
+  if (state.planCancellation !== undefined
+    && (!validPlanCancellation(state.planCancellation)
+      || state.planCancellation.featureId !== state.activeFeature.id)) {
+    return { ok: false, code: "PLAN-LIFECYCLE-CANCELLATION-INVALID", status: null, phase: state.activeFeature.phase, nextAction: null };
+  }
+  if (state.planMixedStateRecovery !== undefined
+    && (!validPlanMixedStateRecovery(state.planMixedStateRecovery)
+      || state.planMixedStateRecovery.featureId !== state.activeFeature.id)) {
+    return { ok: false, code: "PLAN-LIFECYCLE-MIXED-RECOVERY-INVALID", status: null, phase: state.activeFeature.phase, nextAction: null };
   }
   if (state.planSubmission === undefined
     && state.planApproved === false
@@ -611,6 +683,191 @@ export function submitPlan({
   };
 }
 
+/**
+ * Withdraw exactly one still-current, unapproved submission.  The receipt is
+ * retained as historic, typed evidence while every live pre-approval adjunct
+ * is removed.  A second call is a true zero-write replay only when it names
+ * the same persisted receipt; a later submission may retain that history but
+ * is never cancellable through the old receipt.
+ */
+export function cancelSubmittedPlan({
+  state,
+  expectedStateSha256,
+  expectedSubmissionSha256,
+  by,
+  at,
+}) {
+  if (!currentStateMatches(state, expectedStateSha256)) return fail("PLAN-CANCEL-STATE-STALE");
+  if (!validActiveFeature(state?.activeFeature)
+    || !SHA256.test(expectedSubmissionSha256 ?? "")
+    || !isNonBlankString(by)
+    || !isCanonicalIso(at)) return fail("PLAN-CANCEL-REQUEST-INVALID");
+  const cancellation = {
+    schema: PLAN_CANCELLATION_SCHEMA,
+    featureId: state.activeFeature.id,
+    submissionSha256: expectedSubmissionSha256,
+    cancelledBy: by,
+    cancelledAt: at,
+  };
+  const checked = exactTransitionState(state, expectedStateSha256);
+  if (!checked.ok) return checked;
+  if (state.planCancellation !== undefined) {
+    const exactReplay = validPlanCancellation(state.planCancellation)
+      && equalCanonical(state.planCancellation, cancellation)
+      && checked.lifecycle.status === "draft"
+      && state.planSubmission === undefined
+      && state.planApproval === undefined
+      && state.planPresentation === undefined
+      && state.planApprovalBriefing === undefined
+      && state.planApproved === false;
+    if (exactReplay) return { ok: true, replay: true, state, cancellation };
+    return fail("PLAN-CANCEL-ALREADY-CANCELLED");
+  }
+  if (checked.lifecycle.status !== "awaiting-approval" || state.activeFeature.phase !== "design") {
+    return fail("PLAN-CANCEL-STATE-INVALID");
+  }
+  if (checked.lifecycle.submissionSha256 !== expectedSubmissionSha256) {
+    return fail("PLAN-CANCEL-SUBMISSION-STALE");
+  }
+  if (state.planApproved !== false || state.planApproval !== undefined) {
+    return fail("PLAN-CANCEL-STATE-INVALID");
+  }
+  const continuity = state.continuity;
+  if (!validateContinuityState(continuity, state.activeFeature.id).ok
+    || continuity.revision >= Number.MAX_SAFE_INTEGER) {
+    return fail("PLAN-CANCEL-CONTINUITY-INVALID");
+  }
+  const next = {
+    ...state,
+    planApproved: false,
+    planCancellation: cancellation,
+    continuity: {
+      ...continuity,
+      revision: continuity.revision + 1,
+      nativeContinuation: null,
+      resume: {
+        mode: "immediate",
+        sourceRevision: continuity.revision + 1,
+        reasonCode: "active-turn",
+      },
+    },
+  };
+  delete next.planSubmission;
+  delete next.planApproval;
+  delete next.planPresentation;
+  delete next.planApprovalBriefing;
+  if (!validateContinuityState(next.continuity, state.activeFeature.id).ok) {
+    return fail("PLAN-CANCEL-CONTINUITY-POSTIMAGE");
+  }
+  return { ok: true, replay: false, state: next, cancellation };
+}
+
+/**
+ * Retire the exact B9.1 mixed record: one current successor submission plus
+ * a retained, invalidated historical v4 approval. This remains separate from
+ * the ordinary cancellation, which still rejects any retained approval.
+ */
+export function cancelMixedPlanState({
+  state,
+  expectedStateSha256,
+  expectedSubmissionSha256,
+  expectedApprovalSha256,
+  expectedInvalidationSha256,
+  by,
+  at,
+  reason,
+}) {
+  if (!currentStateMatches(state, expectedStateSha256)) return fail("PLAN-MIXED-CANCEL-STATE-STALE");
+  if (!validActiveFeature(state?.activeFeature)
+    || !SHA256.test(expectedSubmissionSha256 ?? "")
+    || !SHA256.test(expectedApprovalSha256 ?? "")
+    || !SHA256.test(expectedInvalidationSha256 ?? "")
+    || !isNonBlankString(by)
+    || !isCanonicalIso(at)
+    || !isNonBlankString(reason)) return fail("PLAN-MIXED-CANCEL-REQUEST-INVALID");
+  const recovery = {
+    schema: PLAN_MIXED_STATE_RECOVERY_SCHEMA,
+    featureId: state.activeFeature.id,
+    submissionSha256: expectedSubmissionSha256,
+    approvalSha256: expectedApprovalSha256,
+    invalidationSha256: expectedInvalidationSha256,
+    recoveredBy: by,
+    recoveredAt: at,
+    reason,
+  };
+  if (state.planMixedStateRecovery !== undefined) {
+    const exactReplay = validPlanMixedStateRecovery(state.planMixedStateRecovery)
+      && equalCanonical(state.planMixedStateRecovery, recovery)
+      && state.activeFeature.phase === "design"
+      && state.planApproved === false
+      && state.planSubmission === undefined
+      && state.planApproval === undefined
+      && state.planPresentation === undefined
+      && state.planApprovalBriefing === undefined
+      && validPlanInvalidation(state.planInvalidation)
+      && state.planInvalidation.featureId === state.activeFeature.id
+      && sha256CanonicalJson(state.planInvalidation) === expectedInvalidationSha256
+      && validateContinuityState(state.continuity, state.activeFeature.id).ok;
+    if (exactReplay) return { ok: true, replay: true, state, recovery };
+    return fail("PLAN-MIXED-CANCEL-ALREADY-RECOVERED");
+  }
+  if (state.activeFeature.phase !== "design" || state.planApproved !== false) {
+    return fail("PLAN-MIXED-CANCEL-STATE-INVALID");
+  }
+  const submission = state.planSubmission;
+  const approval = state.planApproval;
+  const invalidation = state.planInvalidation;
+  if (!validPlanSubmission(submission)
+    || submission.featureId !== state.activeFeature.id
+    || submission.planPath !== state.activeFeature.planPath
+    || !(validCurrentPlanApproval(approval) || validPreviousCurrentPlanApproval(approval))
+    || approval.poGateAuthority.planPath !== state.activeFeature.planPath
+    || !validPlanInvalidation(invalidation)
+    || invalidation.featureId !== state.activeFeature.id
+    || invalidation.invalidatedApprovalSha256 !== sha256CanonicalJson(approval)
+    || approval.submissionSha256 === sha256CanonicalJson(submission)
+    || invalidation.invalidatedSubmissionSha256 === sha256CanonicalJson(submission)) {
+    return fail("PLAN-MIXED-CANCEL-STATE-INVALID");
+  }
+  if (sha256CanonicalJson(submission) !== expectedSubmissionSha256) {
+    return fail("PLAN-MIXED-CANCEL-SUBMISSION-STALE");
+  }
+  if (sha256CanonicalJson(approval) !== expectedApprovalSha256) {
+    return fail("PLAN-MIXED-CANCEL-APPROVAL-STALE");
+  }
+  if (sha256CanonicalJson(invalidation) !== expectedInvalidationSha256) {
+    return fail("PLAN-MIXED-CANCEL-INVALIDATION-STALE");
+  }
+  const continuity = state.continuity;
+  if (!validateContinuityState(continuity, state.activeFeature.id).ok
+    || continuity.revision >= Number.MAX_SAFE_INTEGER) {
+    return fail("PLAN-MIXED-CANCEL-CONTINUITY-INVALID");
+  }
+  const next = {
+    ...state,
+    planApproved: false,
+    planMixedStateRecovery: recovery,
+    continuity: {
+      ...continuity,
+      revision: continuity.revision + 1,
+      nativeContinuation: null,
+      resume: {
+        mode: "immediate",
+        sourceRevision: continuity.revision + 1,
+        reasonCode: "active-turn",
+      },
+    },
+  };
+  delete next.planSubmission;
+  delete next.planApproval;
+  delete next.planPresentation;
+  delete next.planApprovalBriefing;
+  if (!validateContinuityState(next.continuity, state.activeFeature.id).ok) {
+    return fail("PLAN-MIXED-CANCEL-CONTINUITY-POSTIMAGE");
+  }
+  return { ok: true, replay: false, state: next, recovery };
+}
+
 export function approveSubmittedPlan({
   state,
   expectedStateSha256,
@@ -619,6 +876,7 @@ export function approveSubmittedPlan({
   profileSha256,
   by,
   at,
+  designAdvisorAdmissionSha256 = null,
 }) {
   const checked = exactTransitionState(state, expectedStateSha256);
   if (!checked.ok) return checked;
@@ -627,6 +885,7 @@ export function approveSubmittedPlan({
     || !validAuthority(poGateAuthority)
     || !SHA256.test(profileSha256 ?? "")
     || !isNonBlankString(by)
+    || (designAdvisorAdmissionSha256 !== null && !SHA256.test(designAdvisorAdmissionSha256))
     || !isCanonicalIso(at)) return fail("PLAN-APPROVE-REQUEST-INVALID");
   const submission = state.planSubmission;
   if (submission.profileSha256 !== profileSha256
@@ -634,6 +893,9 @@ export function approveSubmittedPlan({
     || submission.planSha256 !== poGateAuthority.planSha256
     || submission.specPath !== poGateAuthority.specPath
     || submission.specSha256 !== poGateAuthority.specSha256) return fail("PLAN-APPROVE-AUTHORITY-STALE");
+  if ((submission.profile === "mini") !== (designAdvisorAdmissionSha256 === null)) {
+    return fail("PLAN-APPROVE-ADVISOR-PROFILE-INVALID");
+  }
   const approval = {
     schema: CURRENT_APPROVAL_SCHEMA,
     approvedBy: by,
@@ -644,6 +906,7 @@ export function approveSubmittedPlan({
     priorInvalidationSha256: state.planInvalidation === undefined
       ? null
       : sha256CanonicalJson(state.planInvalidation),
+    designAdvisorAdmissionSha256,
   };
   const next = { ...state, planApproved: true, planApproval: approval };
   // A renewed exact approval supersedes any retained historical revocation.
@@ -671,7 +934,9 @@ export function sealCurrentPlanApproval({ state, expectedStateSha256 }) {
   }
   if (!validPlanInvalidation(state.planInvalidation)) return fail("PLAN-APPROVAL-SEAL-INVALIDATION-REQUIRED");
   const approval = state.planApproval;
-  if (!validPreviousCurrentPlanApproval(approval)) return fail("PLAN-APPROVAL-SEAL-V3-REQUIRED");
+  if (!validPreviousCurrentPlanApproval(approval) || approval.schema !== PREVIOUS_CURRENT_APPROVAL_SCHEMA) {
+    return fail("PLAN-APPROVAL-SEAL-V4-REQUIRED");
+  }
   const submission = currentSubmission(state, {});
   const authority = approval.poGateAuthority;
   if (submission === null
@@ -686,7 +951,6 @@ export function sealCurrentPlanApproval({ state, expectedStateSha256 }) {
   }
   const sealed = {
     ...approval,
-    schema: CURRENT_APPROVAL_SCHEMA,
     priorInvalidationSha256: sha256CanonicalJson(state.planInvalidation),
   };
   return {

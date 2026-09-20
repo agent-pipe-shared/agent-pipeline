@@ -41,7 +41,7 @@ import { isNeverLiftableKernelPath } from "./guard-maintenance-window.mjs";
 // the normative `parsePushBinding()`, but that file is a HOOK with top-level side effects:
 // importing it to reuse one function would run a guard as a side effect of loading this
 // module. See pushRecoveryTarget() below for the bounded local equivalent.
-import { stripQuotedSegments, tokenizeArgv } from "./git-cmd.mjs";
+import { commandIsGitPush, stripQuotedSegments, tokenizeArgv } from "./git-cmd.mjs";
 import {
   buildGuardHandoffOfferEvent,
   GUARD_HANDOFF_JOURNAL_REFUSAL,
@@ -72,9 +72,9 @@ import { buildGovernanceHgoConsumptionSource } from "./governance-hgo-consumptio
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9._-]{1,120}$/u;
-const REQUEST_SCHEMA = "pipeline.human-guard-override-request.v2";
-const PLAN_SCHEMA = "pipeline.human-guard-override-plan.v2";
-const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v2";
+const REQUEST_SCHEMA = "pipeline.human-guard-override-request.v3";
+const PLAN_SCHEMA = "pipeline.human-guard-override-plan.v3";
+const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v3";
 const AUDIT_SCHEMA = "pipeline.human-guard-override-audit.v1";
 const AUDIT_HEAD_SCHEMA = "pipeline.human-guard-override-audit-head.v1";
 const AUDIT_STATE_SCHEMA = "pipeline.human-guard-override-audit-state.v1";
@@ -1495,7 +1495,6 @@ function localAction(executable, argv, expected, { mutation = false } = {}) {
 // a guessed destination: a wrong hint costs a wasted human ceremony against a ref
 // nobody meant to write.
 // ---------------------------------------------------------------------------------
-const PUSH_COMMAND = /\bgit(?:\.exe)?\b[^\n]*\bpush\b/iu;
 const PUSH_MAIN_REF = "refs/heads/main";
 // `main`/`refs/heads/main` -- the same union guard-push.mjs's own attestedMainPublication()
 // call site treats as main (an explicit destination, or a shorthand push whose source is
@@ -1635,7 +1634,7 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
         },
       };
   }
-  const deniedPushCommand = PUSH_COMMAND.test(command);
+  const deniedPushCommand = commandIsGitPush(command);
   if (code === "HGO-PUBLICATION-REQUIRED" || deniedPushCommand) {
     // Classify ONLY when the denied command is itself a push. A publication-authority
     // denial whose command is not a push at all (a release alias) never named a
@@ -1775,13 +1774,46 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
     if (!parsed) {
       return { eligible: false, code: "HGO-NONOVERRIDABLE-GRAMMAR", paths };
     }
+    const crossBoundaryPaths = [];
+    const refusedPaths = [];
+    const hardBoundaryPaths = [];
     for (const candidate of parsed) {
       const classified = classifyPath(root, candidate);
-      if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [...paths, candidate] };
-      if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+      if (classified.kind === "refused") {
+        refusedPaths.push(candidate);
+        continue;
+      }
+      if (classified.kind === "cross-boundary") {
+        crossBoundaryPaths.push(classified.target);
+        continue;
+      }
       const path = classified.path;
-      if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [...paths, path.relative] };
+      if (hardBoundaryPath(path.relative)) {
+        hardBoundaryPaths.push(path.relative);
+        continue;
+      }
       paths.push(path.relative);
+    }
+    const classifiedPaths = [...new Set([...paths, ...crossBoundaryPaths, ...refusedPaths, ...hardBoundaryPaths])].sort();
+    if (refusedPaths.length > 0) {
+      return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: classifiedPaths };
+    }
+    if (hardBoundaryPaths.length > 0) {
+      return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: classifiedPaths };
+    }
+    if (crossBoundaryPaths.length > 0) {
+      // One capability belongs to one physical authority plane. A patch may span
+      // several files in one external Git repository, but never mix in-root and
+      // out-of-root targets or bind ledgers from multiple external repositories.
+      if (paths.length > 0) {
+        return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: classifiedPaths };
+      }
+      const targetRoots = crossBoundaryPaths.map((target) => crossRepositoryTargetRoot(target));
+      if (crossBoundaryPaths.length > 1
+        && (targetRoots.some((targetRoot) => targetRoot === null) || new Set(targetRoots).size !== 1)) {
+        return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: classifiedPaths };
+      }
+      return crossBoundaryEligible(crossBoundaryPaths.slice(1), crossBoundaryPaths[0]);
     }
     if (paths.some(protectedPath)) return {
       eligible: true,
@@ -1983,6 +2015,7 @@ const PLAN_KEYS = [
   "toolName",
   "toolInputSha256",
   "commandClass",
+  "externalReadOnly",
   "denials",
   "policy",
   "preview",
@@ -2003,6 +2036,7 @@ function validatedPlan(path) {
   const core = Object.fromEntries(Object.entries(value).filter(([name]) => name !== "planSha256"));
   if (!exactKeys(value, PLAN_KEYS) || value.schema !== PLAN_SCHEMA || value.status !== "planned"
     || !SHA256.test(value.requestSha256 ?? "") || !SHA256.test(value.planSha256 ?? "")
+    || typeof value.externalReadOnly !== "boolean"
     || sha(core) !== value.planSha256) {
     fail("HGO-PLAN", "persisted override plan is invalid");
   }
@@ -2020,7 +2054,10 @@ function readPersistedPlan(paths, requestSha256, authorSourceRoot) {
 
 /** The identical check `request` expiry gets at plan first-creation (design doc §1.4 step 1, :1520) and at refreeze (step 6). */
 function assertRequestNotExpired(request, repo, nowMs) {
-  if (request.root !== repo.root || new Date(request.expiresAt).getTime() <= nowMs) {
+  if (request.root !== repo.root) {
+    fail("HGO-REQUEST-ROOT-MISMATCH", "override request belongs to a different repository");
+  }
+  if (new Date(request.expiresAt).getTime() <= nowMs) {
     fail("HGO-EXPIRED", "override request expired");
   }
 }
@@ -2750,6 +2787,7 @@ const CAPABILITY_KEYS = [
   "toolName",
   "toolInputSha256",
   "commandClass",
+  "externalReadOnly",
   "denials",
   "policy",
   "preview",
@@ -2781,11 +2819,12 @@ function validatedCapability(paths, path) {
     || !(object(value.humanApproval)
       && ((value.humanApproval.mode === "chat-attributed-unattested"
         && exactKeys(value.humanApproval, ["mode", "kind"])
-        && value.humanApproval.kind === "human-guard-override")
+        && new Set(["human-guard-override", "external-read-only-po-chat"]).has(value.humanApproval.kind))
         || (value.humanApproval.mode === "signature-verified"
           && exactKeys(value.humanApproval, ["mode"]))))
     || !SHA256.test(value.toolInputSha256 ?? "")
     || typeof value.commandClass !== "string" || value.commandClass.trim() === ""
+    || typeof value.externalReadOnly !== "boolean"
     || !(value.signedCandidate === null
       || (object(value.signedCandidate) && exactKeys(value.signedCandidate, ["commit", "tree"])
         && typeof value.signedCandidate.commit === "string" && value.signedCandidate.commit !== ""
@@ -2818,11 +2857,12 @@ function validatedRequest(paths, requestSha256) {
   const request = readJson(requestPath(paths, requestSha256));
   if (!exactKeys(request, [
     "schema", "root", "plugin", "repository", "toolName", "toolInputSha256", "denials",
-    "policy", "preview", "eligiblePaths", "commandClass", "mode", "authorSourceRoot", "createdAt", "expiresAt",
+    "policy", "preview", "eligiblePaths", "commandClass", "externalReadOnly", "mode", "authorSourceRoot", "createdAt", "expiresAt",
   ])
     || request.schema !== REQUEST_SCHEMA || request.root === undefined
     || !new Set(["standard", "pipeline-author-repair-candidate", "global-plugin-install"]).has(request.mode)
     || request.authorSourceRoot !== null
+    || typeof request.externalReadOnly !== "boolean"
     || !SHA256.test(request.toolInputSha256) || !Array.isArray(request.denials)
     || sha(request) !== requestSha256) fail("HGO-REQUEST", "override request is invalid");
   return request;
@@ -3006,6 +3046,13 @@ export function recordHumanGuardDenial({
     toolName,
     toolInputSha256: sha(toolInput),
     commandClass,
+    // This fact never admits a command by itself. It is bound to the exact
+    // command and denial digests; at consumption the lifecycle guard reruns
+    // its strict read-only classifier before presenting the same denial.
+    externalReadOnly: toolName === "Bash"
+      && denials.length === 1
+      && denials[0]?.guard === "guard-lifecycle-ready.mjs"
+      && String(denials[0]?.reason ?? "").startsWith("GUARD-READ-SCOPE-OUTSIDE-ROOT:"),
     denials: denialDigests(denials),
     policy,
     preview,
@@ -3166,6 +3213,7 @@ export function planHumanGuardOverride({
     toolName: request.toolName,
     toolInputSha256: request.toolInputSha256,
     commandClass: request.commandClass,
+    externalReadOnly: request.externalReadOnly,
     denials: request.denials,
     policy: request.policy,
     preview: request.preview,
@@ -3215,7 +3263,15 @@ export function refreezeHumanGuardOverridePlan({
     fail("HGO-PLAN-ABSENT", "no persisted override plan exists for this request; run plan or prepare-for-signature first");
   }
   const request = validatedRequest(paths, requestSha256);
-  assertRequestNotExpired(request, repo, nowMs);
+  // An expired request is not an authorization and cannot arm anything. It is,
+  // however, still the immutable evidence that binds this explicit recovery to
+  // the exact denied tool input, repository fingerprint, policy, plugin identity,
+  // paths and denial set. Refreeze therefore permits expiry recovery only after
+  // re-validating every one of those bindings below, and grants a new fixed
+  // DEFAULT_TTL_MS plan window. The plan digest changes, so every old selection,
+  // intent and signature stays unusable and a fresh PO signature is mandatory.
+  if (request.root !== repo.root) fail("HGO-EXPIRED", "override request belongs to a different repository");
+  const requestExpired = new Date(request.expiresAt).getTime() <= nowMs;
   const repository = repositoryObservation(repo.root, spawn);
   const policy = policyIdentity(repo.root, pluginRoot, request.denials);
   assertNoRequestDrift(repository, policy, request);
@@ -3223,7 +3279,14 @@ export function refreezeHumanGuardOverridePlan({
   if (canonical(plugin) !== canonical(request.plugin)) {
     fail("HGO-DRIFT", "override plugin identity drifted before refreeze");
   }
-  const refreshedPayload = { ...priorPlan, plugin, repository };
+  const refreshedPayload = {
+    ...priorPlan,
+    plugin,
+    repository,
+    expiresAt: requestExpired
+      ? new Date(nowMs + DEFAULT_TTL_MS).toISOString()
+      : priorPlan.expiresAt,
+  };
   delete refreshedPayload.planSha256;
   const planSha256 = sha(refreshedPayload);
   const record = { ...refreshedPayload, planSha256 };
@@ -3244,7 +3307,7 @@ export function refreezeHumanGuardOverridePlan({
     requestSha256,
     priorPlanSha256: priorPlan.planSha256,
     planSha256,
-    expiresAt: priorPlan.expiresAt,
+    expiresAt: record.expiresAt,
   };
 }
 
@@ -3434,6 +3497,8 @@ export function prepareHumanGuardOverrideForSignature({
         planned.planSha256,
         "--proof",
         "<external-proof.json>",
+        ...(planned.authorSourceRoot === null
+          ? [] : ["--author-source-root", planned.authorSourceRoot]),
       ],
       mutation: true,
       requiresConfirmation: true,
@@ -3471,7 +3536,23 @@ export function authorizeHumanGuardOverride({
   try { approval = readHumanApprovalMode(rootDir, { legacyKind: "push", spawn }); }
   catch { /* fail-closed default above */ }
   const approvalMode = approval.mode;
-  if (approvalMode !== "chat") {
+  let persistedExternalReadOnlyPlan = null;
+  if (approvalMode !== "chat"
+    && SHA256.test(requestSha256 ?? "")
+    && SHA256.test(planSha256 ?? "")
+    && authorSourceRoot === null) {
+    try {
+      const repo = topology(rootDir, spawn);
+      const persisted = readPersistedPlan(storage(repo.common), requestSha256, null);
+      if (persisted?.planSha256 === planSha256 && persisted.externalReadOnly === true) {
+        persistedExternalReadOnlyPlan = buildPlanResult(persisted, scriptPath);
+      }
+    } catch {
+      // A missing, unsafe, stale, or differently-scoped plan is ordinary
+      // signature mode, never an external-read authorization.
+    }
+  }
+  if (approvalMode !== "chat" && persistedExternalReadOnlyPlan === null) {
     fail(
       "HGO-SIGNATURE-MODE-REQUIRED",
       `the in-session activation path is refused while human approval is "${approvalMode}"; use authorizeHumanGuardOverrideBySignature() (CLI: authorize-by-signature) instead`,
@@ -3496,7 +3577,7 @@ export function authorizeHumanGuardOverride({
     || prepared.reasonSha256 !== reasonSha256) {
     fail("HGO-SELECTION", "override authorization selection digest does not match");
   }
-  const planned = planHumanGuardOverride({
+  const planned = persistedExternalReadOnlyPlan ?? planHumanGuardOverride({
     rootDir,
     pluginRoot,
     requestSha256,
@@ -3506,6 +3587,7 @@ export function authorizeHumanGuardOverride({
     authorSourceRoot,
   });
   assertPlanNotExpired(planned, nowMs);
+  const externalReadOnlyPoChat = planned.externalReadOnly === true;
   // AGY-HGOFIX-2: this in-session `activate` path had ZERO attended-terminal check --
   // an agent could run plan -> prepare-authorization -> authorize --activate entirely by
   // itself, computing every required digest itself, with no human step at all. The
@@ -3520,7 +3602,7 @@ export function authorizeHumanGuardOverride({
   // file is written or audit entry appended, so a failed attempt leaves the pending
   // request/plan/selection fully available for a genuine attended retry.
   const globalChat = approval.scope === "global" && approval.source === "pipeline.user.yaml";
-  if (!globalChat) {
+  if (!globalChat && !externalReadOnlyPoChat) {
     const confirmationExpected = `HGO-${selectionSha256.slice(0, 8).toUpperCase()}`;
     const confirmation = requireAttendedChatGateConfirmation({
       summaryLines: [
@@ -3561,7 +3643,9 @@ export function authorizeHumanGuardOverride({
     planSha256,
     selectionSha256,
     reasonSha256,
-    humanApproval: chatAttributionRecord({ kind: "human-guard-override" }),
+    humanApproval: chatAttributionRecord({
+      kind: externalReadOnlyPoChat ? "external-read-only-po-chat" : "human-guard-override",
+    }),
     plugin: planned.plugin,
     repository: freshRepository,
     // Finding 1 (design doc §1.4 step 5) is scoped to the signature path only --
@@ -3570,6 +3654,7 @@ export function authorizeHumanGuardOverride({
     toolName: planned.toolName,
     toolInputSha256: planned.toolInputSha256,
     commandClass: planned.commandClass,
+    externalReadOnly: planned.externalReadOnly,
     denials: planned.denials,
     policy: planned.policy,
     preview: planned.preview,
@@ -3870,6 +3955,7 @@ export function authorizeHumanGuardOverrideBySignature({
     toolName: planned.toolName,
     toolInputSha256: planned.toolInputSha256,
     commandClass: planned.commandClass,
+    externalReadOnly: planned.externalReadOnly,
     denials: planned.denials,
     policy: planned.policy,
     preview: planned.preview,

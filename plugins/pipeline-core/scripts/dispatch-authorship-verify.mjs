@@ -79,9 +79,8 @@
  *   - ABSENT A `commit` FIELD, A LEGACY RECORD HAS NO SHA BINDING. Most existing records predate
  *     the convention, so dimension 1 is frequently silent rather than satisfied. V2 records
  *     cannot use this compatibility path: terminal v2 evidence requires exact full-SHA binding.
- *   - THE EVIDENCE IS READ FROM THE WORKING TREE, NEVER FROM THE COMMIT'S OWN GIT TREE.
- *     Records are resolved under `DEFAULT_EVIDENCE_DIR` in the CURRENT working tree, and
- *     `evidence/` is gitignored. A PASS is therefore a statement about this checkout at this
+ *   - THE EVIDENCE IS READ FROM THE EXPLICIT CONSUMER ROOT, NEVER FROM THE COMMIT'S OWN GIT TREE.
+ *     The CLI requires `--root` and resolves records under that root's `evidence/`. A PASS is therefore a statement about this checkout at this
  *     moment, not a property of the commit: a second party who checks the same commit out
  *     fresh has no `evidence/` directory and gets `record-missing` for every commit that
  *     passed here. Nothing in this script makes the verdict reproducible by a third party.
@@ -100,19 +99,20 @@
  * and no FAIL (with `--strict`, 2 is folded into 1). 3 = usage/environment error.
  *
  * Usage:
- *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs <sha> [<sha> ...]
- *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --range main..HEAD
- *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --json <sha>
- *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --strict <sha>
+ *   node dispatch-authorship-verify.mjs --root <consumer-repo> <sha> [<sha> ...]
+ *   node dispatch-authorship-verify.mjs --root <consumer-repo> --range main..HEAD
+ *   node dispatch-authorship-verify.mjs --root <consumer-repo> --json <sha>
+ *   node dispatch-authorship-verify.mjs --root <consumer-repo> --strict <sha>
  */
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import {
   DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
@@ -522,6 +522,13 @@ export function verifyCommit(sha, deps) {
       return result(sha, VERDICT.fail, `record-${version}-invalid`, `record for \`${taskId}\` fails the ${record.schema} contract: ${error.message}`, { taskId });
     }
   }
+  if (isV3) {
+    const separator = record.agentType.indexOf("-");
+    const recordRole = separator === -1 ? record.agentType : record.agentType.slice(0, separator);
+    if (recordRole !== dispatch.role) {
+      return result(sha, VERDICT.fail, "record-role-mismatch", `trailer role \`${dispatch.role}\` does not match record agentType \`${record.agentType}\``, { taskId });
+    }
+  }
   if (isV2) {
     return result(
       sha,
@@ -650,8 +657,16 @@ export function verifyCommit(sha, deps) {
   });
 }
 
-export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = DEFAULT_EVIDENCE_DIR } = {}) {
-  const git = (args) => execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+export function gitDeps({ repoRoot, evidenceDir } = {}) {
+  if (typeof repoRoot !== "string" || repoRoot.trim() === "") throw new Error("gitDeps requires an explicit repository root");
+  const resolvedEvidenceDir = evidenceDir ?? join(repoRoot, "evidence");
+  const git = (args) => {
+    const outcome = spawnSync("git", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+    if (!isSuccessfulSpawn(outcome) || typeof outcome.stdout !== "string") {
+      throw (outcome?.error ?? new Error(`git ${args[0] ?? ""} failed`));
+    }
+    return outcome.stdout;
+  };
   return {
     readCommitMessage: (sha) => git(["show", "-s", "--format=%B", `${sha}^{commit}`]),
     readChangedPaths: (sha) =>
@@ -659,7 +674,7 @@ export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = DEFAULT_EVIDENCE_D
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line !== ""),
-    readRecord: (taskId) => readRecordFile(evidenceDir, taskId),
+    readRecord: (taskId) => readRecordFile(resolvedEvidenceDir, taskId),
     readBlobAtCommit: (sha, path) => git(["show", `${sha}:${path}`]),
     runAllowlistedGenerator: (entry, sha) =>
       runGeneratorInIsolatedParentTree({ repoRoot, parentRef: `${sha}^`, scriptRelPath: entry.scriptPath, args: entry.args }),
@@ -695,34 +710,76 @@ export function formatLine(entry) {
   return `${entry.verdict.padEnd(12)} ${String(entry.sha).slice(0, 12).padEnd(12)} ${entry.classification}: ${entry.reason}`;
 }
 
-function main(argv) {
-  const strict = argv.includes("--strict");
-  const json = argv.includes("--json");
-  const deps = gitDeps();
+const CLI_USAGE = "usage: dispatch-authorship-verify.mjs --root <consumer-repo> [--strict] [--json] <sha>... | --range <a>..<b>";
+
+function cliUsage(message = CLI_USAGE) {
+  const error = new Error(message);
+  error.code = "usage";
+  throw error;
+}
+
+export function parseCliArgs(argv) {
+  let root = null;
+  let strict = false;
+  let json = false;
   const revisions = [];
+  const ranges = [];
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === "--range") {
-      const range = argv[i + 1];
+    const token = argv[i];
+    if (token === "--root") {
+      const value = argv[i + 1];
       i += 1;
-      if (!range) {
-        process.stderr.write("--range needs a revision range\n");
-        return 3;
-      }
-      const listed = execFileSync("git", ["rev-list", range], { cwd: REPO_ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
-      revisions.push(...listed);
+      if (root !== null || !value || value.startsWith("--")) cliUsage("--root requires exactly one path");
+      root = resolve(value);
       continue;
     }
-    if (argv[i].startsWith("--")) continue;
-    revisions.push(argv[i]);
+    if (token === "--range") {
+      const value = argv[i + 1];
+      i += 1;
+      if (!value || value.startsWith("--")) cliUsage("--range needs a revision range");
+      ranges.push(value);
+      continue;
+    }
+    if (token === "--strict") {
+      if (strict) cliUsage("--strict may be specified only once");
+      strict = true;
+      continue;
+    }
+    if (token === "--json") {
+      if (json) cliUsage("--json may be specified only once");
+      json = true;
+      continue;
+    }
+    if (token.startsWith("--")) cliUsage(`unknown option: ${token}`);
+    revisions.push(token);
   }
-  if (revisions.length === 0) {
-    process.stderr.write("usage: dispatch-authorship-verify.mjs [--strict] [--json] <sha>... | --range <a>..<b>\n");
+  if (root === null) cliUsage("--root is required");
+  if (revisions.length === 0 && ranges.length === 0) cliUsage();
+  return { root, strict, json, revisions, ranges };
+}
+
+export function main(argv, dependencies = {}) {
+  const stdout = dependencies.stdout ?? process.stdout;
+  const stderr = dependencies.stderr ?? process.stderr;
+  let options;
+  try {
+    options = parseCliArgs(argv);
+  } catch (error) {
+    stderr.write(`${error.message}\n${CLI_USAGE}\n`);
     return 3;
   }
+  const makeDeps = dependencies.makeDeps ?? gitDeps;
+  const run = dependencies.execFileSync ?? execFileSync;
+  const deps = makeDeps({ repoRoot: options.root, evidenceDir: join(options.root, "evidence") });
+  const revisions = [...options.revisions];
+  for (const range of options.ranges) {
+    const listed = run("git", ["rev-list", range], { cwd: options.root, encoding: "utf8" }).split("\n").filter(Boolean);
+    revisions.push(...listed);
+  }
   const results = revisions.map((sha) => verifyCommit(sha, deps));
-  if (json) process.stdout.write(`${JSON.stringify({ schema: "pipeline.dispatch-authorship.v1", results }, null, 2)}\n`);
-  else for (const entry of results) process.stdout.write(`${formatLine(entry)}\n`);
-  return exitCodeFor(results, { strict });
+  if (options.json) stdout.write(`${JSON.stringify({ schema: "pipeline.dispatch-authorship.v1", results }, null, 2)}\n`);
+  else for (const entry of results) stdout.write(`${formatLine(entry)}\n`);
+  return exitCodeFor(results, { strict: options.strict });
 }
 
 if (isDirectInvocation(import.meta.url)) process.exit(main(process.argv.slice(2)));

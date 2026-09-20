@@ -176,6 +176,7 @@ function projectCalibrationRelPath(rootDir) {
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
 // NVA-W1-SCRATCHBIND (backlog: 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-
 // calls-it.md, Point 3): read-only observer, no mkdirSync/physicalScratchRoot call -- see
 // buildScratchOrphanAdvisory below for the full rationale.
@@ -2023,7 +2024,7 @@ function readEvidence(relPath) {
   } catch (e) {
     return { ok: false, reason: `${relPath} is corrupted (invalid JSON: ${e.message})` };
   }
-  return { ok: true, data, relPath };
+  return { ok: true, data, raw, relPath };
 }
 
 /** Runs the shared exitCode===0 + commit===pushed-source check; returns failure reasons (empty = pass). */
@@ -2039,7 +2040,32 @@ function checkEvidenceFreshness(relPath) {
     failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)`);
   }
   if (data?.commit !== sourceCommit) {
-    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
+    let promoted = false;
+    const promoRead = readEvidence(RELEASE_PROMOTION_DEFAULT_PATH);
+    if (promoRead.ok) {
+      const verifyRead = relPath === VERIFY_EVIDENCE_DEFAULT_PATH
+        ? read
+        : readEvidence(VERIFY_EVIDENCE_DEFAULT_PATH);
+      const securityRead = relPath === SECURITY_EVIDENCE_DEFAULT_PATH
+        ? read
+        : readEvidence(SECURITY_EVIDENCE_DEFAULT_PATH);
+      if (verifyRead.ok && securityRead.ok) {
+        const validation = validateReleasePromotionEnvelope(promoRead.data, {
+          repoDir: evidenceProjectDir,
+          targetBoundary: "push",
+          // Both inputs are re-read from their canonical paths.  Passing either
+          // one implicitly was the substitution seam closed by envelope v2.
+          verifyEvidence: verifyRead.data,
+          securityEvidence: { path: SECURITY_EVIDENCE_DEFAULT_PATH, raw: securityRead.raw, data: securityRead.data },
+        });
+        if (validation.ok && validation.sourceCommit === data?.commit && validation.recordCommit === sourceCommit) {
+          promoted = true;
+        }
+      }
+    }
+    if (!promoted) {
+      failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
+    }
   }
   if (relPath === VERIFY_EVIDENCE_DEFAULT_PATH && !verifyEvidenceSatisfiesBoundary(data, "push")) {
     failures.push(`${relPath}: Verify evidence was not produced for the push boundary`);

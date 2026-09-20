@@ -67,7 +67,7 @@ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 import { readBoundConsumedCriticReceipt, readCriticVerifyLifecycle, recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
-import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource } from "../lib/worktree-lifecycle.mjs";
+import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource, releaseCompletedVerifyRunSession, retireSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { assertConsumerVerifyAdapter, consumerVerifyPolicy, CONSUMER_VERIFY_DISPATCHER, prepareConsumerVerify, readConsumerVerifyConfiguration } from "../lib/consumer-verify.mjs";
@@ -81,6 +81,13 @@ import {
 } from "../lib/governance-verification-action.mjs";
 
 export const VERIFY_EVIDENCE_SCHEMA = "pipeline.verify-evidence.v0";
+const CLI_HELP = [
+  "Usage: verify-evidence-producer.mjs [--root <repo>] [--out <repo-relative path>] [--event-out <repo-relative path>] [--mode <work|critic|push|candidate|release>] [--base <ref>] [--no-reuse]",
+  "       verify-evidence-producer.mjs --prepare [--root <repo>]",
+  "       verify-evidence-producer.mjs --help",
+  "",
+  "Runs the repository's configured Verify command and writes candidate-bound evidence.",
+].join("\n");
 
 export class VerifyEvidenceError extends Error {
   constructor(code, message) {
@@ -345,25 +352,36 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     registerRun({ runId, runPath }) {
       const descriptor = startSessionDescriptor(root);
       const resourceId = `consumer-${attempt}`;
-      registration = { sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce, resourceId };
+      registration = {
+        sessionId: descriptor.sessionId,
+        ownerNonce: descriptor.ownerNonce,
+        descriptorSha256: descriptor.descriptorSha256,
+        resourceId,
+      };
       registerTemporaryIntent(root, { ...registration, type: "verify-run-directory", path: runPath, contentClass: "verify-recovery", soleCopy: false, cleanupPolicy: "remove-directory" });
       return sealVerifyCleanupRegistration({ status: "registered", runId, runPath, sessionId: descriptor.sessionId, descriptorSha256: descriptor.descriptorSha256, resourceId, registeredAt: new Date().toISOString() });
     },
   });
-  // Keep the real private descriptor and resource available for recovery/resume.
-  // Interrupted runs retain their creating intent rather than inventing a seal.
+  // A process interruption before this point retains the creating intent for
+  // recovery. Once a terminal run was returned, drain its private run
+  // directory and retire the exact descriptor before evaluating its outcome.
   finalizeTemporaryResource(root, { ...registration, canaryRelative: "terminal.json" });
-  if (run.terminal.status !== "passed" && eventPlan === null) {
-    const failures = summarizeVerifyFailures(run);
-    fail("VEP-VERIFY-FAILED", `Required consumer Verify checks failed; no success evidence was written. Private diagnostic run: ${run.runId}. Failed checks: ${JSON.stringify(failures)}`);
-  }
+  const failures = run.terminal.status === "passed" ? null : summarizeVerifyFailures(run);
   let terminalSource = run.terminal;
+  let terminalReadbackFailure = null;
   if (eventPlan !== null) {
     try { terminalSource = JSON.parse(readFileSync(join(run.runDir, "terminal.json"), "utf8")); }
-    catch { fail("VEP-SOURCE-READBACK", "Terminal Verify evidence could not be read back after persistence."); }
-    if (JSON.stringify(terminalSource) !== JSON.stringify(run.terminal)) {
-      fail("VEP-SOURCE-READBACK", "Terminal Verify evidence readback did not match the completed run.");
+    catch { terminalReadbackFailure = "Terminal Verify evidence could not be read back after persistence."; }
+    if (terminalReadbackFailure === null && JSON.stringify(terminalSource) !== JSON.stringify(run.terminal)) {
+      terminalReadbackFailure = "Terminal Verify evidence readback did not match the completed run.";
     }
+  }
+  const cleanup = releaseCompletedVerifyRunSession(root, registration);
+  if (!cleanup.ok) fail("VEP-CLEANUP-FAILED", `Completed Verify run could not be retired safely: ${JSON.stringify(cleanup.receipt.outcomes)}`);
+  retireSessionDescriptor(root, registration);
+  if (terminalReadbackFailure !== null) fail("VEP-SOURCE-READBACK", terminalReadbackFailure);
+  if (run.terminal.status !== "passed" && eventPlan === null) {
+    fail("VEP-VERIFY-FAILED", `Required consumer Verify checks failed; no success evidence was written. Private diagnostic run: ${run.runId}. Failed checks: ${JSON.stringify(failures)}`);
   }
   if (JSON.stringify(consumerVerifyPolicy(root)) !== JSON.stringify(policyInputs)) fail("VEP-DRIFT", "Installed implementation or declared inputs changed during Verify.");
 
@@ -468,8 +486,11 @@ function parseArgs(argv) {
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  try {
-    const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  if (argv.length === 1 && argv[0] === "--help") {
+    process.stdout.write(`${CLI_HELP}\n`);
+  } else try {
+    const args = parseArgs(argv);
     const result = args.prepare ? prepareConsumerVerify(args) : await produceVerifyEvidence(args);
     const output = result.actionEvent === undefined
       ? { status: result.status, outPath: result.outPath, ...result.evidence }

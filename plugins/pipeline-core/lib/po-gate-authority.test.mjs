@@ -1373,7 +1373,7 @@ check("a Spec-binding mismatch is signposted to spec.md and its marker, not to p
 // route exists once a promotion has already bound the PRD -- it must not
 // invent one and must not name the rebind, because the rebind refuses that
 // state (PO-REBIND-STATE, no existing approval to rebind).
-check("an absent technical Spec marker is signposted to adding the line, and names no route for an already-bound PRD", () => {
+check("an absent technical Spec marker is signposted to adding the line, and names reopen-design for an already-bound PRD", () => {
   withFixture({}, ({ primary, validate }) => {
     write(join(primary, "specs", "feature", "prd_feature.md"), `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n# PRD\n`);
     const result = validate();
@@ -1381,11 +1381,10 @@ check("an absent technical Spec marker is signposted to adding the line, and nam
     assert.equal(result.code, "PO-GATE-PRD-SPEC-MARKER-MISSING", JSON.stringify(result));
     assert.match(result.repair, /<[!]-- technical-spec-sha256: <sha256-of-spec\.md> -->/u, JSON.stringify(result));
     assert.match(result.repair, /add that single line/u, JSON.stringify(result));
-    assert.match(result.repair, /no sanctioned way to add the marker to an already-bound PRD/u, JSON.stringify(result));
+    assert.match(result.repair, /pipeline-state\.mjs reopen-design --by <attribution>/u, JSON.stringify(result));
     assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
     assert.match(result.repair, /do not change activeFeature\.planPath/u, JSON.stringify(result));
-    // No route is named for the already-bound state: it is not offered
-    // because it is known to refuse there.
+    // The rebind family refuses that state (no existing approval to rebind).
     assert.equal(/po-authority-rebind/u.test(result.repair), false, JSON.stringify(result));
   });
 });

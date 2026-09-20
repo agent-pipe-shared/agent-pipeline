@@ -56,6 +56,17 @@ const ARCHITECTURE_IMPACTS = new Set([
   "no-architecture-impact",
 ]);
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
+const CLI_HELP = [
+  "Usage: close-coordinator.mjs next <phase>",
+  "       close-coordinator.mjs inspect --root <repository-root> --lifecycle <id>",
+  "       close-coordinator.mjs plan-start --root <repository-root> --lifecycle <id> --actor <name> --close-intent <durable-stop|runtime-transfer>",
+  "       close-coordinator.mjs apply-start <plan-start arguments> --plan-sha256 <sha256> --activate",
+  "       close-coordinator.mjs plan-transition --root <repository-root> --lifecycle <id> --actor <name> --phase <phase> [phase evidence options]",
+  "       close-coordinator.mjs apply-transition <plan-transition arguments> --plan-sha256 <sha256> --activate",
+  "       close-coordinator.mjs --help",
+  "",
+  "Plans, applies, and inspects the durable feature-close coordinator lifecycle.",
+].join("\n");
 
 const canonical = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
@@ -778,7 +789,9 @@ async function applyTransition(values, suppliedDigest) {
 
 const [command, ...argv] = process.argv.slice(2);
 try {
-  if (command === "next" && argv.length === 1 && COORDINATOR_PHASES.includes(argv[0])) {
+  if (command === "--help" && argv.length === 0) {
+    process.stdout.write(`${CLI_HELP}\n`);
+  } else if (command === "next" && argv.length === 1 && COORDINATOR_PHASES.includes(argv[0])) {
     const completion = coordinatorCompletion(argv[0]);
     emit({
       schema: "pipeline.close-coordinator.next.v2",

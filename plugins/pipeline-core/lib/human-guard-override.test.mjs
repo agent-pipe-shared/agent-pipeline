@@ -514,7 +514,7 @@ test("ADR-0059 Decision 1: re-authorizing with an identical proof is an idempote
     const second = authorizeHumanGuardOverrideBySignature({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
     });
-    assert.deepEqual(second, { schema: "pipeline.human-guard-override-capability.v2", status: "armed", planSha256: plan.planSha256, requestSha256: recorded.requestSha256, mutated: false });
+    assert.deepEqual(second, { schema: "pipeline.human-guard-override-capability.v3", status: "armed", planSha256: plan.planSha256, requestSha256: recorded.requestSha256, mutated: false });
     assert.throws(
       () => authorizeHumanGuardOverrideBySignature({
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3999, scriptPath,
@@ -1151,6 +1151,47 @@ test("signature, invalid, and uncommitted global human approval all fail closed 
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  }
+});
+
+test("PO chat may arm an exact external read scope while mutation approval remains signature-bound", () => {
+  const root = fixtureHumanApproval({ humanApproval: "signature" });
+  try {
+    const toolInput = { command: "cat /tmp/pipeline-external-diagnostic.txt" };
+    const readScopeDenial = [{
+      guard: "guard-lifecycle-ready.mjs",
+      reason: "GUARD-READ-SCOPE-OUTSIDE-ROOT: The bounded read-only diagnostic pipeline reads a path outside the project root.",
+    }];
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: readScopeDenial, nowMs: 1_000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2_000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(plan.externalReadOnly, true);
+    const reason = "PO approves this exact external diagnostic read in chat";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2_500, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    let terminalCalls = 0;
+    const armed = authorizeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: {
+        isattyFn: () => { terminalCalls += 1; throw new Error("external read chat must not inspect a terminal"); },
+        readLineFn: () => { terminalCalls += 1; throw new Error("external read chat must not read a terminal"); },
+      },
+      nowMs: 3_000, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(armed.status, "armed");
+    assert.equal(terminalCalls, 0);
+    assert.equal(consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: readScopeDenial, nowMs: 4_000,
+    }).status, "consumed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -1911,6 +1952,18 @@ test("GF-098: a denied push whose destination cannot be read is told so, never r
   }
 });
 
+test("a non-push git apply --check command whose patch path says push never selects push recovery", () => {
+  const root = fixture();
+  try {
+    const observed = pushDenial(root, "git -C /tmp/candidate apply --check scratch/push-repair.patch", denial);
+    assert.notEqual(observed.code, "HGO-NARROWER-PUSH-DESTINATION-REQUIRED");
+    assert.notEqual(observed.code, "HGO-NARROWER-BRANCH-PUSH-APPROVAL-REQUIRED");
+    assert.notEqual(observed.code, "HGO-NARROWER-PUBLICATION-REQUIRED");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("pipeline author repair binds one exact source root and action without State readiness", () => {
   const root = fixture();
   try {
@@ -1977,6 +2030,18 @@ test("pipeline author repair binds one exact source root and action without Stat
       nowMs: 2500,
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
+    const signing = prepareHumanGuardOverrideForSignature({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      authorSourceRoot: sourceRoot,
+      nowMs: 2500,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+      humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+    });
+    assert.deepEqual(signing.authorizeBySignatureCommand.argv.slice(-4), [
+      "--proof", "<external-proof.json>", "--author-source-root", sourceRoot,
+    ]);
     const armed = authorizeHumanGuardOverride({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
@@ -3973,6 +4038,100 @@ test("the rendered reason is bounded to typed tokens against any outcome shape",
 // shapes that were not already classifiable through some other route (cp, rm, git -C,
 // sed -i, an out-of-root redirect, Edit ../x, Write <absolute-outside>).
 
+test("HGO multi-file apply binds one complete external-repository path set and fails closed across authority planes", () => {
+  const root = fixture();
+  const target = fixture();
+  const other = fixture();
+  const nonRepository = mkdtempSync(join(tmpdir(), "hgo-multifile-nonrepo-"));
+  const patchInput = (entries) => ({
+    command: [
+      "*** Begin Patch",
+      ...entries.flatMap((path) => [`*** Update File: ${path}`, "@@", "-old", "+new"]),
+      "*** End Patch",
+    ].join("\n"),
+  });
+  try {
+    const paths = [join(target, "z.mjs"), join(target, "a.mjs"), join(target, "m.mjs")];
+    const boundInput = patchInput(paths);
+    const expected = [...paths].sort();
+    const single = humanGuardOverrideInternals.eligibility(root, "apply_patch", patchInput([paths[0]]));
+    assert.equal(single.eligible, true);
+    assert.deepEqual(single.paths, [paths[0]]);
+    const pair = humanGuardOverrideInternals.eligibility(root, "apply_patch", patchInput(paths.slice(0, 2)));
+    assert.equal(pair.eligible, true);
+    assert.deepEqual(pair.paths, paths.slice(0, 2).sort());
+
+    const complete = humanGuardOverrideInternals.eligibility(root, "apply_patch", boundInput);
+    assert.equal(complete.eligible, true);
+    assert.equal(complete.commandClass, "cross-repository-target");
+    assert.deepEqual(complete.paths, expected);
+
+    for (const input of [
+      patchInput([paths[0], "README.md"]),
+      patchInput([paths[0], join(other, "other.mjs")]),
+      patchInput([paths[0], join(nonRepository, "outside.mjs")]),
+      patchInput([join(nonRepository, "one.mjs"), join(nonRepository, "two.mjs")]),
+    ]) {
+      const refused = humanGuardOverrideInternals.eligibility(root, "apply_patch", input);
+      assert.equal(refused.eligible, false);
+      assert.equal(refused.code, "HGO-NONOVERRIDABLE-CROSS-BOUNDARY");
+    }
+    const hardBoundary = humanGuardOverrideInternals.eligibility(root, "apply_patch", patchInput([paths[0], ".git/config"]));
+    assert.equal(hardBoundary.eligible, false);
+    assert.equal(hardBoundary.code, "HGO-NONOVERRIDABLE-PATH");
+
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
+      toolInput: boundInput, denials: denial, nowMs: 1000,
+    });
+    assert.equal(recorded.status, "planned");
+    assert.equal(recorded.root, target);
+    const plan = planHumanGuardOverride({
+      rootDir: recorded.root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256,
+      nowMs: 1500, scriptPath,
+    });
+    assert.deepEqual(plan.eligiblePaths, expected);
+    assert.equal(plan.commandClass, "cross-repository-target");
+    const reason = "PO attended exact multi-file external repository patch";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: recorded.root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256,
+      planSha256: plan.planSha256, reason, nowMs: 2000, scriptPath,
+    });
+    assert.equal(authorizeHumanGuardOverride({
+      rootDir: recorded.root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256,
+      planSha256: plan.planSha256, selectionSha256: prepared.selectionSha256,
+      reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+      nowMs: 3000, scriptPath,
+    }).status, "armed");
+
+    const reorderedInput = patchInput([...paths].reverse());
+    assert.deepEqual(
+      humanGuardOverrideInternals.eligibility(root, "apply_patch", reorderedInput).paths,
+      expected,
+      "path-set binding stays canonical even when patch sections are reordered",
+    );
+    assert.equal(consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
+      toolInput: reorderedInput, denials: denial, nowMs: 3500,
+    }).status, "absent", "the exact tool-input digest must reject reordered patch text");
+    assert.equal(consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
+      toolInput: boundInput, denials: denial, nowMs: 4000,
+    }).status, "consumed");
+    assert.equal(consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "apply_patch",
+      toolInput: boundInput, denials: denial, nowMs: 4500,
+    }).status, "absent", "one capability must admit the exact patch only once");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+    rmSync(other, { recursive: true, force: true });
+    rmSync(nonRepository, { recursive: true, force: true });
+  }
+});
+
 test("NOVA-HGOELIG-1: an out-of-root target reaches the identical plan/prepare/authorize-by-signature/consume/ledger route, honestly scoped", () => {
   const root = fixtureSignature();
   const outside = mkdtempSync(join(tmpdir(), "hgoelig-1-outside-"));
@@ -4684,7 +4843,7 @@ test("Part A (f): refreeze-plan still blocks with HGO-DRIFT when the project's g
   }
 });
 
-test("Part A (f): refreeze-plan fails HGO-EXPIRED once the underlying request has expired", () => {
+test("Part A (f): refreeze-plan gives an expired exact request a fresh bounded plan but never reuses its old signature binding", () => {
   const root = fixture();
   try {
     const toolInput = { file_path: "notes.md", content: "refreeze expired\n" };
@@ -4692,14 +4851,42 @@ test("Part A (f): refreeze-plan fails HGO-EXPIRED once the underlying request ha
     const request = recordHumanGuardDenial({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000, ttlMs: 1000,
     });
-    planHumanGuardOverride({
+    const plan = planHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 1500, scriptPath,
     });
+    const oldPrepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      planSha256: plan.planSha256, reason: HGO_SIGNATURE_REASON, nowMs: 1500, scriptPath,
+    });
+    const refrozen = refreezeHumanGuardOverridePlan({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 5000,
+    });
+    assert.equal(refrozen.status, "refrozen");
+    assert.equal(refrozen.requestSha256, request.requestSha256, "the exact immutable denial remains bound");
+    assert.equal(refrozen.priorPlanSha256, plan.planSha256);
+    assert.notEqual(refrozen.planSha256, plan.planSha256, "expiry recovery must create a fresh signature subject");
+    assert.equal(refrozen.expiresAt, new Date(5000 + 30 * 60_000).toISOString());
+
+    const refreshed = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 5500, scriptPath,
+    });
+    assert.equal(refreshed.planSha256, refrozen.planSha256);
+    assert.equal(refreshed.toolInputSha256, plan.toolInputSha256);
+    assert.deepEqual(refreshed.eligiblePaths, plan.eligiblePaths);
+    assert.deepEqual(refreshed.policy, plan.policy);
+    assert.deepEqual(refreshed.preview, plan.preview);
+    const newPrepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      planSha256: refrozen.planSha256, reason: HGO_SIGNATURE_REASON, nowMs: 5500, scriptPath,
+    });
+    assert.notEqual(newPrepared.selectionSha256, oldPrepared.selectionSha256,
+      "the old intent/signature selection must never authorize the refreshed window");
     assert.throws(
-      () => refreezeHumanGuardOverridePlan({
-        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 5000,
+      () => prepareHumanGuardOverrideAuthorization({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+        planSha256: plan.planSha256, reason: HGO_SIGNATURE_REASON, nowMs: 5500, scriptPath,
       }),
-      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXPIRED",
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLAN",
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -4905,7 +5092,7 @@ test("Finding 3: two different non-null authorSourceRoot values for the same req
     // per repository, and so cannot itself exercise two distinct persisted values).
     function fabricatedRecord(authorSourceRoot, tag) {
       const payload = {
-        schema: "pipeline.human-guard-override-plan.v2",
+        schema: "pipeline.human-guard-override-plan.v3",
         status: "planned",
         root,
         requestSha256: request.requestSha256,
@@ -4918,6 +5105,7 @@ test("Finding 3: two different non-null authorSourceRoot values for the same req
         policy: { tag },
         preview: { tag },
         eligiblePaths: [`plugins/pipeline-core/${tag}.mjs`],
+        externalReadOnly: false,
         mode: "pipeline-author-repair",
         authorSourceRoot,
         expiresAt: new Date(Date.now() + 60_000).toISOString(),

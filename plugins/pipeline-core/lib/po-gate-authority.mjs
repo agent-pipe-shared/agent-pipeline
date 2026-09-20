@@ -126,6 +126,7 @@ const SPEC_REPAIR = "The active PRD must bind the neighboring spec.md of the sam
   + " if this PRD has not been bound by a kickoff promotion, edit the marker in the PRD to the neighboring spec.md's current digest;"
   + " if a kickoff promotion has already bound this PRD and the plan is not yet approved, do not edit either document in place --"
   + " the promotion already bound their exact bytes, so an in-place edit only breaks that binding and does not make this check pass;"
+  + " instead run the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, edit the spec or marker, then re-submit and approve the plan;"
   + " if the plan is already approved and the Spec changed during implementation, use the sanctioned rebind rather than editing the marker by hand:"
   + " run the pipeline-core script pipeline-state.mjs po-authority-rebind-plan, then pipeline-state.mjs po-authority-rebind-apply"
   + " --plan-sha256 <sha256> --updated-at <ISO-8601> --activate with the digest and timestamp that plan reports."
@@ -137,20 +138,15 @@ const SPEC_REPAIR = "The active PRD must bind the neighboring spec.md of the sam
 // digest is wrong" (SPEC_REPAIR), and it needs its own remedy rather than
 // reusing that one. If a kickoff promotion has already bound this PRD's
 // bytes, adding the marker now would change those bytes and break the
-// binding without making this check pass, and there is no sanctioned route
-// back from that state today: the rebind family requires an existing
-// approval, which a PRD that never carried this marker cannot have reached.
-// This text therefore names the fix only for the still-freely-editable case,
-// and for the bound case says plainly that an in-place edit is not a fix --
-// it does not invent a route, and it does not name the rebind, because
-// offering a route that is known to refuse in this state is the failure this
-// module exists to stop repeating.
+// binding without making this check pass; instead reopen design via
+// pipeline-state.mjs reopen-design --by <attribution> to return to the design
+// stage, add the marker, then re-submit and approve the plan.
 const SPEC_MARKER_MISSING_REPAIR = "The active PRD does not carry the technical Spec marker exactly once, as"
   + " <!-- technical-spec-sha256: <sha256-of-spec.md> --> on its own line, with the neighboring spec.md's own digest."
   + " If this PRD has not been bound by a kickoff promotion, add that single line to the PRD."
   + " If a kickoff promotion has already bound this PRD, do not add or edit that line in place: the promotion already"
   + " bound these exact bytes, and an in-place edit only breaks that binding without making this check pass;"
-  + " there is no sanctioned way to add the marker to an already-bound PRD today;"
+  + " instead run the pipeline-core script pipeline-state.mjs reopen-design --by <attribution>, add the marker, then re-submit and approve the plan;"
   + " do not change activeFeature.planPath, which is not what is wrong here.";
 // PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING is additive to, never a substitute for,
 // PO-GATE-PRD-SPEC-MARKER-MISSING/-MISMATCH above: those bind the PRD to the

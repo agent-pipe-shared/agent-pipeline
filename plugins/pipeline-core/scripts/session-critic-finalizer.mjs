@@ -36,6 +36,12 @@ export const SESSION_CRITIC_FINALIZE_RESULT_SCHEMA = "pipeline.session-critic-fi
 export const SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA = "pipeline.session-critic-finalization-request.v1";
 export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finalization-error.v1";
 export const SESSION_CRITIC_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
+const CLI_HELP = [
+  "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json>",
+  "       session-critic-finalizer.mjs --help",
+  "",
+  "Validates and consumes one bounded Critic request and verdict, then emits its durable receipt.",
+].join("\n");
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VERDICT_SCHEMA = JSON.parse(readFileSync(join(HERE, "critic-verdict.schema.json"), "utf8"));
@@ -356,7 +362,12 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
 export const __test = Object.freeze({ buildResult, receiptFor, validateResult });
 
 if (isDirectInvocation(import.meta.url)) {
-  const result = runSessionCriticFinalizerCli(process.argv.slice(2));
-  process.stdout.write(`${JSON.stringify(result.output)}\n`);
-  process.exitCode = result.exitCode;
+  const argv = process.argv.slice(2);
+  if (argv.length === 1 && argv[0] === "--help") {
+    process.stdout.write(`${CLI_HELP}\n`);
+  } else {
+    const result = runSessionCriticFinalizerCli(argv);
+    process.stdout.write(`${JSON.stringify(result.output)}\n`);
+    process.exitCode = result.exitCode;
+  }
 }

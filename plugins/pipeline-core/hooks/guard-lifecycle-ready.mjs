@@ -262,6 +262,12 @@ const PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH = join(PARTIAL_LIFECYCLE_SCRATCH_DI
 // dev-plan gate about the one directory the pipeline-start skill tells every agent is always
 // safe.
 const INTAKE_LIFECYCLE_STATUSES = new Set(["intake-required", "intake-design-questions-required"]);
+const SCRATCH_LIFECYCLE_STATUSES = new Set([
+  ...INTAKE_LIFECYCLE_STATUSES,
+  "partial",
+  "restart-required",
+  "migration-required",
+]);
 const HEX = /^[a-f0-9]{64}$/u;
 // GUARDDERIVE-1: resolved once at module load from the onboarding CLI's own registered
 // subcommand table (ONBOARDING_SUBCOMMANDS in scripts/project-onboarding-v3.mjs), not
@@ -819,9 +825,9 @@ function blocked(
         // named it in the denial a blocked session actually reads, so a stuck session had no
         // way to discover it existed. Named here, conditional on exactly `partial` -- every
         // other status keeps the two-line message above, unchanged.
-        `A narrow diagnosis lane stays admitted while status is partial: creating the `
-          + `repository's own ${PARTIAL_LIFECYCLE_SCRATCH_DIR} directory and writing exactly `
-          + `${PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH} via Write or Edit.`,
+        `A recovery scratch lane stays admitted while status is partial: create the `
+          + `repository's own ${PARTIAL_LIFECYCLE_SCRATCH_DIR} directory (including nested paths) and write `
+          + `only physically-contained files below it via Edit, Write, or NotebookEdit.`,
       ]
       : INTAKE_LIFECYCLE_STATUSES.has(typedLifecycleStatus)
         ? [
@@ -900,6 +906,7 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
     };
   }
   let overrideGuidance = "";
+  let repeatOverrideGuidance = "";
   if (consumed.status === "absent" || consumed.status === "replan") {
     let approvalMode = "signature";
     const readModeFn = dependencies.readPushApprovalModeFn ?? readPushApprovalMode;
@@ -1000,6 +1007,16 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
           continuation,
           "",
         ].join("\n");
+        // A repeated parser denial must stay directly actionable without dumping
+        // the multi-shell ceremony again. The exact first recovery command remains
+        // present and request-bound; its structured output supplies the next action.
+        repeatOverrideGuidance = [
+          "",
+          `Human override remains available for this exact ${subject}; run this exact next command:`,
+          planCommand.text,
+          "The remaining mode-specific ceremony was printed on the earlier denial of this kind in this scope.",
+          "",
+        ].join("\n");
       } else {
         // ADR-0059 Decision 4: a denial that could not be routed must SAY so. Silence here
         // made this path indistinguishable from a denial that was never eligible for a
@@ -1011,7 +1028,7 @@ function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, de
       overrideGuidance = ["", humanGuardRouteUnavailableReason(subject, { error }), ""].join("\n");
     }
   }
-  return { admitted: null, overrideGuidance };
+  return { admitted: null, overrideGuidance, repeatOverrideGuidance };
 }
 
 function externalRestartOnly() {
@@ -1584,8 +1601,10 @@ function protectedTestPathShellFaultBlocked(error) {
  *   "block" verdict for any candidate (carrying which candidate/lane produced it), or null when
  *   nothing blocks.
  */
-function devPlanShellRefusalHit(command, root, dependencies = {}, toolName = "Bash") {
+function devPlanShellRefusalHit(command, root, dependencies = {}, toolName = "Bash", sessionRoots = []) {
   if (typeof command !== "string" || command === "") return null;
+  const isReadOnly = (dependencies.isReadOnlyDiagnosticCommandFn ?? isReadOnlyDiagnosticCommand)(command, root, sessionRoots);
+  if (isReadOnly) return null;
   try {
     const extractFn = dependencies.extractShellWriteTargetsFn ?? extractShellWriteTargets;
     const verdictFn = dependencies.devPlanGateVerdictFn ?? devPlanGateVerdict;
@@ -1934,6 +1953,15 @@ function sessionReadScopeRoots(input, dependencies = {}) {
   if (transcriptFile !== null) roots.push(transcriptFile);
   const memoryDir = claudeSessionMemoryDirectory(input, dependencies);
   if (memoryDir !== null) roots.push(memoryDir);
+  const explicitCwd = input?.tool_input?.cwd ?? input?.tool_input?.Cwd;
+  if (typeof explicitCwd === "string" && explicitCwd.trim() !== "") {
+    try {
+      const realpath = dependencies.realpathSyncFn ?? realpathSync;
+      roots.push(realpath(resolve(explicitCwd)));
+    } catch {
+      roots.push(resolve(explicitCwd));
+    }
+  }
   return roots;
 }
 
@@ -2975,10 +3003,22 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
     && (/^\\n[^%$`\\r\\n]+\\n$/u.test(args[0])
       || /^\n[^%$`\\\r\n\0-\x08\x0b\x0c\x0e-\x1f\x7f]+\n$/u.test(args[0]));
   if (["node", "node.exe"].includes(executable)) {
-    return args.length === 2
+    if (args.length === 2
       && args[0] === "--check"
       && !args[1].startsWith("-")
-      && isApprovedSingleCommandReadArg(args[1], root, extraRoots);
+      && isApprovedSingleCommandReadArg(args[1], root, extraRoots)) {
+      return true;
+    }
+    if (args.length >= 1 && args[0] === "--test") {
+      const rest = args.slice(1);
+      return rest.every((arg) => arg.startsWith("-") || isApprovedSingleCommandReadArg(arg, root, extraRoots));
+    }
+    if (args.length >= 1 && (args[0].endsWith(".test.mjs") || args[0].endsWith(".test.js") || args[0].endsWith(".test.cjs"))
+      && isApprovedSingleCommandReadArg(args[0], root, extraRoots)) {
+      return true;
+    }
+
+    return false;
   }
   if (executable === "sha256sum") {
     // backlog: 2026-08-08-the-guard-refuses-the-recovery-the-inspection-prescribes.md
@@ -3036,6 +3076,12 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
 function isReadOnlyGitSubcommand(subcommand, subargs) {
   if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref"].includes(subcommand)) {
     return true;
+  }
+  if (subcommand === "apply") {
+    const operands = subargs[0] === "--check"
+      ? (subargs[1] === "--" ? subargs.slice(2) : subargs.slice(1))
+      : [];
+    return operands.length > 0 && operands.every((arg) => !arg.startsWith("-") && /\.(?:diff|patch)$/iu.test(arg));
   }
   if (subcommand === "branch") {
     return subargs.length === 0 || subargs.every((arg) =>
@@ -4089,6 +4135,13 @@ function sanctionedDriverArgs(args, root) {
     requiredValue: {
       "--root": (value) => value === root,
       "--runner": (value) => VALID_RUNNERS.has(value),
+    },
+    // The public driver emits --human-approval. --push-approval remains a
+    // read-compatible spelling for previously copied commands, but an action
+    // must never be refused merely because the driver and this guard chose
+    // different names for the same one-of policy field.
+    requiredValueOneOf: {
+      "--human-approval": (value) => value === "signature" || value === "chat",
       "--push-approval": (value) => value === "signature" || value === "chat",
     },
     optionalValue: {
@@ -4210,6 +4263,16 @@ function sanctionedSessionCleanupArgs(args, root) {
   if (["start", "status", "release-binding", "plan-recovery", "plan-human-recovery", "plan-privatization"].includes(args[0])) {
     const base = args[1] === "--repo" && args[2] === root;
     return base && (args.length === 3 || (exactRunnerTail(3) && args.length === 5));
+  }
+  if (args[0] === "release-orphan-binding") {
+    const validBy = (value) => typeof value === "string"
+      && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
+    const validReason = (value) => typeof value === "string"
+      && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 2000;
+    const base = args[1] === "--repo" && args[2] === root
+      && args[3] === "--by" && validBy(args[4])
+      && args[5] === "--reason" && validReason(args[6]);
+    return base && (args.length === 7 || (exactRunnerTail(7) && args.length === 9));
   }
   if (args[0] === "confirm-privatization") {
     const base = args[1] === "--repo" && args[2] === root
@@ -4338,6 +4401,19 @@ function sanctionedPipelineStateArgs(args, root) {
   if (args[0] === "apply-legacy-v2-revocation-recovery") return false;
   if (args[0] === "reopen-design") {
     return args[1] === "--by" && validBy(args[2]) && args.length === 3;
+  }
+  if (args[0] === "cancel-submitted-plan") {
+    return args[1] === "--by" && validBy(args[2])
+      && args[3] === "--submission-sha256" && /^[a-f0-9]{64}$/u.test(args[4] ?? "")
+      && args.length === 5;
+  }
+  if (args[0] === "cancel-mixed-plan-state") {
+    return args[1] === "--by" && validBy(args[2])
+      && args[3] === "--reason" && validBy(args[4])
+      && args[5] === "--submission-sha256" && /^[a-f0-9]{64}$/u.test(args[6] ?? "")
+      && args[7] === "--approval-sha256" && /^[a-f0-9]{64}$/u.test(args[8] ?? "")
+      && args[9] === "--invalidation-sha256" && /^[a-f0-9]{64}$/u.test(args[10] ?? "")
+      && args.length === 11;
   }
   if (args[0] === "submit-plan") {
     return args[1] === "--by" && validBy(args[2])
@@ -4525,6 +4601,18 @@ export function isSanctionedStartPreflightInvocation(command, root, options = {}
   return resolved !== null && resolved.script === START_PREFLIGHT_SCRIPT && resolved.args.length === 0;
 }
 
+function sanctionedOnboardingConsentMarkArgs(args, root) {
+  if (args[0] !== "record") return false;
+  const matchesRoot = exactRoot(args, root, 1)
+    || (args[1] === "--root" && args[2] === "."
+      && resolve(root, args[2]) === resolve(root)
+      && isRealpathedWithinBoundary(resolve(root, args[2]), root));
+  if (!matchesRoot) return false;
+  if (args[3] !== "--session-id" || typeof args[4] !== "string" || args[4].trim() === "") return false;
+  if (args[5] !== "--answer" || (args[6] !== "yes" && args[6] !== "no")) return false;
+  return args.length === 7;
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
@@ -4590,6 +4678,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
       && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
       && args[5] === "--activate" && args.length === 6;
   }
+  if (script === ONBOARDING_CONSENT_MARK_SCRIPT) return sanctionedOnboardingConsentMarkArgs(args, root);
   return script === APP_SERVER_SCRIPT
     && ["--recover", "--doctor"].includes(args[0])
     && args.length === 1;
@@ -4866,32 +4955,6 @@ export function isSanctionedGhReadOnlyDiagnostic(command, root, options = {}) {
  * This function only recognizes the shape; the caller (evaluateAfterGrammarAdmission()
  * below) is the one that gates it on `lifecycleStatus === "partial"`.
  */
-function isPartialLifecycleScratchDirCreate(command, root) {
-  const words = simpleWords(command, root);
-  if (!words || words.length === 0) return false;
-  if (basename(words[0]).toLowerCase() !== "mkdir") return false;
-  const args = words.slice(1);
-  const target = args.length === 1 ? args[0]
-    : args.length === 2 && args[0] === "-p" ? args[1]
-      : null;
-  return target !== null && resolve(root, target) === join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
-}
-
-/**
- * NVA-LCREADONLY-1: the Write/Edit-side twin -- the ONE fixed incident-report file a session
- * stuck at `partial` may create to persist a report of its own stuck state. Deliberately
- * scoped to Edit/Write only (never NotebookEdit, which this fixed `.md` path can never
- * legitimately name) and to this one exact resolved path -- no other filename, no directory
- * write, no glob. Shaped like isRestartResumeHintInputWrite() above; the caller is again the
- * one that gates this on `lifecycleStatus === "partial"`.
- */
-function isPartialLifecycleIncidentReportWrite(input, root) {
-  const toolName = String(input?.tool_name ?? "");
-  if (toolName !== "Edit" && toolName !== "Write") return false;
-  const filePath = writeTargetPath(input?.tool_input, toolName);
-  return filePath !== "" && resolve(root, filePath) === join(root, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH);
-}
-
 /**
  * NVA-GF-SCRATCH: the write-side twin of the `partial` diagnosis lane above, but scoped to the
  * two onboarding-readiness statuses named in INTAKE_LIFECYCLE_STATUSES rather than to one fixed
@@ -5019,11 +5082,13 @@ function onboardingConsentBlocked(input, root) {
   const markerPath = onboardingConsentMarkerPath(root, sessionId);
   const exists = existsSync(markerPath);
   if (exists) return null;
-  const command = `node "${ONBOARDING_CONSENT_MARK_SCRIPT}" record --root "${root}" --session-id "${sessionId}" --answer yes|no`;
+  const command = `node "${ONBOARDING_CONSENT_MARK_SCRIPT}" record --root "${root}" --session-id "${sessionId}" --answer yes`;
+  const commandNo = `node "${ONBOARDING_CONSENT_MARK_SCRIPT}" record --root "${root}" --session-id "${sessionId}" --answer no`;
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-ONBOARDING-CONSENT-REQUIRED: "
       + `Ask the user, then run this consent-record action with the observed answer:\n${command}\n`
+      + `(or to record refusal: ${commandNo})\n`
       + "After recording yes or no, retry the identical write action.\n",
   );
 }
@@ -5443,11 +5508,14 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     // generic scratch lane -- a write to `scratch/.resume-hint-input.json` must still surface
     // the specific "wrong directory" hint, not a bare verdict(0) that would make the operator
     // believe the write landed somewhere it is actually read from.
-    const restartLifecycleScratchWrite = restartRequired
+    const scratchLifecycleWrite = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && SCRATCH_LIFECYCLE_STATUSES.has(error.lifecycleStatus)
       && !restartResumeHintNearMissWrite(input, root)
       && (isIntakeLifecycleScratchWrite(input, root, dependencies)
         || (toolName === "Bash" && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)));
-    if (restartLifecycleScratchWrite) return verdict(0);
+    if (scratchLifecycleWrite) return verdict(0);
     // NVA-BL-INTAKEBIND-1: the one narrow Edit/Write admission that lets a real
     // session perform the design's own intended staging-PRD/spec review step
     // (isBootstrapBindingStagingAuthoringWrite() above), gated on the exact
@@ -5511,13 +5579,13 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     // RESTART_LIFECYCLE_SCRATCH_WRITE above: both `mkdir scratch` and a
     // `scratch/incident-report.md` write are now ALSO admitted at restart-required, via that
     // separate, more general scratch lane -- not via this partial-only one.)
-    const partialLifecycleDiagnosisWrite = error instanceof ProjectOnboardingReadyError
+    const partialLifecycleScratchWrite = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
       && error.lifecycleStatus === "partial"
-      && ((toolName === "Bash" && isPartialLifecycleScratchDirCreate((input.tool_input.command ?? input.tool_input.CommandLine), root))
-        || isPartialLifecycleIncidentReportWrite(input, root));
-    if (partialLifecycleDiagnosisWrite) return verdict(0);
+      && ((toolName === "Bash" && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies))
+        || isIntakeLifecycleScratchWrite(input, root, dependencies));
+    if (partialLifecycleScratchWrite) return verdict(0);
     // NVA-GF-SCRATCH (backlog: 2026-08-28-a-scratch-write-is-refused-during-intake-against-the-
     // documented-exemption.md): a fresh, not-yet-onboarded session sitting at `intake-required`
     // or `intake-design-questions-required` could write NOTHING at all, including its own
@@ -5712,6 +5780,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   // whatever verdict the remaining checks produce. Declared here rather than folded into
   // `lifts` further down because that array is created after the PowerShell early return, and
   // the test-path shell lane covers PowerShell too.
+  const sessionRoots = toolName === "Bash" ? sessionReadScopeRoots(input, dependencies) : [];
   const shellLifts = [];
   if (SHELL_TOOLS.includes(toolName)) {
     const gateStrength = gateStrengthShellRefusal((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
@@ -5736,7 +5805,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
     // lifecycle gate's shell lane (GUARD-DEVPLAN-SHELL). Same ordering discipline -- a command
     // already refused on a stricter sibling's ground must not also reach a lane that offers its
     // own lift.
-    const devPlanHit = devPlanShellRefusalHit((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies, toolName);
+    const devPlanHit = devPlanShellRefusalHit((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies, toolName, sessionRoots);
     if (devPlanHit !== null && devPlanHit.fault === true) {
       return devPlanShellFaultBlocked(devPlanHit.error);
     }
@@ -5837,7 +5906,6 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
   // every Edit/Write/NotebookEdit call), and reused at every isReadOnlyDiagnosticCommand /
   // retryActionsForDeniedCommand call site below that has `input` in scope. Never a module-
   // level constant, unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS: both roots vary per invocation.
-  const sessionRoots = toolName === "Bash" ? sessionReadScopeRoots(input, dependencies) : [];
   if (toolName === "Bash"
     && isForbiddenCrossRepositoryMutation((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)) {
     const route = humanOverrideRoute(
@@ -5897,7 +5965,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
           code,
           null,
           retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, sessionRoots),
-          route.overrideGuidance,
+          firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance),
           rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed, root),
           grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
           null,
@@ -5940,7 +6008,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
         // every case. Calling it here would be dead code, not a fix.
         const firstOccurrence = isFirstDenialThisScope(input, root, code, dependencies);
         return withLifts(lifts, blocked(
-          code, null, [], route.overrideGuidance, rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
+          code, null, [], firstOccurrence ? route.overrideGuidance : (route.repeatOverrideGuidance || route.overrideGuidance), rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
           grammarRemediation((input.tool_input.command ?? input.tool_input.CommandLine)), null, false, firstOccurrence,
         ));
       }

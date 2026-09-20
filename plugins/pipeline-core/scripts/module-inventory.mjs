@@ -12,8 +12,10 @@ import { parseYaml, YamlLiteError } from "../lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "../../..");
-const SCHEMA_PATH = path.join(REPO_ROOT, "schemas/pipeline.module-inventory.v1.json");
+// This script ships inside `<plugin>/scripts/`; the schema ships beside it at
+// `<plugin>/schemas/`. Resolving through the source repository root happened
+// to work in development but points at the marketplace root after installation.
+const SCHEMA_PATH = path.resolve(__dirname, "../schemas/pipeline.module-inventory.v1.json");
 
 let cachedSchema = null;
 export function getModuleInventorySchema() {

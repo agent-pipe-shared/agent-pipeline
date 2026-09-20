@@ -67,15 +67,17 @@ test("AC-1: discard-feature refuses an unexplained discard (--reason missing), z
   }
 });
 
-test("AC-2: discard-feature refuses when no continuity gates the feature -- close-feature is open, zero write", () => {
+test("AC-2: legacy no-continuity state is honestly discarded because current close evidence is unavailable", () => {
   const state = { schema: "pipeline.state.v0", activeFeature: { id: "x", planPath: "specs/x/prd.md", phase: "design" }, planApproved: false };
   const { root, statePath } = fixture(state);
   try {
     const before = readFileSync(statePath, "utf8");
-    assert.equal(run(["discard-feature", "--by", "PO", "--reason", "changed mind"], { dir: root, now: () => "2026-08-08T10:00:00.000Z" }), 2);
+    assert.equal(run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], { dir: root, now: () => "2026-08-08T10:00:00.000Z" }), 2);
     assert.equal(readFileSync(statePath, "utf8"), before);
-    // Prove the boundary: close-feature IS satisfiable in exactly this state.
-    assert.equal(run(["close-feature", "--by", "PO", "--architecture-impact", "no-architecture-impact"], { dir: root, now: () => "2026-08-08T10:01:00.000Z" }), 0);
+    assert.equal(run(["discard-feature", "--by", "PO", "--reason", "changed mind"], { dir: root, now: () => "2026-08-08T10:01:00.000Z" }), 0);
+    const after = readState(statePath);
+    assert.equal(after.activeFeature, undefined);
+    assert.equal(after.discardedFeatures.at(-1).id, "x");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -167,6 +169,69 @@ test("AC-3/AC-4: discard-feature appends an honest record to discardedFeatures (
     assert.equal(afterSetFeature.planApproved, false);
     // The discard record survives -- append-only, never overwritten by the next feature.
     assert.equal(afterSetFeature.discardedFeatures.length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("discard-feature commits public State first and reports orphan-cleanup-required when private apply fails", () => {
+  const { root, statePath } = fixture(stuckState());
+  try {
+    const calls = [];
+    const exit = run(["discard-feature", "--by", "PO", "--reason", "planned discard"], {
+      dir: root,
+      now: () => "2026-09-20T08:00:00.000Z",
+      planOrphanSessionCleanupBindingReleaseFn(request) {
+        calls.push({ phase: "plan", activeFeature: readState(statePath).activeFeature?.id, request });
+        return { planSha256: "a".repeat(64) };
+      },
+      applyOrphanSessionCleanupBindingReleaseFn(request) {
+        calls.push({ phase: "apply", discardedFeature: readState(statePath).discardedFeatures?.[0]?.id, request });
+        const error = new Error("simulated private failure");
+        error.code = "SESSION-CLEANUP-ORPHAN-RELEASE-WRITE";
+        error.committed = false;
+        throw error;
+      },
+    });
+    assert.equal(exit, 2);
+    assert.equal(calls[0].phase, "plan");
+    assert.equal(calls[0].activeFeature, "abandoned-feature");
+    assert.match(calls[0].request.expectedStateAfterSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(calls[1].phase, "apply");
+    assert.equal(calls[1].discardedFeature, "abandoned-feature");
+    assert.equal(calls[1].request.stateLockHeld, true);
+    const committed = readState(statePath);
+    assert.equal(Object.hasOwn(committed, "activeFeature"), false);
+    assert.equal(committed.discardedFeatures[0].id, "abandoned-feature");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("discard-feature State CAS failure never calls private release apply", () => {
+  const { root, statePath } = fixture(stuckState());
+  try {
+    let applyCalls = 0;
+    const exit = run(["discard-feature", "--by", "PO", "--reason", "planned discard"], {
+      dir: root,
+      now: () => "2026-09-20T08:00:00.000Z",
+      planOrphanSessionCleanupBindingReleaseFn() {
+        const concurrent = readState(statePath);
+        concurrent.concurrentWriter = true;
+        writeFileSync(statePath, `${JSON.stringify(concurrent, null, 2)}\n`);
+        return { planSha256: "b".repeat(64) };
+      },
+      applyOrphanSessionCleanupBindingReleaseFn() {
+        applyCalls += 1;
+        return { status: "released" };
+      },
+    });
+    assert.equal(exit, 2);
+    assert.equal(applyCalls, 0);
+    const retained = readState(statePath);
+    assert.equal(retained.activeFeature.id, "abandoned-feature");
+    assert.equal(retained.continuity.featureId, "abandoned-feature");
+    assert.equal(retained.concurrentWriter, true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

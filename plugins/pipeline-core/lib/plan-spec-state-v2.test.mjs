@@ -9,6 +9,8 @@ import {
   appendPhaseHistory,
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
+  cancelMixedPlanState,
+  cancelSubmittedPlan,
   derivePlanLifecycle,
   enterPlanImplementation,
   planLegacyV2RevocationRecovery,
@@ -22,6 +24,7 @@ import {
 const PLAN = "1".repeat(64);
 const SPEC = "2".repeat(64);
 const PROFILE = "3".repeat(64);
+const ADVISOR = "a".repeat(64);
 const AUTHORITY = {
   schema: "pipeline.po-gate-authority.v2",
   humanFacing: "en",
@@ -109,9 +112,56 @@ function approved(state = submitted(), authority = AUTHORITY, at = LATER) {
     profileSha256: PROFILE,
     by: "PO",
     at,
+    designAdvisorAdmissionSha256: state.planSubmission.profile === "mini" ? null : ADVISOR,
   });
   assert.equal(result.ok, true, JSON.stringify(result));
   return result.state;
+}
+
+function mixedPlanState() {
+  const state = submitted();
+  const approval = {
+    schema: "pipeline.plan-approval.v4",
+    approvedBy: "PO",
+    approvedAt: LATER,
+    submissionSha256: "a".repeat(64),
+    profileSha256: "b".repeat(64),
+    poGateAuthority: {
+      ...AUTHORITY,
+      planSha256: "c".repeat(64),
+      specSha256: "d".repeat(64),
+    },
+    priorInvalidationSha256: null,
+  };
+  return {
+    ...state,
+    planApproval: approval,
+    planInvalidation: {
+      schema: "pipeline.plan-invalidation.v1",
+      featureId: "feature",
+      invalidatedSubmissionSha256: "e".repeat(64),
+      invalidatedApprovalSha256: sha256CanonicalJson(approval),
+      invalidatedBy: "PO",
+      invalidatedAt: REOPENED,
+      reason: "reopen-design",
+    },
+    planPresentation: { schema: "fixture", value: "presentation" },
+    planApprovalBriefing: { schema: "fixture", value: "briefing" },
+  };
+}
+
+function mixedPlanRequest(state, overrides = {}) {
+  return {
+    state,
+    expectedStateSha256: sha256CanonicalJson(state),
+    expectedSubmissionSha256: sha256CanonicalJson(state.planSubmission),
+    expectedApprovalSha256: sha256CanonicalJson(state.planApproval),
+    expectedInvalidationSha256: sha256CanonicalJson(state.planInvalidation),
+    by: "PO",
+    at: IMPLEMENTED,
+    reason: "Retire invalidated approval and successor submission",
+    ...overrides,
+  };
 }
 
 test("closed lifecycle derives draft, awaiting-approval, approved, and implementing", () => {
@@ -157,6 +207,199 @@ test("submission atomically rebinds Continuity authority before approval and imp
     assert.equal(implementation.ok, true, JSON.stringify(implementation));
     assert.deepEqual(implementation.state.continuity, awaiting.continuity);
     assert.equal(derivePlanLifecycle(implementation.state).status, "implementing");
+  }
+});
+
+test("NVA-G19: an exact unapproved submission can be cancelled once, then historically retained", () => {
+  const awaiting = submitted();
+  const submissionSha256 = sha256CanonicalJson(awaiting.planSubmission);
+  const result = cancelSubmittedPlan({
+    state: awaiting,
+    expectedStateSha256: sha256CanonicalJson(awaiting),
+    expectedSubmissionSha256: submissionSha256,
+    by: "PO",
+    at: REOPENED,
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.replay, false);
+  assert.deepEqual(result.cancellation, {
+    schema: "pipeline.plan-cancellation.v1",
+    featureId: "feature",
+    submissionSha256,
+    cancelledBy: "PO",
+    cancelledAt: REOPENED,
+  });
+  assert.equal(result.state.planApproved, false);
+  assert.equal(result.state.planSubmission, undefined);
+  assert.equal(result.state.planApproval, undefined);
+  assert.equal(result.state.planPresentation, undefined);
+  assert.equal(result.state.planApprovalBriefing, undefined);
+  assert.equal(result.state.continuity.revision, awaiting.continuity.revision + 1);
+  assert.equal(derivePlanLifecycle(result.state).status, "draft");
+
+  const replay = cancelSubmittedPlan({
+    state: result.state,
+    expectedStateSha256: sha256CanonicalJson(result.state),
+    expectedSubmissionSha256: submissionSha256,
+    by: "PO",
+    at: REOPENED,
+  });
+  assert.equal(replay.ok, true, JSON.stringify(replay));
+  assert.equal(replay.replay, true);
+  assert.equal(replay.state, result.state);
+
+  const successor = submitted(result.state, AUTHORITY, RESUBMITTED);
+  assert.deepEqual(successor.planCancellation, result.cancellation);
+  const approvedSuccessor = approved(successor, AUTHORITY, REAPPROVED);
+  assert.equal(derivePlanLifecycle(approvedSuccessor).status, "approved");
+  assert.deepEqual(approvedSuccessor.planCancellation, result.cancellation);
+});
+
+test("NVA-G19: cancellation rejects stale, malformed, approved, foreign, and already-cancelled requests", () => {
+  const awaiting = submitted();
+  const digest = sha256CanonicalJson(awaiting.planSubmission);
+  const invalidRequests = [
+    { state: awaiting, expectedStateSha256: "f".repeat(64), expectedSubmissionSha256: digest, by: "PO", at: REOPENED, code: "PLAN-CANCEL-STATE-STALE" },
+    { state: awaiting, expectedStateSha256: sha256CanonicalJson(awaiting), expectedSubmissionSha256: "bad", by: "PO", at: REOPENED, code: "PLAN-CANCEL-REQUEST-INVALID" },
+    { state: approved(awaiting), expectedStateSha256: sha256CanonicalJson(approved(awaiting)), expectedSubmissionSha256: digest, by: "PO", at: REOPENED, code: "PLAN-CANCEL-STATE-INVALID" },
+    { state: awaiting, expectedStateSha256: sha256CanonicalJson(awaiting), expectedSubmissionSha256: "a".repeat(64), by: "PO", at: REOPENED, code: "PLAN-CANCEL-SUBMISSION-STALE" },
+  ];
+  for (const request of invalidRequests) {
+    const result = cancelSubmittedPlan(request);
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, request.code);
+  }
+  const foreignReceipt = {
+    ...awaiting,
+    planCancellation: {
+      schema: "pipeline.plan-cancellation.v1",
+      featureId: "another-feature",
+      submissionSha256: digest,
+      cancelledBy: "PO",
+      cancelledAt: REOPENED,
+    },
+  };
+  assert.equal(derivePlanLifecycle(foreignReceipt).ok, false,
+    "a cancellation receipt must be bound to the active feature");
+  const cancelled = cancelSubmittedPlan({
+    state: awaiting,
+    expectedStateSha256: sha256CanonicalJson(awaiting),
+    expectedSubmissionSha256: digest,
+    by: "PO",
+    at: REOPENED,
+  }).state;
+  for (const request of [
+    { expectedSubmissionSha256: digest, by: "Other", at: REOPENED },
+    { expectedSubmissionSha256: digest, by: "PO", at: REAPPROVED },
+    { expectedSubmissionSha256: "a".repeat(64), by: "PO", at: REOPENED },
+  ]) {
+    const result = cancelSubmittedPlan({ state: cancelled, expectedStateSha256: sha256CanonicalJson(cancelled), ...request });
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PLAN-CANCEL-ALREADY-CANCELLED");
+  }
+});
+
+test("B9.1 cancels the exact mixed state, preserves invalidation, and replays without a write", () => {
+  const state = mixedPlanState();
+  const request = mixedPlanRequest(state);
+  const result = cancelMixedPlanState(request);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.replay, false);
+  assert.deepEqual(result.recovery, {
+    schema: "pipeline.plan-mixed-state-recovery.v1",
+    featureId: "feature",
+    submissionSha256: request.expectedSubmissionSha256,
+    approvalSha256: request.expectedApprovalSha256,
+    invalidationSha256: request.expectedInvalidationSha256,
+    recoveredBy: "PO",
+    recoveredAt: IMPLEMENTED,
+    reason: request.reason,
+  });
+  assert.deepEqual(result.state.planInvalidation, state.planInvalidation);
+  assert.equal(result.state.planApproved, false);
+  assert.equal(result.state.activeFeature.phase, "design");
+  for (const key of ["planSubmission", "planApproval", "planPresentation", "planApprovalBriefing"]) {
+    assert.equal(result.state[key], undefined);
+  }
+  assert.equal(result.state.continuity.revision, state.continuity.revision + 1);
+  assert.equal(derivePlanLifecycle(result.state).status, "draft");
+
+  const replay = cancelMixedPlanState({
+    ...request,
+    state: result.state,
+    expectedStateSha256: sha256CanonicalJson(result.state),
+  });
+  assert.equal(replay.ok, true, JSON.stringify(replay));
+  assert.equal(replay.replay, true);
+  assert.equal(replay.state, result.state);
+
+  const successor = submitted(result.state, AUTHORITY, RESUBMITTED);
+  assert.deepEqual(successor.planMixedStateRecovery, result.recovery);
+  assert.equal(derivePlanLifecycle(successor).status, "awaiting-approval");
+});
+
+test("B9.1 refuses ordinary cancellation, current records, and a forged retained receipt", () => {
+  const state = mixedPlanState();
+  const ordinary = cancelSubmittedPlan({
+    state,
+    expectedStateSha256: sha256CanonicalJson(state),
+    expectedSubmissionSha256: sha256CanonicalJson(state.planSubmission),
+    by: "PO",
+    at: IMPLEMENTED,
+  });
+  assert.equal(ordinary.code, "PLAN-CANCEL-STATE-INVALID");
+
+  const currentApproval = structuredClone(state);
+  currentApproval.planApproval.submissionSha256 = sha256CanonicalJson(currentApproval.planSubmission);
+  currentApproval.planInvalidation.invalidatedApprovalSha256 = sha256CanonicalJson(currentApproval.planApproval);
+  assert.equal(cancelMixedPlanState(mixedPlanRequest(currentApproval)).code, "PLAN-MIXED-CANCEL-STATE-INVALID");
+
+  const currentInvalidation = structuredClone(state);
+  currentInvalidation.planInvalidation.invalidatedSubmissionSha256 = sha256CanonicalJson(currentInvalidation.planSubmission);
+  assert.equal(cancelMixedPlanState(mixedPlanRequest(currentInvalidation)).code, "PLAN-MIXED-CANCEL-STATE-INVALID");
+
+  const wrongApproval = structuredClone(state);
+  wrongApproval.planInvalidation.invalidatedApprovalSha256 = "f".repeat(64);
+  assert.equal(cancelMixedPlanState(mixedPlanRequest(wrongApproval)).code, "PLAN-MIXED-CANCEL-STATE-INVALID");
+
+  const recovered = cancelMixedPlanState(mixedPlanRequest(state)).state;
+  const forged = structuredClone(recovered);
+  forged.planMixedStateRecovery.extra = true;
+  assert.equal(derivePlanLifecycle(forged).code, "PLAN-LIFECYCLE-MIXED-RECOVERY-INVALID");
+  assert.equal(cancelMixedPlanState({
+    ...mixedPlanRequest(state),
+    state: forged,
+    expectedStateSha256: sha256CanonicalJson(forged),
+  }).code, "PLAN-MIXED-CANCEL-ALREADY-RECOVERED");
+});
+
+test("B9.1 binds all three record digests and exact recovery attribution", () => {
+  const state = mixedPlanState();
+  const request = mixedPlanRequest(state);
+  for (const [field, code] of [
+    ["expectedSubmissionSha256", "PLAN-MIXED-CANCEL-SUBMISSION-STALE"],
+    ["expectedApprovalSha256", "PLAN-MIXED-CANCEL-APPROVAL-STALE"],
+    ["expectedInvalidationSha256", "PLAN-MIXED-CANCEL-INVALIDATION-STALE"],
+  ]) {
+    const result = cancelMixedPlanState({ ...request, [field]: "f".repeat(64) });
+    assert.equal(result.code, code, JSON.stringify(result));
+  }
+  const recovered = cancelMixedPlanState(request).state;
+  for (const change of [
+    { by: "Other" },
+    { at: REAPPROVED },
+    { reason: "Competing reason" },
+    { expectedSubmissionSha256: "f".repeat(64) },
+    { expectedApprovalSha256: "f".repeat(64) },
+    { expectedInvalidationSha256: "f".repeat(64) },
+  ]) {
+    const result = cancelMixedPlanState({
+      ...request,
+      state: recovered,
+      expectedStateSha256: sha256CanonicalJson(recovered),
+      ...change,
+    });
+    assert.equal(result.code, "PLAN-MIXED-CANCEL-ALREADY-RECOVERED", JSON.stringify(result));
   }
 });
 
@@ -660,7 +903,7 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
   const successorSubmission = submitted(firstReopen.state, AUTHORITY, RESUBMITTED);
   const successor = approved(successorSubmission, AUTHORITY, REAPPROVED);
   const priorInvalidationSha256 = sha256CanonicalJson(firstReopen.invalidation);
-  assert.equal(successor.planApproval.schema, "pipeline.plan-approval.v4");
+  assert.equal(successor.planApproval.schema, "pipeline.plan-approval.v5");
   assert.equal(successor.planApproval.priorInvalidationSha256, priorInvalidationSha256);
   assert.equal(derivePlanLifecycle(successor).status, "approved");
 
@@ -670,10 +913,11 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
   const wrongSeal = { ...successor, planApproval: { ...successor.planApproval, priorInvalidationSha256: "f".repeat(64) } };
   assert.equal(derivePlanLifecycle(wrongSeal).ok, false);
 
-  const v3WithAudit = { ...successor, planApproval: { ...successor.planApproval, schema: "pipeline.plan-approval.v3" } };
-  delete v3WithAudit.planApproval.priorInvalidationSha256;
-  assert.equal(derivePlanLifecycle(v3WithAudit).ok, false);
-  const sealed = sealCurrentPlanApproval({ state: v3WithAudit, expectedStateSha256: sha256CanonicalJson(v3WithAudit) });
+  const v4WithAudit = { ...successor, planApproval: { ...successor.planApproval, schema: "pipeline.plan-approval.v4" } };
+  delete v4WithAudit.planApproval.designAdvisorAdmissionSha256;
+  v4WithAudit.planApproval.priorInvalidationSha256 = null;
+  assert.equal(derivePlanLifecycle(v4WithAudit).ok, false);
+  const sealed = sealCurrentPlanApproval({ state: v4WithAudit, expectedStateSha256: sha256CanonicalJson(v4WithAudit) });
   assert.equal(sealed.ok, true, JSON.stringify(sealed));
   assert.equal(sealed.state.planApproval.approvedBy, "PO");
   assert.equal(sealed.state.planApproval.priorInvalidationSha256, priorInvalidationSha256);
@@ -681,6 +925,7 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
 
   const v3WithoutAudit = { ...first, planApproval: { ...first.planApproval, schema: "pipeline.plan-approval.v3" } };
   delete v3WithoutAudit.planApproval.priorInvalidationSha256;
+  delete v3WithoutAudit.planApproval.designAdvisorAdmissionSha256;
   assert.equal(derivePlanLifecycle(v3WithoutAudit).status, "approved");
 
   const secondAt = "2026-07-30T20:25:00.000Z";
@@ -690,6 +935,41 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
   assert.equal(secondReopen.invalidation.invalidatedAt, secondAt);
   assert.notEqual(secondReopen.invalidation.invalidatedSubmissionSha256, firstReopen.invalidation.invalidatedSubmissionSha256);
   assert.equal(secondReopen.invalidation.invalidatedApprovalSha256, sha256CanonicalJson(successor.planApproval));
+});
+
+test("new approval requires an Advisor digest exactly for epic and feature profiles", () => {
+  const feature = submitted();
+  const lifecycle = derivePlanLifecycle(feature);
+  const missing = approveSubmittedPlan({
+    state: feature,
+    expectedStateSha256: sha256CanonicalJson(feature),
+    expectedSubmissionSha256: lifecycle.submissionSha256,
+    poGateAuthority: AUTHORITY,
+    profileSha256: PROFILE,
+    by: "PO",
+    at: LATER,
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.code, "PLAN-APPROVE-ADVISOR-PROFILE-INVALID");
+
+  const accepted = approved(feature);
+  assert.equal(accepted.planApproval.designAdvisorAdmissionSha256, ADVISOR);
+  assert.equal(derivePlanLifecycle(accepted).status, "approved");
+
+  const mini = submitted(draft(), AUTHORITY, NOW, "mini");
+  const miniLifecycle = derivePlanLifecycle(mini);
+  const miniAccepted = approveSubmittedPlan({
+    state: mini,
+    expectedStateSha256: sha256CanonicalJson(mini),
+    expectedSubmissionSha256: miniLifecycle.submissionSha256,
+    poGateAuthority: AUTHORITY,
+    profileSha256: PROFILE,
+    by: "PO",
+    at: LATER,
+    designAdvisorAdmissionSha256: null,
+  });
+  assert.equal(miniAccepted.ok, true, JSON.stringify(miniAccepted));
+  assert.equal(miniAccepted.approval.designAdvisorAdmissionSha256, null);
 });
 
 test("appendPhaseHistory is purely additive and order-preserving", () => {

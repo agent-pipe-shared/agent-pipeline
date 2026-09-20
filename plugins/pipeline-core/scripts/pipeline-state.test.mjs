@@ -1005,6 +1005,7 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
   const deps = {
     dir: root, now: () => now,
+    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: () => ({
       ok: true,
@@ -1093,9 +1094,9 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
     "the default signature posture must not acquire a chat-attribution record");
 }
 
-// A global chat selection is still a shared human gate.  It does not turn a
-// later `--by` into approval: the only admissible route is its earlier,
-// plan-bound chat acknowledgement receipt (covered below).
+// An established feature under the global chat policy uses the PO's one
+// explicit chat decision and records honest unattested attribution. It must
+// not be routed through the onboarding-only bootstrap receipt.
 {
   const featureId = "global-chat-plan-approval";
   const planPath = `specs/${featureId}/prd_${featureId}.md`;
@@ -1104,10 +1105,26 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   commitGlobalHumanApproval(root, "chat");
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
   assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps)).result, 0);
-  assert.equal(capturedStderr(() => run(["approve-plan", "--by", "PO"], deps)).result, 2);
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  assert.equal(inspected.result, 0, inspected.lines.join(" "));
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  assert.equal(action.kind, "collect-input");
+  assert.equal(action.input?.name, "by");
+  assert.deepEqual(action.applyAction?.argv.slice(1), [
+    "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>",
+  ]);
+  assert.equal(action.applyAction?.requiresConfirmation, true);
+  const approvalArgv = action.applyAction.argv.slice(1).map((value) => (
+    value === "<PO_PLAN_APPROVER_NAME>" ? "PO" : value
+  ));
+  assert.equal(capturedStderr(() => run(approvalArgv, deps)).result, 0);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
-  assert.equal(state.planApproved, false);
-  assert.equal(state.planApprovalAttribution, undefined);
+  assert.equal(state.planApproved, true);
+  assert.deepEqual(state.planApprovalAttribution, {
+    mode: "chat-attributed-unattested",
+    kind: "plan",
+    by: "PO",
+  });
 }
 
 // NVA-R22-PLANSHOWN Scenario 5: approve-plan refuses when present-plan was
@@ -1414,7 +1431,60 @@ function awaitingApprovalFixture() {
     presentedAt: localNow,
   };
   writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
-  return { root, deps: { dir: root, now: () => localNow }, planPath, specPath, planSha256: state.planSubmission.planSha256, specSha256: state.planSubmission.specSha256 };
+  return {
+    root,
+    deps: {
+      dir: root,
+      now: () => localNow,
+      designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
+    },
+    planPath,
+    specPath,
+    planSha256: state.planSubmission.planSha256,
+    specSha256: state.planSubmission.specSha256,
+  };
+}
+
+// Epic/feature Advisor status is a pre-approval decision with a direct remedy;
+// it must not survive as a vague failure in a later implementation gate.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const missingAdvisor = { ...deps, designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }) };
+  const inspected = capturedStdout(() => run(["inspect"], missingAdvisor));
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  assert.equal(action.kind, "collect-input");
+  assert.equal(action.inputs?.[0]?.name, "runner");
+  assert.ok(action.guidance.includes("DAA-PUBLIC-UNAVAILABLE"));
+  const authorityFixture = planAuthorityFixture({
+    featureId: "advisor-early-refusal",
+    planPath: "specs/advisor-early-refusal/prd.md",
+    specPath: "specs/advisor-early-refusal/spec.md",
+  });
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], authorityFixture.deps), 0);
+  assert.equal(run(["present-plan", "--by", "coordinator"], authorityFixture.deps), 0);
+  const refused = capturedStderr(() => run(["approve-plan", "--by", "PO"], {
+    ...authorityFixture.deps,
+    designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }),
+  }));
+  assert.equal(refused.result, 2);
+  assert.ok(refused.lines.join(" ").includes("DAA-PUBLIC-UNAVAILABLE"));
+  void root;
+}
+
+// Mini is deliberately Advisor-free even where an Advisor dependency itself
+// is unavailable; its ordinary plan-approval action remains visible.
+{
+  const { root, deps } = awaitingApprovalFixture();
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  state.planSubmission.profile = "mini";
+  state.planPresentation.submissionSha256 = sha256CanonicalJson(state.planSubmission);
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  const absentAdvisor = { ...deps, designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }) };
+  const inspected = capturedStdout(() => run(["inspect"], absentAdvisor));
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  assert.equal(action.input?.name, "by");
+  assert.equal(action.inputs, undefined);
+  void root;
 }
 
 // A coordinator-sourced, signed acknowledgement is a single PO decision. Once
@@ -1462,12 +1532,14 @@ function awaitingApprovalFixture() {
   void root;
 }
 
-// The receipt rule protects a coordinator-sourced acknowledgement under the
-// explicit chat policy too. Chat supplies the one in-session PO decision at
-// acknowledgement time; it must not reopen the old terminal `--by` approval
-// path after binding.
+// A bootstrap-bound plan under the explicit chat policy still consumes its
+// exact onboarding acknowledgement receipt. The marker distinguishes it from
+// an established feature, which uses the attributed chat path above.
 {
   const { root, deps } = awaitingApprovalFixture();
+  const bootstrapState = JSON.parse(readFileSync(statePath(root), "utf8"));
+  bootstrapState.bootstrapAcknowledgementRequired = true;
+  writeFileSync(statePath(root), JSON.stringify(bootstrapState, null, 2) + "\n");
   const receiptPath = "scratch/bootstrap-plan-acknowledgement-receipt-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.json";
   const chatDeps = {
     ...deps,
@@ -1908,4 +1980,181 @@ console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
   };
   const applied = invokeCaptured(applyArgsWithoutRunner, attendedDeps);
   assert.equal(applied.status, 0, applied.err);
+}
+
+// Feature-boundary regression: both cancellation receipt lineages are archived
+// by terminal disposal and can never make the next feature non-draft.
+{
+  const featureId = "receipt-boundary-a";
+  const planPath = `specs/${featureId}/prd.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-09-20T13:00:00.000Z" });
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps), 0);
+  let state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  const firstSubmissionSha256 = sha256CanonicalJson(state.planSubmission);
+  assert.equal(run([
+    "cancel-submitted-plan", "--by", "PO", "--submission-sha256", firstSubmissionSha256,
+  ], deps), 0);
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps), 0);
+  state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  const approval = {
+    schema: "pipeline.plan-approval.v4",
+    approvedBy: "PO", approvedAt: "2026-09-19T10:00:00.000Z",
+    submissionSha256: "a".repeat(64), profileSha256: "b".repeat(64),
+    poGateAuthority: {
+      ...deps.poGateAuthority().value,
+      planSha256: "c".repeat(64), specSha256: "d".repeat(64),
+    },
+    priorInvalidationSha256: null,
+  };
+  state.planApproval = approval;
+  state.planInvalidation = {
+    schema: "pipeline.plan-invalidation.v1", featureId,
+    invalidatedSubmissionSha256: "e".repeat(64),
+    invalidatedApprovalSha256: sha256CanonicalJson(approval),
+    invalidatedBy: "PO", invalidatedAt: "2026-09-19T11:00:00.000Z", reason: "reopen-design",
+  };
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  const successorSha256 = sha256CanonicalJson(state.planSubmission);
+  const approvalSha256 = sha256CanonicalJson(state.planApproval);
+  const invalidationSha256 = sha256CanonicalJson(state.planInvalidation);
+  assert.equal(run([
+    "cancel-mixed-plan-state",
+    "--by", "PO", "--reason", "Retire mixed history",
+    "--submission-sha256", successorSha256,
+    "--approval-sha256", approvalSha256,
+    "--invalidation-sha256", invalidationSha256,
+  ], deps), 0);
+  const recovered = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(recovered.planCancellation.submissionSha256, firstSubmissionSha256);
+  assert.equal(recovered.planMixedStateRecovery.submissionSha256, successorSha256);
+
+  assert.equal(run([
+    "discard-feature", "--by", "PO", "--reason", "Feature A retired after recovery",
+  ], { ...deps, gitHead: () => ({ ok: true, commit: "f".repeat(40) }) }), 0);
+  const discarded = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(discarded.planCancellation, undefined);
+  assert.equal(discarded.planMixedStateRecovery, undefined);
+  assert.deepEqual(discarded.discardedFeatures.at(-1).planCancellation, recovered.planCancellation);
+  assert.deepEqual(discarded.discardedFeatures.at(-1).planMixedStateRecovery, recovered.planMixedStateRecovery);
+
+  const nextFeatureId = "receipt-boundary-b";
+  assert.equal(run([
+    "set-feature", "--id", nextFeatureId, "--plan-path", `specs/${nextFeatureId}/prd.md`,
+  ], deps), 0);
+  const featureB = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(featureB.activeFeature.id, nextFeatureId);
+  assert.equal(featureB.planCancellation, undefined);
+  assert.equal(featureB.planMixedStateRecovery, undefined);
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  assert.equal(inspected.result, 0);
+  const payload = JSON.parse(inspected.lines.join("\n"));
+  assert.equal(payload.status, "draft");
+  assert.equal(payload.lifecycle.ok, true);
+  assert.equal(payload.mixedPlanRecovery, null);
+}
+
+// NVA-G19: only the exact current unapproved submission can be withdrawn.
+// The persisted receipt is replayable only with the same immutable tuple;
+// replay must not rewrite State or the next-action documents.
+{
+  const featureId = "nva-g19-cancellation";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-09-19T12:00:00.000Z" });
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps), 0);
+  const submitted = JSON.parse(readFileSync(statePath(root), "utf8"));
+  const digest = sha256CanonicalJson(submitted.planSubmission);
+  assert.equal(run(["cancel-submitted-plan", "--by", "PO", "--submission-sha256", digest], deps), 0);
+  const cancelledBytes = readFileSync(statePath(root), "utf8");
+  const cancelled = JSON.parse(cancelledBytes);
+  assert.deepEqual(cancelled.planCancellation, {
+    schema: "pipeline.plan-cancellation.v1", featureId, submissionSha256: digest,
+    cancelledBy: "PO", cancelledAt: "2026-09-19T12:00:00.000Z",
+  });
+  assert.equal(cancelled.planSubmission, undefined);
+  assert.equal(cancelled.planApproval, undefined);
+  assert.equal(cancelled.planPresentation, undefined);
+  assert.equal(cancelled.planApprovalBriefing, undefined);
+  assert.equal(cancelled.continuity.revision, submitted.continuity.revision + 1);
+  assert.equal(run(["cancel-submitted-plan", "--by", "PO", "--submission-sha256", digest], deps), 0);
+  assert.equal(readFileSync(statePath(root), "utf8"), cancelledBytes, "exact replay is a State zero-write");
+  const refusal = capturedStderr(() => run(["cancel-submitted-plan", "--by", "Other", "--submission-sha256", digest], deps));
+  assert.equal(refusal.result, 2);
+  assert.ok(refusal.lines.some((line) => line.includes("PLAN-CANCEL-ALREADY-CANCELLED")));
+  assert.equal(readFileSync(statePath(root), "utf8"), cancelledBytes, "a conflicting replay is also a State zero-write");
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps), 0);
+  const successor = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.deepEqual(successor.planCancellation, cancelled.planCancellation);
+}
+
+// B9.1: inspection exposes only the dedicated mixed-state recovery, then the
+// exact three-digest writer preserves invalidation and replays without writes.
+{
+  const featureId = "b91-mixed-plan-state";
+  const planPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-09-20T12:00:00.000Z" });
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps), 0);
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  const approval = {
+    schema: "pipeline.plan-approval.v4",
+    approvedBy: "PO", approvedAt: "2026-09-19T10:00:00.000Z",
+    submissionSha256: "a".repeat(64), profileSha256: "b".repeat(64),
+    poGateAuthority: {
+      ...deps.poGateAuthority().value,
+      planSha256: "c".repeat(64), specSha256: "d".repeat(64),
+    },
+    priorInvalidationSha256: null,
+  };
+  state.planApproval = approval;
+  state.planInvalidation = {
+    schema: "pipeline.plan-invalidation.v1", featureId,
+    invalidatedSubmissionSha256: "e".repeat(64),
+    invalidatedApprovalSha256: sha256CanonicalJson(approval),
+    invalidatedBy: "PO", invalidatedAt: "2026-09-19T11:00:00.000Z", reason: "reopen-design",
+  };
+  state.planPresentation = { schema: "fixture" };
+  state.planApprovalBriefing = { schema: "fixture" };
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+
+  const submissionSha256 = sha256CanonicalJson(state.planSubmission);
+  const approvalSha256 = sha256CanonicalJson(state.planApproval);
+  const invalidationSha256 = sha256CanonicalJson(state.planInvalidation);
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  assert.equal(inspected.result, 0);
+  const payload = JSON.parse(inspected.lines.join("\n"));
+  assert.deepEqual(payload.mixedPlanRecovery, { submissionSha256, approvalSha256, invalidationSha256 });
+  assert.equal(payload.nextAction.kind, "collect-input");
+  assert.deepEqual(payload.nextAction.inputs.map((input) => input.name), ["by", "reason"]);
+  assert.deepEqual(payload.nextAction.applyAction.argv.slice(1), [
+    "cancel-mixed-plan-state",
+    "--by", "<MIXED_PLAN_RECOVERY_ACTOR>",
+    "--reason", "<MIXED_PLAN_RECOVERY_REASON>",
+    "--submission-sha256", submissionSha256,
+    "--approval-sha256", approvalSha256,
+    "--invalidation-sha256", invalidationSha256,
+  ]);
+  assert.ok(payload.nextAction.guidance.includes("Ordinary cancel-submitted-plan does not apply"));
+
+  const argv = payload.nextAction.applyAction.argv.slice(1).map((value) => value === "<MIXED_PLAN_RECOVERY_ACTOR>"
+    ? "PO" : value === "<MIXED_PLAN_RECOVERY_REASON>" ? "Retire mixed history" : value);
+  assert.equal(run(argv, deps), 0);
+  const recoveredBytes = readFileSync(statePath(root), "utf8");
+  const recovered = JSON.parse(recoveredBytes);
+  assert.deepEqual(recovered.planInvalidation, state.planInvalidation);
+  assert.deepEqual(recovered.planMixedStateRecovery, {
+    schema: "pipeline.plan-mixed-state-recovery.v1", featureId,
+    submissionSha256, approvalSha256, invalidationSha256,
+    recoveredBy: "PO", recoveredAt: "2026-09-20T12:00:00.000Z", reason: "Retire mixed history",
+  });
+  for (const key of ["planSubmission", "planApproval", "planPresentation", "planApprovalBriefing"]) {
+    assert.equal(recovered[key], undefined);
+  }
+  assert.equal(recovered.continuity.revision, state.continuity.revision + 1);
+  assert.equal(run(argv, deps), 0);
+  assert.equal(readFileSync(statePath(root), "utf8"), recoveredBytes, "exact replay is a zero-write");
+  const competing = capturedStderr(() => run(argv.map((value) => value === "PO" ? "Other" : value), deps));
+  assert.equal(competing.result, 2);
+  assert.ok(competing.lines.some((line) => line.includes("PLAN-MIXED-CANCEL-ALREADY-RECOVERED")));
 }

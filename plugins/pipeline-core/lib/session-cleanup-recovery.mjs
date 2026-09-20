@@ -42,6 +42,7 @@ import {
   assessWindowsPrivatePath,
   hardenWindowsPrivateDirectory,
 } from "./windows-private-state.mjs";
+import { hasExpectedSpawnStatus } from "./successful-spawn.mjs";
 
 export const SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA = "pipeline.session-cleanup-recovery-plan.v1";
 export const SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA = "pipeline.session-cleanup-recovery-apply.v1";
@@ -229,7 +230,7 @@ function recoveryJournalPaths(root, expectedPlanSha256, deps, { create = true } 
     shell: false,
     timeout: 5000,
   });
-  if (result?.status !== 0 || result?.error) {
+  if (!hasExpectedSpawnStatus(result, [0])) {
     fail("WT-SESSION-RECOVERY-JOURNAL", "Git common directory is unavailable");
   }
   const raw = String(result.stdout ?? "").trim();
@@ -283,7 +284,7 @@ function resolveGitCommonDirectoryForBackup(root, deps) {
     shell: false,
     timeout: 5000,
   });
-  if (result?.status !== 0 || result?.error) {
+  if (!hasExpectedSpawnStatus(result, [0])) {
     fail("WT-SESSION-RECOVERY-BACKUP", "Git common directory is unavailable");
   }
   const raw = String(result.stdout ?? "").trim();
@@ -981,6 +982,30 @@ export function planSessionCleanupRecovery({
       applyAction: null,
     }, scriptPath);
   }
+  if (binding.status === "orphan-bound") {
+    return {
+      schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+      status: "orphan-cleanup-required",
+      nextAction: {
+        kind: "command",
+        executable: "node",
+        argv: [
+          scriptPath,
+          "release-orphan-binding",
+          "--repo",
+          binding.root,
+          "--by",
+          "<operator>",
+          "--reason",
+          "release orphan session cleanup binding for discarded feature",
+        ],
+        mutation: true,
+        requiresConfirmation: false,
+        executionBoundary: "local-process",
+        expected: { statuses: ["complete"] },
+      },
+    };
+  }
   if (new Set(["closed-unbound", "design-unbound"]).has(binding.status)) {
     const activeDescriptors = listDescriptors(binding.root);
     if (activeDescriptors.length === 0) {
@@ -1559,7 +1584,7 @@ function scratchDescriptorDirectory(root, deps) {
     shell: false,
     timeout: 5000,
   });
-  if (result?.status !== 0 || result?.error) {
+  if (!hasExpectedSpawnStatus(result, [0])) {
     fail("WT-SCRATCH-DESCRIPTOR", "Git common directory is unavailable");
   }
   const raw = String(result.stdout ?? "").trim();
@@ -1818,7 +1843,7 @@ function spawnWorktreeListPorcelain(root, deps) {
     shell: false,
     timeout: 5000,
   });
-  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  if (!hasExpectedSpawnStatus(result, [0]) || typeof result.stdout !== "string") return null;
   return result.stdout;
 }
 
@@ -2020,7 +2045,7 @@ function resolveMainWorktreePath(root, deps) {
     shell: false,
     timeout: 5000,
   });
-  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  if (!hasExpectedSpawnStatus(result, [0]) || typeof result.stdout !== "string") return null;
   const raw = result.stdout.trim();
   if (raw === "") return null;
   try { return realpathSync(raw); } catch { return null; }
@@ -2058,7 +2083,7 @@ function resolvePrimaryCheckoutRoot(root, deps) {
     shell: false,
     timeout: 5000,
   });
-  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  if (!hasExpectedSpawnStatus(result, [0]) || typeof result.stdout !== "string") return null;
   const raw = result.stdout.trim();
   if (raw === "") return null;
   let commonDir;
@@ -2104,7 +2129,7 @@ function spawnWorktreeStatusPorcelain(worktreePath, deps) {
     shell: false,
     timeout: 5000,
   });
-  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  if (!hasExpectedSpawnStatus(result, [0]) || typeof result.stdout !== "string") return null;
   return result.stdout;
 }
 
@@ -2121,7 +2146,7 @@ function spawnHeadContainedInLocalBranch(root, headSha, deps) {
     shell: false,
     timeout: 5000,
   });
-  if (result?.status !== 0 || result?.error || typeof result.stdout !== "string") return null;
+  if (!hasExpectedSpawnStatus(result, [0]) || typeof result.stdout !== "string") return null;
   return result.stdout.trim() !== "";
 }
 
@@ -2472,7 +2497,7 @@ export function retireRegisteredWorktrees({ rootDir, deps = {}, restrictToPipeli
       shell: false,
       timeout: 15000,
     });
-    if (result?.status !== 0 || result?.error) {
+    if (!hasExpectedSpawnStatus(result, [0])) {
       retained.push({ ...entry, status: "removal-failed" });
       continue;
     }

@@ -32,6 +32,11 @@ export const CODEX_HOST_REPOSITORY_INIT_INTENT = `${CODEX_HOST_REPOSITORY_INIT_D
 export const CODEX_HOST_REPOSITORY_INIT_RECEIPT = `${CODEX_HOST_REPOSITORY_INIT_DIRECTORY}/receipt.json`;
 export const CODEX_HOST_REPOSITORY_INIT_MARKER = `${CODEX_HOST_REPOSITORY_INIT_DIRECTORY}/marker.json`;
 const REQUIRED_CODEX_HOST_CONTROL_PATHS = Object.freeze([".codex", ".git"]);
+const CODEX_PROJECT_AGENT_PROFILES = Object.freeze([
+  "consult-advisor.toml",
+  "critic.toml",
+  "implementor.toml",
+]);
 function projectAuthorityPaths(root) {
   const authority = resolveProjectAuthorityPaths({ rootDir: root });
   if (authority.status === "ready") return authority;
@@ -58,6 +63,27 @@ function readonlyEmptyDirectory(root, name, { access = accessSync, fsConstants =
     if (!info.isDirectory() || info.isSymbolicLink() || readdir(path).length !== 0) return false;
     try { access(path, fsConstants.W_OK); return false; } catch { return true; }
   } catch { return false; }
+}
+
+// A normal Codex project may retain its local runtime configuration while the
+// host projects only .git as read-only.  Treat only this exact configuration
+// shape as equivalent to the empty protected .codex mount; an arbitrary
+// non-empty .codex directory remains a closed near miss.
+function codexProjectRuntimeDirectory(root, { lstat = lstatSync, readdir = readdirSync } = {}) {
+  const codex = join(root, ".codex");
+  const agents = join(codex, "agents");
+  if (!physicalDirectory(codex, { lstat })
+    || !physicalRegularFile(join(codex, "config.toml"), { lstat })
+    || !physicalDirectory(agents, { lstat })) return false;
+  try {
+    const topLevel = readdir(codex).sort();
+    const profiles = readdir(agents).sort();
+    return JSON.stringify(topLevel) === JSON.stringify(["agents", "config.toml"])
+      && JSON.stringify(profiles) === JSON.stringify([...CODEX_PROJECT_AGENT_PROFILES].sort())
+      && CODEX_PROJECT_AGENT_PROFILES.every((name) => physicalRegularFile(join(agents, name), { lstat }));
+  } catch {
+    return false;
+  }
 }
 
 function sha256(bytes) {
@@ -547,12 +573,17 @@ export function hasCodexExistingGitControlMount(root, {
   readFile = readFileSync,
   readdir = readdirSync,
 } = {}) {
-  if (!readonlyEmptyDirectory(root, ".codex", {
+  const protectedRuntimeMount = readonlyEmptyDirectory(root, ".codex", {
     access, fsConstants, lstat, readdir,
-  })) return false;
+  });
+  const projectRuntimeLayout = codexProjectRuntimeDirectory(root, { lstat, readdir });
+  if (!protectedRuntimeMount && !projectRuntimeLayout) return false;
   const git = join(root, ".git");
   if (!physicalDirectory(git, { lstat })) return false;
   try { access(git, fsConstants.W_OK); return false; } catch {}
+  if (physicalRegularFile(join(git, "agent-pipeline", "onboarding", "continuity-history.json"), { lstat })) {
+    return false;
+  }
   if (![join(git, "objects"), join(git, "refs")]
     .every((path) => physicalDirectory(path, { lstat }))) return false;
   const head = join(git, "HEAD");

@@ -1,13 +1,70 @@
 {
   "schema": "pipeline.adoption-state.v1",
-  "state": "approved-scoped",
-  "scope": "architecture/map/",
-  "decidedAt": "2026-09-14T07:44:00.000Z",
+  "state": "deferred",
+  "scope": [
+    "specs/sprint-alfred-epic/"
+  ],
+  "decidedAt": "2026-09-20T14:11:56.000Z",
   "expiresAt": null,
-  "reviewDate": null,
-  "decisionRef": "PO-DECISION-ALFRED-D4",
-  "rationale": "Sprint Alfred full dogfood adoption covering core modules: pipeline-core, harness, schemas, backlog",
+  "reviewDate": "2026-10-20",
+  "decisionRef": "po-0.7.0-release-defer-2026-09-20",
+  "rationale": "PO defers architecture adoption until after the 0.7.0 release; the current candidate and its bound planning package are bounded repair work.",
   "coverageClass": "evaluated",
   "confidence": "measured",
-  "by": "PO"
+  "by": "André",
+  "authority": {
+    "mode": "signature",
+    "request": {
+      "schema": "pipeline.adoption-approval-request.v1",
+      "mode": "signature",
+      "intent": {
+        "value": {
+          "schema": "pipeline.po-approval-intent.v1",
+          "kind": "architecture-adoption",
+          "featureId": "architecture-adoption",
+          "planSha256": "1c100487a78c103b7075fb50bc7c8f068fb86bf5a3f04a0faa4e9edd51c721ef",
+          "specSha256": "a3e84c723b1b8c920f34bec1cdb8d195b6b007ac6ccec19f00d25fe432a64c06",
+          "candidate": {
+            "commit": "297d5d06959f29fb36d8c68c5e675298be364dce",
+            "tree": "d9cefd58629f9de5248af258def756dba8bfceee"
+          },
+          "policyRevision": "adoption-authority-v1",
+          "subjectSha256": "8838c8507ae7567da0f05453b7f65351ee5eed64b197039151a16a08dc0da17a",
+          "decision": "deferred"
+        },
+        "sha256": "9d63189d9c1dba62bbca4f2c7487013eaa43ea0a014005edb5a84c38011c01fb"
+      },
+      "subject": {
+        "repositoryFingerprint": "7d3e1210c7f22b6e7c83c214083c8c844098c049f46b796e116c214acf6fb5d3",
+        "decision": "deferred",
+        "scope": [
+          "specs/sprint-alfred-epic/"
+        ],
+        "rationale": "PO defers architecture adoption until after the 0.7.0 release; the current candidate and its bound planning package are bounded repair work.",
+        "decidedAt": "2026-09-20T14:11:56.000Z",
+        "expiresAt": null,
+        "reviewDate": "2026-10-20",
+        "decisionRef": "po-0.7.0-release-defer-2026-09-20",
+        "candidate": {
+          "commit": "297d5d06959f29fb36d8c68c5e675298be364dce",
+          "tree": "d9cefd58629f9de5248af258def756dba8bfceee"
+        },
+        "profileSha256": "03102ea369d0300ff2aca3ec42f2e7ec55c44784faf45b3d51ee2632f3e2d6b8",
+        "modelSha256": "6ea3d36c4553f4e7979dfdfbbd55ac862e3aaa5801d24a2a36e5ce5cb0db6406",
+        "moduleSnapshotSha256": "02d52b4f14562050068ed49e66bf77e573611b078990b64018893bd6faa5eabb"
+      },
+      "subjectSha256": "8838c8507ae7567da0f05453b7f65351ee5eed64b197039151a16a08dc0da17a"
+    },
+    "proof": {
+      "schema": "pipeline.po-approval-proof.v1",
+      "intentSha256": "9d63189d9c1dba62bbca4f2c7487013eaa43ea0a014005edb5a84c38011c01fb",
+      "keyReference": "local-po-key",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
+      "signatureBase64": "A+8MrF9/03MN8gmldhLdDZ3cJ8seKb7nY5A9Euebql5Xu+60W8TL5qoBEm/VcisYZs+GrcvVps7gK1h6a65CAA=="
+    },
+    "signer": {
+      "keyReference": "local-po-key",
+      "publicKeySha256": "2de20a39d0f1c13c15350e428ea0c70be50f8fbca26ec88758a8dcb1a880beee"
+    }
+  }
 }

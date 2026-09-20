@@ -18,10 +18,16 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  inspectProjectOnboardingV3,
+} from "../lib/project-onboarding-v3.mjs";
+import {
+  applyOrphanSessionCleanupBindingRelease,
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
+  planOrphanSessionCleanupBindingRelease,
+  observeSessionCleanupState,
   readOnboardingSessionCleanupBinding,
 } from "../lib/onboarding-continuity.mjs";
 import {
@@ -2312,6 +2318,663 @@ test("orphan scratch retirement detects PID reuse via processIdentity and never 
     });
     assert.equal(retired.retiredCount, 1);
     assert.equal(existsSync(join(root, bound.scratchRelativePath)), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("release-orphan-binding cleanly releases private binding for a discarded feature", () => {
+  const root = neutralFixture("release-orphan-binding-cli");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-orphan-cli"]);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    assert.equal(existsSync(bindingPath), true);
+    const statePath = join(root, "project", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    const discardedFeatureId = state.activeFeature.id;
+    const discardedAt = new Date().toISOString();
+    state.discardedFeatures = [{
+      id: discardedFeatureId,
+      planPath: state.activeFeature.planPath,
+      phaseAtDiscard: "design",
+      discardedAt,
+      discardedBy: "PO",
+      reason: "discarded for test",
+      forCommit: null,
+    }];
+    delete state.activeFeature;
+    delete state.continuity;
+    state.planApproved = false;
+    state.updatedAt = discardedAt;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    // Retire descriptor
+    unlinkSync(loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    }).path);
+
+    const released = invoke([
+      "release-orphan-binding",
+      "--repo", root,
+      "--by", "PO",
+      "--reason", "releasing orphan for discarded feature",
+    ]);
+    assert.equal(released.code, 0);
+    assert.equal(released.output.code, "WT-SESSION-ORPHAN-BINDING-RELEASED");
+    assert.equal(released.output.status, "released");
+    assert.equal(existsSync(bindingPath), false);
+
+    const after = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(after.status, "released");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("HA deadlock regression: discard-feature -> leftover binding -> set-feature -> release-orphan-binding returns to ready", () => {
+  const root = neutralFixture("ha-orphan-deadlock-recovery");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-ha-deadlock"]);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    assert.equal(existsSync(bindingPath), true);
+    const statePath = join(root, "project", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    const oldFeatureId = state.activeFeature.id;
+    const discardedAt = new Date().toISOString();
+    
+    // Simulate discard-feature with leftover binding
+    state.discardedFeatures = [{
+      id: oldFeatureId,
+      planPath: state.activeFeature.planPath,
+      phaseAtDiscard: "design",
+      discardedAt,
+      discardedBy: "PO",
+      reason: "superseded",
+      forCommit: null,
+    }];
+    delete state.activeFeature;
+    delete state.continuity;
+    state.planApproved = false;
+    state.updatedAt = discardedAt;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    // Remove descriptor so no active descriptor blocks release
+    unlinkSync(loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    }).path);
+
+    // Now set new design feature (activeFeature present, continuity undefined)
+    const newFeatureId = "feature-ha-repaired";
+    mkdirSync(join(root, "specs", "ha"), { recursive: true });
+    writeFileSync(join(root, "specs", "ha", "prd.md"), "# HA Spec\n");
+    state.activeFeature = {
+      id: newFeatureId,
+      planPath: "specs/ha/prd.md",
+      phase: "design",
+    };
+    state.updatedAt = new Date().toISOString();
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    // observeSessionCleanupState / readOnboardingSessionCleanupBinding must NOT throw SESSION-CLEANUP-PRIVATE-CAS!
+    const observedBinding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(observedBinding.status, "orphan-bound");
+    assert.equal(observedBinding.orphanBinding.featureId, oldFeatureId);
+
+    // Release the orphan binding via CLI
+    const released = invoke([
+      "release-orphan-binding",
+      "--repo", root,
+      "--by", "PO",
+      "--reason", "resolving orphan binding from old feature",
+    ]);
+    assert.equal(released.code, 0);
+    assert.equal(existsSync(bindingPath), false);
+
+    // Binding is now design-unbound
+    const postReleaseBinding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(postReleaseBinding.status, "design-unbound");
+
+    // Session cleanup recovery plan needs nothing
+    const recoveryPlan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(recoveryPlan.status, "not-needed");
+
+    // observeSessionCleanupState succeeds without throwing SESSION-CLEANUP-PRIVATE-CAS
+    const observedCleanState = observeSessionCleanupState(root);
+    assert.equal(observedCleanState.mode, "active");
+    assert.equal(observedCleanState.sessionCleanup, null);
+    assert.equal(observedCleanState.privateBinding, null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+test("exact stale binding + exact not-live descriptor: advertised route succeeds and inspect reaches ready", () => {
+  const root = neutralFixture("exact-stale-binding-not-live-descriptor");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-stale-not-live"]);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    assert.equal(existsSync(bindingPath), true);
+    const descriptorPath = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    }).path;
+    assert.equal(existsSync(descriptorPath), true);
+
+    const statePath = join(root, "project", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    const oldFeatureId = state.activeFeature.id;
+    const discardedAt = new Date().toISOString();
+    state.discardedFeatures = [{
+      id: oldFeatureId,
+      planPath: state.activeFeature.planPath,
+      phaseAtDiscard: "design",
+      discardedAt,
+      discardedBy: "PO",
+      reason: "discarded",
+      forCommit: null,
+    }];
+    delete state.activeFeature;
+    delete state.continuity;
+    state.planApproved = false;
+    state.updatedAt = discardedAt;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    const deps = {
+      inspectSessionOwnerRuntimeFn(startPath, sessionId, options) {
+        return {
+          schema: "pipeline.session-owner-status.v1",
+          sessionId,
+          descriptorSha256: started.output.descriptorSha256,
+          status: "not-live",
+        };
+      },
+    };
+
+    const plan = invoke(["plan-human-recovery", "--repo", root], deps).output;
+    assert.equal(plan.status, "decision-required");
+    const attended = plan.candidates.find((c) => c.id === "attended-host-recovery");
+    assert.ok(attended, "attended-host-recovery should be offered");
+    assert.ok(attended.command.includes("release-orphan-binding"));
+
+    const released = invoke([
+      "release-orphan-binding",
+      "--repo", root,
+      "--by", "PO",
+      "--reason", "retire stale not-live session descriptor and binding",
+    ], deps);
+    assert.equal(released.code, 0);
+    assert.equal(released.output.status, "released");
+    assert.equal(existsSync(bindingPath), false);
+    assert.equal(existsSync(descriptorPath), false);
+
+    const backupDir = join(root, ".git", "agent-pipeline", "session-cleanup-recovery", "backups");
+    assert.equal(existsSync(backupDir), true);
+
+    const after = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(after.status, "released");
+    const observed = observeSessionCleanupState(root);
+    assert.equal(observed.sessionCleanup, null);
+    assert.equal(observed.privateBinding, null);
+    assert.equal(invoke(["plan-recovery", "--repo", root]).output.status, "not-needed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("exact stale binding + live descriptor: refused, descriptor and binding unchanged", () => {
+  const root = neutralFixture("exact-stale-binding-live-descriptor");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-stale-live"]);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    const descriptorPath = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    }).path;
+    const beforeBinding = readFileSync(bindingPath);
+    const beforeDescriptor = readFileSync(descriptorPath);
+
+    const statePath = join(root, "project", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.discardedFeatures = [{
+      id: state.activeFeature.id,
+      planPath: state.activeFeature.planPath,
+      phaseAtDiscard: "design",
+      discardedAt: new Date().toISOString(),
+      discardedBy: "PO",
+      reason: "discarded",
+      forCommit: null,
+    }];
+    delete state.activeFeature;
+    delete state.continuity;
+    state.planApproved = false;
+    state.updatedAt = state.discardedFeatures.at(-1).discardedAt;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    const deps = {
+      inspectSessionOwnerRuntimeFn(startPath, sessionId, options) {
+        return {
+          schema: "pipeline.session-owner-status.v1",
+          sessionId,
+          descriptorSha256: started.output.descriptorSha256,
+          status: "live",
+        };
+      },
+    };
+
+    const plan = invoke(["plan-human-recovery", "--repo", root], deps).output;
+    assert.equal(plan.candidates.some((c) => c.id === "attended-host-recovery"), false);
+
+    assert.throws(() => {
+      invoke([
+        "release-orphan-binding",
+        "--repo", root,
+        "--by", "PO",
+        "--reason", "should fail because live",
+      ], deps);
+    }, (err) => err.code === "SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE");
+
+    assert.deepEqual(readFileSync(bindingPath), beforeBinding);
+    assert.deepEqual(readFileSync(descriptorPath), beforeDescriptor);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("reused PID or unavailable owner status refuses orphan release without mutating state", () => {
+  for (const ownerStatus of ["reused", "unavailable"]) {
+    const root = neutralFixture(`stale-binding-${ownerStatus}`);
+    try {
+      const started = invoke(["start", "--repo", root, "--session", `session-${ownerStatus}`]);
+      const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+      const descriptorPath = loadSessionDescriptor(root, started.output.sessionId, {
+        expectedDescriptorSha256: started.output.descriptorSha256,
+      }).path;
+      const beforeBinding = readFileSync(bindingPath);
+      const beforeDescriptor = readFileSync(descriptorPath);
+
+      const statePath = join(root, "project", "pipeline-state.json");
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      state.discardedFeatures = [{
+        id: state.activeFeature.id,
+        planPath: state.activeFeature.planPath,
+        phaseAtDiscard: "design",
+        discardedAt: new Date().toISOString(),
+        discardedBy: "PO",
+        reason: "discarded",
+        forCommit: null,
+      }];
+      delete state.activeFeature;
+      delete state.continuity;
+      writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+      const deps = {
+        inspectSessionOwnerRuntimeFn(startPath, sessionId, options) {
+          return {
+            schema: "pipeline.session-owner-status.v1",
+            sessionId,
+            descriptorSha256: started.output.descriptorSha256,
+            status: ownerStatus,
+          };
+        },
+      };
+
+      const plan = invoke(["plan-human-recovery", "--repo", root], deps).output;
+      assert.equal(plan.candidates.some((c) => c.id === "attended-host-recovery"), false);
+
+      assert.throws(() => {
+        invoke([
+          "release-orphan-binding",
+          "--repo", root,
+          "--by", "PO",
+          "--reason", "should fail",
+        ], deps);
+      }, (err) => err.code === "SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE");
+
+      assert.deepEqual(readFileSync(bindingPath), beforeBinding);
+      assert.deepEqual(readFileSync(descriptorPath), beforeDescriptor);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("descriptor digest or session mismatch refuses orphan release without mutating state", () => {
+  const root = neutralFixture("descriptor-digest-mismatch");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-mismatch"]);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    const descriptorPath = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    }).path;
+    const beforeBinding = readFileSync(bindingPath);
+    const beforeDescriptor = readFileSync(descriptorPath);
+
+    const statePath = join(root, "project", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.discardedFeatures = [{
+      id: state.activeFeature.id,
+      planPath: state.activeFeature.planPath,
+      phaseAtDiscard: "design",
+      discardedAt: new Date().toISOString(),
+      discardedBy: "PO",
+      reason: "discarded",
+      forCommit: null,
+    }];
+    delete state.activeFeature;
+    delete state.continuity;
+    state.planApproved = false;
+    state.updatedAt = state.discardedFeatures.at(-1).discardedAt;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    const deps = {
+      listActiveSessionDescriptorsFn(repo) {
+        return [{
+          sessionId: started.output.sessionId,
+          descriptorSha256: "0".repeat(64),
+        }];
+      },
+      inspectSessionOwnerRuntimeFn(startPath, sessionId, options) {
+        return {
+          schema: "pipeline.session-owner-status.v1",
+          sessionId,
+          descriptorSha256: "0".repeat(64),
+          status: "not-live",
+        };
+      },
+    };
+
+    const plan = invoke(["plan-human-recovery", "--repo", root], deps).output;
+    assert.equal(plan.candidates.some((c) => c.id === "attended-host-recovery"), false);
+
+    assert.throws(() => {
+      invoke([
+        "release-orphan-binding",
+        "--repo", root,
+        "--by", "PO",
+        "--reason", "should fail due to digest mismatch",
+      ], deps);
+    }, (err) => err.code === "SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE");
+
+    assert.deepEqual(readFileSync(bindingPath), beforeBinding);
+    assert.deepEqual(readFileSync(descriptorPath), beforeDescriptor);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("unrelated active descriptor is not touched and prevents release-orphan-binding", () => {
+  const root = neutralFixture("unrelated-descriptor-recovery");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-orphan-first"]);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+
+    const statePath = join(root, "project", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.discardedFeatures = [{
+      id: state.activeFeature.id,
+      planPath: state.activeFeature.planPath,
+      phaseAtDiscard: "design",
+      discardedAt: new Date().toISOString(),
+      discardedBy: "PO",
+      reason: "discarded",
+      forCommit: null,
+    }];
+    delete state.activeFeature;
+    delete state.continuity;
+    state.planApproved = false;
+    state.updatedAt = state.discardedFeatures.at(-1).discardedAt;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    const unrelated = startSessionDescriptor(root, { sessionId: "session-unrelated" });
+    const unrelatedPath = unrelated.path;
+    assert.equal(existsSync(unrelatedPath), true);
+
+    const deps = {
+      inspectSessionOwnerRuntimeFn(startPath, sessionId, options) {
+        return {
+          schema: "pipeline.session-owner-status.v1",
+          sessionId,
+          descriptorSha256: options.expectedDescriptorSha256 ?? started.output.descriptorSha256,
+          status: "not-live",
+        };
+      },
+    };
+
+    const plan = invoke(["plan-human-recovery", "--repo", root], deps).output;
+    assert.equal(plan.candidates.some((c) => c.id === "attended-host-recovery"), false);
+
+    assert.throws(() => {
+      invoke([
+        "release-orphan-binding",
+        "--repo", root,
+        "--by", "PO",
+        "--reason", "should fail due to unrelated descriptor",
+      ], deps);
+    }, (err) => err.code === "SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE");
+
+    assert.equal(existsSync(unrelatedPath), true);
+    assert.equal(existsSync(bindingPath), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("interrupted transition between descriptor retirement and binding release converges safely on rerun", () => {
+  const root = neutralFixture("interrupted-orphan-recovery");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-interrupted"]);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    const descriptorPath = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    }).path;
+
+    const statePath = join(root, "project", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    const discardedAt = new Date().toISOString();
+    state.discardedFeatures = [{
+      id: state.activeFeature.id,
+      planPath: state.activeFeature.planPath,
+      phaseAtDiscard: "design",
+      discardedAt,
+      discardedBy: "PO",
+      reason: "discarded",
+      forCommit: null,
+    }];
+    delete state.activeFeature;
+    delete state.continuity;
+    state.planApproved = false;
+    state.updatedAt = discardedAt;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+    const crashDeps = {
+      inspectSessionOwnerRuntimeFn(startPath, sessionId, options) {
+        return {
+          schema: "pipeline.session-owner-status.v1",
+          sessionId,
+          descriptorSha256: started.output.descriptorSha256,
+          status: "not-live",
+        };
+      },
+      afterDescriptorRetire() {
+        throw new Error("simulated crash immediately after descriptor retirement");
+      },
+    };
+
+    assert.throws(() => {
+      invoke([
+        "release-orphan-binding",
+        "--repo", root,
+        "--by", "PO",
+        "--reason", "crash test",
+      ], crashDeps);
+    }, (err) => err.code === "SESSION-CLEANUP-ORPHAN-RELEASE-WRITE");
+
+    assert.equal(existsSync(descriptorPath), false);
+    assert.equal(existsSync(bindingPath), true);
+    const backupDir = join(root, ".git", "agent-pipeline", "session-cleanup-recovery", "backups");
+    assert.equal(existsSync(backupDir), true);
+
+    const normalDeps = {
+      inspectSessionOwnerRuntimeFn(startPath, sessionId, options) {
+        return {
+          schema: "pipeline.session-owner-status.v1",
+          sessionId,
+          descriptorSha256: started.output.descriptorSha256,
+          status: "not-live",
+        };
+      },
+    };
+
+    const rerun = invoke([
+      "release-orphan-binding",
+      "--repo", root,
+      "--by", "PO",
+      "--reason", "converge after crash",
+    ], normalDeps);
+    assert.equal(rerun.code, 0);
+    assert.equal(rerun.output.status, "released");
+    assert.equal(rerun.output.receipt.reason, "crash test");
+    assert.equal(existsSync(bindingPath), false);
+
+    const after = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(after.status, "released");
+    const observed = observeSessionCleanupState(root);
+    assert.equal(observed.sessionCleanup, null);
+    assert.equal(observed.privateBinding, null);
+    assert.equal(invoke(["plan-recovery", "--repo", root]).output.status, "not-needed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function plannedDiscardState(root, by = "PO", reason = "planned discard") {
+  const statePath = join(root, "project", "pipeline-state.json");
+  const beforeBytes = readFileSync(statePath);
+  const state = JSON.parse(beforeBytes.toString("utf8"));
+  const featureId = state.activeFeature.id;
+  const discardedAt = "2026-09-20T08:00:00.000Z";
+  state.discardedFeatures = [{
+    id: featureId,
+    planPath: state.activeFeature.planPath,
+    phaseAtDiscard: state.activeFeature.phase,
+    discardedAt,
+    discardedBy: by,
+    reason,
+    forCommit: null,
+  }];
+  delete state.activeFeature;
+  delete state.continuity;
+  state.planApproved = false;
+  state.updatedAt = discardedAt;
+  const afterBytes = Buffer.from(`${JSON.stringify(state, null, 2)}\n`);
+  return {
+    statePath,
+    featureId,
+    beforeSha256: createHash("sha256").update(beforeBytes).digest("hex"),
+    afterSha256: createHash("sha256").update(afterBytes).digest("hex"),
+    afterBytes,
+  };
+}
+
+test("orphan release plan is read-only and apply refuses until the exact discarded State postimage commits", () => {
+  const root = neutralFixture("orphan-release-plan-postimage");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-plan-postimage"]);
+    const descriptor = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    });
+    unlinkSync(descriptor.path);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    const bindingBefore = readFileSync(bindingPath);
+    const discard = plannedDiscardState(root);
+    const plan = planOrphanSessionCleanupBindingRelease({
+      rootDir: root,
+      by: "PO",
+      reason: "planned discard",
+      featureId: discard.featureId,
+      expectedStateAfterSha256: discard.afterSha256,
+      deps: { now() { return "2026-09-20T08:00:01.000Z"; } },
+    });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.stateBeforeSha256, discard.beforeSha256);
+    assert.equal(plan.stateAfterSha256, discard.afterSha256);
+    assert.deepEqual(readFileSync(bindingPath), bindingBefore);
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-release-receipt.json")), false);
+
+    assert.throws(() => applyOrphanSessionCleanupBindingRelease({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+    }), (error) => error.code === "SESSION-CLEANUP-RELEASE-CAS" && error.committed === false);
+    assert.deepEqual(readFileSync(bindingPath), bindingBefore);
+
+    writeFileSync(discard.statePath, discard.afterBytes);
+    const applied = applyOrphanSessionCleanupBindingRelease({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+    });
+    assert.equal(applied.status, "released");
+    assert.equal(applied.receipt.stateSha256, discard.afterSha256);
+    assert.equal(existsSync(bindingPath), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("orphan release apply replays the same exact plan after a crash following receipt commit", () => {
+  const root = neutralFixture("orphan-release-plan-replay");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-plan-replay"]);
+    unlinkSync(loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    }).path);
+    const discard = plannedDiscardState(root);
+    const plan = planOrphanSessionCleanupBindingRelease({
+      rootDir: root,
+      by: "PO",
+      reason: "planned discard",
+      featureId: discard.featureId,
+      expectedStateAfterSha256: discard.afterSha256,
+      deps: { now() { return "2026-09-20T08:00:01.000Z"; } },
+    });
+    writeFileSync(discard.statePath, discard.afterBytes);
+    assert.throws(() => applyOrphanSessionCleanupBindingRelease({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      deps: { afterReceiptWrite() { throw new Error("simulated receipt crash"); } },
+    }), (error) => error.code === "SESSION-CLEANUP-ORPHAN-RELEASE-WRITE" && error.committed === true);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    assert.equal(existsSync(bindingPath), true);
+
+    const replay = applyOrphanSessionCleanupBindingRelease({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+    });
+    assert.equal(replay.status, "released");
+    assert.equal(replay.receipt.stateSha256, discard.afterSha256);
+    assert.equal(existsSync(bindingPath), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("binding-absent orphan release plan is a digest-bound zero-write replay", () => {
+  const root = neutralFixture("orphan-release-plan-no-binding");
+  try {
+    const discard = plannedDiscardState(root);
+    writeFileSync(discard.statePath, discard.afterBytes);
+    const plan = planOrphanSessionCleanupBindingRelease({
+      rootDir: root,
+      by: "PO",
+      reason: "planned discard",
+      featureId: discard.featureId,
+    });
+    assert.equal(plan.status, "not-needed");
+    const applied = applyOrphanSessionCleanupBindingRelease({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+    });
+    assert.equal(applied.status, "released");
+    assert.equal(applied.mutated, false);
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-release-receipt.json")), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

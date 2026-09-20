@@ -418,12 +418,15 @@ import {
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import { inspectArchitectureEntryReadiness } from "../lib/architecture-entry-readiness.mjs";
+import { designAdvisoryAdmission } from "../lib/guard-devplan-policy.mjs";
 import { materializeArchitectureDesign } from "../lib/architecture-design.mjs";
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import {
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
   bindPlanSpecApproval,
+  cancelMixedPlanState,
+  cancelSubmittedPlan,
   canonicalJson as canonicalPhxJson,
   derivePlanLifecycle,
   enterPlanImplementation,
@@ -502,9 +505,11 @@ import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
+  applyOrphanSessionCleanupBindingRelease,
   nextActionSection,
   observeBootstrapBindAcknowledgement,
   observeOnboardingBootstrapPlanApproval,
+  planOrphanSessionCleanupBindingRelease,
   readOnboardingIntakeCheckpoint,
   syncStateMdNextAction,
 } from "../lib/onboarding-continuity.mjs";
@@ -687,7 +692,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 const PIPELINE_STATE_COMMANDS = Object.freeze([
   "materialize-architecture",
   "inspect",
-  "set-feature", "submit-plan", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+  "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
@@ -918,6 +923,28 @@ function writeState(dir, state, expectedState, options = {}) {
         return transition === undefined ? failed : { ...failed, transition };
       }
     }
+    let afterCommit;
+    if (written.ok && options.afterCommit) {
+      try {
+        afterCommit = options.afterCommit({
+          state: options.preserveGateEstimate === true
+            ? nextState
+            : clearGateEstimateForMutation(nextState),
+        });
+      } catch (error) {
+        afterCommit = {
+          ok: false,
+          status: "failed",
+          code: typeof error?.code === "string" ? error.code : "PS-AFTER-COMMIT",
+          privateCommitted: error?.committed === true,
+        };
+      }
+      if (!afterCommit?.ok) {
+        const failed = { ok: false, committed: true, code: afterCommit?.code ?? "PS-AFTER-COMMIT", afterCommit };
+        return transition === undefined ? failed : { ...failed, transition };
+      }
+    }
+    if (afterCommit !== undefined) written.afterCommit = afterCommit;
     return transition === undefined ? written : { ...written, transition };
   } finally {
     if (!reusedLock) releaseContinuityLock(lock);
@@ -3613,6 +3640,8 @@ function resolvePushThreatModelArtifact(dir) {
 /** Delivery profiles `submit-plan --profile` accepts; mirrors the case handler's own literal. */
 const DRAFT_PLAN_PROFILES = new Set(["epic", "feature", "mini"]);
 const PLAN_APPROVER_NAME_PLACEHOLDER = "<PO_PLAN_APPROVER_NAME>";
+const MIXED_PLAN_RECOVERY_BY_PLACEHOLDER = "<MIXED_PLAN_RECOVERY_ACTOR>";
+const MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER = "<MIXED_PLAN_RECOVERY_REASON>";
 
 /**
  * NVA-Q2-DRAFTDERIVE: the `draft` gate previously always asked a human for
@@ -3741,7 +3770,69 @@ function resolveDraftProfileReceiptAction(dir, deps = {}) {
   };
 }
 
+function mixedPlanRecoveryObservation(state) {
+  if (state?.activeFeature?.phase !== "design" || state.planApproved !== false
+    || state.planSubmission === null || typeof state.planSubmission !== "object"
+    || state.planApproval === null || typeof state.planApproval !== "object"
+    || state.planInvalidation === null || typeof state.planInvalidation !== "object") return null;
+  try {
+    const observation = {
+      submissionSha256: sha256CanonicalJson(state.planSubmission),
+      approvalSha256: sha256CanonicalJson(state.planApproval),
+      invalidationSha256: sha256CanonicalJson(state.planInvalidation),
+    };
+    const eligible = cancelMixedPlanState({
+      state,
+      expectedStateSha256: sha256CanonicalJson(state),
+      expectedSubmissionSha256: observation.submissionSha256,
+      expectedApprovalSha256: observation.approvalSha256,
+      expectedInvalidationSha256: observation.invalidationSha256,
+      by: "pipeline-state inspection",
+      at: "1970-01-01T00:00:00.000Z",
+      reason: "read-only mixed-plan recovery eligibility probe",
+    });
+    return eligible.ok && !eligible.replay ? observation : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+  const mixed = mixedPlanRecoveryObservation(state);
+  if (mixed !== null) {
+    const scriptPath = fileURLToPath(import.meta.url);
+    const rendered = boundedCopySafeCommand({
+      executable: process.execPath,
+      argv: [
+        scriptPath, "cancel-mixed-plan-state",
+        "--by", placeholder(MIXED_PLAN_RECOVERY_BY_PLACEHOLDER),
+        "--reason", placeholder(MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER),
+        "--submission-sha256", mixed.submissionSha256,
+        "--approval-sha256", mixed.approvalSha256,
+        "--invalidation-sha256", mixed.invalidationSha256,
+      ],
+    });
+    return {
+      kind: "collect-input",
+      inputs: [
+        { name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true },
+        { name: "reason", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 500, singleLine: true, rejectNul: true },
+      ],
+      mutation: false,
+      requiresConfirmation: false,
+      guidance: "State contains a current successor submission plus a retained invalidated historical approval."
+        + ` Collect the recovery actor and reason, replace exactly ${MIXED_PLAN_RECOVERY_BY_PLACEHOLDER}`
+        + ` and ${MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER} in applyAction.argv, then execute that exact action.`
+        + " Ordinary cancel-submitted-plan does not apply to this state.",
+      applyAction: {
+        kind: "command",
+        ...rendered,
+        mutation: true,
+        requiresConfirmation: true,
+      },
+      expected: { schema: INSPECT_SCHEMA, statuses: ["draft"] },
+    };
+  }
   if (!lifecycle.ok || lifecycle.status === null) return null;
   if (lifecycle.status === "draft") {
     const profileAction = resolveDraftProfileReceiptAction(dir, deps);
@@ -3815,6 +3906,24 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
       };
     }
+    if (["epic", "feature"].includes(submission.profile)) {
+      const advisor = (deps.designAdvisoryAdmission ?? designAdvisoryAdmission)(state, dir, submission.planPath, submission.specPath);
+      if (!advisor?.ok || !SHA256_RE.test(advisor.id ?? "")) {
+        const code = advisor?.code ?? "DAA-PRIVATE-INVALID";
+        return {
+          kind: "collect-input",
+          inputs: [
+            { name: "runner", encoding: "utf8", trim: true, minBytes: 5, maxBytes: 11, singleLine: true, rejectNul: true },
+            { name: "decision", encoding: "utf8", trim: true, minBytes: 6, maxBytes: 7, singleLine: true, rejectNul: true },
+            { name: "rationale-file", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 500, singleLine: true, rejectNul: true },
+          ],
+          mutation: false,
+          requiresConfirmation: false,
+          guidance: `Before final PO approval, this ${submission.profile} requires a current design Advisor admission (${code}). Ask for the current runner, accept/decline decision, and a nonempty rationale file below scratch/, then run design-advisory-coordinator.mjs for this exact Plan/Spec and inspect again.`,
+          expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+        };
+      }
+    }
     const scriptPath = fileURLToPath(import.meta.url);
     // A committed repository-wide human approval policy owns plan approval as
     // well as push approval.  Its acknowledgement is the one human decision
@@ -3831,7 +3940,11 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     // preserves legacy projects with no shared-policy key and no receipt,
     // while closing the bypass where a fresh default-signature project had a
     // valid proof but inspection reopened `approve-plan --by`.
-    if (humanMode !== null && (humanMode?.scope === "global" || humanMode?.scope === "default")) {
+    const bootstrapReceiptRequired = humanMode?.mode === "signature"
+      || state.bootstrapAcknowledgementRequired === true;
+    if (humanMode !== null
+      && (humanMode?.scope === "global" || humanMode?.scope === "default")
+      && bootstrapReceiptRequired) {
       let acknowledgement;
       try {
         acknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
@@ -6621,13 +6734,23 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   try { prdText = new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes); } catch { return { ok: false, code: "PO-ACK-PRD-MARKER" }; }
   const acknowledgementMarkers = [...prdText.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
   if (acknowledgementMarkers.length > 1) return { ok: false, code: "PO-ACK-MARKER-DUPLICATE" };
-  if (acknowledgementMarkers.length === 1) return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
+  const marker = rebindMarker(prdText);
+  const acknowledgedStaleSpec = acknowledgementMarkers.length === 1
+    && marker !== null && marker.digest !== spec.sha256;
+  if (acknowledgementMarkers.length === 1 && !acknowledgedStaleSpec) {
+    return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
+  }
   const continuity = eligibleAcknowledgeContinuity(state, prd, spec);
   if (continuity === null) return { ok: false, code: "PO-ACK-CONTINUITY" };
   const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
   const currentProfile = validCurrentPoProfile(profile);
   if (currentProfile === null) return { ok: false, code: "PO-ACK-PROFILE" };
-  const nextPrdBytes = appendAcknowledgementMarker(prd.bytes);
+  // A draft may retain a genuine PO acknowledgement while its technical Spec
+  // marker became stale before the first submission. The same attended,
+  // attributed acknowledgement rebinds only that computed marker.
+  const nextPrdBytes = acknowledgedStaleSpec
+    ? replaceRebindMarker(prd.bytes, marker, spec.sha256)
+    : appendAcknowledgementMarker(prd.bytes);
   if (nextPrdBytes === null) return { ok: false, code: "PO-ACK-PRD-MARKER" };
   const nextPrdSha256 = sha256Bytes(nextPrdBytes);
   const nextAuthority = {
@@ -9361,6 +9484,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.planRevocation;
       delete next.planSubmission;
       delete next.planInvalidation;
+      delete next.planCancellation;
+      delete next.planMixedStateRecovery;
       delete next.phase; // F1 fix: strip any legacy top-level `phase` left over from a
       // pre-fix file -- phase now lives exclusively at activeFeature.phase.
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
@@ -9653,6 +9778,104 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return 0;
     }
 
+
+    // NVA-G19: withdrawing a current submission is separate from revoking a
+    // granted approval. This only creates a cancellation receipt and cannot
+    // create or alter an approval.
+    case "cancel-submitted-plan": {
+      const parsed = parseExactFlags(rest, new Set(["by", "submission-sha256"]));
+      const by = parsed.ok ? parsed.value.by : undefined;
+      const expectedSubmissionSha256 = parsed.ok ? parsed.value["submission-sha256"] : undefined;
+      if (!parsed.ok || isBlank(by) || !SHA256_RE.test(expectedSubmissionSha256 ?? "")) {
+        console.error("Error: cancel-submitted-plan requires exactly --by <name> --submission-sha256 <64-lowercase-hex>.");
+        return 2;
+      }
+      const prior = base.planCancellation;
+      const retainedReplayTimestamp = prior !== null && typeof prior === "object"
+        && prior.submissionSha256 === expectedSubmissionSha256 && prior.cancelledBy === by
+        ? prior.cancelledAt
+        : null;
+      let cancelledAt;
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          cancelledAt = retainedReplayTimestamp ?? now();
+          const transition = cancelSubmittedPlan({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+            expectedSubmissionSha256,
+            by,
+            at: cancelledAt,
+          });
+          return transition.ok && !transition.replay
+            ? { ...transition, state: { ...transition.state, updatedAt: cancelledAt } }
+            : transition;
+        },
+        allowContinuityAdvance: true,
+        requirePhysicalReadback: true,
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: cancel-submitted-plan failed before commit (${written.code}); no cancellation was recorded.`);
+        return 2;
+      }
+      if (!written.replay) syncNextActionDocs(dir, written.transition.state);
+      console.log(written.replay
+        ? "Submitted plan is already cancelled; exact zero-write replay accepted."
+        : `Submitted plan cancelled by \"${by}\" on ${cancelledAt}; lifecycle=\"draft\".`);
+      return 0;
+    }
+
+    case "cancel-mixed-plan-state": {
+      const parsed = parseExactFlags(rest, new Set([
+        "by", "reason", "submission-sha256", "approval-sha256", "invalidation-sha256",
+      ]));
+      const value = parsed.ok ? parsed.value : {};
+      if (!parsed.ok || isBlank(value.by) || isBlank(value.reason)
+        || !SHA256_RE.test(value["submission-sha256"] ?? "")
+        || !SHA256_RE.test(value["approval-sha256"] ?? "")
+        || !SHA256_RE.test(value["invalidation-sha256"] ?? "")) {
+        console.error("Error: cancel-mixed-plan-state requires exactly --by <name> --reason <text> --submission-sha256 <64-lowercase-hex> --approval-sha256 <64-lowercase-hex> --invalidation-sha256 <64-lowercase-hex>.");
+        return 2;
+      }
+      const prior = base.planMixedStateRecovery;
+      const retainedReplayTimestamp = prior !== null && typeof prior === "object"
+        && prior.submissionSha256 === value["submission-sha256"]
+        && prior.approvalSha256 === value["approval-sha256"]
+        && prior.invalidationSha256 === value["invalidation-sha256"]
+        && prior.recoveredBy === value.by
+        && prior.reason === value.reason
+        ? prior.recoveredAt
+        : null;
+      let recoveredAt;
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          recoveredAt = retainedReplayTimestamp ?? now();
+          const transition = cancelMixedPlanState({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+            expectedSubmissionSha256: value["submission-sha256"],
+            expectedApprovalSha256: value["approval-sha256"],
+            expectedInvalidationSha256: value["invalidation-sha256"],
+            by: value.by,
+            at: recoveredAt,
+            reason: value.reason,
+          });
+          return transition.ok && !transition.replay
+            ? { ...transition, state: { ...transition.state, updatedAt: recoveredAt } }
+            : transition;
+        },
+        allowContinuityAdvance: true,
+        requirePhysicalReadback: true,
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: cancel-mixed-plan-state failed before commit (${written.code}); no recovery was recorded.`);
+        return 2;
+      }
+      if (!written.replay) syncNextActionDocs(dir, written.transition.state);
+      console.log(written.replay
+        ? "Mixed plan state is already cancelled; exact zero-write replay accepted."
+        : `Mixed plan state cancelled by "${value.by}" on ${recoveredAt}; lifecycle="draft".`);
+      return 0;
+    }
     // NVA-R22-PLANSHOWN: the mechanical record that the plan/design content was
     // actually rendered to the human before approval -- run after submit-plan,
     // before approve-plan. See the PLAN_PRESENTATION_SCHEMA doc comment above for
@@ -9892,6 +10115,18 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error("Error: approve-plan requires a prior present-plan record bound to this exact submission -- an approval of unseen content is refused; run present-plan --by <name> first.");
         return 2;
       }
+      const advisorRequired = ["epic", "feature"].includes(base.planSubmission?.profile);
+      let designAdvisorAdmissionSha256 = null;
+      if (advisorRequired) {
+        const advisor = (deps.designAdvisoryAdmission ?? designAdvisoryAdmission)(
+          base, dir, authority.value.planPath, authority.value.specPath,
+        );
+        if (!advisor?.ok || !SHA256_RE.test(advisor.id ?? "")) {
+          console.error(`Error: approve-plan requires a current design Advisor admission for this ${base.planSubmission?.profile} (${advisor?.code ?? "DAA-PRIVATE-INVALID"}); complete the Advisor route before requesting final PO approval.`);
+          return 2;
+        }
+        designAdvisorAdmissionSha256 = advisor.id;
+      }
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
       const profileSha256 = sha256CanonicalJson(profile.value);
@@ -9901,7 +10136,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // bootstrapAcknowledgementRequired existed.  Otherwise an old-shaped
       // state in a signature repository could accept `--by` and bypass the
       // signed PRD/Spec acknowledgement entirely.
-      const usesSharedPolicy = approvalMode?.scope === "global";
+      const usesSharedPolicy = approvalMode?.scope === "global"
+        && (approvalMode.mode === "signature" || base.bootstrapAcknowledgementRequired === true);
       let by = approvalFlags.by;
       const receiptFlag = approvalFlags["bootstrap-acknowledgement-receipt"];
       // A global human-approval policy has exactly one policy-selected human
@@ -9950,6 +10186,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             profileSha256,
             by,
             at: approvedAt,
+            designAdvisorAdmissionSha256,
           });
           return transition.ok
             ? {
@@ -10744,6 +10981,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (continuityClose !== undefined) closedEntry.continuityClose = continuityClose;
       if (coordinatorClose !== undefined) closedEntry.coordinatorClose = coordinatorClose;
       if (auditReference !== undefined) closedEntry.auditReference = auditReference;
+      if (base.planCancellation !== undefined) closedEntry.planCancellation = base.planCancellation;
+      if (base.planMixedStateRecovery !== undefined) closedEntry.planMixedStateRecovery = base.planMixedStateRecovery;
       const next = {
         ...base,
         schema: SCHEMA_ID,
@@ -10756,6 +10995,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.planRevocation;
       delete next.planSubmission;
       delete next.planInvalidation;
+      delete next.planCancellation;
+      delete next.planMixedStateRecovery;
       delete next.continuity;
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
@@ -10798,10 +11039,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // already means the close ceremony is available, so this refuses for the same reason.
       // Never widen this to a heuristic ("was anything implemented").
       if (base.continuity === undefined) {
-        console.error('Error: discard-feature refused -- no active continuity gates this feature; close-feature is the route that is available (no Result requirement blocks it).');
-        return 2;
-      }
-      if (base.continuity.authority.result !== null) {
+        // A legacy state with no continuity cannot satisfy the current coordinator-close
+        // contract.  Record an honest discard instead of falsely advertising close-feature.
+      } else if (base.continuity.authority.result !== null) {
         console.error('Error: discard-feature refused -- continuity.authority.result already exists; close-feature is the route that is available.');
         return 2;
       }
@@ -10824,6 +11064,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         reason,
         forCommit: discardForCommit,
       };
+      if (base.planCancellation !== undefined) discardedEntry.planCancellation = base.planCancellation;
+      if (base.planMixedStateRecovery !== undefined) discardedEntry.planMixedStateRecovery = base.planMixedStateRecovery;
       const discardNext = {
         ...base,
         schema: SCHEMA_ID,
@@ -10836,8 +11078,69 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete discardNext.planRevocation;
       delete discardNext.planSubmission;
       delete discardNext.planInvalidation;
+      delete discardNext.planCancellation;
+      delete discardNext.planMixedStateRecovery;
       delete discardNext.continuity;
-      if (!stateWriteSucceeded(writeState(dir, discardNext, base))) {
+      const discardPostimage = clearGateEstimateForMutation(discardNext);
+      const discardPostimageSha256 = sha256Bytes(Buffer.from(`${JSON.stringify(discardPostimage, null, 2)}\n`));
+      const planRelease = deps.planOrphanSessionCleanupBindingReleaseFn
+        ?? planOrphanSessionCleanupBindingRelease;
+      const applyRelease = deps.applyOrphanSessionCleanupBindingReleaseFn
+        ?? applyOrphanSessionCleanupBindingRelease;
+      let releasePlan;
+      if (base.continuity === undefined || base.continuity?.runtime?.sessionCleanup == null) {
+        // Legacy state without a declared cleanup binding carries no private
+        // cleanup-binding contract, so there is no truthful release to plan.
+        releasePlan = { status: "not-needed" };
+      } else {
+        try {
+          releasePlan = planRelease({
+            rootDir: dir,
+            by,
+            reason,
+            featureId: activeFeature.id,
+            expectedStateAfterSha256: discardPostimageSha256,
+          });
+        } catch (error) {
+          const code = typeof error?.code === "string" ? error.code : "SESSION-CLEANUP-ORPHAN-RELEASE-FAILED";
+          console.error(`Error: discard-feature cleanup preflight refused before state commit (${code}); active feature and continuity were retained.`);
+          return 2;
+        }
+      }
+      const written = writeState(dir, discardNext, base, {
+        requirePhysicalReadback: true,
+        afterCommit() {
+          // A non-neutral legacy state has no private cleanup binding model. Its
+          // read-only plan explicitly proved that no release is needed, so never
+          // attempt a private runtime write after the public discard committed.
+          if (releasePlan.status === "not-needed") {
+            return { ok: true, status: "not-needed", release: null };
+          }
+          try {
+            const release = applyRelease({
+              plan: releasePlan,
+              expectedPlanSha256: releasePlan.planSha256,
+              stateLockHeld: true,
+            });
+            return { ok: true, status: "released", release };
+          } catch (error) {
+            return {
+              ok: false,
+              status: "orphan-cleanup-required",
+              code: typeof error?.code === "string"
+                ? error.code
+                : "SESSION-CLEANUP-ORPHAN-RELEASE-FAILED",
+              privateCommitted: error?.committed === true,
+            };
+          }
+        },
+      });
+      if (!written.ok) {
+        if (written.committed && written.afterCommit?.status === "orphan-cleanup-required") {
+          console.error(`Error: discard-feature public State committed; orphan-cleanup-required (${written.afterCommit.code}). Inspect session onboarding and replay the advertised release-orphan-binding action.`);
+        } else {
+          stateWriteSucceeded(written);
+        }
         return 2;
       }
       syncNextActionDocs(dir, discardNext);
@@ -11085,6 +11388,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         phase: base.activeFeature?.phase ?? null,
         planApproved: base.planApproved === true,
         lifecycle: { ok: lifecycle.ok, code: lifecycle.code, status: lifecycle.status },
+        mixedPlanRecovery: mixedPlanRecoveryObservation(base),
         pushApproval: base.pushApproval ?? null,
         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),

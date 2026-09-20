@@ -19,6 +19,7 @@ import {
 import { spawnSync } from "node:child_process";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
 import {
+  chmodSync,
   closeSync,
   constants,
   existsSync,
@@ -78,10 +79,15 @@ import { initializePoGateProfileReceipt, publishPoGateProfileReceipt } from "./p
 import { correctPromotedLanguage } from "./onboarding-language-correction.mjs";
 import {
   inspectSessionClosure,
+  inspectSessionOwnerRuntime,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
-import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+import {
+  derivePlanLifecycle,
+  validPlanCancellation,
+  validPlanMixedStateRecovery,
+} from "./plan-spec-state-v2.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 import { resolveRepoScopedDirectory } from "./po-key-directory.mjs";
@@ -101,6 +107,8 @@ export const SESSION_CLEANUP_RELEASE_PROOF_SCHEMA = "pipeline.session-cleanup-re
 export const SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.session-cleanup-release-receipt.v1";
 export const PRIVATE_SESSION_CLEANUP_BINDING_SCHEMA = "pipeline.private-session-cleanup-binding.v1";
 export const PRIVATE_SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.private-session-cleanup-release-receipt.v1";
+export const PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA = "pipeline.private-session-cleanup-orphan-release-receipt.v1";
+export const SESSION_CLEANUP_ORPHAN_RELEASE_PLAN_SCHEMA = "pipeline.session-cleanup-orphan-release-plan.v1";
 export const PRIVATE_SESSION_CLEANUP_RELEASE_QUARANTINE_SCHEMA = "pipeline.private-session-cleanup-release-quarantine.v1";
 export const SESSION_CLEANUP_PRIVATIZATION_PLAN_SCHEMA = "pipeline.session-cleanup-privatization-plan.v1";
 export const SESSION_CLEANUP_PRIVATIZATION_APPLY_SCHEMA = "pipeline.session-cleanup-privatization-apply.v1";
@@ -383,8 +391,12 @@ function validClosedTransitionState(root, state) {
 
 function validDiscardedFeatureEntry(root, entry) {
   const expectedKeys = new Set(["id", "planPath", "phaseAtDiscard", "discardedAt", "discardedBy", "reason", "forCommit"]);
+  if (entry?.planCancellation !== undefined) expectedKeys.add("planCancellation");
+  if (entry?.planMixedStateRecovery !== undefined) expectedKeys.add("planMixedStateRecovery");
   if (!exactKeys(entry, expectedKeys)
     || typeof entry.id !== "string" || entry.id.length === 0
+    || (entry.planCancellation !== undefined && (!validPlanCancellation(entry.planCancellation) || entry.planCancellation.featureId !== entry.id))
+    || (entry.planMixedStateRecovery !== undefined && (!validPlanMixedStateRecovery(entry.planMixedStateRecovery) || entry.planMixedStateRecovery.featureId !== entry.id))
     || typeof entry.planPath !== "string" || entry.planPath.length === 0
     || !(entry.phaseAtDiscard === null || typeof entry.phaseAtDiscard === "string")
     || !canonicalIsoTimestamp(entry.discardedAt)
@@ -426,12 +438,16 @@ function validDiscardedTransitionState(root, state) {
 function closedEntryStaticShape(entry) {
   const baseKeys = new Set(["id", "planPath", "phaseAtClose", "closedAt", "closedBy", "forCommit"]);
   const expectedKeys = new Set(baseKeys);
+  if (entry?.planCancellation !== undefined) expectedKeys.add("planCancellation");
+  if (entry?.planMixedStateRecovery !== undefined) expectedKeys.add("planMixedStateRecovery");
   if (entry?.architectureImpact !== undefined) expectedKeys.add("architectureImpact");
   if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
   if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
   if (entry?.auditReference !== undefined) expectedKeys.add("auditReference");
   if (!exactKeys(entry, expectedKeys)
     || typeof entry.id !== "string" || entry.id.length === 0
+    || (entry.planCancellation !== undefined && (!validPlanCancellation(entry.planCancellation) || entry.planCancellation.featureId !== entry.id))
+    || (entry.planMixedStateRecovery !== undefined && (!validPlanMixedStateRecovery(entry.planMixedStateRecovery) || entry.planMixedStateRecovery.featureId !== entry.id))
     || typeof entry.planPath !== "string" || entry.planPath.length === 0
     || !(entry.phaseAtClose === null || typeof entry.phaseAtClose === "string")
     || !(entry.architectureImpact === undefined || [
@@ -1718,6 +1734,17 @@ function readPrivateCleanupBinding(root, { spawn = defaultGitSpawn } = {}) {
 }
 
 function privateReleaseReceiptCore(value) {
+  if (value.schema === PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA) {
+    return {
+      schema: value.schema,
+      featureId: value.featureId,
+      stateSha256: value.stateSha256,
+      bindingSha256: value.bindingSha256,
+      by: value.by,
+      reason: value.reason,
+      releasedAt: value.releasedAt,
+    };
+  }
   return {
     schema: value.schema,
     featureId: value.featureId,
@@ -1771,7 +1798,20 @@ function readPrivateCleanupReleaseReceipt(root, { spawn = defaultGitSpawn } = {}
     if (error instanceof KickoffError) throw error;
     fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup release receipt is malformed");
   }
-  if (!exactKeys(value, new Set([
+  if (value.schema === PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA) {
+    if (!exactKeys(value, new Set([
+      "schema", "featureId", "stateSha256", "bindingSha256", "by", "reason", "releasedAt", "mac",
+    ]))
+      || typeof value.featureId !== "string" || value.featureId.length === 0
+      || !SHA256_RE.test(value.stateSha256 ?? "")
+      || !SHA256_RE.test(value.bindingSha256 ?? "")
+      || typeof value.by !== "string" || value.by.trim().length === 0
+      || typeof value.reason !== "string" || value.reason.trim().length === 0
+      || !canonicalIsoTimestamp(value.releasedAt)
+      || !SHA256_RE.test(value.mac ?? "")) {
+      fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup release receipt has an invalid orphan shape");
+    }
+  } else if (!exactKeys(value, new Set([
     "schema", "featureId", "stateSha256", "coordinatorCloseSha256", "closureReceiptSha256",
     "recoveryPlanSha256", "bindingSha256", "releasedAt", "mac",
   ]))
@@ -2692,7 +2732,21 @@ export function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
         fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state cannot prove a cleanup descriptor");
       }
       if (observed.privateBinding !== null) {
-        fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding exists for a non-bindable design state");
+        const discardedEntry = Array.isArray(state.discardedFeatures)
+          ? state.discardedFeatures.find((entry) => entry.id === observed.privateBinding.featureId)
+          : undefined;
+        if (!discardedEntry) {
+          fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding exists for a non-bindable design state");
+        }
+        return {
+          ...observed,
+          mode: "active",
+          revision: null,
+          activeFeatureId: state.activeFeature.id,
+          sessionCleanup: null,
+          orphanBinding: observed.privateBinding,
+          discardedEntry,
+        };
       }
       return {
         ...observed,
@@ -2772,6 +2826,22 @@ export function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
   }
   if (observed.privateBinding !== null
     && observed.privateBinding.featureId !== state.activeFeature.id) {
+    if (state.continuity?.runtime?.sessionCleanup === null) {
+      const discardedEntry = Array.isArray(state.discardedFeatures)
+        ? state.discardedFeatures.find((entry) => entry.id === observed.privateBinding.featureId)
+        : undefined;
+      if (discardedEntry) {
+        return {
+          ...observed,
+          mode: "active",
+          revision: state.continuity.revision,
+          activeFeatureId: state.activeFeature.id,
+          sessionCleanup: null,
+          orphanBinding: observed.privateBinding,
+          discardedEntry,
+        };
+      }
+    }
     fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding names a different active feature");
   }
   return {
@@ -2797,19 +2867,31 @@ export function readOnboardingSessionCleanupBinding({ rootDir, spawn = defaultGi
   const privateReleaseReceipt = privateReceiptObservation.receipt;
   const closedEntry = observed.mode === "closed" ? observed.state.closedFeatures?.at(-1) : undefined;
   const coordinatorClose = closedEntry?.coordinatorClose;
-  const privateReceiptConflict = observed.neutral && observed.mode === "closed"
+  const isOrphanReceipt = privateReleaseReceipt?.schema === PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA;
+  const matchingDiscarded = isOrphanReceipt
+    ? observed.state.discardedFeatures?.find((entry) => entry.id === privateReleaseReceipt.featureId)
+    : undefined;
+  const orphanReceiptConflict = isOrphanReceipt
+    && observed.neutral
+    && (matchingDiscarded === undefined || privateReleaseReceipt.stateSha256 !== observed.stateSha256);
+  const closedReceiptConflict = !isOrphanReceipt && observed.neutral && observed.mode === "closed"
     && observed.privateBinding === null && privateReceiptObservation.status === "valid"
     && (privateReleaseReceipt.featureId !== closedEntry?.id
       || privateReleaseReceipt.stateSha256 !== observed.stateSha256
       || coordinatorClose === undefined
       || privateReleaseReceipt.coordinatorCloseSha256 !== canonicalSha256(coordinatorClose));
+  const privateReceiptConflict = isOrphanReceipt ? orphanReceiptConflict : closedReceiptConflict;
   const privateReceiptInvalid = privateReceiptObservation.status === "invalid" || privateReceiptConflict;
   const status = observed.mode === "active"
-    ? (observed.revision === null
-      ? "design-unbound"
-      : observed.sessionCleanup === null ? "unbound" : "bound")
+    ? (observed.orphanBinding
+      ? "orphan-bound"
+      : (observed.revision === null
+        ? "design-unbound"
+        : observed.sessionCleanup === null ? "unbound" : "bound"))
     : observed.neutral && observed.privateBinding === null && privateReceiptInvalid
       ? "closed-receipt-invalid"
+    : (isOrphanReceipt && !orphanReceiptConflict && observed.privateBinding === null)
+      ? "released"
     : observed.released
       ? "released"
       : observed.sessionCleanup === null
@@ -2822,6 +2904,7 @@ export function readOnboardingSessionCleanupBinding({ rootDir, spawn = defaultGi
     stateSha256: observed.stateSha256,
     revision: observed.revision,
     sessionCleanup: structuredClone(observed.sessionCleanup),
+    ...(observed.orphanBinding ? { orphanBinding: structuredClone(observed.orphanBinding) } : {}),
     ...(observed.releaseProof ? { releaseProof: structuredClone(observed.releaseProof) } : {}),
     ...(observed.releaseReceipt ? {
       releasePlanSha256: observed.releaseReceipt.recoveryPlanSha256,
@@ -3442,6 +3525,384 @@ export function bindEphemeralPrivateCleanup({ rootDir, sessionCleanup, deps = {}
     fail("SESSION-CLEANUP-EPHEMERAL-STORAGE", "ephemeral cleanup binding unexpectedly targeted tracked authority state");
   }
   return bound;
+}
+
+/**
+ * Release an orphan private session cleanup binding belonging to a discarded feature.
+ * Writes an authenticated private release receipt before unlinking the binding.
+ */
+function backupPrivateFile(commonDir, label, filePath, deps = {}) {
+  if (typeof deps.backupBeforeMutation === "function") {
+    return deps.backupBeforeMutation(commonDir, deps, label, filePath);
+  }
+  let info;
+  try {
+    info = lstatSync(filePath);
+  } catch (err) {
+    if (err?.code === "ENOENT") return null;
+    throw err;
+  }
+  if (!info.isFile() || info.isSymbolicLink()) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-BACKUP", "backup source is unsafe");
+  }
+  const bytes = readFileSync(filePath);
+  const backupDir = join(commonDir, "agent-pipeline", "session-cleanup-recovery", "backups");
+  mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+  try { chmodSync(backupDir, 0o700); } catch {}
+  const backupPath = join(backupDir, `${label}.bak`);
+  const tempPath = `${backupPath}.tmp-${Date.now()}`;
+  writeFileSync(tempPath, bytes, { mode: 0o600 });
+  renameSync(tempPath, backupPath);
+  fsyncDirectory(backupDir);
+  return backupPath;
+}
+
+function sameOrphanReleaseReceipt(receipt, expected) {
+  return receipt?.schema === PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA
+    && canonicalSha256(privateReleaseReceiptCore(receipt)) === canonicalSha256(expected);
+}
+
+function observeOrphanReleaseDescriptor(root, privateBinding, deps) {
+  const listDescriptors = deps.listActiveSessionDescriptorsFn
+    ?? deps.listActiveSessionDescriptors
+    ?? listActiveSessionDescriptors;
+  const activeDescriptors = listDescriptors(root);
+  const matchingDescriptors = activeDescriptors.filter(
+    (entry) => entry.sessionId === privateBinding.sessionCleanup.sessionId,
+  );
+  const unrelatedDescriptors = activeDescriptors.filter(
+    (entry) => entry.sessionId !== privateBinding.sessionCleanup.sessionId,
+  );
+  if (unrelatedDescriptors.length > 0 || matchingDescriptors.length > 1) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", "cannot release orphan cleanup binding while unrelated session descriptors are active");
+  }
+  if (matchingDescriptors.length === 0) return null;
+  const matching = matchingDescriptors[0];
+  if (matching.descriptorSha256 !== privateBinding.sessionCleanup.descriptorSha256) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", "session descriptor digest does not match the private cleanup binding");
+  }
+  const inspectOwner = deps.inspectSessionOwnerRuntimeFn
+    ?? deps.inspectSessionOwnerRuntime
+    ?? inspectSessionOwnerRuntime;
+  const owner = inspectOwner(root, matching.sessionId, {
+    expectedDescriptorSha256: matching.descriptorSha256,
+  });
+  if (!isObject(owner)
+    || owner.schema !== "pipeline.session-owner-status.v1"
+    || owner.sessionId !== matching.sessionId
+    || owner.descriptorSha256 !== matching.descriptorSha256
+    || !new Set(["live", "not-live", "reused", "unavailable", "unobserved"]).has(owner.status)) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", "session owner status readback is invalid");
+  }
+  if (owner.status !== "not-live") {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", `cannot release orphan cleanup binding while its session descriptor is ${owner.status}`);
+  }
+  return {
+    sessionId: matching.sessionId,
+    descriptorSha256: matching.descriptorSha256,
+  };
+}
+
+function orphanReleasePlanBinding(plan) {
+  const { planSha256: _planSha256, ...binding } = plan;
+  return binding;
+}
+
+/** Read-only exact plan for releasing one private binding after public discard. */
+export function planOrphanSessionCleanupBindingRelease({
+  rootDir,
+  by,
+  reason,
+  featureId = null,
+  expectedStateAfterSha256 = null,
+  deps = {},
+} = {}) {
+  if (typeof by !== "string" || by.trim() === ""
+    || typeof reason !== "string" || reason.trim() === ""
+    || (featureId !== null && (typeof featureId !== "string" || featureId.length === 0))
+    || (expectedStateAfterSha256 !== null && !SHA256_RE.test(expectedStateAfterSha256))) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-REQUEST", "orphan cleanup release plan request is invalid");
+  }
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const initial = observeMachineState(rootDir, spawn);
+  const privateBinding = initial.privateBinding;
+  // Legacy .claude state has no private cleanup binding model.  Do not probe a
+  // private Git area that cannot exist there: this makes an honest legacy discard
+  // needlessly impossible while modern neutral state remains fully fail-closed.
+  const receiptObservation = initial.neutral
+    ? observePrivateCleanupReleaseReceipt(initial.root, { spawn })
+    : { status: "absent", receipt: null };
+  const inferredFeatureId = featureId
+    ?? privateBinding?.featureId
+    ?? (receiptObservation.receipt?.schema === PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA
+      ? receiptObservation.receipt.featureId
+      : null);
+  if (privateBinding !== null && privateBinding.featureId !== inferredFeatureId) {
+    fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding names a different feature");
+  }
+  const discardedEntry = inferredFeatureId === null ? undefined : initial.state.discardedFeatures?.find(
+    (entry) => entry.id === inferredFeatureId,
+  );
+  const activeTarget = inferredFeatureId !== null && initial.state.activeFeature?.id === inferredFeatureId;
+  if (privateBinding !== null && !discardedEntry && !activeTarget) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-NOT-DISCARDED", "orphan cleanup release targets neither the active transition feature nor a discarded feature");
+  }
+  if (activeTarget && expectedStateAfterSha256 === null) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-POSTIMAGE", "active-feature release planning requires the exact discarded State postimage digest");
+  }
+  const stateAfterSha256 = expectedStateAfterSha256 ?? initial.stateSha256;
+  if (discardedEntry && expectedStateAfterSha256 !== null
+    && expectedStateAfterSha256 !== initial.stateSha256) {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-POSTIMAGE", "discarded-feature recovery must bind the current State digest");
+  }
+
+  if (privateBinding === null) {
+    if (receiptObservation.status !== "absent") {
+      const receipt = receiptObservation.receipt;
+      if (receiptObservation.status !== "valid"
+        || receipt?.schema !== PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA
+        || (inferredFeatureId !== null && receipt.featureId !== inferredFeatureId)
+        || receipt.stateSha256 !== stateAfterSha256
+      ) {
+        fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup release receipt conflicts with the release plan");
+      }
+    }
+    const plan = {
+      schema: SESSION_CLEANUP_ORPHAN_RELEASE_PLAN_SCHEMA,
+      status: "not-needed",
+      root: initial.root,
+      featureId: inferredFeatureId,
+      by,
+      reason,
+      stateBeforeSha256: initial.stateSha256,
+      stateAfterSha256,
+      binding: null,
+      descriptor: null,
+      receipt: receiptObservation.receipt === null
+        ? null
+        : privateReleaseReceiptCore(receiptObservation.receipt),
+    };
+    return { ...plan, planSha256: canonicalSha256(plan) };
+  }
+
+  const descriptor = observeOrphanReleaseDescriptor(initial.root, privateBinding, deps);
+  let receipt;
+  if (receiptObservation.status === "absent") {
+    const releasedAt = deps.now ? deps.now() : new Date().toISOString();
+    if (!canonicalIsoTimestamp(releasedAt)) {
+      fail("SESSION-CLEANUP-ORPHAN-RELEASE-REQUEST", "orphan cleanup release timestamp is invalid");
+    }
+    receipt = {
+      schema: PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA,
+      featureId: inferredFeatureId,
+      stateSha256: stateAfterSha256,
+      bindingSha256: initial.privateBindingSha256,
+      by,
+      reason,
+      releasedAt,
+    };
+  } else {
+    receipt = receiptObservation.receipt === null
+      ? null
+      : privateReleaseReceiptCore(receiptObservation.receipt);
+    const expected = receipt === null ? null : {
+      ...receipt,
+      schema: PRIVATE_SESSION_CLEANUP_ORPHAN_RELEASE_RECEIPT_SCHEMA,
+      featureId: inferredFeatureId,
+      stateSha256: stateAfterSha256,
+      bindingSha256: initial.privateBindingSha256,
+    };
+    if (receiptObservation.status !== "valid" || receipt === null
+      || !sameOrphanReleaseReceipt(receiptObservation.receipt, expected)) {
+      fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup release receipt conflicts with the release plan");
+    }
+  }
+  const plan = {
+    schema: SESSION_CLEANUP_ORPHAN_RELEASE_PLAN_SCHEMA,
+    status: "ready",
+    root: initial.root,
+    featureId: inferredFeatureId,
+    by,
+    reason,
+    stateBeforeSha256: initial.stateSha256,
+    stateAfterSha256,
+    binding: {
+      sha256: initial.privateBindingSha256,
+      sessionCleanup: structuredClone(privateBinding.sessionCleanup),
+    },
+    descriptor,
+    receipt,
+  };
+  return { ...plan, planSha256: canonicalSha256(plan) };
+}
+
+/** Apply one exact plan after the public discarded State is durable. */
+export function applyOrphanSessionCleanupBindingRelease({
+  plan,
+  expectedPlanSha256,
+  stateLockHeld = false,
+  deps = {},
+} = {}) {
+  if (!isObject(plan)
+    || plan.schema !== SESSION_CLEANUP_ORPHAN_RELEASE_PLAN_SCHEMA
+    || !new Set(["ready", "not-needed"]).has(plan.status)
+    || !SHA256_RE.test(plan.planSha256 ?? "")
+    || expectedPlanSha256 !== plan.planSha256
+    || canonicalSha256(orphanReleasePlanBinding(plan)) !== plan.planSha256
+    || !SHA256_RE.test(plan.stateBeforeSha256 ?? "")
+    || !SHA256_RE.test(plan.stateAfterSha256 ?? "")
+    || typeof stateLockHeld !== "boolean") {
+    fail("SESSION-CLEANUP-ORPHAN-RELEASE-PLAN", "orphan cleanup release plan is invalid or changed");
+  }
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const execute = () => {
+    let committed = false;
+    try {
+      const current = observeMachineState(plan.root, spawn);
+      if (current.stateSha256 !== plan.stateAfterSha256) {
+        fail("SESSION-CLEANUP-RELEASE-CAS", "discarded State postimage does not match the orphan release plan");
+      }
+      if (plan.featureId !== null
+        && !current.state.discardedFeatures?.some((entry) => entry.id === plan.featureId)) {
+        fail("SESSION-CLEANUP-ORPHAN-RELEASE-NOT-DISCARDED", "orphan cleanup release postimage does not contain the discarded feature");
+      }
+      const currentBindingObs = {
+        binding: current.privateBinding,
+        sha256: current.privateBindingSha256,
+      };
+      const currentReceiptObs = observePrivateCleanupReleaseReceipt(current.root, { spawn });
+      const receiptMatches = currentReceiptObs.status === "valid"
+        && sameOrphanReleaseReceipt(currentReceiptObs.receipt, plan.receipt);
+      if (plan.status === "not-needed") {
+        if (currentBindingObs.binding !== null
+          || (plan.receipt === null
+            ? currentReceiptObs.status !== "absent"
+            : !receiptMatches)) {
+          fail("SESSION-CLEANUP-PRIVATE-CAS", "no-write orphan release plan preimage changed");
+        }
+        return {
+          schema: SESSION_CLEANUP_BIND_SCHEMA,
+          status: "released",
+          root: current.root,
+          stateSha256: current.stateSha256,
+          featureId: plan.featureId,
+          mutated: false,
+        };
+      }
+      if (currentBindingObs.binding !== null
+        && (currentBindingObs.sha256 !== plan.binding.sha256
+          || currentBindingObs.binding.featureId !== plan.featureId
+          || canonicalSha256(currentBindingObs.binding.sessionCleanup)
+            !== canonicalSha256(plan.binding.sessionCleanup))) {
+        fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding changed after release planning");
+      }
+      if (currentBindingObs.binding === null && !receiptMatches) {
+        fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding disappeared without the planned receipt");
+      }
+      if (currentBindingObs.binding !== null) {
+        const descriptorBeforeCommit = observeOrphanReleaseDescriptor(current.root, currentBindingObs.binding, deps);
+        if (canonicalSha256(descriptorBeforeCommit) !== canonicalSha256(plan.descriptor)) {
+          fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", "session descriptor changed after release planning");
+        }
+      }
+      if (!receiptMatches) {
+        if (currentReceiptObs.status !== "absent") {
+          fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup release receipt changed after planning");
+        }
+        writePrivateCleanupReleaseReceipt(current.root, plan.receipt, { spawn });
+        committed = true;
+        deps.afterReceiptWrite?.({ root: current.root, receipt: structuredClone(plan.receipt) });
+      } else {
+        committed = true;
+      }
+
+      if (currentBindingObs.binding !== null) {
+        const descriptorNow = observeOrphanReleaseDescriptor(current.root, currentBindingObs.binding, deps);
+        if (descriptorNow !== null) {
+          if (plan.descriptor === null
+            || canonicalSha256(descriptorNow) !== canonicalSha256(plan.descriptor)) {
+            fail("SESSION-CLEANUP-ORPHAN-RELEASE-DESCRIPTOR-ACTIVE", "session descriptor changed after release planning");
+          }
+          const loadDescriptor = deps.loadSessionDescriptorFn ?? deps.loadSessionDescriptor ?? loadSessionDescriptor;
+          const loaded = loadDescriptor(current.root, descriptorNow.sessionId, {
+            expectedDescriptorSha256: descriptorNow.descriptorSha256,
+          });
+          const commonDir = loaded.repo.commonDir;
+          const manifestPath = join(commonDir, "agent-pipeline", "session-cleanup", "active", `${loaded.sessionId}.json`);
+          if (existsSync(manifestPath)) {
+            backupPrivateFile(commonDir, `session-cleanup-manifest.${loaded.sessionId}`, manifestPath, deps);
+            unlinkSync(manifestPath);
+            fsyncDirectory(dirname(manifestPath));
+          }
+          backupPrivateFile(commonDir, `session-descriptor.${loaded.sessionId}`, loaded.path, deps);
+          unlinkSync(loaded.path);
+          fsyncDirectory(dirname(loaded.path));
+          deps.afterDescriptorRetire?.({ root: current.root, sessionId: loaded.sessionId });
+        }
+        const bindingBeforeDelete = readPrivateCleanupBinding(current.root, { spawn });
+        if (bindingBeforeDelete.binding !== null) {
+          if (bindingBeforeDelete.sha256 !== plan.binding.sha256) {
+            fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding changed during release");
+          }
+          deletePrivateCleanupBinding(current.root, plan.binding.sessionCleanup, { spawn });
+          deps.afterBindingUnlink?.({ root: current.root });
+        }
+      }
+      const finalBinding = readPrivateCleanupBinding(current.root, { spawn });
+      const finalReceipt = observePrivateCleanupReleaseReceipt(current.root, { spawn });
+      if (finalBinding.binding !== null
+        || finalReceipt.status !== "valid"
+        || !sameOrphanReleaseReceipt(finalReceipt.receipt, plan.receipt)) {
+        fail("SESSION-CLEANUP-ORPHAN-RELEASE-READBACK", "orphan cleanup release readback is invalid", { committed: true });
+      }
+      fsyncDirectory(finalReceipt.paths.directory);
+      return {
+        schema: SESSION_CLEANUP_BIND_SCHEMA,
+        status: "released",
+        root: current.root,
+        stateSha256: current.stateSha256,
+        featureId: plan.featureId,
+        receipt: finalReceipt.receipt,
+        mutated: true,
+        storage: "private-runtime",
+      };
+    } catch (error) {
+      if (error instanceof KickoffError) {
+        fail(error.code, error.message, { committed: committed || error.committed });
+      }
+      fail("SESSION-CLEANUP-ORPHAN-RELEASE-WRITE", "orphan cleanup release failed", { committed });
+    }
+  };
+  if (stateLockHeld) return execute();
+  const token = `session-cleanup-orphan-release-${plan.planSha256.slice(0, 32)}`;
+  const lock = acquireLock(
+    `${join(plan.root, authorityPaths(plan.root).state)}.lock`,
+    "pipeline.continuity-lock.v0",
+    token,
+    { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 },
+  );
+  try { return execute(); } finally { releaseLock(lock); }
+}
+
+export function releaseOrphanSessionCleanupBinding({
+  rootDir,
+  by,
+  reason,
+  featureId = null,
+  deps = {},
+} = {}) {
+  const plan = planOrphanSessionCleanupBindingRelease({
+    rootDir,
+    by,
+    reason,
+    featureId,
+    deps,
+  });
+  return applyOrphanSessionCleanupBindingRelease({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    deps,
+  });
 }
 
 /**

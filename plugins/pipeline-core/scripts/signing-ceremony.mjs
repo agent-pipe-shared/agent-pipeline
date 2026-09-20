@@ -160,12 +160,15 @@ export async function runSigningCeremony(argv = process.argv.slice(2), dependenc
   try {
     // `install --request` has no externality requirement (unlike `--proof`/`--authority`):
     // it just reads back the exact `request` object STEP 1 already produced, written here
-    // so the CLI wrapper's own file-based contract stays unchanged. `proof-manual.json` is
-    // the fixed artifact name `sign-intent` always writes to the external `--directory`,
-    // regardless of whether it was invoked with `--intent-sha256` or `--request`.
+    // so the CLI wrapper's own file-based contract stays unchanged. The returned proof
+    // path is intent-specific: a shared external key directory must never make this
+    // ceremony consume a later ceremony's proof through a mutable fixed alias.
     const requestPath = join(scratchDir, "gmw-request.json");
     writeFileSync(requestPath, JSON.stringify(request), { mode: 0o600 });
-    const proofPath = join(resolve(parsed.directory), "proof-manual.json");
+    const proofPath = signed?.paths?.proof;
+    if (typeof proofPath !== "string" || proofPath.length === 0) {
+      throw new Error("SIGNING-CEREMONY-SIGN-RESULT-INVALID: sign-intent returned no authoritative proof path");
+    }
     const installArgv = [
       "install", "--repo-root", parsed.repoRoot, "--request", requestPath, "--proof", proofPath,
       "--plan", parsed.plan, "--spec", parsed.spec,

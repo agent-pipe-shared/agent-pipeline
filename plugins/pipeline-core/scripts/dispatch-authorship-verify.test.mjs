@@ -36,6 +36,7 @@ import {
   exitCodeFor,
   gitDeps,
   isTerminalOutcome,
+  main,
   missingBriefingFields,
   parseDispatchTrailer,
   readRecordFile,
@@ -325,6 +326,53 @@ test("v3 records bind authorship and carry exactly one Critic disposition", () =
   const missing = verifyCommit(sha, deps);
   assert.equal(missing.verdict, VERDICT.fail);
   assert.equal(missing.classification, "record-v3-invalid");
+});
+
+test("v3 binding refuses an invented task, a forged existing task, and a record role that contradicts the trailer", () => {
+  const sha = "4".repeat(40);
+  const record = {
+    schema: "pipeline.dispatch-record.v3", taskId: "REAL-TASK", agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: "3".repeat(40), resultSha256: "a".repeat(64), outcome: "completed", commits: ["3".repeat(40)], log: [],
+    report: { text: "Done.", changedFiles: ["src/thing.mjs"] }, criticSkip: skip(),
+  };
+  writeRecord("REAL-TASK", record);
+  const forged = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: REAL-TASK (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(forged.verdict, VERDICT.fail);
+  assert.equal(forged.classification, "record-names-different-commit");
+
+  const invented = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: INVENTED-TASK (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(invented.verdict, VERDICT.fail);
+  assert.equal(invented.classification, "record-missing");
+
+  writeRecord("ROLE-TASK", { ...record, taskId: "ROLE-TASK", agentType: "critic", candidateCommit: sha, commits: [sha] });
+  const role = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: ROLE-TASK (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(role.verdict, VERDICT.fail);
+  assert.equal(role.classification, "record-role-mismatch");
+});
+
+test("CLI requires exact --root and routes every git reader to that consumer root", () => {
+  const root = "/consumer/repository";
+  const writes = [];
+  const observed = [];
+  const streams = { stdout: { write: (value) => writes.push(value) }, stderr: { write: (value) => writes.push(value) } };
+  const makeDeps = (options) => {
+    observed.push(["deps", options]);
+    return commit({ message: "docs(x): no dispatch\n", paths: ["docs/x.md"] });
+  };
+  const run = (command, args, options) => {
+    observed.push([command, args, options]);
+    return "deadbeef\n";
+  };
+  assert.equal(main(["--root", root, "--range", "base..head"], { ...streams, makeDeps, execFileSync: run }), 2);
+  assert.deepEqual(observed[0], ["deps", { repoRoot: root, evidenceDir: `${root}/evidence` }]);
+  assert.deepEqual(observed[1], ["git", ["rev-list", "base..head"], { cwd: root, encoding: "utf8" }]);
+
+  let called = false;
+  const noGit = () => { called = true; throw new Error("must not run"); };
+  assert.equal(main(["deadbeef"], { ...streams, makeDeps: noGit, execFileSync: noGit }), 3);
+  assert.equal(main(["--repo-root", root, "deadbeef"], { ...streams, makeDeps: noGit, execFileSync: noGit }), 3);
+  assert.equal(called, false);
 });
 
 test("v3 criticRequired is a valid pending lifecycle state but cannot mint authorship PASS", () => {
@@ -866,7 +914,7 @@ test("(sandbox) DoD-d: a malicious-shaped generator cannot mutate the real worki
 });
 
 test("the real git-backed readers work against this repository's own HEAD", () => {
-  const deps = gitDeps({ evidenceDir: DEFAULT_EVIDENCE_DIR });
+  const deps = gitDeps({ repoRoot: REPO_ROOT, evidenceDir: DEFAULT_EVIDENCE_DIR });
   assert.equal(typeof deps.readCommitMessage("HEAD"), "string");
   assert.ok(Array.isArray(deps.readChangedPaths("HEAD")));
   const verdict = verifyCommit("HEAD", deps);

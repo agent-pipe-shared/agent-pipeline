@@ -59,6 +59,16 @@ Batman adopts the following bounded architecture:
    `<primary-root>/branch/<ref-segments>` (or the bounded detached namespace).
    `/tmp` is ephemeral and session-owned only. Full and light close both end with
    safe owned-resource cleanup plus a post-commit clean-repository gate.
+   For consumer/user repositories, the physical primary checkout is the default
+   work location: an agent must not create a clone, temporary worktree, or
+   sibling checkout outside it merely for isolation, parallelism, staging, or a
+   sandbox workaround. An existing external worktree is foreign unless it is a
+   recorded legacy source being migrated into the canonical primary `branch/`
+   namespace. A recognized sandbox/private-Git EPERM routes the same bound
+   operation to an attended host action against that same physical root; it is
+   never a reason to copy the repository elsewhere. A PO may approve a narrow
+   exception only with the exact path, purpose, mergeback/readback, rollback,
+   and cleanup recorded before creation.
 10. **Interaction continuity:** informational questions and additive PO input do
    not clear or replace active work. The Coordinator answers or incorporates
    them, then continues the persisted next action. Bootstrap and compact/resume
@@ -165,6 +175,13 @@ Auch die Publikations-Topologie war noch offen.
    `<primary-root>/branch/...`. `/tmp` ist nur für registrierte kurzlebige
    Ressourcen zulässig; Full Close und Close-light prüfen Cleanup und einen
    sauberen Endzustand.
+   Für Consumer-/User-Repositories ist der physische Primary-Checkout der
+   Standardarbeitsort. Agenten erzeugen keinen Clone, temporären Worktree oder
+   Geschwister-Checkout außerhalb davon für Isolation, Parallelität, Staging
+   oder als Sandbox-Umgehung. Ein erkannter Sandbox-/Private-Git-EPERM routet
+   dieselbe gebundene Aktion an den attended Host gegen dieselbe physische
+   Root, niemals an eine Kopie. Eine PO-Ausnahme benötigt vorab exakten Pfad,
+   Zweck, Mergeback-/Readback, Rollback und Cleanup.
 10. Informationsfragen und additive PO-Hinweise lassen aktive Arbeit bestehen.
     Nach der Antwort wird der gespeicherte nächste Schritt fortgesetzt; Bootstrap
     und Compact-/Resume-Re-Grounding laden diese Pflicht aus dem Machine-State.

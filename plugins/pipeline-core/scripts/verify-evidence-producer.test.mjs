@@ -44,6 +44,10 @@ async function withFixture(verifyCommand, run) {
   const root = fixture(verifyCommand);
   try { await run(root); } finally { rmSync(root, { recursive: true, force: true }); }
 }
+function activeSessionDescriptors(root) {
+  const directory = join(root, ".git", "agent-pipeline", "session-descriptors", "active");
+  return existsSync(directory) ? readdirSync(directory).sort() : [];
+}
 async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict = null } = {}) {
   mkdirSync(join(root, "specs"), { recursive: true });
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
@@ -87,6 +91,7 @@ test("a passing verify produces a consumable artifact bound to the exact commit 
     assert.equal(result.evidence.selection.mode, "candidate");
     const onDisk = JSON.parse(readFileSync(join(root, "evidence", "verify.json"), "utf8"));
     assert.deepEqual(onDisk, result.evidence);
+    assert.deepEqual(activeSessionDescriptors(root), [], "a completed Verify must retire its private session descriptor");
   });
 });
 
@@ -97,6 +102,7 @@ test("a failing verify command produces no artifact at all", async () => {
       (error) => error instanceof VerifyEvidenceError && error.code === "VEP-VERIFY-FAILED" && /"suite":"configured-verify","exitCode":3/u.test(error.message),
     );
     assert.equal(existsSync(join(root, "evidence", "verify.json")), false, "a failing verify must leave no evidence file");
+    assert.deepEqual(activeSessionDescriptors(root), [], "a terminal failed Verify must retire its private session descriptor");
   });
 });
 
@@ -378,7 +384,7 @@ test("consumer full fallback preserves the changed and unmatched paths", async (
     writeFileSync(join(root, "unknown.bin"), "changed\n");
     git(root, ["add", "unknown.bin"]);
     git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "unknown change"]);
-    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate", base: "HEAD^1" });
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "work", base: "HEAD^1" });
     assert.equal(result.evidence.selection.execution, "full");
     assert.equal(result.evidence.selection.fallbackReason, "unclassified-change");
     assert.deepEqual(result.evidence.selection.changedPaths, ["unknown.bin"]);

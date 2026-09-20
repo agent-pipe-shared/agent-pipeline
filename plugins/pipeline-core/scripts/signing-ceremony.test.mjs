@@ -211,7 +211,9 @@ test("maintenance-window ceremony runs prepare, present+sign, install, verify en
   // The real OpenSSL signature is never bypassed (backlog item constraint 1): the
   // proof left in the external directory verifies cryptographically against the
   // fixture's own trust anchor.
-  const proof = JSON.parse(readFileSync(join(directory, "proof-manual.json"), "utf8"));
+  const proofPath = join(directory, `proof-${result.prepared.intent.sha256}.json`);
+  const proof = JSON.parse(readFileSync(proofPath, "utf8"));
+  assert.equal(proof.intentSha256, result.prepared.intent.sha256);
   assert.equal(proof.publicKey, publicKeyPem);
   const verified = verifyPoApprovalProof({
     intent: { sha256: proof.intentSha256 },

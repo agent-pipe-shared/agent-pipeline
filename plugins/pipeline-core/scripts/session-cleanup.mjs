@@ -23,6 +23,7 @@ import {
   planOnboardingSessionCleanupPrivatization,
   readOnboardingSessionCleanupBinding,
   releaseOnboardingSessionCleanup,
+  releaseOrphanSessionCleanupBinding,
 } from "../lib/onboarding-continuity.mjs";
 import {
   SessionCleanupRecoveryError,
@@ -63,6 +64,7 @@ const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
   session-cleanup.mjs status --repo <checkout>
   session-cleanup.mjs release-binding --repo <checkout>
+  session-cleanup.mjs release-orphan-binding --repo <checkout> --by <name> --reason <reason>
   session-cleanup.mjs plan-privatization --repo <checkout>
   session-cleanup.mjs confirm-privatization --repo <checkout> --plan-sha256 <sha256> --accept
   session-cleanup.mjs apply-privatization --repo <checkout> --plan-sha256 <sha256> --activate
@@ -87,6 +89,7 @@ environment, mirroring pipeline-start-preflight.mjs; an explicit --runner
 always wins and an invalid explicit value fails closed.
 `;
 const HERE = dirname(fileURLToPath(import.meta.url));
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(import.meta.url);
 const SESSION_POWER_SCRIPT = join(HERE, "session-power.mjs");
 const POWER_RESULT_KEYS = new Set(["schema", "operation", "sessionId", "status", "revision", "failureClass", "observedAt"]);
 
@@ -118,23 +121,78 @@ function planHumanRecovery(repo, dependencies = {}) {
         : "SESSION-CLEANUP-OBSERVATION-UNAVAILABLE",
     };
   }
+  const candidates = [
+    {
+      id: "retain-and-observe",
+      mutation: false,
+      effect: "retain-exact-state",
+    },
+  ];
+  let offerAttendedRecovery = true;
+  try {
+    const listDescriptors = dependencies.listActiveSessionDescriptorsFn
+      ?? listActiveSessionDescriptors;
+    const descriptors = listDescriptors(repo);
+    if (descriptors.length > 0) {
+      const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
+        ?? readOnboardingSessionCleanupBinding;
+      let targetSessionId = null;
+      let expectedSha256 = null;
+      try {
+        const binding = readBinding({ rootDir: repo });
+        targetSessionId = binding?.orphanBinding?.sessionCleanup?.sessionId ?? binding?.sessionCleanup?.sessionId ?? null;
+        expectedSha256 = binding?.orphanBinding?.sessionCleanup?.descriptorSha256 ?? binding?.sessionCleanup?.descriptorSha256 ?? null;
+      } catch {}
+      if (targetSessionId) {
+        const unrelated = descriptors.filter((d) => d.sessionId !== targetSessionId);
+        if (unrelated.length > 0) {
+          offerAttendedRecovery = false;
+        }
+        const matching = descriptors.find((d) => d.sessionId === targetSessionId);
+        if (matching) {
+          if (expectedSha256 && matching.descriptorSha256 !== expectedSha256) {
+            offerAttendedRecovery = false;
+          } else {
+            const inspectOwner = dependencies.inspectSessionOwnerRuntimeFn
+              ?? inspectSessionOwnerRuntime;
+            const owner = inspectOwner(repo, matching.sessionId, {
+              expectedDescriptorSha256: matching.descriptorSha256,
+            });
+            if (owner?.status !== "not-live") {
+              offerAttendedRecovery = false;
+            }
+          }
+        }
+      } else {
+        // If descriptors exist but no target session found, or more than one descriptor:
+        const inspectOwner = dependencies.inspectSessionOwnerRuntimeFn
+          ?? inspectSessionOwnerRuntime;
+        for (const desc of descriptors) {
+          const owner = inspectOwner(repo, desc.sessionId, {
+            expectedDescriptorSha256: desc.descriptorSha256,
+          });
+          if (owner?.status !== "not-live") {
+            offerAttendedRecovery = false;
+            break;
+          }
+        }
+      }
+    }
+  } catch {}
+  if (offerAttendedRecovery) {
+    candidates.push({
+      id: "attended-host-recovery",
+      mutation: false,
+      effect: "requires-separate-po-confirmed-host-action",
+      command: `node ${SESSION_CLEANUP_SCRIPT} release-orphan-binding --repo ${repo} --by "<operator>" --reason "<reason>"`,
+    });
+  }
   const payload = {
     schema: "pipeline.session-cleanup-human-recovery-plan.v1",
     status: "decision-required",
     root: repo,
     observed,
-    candidates: [
-      {
-        id: "retain-and-observe",
-        mutation: false,
-        effect: "retain-exact-state",
-      },
-      {
-        id: "attended-host-recovery",
-        mutation: false,
-        effect: "requires-separate-po-confirmed-host-action",
-      },
-    ],
+    candidates,
     automaticMutation: false,
   };
   return { ...payload, planSha256: sha256(JSON.stringify(payload)) };
@@ -193,7 +251,7 @@ function drainSessionPower(repo, session) {
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (!new Set([
-    "start", "status", "release-binding", "plan-privatization", "confirm-privatization", "apply-privatization",
+    "start", "status", "release-binding", "release-orphan-binding", "plan-privatization", "confirm-privatization", "apply-privatization",
     "plan-recovery", "plan-human-recovery", "apply-recovery",
     "register-intent", "finalize", "seal", "cleanup", "hygiene",
   ]).has(command)) throw new Error(USAGE);
@@ -218,6 +276,7 @@ function parseArgs(argv) {
     : new Set(["finalize", "seal"]).has(command) ? ["resource-id", "canary"] : [];
   const allowed = command === "start" ? new Set(["repo", "session", "runner"])
     : new Set(["status", "release-binding"]).has(command) ? new Set(["repo", "runner"])
+      : command === "release-orphan-binding" ? new Set(["repo", "by", "reason", "runner"])
       : new Set(["plan-recovery", "plan-human-recovery", "plan-privatization"]).has(command) ? new Set(["repo", "runner"])
       : command === "confirm-privatization" ? new Set(["repo", "plan-sha256", "accept", "runner"])
       : command === "apply-recovery" ? new Set(["repo", "plan-sha256", "activate", "runner", "event-out"])
@@ -585,6 +644,18 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
         descriptorSha256: persisted.sessionCleanup.descriptorSha256,
       };
     }
+  } else if (command === "release-orphan-binding") {
+    const by = required(flags, "by");
+    const reason = required(flags, "reason");
+    const releaseOrphan = dependencies.releaseOrphanSessionCleanupBindingFn
+      ?? releaseOrphanSessionCleanupBinding;
+    const result = releaseOrphan({
+      rootDir: repo,
+      by,
+      reason,
+      deps: dependencies,
+    });
+    output = { ok: true, code: "WT-SESSION-ORPHAN-BINDING-RELEASED", ...result };
   } else if (command === "release-binding") {
     // This is a narrow, exact post-cleanup CAS release.  Requiring general
     // onboarding readiness here creates a cycle when a legacy authority's
