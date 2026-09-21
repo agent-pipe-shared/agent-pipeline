@@ -228,6 +228,9 @@ const LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.
 const READBACK_SCRIPT = fileURLToPath(new URL("../scripts/codex-project-runtime-readback-host.mjs", import.meta.url));
 const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
+// A stale pipeline-owned hook must be able to invoke only its own exact updater.
+const PRE_PUSH_HOOK_INSTALL_SCRIPT = fileURLToPath(new URL("../scripts/pre-push-hook-install.mjs", import.meta.url));
+const OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../scripts/observation-governance-bootstrap.mjs", import.meta.url));
 // The sole pre-bootstrap route that may inspect a runner's private transcript
 // collection.  Its own implementation derives the collection, authenticates the
 // recorded repository identity, and excludes the current session; this guard
@@ -267,7 +270,6 @@ const PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH = join(PARTIAL_LIFECYCLE_SCRATCH_DI
 const INTAKE_LIFECYCLE_STATUSES = new Set(["intake-required", "intake-design-questions-required"]);
 const SCRATCH_LIFECYCLE_STATUSES = new Set([
   ...INTAKE_LIFECYCLE_STATUSES,
-  "partial",
   "restart-required",
   "migration-required",
 ]);
@@ -828,9 +830,9 @@ function blocked(
         // named it in the denial a blocked session actually reads, so a stuck session had no
         // way to discover it existed. Named here, conditional on exactly `partial` -- every
         // other status keeps the two-line message above, unchanged.
-        `A recovery scratch lane stays admitted while status is partial: create the `
-          + `repository's own ${PARTIAL_LIFECYCLE_SCRATCH_DIR} directory (including nested paths) and write `
-          + `only physically-contained files below it via Edit, Write, or NotebookEdit.`,
+        `A narrow diagnosis lane stays admitted while status is partial: creating the `
+          + `repository's own ${PARTIAL_LIFECYCLE_SCRATCH_DIR} directory and writing exactly `
+          + `${PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH} via Write or Edit.`,
       ]
       : INTAKE_LIFECYCLE_STATUSES.has(typedLifecycleStatus)
         ? [
@@ -2719,8 +2721,12 @@ function isBoundedGitPipeline(parsed, root, extraRoots = BOUNDED_PIPELINE_ADDITI
   if (sourceName !== expectedGit) return false;
   const sourceArgv = parsed.segments[0].argv;
   if (sourceArgv.length === 0) return false;
-  const subcommand = sourceArgv[0];
-  const subargs = sourceArgv.slice(1);
+  let index = 0;
+  while (index < sourceArgv.length && ["--no-pager", "-p", "--literal-pathspecs"].includes(sourceArgv[index])) {
+    index += 1;
+  }
+  const subcommand = sourceArgv[index];
+  const subargs = sourceArgv.slice(index + 1);
   if (!isReadOnlyGitSubcommand(subcommand, subargs)) return false;
   if (!subargs.every((arg) => isApprovedSingleCommandReadArg(arg, root, extraRoots))) return false;
   const sinkName = basename(parsed.segments[1].executable).toLowerCase();
@@ -3172,7 +3178,15 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
   }
   if (executable !== "git") return false;
   let index = 0;
-  if (args[index] === "-C") index += 2;
+  while (index < args.length && args[index].startsWith("-")) {
+    if (args[index] === "-C") {
+      index += 2;
+    } else if (["--no-pager", "-p", "--literal-pathspecs"].includes(args[index])) {
+      index += 1;
+    } else {
+      break;
+    }
+  }
   const subcommand = args[index];
   const subargs = args.slice(index + 1);
   return isReadOnlyGitSubcommand(subcommand, subargs);
@@ -3185,7 +3199,7 @@ function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE_ADDITI
 // function nor isBoundedGitPipeline support it, keeping both callers free of the
 // cross-repository-reaching `-C` shape.
 function isReadOnlyGitSubcommand(subcommand, subargs) {
-  if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref"].includes(subcommand)) {
+  if (["status", "diff", "log", "show", "rev-parse", "ls-files", "ls-tree", "for-each-ref", "describe"].includes(subcommand)) {
     return true;
   }
   if (subcommand === "apply") {
@@ -3194,9 +3208,13 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
       : [];
     return operands.length > 0 && operands.every((arg) => !arg.startsWith("-") && /\.(?:diff|patch)$/iu.test(arg));
   }
+  if (subcommand === "tag") {
+    return subargs.length === 0 || subargs.every((arg) =>
+      arg === "-l" || arg === "--list" || arg.startsWith("--format="));
+  }
   if (subcommand === "branch") {
     return subargs.length === 0 || subargs.every((arg) =>
-      arg === "--list" || arg === "--show-current" || arg === "--contains" || arg.startsWith("--format="));
+      arg === "-a" || arg === "-r" || arg === "-v" || arg === "-vv" || arg === "--list" || arg === "--show-current" || arg === "--contains" || arg.startsWith("--format="));
   }
   if (subcommand === "remote") return subargs.length === 0 || (subargs.length === 1 && subargs[0] === "-v");
   // Fetch updates only remote-tracking/object state; it never changes the
@@ -3205,8 +3223,8 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
   // adoption remains separately guarded at checkout/switch time.
   if (subcommand === "fetch") return true;
   return subcommand === "config"
-    && subargs.length >= 2
-    && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);
+    && (subargs.includes("--list") || subargs.includes("-l")
+      || (subargs.length >= 2 && ["--get", "--get-all", "--get-regexp"].includes(subargs[0])));
 }
 
 /**
@@ -4747,6 +4765,10 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   }
   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
+  if (script === PRE_PUSH_HOOK_INSTALL_SCRIPT) return args[0] === "--install" && args.length === 1;
+  if (script === OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
+  // F6 is an obligatory read-only diagnosis after governance bootstrap reports failure.
+  if (script === resolve(root, "harness/scripts/check-observation-governance.mjs")) return args.length === 0;
   // OBLIGROUTE-1. templates/prompts/agent-obligations.md SS5 tells every dispatched agent to
   // ASK which refusals can be lifted -- `node <plugin-root>/scripts/repair-map.mjs` -- rather
   // than read a static table, and the map's own `GUARD-LIFECYCLE-NOT-READY` row is the row an
@@ -5007,19 +5029,15 @@ function isExactObservedRunnerPermissionsPlannerAction(command, root, dependenci
     && expected.schema === "pipeline.settings-allowlist-merge-plan.v1"
     && Array.isArray(expected.statuses) && expected.statuses.length === 3
     && expected.statuses[0] === "ready" && expected.statuses[1] === "no-op" && expected.statuses[2] === "unrepairable";
-  const expectedPlannerWords = ["node", SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", root];
   return observed?.schema === "pipeline.project-onboarding.v4"
     && observed?.status === "projection-drift"
     && observed?.root === root
     && observed?.intent === "session"
     && ["drifted", "pending-runtime-initialization", "unavailable"].includes(observed?.runnerPermissions?.status)
-    && ((observedPlannerAction
-      && words.length === action.argv.length + 1
-      && words[0] === action.executable
-      && action.argv.every((value, index) => words[index + 1] === value))
-      || (observedApplyAction
-        && words.length === expectedPlannerWords.length
-        && words.every((value, index) => value === expectedPlannerWords[index])));
+    && observedPlannerAction
+    && words.length === action.argv.length + 1
+    && words[0] === action.executable
+    && action.argv.every((value, index) => words[index + 1] === value);
 }
 
 /**
@@ -5119,6 +5137,43 @@ function isPhysicalIntakeScratchPath(filePath, root, dependencies = {}, { allowS
   } catch {
     return false;
   }
+}
+
+/**
+ * NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
+ * tmp-fallback.md): the write-side twin of isReadOnlyDiagnosticCommand() above, scoped to
+ * the ONE directory a session stuck at `partial` needs in order to leave a trace of its own
+ * incident -- `mkdir scratch` or `mkdir -p scratch`, nothing else. Exact by construction,
+ * like every sibling admission in this file: the target argument must resolve to exactly
+ * `<root>/scratch`, so `mkdir scratch/nested`, `mkdir somethingelse` and any extra or
+ * reordered flag all still fall through to the ordinary GUARD-LIFECYCLE-NOT-READY refusal.
+ * This function only recognizes the shape; the caller (evaluateAfterGrammarAdmission()
+ * below) is the one that gates it on `lifecycleStatus === "partial"`.
+ */
+function isPartialLifecycleScratchDirCreate(command, root) {
+  const words = simpleWords(command, root);
+  if (!words || words.length === 0) return false;
+  if (basename(words[0]).toLowerCase() !== "mkdir") return false;
+  const args = words.slice(1);
+  const target = args.length === 1 ? args[0]
+    : args.length === 2 && args[0] === "-p" ? args[1]
+      : null;
+  return target !== null && resolve(root, target) === join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
+}
+
+/**
+ * NVA-LCREADONLY-1: the Write/Edit-side twin -- the ONE fixed incident-report file a session
+ * stuck at `partial` may create to persist a report of its own stuck state. Deliberately
+ * scoped to Edit/Write only (never NotebookEdit, which this fixed `.md` path can never
+ * legitimately name) and to this one exact resolved path -- no other filename, no directory
+ * write, no glob. Shaped like isRestartResumeHintInputWrite() above; the caller is again the
+ * one that gates this on `lifecycleStatus === "partial"`.
+ */
+function isPartialLifecycleIncidentReportWrite(input, root) {
+  const toolName = String(input?.tool_name ?? "");
+  if (toolName !== "Edit" && toolName !== "Write") return false;
+  const filePath = writeTargetPath(input?.tool_input, toolName);
+  return filePath !== "" && resolve(root, filePath) === join(root, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH);
 }
 
 function isIntakeLifecycleScratchWrite(input, root, dependencies = {}) {
@@ -5690,13 +5745,13 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
     // RESTART_LIFECYCLE_SCRATCH_WRITE above: both `mkdir scratch` and a
     // `scratch/incident-report.md` write are now ALSO admitted at restart-required, via that
     // separate, more general scratch lane -- not via this partial-only one.)
-    const partialLifecycleScratchWrite = error instanceof ProjectOnboardingReadyError
+    const partialLifecycleDiagnosisWrite = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
       && error.lifecycleStatus === "partial"
-      && ((toolName === "Bash" && isIntakeLifecycleScratchMkdir((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies))
-        || isIntakeLifecycleScratchWrite(input, root, dependencies));
-    if (partialLifecycleScratchWrite) return verdict(0);
+      && ((toolName === "Bash" && isPartialLifecycleScratchDirCreate((input.tool_input.command ?? input.tool_input.CommandLine), root))
+        || isPartialLifecycleIncidentReportWrite(input, root));
+    if (partialLifecycleDiagnosisWrite) return verdict(0);
     // NVA-GF-SCRATCH (backlog: 2026-08-28-a-scratch-write-is-refused-during-intake-against-the-
     // documented-exemption.md): a fresh, not-yet-onboarded session sitting at `intake-required`
     // or `intake-design-questions-required` could write NOTHING at all, including its own

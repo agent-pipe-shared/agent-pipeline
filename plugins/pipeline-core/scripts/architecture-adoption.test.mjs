@@ -144,6 +144,27 @@ describe("Architecture Adoption (WP-D4, Issue #109, AC-9, AC-17)", () => {
 
   describe("2. Staged Proposal Generation (#109 §5)", () => {
     it("generates a 4-stage proposal with map first", () => {
+      // This assertion covers harvested contracts; supply a schema-valid map
+      // rather than asserting a non-empty inventory for an empty temp root.
+      fs.mkdirSync(path.join(tempDir, "architecture", "map"), { recursive: true });
+      fs.mkdirSync(path.join(tempDir, "plugins", "pipeline-core", "lib"), { recursive: true });
+      fs.writeFileSync(path.join(tempDir, "architecture", "map", "index.md"), "# Architecture map\n");
+      fs.writeFileSync(path.join(tempDir, "architecture", "map", "core.md"), `---
+id: core
+responsibility: Proposal contract fixture.
+nonResponsibilities: []
+ownedPaths:
+  - plugins/pipeline-core/lib/**
+publicContracts:
+  - plugins/pipeline-core/lib/contract.mjs
+allowedDependencies: []
+authorityEffects: []
+verificationEntryPoints: []
+adrReferences: []
+---
+# Core
+`);
+      fs.writeFileSync(path.join(tempDir, "plugins", "pipeline-core", "lib", "contract.mjs"), "export {};\n");
       const proposal = generateAdoptionProposal(tempDir);
       assert.equal(proposal.schema, SCHEMA_ADOPTION_PROPOSAL);
       assert.equal(proposal.stages.length, 4);

@@ -42,6 +42,7 @@ import {
   registerTemporaryIntent,
   runGit,
   loadSessionDescriptor,
+  listActiveSessionDescriptors,
   retireSessionDescriptor,
   sealTemporaryResource,
   startSessionDescriptor,
@@ -971,6 +972,18 @@ check("D0-TO03 discoverRepository forwards its options.timeout down to every git
   assert.equal(repo.primaryRoot, resolve(primary));
   assert.ok(seenTimeouts.length > 0);
   assert.ok(seenTimeouts.every((t) => t === 5000));
+});
+
+check("D0-TMP-IGN listActiveSessionDescriptors ignores abandoned atomic write temporary files", () => {
+  const { primary } = repoFixture();
+  const started = startSessionDescriptor(primary, "test-active-tmp");
+  const common = discoverRepository(primary).commonDir;
+  const activeDir = join(common, "agent-pipeline", "session-descriptors", "active");
+  writeFileSync(join(activeDir, ".capability-test.json.12345.abcdef.tmp"), "in-flight-bytes");
+  const listed = listActiveSessionDescriptors(primary);
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].sessionId, started.sessionId);
+  retireSessionDescriptor(primary, { sessionId: started.sessionId, ownerNonce: started.ownerNonce });
 });
 
 function readdirJson(path) {

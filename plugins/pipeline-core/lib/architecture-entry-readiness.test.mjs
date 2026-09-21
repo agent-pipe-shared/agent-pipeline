@@ -14,7 +14,7 @@ import {
 } from "./architecture-entry-readiness.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
-const readyDisposition = () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" });
+const readyDisposition = () => ({ ok: true, disposition: "approved-scoped", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" });
 
 function fixture() {
   return mkdtempSync(join(tmpdir(), "architecture-entry-readiness-"));
@@ -49,7 +49,7 @@ test("malformed physical map blocks even with an authorized adoption disposition
 test("a PO-deferred adoption reports complete fitness observations without enforcing them", () => {
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,
-    deps: { checkPlanningAdoptionDisposition: readyDisposition },
+    deps: { checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }) },
   });
   assert.equal(result.status, "ready", JSON.stringify(result));
   assert.equal(result.fitness.blockingOverallStatus, "deferred");

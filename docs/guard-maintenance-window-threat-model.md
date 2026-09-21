@@ -252,6 +252,19 @@ below assumes it holds and is written to catch a change that would break it.
   `push-prepare.mjs` imports `release-promotion-envelope.mjs`, so neither
   evidence capture nor candidate release promotion can be altered via a
   maintenance window.
+- The 2026-09-20 Alfred candidate architecture adoption, design advisory, and rigor closure adds:
+  `lib/advisory-receipt.mjs`, `lib/architecture-adoption-authority.mjs`,
+  `lib/architecture-adoption-orientation.mjs`, `lib/architecture-design.mjs`,
+  `lib/architecture-map-scaffold.mjs`, `lib/critic-diagnostic-evidence.mjs`,
+  `lib/critic-diagnostic-packet.mjs`, `lib/design-advisory-admission.mjs`,
+  `lib/design-advisory-enforcement.mjs`, `lib/design-advisory-final-approval.mjs`,
+  `lib/design-advisory-transaction.mjs`, `lib/governance-authority-resolver.mjs`,
+  `lib/protected-baseline.mjs`, `scripts/architecture-adoption.mjs`,
+  `scripts/architecture-fitness.mjs`, `scripts/architecture-remedy.mjs`,
+  `scripts/check-clone-provisioning.mjs`, `scripts/governance-authority.mjs`,
+  `scripts/module-inventory.mjs`, and `scripts/rigor-floor.mjs`.
+  Guards (`guard-lifecycle-ready.mjs`, `guard-devplan-policy.mjs`, etc.) import these
+  delegates to enforce architecture compliance, advisor admission, and rigor floor gates.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

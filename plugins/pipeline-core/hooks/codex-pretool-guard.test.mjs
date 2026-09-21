@@ -258,19 +258,9 @@ function createReadyLifecycleFixture(mode = "chat") {
   followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-acknowledge-chat-apply");
   const bind = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-bind-plan");
   followLifecycleAction(root, bind, "bootstrap-bind-apply");
-  const permissionsDrift = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
-  assert.equal(permissionsDrift.status, "projection-drift");
-  assert.equal(permissionsDrift.runnerPermissions.status, "pending-runtime-initialization");
-  // Exercise the native adapter, not merely the bare repair CLI.  This is the
-  // self-deadlock regression: the exact action the lifecycle producer returns
-  // must be admitted while the project is still projection-drifted.
-  const repairCommand = [permissionsDrift.nextAction.executable, ...permissionsDrift.nextAction.argv]
-    .map((value) => JSON.stringify(value)).join(" ");
-  const repairGuard = run({ tool_name: "Bash", tool_input: { command: repairCommand } }, root);
-  assert.equal(repairGuard.status, 0, `${repairGuard.stderr}\n${repairGuard.stdout}`);
-  const permissionsApplied = executeFixtureAction(root, permissionsDrift.nextAction, {});
-  assert.equal(permissionsApplied.status, "ready");
-  assert.equal(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex").status, "ready");
+  const readyResult = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+  assert.equal(readyResult.status, "ready");
+  assert.equal(readyResult.runnerPermissions.status, "not-applicable");
   if (mode === "signature") {
     const sourcePath = join(root, "pipeline.user.yaml");
     const signatureSource = readFileSync(sourcePath, "utf8")

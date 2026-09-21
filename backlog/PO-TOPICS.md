@@ -193,3 +193,12 @@ runtime readback as one publication outcome.  This is additional evidence for,
 not a duplicate of,
 `pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op` and
 `pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy`.
+
+## Active candidate topics — 2026-09-20 / 2026-09-21 (Alfred 0.7 candidate)
+
+| Priority | PO topic | Current disposition | Next safe action |
+| --- | --- | --- | --- |
+| P0 | `pipeline-state.mjs` feature-close audit verification restoration (PB-SANCTIONED-WRITER). | Fully reconciled via 3-way merge between Alfred (`0aeaef18^1`) and Nova (`14ebe5ec`); all 1,140 lines of Alfred logic restored. Verified: `pipeline-state.test.mjs` passes 100% clean. | Included in candidate commit. |
+| P1 | Register test suites in `harness/verify-suites.json` (PB-VERIFY-REGISTRATION) and categorize in `docs/product-capability-inventory.json`. | All 48 suites registered in `harness/verify-suites.json`; all 713 product surfaces categorized in `docs/product-capability-inventory.json` with 0 duplicates. Verified: `check-verify-suite-registration.mjs` passes with 0 findings. | Included in candidate commit. |
+| P2 | Backlog ledger reconciliation for `2026-09-20-codex-lifecycle-guard-can-contradict-ready-bootstrap.md`. | Defect documented and resolved (atomic write cleanup and temporary file ignoring in `worktree-lifecycle.mjs`, git read-only flag/subcommand expansion in `guard-lifecycle-ready.mjs`). Verified: `guard-lifecycle-ready.test.mjs` (253/253) and `codex-pretool-guard.test.mjs` (37/37) green. | Commit working tree changes, then run `node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate`. |
+

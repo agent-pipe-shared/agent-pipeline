@@ -41,6 +41,7 @@ import {
 } from "../lib/critic-packet-governance.mjs";
 import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
 import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
+import { createDiagnosticBundle, materializeDiagnosticBundle, revalidateDiagnosticBundle, validateDiagnosticBundleShape } from "../lib/critic-diagnostic-packet.mjs";
 
 export const PACKET_SCHEMA = "pipeline.critic-candidate-packet.v1";
 export const STATE_SCHEMA = "pipeline.critic-candidate-state.v1";
@@ -288,6 +289,7 @@ function bindingsFor(packet) {
     requestSha256: sha256(canonicalJson(packet.request)),
     diffPathsSha256: sha256(canonicalJson(packet.diffPaths)),
     governanceSha256: sha256(canonicalJson(packet.governance)),
+    ...(packet.diagnostics === undefined ? {} : { diagnosticsSha256: sha256(canonicalJson(packet.diagnostics)) }),
   };
 }
 function recordBody(packet, revision, priorStateDigest, phase, body, timestamp) {
@@ -300,6 +302,7 @@ function validatePacketShape(packet) {
   const expected = bindingsFor(packet);
   if (JSON.stringify(expected) !== JSON.stringify(packet.bindings)) fail("CPP-DIGEST", "Packet binding digest mismatch.");
   if (packet.request?.sessionBinding !== undefined) normalizeSessionBinding(packet.request.sessionBinding);
+  if (packet.diagnostics !== undefined && !validateDiagnosticBundleShape(packet.diagnostics)) fail("CPP-DIAGNOSTIC", "Invalid diagnostic bundle.");
 }
 function packetContext(controlRoot, packetId) {
   if (!PACKET_ID.test(packetId)) fail("CPP-ARGUMENT", "packetId must be 32 lowercase hex characters.");
@@ -404,6 +407,10 @@ function revalidateCandidate(packet) {
     const entry = inventory.find(({ path }) => path === reference.path);
     if (!entry?.readable || entry.blobOid !== reference.candidateBlobOid) fail("CPP-REFERENCE", `Reference drift: ${reference.path}`);
   }
+  if (packet.diagnostics !== undefined) {
+    try { revalidateDiagnosticBundle({ checkout, candidate: packet.candidate, bundle: packet.diagnostics }); }
+    catch { fail("CPP-DIAGNOSTIC", "Diagnostic snapshot drifted or is invalid."); }
+  }
 }
 
 export function prepareCandidatePacket(options, { now = new Date(), nonce = randomBytes } = {}) {
@@ -432,6 +439,16 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
       if (baseType !== "tree" || parents.length !== 1 || base !== emptyTree) fail("CPP-REF", "Base ref is neither an ancestor commit nor the empty tree of a root candidate.");
     }
     const candidateTree = assertOid(gitText(repoRoot, ["rev-parse", `${candidate}^{tree}`]), objectFormat, "candidate tree");
+    let diagnostics;
+    if (options.evidencePaths !== undefined) {
+      const specRef = (options.references ?? []).filter(ref => ref.kind === "spec");
+      if (specRef.length !== 1) fail("CPP-DIAGNOSTIC", "Diagnostics require exactly one specification reference.");
+      const binding = path => ({ path, sha256: sha256(String(git(repoRoot, ["show", `${candidate}:${normalizePacketPath(path)}`]).stdout)) });
+      const spec = binding(specRef[0].path);
+      const guardrails = (options.references ?? []).filter(ref => ref.kind === "guardrail").map(ref => binding(ref.path));
+      try { diagnostics = createDiagnosticBundle({ root: repoRoot, candidate: { commit: candidate, tree: candidateTree }, evidencePaths: options.evidencePaths, spec, guardrails }); }
+      catch { fail("CPP-DIAGNOSTIC", "Diagnostic admission or source binding failed."); }
+    }
     const diffPaths = changedPaths(repoRoot, base, candidate);
     const packetDir = assertNoSymlinkPath(join(controlRoot, options.packetId), controlRoot, "packet directory");
     mkdirSync(packetDir, { mode: 0o700 });
@@ -440,6 +457,7 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const creatorNonce = nonce(32).toString("hex");
     const cleanupCapability = nonce(32).toString("hex");
     createCheckout(repoRoot, checkoutPath, candidate);
+    if (diagnostics !== undefined) materializeDiagnosticBundle(checkoutPath, diagnostics);
     const diff = materializeDiff(checkoutPath, base, candidate);
     const checkout = observeCheckout(checkoutPath, candidate, candidateTree, creatorNonce);
     const inventory = candidateInventory(checkoutPath, objectFormat);
@@ -473,6 +491,7 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
       diffPaths,
       references: normalizeReferences(options.references ?? [], candidateByPath),
       governance,
+      ...(diagnostics === undefined ? {} : { diagnostics }),
       checkout,
       cleanupCapability,
       bindings: null,
@@ -546,6 +565,15 @@ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now
   publishExclusive(join(packetDir, "receipt.json"), record);
   replaceState(join(packetDir, "state.json"), recordBody(packet, record.revision, record.priorStateDigest, record.phase, record.body, timestamp));
   return { ok: true, code: "CPP-CONSUMED", replay: false, packet, record };
+}
+
+export function readConsumedCandidateReceipt({ controlRoot, packetId }) {
+  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  const state = currentState(packetDir, packet);
+  if (state.phase !== "consumed") fail("CPP-CONSUMED", "Packet is not consumed.");
+  const receiptRecord = readJson(join(packetDir, "receipt.json"), "CPP-RECEIPT");
+  const receipt = receiptRecord?.body ?? receiptRecord;
+  return Object.freeze({ packet, receipt });
 }
 
 export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapability }, { now = new Date() } = {}) {

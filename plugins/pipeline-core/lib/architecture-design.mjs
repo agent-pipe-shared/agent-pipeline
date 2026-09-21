@@ -8,7 +8,7 @@ import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { resolveModuleForPath } from "../scripts/module-inventory.mjs";
-import moduleSchema from "../schemas/pipeline.module-inventory.v1.json" with { type: "json" };
+const moduleSchema = JSON.parse(readFileSync(new URL("../schemas/pipeline.module-inventory.v1.json", import.meta.url), "utf8"));
 
 export const ARCHITECTURE_DESIGN_SCHEMA = "pipeline.architecture-design.v1";
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");

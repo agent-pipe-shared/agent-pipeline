@@ -121,6 +121,8 @@ const PUSH_INIT_SCRIPT = fileURLToPath(new URL("../scripts/push-init.mjs", impor
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
+const PRE_PUSH_HOOK_INSTALL_SCRIPT = fileURLToPath(new URL("../scripts/pre-push-hook-install.mjs", import.meta.url));
+const OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../scripts/observation-governance-bootstrap.mjs", import.meta.url));
 const TRANSCRIPT_RECOVERY_SCRIPT = fileURLToPath(new URL("../scripts/runner-transcript-recovery.mjs", import.meta.url));
 const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../scripts/repair-map.mjs", import.meta.url));
 const SCRIPTS_DIR = fileURLToPath(new URL("../scripts/", import.meta.url));
@@ -1873,6 +1875,15 @@ test("the &&-chain union (read-only classifier plus the small always-safe-write 
       // no new authority, since the pipe segment was always independently reachable as its
       // own tool call once isBoundedGitPipeline exists.
       "git rev-parse HEAD && git log --oneline -5 | head -n 5",
+      "git --no-pager log",
+      "git --no-pager diff",
+      "git -p log",
+      "git branch -a",
+      "git branch -r",
+      "git describe",
+      "git tag -l",
+      "git config -l",
+      "git config --list",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
@@ -2516,6 +2527,52 @@ test("GF-097: bare `gh --version` and `gh auth status` are admitted while lifecy
  * fixture. The two known zero-argument admissions are named and justified; a third one appearing
  * turns this test red instead of passing quietly.
  */
+test("stale pipeline-owned pre-push hook recovery is admitted only by its exact installer argv", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const partial = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+    const admitted = `node '${PRE_PUSH_HOOK_INSTALL_SCRIPT}' --install`;
+    assert.equal(isSanctionedLifecycleCommand(admitted, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), partial), { exitCode: 0, stderr: "" });
+    for (const command of [`node '${PRE_PUSH_HOOK_INSTALL_SCRIPT}'`, `node '${PRE_PUSH_HOOK_INSTALL_SCRIPT}' --install --extra`]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), partial).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("root-bound governance bootstrap is admitted only by its exact read-only argv", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const partial = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+    const admitted = `node '${OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT}' --root '${path}'`;
+    assert.equal(isSanctionedLifecycleCommand(admitted, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), partial), { exitCode: 0, stderr: "" });
+    for (const command of [`node '${OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT}'`, `node '${OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT}' --root '${path}' --extra`]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), partial).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("F6 governance checker is admitted only from the active repository root", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const partial = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+    const checker = join(path, "harness", "scripts", "check-observation-governance.mjs");
+    const admitted = `node '${checker}'`;
+    assert.equal(isSanctionedLifecycleCommand(admitted, path), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), partial), { exitCode: 0, stderr: "" });
+    for (const command of [`node '${checker}' --extra`, `node '${join(path, "other", "check-observation-governance.mjs")}'`]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), partial).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and nothing beside it", () => {
   const path = root();
   try {
@@ -8572,6 +8629,7 @@ function rbImplementingState() {
     expectedSubmissionSha256: rbDerivePlanLifecycle(submitted.state).submissionSha256,
     poGateAuthority: REBWIRE_AUTHORITY,
     profileSha256: "3".repeat(64),
+    designAdvisorAdmissionSha256: "4".repeat(64),
     by: "PO",
     at: "2026-09-01T20:05:00.000Z",
   });
@@ -9063,7 +9121,8 @@ function rbdMarkedState(marker) {
   const approved = approveSubmittedPlan({
     state: submitted.state, expectedStateSha256: sha256CanonicalJson(submitted.state),
     expectedSubmissionSha256: rbDerivePlanLifecycle(submitted.state).submissionSha256,
-    poGateAuthority: REBWIRE_AUTHORITY, profileSha256: "3".repeat(64), by: "PO", at: "2026-09-01T20:05:00.000Z",
+    poGateAuthority: REBWIRE_AUTHORITY, profileSha256: "3".repeat(64),
+    designAdvisorAdmissionSha256: "4".repeat(64), by: "PO", at: "2026-09-01T20:05:00.000Z",
   });
   assert.equal(approved.ok, true, JSON.stringify(approved));
   const implementing = enterPlanImplementation({

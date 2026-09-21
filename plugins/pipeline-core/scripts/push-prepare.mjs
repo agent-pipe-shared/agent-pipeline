@@ -42,7 +42,7 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
-import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { criticalProofWaiverFor, readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { readMachinePlane, resolveLocalOperatorKeyAnchor } from "../lib/machine-plane.mjs";
 import { gateConfig, loadManifestSafe } from "../lib/manifest.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -378,6 +378,23 @@ export function checkCriticalHumanProofPolicy(dir, deps = {}) {
     };
   }
   return { id, ok: true, message: `posture: ${posture}; the key in the resolved approval directory IS a member.`, directory: resolved.directory };
+}
+
+export function checkCriticalProofModeConflict(dir, deps = {}) {
+  const waiverFor = deps.criticalProofWaiverFor ?? criticalProofWaiverFor;
+  const result = waiverFor(dir, "push");
+  if (result?.code !== "CRITICAL-PROOF-MODE-CONFLICT") return null;
+  const readApproval = deps.readHumanApprovalMode ?? readHumanApprovalMode;
+  const approval = readApproval(dir, { legacyKind: "push" });
+  const source = approval?.source ?? "unknown source";
+  const key = approval?.key ?? "gates.push_approval";
+  return {
+    id: "critical-proof-mode-conflict",
+    ok: false,
+    code: result.code,
+    message: `CRITICAL-PROOF-MODE-CONFLICT: committed ${key}: chat (${source}) conflicts with the committed push proof policy in project/critical-human-proof.json; choose one authority or retain signature mode.`,
+    remedy: "commit a consistent push approval mode and critical-human-proof policy (do not delete the anchor or create a waiver automatically)",
+  };
 }
 
 /**

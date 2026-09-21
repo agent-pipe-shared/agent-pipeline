@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Test-only authority: ephemeral key remains inside the disposable fixture.
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
@@ -16,10 +16,15 @@ export function setupAdoptionFixture(root, { mode = "signature" } = {}) {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
   const pem = publicKey.export({ type: "spki", format: "pem" });
   mkdirSync(join(root, "project"), { recursive: true });
+  if (!existsSync(join(root, "architecture", "map", "index.md"))) {
+    mkdirSync(join(root, "architecture", "map"), { recursive: true });
+    writeFileSync(join(root, "architecture", "map", "index.md"), "# Architecture map\n");
+    writeFileSync(join(root, "architecture", "map", "core.md"), "---\nid: core\nresponsibility: Test-only adoption authority fixture.\nnonResponsibilities: []\nownedPaths:\n  - plugins/pipeline-core/lib/**\npublicContracts:\n  - plugins/pipeline-core/lib/architecture-adoption-authority.mjs\nallowedDependencies: []\nauthorityEffects: []\nverificationEntryPoints:\n  - plugins/pipeline-core/scripts/architecture-adoption.test.mjs\nadrReferences: []\n---\n# Core\n");
+  }
   writeFileSync(join(root, "project/critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "test-only", publicKeySha256: createHash("sha256").update(pem).digest("hex") }] }));
   writeFileSync(join(root, "pipeline.user.yaml"), `gates:\n  human_approval: ${mode}\n`);
   fixtureGit(root, ["init", "-q"]);
-  fixtureGit(root, ["add", "--", "project/critical-human-proof.json", "pipeline.user.yaml"]);
+  fixtureGit(root, ["add", "-A"]);
   fixtureGit(root, ["commit", "-qm", "fixture authority", "--allow-empty"]);
   return { pem, privateKey };
 }

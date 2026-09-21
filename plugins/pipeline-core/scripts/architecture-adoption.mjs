@@ -16,9 +16,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadBaseline } from "./architecture-fitness.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
-import stateSchema from "../schemas/pipeline.adoption-state.v1.json" with { type: "json" };
+const stateSchema = JSON.parse(fs.readFileSync(new URL("../schemas/pipeline.adoption-state.v1.json", import.meta.url), "utf8"));
 import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
-import proposalSchema from "../schemas/pipeline.adoption-proposal.v1.json" with { type: "json" };
+const proposalSchema = JSON.parse(fs.readFileSync(new URL("../schemas/pipeline.adoption-proposal.v1.json", import.meta.url), "utf8"));
 import {
   buildAdoptionSubject,
   prepareAdoptionAuthority,

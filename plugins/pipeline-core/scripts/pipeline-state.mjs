@@ -48,6 +48,7 @@
  *     } | absent,
  *     "closedFeatures": [
  *       { "id": "<string>", "planPath": "<string>", "phaseAtClose": "<string>|null",
+ *         "architectureImpact": "architecture-conforms|architecture-decision-added|architecture-decision-superseded|architecture-summary-updated|no-architecture-impact",
  *         "closedAt": "<ISO-8601>", "closedBy": "<string>", "forCommit": "<sha>|null" }
  *     ] | absent,
  *     "deployApprovals": [
@@ -178,9 +179,11 @@
  *                                                 where forCommit is the CURRENT HEAD
  *                                                 (`git rev-parse HEAD`, spawned in the
  *                                                 target project dir).
- *   close-feature --by <name>                     Closes the current activeFeature:
+ *   close-feature --by <name> --architecture-impact <typed-value>
+ *                                                 Closes the current activeFeature:
  *                                                 appends {id, planPath, phaseAtClose,
- *                                                 closedAt, closedBy, forCommit} to
+ *                                                 architectureImpact, closedAt, closedBy,
+ *                                                 forCommit} to
  *                                                 closedFeatures (existing entries kept,
  *                                                 append-only), deletes activeFeature,
  *                                                 sets planApproved=false, clears
@@ -414,11 +417,16 @@ import {
 } from "../lib/external-push-ledger.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+import { inspectArchitectureEntryReadiness } from "../lib/architecture-entry-readiness.mjs";
+import { designAdvisoryAdmission } from "../lib/guard-devplan-policy.mjs";
+import { materializeArchitectureDesign } from "../lib/architecture-design.mjs";
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import {
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
   bindPlanSpecApproval,
+  cancelMixedPlanState,
+  cancelSubmittedPlan,
   canonicalJson as canonicalPhxJson,
   derivePlanLifecycle,
   enterPlanImplementation,
@@ -492,11 +500,16 @@ import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
+import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
+  applyOrphanSessionCleanupBindingRelease,
   nextActionSection,
   observeBootstrapBindAcknowledgement,
   observeOnboardingBootstrapPlanApproval,
+  planOrphanSessionCleanupBindingRelease,
   readOnboardingIntakeCheckpoint,
   syncStateMdNextAction,
 } from "../lib/onboarding-continuity.mjs";
@@ -506,6 +519,13 @@ import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-gu
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
+export const ARCHITECTURE_IMPACT_VALUES = Object.freeze([
+  "architecture-conforms",
+  "architecture-decision-added",
+  "architecture-decision-superseded",
+  "architecture-summary-updated",
+  "no-architecture-impact",
+]);
 
 // Restored verbatim from 5f8bf1d:harness/scripts/pipeline-state.mjs (the pre-merge
 // home of this module), dropped by merge 75b8361 when the second-parent side of
@@ -670,8 +690,9 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // `materialize-push-threat-model` was absent from it while another refusal named
 // that exact command as the way out of a stuck approval.
 const PIPELINE_STATE_COMMANDS = Object.freeze([
+  "materialize-architecture",
   "inspect",
-  "set-feature", "submit-plan", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+  "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
@@ -689,6 +710,8 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "publication-approve", "publication-authorize", "publication-reconcile", "publication-observe",
   "publication-start-readback", "publication-close", "publication-rearm", "publication-block",
   "feature-package-inspect", "feature-package-status", "feature-package-plan", "feature-package-apply",
+  "closed-evidence-restore-plan", "closed-evidence-restore-apply",
+  "closed-evidence-repin-plan", "closed-evidence-repin-apply",
   "feature-package-reconcile", "feature-package-recover", "feature-package-rebind-mutable",
 ]);
 const PUSH_THREAT_MODEL_DEFAULT_PATH = "project/push-threat-model.md";
@@ -740,6 +763,10 @@ const PUBLICATION_AUTHORIZATION_SCHEMA = "pipeline.publication-authorization.v1"
 const LOCK_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/;
 const LEGACY_WRITER_LOCK_TOKEN = "pipeline-legacy-writer-v0";
+export const CLOSED_EVIDENCE_REPAIR_SCHEMA = "pipeline.closed-evidence-repair.v1";
+const CLOSED_EVIDENCE_REPAIR_BINDING_CODE = "CLOSED-EVIDENCE-REPAIR-BINDING";
+const CLOSED_EVIDENCE_REPAIR_PATH_CODE = "CLOSED-EVIDENCE-REPAIR-UNSAFE-PATH";
+const CLOSED_EVIDENCE_REPAIR_PLAN_CODE = "CLOSED-EVIDENCE-REPAIR-PLAN-STALE";
 const RESULT_CLOSE_PLAN_SCHEMA = "pipeline.continuity-result-close-plan.v1";
 const RESULT_CLOSE_APPLY_SCHEMA = "pipeline.continuity-result-close-apply.v1";
 const RESULT_CLOSE_LOCK_TOKEN = "pipeline-result-close-v1";
@@ -917,6 +944,28 @@ function writeState(dir, state, expectedState, options = {}) {
         return transition === undefined ? failed : { ...failed, transition };
       }
     }
+    let afterCommit;
+    if (written.ok && options.afterCommit) {
+      try {
+        afterCommit = options.afterCommit({
+          state: options.preserveGateEstimate === true
+            ? nextState
+            : clearGateEstimateForMutation(nextState),
+        });
+      } catch (error) {
+        afterCommit = {
+          ok: false,
+          status: "failed",
+          code: typeof error?.code === "string" ? error.code : "PS-AFTER-COMMIT",
+          privateCommitted: error?.committed === true,
+        };
+      }
+      if (!afterCommit?.ok) {
+        const failed = { ok: false, committed: true, code: afterCommit?.code ?? "PS-AFTER-COMMIT", afterCommit };
+        return transition === undefined ? failed : { ...failed, transition };
+      }
+    }
+    if (afterCommit !== undefined) written.afterCommit = afterCommit;
     const result = externalMutation && !written.ok ? { ...written, externalMutation: true } : written;
     return transition === undefined ? result : { ...result, transition };
   } finally {
@@ -2549,7 +2598,12 @@ function continuityTransition(sub, base, expectedRevision, request) {
   const featureId = base.activeFeature?.id;
   if (typeof featureId !== "string" || featureId.trim() === "") return { ok: false, code: "PS-CONTINUITY-NO-ACTIVE-FEATURE" };
   if (sub === "continuity-init") {
-    if (expectedRevision !== "absent" || base.continuity !== undefined) return { ok: false, code: "PS-CONTINUITY-STALE" };
+    const isInitialDesign = base.continuity !== undefined
+      && base.continuity.revision === 0
+      && base.activeFeature?.phase === "design"
+      && base.planApproved === false
+      && base.planSubmission === undefined;
+    if (expectedRevision !== "absent" || (base.continuity !== undefined && !isInitialDesign)) return { ok: false, code: "PS-CONTINUITY-STALE" };
     const valid = validateContinuityState(request, featureId);
     return valid.ok && request.revision === 0
       ? { ok: true, code: "PS-CONTINUITY-INITIALIZED", state: structuredClone(request), mutated: true }
@@ -3635,6 +3689,8 @@ function resolvePushThreatModelArtifact(dir) {
 /** Delivery profiles `submit-plan --profile` accepts; mirrors the case handler's own literal. */
 const DRAFT_PLAN_PROFILES = new Set(["epic", "feature", "mini"]);
 const PLAN_APPROVER_NAME_PLACEHOLDER = "<PO_PLAN_APPROVER_NAME>";
+const MIXED_PLAN_RECOVERY_BY_PLACEHOLDER = "<MIXED_PLAN_RECOVERY_ACTOR>";
+const MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER = "<MIXED_PLAN_RECOVERY_REASON>";
 
 /**
  * NVA-Q2-DRAFTDERIVE: the `draft` gate previously always asked a human for
@@ -3763,7 +3819,69 @@ function resolveDraftProfileReceiptAction(dir, deps = {}) {
   };
 }
 
+function mixedPlanRecoveryObservation(state) {
+  if (state?.activeFeature?.phase !== "design" || state.planApproved !== false
+    || state.planSubmission === null || typeof state.planSubmission !== "object"
+    || state.planApproval === null || typeof state.planApproval !== "object"
+    || state.planInvalidation === null || typeof state.planInvalidation !== "object") return null;
+  try {
+    const observation = {
+      submissionSha256: sha256CanonicalJson(state.planSubmission),
+      approvalSha256: sha256CanonicalJson(state.planApproval),
+      invalidationSha256: sha256CanonicalJson(state.planInvalidation),
+    };
+    const eligible = cancelMixedPlanState({
+      state,
+      expectedStateSha256: sha256CanonicalJson(state),
+      expectedSubmissionSha256: observation.submissionSha256,
+      expectedApprovalSha256: observation.approvalSha256,
+      expectedInvalidationSha256: observation.invalidationSha256,
+      by: "pipeline-state inspection",
+      at: "1970-01-01T00:00:00.000Z",
+      reason: "read-only mixed-plan recovery eligibility probe",
+    });
+    return eligible.ok && !eligible.replay ? observation : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
+  const mixed = mixedPlanRecoveryObservation(state);
+  if (mixed !== null) {
+    const scriptPath = fileURLToPath(import.meta.url);
+    const rendered = boundedCopySafeCommand({
+      executable: process.execPath,
+      argv: [
+        scriptPath, "cancel-mixed-plan-state",
+        "--by", placeholder(MIXED_PLAN_RECOVERY_BY_PLACEHOLDER),
+        "--reason", placeholder(MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER),
+        "--submission-sha256", mixed.submissionSha256,
+        "--approval-sha256", mixed.approvalSha256,
+        "--invalidation-sha256", mixed.invalidationSha256,
+      ],
+    });
+    return {
+      kind: "collect-input",
+      inputs: [
+        { name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true },
+        { name: "reason", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 500, singleLine: true, rejectNul: true },
+      ],
+      mutation: false,
+      requiresConfirmation: false,
+      guidance: "State contains a current successor submission plus a retained invalidated historical approval."
+        + ` Collect the recovery actor and reason, replace exactly ${MIXED_PLAN_RECOVERY_BY_PLACEHOLDER}`
+        + ` and ${MIXED_PLAN_RECOVERY_REASON_PLACEHOLDER} in applyAction.argv, then execute that exact action.`
+        + " Ordinary cancel-submitted-plan does not apply to this state.",
+      applyAction: {
+        kind: "command",
+        ...rendered,
+        mutation: true,
+        requiresConfirmation: true,
+      },
+      expected: { schema: INSPECT_SCHEMA, statuses: ["draft"] },
+    };
+  }
   if (!lifecycle.ok || lifecycle.status === null) return null;
   if (lifecycle.status === "draft") {
     const profileAction = resolveDraftProfileReceiptAction(dir, deps);
@@ -3837,6 +3955,24 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
       };
     }
+    if (["epic", "feature"].includes(submission.profile)) {
+      const advisor = (deps.designAdvisoryAdmission ?? designAdvisoryAdmission)(state, dir, submission.planPath, submission.specPath);
+      if (!advisor?.ok || !SHA256_RE.test(advisor.id ?? "")) {
+        const code = advisor?.code ?? "DAA-PRIVATE-INVALID";
+        return {
+          kind: "collect-input",
+          inputs: [
+            { name: "runner", encoding: "utf8", trim: true, minBytes: 5, maxBytes: 11, singleLine: true, rejectNul: true },
+            { name: "decision", encoding: "utf8", trim: true, minBytes: 6, maxBytes: 7, singleLine: true, rejectNul: true },
+            { name: "rationale-file", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 500, singleLine: true, rejectNul: true },
+          ],
+          mutation: false,
+          requiresConfirmation: false,
+          guidance: `Before final PO approval, this ${submission.profile} requires a current design Advisor admission (${code}). Ask for the current runner, accept/decline decision, and a nonempty rationale file below scratch/, then run design-advisory-coordinator.mjs for this exact Plan/Spec and inspect again.`,
+          expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+        };
+      }
+    }
     const scriptPath = fileURLToPath(import.meta.url);
     // A committed repository-wide human approval policy owns plan approval as
     // well as push approval.  Its acknowledgement is the one human decision
@@ -3853,7 +3989,11 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     // preserves legacy projects with no shared-policy key and no receipt,
     // while closing the bypass where a fresh default-signature project had a
     // valid proof but inspection reopened `approve-plan --by`.
-    if (humanMode !== null && (humanMode?.scope === "global" || humanMode?.scope === "default")) {
+    const bootstrapReceiptRequired = humanMode?.mode === "signature"
+      || state.bootstrapAcknowledgementRequired === true;
+    if (humanMode !== null
+      && (humanMode?.scope === "global" || humanMode?.scope === "default")
+      && bootstrapReceiptRequired) {
       let acknowledgement;
       try {
         acknowledgement = (deps.observeOnboardingBootstrapPlanApproval ?? observeOnboardingBootstrapPlanApproval)({
@@ -3913,6 +4053,12 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     };
   }
   if (lifecycle.status === "approved") {
+    const architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
+      rootDir: dir,
+      taskScope: state.activeFeature?.planPath ?? null,
+      now: new Date(),
+    });
+    if (architecture.status !== "ready") return architecture.nextAction;
     const verifyStatus = readCalibrationVerifyStatus(dir);
     if (!new Set(["configured", "baseline-only"]).has(verifyStatus.status)) {
       const scriptPath = fileURLToPath(import.meta.url);
@@ -6621,6 +6767,7 @@ function appendAcknowledgementMarker(prdBytes) {
 function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.now?.() ?? new Date().toISOString()) {
   const by = deps.acknowledgeBy;
   if (isBlank(by)) return { ok: false, code: "PO-ACK-BY-REQUIRED" };
+  const runnerResolved = resolvePoRebindRunner(deps.acknowledgeRunner ?? deps.runner, deps.env ?? process.env);
   if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-ACK-STATE" };
   const state = existing.state;
   if (state.schema !== SCHEMA_ID || !state.activeFeature || typeof state.activeFeature.planPath !== "string"
@@ -6636,13 +6783,23 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   try { prdText = new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes); } catch { return { ok: false, code: "PO-ACK-PRD-MARKER" }; }
   const acknowledgementMarkers = [...prdText.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
   if (acknowledgementMarkers.length > 1) return { ok: false, code: "PO-ACK-MARKER-DUPLICATE" };
-  if (acknowledgementMarkers.length === 1) return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
+  const marker = rebindMarker(prdText);
+  const acknowledgedStaleSpec = acknowledgementMarkers.length === 1
+    && marker !== null && marker.digest !== spec.sha256;
+  if (acknowledgementMarkers.length === 1 && !acknowledgedStaleSpec) {
+    return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
+  }
   const continuity = eligibleAcknowledgeContinuity(state, prd, spec);
   if (continuity === null) return { ok: false, code: "PO-ACK-CONTINUITY" };
   const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
   const currentProfile = validCurrentPoProfile(profile);
   if (currentProfile === null) return { ok: false, code: "PO-ACK-PROFILE" };
-  const nextPrdBytes = appendAcknowledgementMarker(prd.bytes);
+  // A draft may retain a genuine PO acknowledgement while its technical Spec
+  // marker became stale before the first submission. The same attended,
+  // attributed acknowledgement rebinds only that computed marker.
+  const nextPrdBytes = acknowledgedStaleSpec
+    ? replaceRebindMarker(prd.bytes, marker, spec.sha256)
+    : appendAcknowledgementMarker(prd.bytes);
   if (nextPrdBytes === null) return { ok: false, code: "PO-ACK-PRD-MARKER" };
   const nextPrdSha256 = sha256Bytes(nextPrdBytes);
   const nextAuthority = {
@@ -6688,6 +6845,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
     schema: PO_ACK_PLAN_SCHEMA,
     root: realpathSync(resolve(dir)),
     by,
+    ...(runnerResolved.ok ? { runner: runnerResolved.runner } : {}),
     plannedAt,
     preimage: {
       state: { sha256: sha256Bytes(existing.raw), identity: stateFile.identity, updatedAt: state.updatedAt ?? null, continuityRevision: continuity.revision },
@@ -6773,13 +6931,29 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
         return 1;
       }
     }
-    const runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
-    if (!runnerResolved.ok) {
-      console.error(`Error: po-authority-acknowledge-apply refused (${runnerResolved.code}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
+    let runnerResolved = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    let runner = runnerResolved.ok ? runnerResolved.runner : null;
+    if (!runner && apply.runner === undefined) {
+      const existing = readStateRaw(deps.dir);
+      for (const candidateRunner of ["claude", "codex", "antigravity"]) {
+        const candidateDeps = {
+          ...deps,
+          acknowledgeBy: apply.by,
+          acknowledgeGlobalHumanApproval: globalChat,
+          acknowledgeRunner: candidateRunner,
+        };
+        const testPlan = buildPoAuthorityAcknowledgePlan(deps.dir, candidateDeps, existing, apply.plannedAt);
+        if (testPlan.ok && testPlan.planSha256 === apply.planSha256) {
+          runner = testPlan.payload.runner ?? candidateRunner;
+          break;
+        }
+      }
+    }
+    if (!runner) {
+      console.error(`Error: po-authority-acknowledge-apply refused (${runnerResolved.code ?? "PO-REBIND-RUNNER-UNKNOWN"}); no --runner was given and no recognized runner environment marker (CLAUDECODE, ANTIGRAVITY_AGENT, AI_AGENT, CODEX_SESSION_ID, CODEX_THREAD_ID) is set. Re-run with an explicit --runner claude|codex|antigravity instead of relying on a guessed default.`);
       return 2;
     }
-    const runner = runnerResolved.runner;
-    const ackDeps = { ...deps, acknowledgeBy: apply.by, acknowledgeGlobalHumanApproval: globalChat };
+    const ackDeps = { ...deps, acknowledgeBy: apply.by, acknowledgeGlobalHumanApproval: globalChat, acknowledgeRunner: runner };
     const lock = acquireContinuityLock(ackDeps.dir, PO_REBIND_LOCK_TOKEN, ackDeps);
     if (!lock.ok) { console.error(`Error: PO authority acknowledge refused (${lock.code}); zero mutation.`); return 2; }
     try {
@@ -6806,6 +6980,7 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     ...deps,
     acknowledgeBy: planBy,
     acknowledgeGlobalHumanApproval: committedGlobalChatHumanApproval(deps.dir, deps),
+    acknowledgeRunner: runnerResolved.runner,
   };
   const planned = buildPoAuthorityAcknowledgePlan(ackDeps.dir, ackDeps, existing);
   if (!planned.ok) {
@@ -8435,12 +8610,757 @@ function exactGeneratorAcknowledgementExemption({ dir, authority, deps }) {
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
  * touching the real filesystem/clock/git/environment.
  */
+
+function parseClosedEvidenceRestorePlan(argv) {
+  let featureId = null;
+  let artifactPath = null;
+  let by = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--feature-id" && i + 1 < argv.length) {
+      featureId = argv[++i];
+    } else if (argv[i] === "--artifact-path" && i + 1 < argv.length) {
+      artifactPath = argv[++i];
+    } else if (argv[i] === "--by" && i + 1 < argv.length) {
+      by = argv[++i];
+    }
+  }
+  if (!featureId || !by) return null;
+  return { featureId, artifactPath, by };
+}
+
+function parseClosedEvidenceRestoreApply(argv) {
+  let featureId = null;
+  let artifactPath = null;
+  let expectedSha256 = null;
+  let closeCommit = null;
+  let planSha256 = null;
+  let by = null;
+  let activate = false;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--feature-id" && i + 1 < argv.length) {
+      featureId = argv[++i];
+    } else if (argv[i] === "--artifact-path" && i + 1 < argv.length) {
+      artifactPath = argv[++i];
+    } else if (argv[i] === "--expected-sha256" && i + 1 < argv.length) {
+      expectedSha256 = argv[++i];
+    } else if (argv[i] === "--close-commit" && i + 1 < argv.length) {
+      closeCommit = argv[++i];
+    } else if (argv[i] === "--plan-sha256" && i + 1 < argv.length) {
+      planSha256 = argv[++i];
+    } else if (argv[i] === "--by" && i + 1 < argv.length) {
+      by = argv[++i];
+    } else if (argv[i] === "--activate") {
+      activate = true;
+    }
+  }
+  if (!featureId || !artifactPath || !expectedSha256 || !closeCommit || !planSha256 || !by || !activate || !SHA256_RE.test(planSha256)) return null;
+  return { featureId, artifactPath, expectedSha256, closeCommit, planSha256, by, activate };
+}
+
+/*
+ * Closed evidence is a state-bound protected surface.  Unlike ordinary
+ * writer paths it may legitimately be missing (restore recreates it), so the
+ * regular-file helper used by the authority rebind transaction cannot be used
+ * directly.  This deliberately narrow resolver keeps the same containment
+ * guarantees: canonical relative path only, no links in an existing parent
+ * chain, and no linked/non-regular target.  It never accepts an absolute or
+ * traversal path supplied through a forged apply command.
+ */
+function closedEvidenceArtifactTarget(dir, artifactPath, { createParents = false } = {}) {
+  if (typeof artifactPath !== "string" || artifactPath.length < 1 || artifactPath.length > 240
+    || isAbsolute(artifactPath) || artifactPath.includes("\\") || artifactPath.includes("\0")) return null;
+  const parts = artifactPath.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return null;
+  try {
+    const root = realpathSync(resolve(dir));
+    if (root !== resolve(dir) || !lstatSync(root).isDirectory()) return null;
+    let cursor = root;
+    for (const part of parts.slice(0, -1)) {
+      cursor = join(cursor, part);
+      if (!existsSync(cursor)) {
+        if (!createParents) return null;
+        mkdirSync(cursor);
+      }
+      const info = lstatSync(cursor);
+      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(cursor) !== cursor) return null;
+    }
+    const absolute = join(cursor, parts.at(-1));
+    if (!existsSync(absolute)) return { path: artifactPath, absolute, sha256: null };
+    const info = lstatSync(absolute);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(absolute) !== absolute) return null;
+    const bytes = readFileSync(absolute);
+    const after = lstatSync(absolute);
+    if (!after.isFile() || after.isSymbolicLink() || after.nlink !== 1
+      || info.dev !== after.dev || info.ino !== after.ino || info.mode !== after.mode
+      || info.size !== after.size || info.mtimeMs !== after.mtimeMs || realpathSync(absolute) !== absolute) return null;
+    return { path: artifactPath, absolute, sha256: sha256Bytes(bytes) };
+  } catch { return null; }
+}
+
+function closedEvidenceBinding(entry, artifactPath) {
+  const close = entry?.continuityClose;
+  if (!close || !/^[a-f0-9]{7,64}$/u.test(entry?.forCommit ?? "")) return null;
+  const candidates = [close.result, close.closeEvidence].filter(Boolean);
+  const binding = artifactPath === null || artifactPath === undefined
+    ? null
+    : candidates.find((candidate) => candidate?.path === artifactPath);
+  if (!binding || typeof binding.path !== "string" || !SHA256_RE.test(binding.sha256 ?? "")) return null;
+  return { binding, closeCommit: entry.forCommit };
+}
+
+function closedEvidenceRepairPayload({ action, dir, stateRaw, entry, binding, closeCommit, currentSha256, by, newSha256 = undefined }) {
+  return {
+    schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+    action,
+    featureId: entry.id,
+    artifactPath: binding.path,
+    ...(action === "restore" ? { expectedSha256: binding.sha256 } : { oldSha256: binding.sha256, newSha256 }),
+    closeCommit,
+    stateSha256: sha256Bytes(stateRaw),
+    currentSha256,
+    by,
+    root: realpathSync(resolve(dir)),
+  };
+}
+
+function confirmClosedEvidenceRepair({ action, apply, deps }) {
+  const globalChat = committedGlobalChatHumanApproval(deps.dir, deps);
+  if (globalChat) return { ok: true, humanApproval: chatAttributionRecord({ kind: `closed-evidence-${action}`, by: apply.by }) };
+  const confirmation = requireAttendedChatGateConfirmation({
+    summaryLines: [
+      `CLOSED EVIDENCE ${action.toUpperCase()} CONFIRMATION -- read before you type the value:`,
+      `  by: ${apply.by}`,
+      `  plan-sha256: ${apply.planSha256}`,
+      `  confirmation value: ${PO_ACK_APPLY_CONFIRMATION_TOKEN}`,
+    ],
+    expected: PO_ACK_APPLY_CONFIRMATION_TOKEN,
+    dependencies: deps,
+  });
+  return confirmation.ok ? { ok: true } : { ok: false, code: confirmation.code };
+}
+
+function runClosedEvidenceRestoreCommand(sub, rest, deps) {
+  const dir = deps.dir ?? projectDir();
+  const spawn = deps.spawn ?? spawnSync;
+
+  if (sub === "closed-evidence-restore-plan") {
+    const parsed = parseClosedEvidenceRestorePlan(rest);
+    if (!parsed) {
+      console.error("Error: closed-evidence-restore-plan requires --feature-id <id> --by <poName> [--artifact-path <path>].");
+      return 2;
+    }
+    const current = readStateRaw(dir);
+    if (current.status !== "ok") {
+      console.error("Error: pipeline-state is missing or malformed; zero mutation.");
+      return 2;
+    }
+    const state = current.state;
+    const entry = (state.closedFeatures ?? []).find((f) => f?.id === parsed.featureId);
+    if (!entry) {
+      console.error(`Error: feature "${parsed.featureId}" not found in closedFeatures.`);
+      return 2;
+    }
+    if (!entry.continuityClose) {
+      console.error(`Error: feature "${parsed.featureId}" has no continuityClose record.`);
+      return 2;
+    }
+    const close = entry.continuityClose;
+    let targetBinding = null;
+    if (parsed.artifactPath) {
+      if (close.result?.path === parsed.artifactPath) targetBinding = close.result;
+      else if (close.closeEvidence?.path === parsed.artifactPath) targetBinding = close.closeEvidence;
+      else {
+        console.error(`Error: artifact path "${parsed.artifactPath}" not bound in continuityClose.`);
+        return 2;
+      }
+    } else {
+      const fullResult = closedEvidenceArtifactTarget(dir, close.result?.path);
+      const resultDrifted = fullResult === null || fullResult.sha256 !== close.result?.sha256;
+      const fullEvidence = close.closeEvidence ? closedEvidenceArtifactTarget(dir, close.closeEvidence.path) : null;
+      const evidenceDrifted = close.closeEvidence && (fullEvidence === null || fullEvidence.sha256 !== close.closeEvidence.sha256);
+      if (resultDrifted) targetBinding = close.result;
+      else if (evidenceDrifted) targetBinding = close.closeEvidence;
+      else targetBinding = close.result;
+    }
+
+    const resolvedBinding = closedEvidenceBinding(entry, targetBinding?.path);
+    if (!resolvedBinding) {
+      console.error(`Error: closed feature "${parsed.featureId}" has an invalid protected artifact binding (${CLOSED_EVIDENCE_REPAIR_BINDING_CODE}).`);
+      return 2;
+    }
+    const { binding: protectedBinding, closeCommit } = resolvedBinding;
+    const artifactPath = protectedBinding.path;
+    const expectedSha256 = protectedBinding.sha256;
+    if (!closeCommit) {
+      console.error(`Error: closed feature "${parsed.featureId}" has no forCommit.`);
+      return 2;
+    }
+
+    const gitShow = spawn("git", ["show", `${closeCommit}:${artifactPath}`], { cwd: dir, encoding: "buffer" });
+    if (gitShow.status !== 0) {
+      console.error(`Error: failed to retrieve ${artifactPath} at commit ${closeCommit} via git show.`);
+      return 2;
+    }
+    const gitBytes = gitShow.stdout;
+    const gitSha = sha256Bytes(gitBytes);
+    if (gitSha !== expectedSha256) {
+      console.error(`Error: retrieved git bytes sha256 (${gitSha}) does not match pinned sha256 (${expectedSha256}).`);
+      return 2;
+    }
+
+    const target = closedEvidenceArtifactTarget(dir, artifactPath);
+    if (target === null) {
+      console.error(`Error: protected artifact path "${artifactPath}" is unsafe or unavailable for a repair plan (${CLOSED_EVIDENCE_REPAIR_PATH_CODE}).`);
+      return 2;
+    }
+    const payload = closedEvidenceRepairPayload({
+      action: "restore", dir, stateRaw: current.raw, entry, binding: protectedBinding,
+      closeCommit, currentSha256: target.sha256, by: parsed.by,
+    });
+    const planSha256 = sha256CanonicalJson(payload);
+    const writer = fileURLToPath(import.meta.url);
+    const applyAction = {
+      executable: process.execPath,
+      argv: [
+        writer,
+        "closed-evidence-restore-apply",
+        "--feature-id", entry.id,
+        "--artifact-path", artifactPath,
+        "--expected-sha256", expectedSha256,
+        "--close-commit", closeCommit,
+        "--plan-sha256", planSha256,
+        "--by", parsed.by,
+        "--activate",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary: "host-authorized-wsl",
+      expected: { schema: CLOSED_EVIDENCE_REPAIR_SCHEMA, statuses: ["applied", "replayed"] },
+    };
+    console.log(JSON.stringify({ ...payload, planSha256, applyAction }, null, 2));
+    return 0;
+  }
+
+  // apply
+  const apply = parseClosedEvidenceRestoreApply(rest);
+  if (!apply) {
+    console.error("Error: closed-evidence-restore-apply requires --feature-id, --artifact-path, --expected-sha256, --close-commit, --plan-sha256, --by, and --activate.");
+    return 2;
+  }
+
+  const confirmation = confirmClosedEvidenceRepair({ action: "restore", apply, deps });
+  if (!confirmation.ok) {
+    console.error(`Error: closed-evidence-restore-apply refused (${confirmation.code}); a PO must confirm the exact plan in an attended terminal.`);
+    return 1;
+  }
+
+  const lock = acquireContinuityLock(dir, "closed-evidence-restore", deps);
+  if (!lock.ok) {
+    console.error(`Error: closed-evidence-restore refused (${lock.code}); zero mutation.`);
+    return 2;
+  }
+  try {
+    const stateRaw = readStateRaw(dir);
+    if (stateRaw.status !== "ok") {
+      console.error("Error: pipeline-state is missing or malformed; zero mutation.");
+      return 2;
+    }
+    const entry = (stateRaw.state.closedFeatures ?? []).find((feature) => feature?.id === apply.featureId);
+    const resolvedBinding = closedEvidenceBinding(entry, apply.artifactPath);
+    if (!resolvedBinding || resolvedBinding.closeCommit !== apply.closeCommit || resolvedBinding.binding.sha256 !== apply.expectedSha256) {
+      console.error(`Error: closed-evidence-restore plan binding no longer matches closed state (${CLOSED_EVIDENCE_REPAIR_BINDING_CODE}); zero mutation.`);
+      return 2;
+    }
+    const target = closedEvidenceArtifactTarget(dir, apply.artifactPath);
+    if (target === null) {
+      console.error(`Error: protected artifact path "${apply.artifactPath}" is unsafe or unavailable (${CLOSED_EVIDENCE_REPAIR_PATH_CODE}); zero mutation.`);
+      return 2;
+    }
+    const payload = closedEvidenceRepairPayload({
+      action: "restore", dir, stateRaw: stateRaw.raw, entry, binding: resolvedBinding.binding,
+      closeCommit: resolvedBinding.closeCommit, currentSha256: target.sha256, by: apply.by,
+    });
+    if (sha256CanonicalJson(payload) !== apply.planSha256) {
+      console.error(`Error: closed-evidence-restore plan is stale or forged (${CLOSED_EVIDENCE_REPAIR_PLAN_CODE}); zero mutation.`);
+      return 2;
+    }
+
+  const gitShow = spawn("git", ["show", `${apply.closeCommit}:${apply.artifactPath}`], { cwd: dir, encoding: "buffer" });
+  if (gitShow.status !== 0) {
+    console.error(`Error: failed to retrieve ${apply.artifactPath} at commit ${apply.closeCommit} via git show.`);
+    return 2;
+  }
+  const gitBytes = gitShow.stdout;
+  const gitSha = sha256Bytes(gitBytes);
+  if (gitSha !== apply.expectedSha256) {
+    console.error(`Error: retrieved git bytes sha256 (${gitSha}) does not match expected (${apply.expectedSha256}).`);
+    return 2;
+  }
+
+  const fullPath = target.absolute;
+  const alreadyMatches = target.sha256 === apply.expectedSha256;
+  if (alreadyMatches) {
+    console.log(JSON.stringify({
+      schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+      status: "replayed",
+      action: "restore",
+      featureId: apply.featureId,
+      artifactPath: apply.artifactPath,
+      restoredSha256: apply.expectedSha256,
+      by: apply.by,
+      ...(confirmation.humanApproval ? { humanApproval: confirmation.humanApproval } : {}),
+      mutated: false,
+    }, null, 2));
+    return 0;
+  }
+
+  const writeTarget = closedEvidenceArtifactTarget(dir, apply.artifactPath, { createParents: true });
+  if (writeTarget === null || writeTarget.absolute !== fullPath) {
+      console.error(`Error: protected artifact path changed during restore (${CLOSED_EVIDENCE_REPAIR_PATH_CODE}); zero mutation.`);
+    return 2;
+  }
+  writeFileSync(fullPath, gitBytes);
+
+  console.log(JSON.stringify({
+    schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+    status: "applied",
+    action: "restore",
+    featureId: apply.featureId,
+    artifactPath: apply.artifactPath,
+    restoredSha256: apply.expectedSha256,
+    by: apply.by,
+    ...(confirmation.humanApproval ? { humanApproval: confirmation.humanApproval } : {}),
+    mutated: true,
+  }, null, 2));
+  return 0;
+  } finally {
+    releaseContinuityLock(lock);
+  }
+}
+
+function parseClosedEvidenceRepinPlan(argv) {
+  let featureId = null;
+  let artifactPath = null;
+  let by = null;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--feature-id" && i + 1 < argv.length) {
+      featureId = argv[++i];
+    } else if (argv[i] === "--artifact-path" && i + 1 < argv.length) {
+      artifactPath = argv[++i];
+    } else if (argv[i] === "--by" && i + 1 < argv.length) {
+      by = argv[++i];
+    }
+  }
+  if (!featureId || !by) return null;
+  return { featureId, artifactPath, by };
+}
+
+function parseClosedEvidenceRepinApply(argv) {
+  let featureId = null;
+  let artifactPath = null;
+  let oldSha256 = null;
+  let newSha256 = null;
+  let by = null;
+  let planSha256 = null;
+  let activate = false;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--feature-id" && i + 1 < argv.length) {
+      featureId = argv[++i];
+    } else if (argv[i] === "--artifact-path" && i + 1 < argv.length) {
+      artifactPath = argv[++i];
+    } else if (argv[i] === "--old-sha256" && i + 1 < argv.length) {
+      oldSha256 = argv[++i];
+    } else if (argv[i] === "--new-sha256" && i + 1 < argv.length) {
+      newSha256 = argv[++i];
+    } else if (argv[i] === "--by" && i + 1 < argv.length) {
+      by = argv[++i];
+    } else if (argv[i] === "--plan-sha256" && i + 1 < argv.length) {
+      planSha256 = argv[++i];
+    } else if (argv[i] === "--activate") {
+      activate = true;
+    }
+  }
+  if (!featureId || !artifactPath || !oldSha256 || !newSha256 || !by || !planSha256 || !activate || !SHA256_RE.test(planSha256)) return null;
+  return { featureId, artifactPath, oldSha256, newSha256, by, planSha256, activate };
+}
+
+function runClosedEvidenceRepinCommand(sub, rest, deps) {
+  const dir = deps.dir ?? projectDir();
+  const now = deps.now ?? (() => new Date().toISOString());
+
+  if (sub === "closed-evidence-repin-plan") {
+    const parsed = parseClosedEvidenceRepinPlan(rest);
+    if (!parsed) {
+      console.error("Error: closed-evidence-repin-plan requires --feature-id <id> --by <poName> [--artifact-path <path>].");
+      return 2;
+    }
+    const current = readStateRaw(dir);
+    if (current.status !== "ok") {
+      console.error("Error: pipeline-state is missing or malformed; zero mutation.");
+      return 2;
+    }
+    const state = current.state;
+    const entry = (state.closedFeatures ?? []).find((f) => f?.id === parsed.featureId);
+    if (!entry) {
+      console.error(`Error: feature "${parsed.featureId}" not found in closedFeatures.`);
+      return 2;
+    }
+    if (!entry.continuityClose) {
+      console.error(`Error: feature "${parsed.featureId}" has no continuityClose record.`);
+      return 2;
+    }
+    const close = entry.continuityClose;
+    let targetBinding = null;
+    if (parsed.artifactPath) {
+      if (close.result?.path === parsed.artifactPath) targetBinding = close.result;
+      else if (close.closeEvidence?.path === parsed.artifactPath) targetBinding = close.closeEvidence;
+      else {
+        console.error(`Error: artifact path "${parsed.artifactPath}" not bound in continuityClose.`);
+        return 2;
+      }
+    } else {
+      const fullResult = closedEvidenceArtifactTarget(dir, close.result?.path);
+      const resultDrifted = fullResult === null || fullResult.sha256 !== close.result?.sha256;
+      const fullEvidence = close.closeEvidence ? closedEvidenceArtifactTarget(dir, close.closeEvidence.path) : null;
+      const evidenceDrifted = close.closeEvidence && (fullEvidence === null || fullEvidence.sha256 !== close.closeEvidence.sha256);
+      if (resultDrifted) targetBinding = close.result;
+      else if (evidenceDrifted) targetBinding = close.closeEvidence;
+      else targetBinding = close.result;
+    }
+
+    const resolvedBinding = closedEvidenceBinding(entry, targetBinding?.path);
+    if (!resolvedBinding) {
+      console.error(`Error: closed feature "${parsed.featureId}" has an invalid protected artifact binding (${CLOSED_EVIDENCE_REPAIR_BINDING_CODE}).`);
+      return 2;
+    }
+    const { binding: protectedBinding, closeCommit } = resolvedBinding;
+    const artifactPath = protectedBinding.path;
+    const oldSha256 = protectedBinding.sha256;
+    const target = closedEvidenceArtifactTarget(dir, artifactPath);
+    if (target === null || target.sha256 === null) {
+      console.error(`Error: worktree file "${artifactPath}" is missing; cannot repin missing artifact.`);
+      return 2;
+    }
+    const newSha256 = target.sha256;
+    const payload = closedEvidenceRepairPayload({
+      action: "repin", dir, stateRaw: current.raw, entry, binding: protectedBinding,
+      closeCommit, currentSha256: target.sha256, newSha256, by: parsed.by,
+    });
+    const planSha256 = sha256CanonicalJson(payload);
+    const writer = fileURLToPath(import.meta.url);
+    const applyAction = {
+      executable: process.execPath,
+      argv: [
+        writer,
+        "closed-evidence-repin-apply",
+        "--feature-id", entry.id,
+        "--artifact-path", artifactPath,
+        "--old-sha256", oldSha256,
+        "--new-sha256", newSha256,
+        "--by", parsed.by,
+        "--plan-sha256", planSha256,
+        "--activate",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary: "host-authorized-wsl",
+      expected: { schema: CLOSED_EVIDENCE_REPAIR_SCHEMA, statuses: ["applied", "replayed"] },
+    };
+    console.log(JSON.stringify({ ...payload, planSha256, applyAction }, null, 2));
+    return 0;
+  }
+
+  // apply
+  const apply = parseClosedEvidenceRepinApply(rest);
+  if (!apply) {
+    console.error("Error: closed-evidence-repin-apply requires --feature-id, --artifact-path, --old-sha256, --new-sha256, --by, --plan-sha256, and --activate.");
+    return 2;
+  }
+
+  const confirmation = confirmClosedEvidenceRepair({ action: "repin", apply, deps });
+  if (!confirmation.ok) {
+    console.error(`Error: closed-evidence-repin-apply refused (${confirmation.code}); a PO must confirm the exact plan in an attended terminal.`);
+    return 1;
+  }
+
+  const lock = acquireContinuityLock(dir, "closed-evidence-repin", deps);
+  if (!lock.ok) {
+    console.error(`Error: closed-evidence-repin refused (${lock.code}); zero mutation.`);
+    return 2;
+  }
+  try {
+    const current = readState(dir);
+    if (current.status !== "ok") {
+      console.error("Error: pipeline-state is missing or malformed; zero mutation.");
+      return 2;
+    }
+    const base = current.state;
+    const baseRaw = readStateRaw(dir);
+    if (baseRaw.status !== "ok") {
+      console.error("Error: pipeline-state is missing or malformed; zero mutation.");
+      return 2;
+    }
+    const state = JSON.parse(JSON.stringify(base));
+    const entry = (state.closedFeatures ?? []).find((f) => f?.id === apply.featureId);
+    if (!entry || !entry.continuityClose) {
+      console.error(`Error: closed feature "${apply.featureId}" not found or has no continuityClose.`);
+      return 2;
+    }
+    const close = entry.continuityClose;
+    let targetBinding = null;
+    if (close.result?.path === apply.artifactPath) targetBinding = close.result;
+    else if (close.closeEvidence?.path === apply.artifactPath) targetBinding = close.closeEvidence;
+    else {
+      console.error(`Error: artifact path "${apply.artifactPath}" not bound in continuityClose.`);
+      return 2;
+    }
+
+    const target = closedEvidenceArtifactTarget(dir, apply.artifactPath);
+    if (target === null || target.sha256 === null) {
+      console.error(`Error: worktree file "${apply.artifactPath}" is missing.`);
+      return 2;
+    }
+    const actualWorktreeSha = target.sha256;
+    if (actualWorktreeSha !== apply.newSha256) {
+      console.error(`Error: worktree sha256 (${actualWorktreeSha}) does not match expected new sha256 (${apply.newSha256}).`);
+      return 2;
+    }
+
+    const resolvedBinding = closedEvidenceBinding(entry, apply.artifactPath);
+    if (!resolvedBinding || resolvedBinding.binding !== targetBinding) {
+      console.error(`Error: closed-evidence-repin binding is invalid (${CLOSED_EVIDENCE_REPAIR_BINDING_CODE}); zero mutation.`);
+      return 2;
+    }
+    const payload = closedEvidenceRepairPayload({
+      action: "repin", dir, stateRaw: baseRaw.raw, entry, binding: targetBinding,
+      closeCommit: resolvedBinding.closeCommit, currentSha256: actualWorktreeSha,
+      newSha256: apply.newSha256, by: apply.by,
+    });
+    if (sha256CanonicalJson(payload) !== apply.planSha256 || targetBinding.sha256 !== apply.oldSha256) {
+      console.error(`Error: closed-evidence-repin plan is stale or forged (${CLOSED_EVIDENCE_REPAIR_PLAN_CODE}); zero mutation.`);
+      return 2;
+    }
+
+    if (targetBinding.sha256 === apply.newSha256 && (state.evidenceRepins ?? []).some((r) => r.featureId === apply.featureId && r.artifactPath === apply.artifactPath && r.newSha256 === apply.newSha256)) {
+      console.log(JSON.stringify({
+        schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+        status: "replayed",
+        action: "repin",
+        featureId: apply.featureId,
+        artifactPath: apply.artifactPath,
+        oldSha256: apply.oldSha256,
+        newSha256: apply.newSha256,
+        by: apply.by,
+        ...(confirmation.humanApproval ? { humanApproval: confirmation.humanApproval } : {}),
+        mutated: false,
+      }, null, 2));
+      return 0;
+    }
+
+    targetBinding.sha256 = apply.newSha256;
+    if (!Array.isArray(state.evidenceRepins)) {
+      state.evidenceRepins = [];
+    }
+    const repinnedAt = now();
+    const auditEntry = {
+      featureId: apply.featureId,
+      artifactPath: apply.artifactPath,
+      oldSha256: apply.oldSha256,
+      newSha256: apply.newSha256,
+      repinnedAt,
+      by: apply.by,
+    };
+    state.evidenceRepins.push(auditEntry);
+    state.updatedAt = repinnedAt;
+
+    const written = writeState(dir, state, base, { reuseLock: lock });
+    if (!stateWriteSucceeded(written)) {
+      console.error("Error: failed to write updated state during repin.");
+      return 2;
+    }
+
+    console.log(JSON.stringify({
+      schema: CLOSED_EVIDENCE_REPAIR_SCHEMA,
+      status: "applied",
+      action: "repin",
+      featureId: apply.featureId,
+      artifactPath: apply.artifactPath,
+      oldSha256: apply.oldSha256,
+      newSha256: apply.newSha256,
+      repinnedAt,
+      by: apply.by,
+      ...(confirmation.humanApproval ? { humanApproval: confirmation.humanApproval } : {}),
+      mutated: true,
+    }, null, 2));
+    return 0;
+  } finally {
+    releaseContinuityLock(lock);
+  }
+}
+
+/**
+ * Authority gate worktree/HEAD divergence checking (WP-A5-iii, Issue #106, AC-5, IR-1).
+ *
+ * Compares each authority path's worktree bytes against HEAD (`git show HEAD:<path>`).
+ * Pre-commit checking is the gate's purpose, so worktree/HEAD divergence is emitted
+ * as a warning/diagnostic rather than a hard refusal.
+ * The PRD-cardinality check runs against both views and reports per view.
+ */
+export function checkPoGateAuthority(request = {}, deps = {}) {
+  const dir = request.repoRoot ?? deps.dir ?? projectDir();
+  const baseResult = (deps.validateAuthority ?? validatePoGateAuthorityForRepository)({ ...request, repoRoot: dir }, deps);
+
+  const spawn = deps.spawn ?? spawnSync;
+  const divergences = [];
+  let prdCardinality = {
+    worktree: { count: 0, paths: [], ok: false },
+    head: { count: 0, paths: [], ok: false },
+  };
+
+  try {
+    let featureDir = null;
+    let planPath = baseResult.value?.planPath ?? null;
+    let specPath = baseResult.value?.specPath ?? null;
+
+    if (planPath) {
+      featureDir = dirname(planPath).split(sep).join("/");
+    } else {
+      const state = readState(dir);
+      if (state.status === "ok" && state.state.activeFeature?.planPath) {
+        planPath = state.state.activeFeature.planPath;
+        featureDir = dirname(planPath).split(sep).join("/");
+        specPath = `${featureDir}/spec.md`;
+      }
+    }
+
+    if (featureDir) {
+      const resolvedFeatureDir = resolve(dir, featureDir);
+      let worktreePrds = [];
+      if (existsSync(resolvedFeatureDir)) {
+        try {
+          const files = readdirSync(resolvedFeatureDir);
+          worktreePrds = files
+            .filter((name) => /^prd_[^/\\]+\.md$/u.test(name))
+            .map((name) => `${featureDir}/${name}`)
+            .sort();
+        } catch {}
+      }
+      prdCardinality.worktree = {
+        count: worktreePrds.length,
+        paths: worktreePrds,
+        ok: worktreePrds.length === 1,
+      };
+
+      let headPrds = [];
+      const gitLs = spawn("git", ["ls-tree", "-r", "--name-only", "HEAD", featureDir], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+      if (gitLs.status === 0 && typeof gitLs.stdout === "string") {
+        const lines = gitLs.stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+        headPrds = lines
+          .filter((p) => /^prd_[^/\\]+\.md$/u.test(basename(p)))
+          .sort();
+      }
+      prdCardinality.head = {
+        count: headPrds.length,
+        paths: headPrds,
+        ok: headPrds.length === 1,
+      };
+
+      if (headPrds.length !== 1) {
+        divergences.push({
+          code: "AUTHORITY-WORKTREE-HEAD-DIVERGENCE",
+          path: featureDir,
+          divergence: "prd-cardinality-divergence",
+          message: `PRD cardinality in HEAD is ${headPrds.length}, expected 1.`,
+          headPrds,
+          worktreePrds,
+        });
+      }
+
+      const allAuthorityPaths = new Set([
+        ...(planPath ? [planPath] : []),
+        ...(specPath ? [specPath] : []),
+        ...worktreePrds,
+        ...headPrds,
+      ]);
+
+      for (const authPath of allAuthorityPaths) {
+        const fullWorktree = resolve(dir, authPath);
+        const existsInWorktree = existsSync(fullWorktree);
+        let worktreeSha256 = null;
+        if (existsInWorktree) {
+          try {
+            worktreeSha256 = sha256Bytes(readFileSync(fullWorktree));
+          } catch {}
+        }
+
+        const gitShow = spawn("git", ["show", `HEAD:${authPath}`], {
+          cwd: dir,
+          encoding: "buffer",
+        });
+        const existsInHead = gitShow.status === 0;
+        let headSha256 = null;
+        if (existsInHead) {
+          headSha256 = sha256Bytes(gitShow.stdout);
+        }
+
+        if (existsInWorktree && !existsInHead) {
+          divergences.push({
+            code: "AUTHORITY-WORKTREE-HEAD-DIVERGENCE",
+            path: authPath,
+            divergence: "missing-in-head",
+            message: `Authority path "${authPath}" exists in worktree but is untracked/unstaged in HEAD.`,
+            worktreeSha256,
+            headSha256: null,
+          });
+        } else if (!existsInWorktree && existsInHead) {
+          divergences.push({
+            code: "AUTHORITY-WORKTREE-HEAD-DIVERGENCE",
+            path: authPath,
+            divergence: "missing-in-worktree",
+            message: `Authority path "${authPath}" exists in HEAD but is missing in worktree.`,
+            worktreeSha256: null,
+            headSha256,
+          });
+        } else if (existsInWorktree && existsInHead && worktreeSha256 !== headSha256) {
+          divergences.push({
+            code: "AUTHORITY-WORKTREE-HEAD-DIVERGENCE",
+            path: authPath,
+            divergence: "differs",
+            message: `Authority path "${authPath}" differs between worktree and HEAD.`,
+            worktreeSha256,
+            headSha256,
+          });
+        }
+      }
+    }
+  } catch {
+    // Non-fatal git errors
+  }
+
+  return {
+    ...baseResult,
+    divergences,
+    prdCardinality,
+    warnings: [
+      ...(baseResult.warnings ?? []),
+      ...divergences,
+    ],
+    diagnostics: [
+      ...(baseResult.diagnostics ?? []),
+      ...divergences,
+    ],
+  };
+}
+
 export function run(argv = process.argv.slice(2), deps = {}) {
   const dir = deps.dir ?? projectDir();
   const now = deps.now ?? (() => new Date().toISOString());
   const gitHead = deps.gitHead ?? defaultGitHead;
   const gitCandidate = deps.gitCandidate ?? defaultGitCandidate;
-  const poGateAuthority = deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request));
+  const poGateAuthority = deps.poGateAuthority ?? ((request) => checkPoGateAuthority(request, deps));
 
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
@@ -8487,6 +9407,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   if (sub === "continuity-result-case-migration-plan" || sub === "continuity-result-case-migration-apply") {
     return runResultCaseMigrationCommand(sub, rest, { ...deps, dir, now });
   }
+  if (sub === "closed-evidence-restore-plan" || sub === "closed-evidence-restore-apply") {
+    return runClosedEvidenceRestoreCommand(sub, rest, { ...deps, dir, now });
+  }
+  if (sub === "closed-evidence-repin-plan" || sub === "closed-evidence-repin-apply") {
+    return runClosedEvidenceRepinCommand(sub, rest, { ...deps, dir, now });
+  }
   if (AUTHORITY_REVISION_SUBCOMMANDS.has(sub)) {
     return runAuthorityRevisionCommand(sub, rest, { ...deps, dir, now, gitCandidate });
   }
@@ -8520,22 +9446,95 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: set-feature requires --id <id> and --plan-path <path> (both non-empty).');
         return 2;
       }
-      if (base.continuity !== undefined) {
+      const hasActiveContinuity = base.continuity !== undefined
+        && !(base.continuity.revision === 0
+          && (base.activeFeature?.phase === "design" || base.activeFeature?.phase === undefined)
+          && base.continuity.authority?.result === null
+          && (base.continuity.queueHead?.dispatch === null || base.continuity.queueHead === null));
+      if (hasActiveContinuity) {
         console.error("Error: set-feature cannot replace an active continuity feature; close it through the revision/evidence-bound close gate first.");
         return 2;
       }
       const timestamp = now();
+
+      let prdSha256 = null;
+      let specSha256 = null;
+      let resolvedSpecPath = flags["spec-path"] ?? (dirname(planPath) === "." ? "spec.md" : join(dirname(planPath), "spec.md").split(sep).join("/"));
+
+      const auth = poGateAuthority({ repoRoot: dir });
+      if (auth?.ok && auth.value?.planPath === planPath) {
+        resolvedSpecPath = auth.value.specPath;
+        prdSha256 = auth.value.planSha256;
+        specSha256 = auth.value.specSha256;
+      }
+      const readFile = deps.readFile ?? readFileSync;
+      if (!prdSha256) {
+        try {
+          const content = readFile(resolve(dir, planPath));
+          prdSha256 = createHash("sha256").update(content).digest("hex");
+        } catch {
+          prdSha256 = "0".repeat(64);
+        }
+      }
+      if (!specSha256) {
+        try {
+          const content = readFile(resolve(dir, resolvedSpecPath));
+          specSha256 = createHash("sha256").update(content).digest("hex");
+        } catch {
+          specSha256 = "0".repeat(64);
+        }
+      }
+
+      const initialContinuity = {
+        schema: "pipeline.continuity.v0",
+        featureId: id,
+        revision: 0,
+        runtime: {
+          humanFacingLanguage: "en",
+          activeDuty: "Coordinator",
+          sessionCleanup: null,
+        },
+        authority: {
+          prd: { path: planPath, sha256: prdSha256 },
+          spec: { path: resolvedSpecPath, sha256: specSha256 },
+          result: null,
+        },
+        queueHead: {
+          packageId: "continuity-adoption",
+          actionId: "review-active-feature",
+          nextAction: "review",
+          productRetryCount: 0,
+          environmentRerouteCount: 0,
+          dispatch: null,
+        },
+        blocker: null,
+        acknowledgedFinal: null,
+        resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+        recovery: null,
+        decisionTxn: null,
+        closeTransition: null,
+        capacity: {
+          concurrencyLimit: 4,
+          reservedCriticSlots: 1,
+          reservedRecoverySlots: 1,
+          fallbackPolicy: "defer",
+        },
+      };
+
       const next = {
         ...base,
         schema: SCHEMA_ID,
         activeFeature: { id, planPath, phase: "design" },
         planApproved: false,
+        continuity: initialContinuity,
         updatedAt: timestamp,
       };
       delete next.planApproval;
       delete next.planRevocation;
       delete next.planSubmission;
       delete next.planInvalidation;
+      delete next.planCancellation;
+      delete next.planMixedStateRecovery;
       delete next.phase; // F1 fix: strip any legacy top-level `phase` left over from a
       // pre-fix file -- phase now lives exclusively at activeFeature.phase.
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
@@ -8544,6 +9543,18 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       syncNextActionDocs(dir, next);
       console.log(`Feature "${id}" set. Plan path: ${planPath}. planApproved=false, phase="design".`);
       return 0;
+    }
+
+    case "materialize-architecture": {
+      if (rest.length !== 0) { console.error("materialize-architecture accepts no arguments"); return 2; }
+      const lock = acquireContinuityLock(dir, "architecture-design-materialization");
+      if (!lock.ok) { console.error(JSON.stringify(lock)); return 2; }
+      try {
+        const result = materializeArchitectureDesign(dir, { lock });
+        console.log(JSON.stringify({ schema: "pipeline.architecture-design-materialization.v1", status: result.status,
+          code: result.code ?? null, receipt: result.receipt ?? null }));
+        return result.ok && result.status === "materialized" ? 0 : 2;
+      } finally { releaseContinuityLock(lock); }
     }
 
     case "set-phase": {
@@ -8564,6 +9575,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         }
         console.log('Phase already "design"; zero-write replay accepted.');
         return 0;
+      }
+      const architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
+        rootDir: dir,
+        taskScope: base.activeFeature?.planPath ?? null,
+        now: new Date(now()),
+      });
+      if (architecture.status !== "ready") {
+        console.error(`Error: set-phase implementation refused (${architecture.code}); ${architecture.message}`);
+        console.error(JSON.stringify({ schema: architecture.schema, code: architecture.code, nextAction: architecture.nextAction }));
+        return 2;
       }
       // NVA-CF-VERIFYDEADLOCK: the design->implementation transition is the one
       // sanctioned moment that may write project/pipeline.json's `verify` field --
@@ -8673,7 +9694,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // onboarding staging directory carries its own "not yet bound as
       // project authority" banner -- submit-plan must not bind it as
       // authority regardless of what else checks out.
-      const submitStagingRefusal = refusePlanAuthorityStagingPath({ rootDir: dir, planPath: authority.value.planPath, specPath: authority.value.specPath });
+      const submitStagingRefusal = refusePlanAuthorityStagingPath({
+        rootDir: dir,
+        planPath: authority.value.planPath,
+        specPath: authority.value.specPath,
+        readFileFn: deps.readFile ?? readFileSync,
+      });
       if (!submitStagingRefusal.ok) {
         console.error(`Error: submit-plan blocked by ${submitStagingRefusal.code}: ${submitStagingRefusal.message}`);
         return 2;
@@ -8801,6 +9827,104 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return 0;
     }
 
+
+    // NVA-G19: withdrawing a current submission is separate from revoking a
+    // granted approval. This only creates a cancellation receipt and cannot
+    // create or alter an approval.
+    case "cancel-submitted-plan": {
+      const parsed = parseExactFlags(rest, new Set(["by", "submission-sha256"]));
+      const by = parsed.ok ? parsed.value.by : undefined;
+      const expectedSubmissionSha256 = parsed.ok ? parsed.value["submission-sha256"] : undefined;
+      if (!parsed.ok || isBlank(by) || !SHA256_RE.test(expectedSubmissionSha256 ?? "")) {
+        console.error("Error: cancel-submitted-plan requires exactly --by <name> --submission-sha256 <64-lowercase-hex>.");
+        return 2;
+      }
+      const prior = base.planCancellation;
+      const retainedReplayTimestamp = prior !== null && typeof prior === "object"
+        && prior.submissionSha256 === expectedSubmissionSha256 && prior.cancelledBy === by
+        ? prior.cancelledAt
+        : null;
+      let cancelledAt;
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          cancelledAt = retainedReplayTimestamp ?? now();
+          const transition = cancelSubmittedPlan({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+            expectedSubmissionSha256,
+            by,
+            at: cancelledAt,
+          });
+          return transition.ok && !transition.replay
+            ? { ...transition, state: { ...transition.state, updatedAt: cancelledAt } }
+            : transition;
+        },
+        allowContinuityAdvance: true,
+        requirePhysicalReadback: true,
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: cancel-submitted-plan failed before commit (${written.code}); no cancellation was recorded.`);
+        return 2;
+      }
+      if (!written.replay) syncNextActionDocs(dir, written.transition.state);
+      console.log(written.replay
+        ? "Submitted plan is already cancelled; exact zero-write replay accepted."
+        : `Submitted plan cancelled by \"${by}\" on ${cancelledAt}; lifecycle=\"draft\".`);
+      return 0;
+    }
+
+    case "cancel-mixed-plan-state": {
+      const parsed = parseExactFlags(rest, new Set([
+        "by", "reason", "submission-sha256", "approval-sha256", "invalidation-sha256",
+      ]));
+      const value = parsed.ok ? parsed.value : {};
+      if (!parsed.ok || isBlank(value.by) || isBlank(value.reason)
+        || !SHA256_RE.test(value["submission-sha256"] ?? "")
+        || !SHA256_RE.test(value["approval-sha256"] ?? "")
+        || !SHA256_RE.test(value["invalidation-sha256"] ?? "")) {
+        console.error("Error: cancel-mixed-plan-state requires exactly --by <name> --reason <text> --submission-sha256 <64-lowercase-hex> --approval-sha256 <64-lowercase-hex> --invalidation-sha256 <64-lowercase-hex>.");
+        return 2;
+      }
+      const prior = base.planMixedStateRecovery;
+      const retainedReplayTimestamp = prior !== null && typeof prior === "object"
+        && prior.submissionSha256 === value["submission-sha256"]
+        && prior.approvalSha256 === value["approval-sha256"]
+        && prior.invalidationSha256 === value["invalidation-sha256"]
+        && prior.recoveredBy === value.by
+        && prior.reason === value.reason
+        ? prior.recoveredAt
+        : null;
+      let recoveredAt;
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          recoveredAt = retainedReplayTimestamp ?? now();
+          const transition = cancelMixedPlanState({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+            expectedSubmissionSha256: value["submission-sha256"],
+            expectedApprovalSha256: value["approval-sha256"],
+            expectedInvalidationSha256: value["invalidation-sha256"],
+            by: value.by,
+            at: recoveredAt,
+            reason: value.reason,
+          });
+          return transition.ok && !transition.replay
+            ? { ...transition, state: { ...transition.state, updatedAt: recoveredAt } }
+            : transition;
+        },
+        allowContinuityAdvance: true,
+        requirePhysicalReadback: true,
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: cancel-mixed-plan-state failed before commit (${written.code}); no recovery was recorded.`);
+        return 2;
+      }
+      if (!written.replay) syncNextActionDocs(dir, written.transition.state);
+      console.log(written.replay
+        ? "Mixed plan state is already cancelled; exact zero-write replay accepted."
+        : `Mixed plan state cancelled by "${value.by}" on ${recoveredAt}; lifecycle="draft".`);
+      return 0;
+    }
     // NVA-R22-PLANSHOWN: the mechanical record that the plan/design content was
     // actually rendered to the human before approval -- run after submit-plan,
     // before approve-plan. See the PLAN_PRESENTATION_SCHEMA doc comment above for
@@ -9016,7 +10140,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // depth -- a submission bound before this bolt existed, or written by
       // any other path, must not be approvable while its authority still
       // resolves inside the onboarding staging directory).
-      const approveStagingRefusal = refusePlanAuthorityStagingPath({ rootDir: dir, planPath: authority.value.planPath, specPath: authority.value.specPath });
+      const approveStagingRefusal = refusePlanAuthorityStagingPath({
+        rootDir: dir,
+        planPath: authority.value.planPath,
+        specPath: authority.value.specPath,
+        readFileFn: deps.readFile ?? readFileSync,
+      });
       if (!approveStagingRefusal.ok) {
         console.error(`Error: approve-plan blocked by ${approveStagingRefusal.code}: ${approveStagingRefusal.message}`);
         return 2;
@@ -9035,6 +10164,18 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error("Error: approve-plan requires a prior present-plan record bound to this exact submission -- an approval of unseen content is refused; run present-plan --by <name> first.");
         return 2;
       }
+      const advisorRequired = ["epic", "feature"].includes(base.planSubmission?.profile);
+      let designAdvisorAdmissionSha256 = null;
+      if (advisorRequired) {
+        const advisor = (deps.designAdvisoryAdmission ?? designAdvisoryAdmission)(
+          base, dir, authority.value.planPath, authority.value.specPath,
+        );
+        if (!advisor?.ok || !SHA256_RE.test(advisor.id ?? "")) {
+          console.error(`Error: approve-plan requires a current design Advisor admission for this ${base.planSubmission?.profile} (${advisor?.code ?? "DAA-PRIVATE-INVALID"}); complete the Advisor route before requesting final PO approval.`);
+          return 2;
+        }
+        designAdvisorAdmissionSha256 = advisor.id;
+      }
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
       const profileSha256 = sha256CanonicalJson(profile.value);
@@ -9044,7 +10185,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // bootstrapAcknowledgementRequired existed.  Otherwise an old-shaped
       // state in a signature repository could accept `--by` and bypass the
       // signed PRD/Spec acknowledgement entirely.
-      const usesSharedPolicy = approvalMode?.scope === "global";
+      const usesSharedPolicy = approvalMode?.scope === "global"
+        && (approvalMode.mode === "signature" || base.bootstrapAcknowledgementRequired === true);
       let by = approvalFlags.by;
       const receiptFlag = approvalFlags["bootstrap-acknowledgement-receipt"];
       // A global human-approval policy has exactly one policy-selected human
@@ -9093,6 +10235,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             profileSha256,
             by,
             at: approvedAt,
+            designAdvisorAdmissionSha256,
           });
           return transition.ok
             ? {
@@ -9708,9 +10851,30 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "close-feature": {
-      const by = flags.by;
+      // Closing is deliberately a closed argument grammar.  A direct legacy
+      // invocation cannot smuggle an ignored flag or bypass the private
+      // Critic/Verify + audit readback with a green-looking public object.
+      const closeValues = {};
+      const closeNames = new Set(["by", "architecture-impact", "coordinator-lifecycle", "coordinator-sha256", "critic-verify-lifecycle", "continuity-close-request"]);
+      let closeArgsValid = true;
+      for (let index = 0; index < rest.length; index += 2) {
+        const name = rest[index]; const value = rest[index + 1];
+        if (typeof name !== "string" || !name.startsWith("--") || value === undefined || value.startsWith("--")
+          || !closeNames.has(name.slice(2)) || Object.hasOwn(closeValues, name.slice(2))) { closeArgsValid = false; break; }
+        closeValues[name.slice(2)] = value;
+      }
+      const by = closeValues.by;
+      const architectureImpact = closeValues["architecture-impact"];
+      if (!closeArgsValid) {
+        console.error("Error: close-feature accepts only exact coordinator-bound closure arguments; no legacy bypass is available.");
+        return 2;
+      }
       if (isBlank(by)) {
         console.error('Error: close-feature requires --by <name> (non-empty) -- an unattributed close is refused.');
+        return 2;
+      }
+      if (!ARCHITECTURE_IMPACT_VALUES.includes(architectureImpact)) {
+        console.error(`Error: close-feature requires --architecture-impact <${ARCHITECTURE_IMPACT_VALUES.join("|")}>; an unclassified architecture close is refused.`);
         return 2;
       }
       const activeFeature = base.activeFeature;
@@ -9727,14 +10891,17 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       let coordinatorClose;
-      const coordinatorLifecycle = flags["coordinator-lifecycle"];
-      const coordinatorSha256 = flags["coordinator-sha256"];
-      if (coordinatorLifecycle !== undefined || coordinatorSha256 !== undefined) {
-        if (isBlank(coordinatorLifecycle) || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinatorLifecycle)
-          || !/^[0-9a-f]{64}$/u.test(coordinatorSha256 ?? "")) {
-          console.error("Error: close-feature coordinator binding requires exact --coordinator-lifecycle and --coordinator-sha256 values.");
-          return 2;
-        }
+      let auditReference;
+      let auditCandidate;
+      const coordinatorLifecycle = closeValues["coordinator-lifecycle"];
+      const coordinatorSha256 = closeValues["coordinator-sha256"];
+      const criticVerifyLifecycle = closeValues["critic-verify-lifecycle"];
+      if (isBlank(coordinatorLifecycle) || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinatorLifecycle)
+        || !/^[0-9a-f]{64}$/u.test(coordinatorSha256 ?? "") || !/^[0-9a-f]{64}$/u.test(criticVerifyLifecycle ?? "")) {
+        console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: close-feature requires the exact coordinator lifecycle/digest and private Critic/Verify lifecycle ID returned by finish-feature; direct or legacy close has zero mutation.");
+        return 2;
+      }
+      {
         const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
         if (!common?.ok) {
           console.error("Error: close-feature coordinator Git common directory is unavailable.");
@@ -9752,10 +10919,43 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           || coordinator.featureId !== activeFeature.id
           || coordinator.activeFeature?.id !== activeFeature.id
           || coordinator.activeFeature?.planPath !== activeFeature.planPath
+          || coordinator.architectureImpact !== architectureImpact
           || coordinator.authority?.pipelineStateSha256
             !== sha256Bytes(readFileSync(statePath(dir)))
           || closeCoordinatorDigest(coordinator) !== coordinatorSha256) {
           console.error("Error: close-feature coordinator is not bound to this exact feature-close-prepared State transition.");
+          return 2;
+        }
+        const audit = coordinator.featureCloseAudit;
+        if (!audit || audit.criticVerifyLifecycleId !== criticVerifyLifecycle) {
+          console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: coordinator is legacy or lacks the exact Critic/Verify lifecycle binding; preserve it and begin a new qualified close lifecycle.");
+          return 2;
+        }
+        try {
+          const receiptPath = physicalAuditPath(common.path, `agent-pipeline/publication-close/${coordinatorLifecycle}/evidence/feature-close-audit.json`);
+          assertPrivateRegularFile(receiptPath);
+          const saved = JSON.parse(readFileSync(receiptPath, "utf8"));
+          if (Object.keys(saved).sort().join("\0") !== "plan\0receipt") throw new Error("receipt shape");
+          const checked = validateFeatureCloseAuditReceipt({ repositoryRoot: dir, lifecycleId: coordinatorLifecycle,
+            expectedPlanSha256: audit.auditPlanSha256, plan: saved.plan, receipt: saved.receipt });
+          if (!checked.ok || checked.receiptSha256 !== audit.auditReceiptSha256 || saved.receipt.outputPath !== audit.outputPath) throw new Error(checked.code ?? "audit receipt drift");
+          const verifyPath = saved.plan.qualification.path;
+          const verifyBytes = readFileSync(physicalAuditPath(dir, verifyPath));
+          const verify = JSON.parse(verifyBytes);
+          const lifecycle = readCriticVerifyLifecycle({ gitCommonDir: common.path, id: criticVerifyLifecycle,
+            candidate: saved.plan.candidate, evidencePath: verifyPath, evidence: verify });
+          if (lifecycle.receiptSha256 !== audit.criticVerifyLifecycleReceiptSha256) throw new Error("Critic/Verify lifecycle drift");
+          auditReference = {
+            schema: "pipeline.feature-close-audit-reference.v1",
+            auditPlanSha256: audit.auditPlanSha256,
+            auditReceiptSha256: audit.auditReceiptSha256,
+            criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
+            criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
+            outputPath: audit.outputPath,
+          };
+          auditCandidate = saved.receipt.sourceCandidate;
+        } catch (error) {
+          console.error(`Error: CLOSE-AUDIT-READBACK: ${error?.message ?? "unavailable"}. Verified audit and Critic/Verify receipt are required; zero State mutation.`);
           return 2;
         }
         coordinatorClose = {
@@ -9767,8 +10967,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         };
       }
       let continuityClose;
-      if (base.continuity !== undefined) {
-        const closeRequest = readContinuityRequest(dir, flags["continuity-close-request"]);
+      const requiresContinuityClose = base.continuity !== undefined
+        && (closeValues["continuity-close-request"] !== undefined
+          || base.continuity.authority?.result !== null
+          || (base.activeFeature?.phase !== "design" && base.activeFeature?.phase !== undefined)
+          || base.continuity.revision > 0
+          || base.continuity.queueHead?.nextAction === "close");
+      if (requiresContinuityClose) {
+        const closeRequest = readContinuityRequest(dir, closeValues["continuity-close-request"]);
         if (!closeRequest.ok || !validateContinuityCloseRequest(dir, base, closeRequest.value)) {
           console.error("Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence.");
           return 2;
@@ -9792,16 +10998,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           }
         }
       }
-      // DEVIATION vs. approve-push (declared in the header): a git failure here is NOT fatal --
-      // forCommit becomes null, a warning goes to stderr, and the close proceeds (exit 0).
       const head = gitHead(dir);
-      let forCommit = null;
-      if (head.ok) {
-        forCommit = head.commit;
-      } else {
-        console.error(`Warning: current commit (git rev-parse HEAD) could not be determined: ${head.error}.`);
-        console.error("close-feature proceeds anyway -- forCommit is recorded as null.");
+      if (!head.ok || head.commit !== auditCandidate?.commit) {
+        console.error("Error: CLOSE-AUDIT-CANDIDATE-DRIFT: current HEAD must equal the verified audit candidate; zero State mutation.");
+        return 2;
       }
+      const forCommit = head.commit;
       const closedAt = now();
       const priorClosed = Array.isArray(base.closedFeatures) ? base.closedFeatures : [];
       if (continuityClose !== undefined) {
@@ -9820,12 +11022,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         id: activeFeature.id,
         planPath: activeFeature.planPath,
         phaseAtClose: activeFeature.phase ?? null,
+        architectureImpact,
         closedAt,
         closedBy: by,
         forCommit,
       };
       if (continuityClose !== undefined) closedEntry.continuityClose = continuityClose;
       if (coordinatorClose !== undefined) closedEntry.coordinatorClose = coordinatorClose;
+      if (auditReference !== undefined) closedEntry.auditReference = auditReference;
+      if (base.planCancellation !== undefined) closedEntry.planCancellation = base.planCancellation;
+      if (base.planMixedStateRecovery !== undefined) closedEntry.planMixedStateRecovery = base.planMixedStateRecovery;
       const next = {
         ...base,
         schema: SCHEMA_ID,
@@ -9838,6 +11044,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.planRevocation;
       delete next.planSubmission;
       delete next.planInvalidation;
+      delete next.planCancellation;
+      delete next.planMixedStateRecovery;
       delete next.continuity;
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
@@ -9880,10 +11088,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // already means the close ceremony is available, so this refuses for the same reason.
       // Never widen this to a heuristic ("was anything implemented").
       if (base.continuity === undefined) {
-        console.error('Error: discard-feature refused -- no active continuity gates this feature; close-feature is the route that is available (no Result requirement blocks it).');
-        return 2;
-      }
-      if (base.continuity.authority.result !== null) {
+        // A legacy state with no continuity cannot satisfy the current coordinator-close
+        // contract.  Record an honest discard instead of falsely advertising close-feature.
+      } else if (base.continuity.authority.result !== null) {
         console.error('Error: discard-feature refused -- continuity.authority.result already exists; close-feature is the route that is available.');
         return 2;
       }
@@ -9906,6 +11113,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         reason,
         forCommit: discardForCommit,
       };
+      if (base.planCancellation !== undefined) discardedEntry.planCancellation = base.planCancellation;
+      if (base.planMixedStateRecovery !== undefined) discardedEntry.planMixedStateRecovery = base.planMixedStateRecovery;
       const discardNext = {
         ...base,
         schema: SCHEMA_ID,
@@ -9918,8 +11127,69 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete discardNext.planRevocation;
       delete discardNext.planSubmission;
       delete discardNext.planInvalidation;
+      delete discardNext.planCancellation;
+      delete discardNext.planMixedStateRecovery;
       delete discardNext.continuity;
-      if (!stateWriteSucceeded(writeState(dir, discardNext, base))) {
+      const discardPostimage = clearGateEstimateForMutation(discardNext);
+      const discardPostimageSha256 = sha256Bytes(Buffer.from(`${JSON.stringify(discardPostimage, null, 2)}\n`));
+      const planRelease = deps.planOrphanSessionCleanupBindingReleaseFn
+        ?? planOrphanSessionCleanupBindingRelease;
+      const applyRelease = deps.applyOrphanSessionCleanupBindingReleaseFn
+        ?? applyOrphanSessionCleanupBindingRelease;
+      let releasePlan;
+      if (base.continuity === undefined || base.continuity?.runtime?.sessionCleanup == null) {
+        // Legacy state without a declared cleanup binding carries no private
+        // cleanup-binding contract, so there is no truthful release to plan.
+        releasePlan = { status: "not-needed" };
+      } else {
+        try {
+          releasePlan = planRelease({
+            rootDir: dir,
+            by,
+            reason,
+            featureId: activeFeature.id,
+            expectedStateAfterSha256: discardPostimageSha256,
+          });
+        } catch (error) {
+          const code = typeof error?.code === "string" ? error.code : "SESSION-CLEANUP-ORPHAN-RELEASE-FAILED";
+          console.error(`Error: discard-feature cleanup preflight refused before state commit (${code}); active feature and continuity were retained.`);
+          return 2;
+        }
+      }
+      const written = writeState(dir, discardNext, base, {
+        requirePhysicalReadback: true,
+        afterCommit() {
+          // A non-neutral legacy state has no private cleanup binding model. Its
+          // read-only plan explicitly proved that no release is needed, so never
+          // attempt a private runtime write after the public discard committed.
+          if (releasePlan.status === "not-needed") {
+            return { ok: true, status: "not-needed", release: null };
+          }
+          try {
+            const release = applyRelease({
+              plan: releasePlan,
+              expectedPlanSha256: releasePlan.planSha256,
+              stateLockHeld: true,
+            });
+            return { ok: true, status: "released", release };
+          } catch (error) {
+            return {
+              ok: false,
+              status: "orphan-cleanup-required",
+              code: typeof error?.code === "string"
+                ? error.code
+                : "SESSION-CLEANUP-ORPHAN-RELEASE-FAILED",
+              privateCommitted: error?.committed === true,
+            };
+          }
+        },
+      });
+      if (!written.ok) {
+        if (written.committed && written.afterCommit?.status === "orphan-cleanup-required") {
+          console.error(`Error: discard-feature public State committed; orphan-cleanup-required (${written.afterCommit.code}). Inspect session onboarding and replay the advertised release-orphan-binding action.`);
+        } else {
+          stateWriteSucceeded(written);
+        }
         return 2;
       }
       syncNextActionDocs(dir, discardNext);
@@ -10167,6 +11437,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         phase: base.activeFeature?.phase ?? null,
         planApproved: base.planApproved === true,
         lifecycle: { ok: lifecycle.ok, code: lifecycle.code, status: lifecycle.status },
+        mixedPlanRecovery: mixedPlanRecoveryObservation(base),
         pushApproval: base.pushApproval ?? null,
         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),

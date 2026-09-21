@@ -453,6 +453,27 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // push-prepare.mjs imports release-promotion-envelope.mjs.
   "plugins/pipeline-core/scripts/capture-evidence.mjs",
   "plugins/pipeline-core/lib/release-promotion-envelope.mjs",
+  // Alfred architecture-adoption, design-advisory, and candidate verification closure (GMWKC01):
+  "plugins/pipeline-core/lib/advisory-receipt.mjs",
+  "plugins/pipeline-core/lib/architecture-adoption-authority.mjs",
+  "plugins/pipeline-core/lib/architecture-adoption-orientation.mjs",
+  "plugins/pipeline-core/lib/architecture-design.mjs",
+  "plugins/pipeline-core/lib/architecture-map-scaffold.mjs",
+  "plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs",
+  "plugins/pipeline-core/lib/critic-diagnostic-packet.mjs",
+  "plugins/pipeline-core/lib/design-advisory-admission.mjs",
+  "plugins/pipeline-core/lib/design-advisory-enforcement.mjs",
+  "plugins/pipeline-core/lib/design-advisory-final-approval.mjs",
+  "plugins/pipeline-core/lib/design-advisory-transaction.mjs",
+  "plugins/pipeline-core/lib/governance-authority-resolver.mjs",
+  "plugins/pipeline-core/lib/protected-baseline.mjs",
+  "plugins/pipeline-core/scripts/architecture-adoption.mjs",
+  "plugins/pipeline-core/scripts/architecture-fitness.mjs",
+  "plugins/pipeline-core/scripts/architecture-remedy.mjs",
+  "plugins/pipeline-core/scripts/check-clone-provisioning.mjs",
+  "plugins/pipeline-core/scripts/governance-authority.mjs",
+  "plugins/pipeline-core/scripts/module-inventory.mjs",
+  "plugins/pipeline-core/scripts/rigor-floor.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

@@ -368,13 +368,18 @@ function writeAtomic(path, bytes, mode = 0o600, { windowsAssurance = true } = {}
   const temporary = join(parent, `.${basename(path)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
   const fd = openSync(temporary, "wx", mode);
   try {
-    writeFileSync(fd, bytes);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
+    try {
+      writeFileSync(fd, bytes);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(temporary, path);
+    fsyncDirectory(parent);
+  } catch (error) {
+    try { unlinkSync(temporary); } catch {}
+    throw error;
   }
-  renameSync(temporary, path);
-  fsyncDirectory(parent);
 }
 
 export function ensurePrimaryBranchExclude(repository) {
@@ -815,6 +820,7 @@ export function listActiveSessionDescriptors(startPath, options = {}) {
     fail("WT-SESSION-DESCRIPTOR-DIRECTORY", "session descriptor directory is unsafe");
   }
   const entries = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => !(entry.isFile() && !entry.isSymbolicLink() && entry.name.startsWith(".") && entry.name.endsWith(".tmp")))
     .sort((left, right) => left.name.localeCompare(right.name, "en"));
   return entries.map((entry) => {
     if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".json")) {

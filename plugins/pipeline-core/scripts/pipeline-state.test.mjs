@@ -1702,7 +1702,7 @@ function awaitingApprovalFixture() {
   const refused = (options, label) => {
     const root = fixture(options);
     const before = snapshot(root);
-    assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir: root, now: () => now }), 2, label);
+    assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir: root, now: () => now, architectureEntryReadiness: () => ({ status: "ready" }) }), 2, label);
     assert.deepEqual(snapshot(root), before, `${label}: State and every present calibration must remain byte-identical`);
   };
 
@@ -1719,7 +1719,7 @@ function awaitingApprovalFixture() {
     ["matching-dual", {}, ["project/pipeline.json", ".claude/pipeline.json"]],
   ]) {
     const root = fixture(options);
-    assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir: root, now: () => now }), 0, `${label} layout must remain supported`);
+    assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir: root, now: () => now, architectureEntryReadiness: () => ({ status: "ready" }) }), 0, `${label} layout must remain supported`);
     for (const path of expectedPaths) assert.equal(JSON.parse(readFileSync(join(root, path), "utf8")).verify, verifyCommand, `${label} must configure ${path}`);
   }
 
@@ -1732,6 +1732,13 @@ function awaitingApprovalFixture() {
 // this observable partial write as zero mutation.
 {
   const root = mktempProjectDir();
+  const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
+  for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
+    cpSync(join(repositoryRoot, directory), join(root, directory), { recursive: true });
+  }
+  mkdirSync(join(root, "specs/partial-calibration-io"), { recursive: true });
+  writeFileSync(join(root, "specs/partial-calibration-io/prd.md"), "Implement plugins/pipeline-core/scripts/pipeline-state.mjs\n", "utf8");
+
   const calibration = { project: "partial-calibration-io", verify: "node --test old.mjs", handover: "docs/state.md" };
   const calibrationPath = join(root, "project", "pipeline.json");
   const legacyPath = join(root, ".claude", "pipeline.json");
@@ -1746,6 +1753,13 @@ function awaitingApprovalFixture() {
     planApproved: true,
     planApproval: { approvedBy: "PO", approvedAt: now },
   }, null, 2));
+
+  fixtureAdoption({
+    rootDir: root,
+    decision: "approved-scoped",
+    scope: ["plugins/pipeline-core/", "architecture/map/", "project/pipeline.json", "pipeline.user.yaml", "specs/partial-calibration-io/"],
+    rationale: "partial calibration test fixture",
+  });
   const before = [readFileSync(calibrationPath, "utf8"), readFileSync(legacyPath, "utf8"), readFileSync(stateFile, "utf8")];
   const preload = join(root, "inject-partial-calibration-write.mjs");
   writeFileSync(preload, `import fs from "node:fs";

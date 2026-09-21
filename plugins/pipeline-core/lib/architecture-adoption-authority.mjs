@@ -7,13 +7,30 @@ import { spawnSync } from "node:child_process";
 import { createPoApprovalIntent, canonical } from "./po-approval-proof.mjs";
 import { readHumanApprovalMode, readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { loadMapBundle } from "../scripts/module-inventory.mjs";
-import moduleSchema from "../schemas/pipeline.module-inventory.v1.json" with { type: "json" };
+const moduleSchema = JSON.parse(readFileSync(new URL("../schemas/pipeline.module-inventory.v1.json", import.meta.url), "utf8"));
 export const loadAdoptionMap = root => loadMapBundle(root, moduleSchema);
 
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40,64}$/u;
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const hash = (value) => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
+
+// v2 binds a durable repository identity, not a checkout path.  HTTPS and SSH
+// spellings of the same origin intentionally produce the same fingerprint.
+export function repositoryFingerprintFor(rootDir) {
+  const origin = git(resolve(rootDir), ["remote", "get-url", "origin"]);
+  if (!origin) return hash({ schema: "pipeline.adoption-repository-identity.v2", fallbackPath: realpathSync(resolve(rootDir)) });
+  const normalized = origin.trim().replace(/^https?:\/\//u, "").replace(/^git@/u, "").replace(/^[^@/]+@/u, "").replace(/:/u, "/").replace(/\.git\/?$/u, "").replace(/\/+$/u, "").toLowerCase();
+  return hash({ schema: "pipeline.adoption-repository-identity.v2", origin: normalized });
+}
+
+// A signature cannot be rewritten.  This one known v1 path-bound deferral may
+// continue only through its review date and only when its signed candidate is
+// in this repository history.  New decisions always use v2 origin identity.
+const LEGACY_DEFERRED_PATH_FINGERPRINTS = new Set(["7d3e1210c7f22b6e7c83c214083c8c844098c049f46b796e116c214acf6fb5d3"]);
+function acceptsLegacyDeferredIdentity(rootDir, subject) {
+  return subject.decision === "deferred" && LEGACY_DEFERRED_PATH_FINGERPRINTS.has(subject.repositoryFingerprint) && git(rootDir, ["merge-base", "--is-ancestor", subject.candidate.commit, "HEAD"]) === "";
+}
 
 function git(root, args) {
   const out = spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
@@ -71,7 +88,7 @@ export function buildAdoptionSubject({ rootDir, decision, scope, rationale, deci
   const dates = { expiresAt: dateValue(expiresAt, "expiresAt"), reviewDate: dateValue(reviewDate, "reviewDate") };
   const snapshot = adoptionSnapshot(root, { model, effort });
   const subject = {
-    repositoryFingerprint: hash(realpathSync(root)),
+    repositoryFingerprint: repositoryFingerprintFor(root),
     decision,
     scope: scopeValue(scope),
     rationale: rationale.trim(),
@@ -131,7 +148,7 @@ export function verifyAdoptionAuthority({ rootDir, request, proof, chatApproval 
     if (!exact(request, ["schema", "mode", "intent", "subject", "subjectSha256"]) || request.schema !== "pipeline.adoption-approval-request.v1") throw new Error("ADOPTION-AUTHORITY-MISSING");
     validateSubject(request.subject);
     if (request.subjectSha256 !== hash(request.subject) || canonical(request.intent) !== canonical(intentFor(request.subject))) throw new Error("ADOPTION-AUTHORITY-INTENT-MISMATCH");
-    if (request.subject.repositoryFingerprint !== hash(realpathSync(rootDir))) throw new Error("ADOPTION-AUTHORITY-REPOSITORY-MISMATCH");
+    if (request.subject.repositoryFingerprint !== repositoryFingerprintFor(rootDir) && !acceptsLegacyDeferredIdentity(rootDir, request.subject)) throw new Error("ADOPTION-AUTHORITY-REPOSITORY-MISMATCH");
     if (requireCurrent && (canonical(request.subject.candidate) !== canonical(candidateFor(rootDir)) || Object.entries(adoptionSnapshot(rootDir)).some(([key, value]) => request.subject[key] !== value))) throw new Error("ADOPTION-AUTHORITY-INPUT-CHANGED");
   } catch (error) { return { ok: false, code: error.message }; }
   const mode = readHumanApprovalMode(rootDir);

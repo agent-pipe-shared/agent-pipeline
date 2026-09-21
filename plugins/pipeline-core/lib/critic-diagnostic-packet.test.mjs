@@ -19,6 +19,13 @@ function fixture(exitCode = 1) {
   const candidate = git(root, ["rev-parse", "HEAD"]);
   const diagnostic = produceCriticDiagnostic({ root, specPath: "spec.md", command: [process.execPath, "-e", `console.log('actual diagnostic'); process.exit(${exitCode})`], logPath: "evidence/targeted.log" });
   writeFileSync(join(root, "evidence/diagnostic.json"), JSON.stringify(diagnostic));
+  writeFileSync(join(root, "evidence", "dispatch-record-diagnostic-test.json"), `${JSON.stringify({
+    schema: "pipeline.dispatch-record.v4", taskId: "diagnostic-test", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+    rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit: candidate, resultSha256: null,
+    outcome: "in-progress", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    commits: [], log: [], report: null,
+    criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" },
+  })}\n`);
   const controlRoot = join(root, ".git/agent-pipeline/critic-packets"); mkdirSync(controlRoot, { recursive: true, mode: 0o700 }); chmodSync(join(controlRoot, ".."), 0o700); chmodSync(controlRoot, 0o700);
   return { root, controlRoot, diagnostic, options: { repoRoot: root, controlRoot, packetId: "a".repeat(32), taskId: "diagnostic-test", projectId: "pipeline", baseCommit: base, candidateCommit: candidate, rulesetOid: candidate, route: { routeId: "codex-critic", runner: "codex", adapter: "codex-functional-equivalent", provider: "openai", modelTier: "review", effortTier: "xhigh", assurance: CODEX_PACKET_ASSURANCE, projectionDigest: "b".repeat(64) }, references: [{ kind: "spec", path: "spec.md" }], evidencePaths: ["evidence/diagnostic.json"] } };
 }

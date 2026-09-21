@@ -90,6 +90,204 @@
       "file": "plugins/pipeline-core/scripts/rigor-floor.test.mjs",
       "invariantPinned": "Deterministic derivation of minimum rigor profile from mechanical inputs",
       "nonOverlapNote": "Unique test suite for rigor-floor.mjs"
+    },
+    {
+      "name": "check-audit-evidence-overview-tests",
+      "file": "harness/scripts/check-audit-evidence-overview.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for harness/scripts/check-audit-evidence-overview.test.mjs",
+      "nonOverlapNote": "Unique test suite for harness/scripts/check-audit-evidence-overview.test.mjs"
+    },
+    {
+      "name": "guard-push-promotion-tests",
+      "file": "plugins/pipeline-core/hooks/guard-push-promotion.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/hooks/guard-push-promotion.test.mjs"
+    },
+    {
+      "name": "agy-session-authority-tests",
+      "file": "plugins/pipeline-core/lib/agy-session-authority.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/agy-session-authority.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/agy-session-authority.test.mjs"
+    },
+    {
+      "name": "agy-session-dispatch-tests",
+      "file": "plugins/pipeline-core/lib/agy-session-dispatch.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/agy-session-dispatch.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/agy-session-dispatch.test.mjs"
+    },
+    {
+      "name": "architecture-adoption-orientation-tests",
+      "file": "plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs"
+    },
+    {
+      "name": "architecture-design-test-fixture-tests",
+      "file": "plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-design-test-fixture.test.mjs"
+    },
+    {
+      "name": "architecture-design-tests",
+      "file": "plugins/pipeline-core/lib/architecture-design.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-design.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-design.test.mjs"
+    },
+    {
+      "name": "architecture-entry-readiness-tests",
+      "file": "plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs"
+    },
+    {
+      "name": "architecture-map-scaffold-tests",
+      "file": "plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/architecture-map-scaffold.test.mjs"
+    },
+    {
+      "name": "critic-diagnostic-evidence-tests",
+      "file": "plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs"
+    },
+    {
+      "name": "critic-diagnostic-packet-tests",
+      "file": "plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs"
+    },
+    {
+      "name": "critic-lifecycle-admission-tests",
+      "file": "plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-lifecycle-admission.test.mjs"
+    },
+    {
+      "name": "critic-verify-lifecycle-tests",
+      "file": "plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs"
+    },
+    {
+      "name": "critical-action-authorization-chat-tests",
+      "file": "plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critical-action-authorization-chat.test.mjs"
+    },
+    {
+      "name": "design-advisory-admission-tests",
+      "file": "plugins/pipeline-core/lib/design-advisory-admission.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-admission.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-admission.test.mjs"
+    },
+    {
+      "name": "design-advisory-coordinator-tests",
+      "file": "plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-coordinator.test.mjs"
+    },
+    {
+      "name": "design-advisory-enforcement-tests",
+      "file": "plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-enforcement.test.mjs"
+    },
+    {
+      "name": "design-advisory-transaction-tests",
+      "file": "plugins/pipeline-core/lib/design-advisory-transaction.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/design-advisory-transaction.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/design-advisory-transaction.test.mjs"
+    },
+    {
+      "name": "feature-close-audit-executor-tests",
+      "file": "plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-executor.test.mjs"
+    },
+    {
+      "name": "feature-close-audit-preflight-tests",
+      "file": "plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-preflight.test.mjs"
+    },
+    {
+      "name": "feature-close-audit-receipt-tests",
+      "file": "plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/feature-close-audit-receipt.test.mjs"
+    },
+    {
+      "name": "pipeline-commit-tests",
+      "file": "plugins/pipeline-core/lib/pipeline-commit.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pipeline-commit.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pipeline-commit.test.mjs"
+    },
+    {
+      "name": "release-promotion-envelope-tests",
+      "file": "plugins/pipeline-core/lib/release-promotion-envelope.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/release-promotion-envelope.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/release-promotion-envelope.test.mjs"
+    },
+    {
+      "name": "agy-session-consent-tests",
+      "file": "plugins/pipeline-core/scripts/agy-session-consent.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/agy-session-consent.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/agy-session-consent.test.mjs"
+    },
+    {
+      "name": "cli-help-tests",
+      "file": "plugins/pipeline-core/scripts/cli-help.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/cli-help.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/cli-help.test.mjs"
+    },
+    {
+      "name": "close-coordinator-audit-lifecycle-tests",
+      "file": "plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/close-coordinator-audit-lifecycle.test.mjs"
+    },
+    {
+      "name": "elephant-agy-implementation-dispatch-tests",
+      "file": "plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/elephant-agy-implementation-dispatch.test.mjs"
+    },
+    {
+      "name": "elephant-implementation-dispatch-tests",
+      "file": "plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/elephant-implementation-dispatch.test.mjs"
+    },
+    {
+      "name": "finish-feature-tests",
+      "file": "plugins/pipeline-core/scripts/finish-feature.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/finish-feature.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/finish-feature.test.mjs"
+    },
+    {
+      "name": "goldfish-antigravity-live-host-tests",
+      "file": "plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs"
+    },
+    {
+      "name": "plugins-pipeline-core-scripts-pipeline-commit-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-commit.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-commit.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-commit.test.mjs"
+    },
+    {
+      "name": "pipeline-state-close-audit-tests",
+      "file": "plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs"
+    },
+    {
+      "name": "publication-close-audit-binding-tests",
+      "file": "plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs"
     }
   ]
 }
