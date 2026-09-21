@@ -4,11 +4,13 @@
 /** Translate provider-neutral guard exits into Codex PreToolUse denials. */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, read, realpathSync } from "node:fs";
+import { existsSync, read, readFileSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  isForbiddenCrossRepositoryMutation,
+  isReadOnlyDiagnosticCommand,
   isSanctionedLifecycleCommand,
   isSanctionedStartPreflightInvocation,
 } from "./guard-lifecycle-ready.mjs";
@@ -301,9 +303,45 @@ export function isBootstrapReadCommand(value, {
   catch { return false; }
 }
 
+/** Fast-path pure read-only in-root diagnostic commands to avoid heavyweight lifecycle scans. */
+export function isReadOnlyDiagnostic(toolName, command, projectRoot) {
+  return toolName === "Bash"
+    && !isForbiddenCrossRepositoryMutation(command, projectRoot)
+    && isReadOnlyDiagnosticCommand(command, projectRoot);
+}
+
+/** Check if an active, cryptographically bound session descriptor or bootstrap receipt exists. */
+export function hasActiveSessionAttestation(projectRoot, sessionId, agentId = null) {
+  if (!sessionId && !agentId) return false;
+  const commonGitDir = join(projectRoot, ".git");
+  if (sessionId) {
+    const descriptorPath = join(commonGitDir, "agent-pipeline", "session-descriptors", "active", `${sessionId}.json`);
+    try {
+      if (existsSync(descriptorPath)) {
+        const descriptor = JSON.parse(readFileSync(descriptorPath, "utf8"));
+        if (descriptor && descriptor.sessionId === sessionId) return true;
+      }
+    } catch { /* fail closed */ }
+  }
+  const effectiveAgentId = agentId ?? sessionId;
+  if (effectiveAgentId) {
+    const receiptPath = join(commonGitDir, "agent-pipeline", "bootstrap-receipt", `${effectiveAgentId}.json`);
+    try {
+      if (existsSync(receiptPath)) {
+        const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+        if (receipt && (receipt.agentId === effectiveAgentId || receipt.sessionId === effectiveAgentId)) return true;
+      }
+    } catch { /* fail closed */ }
+  }
+  return false;
+}
+
+const isReadOnlyDiagnosticCall = isReadOnlyDiagnostic(toolName, command, projectRoot);
+
 const lifecycleShouldRun = lifecycleGoverned
   && (!isLifecycleTool || isPrescribedBootstrapPreflight)
   && !isBootstrapReadCommand(command)
+  && !isReadOnlyDiagnosticCall
   && ["Bash", "Edit", "Write"].includes(toolName);
 const supportedTools = new Set(["Bash", "apply_patch", "Edit", "Write"]);
 if (!supportedTools.has(toolName)) {

@@ -129,6 +129,7 @@
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
 | pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap | closed | defect | pipeline | nova-b | 2026-09-20 | — | — |
 | pipeline.codex-plugin-validator-host-parity | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | — | 2026-08-09 | 2026-08-23 | — |
@@ -692,6 +693,6 @@
 
 - open: 29
 - in_progress: 0
-- closed: 639
+- closed: 640
 - rejected: 3
 - deferred: 11

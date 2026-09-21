@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e7d357a85d8e896b418e3d3b5703b638c08b59c3b2b6e60847fdbceaf5f62135"
+    "transitionHead": "54d8e9d6ef3ae9b9c55193159b3f245566245ab6eb705534163df8add1ea5afb"
   },
   "counts": {
     "open": 29,
     "in_progress": 0,
-    "closed": 639,
+    "closed": 640,
     "rejected": 3,
     "deferred": 11
   },
@@ -1706,6 +1706,20 @@
       "closureRepository": "self",
       "closureCommit": "05e6f1fe9ffa254841373bdc7a801aec9f1bffe8",
       "closureEvidence": "backlog/items/2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md"
+    },
+    {
+      "id": "pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-20",
+      "source": "Live 0.7 candidate bootstrap on 2026-09-20: pipeline-start-preflight, onboarding, hook freshness and governance all returned ready, while the nested Codex lifecycle guard denied an ordinary Git read as partial.",
+      "deferred": false,
+      "sprint": "nova-b",
+      "closedAt": "2026-09-20",
+      "closureRepository": "self",
+      "closureCommit": "0aeaef18f6e14edd2dc7271e36e4784237408ad6",
+      "closureEvidence": "plugins/pipeline-core/lib/worktree-lifecycle.mjs"
     },
     {
       "id": "pipeline.codex-plugin-validator-host-parity",
