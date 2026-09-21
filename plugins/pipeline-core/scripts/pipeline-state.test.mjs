@@ -2041,7 +2041,7 @@ function closeCollideFixture({
 }
 
 function closeCollideDeps(dir) {
-  return { dir, now: () => "2026-02-02T00:00:00.000Z", gitHead: () => ({ ok: true, commit: "c".repeat(40) }) };
+  return { dir, allowLegacyClose: false, now: () => "2026-02-02T00:00:00.000Z", gitHead: () => ({ ok: true, commit: "c".repeat(40) }) };
 }
 
 function closeCollidePriorEntry(overrides = {}) {
