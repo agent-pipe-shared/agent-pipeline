@@ -139,16 +139,7 @@ if (isDirectInvocation(import.meta.url)) {
   const prompt = toolInput.prompt ?? toolInput.message ?? "";
 
   let dispatches;
-  if (typeof subagentType === "string" && subagentType !== "" && typeof prompt === "string") {
-    dispatches = [{ subagentType, prompt, transport: codexDispatch ? "codex" : "direct" }];
-  } else if (["Task", "Agent"].includes(input?.tool_name)) {
-    dispatches = [{ subagentType, prompt, transport: "direct" }];
-  } else if (typeof toolInput.script === "string" && toolInput.script !== "") {
-    // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
-    // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
-    dispatches = extractWorkflowDispatches(toolInput.script).map((dispatch) => ({ ...dispatch, transport: "workflow" }));
-    if (dispatches.length === 0) process.exit(0);
-  } else if (Array.isArray(toolInput.Subagents)) {
+  if (Array.isArray(toolInput.Subagents)) {
     // Antigravity runner's native invoke_subagent shape: capitalized, array-wrapped.
     const malformed = toolInput.Subagents.length === 0 || toolInput.Subagents.some((entry) => !entry || typeof entry !== "object"
       || typeof entry.TypeName !== "string" || entry.TypeName.trim() === ""
@@ -156,6 +147,15 @@ if (isDirectInvocation(import.meta.url)) {
     dispatches = malformed
       ? [{ subagentType: "", prompt: "", transport: "antigravity" }]
       : extractAntigravityDispatches(toolInput.Subagents).map((dispatch) => ({ ...dispatch, transport: "antigravity" }));
+    if (dispatches.length === 0) process.exit(0);
+  } else if (typeof subagentType === "string" && subagentType !== "" && typeof prompt === "string") {
+    dispatches = [{ subagentType, prompt, transport: codexDispatch ? "codex" : "direct" }];
+  } else if (["Task", "Agent"].includes(input?.tool_name)) {
+    dispatches = [{ subagentType, prompt, transport: "direct" }];
+  } else if (typeof toolInput.script === "string" && toolInput.script !== "") {
+    // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
+    // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
+    dispatches = extractWorkflowDispatches(toolInput.script).map((dispatch) => ({ ...dispatch, transport: "workflow" }));
     if (dispatches.length === 0) process.exit(0);
   } else {
     process.exit(0);
@@ -169,7 +169,8 @@ if (isDirectInvocation(import.meta.url)) {
   const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
   if (blocked.length === 0) {
     const toolUseId = input?.tool_use_id ?? input?.toolUseId;
-    const bindingCapableTool = ["Task", "Agent", "Workflow"].includes(input?.tool_name);
+    const bindingCapableTool = ["Task", "Agent", "Workflow"].includes(input?.tool_name)
+      && !dispatches.some((dispatch) => dispatch.transport === "antigravity");
     const advisorBinding = bindingCapableTool
       ? prepareAdvisorProhibitionBindings(dispatches)
       : { status: "not-applicable" };
