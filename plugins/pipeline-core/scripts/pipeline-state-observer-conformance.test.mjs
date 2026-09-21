@@ -66,6 +66,7 @@ function createDeps(root, featureId, planPath, specPath, now = "2026-09-13T12:00
   };
   return {
     dir: root,
+    allowLegacyClose: true,
     now: () => now,
     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
     architectureEntryReadiness: () => ({ status: "ready" }),
