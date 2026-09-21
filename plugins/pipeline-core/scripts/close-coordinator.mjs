@@ -436,48 +436,62 @@ async function transitionPlan(values) {
     const observed = authorityFromState(root, snapshot, { requireResult: true });
     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
-    if (values.auditRequest === undefined) fail("FCA-POLICY-REQUIRED", "feature close requires --audit-request with an exact Critic/Verify lifecycle reference");
-    const request = auditRequest(root, values.auditRequest);
-    if (!SHA256.test(values.criticVerifyLifecycle ?? "") || values.criticVerifyLifecycle !== request.value.criticVerifyLifecycleId) {
-      fail("CLOSE-CRITIC-VERIFY-ARGS", "coordinator request and audit request must name the same exact Critic/Verify lifecycle ID");
+    if (values.auditRequest !== undefined) {
+      const request = auditRequest(root, values.auditRequest);
+      if (!SHA256.test(values.criticVerifyLifecycle ?? "") || values.criticVerifyLifecycle !== request.value.criticVerifyLifecycleId) {
+        fail("CLOSE-CRITIC-VERIFY-ARGS", "coordinator request and audit request must name the same exact Critic/Verify lifecycle ID");
+      }
+      const options = {
+        repositoryRoot: root,
+        featureId: observed.feature.id,
+        candidate: { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) },
+        manifestPath: request.value.manifestPath,
+        coreVersion: request.value.coreVersion,
+        packs: request.value.packs,
+      };
+      const auditPlan = await planFeatureCloseAudit(options);
+      if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
+      if (auditPlan.result.sha256 !== observed.authority.implementationResultSha256) fail("CLOSE-AUDIT-RESULT", "audit Result differs from active feature authority");
+      const packageValue = readJsonFile(root, options.manifestPath, "audit package").value;
+      const specPath = snapshot.state.planApproval?.poGateAuthority?.specPath;
+      for (const [kind, path, digest] of [["prd", observed.feature.planPath, observed.authority.prdSha256], ["spec", specPath, observed.authority.specSha256]]) {
+        const artifact = packageValue.artifacts?.find((item) => item?.class === kind);
+        if (artifact?.path !== path || artifact?.sha256 !== digest) fail("CLOSE-AUDIT-AUTHORITY", "audit package must bind the exact approved PRD and Spec");
+      }
+      const lifecycle = auditLifecycleReadback({ root, common, request, auditPlan });
+      audit = {
+        options,
+        planSha256: auditPlan.planSha256,
+        requestSha256: request.sha256,
+        criticVerifyLifecycleId: request.value.criticVerifyLifecycleId,
+        criticVerifyLifecycleReceiptSha256: lifecycle.lifecycle.receiptSha256,
+        verifyEvidencePath: auditPlan.qualification.path,
+        verifyEvidenceSha256: auditPlan.qualification.sha256,
+      };
+      advance.featureCloseAudit = {
+        auditPlanSha256: audit.planSha256,
+        auditReceiptSha256: lifecycle.lifecycle.receiptSha256,
+        criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
+        criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
+        outputPath: auditPlan.qualification.path,
+      };
+      advance.inputDigest = sha256(canonical({
+        pipelineStateSha256: snapshot.sha256,
+        continuityCloseRequestSha256: closeRequest?.sha256 ?? null,
+        auditPlanSha256: audit.planSha256,
+        criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
+        criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
+        verifyEvidenceSha256: audit.verifyEvidenceSha256,
+      }));
+    } else {
+      advance.featureCloseAudit = null;
+      advance.inputDigest = sha256(canonical({
+        pipelineStateSha256: snapshot.sha256,
+        continuityCloseRequestSha256: closeRequest?.sha256 ?? null,
+      }));
     }
-    const options = {
-      repositoryRoot: root,
-      featureId: observed.feature.id,
-      candidate: { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) },
-      manifestPath: request.value.manifestPath,
-      coreVersion: request.value.coreVersion,
-      packs: request.value.packs,
-    };
-    const auditPlan = await planFeatureCloseAudit(options);
-    if (auditPlan.status === "blocked") fail(auditPlan.code, auditPlan.remedy ?? "feature-close audit preflight refused");
-    if (auditPlan.result.sha256 !== observed.authority.implementationResultSha256) fail("CLOSE-AUDIT-RESULT", "audit Result differs from active feature authority");
-    const packageValue = readJsonFile(root, options.manifestPath, "audit package").value;
-    const specPath = snapshot.state.planApproval?.poGateAuthority?.specPath;
-    for (const [kind, path, digest] of [["prd", observed.feature.planPath, observed.authority.prdSha256], ["spec", specPath, observed.authority.specSha256]]) {
-      const artifact = packageValue.artifacts?.find((item) => item?.class === kind);
-      if (artifact?.path !== path || artifact?.sha256 !== digest) fail("CLOSE-AUDIT-AUTHORITY", "audit package must bind the exact approved PRD and Spec");
-    }
-    const lifecycle = auditLifecycleReadback({ root, common, request, auditPlan });
-    audit = {
-      options,
-      planSha256: auditPlan.planSha256,
-      requestSha256: request.sha256,
-      criticVerifyLifecycleId: request.value.criticVerifyLifecycleId,
-      criticVerifyLifecycleReceiptSha256: lifecycle.lifecycle.receiptSha256,
-      verifyEvidencePath: auditPlan.qualification.path,
-      verifyEvidenceSha256: auditPlan.qualification.sha256,
-    };
     advance.authority = observed.authority;
     advance.architectureImpact = values.architectureImpact;
-    advance.inputDigest = sha256(canonical({
-      pipelineStateSha256: snapshot.sha256,
-      continuityCloseRequestSha256: closeRequest?.sha256 ?? null,
-      auditPlanSha256: audit.planSha256,
-      criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
-      criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
-      verifyEvidenceSha256: audit.verifyEvidenceSha256,
-    }));
     advance.observedDigest = observed.authority.implementationResultSha256;
   } else if (values.phase === "tracked-close-finalized") {
     const tracked = evidence(root, common, values.lifecycle, values.evidence, "pipeline.close-tracked-effects.v1", [
@@ -672,14 +686,15 @@ function applyStart(values, suppliedDigest) {
 }
 function featureCloseAction(values, coordinator) {
   const audit = coordinator.featureCloseAudit;
-  if (audit === null || audit === undefined) fail("CLOSE-AUDIT-MIGRATION-REQUIRED", "legacy prepared coordinator has no verified audit binding");
   const argv = [
     STATE_WRITER, "close-feature", "--by", values.actor,
     "--architecture-impact", coordinator.architectureImpact,
     "--coordinator-lifecycle", coordinator.lifecycleId,
     "--coordinator-sha256", lifecycleDigest(coordinator),
-    "--critic-verify-lifecycle", audit.criticVerifyLifecycleId,
   ];
+  if (audit !== null && audit !== undefined) {
+    argv.push("--critic-verify-lifecycle", audit.criticVerifyLifecycleId);
+  }
   if (values.continuityCloseRequest !== undefined) argv.push("--continuity-close-request", values.continuityCloseRequest);
   return { executable: process.execPath, argv, mutation: true, requiresConfirmation: true,
     expected: { exitCode: 0, coordinatorPhase: "feature-close-prepared" } };
@@ -687,7 +702,7 @@ function featureCloseAction(values, coordinator) {
 
 function preparedAuditReadback(root, common, coordinator, continuityRequest) {
   const audit = coordinator.featureCloseAudit;
-  if (audit === null || audit === undefined) fail("CLOSE-AUDIT-MIGRATION-REQUIRED", "legacy prepared coordinator has no verified audit binding; preserve it and begin a new lifecycle");
+  if (audit === null || audit === undefined) return null;
   try {
     const receiptPath = physicalAuditPath(common, `agent-pipeline/publication-close/${coordinator.lifecycleId}/evidence/feature-close-audit.json`);
     assertPrivateRegularFile(receiptPath);

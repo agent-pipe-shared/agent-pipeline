@@ -67,6 +67,8 @@ function createDeps(root, featureId, planPath, specPath, now = "2026-09-13T12:00
   return {
     dir: root,
     now: () => now,
+    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
+    architectureEntryReadiness: () => ({ status: "ready" }),
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: () => ({
       ok: true,

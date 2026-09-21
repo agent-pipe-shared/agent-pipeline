@@ -62,6 +62,7 @@ import {
   validateFeaturePackage,
 } from "../../plugins/pipeline-core/lib/feature-package-topology.mjs";
 import { sha256CanonicalJson } from "../../plugins/pipeline-core/lib/plan-spec-state-v2.mjs";
+import { materializeArchitectureDesignFixture } from "../../plugins/pipeline-core/lib/architecture-design-test-fixture.mjs";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../../plugins/pipeline-core/lib/critical-action-approval-request.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
@@ -71,6 +72,8 @@ const PHOENIX_SPEC_BOUND_BY = "PO reauthorization for Phoenix R-14 digest bindin
 function freshDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `pipeline-state-${prefix}-`));
   ALL_DIRS.push(dir);
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "pipeline.json"), JSON.stringify({ schema: "pipeline.project.v1", verify: "echo ok" }) + "\n");
   return dir;
 }
 
@@ -784,6 +787,8 @@ function lifecycleDeps(dir, planPath, overrides = {}) {
     now: FIXED_NOW,
     poGateAuthority: injectedPoGateAuthority(planPath),
     poGateProfile: injectedPoGateProfile(),
+    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
+    architectureEntryReadiness: () => ({ status: "ready" }),
     ...overrides,
   };
 }
@@ -868,7 +873,7 @@ function seedSubprocessPoGateAuthority(dir, planPath) {
   const specBytes = Buffer.from("# Test Spec\n", "utf8");
   writeFileSync(specPath, specBytes);
   const specSha256 = createHash("sha256").update(specBytes).digest("hex");
-  writeFileSync(join(dir, planPath), `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${specSha256} -->\n# Test PRD\n`);
+  writeFileSync(join(dir, planPath), `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${specSha256} -->\n# Test PRD\nImplementation surface: \`src/index.mjs\`.\n`);
 
   const gitCommonDir = join(dir, ".git");
   const receipt = createPoGateProfileReceipt({
@@ -1154,7 +1159,7 @@ function canonicalFixtureJson(value) {
   ok(
     "PS06d planApproval is exact v4 and binds the submitted Plan, Spec, profile authority, and an empty audit seal",
     state.planSubmission?.schema === "pipeline.plan-submission.v1"
-      && state.planApproval?.schema === "pipeline.plan-approval.v4"
+      && state.planApproval?.schema === "pipeline.plan-approval.v5"
       && state.planApproval?.approvedBy === "po-test"
       && state.planApproval?.approvedAt === FIXED_NOW()
       && state.planApproval?.submissionSha256
@@ -1209,19 +1214,19 @@ function canonicalFixtureJson(value) {
   const successorPresented = run(["present-plan", "--by", "coordinator"], successorDeps);
   const successorApproved = run(["approve-plan", "--by", "po-test"], successorDeps);
   const legacy = readState(dir).state;
-  const { priorInvalidationSha256: _ignored, ...v3Approval } = legacy.planApproval;
-  const historicalV3 = {
+  const { priorInvalidationSha256: _ignored, designAdvisorAdmissionSha256: _d, ...v4Approval } = legacy.planApproval;
+  const historicalV4 = {
     ...legacy,
     planApproved: true,
-    planApproval: { ...v3Approval, schema: "pipeline.plan-approval.v3" },
+    planApproval: { ...v4Approval, schema: "pipeline.plan-approval.v4", priorInvalidationSha256: null },
   };
-  writeFileSync(statePath(dir), `${JSON.stringify(historicalV3, null, 2)}\n`);
+  writeFileSync(statePath(dir), `${JSON.stringify(historicalV4, null, 2)}\n`);
   const beforeSeal = readState(dir).state;
   const sealed = captureConsole(() => run(["seal-plan-approval"], successorDeps));
   const afterSeal = readState(dir).state;
-  ok("PS08a-1 fixture reopens a prior approval before retaining a successor v3 audit record", reopened === 0 && successorSubmitted === 0 && successorApproved === 0 && beforeSeal.planInvalidation?.schema === "pipeline.plan-invalidation.v1");
+  ok("PS08a-1 fixture reopens a prior approval before retaining a successor v4 audit record", reopened === 0 && successorSubmitted === 0 && successorApproved === 0 && beforeSeal.planInvalidation?.schema === "pipeline.plan-invalidation.v1");
   ok("PS08a-1a present-plan exit 0 for the successor submission", successorPresented === 0, `got ${successorPresented}`);
-  ok("PS08a-2 seal-plan-approval upgrades only a retained v3 approval and emits its audit receipt", sealed.value === 0 && sealed.text.includes("Plan approval audit seal written"));
+  ok("PS08a-2 seal-plan-approval upgrades only a retained v4 approval and emits its audit receipt", sealed.value === 0 && sealed.text.includes("Plan approval audit seal written"));
   ok(
     "PS08a-3 seal readback is exact v4 and binds the canonical retained invalidation",
     afterSeal.planApproved === true
@@ -1235,7 +1240,7 @@ function canonicalFixtureJson(value) {
   ok("PS08a-4 exact v4 readback permits the implementation lifecycle transition", run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], successorDeps) === 0);
   const beforeReplay = readFileSync(statePath(dir), "utf8");
   const replay = captureConsoleError(() => run(["seal-plan-approval"], successorDeps));
-  ok("PS08a-5 seal replay rejects the already-v4 approval without a false success claim or mutation", replay.value === 2 && replay.text.includes("PLAN-APPROVAL-SEAL-V3-REQUIRED") && readFileSync(statePath(dir), "utf8") === beforeReplay);
+  ok("PS08a-5 seal replay rejects the already-v4 approval without a false success claim or mutation", replay.value === 2 && replay.text.includes("PLAN-APPROVAL-SEAL-V4-REQUIRED") && readFileSync(statePath(dir), "utf8") === beforeReplay);
   const malformed = captureConsoleError(() => run(["seal-plan-approval", "--by", "po-test"], successorDeps));
   ok("PS08a-6 seal CLI refuses caller arguments without mutating the exact v4 readback", malformed.value === 2 && readFileSync(statePath(dir), "utf8") === beforeReplay);
 }
@@ -1272,7 +1277,7 @@ function canonicalFixtureJson(value) {
   const dir = freshDir("set-phase");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
   submitAndApprove(dir, "p1.md");
-  const code = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], { dir, now: FIXED_NOW });
+  const code = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], lifecycleDeps(dir, "p1.md"));
   ok("PS09a set-phase exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS09b phase updated (inside activeFeature, F1 fix)", state.activeFeature?.phase === "implementation");
@@ -1323,7 +1328,7 @@ function canonicalFixtureJson(value) {
   ok("PS12a1 subprocess continuity-init exit 0", continuity.status === 0, `stderr: ${continuity.stderr}`);
 
   const submitted = spawnSync(process.execPath, [
-    CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
+    CLI, "submit-plan", "--by", "coordinator", "--profile", "mini",
   ], {
     encoding: "utf8",
     env: e2eEnv,
@@ -1418,7 +1423,12 @@ function canonicalFixtureJson(value) {
   );
 
   const planPath = "specs/f1-integration/prd_f1-integration.md";
+  const userYaml = join(dir, "pipeline.user.yaml");
+  writeFileSync(userYaml, "schema: pipeline.user.v1\nlanguage:\n  human_facing: de\n  agent_facing: en\ngates:\n  human_approval: chat\n  push_approval: chat\n");
+  git("add", "pipeline.user.yaml");
+  git("commit", "-qm", "fixture: add pipeline policy source", "--", "pipeline.user.yaml");
   seedSubprocessPoGateAuthority(dir, planPath);
+  materializeArchitectureDesignFixture({ rootDir: dir, planPath });
 
   const env = { ...process.env, CLAUDE_PROJECT_DIR: dir };
   const r1 = spawnSync(process.execPath, [CLI, "set-feature", "--id", "f1-integration-test", "--plan-path", planPath], {
@@ -1434,7 +1444,7 @@ function canonicalFixtureJson(value) {
   );
   ok("PS14a-1 F1-integration: real continuity-init subprocess exit 0", continuity.status === 0, `stderr: ${continuity.stderr}`);
   const submitted = spawnSync(process.execPath, [
-    CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
+    CLI, "submit-plan", "--by", "coordinator", "--profile", "mini",
   ], { encoding: "utf8", env });
   ok("PS14a0 F1-integration: real submit-plan subprocess exit 0", submitted.status === 0, `stderr: ${submitted.stderr}`);
   const presented = spawnSync(process.execPath, [CLI, "present-plan", "--by", "coordinator"], { encoding: "utf8", env });
@@ -1552,7 +1562,7 @@ function canonicalFixtureJson(value) {
       observedDigest: B,
       operationSha256: D,
       ...(phase === "feature-close-prepared"
-        ? { authority: { ...coordinator.authority, implementationResultSha256: D }, architectureImpact: "no-architecture-impact" }
+        ? { authority: { ...coordinator.authority, implementationResultSha256: D }, architectureImpact: "no-architecture-impact", featureCloseAudit: null }
         : {}),
     });
   }
@@ -3812,6 +3822,8 @@ function runAuthorityRevisionTests() {
   // fires BEFORE the revision/preState staleness checks that the lifecycle transition's
   // own State writes would otherwise trip first.
   const { fx, request } = preparedRevision("ar03-decision-scope");
+  mkdirSync(join(fx.dir, "project"), { recursive: true });
+  writeFileSync(join(fx.dir, "project", "pipeline.json"), JSON.stringify({ schema: "pipeline.project.v1", verify: "echo ok" }) + "\n");
   const lifecycleDepsForFx = lifecycleDeps(fx.dir, fx.prdRel);
   const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], lifecycleDepsForFx);
   const presented = run(["present-plan", "--by", "coordinator"], lifecycleDepsForFx);

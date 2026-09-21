@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
-import { captureEvidence } from "../scripts/capture-evidence.mjs";
 import { validateVerifySelection } from "./verify-selection.mjs";
 
 export const CRITIC_DIAGNOSTIC_SCHEMA = "pipeline.critic-diagnostic-evidence.v1";
@@ -86,25 +85,4 @@ export function validateCriticDiagnostic(value, { root, candidate, spec = null, 
   if (diagnosticDigest(log) !== t.log.sha256 || !log.toString("utf8").startsWith("command: ") || !log.toString("utf8").includes(`\nlabel: ${t.label}\nexitCode: ${t.exitCode}\n--- stdout ---\n`) || !log.toString("utf8").includes("\n--- stderr ---\n")) fail("CDI-DIGEST");
   if (!Array.isArray(value.pending) || value.pending.some(id => typeof id !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(id)) || new Set(value.pending).size !== value.pending.length || (value.fullVerify.status === "not-run" && !value.pending.includes("full-verify"))) fail("CDI-PENDING");
   return { kind: "critic-diagnostic", fullVerify: value.fullVerify.status, targeted: { status: t.status, exitCode: t.exitCode, log: t.log }, pending: value.pending };
-}
-/** Execute, capture and bind an actual targeted run. No caller-supplied success flag. */
-export function produceCriticDiagnostic({ root, candidate = "HEAD", specPath, guardrailPaths = [], command, label = "targeted-check", logPath, fullVerifyPath = null, pending = [] }) {
-  const bound = candidateBinding(root, candidate);
-  if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
-  newDiagnosticPath(root, logPath);
-  if (!logPath.startsWith("evidence/") || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");
-  const spec = source(root, bound.commit, specPath);
-  const guardrails = [...new Set(guardrailPaths)].sort().map(path => source(root, bound.commit, path));
-  const captured = captureEvidence({ command, label, out: logPath, cwd: root, repoRoot: root });
-  if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
-  const fullVerify = { status: "not-run", evidence: null };
-  if (fullVerifyPath !== null) {
-    const bytes = readDiagnosticArtifact(root, fullVerifyPath);
-    const observed = inspectCriticVerifyDiagnostic(JSON.parse(bytes), bound);
-    if (observed.execution !== "full") fail("CDI-FULL-VERIFY");
-    fullVerify.status = observed.status; fullVerify.evidence = { path: fullVerifyPath, sha256: diagnosticDigest(bytes) };
-  }
-  const value = { schema: CRITIC_DIAGNOSTIC_SCHEMA, producer: "critic-diagnostic-evidence", assurance: "captured-process-output-not-host-attested", candidate: bound, spec, guardrails, fullVerify, targeted: { label, status: captured.exitCode === 0 ? "passed" : "failed", exitCode: captured.exitCode, log: { path: logPath, sha256: diagnosticDigest(readDiagnosticArtifact(root, logPath)) } }, pending: [...new Set([...pending, ...(fullVerify.status === "not-run" ? ["full-verify"] : [])])].sort() };
-  validateCriticDiagnostic(value, { root, candidate: bound, spec, guardrails });
-  return value;
 }

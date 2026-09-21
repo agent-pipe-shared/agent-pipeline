@@ -75,6 +75,7 @@ function lifecycleDeps(dir, planPath) {
     now: FIXED_NOW,
     poGateAuthority: injectedPoGateAuthority(planPath),
     poGateProfile: injectedPoGateProfile(),
+    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
   };
 }
 

@@ -9,7 +9,6 @@
  * Hermetics: every spawn sets CLAUDE_PROJECT_DIR to a fresh temp dir so this machine's
  * real .claude/pipeline.yaml / pipeline-state.json can never leak into these cases.
  */
-import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, rmSync } from "node:fs";
@@ -51,19 +50,19 @@ function writeAdvisorTransaction(dir, { unavailable = false } = {}) {
   return writeDesignAdvisoryTransaction(args);
 }
 
-function assertAdvisorLanes(dir, allowed, code = null) {
+function verifyAdvisorLanes(dir, allowed, code = null) {
   const direct = runGuard("Edit", "src/foo.ts", dir);
   const shell = evaluateLifecycleReadyGuard(
     { tool_name: "Bash", tool_input: { command: "cp scratch/change.ts src/foo.ts" } },
     { projectDir: dir, requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }) },
   );
-  assert.equal(direct.code, allowed ? 0 : 2, direct.stderr);
-  assert.equal(shell.exitCode, allowed ? 0 : 2, shell.stderr);
+  if (direct.code !== (allowed ? 0 : 2)) throw new Error(direct.stderr);
+  if (shell.exitCode !== (allowed ? 0 : 2)) throw new Error(shell.stderr);
   if (code !== null) {
-    assert.ok(direct.stderr.includes(code), direct.stderr);
-    assert.ok(shell.stderr.includes(code), shell.stderr);
-    assert.ok(direct.stderr.includes("reopen-design"), direct.stderr);
-    assert.ok(shell.stderr.includes("design-advisory-admission.mjs inspect"), shell.stderr);
+    if (!direct.stderr.includes(code)) throw new Error(direct.stderr);
+    if (!shell.stderr.includes(code)) throw new Error(shell.stderr);
+    if (!direct.stderr.includes("reopen-design")) throw new Error(direct.stderr);
+    if (!shell.stderr.includes("design-advisory-admission.mjs inspect")) throw new Error(shell.stderr);
   }
 }
 
@@ -236,7 +235,7 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
     stderrIncludes: ["approved", "set-phase"],
   });
   const initialized = spawnSync("git", ["init", "--quiet", dir], { encoding: "utf8" });
-  assert.equal(initialized.status, 0, initialized.stderr);
+  if (initialized.status !== 0) throw new Error(initialized.stderr);
   writeAuthorityDocs(dir);
   writeState(dir, v2AuthorityState({ repositoryFingerprint: "7".repeat(64) }));
   writeAdvisorTransaction(dir);
@@ -815,7 +814,7 @@ for (const variant of ["valid", "separate-common", "missing", "public-only", "ma
   }
   if (variant === "separate-common") {
     const moved = spawnSync("git", ["init", "--quiet", "--separate-git-dir", join(dir, "private-control"), dir], { encoding: "utf8" });
-    assert.equal(moved.status, 0, moved.stderr);
+    if (moved.status !== 0) throw new Error(moved.stderr);
   }
   const allowed = ["valid", "separate-common", "unavailable-approved"].includes(variant);
   const code = {
@@ -824,18 +823,18 @@ for (const variant of ["valid", "separate-common", "missing", "public-only", "ma
     "unavailable-no-final": "DAA-UNAVAILABLE-FINAL-APPROVAL",
     "unavailable-stale-candidate": "DAA-UNAVAILABLE-FINAL-APPROVAL",
   }[variant] ?? null;
-  assertAdvisorLanes(dir, allowed, code);
+  verifyAdvisorLanes(dir, allowed, code);
   const admission = designAdvisoryAdmission(state, dir, AUTHORITY_PLAN_PATH, AUTHORITY_SPEC_PATH);
-  assert.equal(admission.ok, allowed, JSON.stringify(admission));
-  if (variant === "stale-package") assert.equal(admission.code, "DAA-PUBLIC-INVALID");
+  if (admission.ok !== allowed) throw new Error(JSON.stringify(admission));
+  if (variant === "stale-package" && admission.code !== "DAA-PUBLIC-INVALID") throw new Error(admission.code);
   if (variant === "valid") {
     // A state path must be rejected before the final-authority/hash reader.
     for (const badPath of ["../outside.md", "/outside.md", "specs/../feature/prd.md", "specs\\\\feature\\\\prd.md"]) {
-      assert.equal(designAdvisoryAdmission(state, dir, badPath, AUTHORITY_SPEC_PATH).code, "DAA-PATH");
+      if (designAdvisoryAdmission(state, dir, badPath, AUTHORITY_SPEC_PATH).code !== "DAA-PATH") throw new Error("badPath");
     }
     if (process.platform !== "win32") {
       symlinkSync(join(dir, AUTHORITY_PLAN_PATH), join(dir, "plan-link.md"));
-      assert.equal(designAdvisoryAdmission(state, dir, "plan-link.md", AUTHORITY_SPEC_PATH).code, "DAA-PATH");
+      if (designAdvisoryAdmission(state, dir, "plan-link.md", AUTHORITY_SPEC_PATH).code !== "DAA-PATH") throw new Error("symlink");
     }
   }
   pass++;

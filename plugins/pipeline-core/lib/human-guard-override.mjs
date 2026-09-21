@@ -1230,11 +1230,29 @@ function patchPaths(command) {
   const normalized = command.replace(/\r\n/gu, "\n").replace(/\n+$/u, "");
   if (!normalized.startsWith("*** Begin Patch\n") || !normalized.endsWith("*** End Patch")) return null;
   const paths = [];
+  const moveSources = new Set();
+  let lastUpdateFile = null;
   for (const line of normalized.split("\n")) {
-    const match = line.match(/^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$/u);
-    if (match) paths.push(match[1]);
+    const updateMatch = line.match(/^\*\*\* Update File: (.+)$/u);
+    if (updateMatch) {
+      lastUpdateFile = updateMatch[1];
+      paths.push(lastUpdateFile);
+      continue;
+    }
+    const moveMatch = line.match(/^\*\*\* Move to: (.+)$/u);
+    if (moveMatch) {
+      if (lastUpdateFile) moveSources.add(lastUpdateFile);
+      paths.push(moveMatch[1]);
+      lastUpdateFile = null;
+      continue;
+    }
+    const match = line.match(/^\*\*\* (?:Add|Delete) File: (.+)$/u);
+    if (match) {
+      paths.push(match[1]);
+      lastUpdateFile = null;
+    }
   }
-  return paths.length > 0 ? paths : null;
+  return paths.length > 0 ? { paths, moveSources } : null;
 }
 
 function exactGitSubcommand(parsed) {
@@ -1770,10 +1788,11 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
       commandClass: "writer-owned-project-policy-emergency",
     };
   } else if (toolName === "apply_patch") {
-    const parsed = patchPaths(toolInput?.command);
-    if (!parsed) {
+    const parsedResult = patchPaths(toolInput?.command);
+    if (!parsedResult) {
       return { eligible: false, code: "HGO-NONOVERRIDABLE-GRAMMAR", paths };
     }
+    const { paths: parsed, moveSources } = parsedResult;
     const crossBoundaryPaths = [];
     const refusedPaths = [];
     const hardBoundaryPaths = [];
@@ -1805,7 +1824,8 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
       // One capability belongs to one physical authority plane. A patch may span
       // several files in one external Git repository, but never mix in-root and
       // out-of-root targets or bind ledgers from multiple external repositories.
-      if (paths.length > 0) {
+      const inRootTargets = paths.filter((p) => !moveSources.has(p));
+      if (inRootTargets.length > 0) {
         return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: classifiedPaths };
       }
       const targetRoots = crossBoundaryPaths.map((target) => crossRepositoryTargetRoot(target));

@@ -74,7 +74,13 @@ function injectedPoGateProfile() {
 }
 
 function lifecycleDeps(dir, planPath) {
-  return { dir, now: FIXED_NOW, poGateAuthority: injectedPoGateAuthority(planPath), poGateProfile: injectedPoGateProfile() };
+  return {
+    dir,
+    now: FIXED_NOW,
+    poGateAuthority: injectedPoGateAuthority(planPath),
+    poGateProfile: injectedPoGateProfile(),
+    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
+  };
 }
 
 function lifecycleContinuity(featureId, authority) {
@@ -199,7 +205,7 @@ test("the marker stays atomic with a real design -> implementation transition", 
     const approved = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, planPath));
     assert.equal(approved, 0);
 
-    const setPhase = run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir, now: FIXED_NOW });
+    const setPhase = run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir, now: FIXED_NOW, architectureEntryReadiness: () => ({ status: "ready" }) });
     assert.equal(setPhase, 0);
     assert.equal(JSON.parse(readFileSync(join(dir, "project/pipeline.json"), "utf8")).verify, verifyCommand);
     const afterSetPhase = checkStatePhaseConsistency({ rootDir: dir });

@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { produceCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+import { produceCriticDiagnostic } from "./critic-diagnostic-producer.mjs";
 import { deriveCriticExportView } from "./critic-export-policy.mjs";
 import { prepareCandidatePacket, inspectCandidatePacket } from "../scripts/critic-packet-preflight.mjs";
 import { CODEX_PACKET_ASSURANCE, prepareCodexPacketDispatch } from "../scripts/codex-critic-packet-host.mjs";

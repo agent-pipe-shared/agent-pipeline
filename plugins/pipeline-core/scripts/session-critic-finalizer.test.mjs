@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { produceCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
+import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -45,6 +45,32 @@ function fixture({ rootCandidate = false, targetedExitCode = 0 } = {}) {
     base = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
     const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
     writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
+    writeFileSync(join(root, "evidence", "dispatch-record-nova-b-lnd5.json"), JSON.stringify({
+      schema: "pipeline.dispatch-record.v3",
+      taskId: "nova-b-lnd5",
+      agentType: "default",
+      model: "gpt-5.6-luna",
+      effort: "medium",
+      rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+      dispatcher: "elephant",
+      outcome: "completed",
+      commits: [candidate],
+      candidateCommit: candidate,
+      resultSha256: "a".repeat(64),
+      log: [],
+      report: { text: "done", changedFiles: ["specs/spec.md"] },
+      criticRequired: {
+        schema: "pipeline.critic-required-decision.v1",
+        trigger: {
+          schema: "pipeline.critic-trigger-input.v1",
+          rigorLevel: 2,
+          riskClass: "high",
+          riskFlag: true,
+          diff: { mechanical: false, architecture: false, guardrails: true, security: false },
+        },
+        appliedRow: "T1",
+      },
+    }, null, 2));
     return { root, base, candidate, tree };
   }
   base = commit(root, "base");
@@ -54,6 +80,32 @@ function fixture({ rootCandidate = false, targetedExitCode = 0 } = {}) {
   // Deliberately untracked: the normal session preflight admits this local,
   // candidate-bound machine evidence without fabricating a candidate blob.
   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
+  writeFileSync(join(root, "evidence", "dispatch-record-nova-b-lnd5.json"), JSON.stringify({
+    schema: "pipeline.dispatch-record.v3",
+    taskId: "nova-b-lnd5",
+    agentType: "default",
+    model: "gpt-5.6-luna",
+    effort: "medium",
+    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+    dispatcher: "elephant",
+    outcome: "completed",
+    commits: [candidate],
+    candidateCommit: candidate,
+    resultSha256: "a".repeat(64),
+    log: [],
+    report: { text: "done", changedFiles: ["specs/spec.md"] },
+    criticRequired: {
+      schema: "pipeline.critic-required-decision.v1",
+      trigger: {
+        schema: "pipeline.critic-trigger-input.v1",
+        rigorLevel: 2,
+        riskClass: "high",
+        riskFlag: true,
+        diff: { mechanical: false, architecture: false, guardrails: true, security: false },
+      },
+      appliedRow: "T1",
+    },
+  }, null, 2));
   return { root, base, candidate, tree };
 }
 function verdict(overrides = {}) {

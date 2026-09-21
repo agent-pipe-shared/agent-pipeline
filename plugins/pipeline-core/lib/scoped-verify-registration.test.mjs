@@ -255,7 +255,7 @@ function scopedRegistrationFailureFixture() {
       writeFileSync(target, "// fixture target\n");
     }
 
-    const result = spawnSync(process.execPath, [writer], { cwd: fixtureRoot, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [writer, "--mode", "candidate"], { cwd: fixtureRoot, encoding: "utf8" });
     if (result.status === 0 || !existsSync(evidencePath)) return false;
     const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
     return evidence.exitCode !== 0

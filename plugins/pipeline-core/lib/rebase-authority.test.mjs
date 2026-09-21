@@ -132,6 +132,7 @@ function approvedState() {
     expectedSubmissionSha256: derivePlanLifecycle(awaiting).submissionSha256,
     poGateAuthority: AUTHORITY,
     profileSha256: PROFILE,
+    designAdvisorAdmissionSha256: "a".repeat(64),
     by: "PO",
     at: LATER,
   });

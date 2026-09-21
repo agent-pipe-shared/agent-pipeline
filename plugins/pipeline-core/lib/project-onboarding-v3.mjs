@@ -880,6 +880,14 @@ function isExistingGitMetadata(entry, root, fs) {
   return isSuccessfulSpawn(probe) && String(probe.stdout ?? "").trim() === "true";
 }
 
+function isUnbornEmptyGit(root, entries, fs) {
+  if (entries.length !== 1 || entries[0].name !== ".git" || entries[0].symlink) return false;
+  const gitPath = join(root, ".git");
+  if (!fs.existsSync(join(gitPath, "HEAD"))) return false;
+  const probe = fs.spawnSync("git", ["rev-parse", "--verify", "HEAD"], { cwd: root, encoding: "utf8" });
+  return !isSuccessfulSpawn(probe);
+}
+
 function isAdoptableUnmanagedRoot(entries, root, fs) {
   return entries.length > 0 && entries.every((entry) => {
     if (entry.name === ".git") return isExistingGitMetadata(entry, root, fs);
@@ -1438,7 +1446,7 @@ function legacyInspection(rootDir, fs) {
   try { entries = rootEntries(root, fs); } catch (error) { return { schema: LEGACY_SCHEMA, status: "unsafe", root, diagnostics: [diagnostic("$.root", "root_unreadable", error.message, "repair root access before onboarding")] }; }
   const link = entries.find((entry) => entry.symlink);
   if (link) return { schema: LEGACY_SCHEMA, status: "unsafe", root, diagnostics: [diagnostic(`$.entries.${link.name}`, "symlink_entry", "fresh onboarding rejects symbolic links", "use a real empty directory")], entries: entries.map((entry) => entry.name) };
-  if (entries.length === 0) return { schema: LEGACY_SCHEMA, status: "fresh", root, diagnostics: [], entries: [] };
+  if (entries.length === 0 || isUnbornEmptyGit(root, entries, fs)) return { schema: LEGACY_SCHEMA, status: "fresh", root, diagnostics: [], entries: entries.map((entry) => entry.name) };
   if (isHostControlLayout(root, entries, fs)) {
     return {
       schema: LEGACY_SCHEMA,
@@ -5022,7 +5030,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     after: describe(target.bytes),
     changed: true,
   }));
-  const initializesGit = !hostManaged && (inspected.status === "fresh" || !inspected.entries.includes(".git"));
+  const initializesGit = !hostManaged && !inspected.entries.includes(".git");
   const plan = { schema: PLAN_SCHEMA, status: "ready", root: inspected.root, state: inspected.status, intentSha256: sha256(JSON.stringify(stable(intent))), git: hostManaged ? { mode: "host-managed", initialBranch: null, version: null, initializesGit: false } : { mode: "local", initialBranch: "main", version: git.version, initializesGit }, targets, changes: targets.map((target) => target.path), runnerPermissions: runnerPermissionsReadback({ root: inspected.root, runner, repository: { mode: hostManaged ? "host-managed" : "local" }, fs }), requiresExplicitActivation: true, activation: { command: "apply --activate", createsGitRepository: initializesGit, createsCommit: false } };
   AUTHENTICATED.set(plan, { signature: JSON.stringify(plan), root: inspected.root, targets: internal, state: inspected.status, initializesGit, hostManaged, runner });
   return plan;

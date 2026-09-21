@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { diagnosticPath, newDiagnosticPath, produceCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
+import { diagnosticPath, newDiagnosticPath } from "../lib/critic-diagnostic-evidence.mjs";
+import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export function runCriticDiagnosticCli(argv) {

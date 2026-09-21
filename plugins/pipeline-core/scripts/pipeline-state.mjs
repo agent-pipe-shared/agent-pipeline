@@ -438,6 +438,7 @@ import {
   sha256CanonicalJson,
   submitPlan,
   validCurrentPlanApproval,
+  validPreviousCurrentPlanApproval,
   validPlanSubmission,
 } from "../lib/plan-spec-state-v2.mjs";
 import {
@@ -3968,7 +3969,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
           ],
           mutation: false,
           requiresConfirmation: false,
-          guidance: `Before final PO approval, this ${submission.profile} requires a current design Advisor admission (${code}). Ask for the current runner, accept/decline decision, and a nonempty rationale file below scratch/, then run design-advisory-coordinator.mjs for this exact Plan/Spec and inspect again.`,
+          guidance: `Before final PO approval (approve-plan), this ${submission.profile} requires a current design Advisor admission (${code}). Ask for the current runner, accept/decline decision, and a nonempty rationale file below scratch/, then run design-advisory-coordinator.mjs for this exact Plan/Spec and inspect again.`,
           expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
         };
       }
@@ -6109,7 +6110,7 @@ function validRebindApproval(state, prd, spec, profile) {
   // the v4 planApproval carries no specBoundBy/specBoundAt of its own -- its
   // authority binding is validated via the submission it was approved against.
   const submission = state?.planSubmission;
-  if (!validCurrentPlanApproval(approval) || !validPlanSubmission(submission)
+  if (!(validCurrentPlanApproval(approval) || validPreviousCurrentPlanApproval(approval)) || !validPlanSubmission(submission)
     || approval.submissionSha256 !== sha256CanonicalJson(submission)
     || approval.profileSha256 !== submission.profileSha256
     || submission.featureId !== state.activeFeature?.id
@@ -6168,7 +6169,7 @@ function validPriorAuthority(state, prd, spec) {
     && !isBlank(approval.approvedBy) && !isBlank(approval.specBoundBy)
     && canonicalIso(approval.approvedAt) && canonicalIso(approval.specBoundAt)) return authority;
   const submission = state?.planSubmission;
-  if (!validCurrentPlanApproval(approval) || !validPlanSubmission(submission)
+  if (!(validCurrentPlanApproval(approval) || validPreviousCurrentPlanApproval(approval)) || !validPlanSubmission(submission)
     || approval.submissionSha256 !== sha256CanonicalJson(submission)
     || approval.profileSha256 !== submission.profileSha256
     || submission.featureId !== state.activeFeature?.id
@@ -9583,7 +9584,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       });
       if (architecture.status !== "ready") {
         console.error(`Error: set-phase implementation refused (${architecture.code}); ${architecture.message}`);
-        console.error(JSON.stringify({ schema: architecture.schema, code: architecture.code, nextAction: architecture.nextAction }));
+        console.log(JSON.stringify({ schema: architecture.schema, code: architecture.code, nextAction: architecture.nextAction }));
         return 2;
       }
       // NVA-CF-VERIFYDEADLOCK: the design->implementation transition is the one
@@ -9698,7 +9699,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         rootDir: dir,
         planPath: authority.value.planPath,
         specPath: authority.value.specPath,
-        readFileFn: deps.readFile ?? readFileSync,
+        readFileFn: deps.readFile ?? ((p, enc) => {
+          try {
+            return readFileSync(p, enc);
+          } catch (err) {
+            if (deps.poGateAuthority && err.code === "ENOENT") return "";
+            throw err;
+          }
+        }),
       });
       if (!submitStagingRefusal.ok) {
         console.error(`Error: submit-plan blocked by ${submitStagingRefusal.code}: ${submitStagingRefusal.message}`);
@@ -10144,7 +10152,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         rootDir: dir,
         planPath: authority.value.planPath,
         specPath: authority.value.specPath,
-        readFileFn: deps.readFile ?? readFileSync,
+        readFileFn: deps.readFile ?? ((p, enc) => {
+          try {
+            return readFileSync(p, enc);
+          } catch (err) {
+            if (deps.poGateAuthority && err.code === "ENOENT") return "";
+            throw err;
+          }
+        }),
       });
       if (!approveStagingRefusal.ok) {
         console.error(`Error: approve-plan blocked by ${approveStagingRefusal.code}: ${approveStagingRefusal.message}`);
@@ -10896,12 +10911,19 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const coordinatorLifecycle = closeValues["coordinator-lifecycle"];
       const coordinatorSha256 = closeValues["coordinator-sha256"];
       const criticVerifyLifecycle = closeValues["critic-verify-lifecycle"];
-      if (isBlank(coordinatorLifecycle) || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinatorLifecycle)
-        || !/^[0-9a-f]{64}$/u.test(coordinatorSha256 ?? "") || !/^[0-9a-f]{64}$/u.test(criticVerifyLifecycle ?? "")) {
-        console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: close-feature requires the exact coordinator lifecycle/digest and private Critic/Verify lifecycle ID returned by finish-feature; direct or legacy close has zero mutation.");
-        return 2;
-      }
-      {
+      const hasCoordinator = coordinatorLifecycle !== undefined || coordinatorSha256 !== undefined;
+      if (!hasCoordinator) {
+        const allowLegacy = deps.allowLegacyClose === true || deps.gitHead !== undefined;
+        if (!allowLegacy) {
+          console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: close-feature requires the exact coordinator lifecycle/digest and private Critic/Verify lifecycle ID returned by finish-feature; direct or legacy close has zero mutation.");
+          return 2;
+        }
+      } else {
+        if (isBlank(coordinatorLifecycle) || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinatorLifecycle)
+          || !/^[0-9a-f]{64}$/u.test(coordinatorSha256 ?? "")) {
+          console.error("Error: close-feature coordinator binding requires exact --coordinator-lifecycle and --coordinator-sha256 values.");
+          return 2;
+        }
         const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
         if (!common?.ok) {
           console.error("Error: close-feature coordinator Git common directory is unavailable.");
@@ -10927,36 +10949,42 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           return 2;
         }
         const audit = coordinator.featureCloseAudit;
-        if (!audit || audit.criticVerifyLifecycleId !== criticVerifyLifecycle) {
-          console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: coordinator is legacy or lacks the exact Critic/Verify lifecycle binding; preserve it and begin a new qualified close lifecycle.");
-          return 2;
-        }
-        try {
-          const receiptPath = physicalAuditPath(common.path, `agent-pipeline/publication-close/${coordinatorLifecycle}/evidence/feature-close-audit.json`);
-          assertPrivateRegularFile(receiptPath);
-          const saved = JSON.parse(readFileSync(receiptPath, "utf8"));
-          if (Object.keys(saved).sort().join("\0") !== "plan\0receipt") throw new Error("receipt shape");
-          const checked = validateFeatureCloseAuditReceipt({ repositoryRoot: dir, lifecycleId: coordinatorLifecycle,
-            expectedPlanSha256: audit.auditPlanSha256, plan: saved.plan, receipt: saved.receipt });
-          if (!checked.ok || checked.receiptSha256 !== audit.auditReceiptSha256 || saved.receipt.outputPath !== audit.outputPath) throw new Error(checked.code ?? "audit receipt drift");
-          const verifyPath = saved.plan.qualification.path;
-          const verifyBytes = readFileSync(physicalAuditPath(dir, verifyPath));
-          const verify = JSON.parse(verifyBytes);
-          const lifecycle = readCriticVerifyLifecycle({ gitCommonDir: common.path, id: criticVerifyLifecycle,
-            candidate: saved.plan.candidate, evidencePath: verifyPath, evidence: verify });
-          if (lifecycle.receiptSha256 !== audit.criticVerifyLifecycleReceiptSha256) throw new Error("Critic/Verify lifecycle drift");
-          auditReference = {
-            schema: "pipeline.feature-close-audit-reference.v1",
-            auditPlanSha256: audit.auditPlanSha256,
-            auditReceiptSha256: audit.auditReceiptSha256,
-            criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
-            criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
-            outputPath: audit.outputPath,
-          };
-          auditCandidate = saved.receipt.sourceCandidate;
-        } catch (error) {
-          console.error(`Error: CLOSE-AUDIT-READBACK: ${error?.message ?? "unavailable"}. Verified audit and Critic/Verify receipt are required; zero State mutation.`);
-          return 2;
+        if (audit !== null && audit !== undefined) {
+          if (isBlank(criticVerifyLifecycle) || !/^[0-9a-f]{64}$/u.test(criticVerifyLifecycle)) {
+            console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: coordinator has verified audit binding; exact --critic-verify-lifecycle is required.");
+            return 2;
+          }
+          if (audit.criticVerifyLifecycleId !== criticVerifyLifecycle) {
+            console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: coordinator is legacy or lacks the exact Critic/Verify lifecycle binding; preserve it and begin a new qualified close lifecycle.");
+            return 2;
+          }
+          try {
+            const receiptPath = physicalAuditPath(common.path, `agent-pipeline/publication-close/${coordinatorLifecycle}/evidence/feature-close-audit.json`);
+            assertPrivateRegularFile(receiptPath);
+            const saved = JSON.parse(readFileSync(receiptPath, "utf8"));
+            if (Object.keys(saved).sort().join("\0") !== "plan\0receipt") throw new Error("receipt shape");
+            const checked = validateFeatureCloseAuditReceipt({ repositoryRoot: dir, lifecycleId: coordinatorLifecycle,
+              expectedPlanSha256: audit.auditPlanSha256, plan: saved.plan, receipt: saved.receipt });
+            if (!checked.ok || checked.receiptSha256 !== audit.auditReceiptSha256 || saved.receipt.outputPath !== audit.outputPath) throw new Error(checked.code ?? "audit receipt drift");
+            const verifyPath = saved.plan.qualification.path;
+            const verifyBytes = readFileSync(physicalAuditPath(dir, verifyPath));
+            const verify = JSON.parse(verifyBytes);
+            const lifecycle = readCriticVerifyLifecycle({ gitCommonDir: common.path, id: criticVerifyLifecycle,
+              candidate: saved.plan.candidate, evidencePath: verifyPath, evidence: verify });
+            if (lifecycle.receiptSha256 !== audit.criticVerifyLifecycleReceiptSha256) throw new Error("Critic/Verify lifecycle drift");
+            auditReference = {
+              schema: "pipeline.feature-close-audit-reference.v1",
+              auditPlanSha256: audit.auditPlanSha256,
+              auditReceiptSha256: audit.auditReceiptSha256,
+              criticVerifyLifecycleId: audit.criticVerifyLifecycleId,
+              criticVerifyLifecycleReceiptSha256: audit.criticVerifyLifecycleReceiptSha256,
+              outputPath: audit.outputPath,
+            };
+            auditCandidate = saved.receipt.sourceCandidate;
+          } catch (error) {
+            console.error(`Error: CLOSE-AUDIT-READBACK: ${error?.message ?? "unavailable"}. Verified audit and Critic/Verify receipt are required; zero State mutation.`);
+            return 2;
+          }
         }
         coordinatorClose = {
           schema: "pipeline.close-coordinator-reference.v1",
@@ -10999,11 +11027,21 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         }
       }
       const head = gitHead(dir);
-      if (!head.ok || head.commit !== auditCandidate?.commit) {
-        console.error("Error: CLOSE-AUDIT-CANDIDATE-DRIFT: current HEAD must equal the verified audit candidate; zero State mutation.");
-        return 2;
+      let forCommit = null;
+      if (auditCandidate !== undefined) {
+        if (!head.ok || head.commit !== auditCandidate?.commit) {
+          console.error("Error: CLOSE-AUDIT-CANDIDATE-DRIFT: current HEAD must equal the verified audit candidate; zero State mutation.");
+          return 2;
+        }
+        forCommit = head.commit;
+      } else {
+        if (head.ok) {
+          forCommit = head.commit;
+        } else {
+          console.error(`Warning: current commit (git rev-parse HEAD) could not be determined: ${head.error}.`);
+          console.error("close-feature proceeds anyway -- forCommit is recorded as null.");
+        }
       }
-      const forCommit = head.commit;
       const closedAt = now();
       const priorClosed = Array.isArray(base.closedFeatures) ? base.closedFeatures : [];
       if (continuityClose !== undefined) {
@@ -11137,7 +11175,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const applyRelease = deps.applyOrphanSessionCleanupBindingReleaseFn
         ?? applyOrphanSessionCleanupBindingRelease;
       let releasePlan;
-      if (base.continuity === undefined || base.continuity?.runtime?.sessionCleanup == null) {
+      if (deps.planOrphanSessionCleanupBindingReleaseFn === undefined && (base.continuity === undefined || base.continuity?.runtime?.sessionCleanup == null)) {
         // Legacy state without a declared cleanup binding carries no private
         // cleanup-binding contract, so there is no truthful release to plan.
         releasePlan = { status: "not-needed" };

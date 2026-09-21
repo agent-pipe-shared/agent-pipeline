@@ -942,10 +942,43 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       })}\n`);
 
       // Re-enter only through the public driver. It observes the proof,
-      // executes the exact acknowledgement/bind actions, then consumes that
-      // one receipt and enters implementation without accepting --by as a
-      // substitute for the signature or asking for a second activation.
-      const approval = freshDriver(path, runner, env);
+      // executes the exact acknowledgement/bind actions, submits and presents
+      // the plan, coordinates the required design advisory, and enters
+      // implementation without accepting --by as a substitute for the signature.
+      const preApproval = freshDriver(path, runner, env);
+      const preState = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
+      const stagedDesign = spawnSync("git", ["add", "--", "."], { cwd: path, encoding: "utf8" });
+      assert.equal(stagedDesign.status, 0, stagedDesign.stderr);
+      const committedDesign = spawnSync("git", ["-c", "user.name=Greenfield E2E PO", "-c", "user.email=greenfield-e2e@example.invalid", "commit", "-m", "test: bind greenfield design package\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)"], { cwd: path, encoding: "utf8" });
+      assert.equal(committedDesign.status, 0, committedDesign.stderr);
+
+      const advisory = await coordinateDesignAdvisory({
+        repoRoot: path,
+        runtime: { runner, profile: "feature" },
+        featureId: preState.activeFeature.id,
+        planPath: preState.activeFeature.planPath,
+        specPath: preState.planSubmission.specPath,
+        disposition: { decision: "accept", rationale: "The independent design review is bounded and accepted." },
+        invokeBridge: async ({ receiptPath, input }) => {
+          const selector = { kind: "model-id", value: runner === "claude" ? "claude-sonnet" : runner === "antigravity" ? "gemini-3-flash" : "gpt-5.6-sol" };
+          const receipt = { schema: "pipeline.advisory-receipt.v1", receiptId: input.receiptId,
+            dispatch: structuredClone(input.dispatch), duty: "advisory", profile: input.profile,
+            configuredRoute: { runner, selector, effort: "high" }, adapter: "consult",
+            observed: { status: "answered", identity: { provider: runner === "claude" ? "anthropic" : runner === "antigravity" ? "google" : "openai", modelId: selector.value, effort: "high" } },
+            questionSha256: createHash("sha256").update(input.question).digest("hex"),
+            answerSha256: createHash("sha256").update("Use a bounded review.").digest("hex"),
+            fallback: { reason: "none", redactedErrorClass: null }, emittedAtMs: 1 };
+          writeFileSync(receiptPath, JSON.stringify(receipt) + "\n", { mode: 0o600 });
+          return 0;
+        },
+      });
+      assert.equal(advisory.status, "admitted", `${runner}: the mandatory Advisor transaction must bind before implementation`);
+
+      const postApproval = freshDriver(path, runner, env);
+      const approval = {
+        ...postApproval,
+        steps: [...preApproval.steps, ...postApproval.steps],
+      };
       assert.equal(approval.outcome, "ready", `${runner}: ${JSON.stringify(approval)}`);
       assert.equal(approval.final.status, "ready");
       const planSteps = approval.steps.map((step) => step.argv);
@@ -982,33 +1015,6 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(inspectArchitectureDesign(path).code, "ARCHITECTURE-DESIGN-RECEIPT-STALE");
       writeFileSync(receiptPath, receiptBytes);
       assert.equal(inspectArchitectureDesign(path).status, "materialized");
-
-      const stagedDesign = spawnSync("git", ["add", "--", "."], { cwd: path, encoding: "utf8" });
-      assert.equal(stagedDesign.status, 0, stagedDesign.stderr);
-      const committedDesign = spawnSync("git", ["-c", "user.name=Greenfield E2E PO", "-c", "user.email=greenfield-e2e@example.invalid", "commit", "-m", "test: bind greenfield design package\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)"], { cwd: path, encoding: "utf8" });
-      assert.equal(committedDesign.status, 0, committedDesign.stderr);
-
-      const advisory = await coordinateDesignAdvisory({
-        repoRoot: path,
-        runtime: { runner, profile: "feature" },
-        featureId: state.activeFeature.id,
-        planPath: state.activeFeature.planPath,
-        specPath: state.planApproval.poGateAuthority.specPath,
-        disposition: { decision: "accept", rationale: "The independent design review is bounded and accepted." },
-        invokeBridge: async ({ receiptPath, input }) => {
-          const selector = { kind: "model-id", value: runner === "claude" ? "claude-sonnet" : runner === "antigravity" ? "gemini-3-flash" : "gpt-5.6-sol" };
-          const receipt = { schema: "pipeline.advisory-receipt.v1", receiptId: input.receiptId,
-            dispatch: structuredClone(input.dispatch), duty: "advisory", profile: input.profile,
-            configuredRoute: { runner, selector, effort: "high" }, adapter: "consult",
-            observed: { status: "answered", identity: { provider: runner === "claude" ? "anthropic" : runner === "antigravity" ? "google" : "openai", modelId: selector.value, effort: "high" } },
-            questionSha256: createHash("sha256").update(input.question).digest("hex"),
-            answerSha256: createHash("sha256").update("Use a bounded review.").digest("hex"),
-            fallback: { reason: "none", redactedErrorClass: null }, emittedAtMs: 1 };
-          writeFileSync(receiptPath, JSON.stringify(receipt) + "\n", { mode: 0o600 });
-          return 0;
-        },
-      });
-      assert.equal(advisory.status, "admitted", `${runner}: the mandatory Advisor transaction must bind before implementation`);
 
       const externalInventory = evaluateLifecycleReadyGuard({
         tool_name: "Bash",

@@ -117,7 +117,7 @@ import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip
 import {
   DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
   declaredPaths, isNonEmptyValue, isSafeTaskId, isTerminalOutcome, missingBriefingFields,
-  isCommitAuthorshipOutcome, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord,
+  isCommitAuthorshipOutcome, isNoDeliveryOutcome, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord,
 } from "../lib/dispatch-record.mjs";
 export {
   NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
@@ -496,6 +496,16 @@ export function verifyCommit(sha, deps) {
       "record-outcome-does-not-attest-authorship",
       `record for \`${taskId}\` is a terminal ${record.outcomeClassification.kind} observation and cannot attest commit authorship`,
       { taskId },
+    );
+  }
+  const noDelivery = (isV3 || isV4) && isNoDeliveryOutcome(record.outcome);
+  if (noDelivery) {
+    return result(
+      sha,
+      VERDICT.unverifiable,
+      "no-delivery-no-authorship",
+      `record for \`${taskId}\` is a truthful no-delivery terminal outcome and cannot attribute authorship to commit \`${sha}\``,
+      { taskId, declaredShas: [] },
     );
   }
   if ((isV3 || isV4) && criticDisposition(record) === "required") {

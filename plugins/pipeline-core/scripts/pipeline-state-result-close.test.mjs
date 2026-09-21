@@ -111,6 +111,7 @@ function approvedImplementation() {
     profileSha256: PROFILE,
     by: "PO",
     at: "2026-07-31T11:10:00.000Z",
+    designAdvisorAdmissionSha256: h("8"),
   });
   assert.equal(approved.ok, true);
   const implementation = enterPlanImplementation({

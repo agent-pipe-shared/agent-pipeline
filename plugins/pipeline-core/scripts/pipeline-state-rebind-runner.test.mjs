@@ -212,6 +212,7 @@ function generatorSubmitFixture(name, { exempt }) {
       prd: { path: planPath, sha256: planSha256 },
       spec: { path: specPath, sha256: specSha256 },
     }),
+    designAdvisoryAdmission: () => ({ ok: true, id: h("e"), mode: "admitted" }),
   };
   return { dir, deps };
 }

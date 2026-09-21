@@ -95,7 +95,7 @@ function step(s, phase, extra = {}) {
     inputDigest: h("a"),
     observedDigest: h("b"),
     operationSha256: h("f"),
-    ...(phase === "feature-close-prepared" ? { architectureImpact: "architecture-conforms" } : {}),
+    ...(phase === "feature-close-prepared" ? { architectureImpact: "architecture-conforms", featureCloseAudit: null } : {}),
     ...candidate,
     ...completionAuthority,
     ...extra,

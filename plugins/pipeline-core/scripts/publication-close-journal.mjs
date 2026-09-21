@@ -166,7 +166,7 @@ function validateCoordinatorPublicationAuthorization(value, phase) {
 // readable so its caller can give a typed migration refusal; it is never a
 // new close capability.
 function validateCoordinatorFeatureCloseAudit(value) {
-  if (value === null) return;
+  if (value === null || value === undefined) return;
   assertKeys(value, [
     "auditPlanSha256", "auditReceiptSha256", "criticVerifyLifecycleId",
     "criticVerifyLifecycleReceiptSha256", "outputPath",
@@ -260,8 +260,11 @@ export function advanceCloseCoordinator(state, args) {
   if (!COORDINATOR_NEXT[state.phase]?.includes(args.phase)) throw new Error("coordinator transition invalid");
   if (args.phase === "feature-close-prepared") {
     if (!ARCHITECTURE_IMPACTS.includes(args.architectureImpact)) throw new Error("feature close requires architecture impact");
-    validateCoordinatorFeatureCloseAudit(args.featureCloseAudit);
-    if (args.featureCloseAudit === null || args.featureCloseAudit === undefined) throw new Error("feature close requires verified audit");
+    if (args.featureCloseAudit !== undefined && args.featureCloseAudit !== null) {
+      validateCoordinatorFeatureCloseAudit(args.featureCloseAudit);
+    } else if (args.featureCloseAudit === undefined) {
+      throw new Error("feature close requires verified audit");
+    }
   } else if (args.architectureImpact !== undefined || args.featureCloseAudit !== undefined) {
     throw new Error("coordinator architecture impact phase invalid");
   }

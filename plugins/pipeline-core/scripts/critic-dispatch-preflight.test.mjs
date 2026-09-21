@@ -16,7 +16,7 @@ import path from "node:path";
 import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
 import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
-import { produceCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
+import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 
 function verifyValue(commit, tree, exitCode = 0) {
   return { schema: "pipeline.verify-evidence.v0", commit, tree, exitCode, steps: [{ name: "fixture-check", exitCode }], selection: planVerifySelection({ mode: "critic", candidateCommit: commit, registeredSuiteIds: ["fixture-check"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["fixture-check"], areas: [{ id: "all", paths: ["**"], suites: ["fixture-check"] }] } }) };

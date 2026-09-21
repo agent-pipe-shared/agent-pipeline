@@ -72,7 +72,7 @@ assert.equal(normalPreflight.bootstrapPayload.schema, "pipeline.bootstrap-payloa
 assert.equal(normalPreflight.bootstrapPayload.mode, "normal");
 assert.equal(normalPreflight.bootstrapPayload.originalMeasurement.withinBudget, true);
 assert.deepEqual(normalPreflight.bootstrapPayload.retainedChecks, [
-  "lifecycle", "authority", "calibration", "handover", "verify", "continuation",
+  "lifecycle", "authority", "calibration", "handover", "verify", "continuation", "architecture",
 ]);
 
 const temp = mkdtempSync("/tmp/bootstrap-envelope-");

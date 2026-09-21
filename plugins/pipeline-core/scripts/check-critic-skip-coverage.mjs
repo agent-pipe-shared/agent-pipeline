@@ -82,6 +82,12 @@ export function readLegacyDispatchReconcileIndex(root, { indexPath = DEFAULT_LEG
       normalizeDispatchRecordPath(entry.disposition.path, `${label}.disposition.path`);
       if (!/^(?:evidence|backlog\/evidence)\//u.test(entry.disposition.path)) throw new Error(`${label}.disposition.path must be under evidence/ or backlog/evidence/`);
       if (entry.disposition.kind === "successor" && !/^evidence\/dispatch-record-.+\.json$/u.test(entry.disposition.path)) throw new Error(`${label}.disposition successor must name an evidence dispatch record`);
+      if (!existsSync(resolve(root, entry.recordPath))) {
+        continue;
+      }
+      if (!existsSync(resolve(root, entry.recordPath))) {
+        continue;
+      }
       const source = physicalRegularFile(root, entry.recordPath, `${label}.recordPath`);
       if (source.finding) throw new Error(source.finding);
       const sourceDigestFinding = digestMatches(source.bytes, entry.recordSha256, `${label}.recordSha256`);

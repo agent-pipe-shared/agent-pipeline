@@ -53,7 +53,7 @@ import { applySettingsAllowlistMerge, planSettingsAllowlistMerge } from "../scri
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
-import { validCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
+import { validCurrentPlanApproval, validPreviousCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
 import { driveOnboardingInit } from "../scripts/onboarding-init.mjs";
 import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
@@ -871,6 +871,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
       intent: "session",
       deps: {
         ...fakeDeps,
+        listActiveSessionDescriptors: () => [{ id: "session-1" }, { id: "session-2" }],
         observeOnboardingAppServer(options) {
           activeSessionAppServerCalls += 1;
           return fakeAppServer(options);
@@ -1694,7 +1695,7 @@ test("V4 authority drift reopens the historical approval instead of rebinding it
     const continuity = { schema: "pipeline.continuity.v0", featureId: "v4-drift", revision: 3, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: oldSpecSha }, result: null }, queueHead: { packageId: "v4", actionId: "review", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
     const approval = { schema: "pipeline.plan-approval.v4", approvedBy: "PO", approvedAt: "2026-08-02T09:05:00.000Z", submissionSha256: sha256(canonicalJson(submission)), profileSha256: submission.profileSha256, poGateAuthority: historicalAuthority, priorInvalidationSha256: null };
     assert.equal(validPlanSubmission(submission), true);
-    assert.equal(validCurrentPlanApproval(approval), true);
+    assert.equal(validPreviousCurrentPlanApproval(approval), true);
     writeFileSync(join(path, "project/pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "v4-drift", planPath, phase: "implementation" }, planApproved: true, planSubmission: submission, planApproval: approval, continuity, updatedAt: "2026-08-02T09:06:00.000Z" }, null, 2)}\n`);
     const authority = ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === currentSpecSha
       ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: currentSpecSha } }
@@ -4482,6 +4483,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
         // deliberately legacy-scoped; global signature/chat receipt behavior
         // is covered by the dedicated acknowledgement tests below.
         readHumanApprovalMode: () => ({ mode: "signature", source: "test", key: "human_approval", scope: "legacy" }),
+        designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
       });
       return { code, stderr: stderr.join("") };
     };
@@ -4570,6 +4572,7 @@ test("the public onboarding handover is executable for every runner with baselin
           // Keep this handover test's concern to public lifecycle handoff.
           // The signature/global receipt contract has its own all-runner test.
           readHumanApprovalMode: () => ({ mode: "signature", source: "test", key: "human_approval", scope: "legacy" }),
+          designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
         });
         return { code, stderr: stderr.join("") };
       };
@@ -4759,6 +4762,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
         // policy; retain the legacy fixture instead of reviving --by in the
         // production global policy.
         readHumanApprovalMode: () => ({ mode: "signature", source: "test", key: "human_approval", scope: "legacy" }),
+        designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
       });
       return { code, stderr: stderr.join("") };
     };
@@ -8577,6 +8581,7 @@ test("all three runners execute the exact returned consent and design-question a
 
 test("bootstrap-binding-required routes a hand-authored staging PRD through its policy-selected acknowledgement and then binds", () => {
   const path = root();
+  hostGit(path, ["init", "--initial-branch=main"]);
   let stderr = "";
   const intakeDeps = { ...fakeDeps, spawn: fakeGit };
   const invoke = (args, deps = intakeDeps) => {

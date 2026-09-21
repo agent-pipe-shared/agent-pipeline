@@ -25,6 +25,7 @@ import {
 import { buildNativeCriticSelection, nativeCriticArtifactRequestDigest, nativeCriticCanonicalDigest } from "../lib/codex-native-critic-policy.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { readCriticExportConsentState, resolveCriticExportConsentState, runCriticExportConsent } from "./critic-export-consent.mjs";
 import { prepareCriticExportConsent, recordCriticExportConsent } from "../lib/critic-export-policy.mjs";
@@ -2013,7 +2014,24 @@ await checkAsync("a real Git current-artifact preflight flows through the actual
     writeFileSync(join(root, "notes", "later.md"), "unrelated later commit\n"); run("git", ["add", "notes/later.md"], root); run("git", ["commit", "-qm", "later unrelated correction"], root);
     const candidateCommit = run("git", ["rev-parse", "HEAD"], root);
     const candidateTree = run("git", ["rev-parse", "HEAD^{tree}"], root);
-    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidateCommit, tree: candidateTree } })}\n`);
+    const verifySelection = planVerifySelection({
+      mode: "critic",
+      candidateCommit,
+      registeredSuiteIds: ["suite-a"],
+      policy: {
+        schema: "pipeline.verify-selection.v1",
+        baseline: ["suite-a"],
+        areas: [{ id: "area-a", paths: ["**"], suites: ["suite-a"] }],
+      },
+    });
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({
+      schema: "pipeline.verify-evidence.v0",
+      commit: candidateCommit,
+      tree: candidateTree,
+      exitCode: 0,
+      steps: [{ name: "suite-a", exitCode: 0 }],
+      selection: verifySelection,
+    })}\n`);
     const reviewScope = { kind: "current-artifacts", paths: ["specs/review.md"] };
     const preflight = preflightCriticDispatch({
       root, candidate: candidateCommit, reviewScope, specPath: "specs/review.md", guardrailPaths: [], evidencePaths: ["evidence/verify.json"],
@@ -2023,7 +2041,7 @@ await checkAsync("a real Git current-artifact preflight flows through the actual
     for (const record of [preflight.spec, ...preflight.guardrails]) {
       if (!references.has(record.path)) references.set(record.path, record);
     }
-    for (const record of preflight.evidence) references.set(record.path, record);
+    for (const record of preflight.evidence) references.set(record.path, { path: record.path, sha256: record.sha256, candidate: record.candidate });
     const referenceRecords = [...references.values()].sort((left, right) => left.path.localeCompare(right.path));
     const referencePaths = referenceRecords.map(({ path }) => path);
     const fake = writeFakeCriticAppServer(root, [

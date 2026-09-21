@@ -152,21 +152,23 @@ function readEvidenceInput(path, deps) {
  * malformed calibration -- or one with no `verify` key -- degrades honestly:
  * it never invents a command and never falls back to a source-only path.
  */
+export function resolveVerifyRemedyPlan(dir, relPath, deps = {}) {
+  if (relPath !== "evidence/verify-latest.json") return { kind: "manual", reason: "Use the configured security evidence producer; Verify preparation does not regenerate security evidence." };
+  const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+  const base = typeof deps.verifyBase === "string" && deps.verifyBase.trim() && !deps.verifyBase.startsWith("-") ? deps.verifyBase : null;
+  return {
+    kind: "verify-evidence-repair",
+    prepare: { executable: "node", argv: [script, "--root", dir, "--prepare"] },
+    prerequisite: "Review and commit the generated consumer adapter before producing evidence at the resulting candidate.",
+    produce: { executable: "node", argv: [script, "--root", dir, "--mode", "push", ...(base ? ["--base", base] : []), "--out", relPath], executableNow: base !== null, unresolvedInputs: base ? [] : ["verified-base"] },
+  };
+}
+
 export function resolveVerifyRemedy(dir, relPath, deps = {}) {
-  const resolveArtifact = deps.resolveAuthorityArtifactPath ?? resolveAuthorityArtifactPath;
-  try {
-    const artifact = resolveArtifact("calibration", { rootDir: dir });
-    if (artifact.exists) {
-      const raw = (deps.readFile ?? readFileSync)(artifact.path, "utf8");
-      const parsed = JSON.parse(raw);
-      if (typeof parsed?.verify === "string" && parsed.verify.trim() !== "") {
-        return `${parsed.verify}  # regenerates ${relPath}`;
-      }
-    }
-  } catch {
-    // absent/unreadable/malformed calibration -- fall through to the honest degradation below.
-  }
-  return `run this project's own calibrated verify command  # its calibration does not define one; regenerates ${relPath}`;
+  const plan = resolveVerifyRemedyPlan(dir, relPath, deps);
+  if (plan.kind === "manual") return plan.reason;
+  const render = action => [action.executable, ...action.argv.map(value => JSON.stringify(value))].join(" ");
+  return `${render(plan.prepare)}\n${plan.prerequisite}\n${plan.produce.executableNow ? render(plan.produce) : "Production is not executable until an explicit verified base is supplied. Then invoke verify-evidence-producer.mjs with --root, --mode push, --base and --out; never invoke the product verify command as an evidence writer."}`;
 }
 
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
@@ -174,8 +176,9 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
   const evidenceInput = readEvidenceInput(path, deps);
   const data = evidenceInput?.data ?? null;
   const remedy = resolveVerifyRemedy(dir, relPath, deps);
-  if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy };
-  if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy };
+  const remedyPlan = resolveVerifyRemedyPlan(dir, relPath, deps);
+  if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy, remedyPlan };
+  if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy, remedyPlan };
   if (data.commit !== headCommit) {
     const promotionPath = join(dir, RELEASE_PROMOTION_DEFAULT_PATH);
     const promotionEnvelope = deps.promotionEnvelope ?? readJson(promotionPath, deps);
@@ -198,7 +201,7 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
       if (validation.ok && validation.sourceCommit === data.commit && validation.recordCommit === headCommit) {
         if (id === "verify-evidence") {
           if (!verifyEvidenceSatisfiesBoundary(data, "push")) {
-            return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push` };
+            return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
           }
           return { id, ok: true, message: `${relPath} is fresh and green at HEAD (promoted from ${data.commit.slice(0, 8)} via release-promotion-envelope).` };
         }
@@ -207,10 +210,10 @@ export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) 
         }
       }
     }
-    return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy };
+    return { id, ok: false, message: `${relPath}: commit=${JSON.stringify(data.commit)} is stale (HEAD is ${JSON.stringify(headCommit)}).`, remedy, remedyPlan };
   }
   if (id === "verify-evidence" && !verifyEvidenceSatisfiesBoundary(data, "push")) {
-    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push` };
+    return { id, ok: false, message: `${relPath}: Verify evidence was not produced for the push boundary.`, remedy: `${remedy} --mode push`, remedyPlan };
   }
   return { id, ok: true, message: `${relPath} is fresh and green at HEAD.` };
 }
@@ -573,6 +576,21 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
   const readHumanApproval = deps.readHumanApprovalMode ?? readHumanApprovalMode;
   const humanApproval = readHumanApproval(dir, { legacyKind: "push" });
   const chatMode = humanApproval.mode === "chat";
+
+  const conflict = checkCriticalProofModeConflict(dir, deps);
+  if (conflict) {
+    return {
+      ok: true,
+      report: {
+        schema: "pipeline.push-prepare-report.v1",
+        by, remote, destination, headCommit: null,
+        humanApproval: humanApproval.mode,
+        checks: [conflict],
+        ready: false,
+      },
+      lines: null,
+    };
+  }
 
   // Runs BEFORE anything below that assumes a clean tree (NVA-PUSHFOLD-1): a pending trailing
   // write from a prior `approve-push` is folded in here first, so `checkWorkingTreeClean`

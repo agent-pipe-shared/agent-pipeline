@@ -5,7 +5,8 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { produceCriticDiagnostic, validateCriticDiagnostic, inspectCriticVerifyDiagnostic } from "./critic-diagnostic-evidence.mjs";
+import { validateCriticDiagnostic, inspectCriticVerifyDiagnostic } from "./critic-diagnostic-evidence.mjs";
+import { produceCriticDiagnostic } from "./critic-diagnostic-producer.mjs";
 import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "./verify-selection.mjs";
 
 function git(root, args) {

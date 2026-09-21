@@ -29,22 +29,13 @@
       "evidence/dispatch-record-ALF-BANNER-FIX.json"
     ]
   },
-  "criticRequired": {
-    "schema": "pipeline.critic-required-decision.v1",
-    "trigger": {
-      "schema": "pipeline.critic-trigger-input.v1",
-      "rigorLevel": 2,
-      "riskClass": "high",
-      "riskFlag": true,
-      "diff": {
-        "mechanical": false,
-        "architecture": false,
-        "guardrails": true,
-        "security": false
-      }
-    },
-    "appliedRow": "T1"
-  },
   "candidateCommit": "abf45e1a48763f4ceadeb5ccd06ac2cd9be1cc80",
-  "resultSha256": "758f5013e6bb571f67f2341937be7b10d74b64424c3ac9a7830b1f9decdf3232"
+  "resultSha256": "758f5013e6bb571f67f2341937be7b10d74b64424c3ac9a7830b1f9decdf3232",
+  "criticEvidence": {
+    "schema": "pipeline.critic-evidence-reference.v1",
+    "taskId": "ALF-BANNER-FIX",
+    "candidateCommit": "abf45e1a48763f4ceadeb5ccd06ac2cd9be1cc80",
+    "path": "backlog/evidence/2026-09-19-critic-alf-banner-fix.md",
+    "sha256": "16b45d8b8bf9006290957a525f74b9f892a0d53604b1b4f0fd04775f9316a927"
+  }
 }

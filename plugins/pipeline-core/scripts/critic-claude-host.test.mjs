@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
-import { produceCriticDiagnostic } from "../lib/critic-diagnostic-evidence.mjs";
+import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { prepareCandidatePacket } from "./critic-packet-preflight.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { buildNativeBareArgv, preflightNativeBare, runNativeBare, NativeBareError } from "./critic-native-bare.mjs";
@@ -40,6 +40,33 @@ function repository({ references = [{ kind: "spec", path: "specs/work.md" }], di
   git(root, ["init", "--quiet"]); git(root, ["config", "user.email", "test@example.invalid"]); git(root, ["config", "user.name", "Test"]);
   mkdirSync(join(root, "specs")); writeFileSync(join(root, "specs", "work.md"), "base\n"); git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "base"]); const base = git(root, ["rev-parse", "HEAD"]);
   writeFileSync(join(root, "specs", "work.md"), "candidate\n"); git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "candidate"]); const candidate = git(root, ["rev-parse", "HEAD"]);
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  writeFileSync(join(root, "evidence", "dispatch-record-batman-claude.json"), JSON.stringify({
+    schema: "pipeline.dispatch-record.v3",
+    taskId: "batman-claude",
+    agentType: "default",
+    model: "gpt-5.6-luna",
+    effort: "medium",
+    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+    dispatcher: "elephant",
+    outcome: "completed",
+    commits: [candidate],
+    candidateCommit: candidate,
+    resultSha256: "a".repeat(64),
+    log: [],
+    report: { text: "done", changedFiles: ["specs/work.md"] },
+    criticRequired: {
+      schema: "pipeline.critic-required-decision.v1",
+      trigger: {
+        schema: "pipeline.critic-trigger-input.v1",
+        rigorLevel: 2,
+        riskClass: "high",
+        riskFlag: true,
+        diff: { mechanical: false, architecture: false, guardrails: true, security: false },
+      },
+      appliedRow: "T1",
+    },
+  }, null, 2));
   const control = join(root, git(root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets"); mkdirSync(control, { recursive: true, mode: 0o700 }); chmodSync(join(control, ".."), 0o700); chmodSync(control, 0o700);
   // On native Windows, mkdir/chmod cannot establish the owner-only DACL the control
   // root contract requires; harden it the way a real caller's private root would be (no-op on POSIX).

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { commitPipeline } from "../lib/pipeline-commit.mjs";

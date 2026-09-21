@@ -30,7 +30,14 @@ const PLAN_PATH_TOKEN = /(?:^|[\s`"'([{])((?:(?:\.claude|app|architecture|backlo
 export function deriveArchitecturePlanningSurface(rootDir, read = readFileSync) {
   const root = resolve(rootDir);
   let state;
-  try { state = JSON.parse(read(resolve(root, "project/pipeline-state.json"), "utf8")); } catch { return null; }
+  for (const relState of ["project/pipeline-state.json", ".claude/pipeline-state.json"]) {
+    try {
+      const candidate = JSON.parse(read(resolve(root, relState), "utf8"));
+      if (candidate?.activeFeature?.planPath) { state = candidate; break; }
+      if (!state) state = candidate;
+    } catch { /* try next layout */ }
+  }
+  if (!state) return null;
   const planPath = state?.activeFeature?.planPath;
   if (typeof planPath !== "string" || planPath.trim() === "" || planPath.includes("\0")
     || planPath.startsWith("/") || planPath.includes("\\")

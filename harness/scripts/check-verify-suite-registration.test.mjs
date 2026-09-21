@@ -657,7 +657,7 @@ function buildVerifyFixtureRoot({ injectDuplicate }) {
 function runVerifyFixture({ injectDuplicate }) {
   const root = buildVerifyFixtureRoot({ injectDuplicate });
   try {
-    const spawned = spawnSync(process.execPath, [join(root, ...VERIFY_REL_PATH.split("/"))], { cwd: root, encoding: "utf8" });
+    const spawned = spawnSync(process.execPath, [join(root, ...VERIFY_REL_PATH.split("/")), "--mode", "candidate"], { cwd: root, encoding: "utf8" });
     const evidencePath = join(root, "evidence", "verify-latest.json");
     return {
       status: spawned.status,

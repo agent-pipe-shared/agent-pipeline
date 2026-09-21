@@ -47,7 +47,7 @@ for (const [label, input, reason] of [
   ["missing base is full", { ...common, mode: "work", baseCommit: null, changedPaths: ["src/a.mjs"] }, "missing-binding"],
   ["equal base is full", { ...common, mode: "push", baseCommit: "b", changedPaths: [] }, "invalid-base"],
   ["unknown path is full", { ...common, mode: "push", changedPaths: ["secrets/new.bin"] }, "unclassified-change"],
-  ["unclassified suite is full", { ...common, mode: "candidate", registeredSuiteIds: [...common.registeredSuiteIds, "orphan"], changedPaths: ["src/a.mjs"] }, "unclassified-suite"],
+  ["unclassified suite is full", { ...common, mode: "work", registeredSuiteIds: [...common.registeredSuiteIds, "orphan"], changedPaths: ["src/a.mjs"] }, "unclassified-suite"],
 ]) {
   const result = planVerifySelection(input);
   assert.equal(result.execution, "full", label);

@@ -23,6 +23,33 @@ function fixture() {
   mkdirSync(join(root, "specs")); writeFileSync(join(root, "specs", "work.md"), "base\n");
   git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "base"]); const base = git(root, ["rev-parse", "HEAD"]);
   writeFileSync(join(root, "specs", "work.md"), "candidate\n"); git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "candidate"]); const candidate = git(root, ["rev-parse", "HEAD"]);
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  writeFileSync(join(root, "evidence", "dispatch-record-batman-codex.json"), JSON.stringify({
+    schema: "pipeline.dispatch-record.v3",
+    taskId: "batman-codex",
+    agentType: "default",
+    model: "gpt-5.6-luna",
+    effort: "medium",
+    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+    dispatcher: "elephant",
+    outcome: "completed",
+    commits: [candidate],
+    candidateCommit: candidate,
+    resultSha256: "a".repeat(64),
+    log: [],
+    report: { text: "done", changedFiles: ["specs/work.md"] },
+    criticRequired: {
+      schema: "pipeline.critic-required-decision.v1",
+      trigger: {
+        schema: "pipeline.critic-trigger-input.v1",
+        rigorLevel: 2,
+        riskClass: "high",
+        riskFlag: true,
+        diff: { mechanical: false, architecture: false, guardrails: true, security: false },
+      },
+      appliedRow: "T1",
+    },
+  }, null, 2));
   const control = join(root, git(root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
   mkdirSync(control, { recursive: true, mode: 0o700 }); chmodSync(join(control, ".."), 0o700); chmodSync(control, 0o700);
   const prepared = prepareCandidatePacket({

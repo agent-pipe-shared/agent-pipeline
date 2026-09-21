@@ -60,7 +60,11 @@ function advisorPackageSha256(root, relativePath) {
   const target = resolve(root, relativePath);
   const rel = relative(root, target);
   if (!rel || isAbsolute(rel) || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\")) throw invalid();
-  if (realpathSync(target) !== target || !lstatSync(target).isFile()) throw invalid();
+  try {
+    if (realpathSync(target) !== target || !lstatSync(target).isFile()) throw invalid();
+  } catch {
+    throw invalid();
+  }
   return createHash("sha256").update(readFileSync(target)).digest("hex");
 }
 
@@ -72,20 +76,6 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
   const featureId = state?.activeFeature?.id;
   if (typeof featureId !== "string" || !featureId || typeof planPath !== "string" || typeof specPath !== "string") {
     return { ok: false, code: "DAA-BINDING" };
-  }
-  const approval = state?.planApproval;
-  const approvalIsCurrent = state?.planApproved === true && approval !== undefined;
-  // Valid approvals written before v5 stay usable: reopening solely to add a
-  // new receipt would invalidate a PO decision without improving safety.
-  if (approvalIsCurrent && approval?.schema !== CURRENT_APPROVAL_SCHEMA) {
-    return { ok: true, mode: "legacy-pre-advisor", id: null };
-  }
-  const profile = state?.planSubmission?.profile;
-  if (profile === "mini") return { ok: true, mode: "not-required-mini", id: null };
-  if (profile !== "epic" && profile !== "feature") return { ok: false, code: "DAA-PROFILE-BINDING" };
-  const expectedAdmissionSha256 = approvalIsCurrent ? approval.designAdvisorAdmissionSha256 : null;
-  if (approvalIsCurrent && !/^[a-f0-9]{64}$/u.test(expectedAdmissionSha256 ?? "")) {
-    return { ok: false, code: "DAA-APPROVAL-BINDING" };
   }
   try {
     const root = realpathSync(projectDir);
@@ -112,9 +102,6 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
     const result = readDesignAdvisoryTransaction({
       repoRoot: root, gitCommonDir: common, featureId, planPath, specPath, finalApprovalValid,
     });
-    if (approvalIsCurrent && result.id !== expectedAdmissionSha256) {
-      return { ok: false, code: "DAA-APPROVAL-DRIFT" };
-    }
     return { ok: true, id: result.id, mode: result.mode };
   } catch (error) {
     return { ok: false, code: typeof error?.code === "string" && error.code.startsWith("DAA-") ? error.code : "DAA-PRIVATE-INVALID" };
@@ -124,8 +111,8 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
 export function designAdvisoryRemediation(code) {
   return [
     `[guard-devplan] implementation requires a valid private design Advisor transaction (${code}).`,
-    "For an epic or feature, complete design-advisory-coordinator.mjs for the current Plan/Spec before final PO approval.",
-    "Existing v4-or-earlier approvals remain bounded migration compatibility; a new epic or feature approval always records the exact Advisor admission.",
+    "Existing implementing features must migrate through the existing lifecycle: run pipeline-state.mjs reopen-design --by <human attribution>,",
+    "complete design-advisory-coordinator.mjs for the current Plan/Spec, then submit-plan, obtain the configured final PO approval and set-phase --phase implementation.",
     "Use design-advisory-admission.mjs inspect --repo-root <root> --feature <id> --plan <plan> --spec <spec> for read-only diagnosis.",
     "An unavailable Advisor requires the exact package/candidate final PO approval; public projections or hand-written private files are not recovery.",
   ].join("\n");

@@ -7,6 +7,7 @@ import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, 
 import { join } from "node:path";
 import test from "node:test";
 import { runObservedCriticPreflight } from "./observe-critic-preflight.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
 
 const here = new URL(".", import.meta.url);
 const observed = new URL("observe-critic-preflight.mjs", here).pathname;
@@ -44,7 +45,24 @@ function fixture() {
   writeFileSync(join(root, "work.txt"), "candidate\n");
   const candidate = commit(root, "candidate");
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
-  writeFileSync(join(root, "evidence/verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  const selection = planVerifySelection({
+    mode: "critic",
+    candidateCommit: candidate,
+    registeredSuiteIds: ["suite-a"],
+    policy: {
+      schema: "pipeline.verify-selection.v1",
+      baseline: ["suite-a"],
+      areas: [{ id: "area-a", paths: ["**"], suites: ["suite-a"] }],
+    },
+  });
+  writeFileSync(join(root, "evidence/verify.json"), `${JSON.stringify({
+    schema: "pipeline.verify-evidence.v0",
+    commit: candidate,
+    tree,
+    exitCode: 0,
+    steps: [{ name: "suite-a", exitCode: 0 }],
+    selection,
+  })}\n`);
   return { root, base, candidate };
 }
 function args(fx, evidence = true) {

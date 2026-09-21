@@ -16,6 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // `<plugin>/schemas/`. Resolving through the source repository root happened
 // to work in development but points at the marketplace root after installation.
 const SCHEMA_PATH = path.resolve(__dirname, "../schemas/pipeline.module-inventory.v1.json");
+const REPO_ROOT = path.resolve(__dirname, "../../..");
 
 let cachedSchema = null;
 export function getModuleInventorySchema() {

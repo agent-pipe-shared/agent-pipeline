@@ -255,7 +255,7 @@ function windowsAssuranceRegistrationFailureFixture() {
       writeFileSync(target, "// fixture target\n");
     }
 
-    const result = spawnSync(process.execPath, [writer], { cwd: fixtureRoot, encoding: "utf8" });
+    const result = spawnSync(process.execPath, [writer, "--mode", "candidate"], { cwd: fixtureRoot, encoding: "utf8" });
     assertFixtureReachedVerify(result, existsSync(evidencePath));
     if (result.status === 0) return false;
     const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));

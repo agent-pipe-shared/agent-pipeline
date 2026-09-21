@@ -57,6 +57,32 @@ async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict 
   const candidate = git(root, ["rev-parse", "HEAD"]);
   const base = git(root, ["rev-parse", "HEAD^1"]);
   await produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-candidate.json", mode: "critic", base });
+  writeFileSync(join(root, "evidence", "dispatch-record-release-verify.json"), JSON.stringify({
+    schema: "pipeline.dispatch-record.v3",
+    taskId: "release-verify",
+    agentType: "default",
+    model: "gpt-5.6-luna",
+    effort: "medium",
+    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+    dispatcher: "elephant",
+    outcome: "completed",
+    commits: [candidate],
+    candidateCommit: candidate,
+    resultSha256: "a".repeat(64),
+    log: [],
+    report: { text: "done", changedFiles: ["specs/spec.md"] },
+    criticRequired: {
+      schema: "pipeline.critic-required-decision.v1",
+      trigger: {
+        schema: "pipeline.critic-trigger-input.v1",
+        rigorLevel: 2,
+        riskClass: "high",
+        riskFlag: true,
+        diff: { mechanical: false, architecture: false, guardrails: true, security: false },
+      },
+      appliedRow: "T1",
+    },
+  }, null, 2));
   const final = finalizeSessionCriticReview({
     preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/critic-candidate.json"], priorCriticEvidencePath: null },
     taskId: "release-verify", projectId: "fixture", sessionId: "release-review-1", packetId,

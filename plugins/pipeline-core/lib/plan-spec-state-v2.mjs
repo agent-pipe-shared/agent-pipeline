@@ -347,7 +347,7 @@ export function validCurrentPlanApproval(value) {
     && validAuthority(value.poGateAuthority);
 }
 
-function validPreviousCurrentPlanApproval(value) {
+export function validPreviousCurrentPlanApproval(value) {
   const shared = isNonBlankString(value?.approvedBy)
     && isCanonicalIso(value?.approvedAt)
     && SHA256.test(value?.submissionSha256 ?? "")
@@ -934,7 +934,7 @@ export function sealCurrentPlanApproval({ state, expectedStateSha256 }) {
   }
   if (!validPlanInvalidation(state.planInvalidation)) return fail("PLAN-APPROVAL-SEAL-INVALIDATION-REQUIRED");
   const approval = state.planApproval;
-  if (!validPreviousCurrentPlanApproval(approval) || approval.schema !== PREVIOUS_CURRENT_APPROVAL_SCHEMA) {
+  if (!validPreviousCurrentPlanApproval(approval) || approval.schema !== PREVIOUS_CURRENT_APPROVAL_SCHEMA || approval.priorInvalidationSha256 !== null) {
     return fail("PLAN-APPROVAL-SEAL-V4-REQUIRED");
   }
   const submission = currentSubmission(state, {});

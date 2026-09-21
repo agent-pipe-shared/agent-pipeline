@@ -265,6 +265,15 @@ below assumes it holds and is written to catch a change that would break it.
   `scripts/module-inventory.mjs`, and `scripts/rigor-floor.mjs`.
   Guards (`guard-lifecycle-ready.mjs`, `guard-devplan-policy.mjs`, etc.) import these
   delegates to enforce architecture compliance, advisor admission, and rigor floor gates.
+- The 2026-09-21 Alfred candidate close audit and critic verification lifecycle closure adds:
+  `lib/architecture-entry-readiness.mjs`, `lib/audit-bundle.mjs`,
+  `lib/critic-packet-governance.mjs`, `lib/critic-review-lineage.mjs`,
+  `lib/critic-verify-lifecycle.mjs`, `lib/feature-close-audit-receipt.mjs`,
+  `lib/governance-review-action.mjs`, `lib/organization-policy.mjs`,
+  `lib/requirement-traceability.mjs`, `scripts/check-critic-skip-coverage.mjs`,
+  `scripts/critic-dispatch-preflight.mjs`, `scripts/critic-packet-preflight.mjs`, and
+  `scripts/session-critic-finalizer.mjs`.
+  Guards and close coordination import these modules to enforce verified feature close audit and critic lifecycle readback.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

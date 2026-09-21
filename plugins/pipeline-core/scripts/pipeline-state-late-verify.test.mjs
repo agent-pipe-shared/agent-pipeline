@@ -47,7 +47,7 @@ function quietConsole(fn) {
 test("baseline-only implementation exposes and completes the typed late verify recovery", () => {
   const root = rootFor("happy-path");
   writeFixture(root);
-  const deps = { dir: root, now: () => NOW };
+  const deps = { dir: root, now: () => NOW, architectureEntryReadiness: () => ({ status: "ready" }) };
 
   assert.equal(quietConsole(() => run(["set-phase", "--phase", "implementation"], deps)).result, 0,
     "the deliberately baseline-only approved project enters implementation first");

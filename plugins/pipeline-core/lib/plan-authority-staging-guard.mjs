@@ -116,8 +116,10 @@ export function refusePlanAuthorityStagingPath({ rootDir, planPath, specPath, re
     try {
       const content = readFileFn(resolve(rootDir, relativePath), "utf8");
       if (typeof content !== "string" || content.includes(PRE_AUTHORITY_BANNER_SNIPPET)) bannerPaths.push(label);
-    } catch {
-      unreadablePaths.push(label);
+    } catch (err) {
+      if (err?.code !== "ENOENT") {
+        unreadablePaths.push(label);
+      }
     }
   }
   if (bannerPaths.length > 0) {

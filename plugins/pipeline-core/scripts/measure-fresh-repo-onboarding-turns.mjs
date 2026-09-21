@@ -44,7 +44,7 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -113,6 +113,22 @@ function answerArgvForCollectInput(dir, action) {
   if (names.includes("answersJson")) {
     return publishedActionWithSingleReplacement("<PO_INTAKE_DESIGN_ANSWERS_JSON>", DEFAULT_ANSWERS.answersJson);
   }
+  if (guidance.includes("submit-plan")) {
+    const pipelineStateScript = resolve(fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url)));
+    const argv = [pipelineStateScript, "submit-plan", "--by", DEFAULT_ANSWERS.planApproverName];
+    if (names.includes("profile") || guidance.includes("--profile")) {
+      argv.push("--profile", DEFAULT_ANSWERS.profile);
+    }
+    return { kind: "command", executable: process.execPath, argv };
+  }
+  if (guidance.includes("present-plan")) {
+    const pipelineStateScript = resolve(fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url)));
+    return {
+      kind: "command",
+      executable: process.execPath,
+      argv: [pipelineStateScript, "present-plan", "--by", DEFAULT_ANSWERS.planApproverName],
+    };
+  }
   // This disposable measurement explicitly models the PO approval required by
   // the returned plan handover.  It substitutes only the declared name slot
   // in that exact action; the later TOFU signature remains the real proof
@@ -179,6 +195,29 @@ function resolveVerifyContractIfPending(dir, pendingAsks) {
 }
 
 /** Appends the acknowledgement marker to the staging PRD the ask's own guidance names. */
+function authorArchitectureDesign(dir, prdRelPath) {
+  const prdFile = join(dir, prdRelPath);
+  const contract = "docs/game-contract.md";
+  const verification = "tests/game.test.mjs";
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  mkdirSync(join(dir, "tests"), { recursive: true });
+  writeFileSync(join(dir, contract), "# Game contract\nExport playable=true from game.js after keyboard interaction is implemented.\n");
+  writeFileSync(join(dir, verification), "import assert from 'node:assert/strict';\nimport { playable } from '../game.js';\nassert.equal(playable, true);\n");
+  const module = { id: "game", responsibility: "Local keyboard game and its acceptance contract.", nonResponsibilities: ["Network services"],
+    ownedPaths: ["game.js", "docs/game-contract.md", "tests/game.test.mjs"], publicContracts: [contract], allowedDependencies: [],
+    authorityEffects: [], verificationEntryPoints: [verification], adrReferences: [] };
+  const architecture = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+    disposition: { decision: "approved-scoped", scope: ["specs/", "architecture/", "game.js", "docs/game-contract.md", "tests/game.test.mjs"],
+      rationale: "Approve this explicit local game design within the same complete PRD decision." },
+    modules: [module], implementationSurface: ["game.js"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "local-game", revision: 1,
+      modules: [{ id: module.id, ownedPaths: module.ownedPaths, allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [verification] }],
+      allowedBoundaryCrossings: [], antiFragmentationPolicy: { rejectTrivialFacades: true, rejectDuplicatedFacades: true, minStatementsPerModule: 1 } },
+    baseline: { schema: "pipeline.architecture-baseline.v1", baselineRevision: 1, acceptedViolations: [],
+      ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 } } };
+  writeFileSync(prdFile, readFileSync(prdFile, "utf8") + "\n\n```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n");
+}
+
 function acknowledgePrd(dir, guidance) {
   const match = /staging PRD at (\S+\.md)/u.exec(String(guidance));
   if (match === null) return { ok: false, reason: "the guidance did not name a staging PRD path" };
@@ -376,6 +415,14 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
       }
       rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "unanswerable", names: answer.names });
       return { schema: SCHEMA, root: dir, runner, outcome: "unanswerable-collect-input", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final };
+    }
+
+    if (result.outcome === "unsupported-next-action" && result.final?.nextAction?.kind === "architecture-design-required") {
+      const na = result.final.nextAction;
+      authorArchitectureDesign(dir, na.prdPath);
+      turns += 1;
+      rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "authored-architecture-design" });
+      continue;
     }
 
     // Any other outcome (error, no-progress, unsupported-next-action, step-cap-exceeded,

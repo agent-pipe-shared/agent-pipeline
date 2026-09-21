@@ -333,7 +333,7 @@ function preflightInput(value) {
 
 function productionPlatform(root) {
   try {
-    if (process.platform !== "linux" || process.versions.node !== "24.15.0" || !Number.isInteger(fs.constants.O_NOFOLLOW)
+    if (process.platform !== "linux" || !process.versions.node.startsWith("24.") || !Number.isInteger(fs.constants.O_NOFOLLOW)
       || !Number.isInteger(fs.constants.O_DIRECTORY) || fs.constants.O_NOFOLLOW === 0 || fs.constants.O_DIRECTORY === 0) return { status: "unsupported", backendId: null };
     const rootInfo = fs.lstatSync(root, { bigint: true });
     if (!directory(rootInfo)) return { status: "unsupported", backendId: null };

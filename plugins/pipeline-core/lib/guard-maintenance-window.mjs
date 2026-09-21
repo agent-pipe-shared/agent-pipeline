@@ -474,6 +474,20 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/governance-authority.mjs",
   "plugins/pipeline-core/scripts/module-inventory.mjs",
   "plugins/pipeline-core/scripts/rigor-floor.mjs",
+  // Alfred candidate close audit and critic verification lifecycle closure (GMWKC01):
+  "plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+  "plugins/pipeline-core/lib/audit-bundle.mjs",
+  "plugins/pipeline-core/lib/critic-packet-governance.mjs",
+  "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+  "plugins/pipeline-core/lib/critic-verify-lifecycle.mjs",
+  "plugins/pipeline-core/lib/feature-close-audit-receipt.mjs",
+  "plugins/pipeline-core/lib/governance-review-action.mjs",
+  "plugins/pipeline-core/lib/organization-policy.mjs",
+  "plugins/pipeline-core/lib/requirement-traceability.mjs",
+  "plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs",
+  "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+  "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+  "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

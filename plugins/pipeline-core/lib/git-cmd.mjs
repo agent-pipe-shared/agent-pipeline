@@ -360,12 +360,13 @@ export function commandIsGitPush(cmd) {
     }
     return index === 0 ? rawDetectionTokens : rawDetectionTokens.slice(index);
   })();
-  const directExecutable = /^(?:git|git\.exe)$/i.test(detectionTokens[0] ?? "");
+  const executableToken = (detectionTokens[0] ?? "").split(/[\/\\]/).pop();
+  const directExecutable = /^(?:git|git\.exe)$/i.test(executableToken);
   const directPush =
     directExecutable &&
     (detectionTokens[1]?.toLowerCase() === "push" ||
       (detectionTokens[1] === "-C" && detectionTokens[2] && detectionTokens[3]?.toLowerCase() === "push"));
-  const shellWrapperPush = /^(?:(?:ba|z|da)?sh|pwsh|powershell|cmd|ssh)(?:\.exe)?$/i.test(detectionTokens[0] ?? "") &&
+  const shellWrapperPush = /^(?:(?:ba|z|da)?sh|pwsh|powershell|cmd|ssh)(?:\.exe)?$/i.test(executableToken) &&
     detectionTokens.some((token) => /\bgit(?:\.exe)?(?:\s+-C\s+\S+)?\s+push\b/i.test(token));
   return /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush;
 }
