@@ -203,3 +203,13 @@ content-v1:90d2c785141be4f2159703a252dfa0020556b321d8c510484411ec301246efcf:gove
 # idempotencyKey/payload.decisionId, rule, repository-relative path, line and column.
 content-v1:4cfbf0ca18387ff1f404c00757265933984703de4f8606f2b8f1c31dbf94aa8d:governance/events/human/17-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-0.json:generic-api-key:1:1019
 content-v1:f0ce87116e1b527f5ab54097347aed245477dc9f8b0a30e13547c0c38e5b74cb:governance/events/human/19-evt-gmw-revoke-3f7fdf423cbf3011f758aeb70977dffc-1.json:generic-api-key:1:1024
+# Reconciled human governance event idempotency keys
+content-v1:4d221c0e0df550d5f572b72ee7071721d3683906298879dc20db3c9acd389992:governance/events/human/22-evt-gmw-revoke-ef29c647f545365f11cd893dff3e53db-0.json:generic-api-key:1:1024
+content-v1:eb4dd4f020b46946af15b68d1551dac23bb657742b1c2f3a78cbfd4e636167a4:governance/events/human/36-evt-hgo-deny-cf13c0c413f3893f92c60aa52cd8055f-0.json:generic-api-key:1:987
+content-v1:d4a957d76d776bff56a970aac2781be6a6ccec8ff82dd6104e851fbbd17e25a2:governance/events/human/40-evt-hgo-deny-1063805339a865dde6bcee072416fd85-0.json:generic-api-key:1:987
+content-v1:2f9d636a9542b3681b19a21e1aa05608f76b4b02176555194675fec3d584a589:governance/events/human/38-evt-hgo-deny-aae1302836efe859a9be0696d07ceebb-0.json:generic-api-key:1:987
+content-v1:6dd681a63263134c3d24c672e8b2ac50ecc3a7565dcb36fca0fbefa656a8abc0:governance/events/human/31-evt-gmw-revoke-32a232bab572231c215c9c4f853200f3-0.json:generic-api-key:1:1047
+content-v1:6cfbf95413d12d03d9840a46a4cb96ca8363ad1655003f54a277c7b3ec8b2b53:governance/events/human/43-evt-gmw-revoke-18ebbdd9bc82e4d03c99c05a4e8a7182-0.json:generic-api-key:1:1024
+content-v1:e54ba2dd01807e12464178a678547ec0decd0c0e9671e1d57fcb8eeaac35480f:governance/events/human/34-evt-gmw-revoke-70ec32844333bd613eaaad1208cd41e1-0.json:generic-api-key:1:1071
+content-v1:c91d79d2d3ef6db00cf593ce278dd5fa139bb90857d3ee4a79666715e4b430a0:governance/events/human/25-evt-gmw-revoke-a4ab91786ab3fd289eaa6aca5c4c0c80-0.json:generic-api-key:1:1024
+content-v1:f840c4991e62e19fcd599381605f275b7266199ff6ece6c9611b3e175ffadbe6:governance/events/human/28-evt-gmw-revoke-3e56dd12d9ce87a4d3e56dbb473c7265-0.json:generic-api-key:1:1047

@@ -68,10 +68,20 @@ useDefault = true
 id = "sentry-access-token"
 
 [[rules.allowlists]]
-paths = ['''.*/backlog/transitions\.ndjson$''', '''.*/backlog/transitions-phoenix-history\.ndjson$''']
+paths = [
+  '''.*/backlog/transitions\.ndjson$''',
+  '''.*/backlog/transitions-phoenix-history\.ndjson$''',
+  '''.*/backlog/transitions-alfred-history\.ndjson$''',
+  '''.*/backlog/transitions-alfred-history\.pre-rebase\.ndjson$'''
+]
 
 [[rules]]
 id = "generic-api-key"
 
 [[rules.allowlists]]
-paths = ['''.*/backlog/transitions\.ndjson$''', '''.*/backlog/transitions-phoenix-history\.ndjson$''']
+paths = [
+  '''.*/backlog/transitions\.ndjson$''',
+  '''.*/backlog/transitions-phoenix-history\.ndjson$''',
+  '''.*/backlog/transitions-alfred-history\.ndjson$''',
+  '''.*/backlog/transitions-alfred-history\.pre-rebase\.ndjson$'''
+]
