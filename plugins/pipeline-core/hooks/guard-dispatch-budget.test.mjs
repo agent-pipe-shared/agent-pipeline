@@ -165,7 +165,7 @@ writeFileSync(PARALLEL_COUNTER_RUNNER_PATH, [
   "  if (!result.stderr.includes('counter-lock-busy') && !result.stderr.includes('counter-lock-recovery-busy')) break;",
   "  await new Promise((resolve) => setTimeout(resolve, 2));",
   "}",
-  "console.log(JSON.stringify({ exitCode: result.exitCode, stderr: result.stderr, count: JSON.parse((await import('node:fs')).readFileSync(counterPath, 'utf8')).count }));",
+  "console.log(JSON.stringify({ exitCode: result.exitCode, stderr: result.stderr }));",
 ].join("\n"));
 process.on("exit", () => { try { rmSync(runnerDir, { recursive: true, force: true }); } catch { /* best effort */ } });
 

@@ -10913,7 +10913,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const criticVerifyLifecycle = closeValues["critic-verify-lifecycle"];
       const hasCoordinator = coordinatorLifecycle !== undefined || coordinatorSha256 !== undefined;
       if (!hasCoordinator) {
-        const allowLegacy = deps.allowLegacyClose === true || deps.gitHead !== undefined;
+        const allowLegacy = deps.allowLegacyClose === true;
         if (!allowLegacy) {
           console.error("Error: CLOSE-AUDIT-MIGRATION-REQUIRED: close-feature requires the exact coordinator lifecycle/digest and private Critic/Verify lifecycle ID returned by finish-feature; direct or legacy close has zero mutation.");
           return 2;
