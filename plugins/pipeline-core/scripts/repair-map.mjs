@@ -97,6 +97,23 @@ export const PROBES = Object.freeze([
   { label: "cross-boundary target", toolName: "Bash", toolInput: { command: "cat /etc/shadow" } },
   { label: "ungrammatical command", toolName: "Bash", toolInput: { command: "cat 'unterminated/quote" } },
   { label: "pipeline plugin source edit", toolName: "Edit", toolInput: { file_path: "plugins/pipeline-core/scripts/repair-map.mjs" } },
+  {
+    label: "mixed plugin and ordinary patch",
+    toolName: "apply_patch",
+    toolInput: { command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/scripts/repair-map.mjs\n@@\n-x\n+y\n*** Update File: README.md\n@@\n-x\n+y\n*** End Patch" },
+  },
+  {
+    label: "plugin source with mismatched author root",
+    toolName: "Edit",
+    toolInput: { file_path: "plugins/pipeline-core/scripts/repair-map.mjs" },
+    eligibilityOptions: { selectedAuthorSourceRoot: "." },
+  },
+  {
+    label: "ordinary target with author root selected",
+    toolName: "Edit",
+    toolInput: { file_path: "README.md" },
+    eligibilityOptions: { selectedAuthorSourceRoot: "." },
+  },
   { label: "ordinary in-root command", toolName: "Bash", toolInput: { command: "printf hello" } },
 ]);
 
@@ -148,8 +165,8 @@ function overridePlanCommands(rootDir, requestSha256, approvalMode) {
  * Ask the real planner for one probe. Never writes: see the module header
  * for the exact proof, keyed on which branch `eligibility()` reports.
  */
-export function classifyProbe({ rootDir, pluginRoot, toolName, toolInput }) {
-  const eligible = eligibility(rootDir, toolName, toolInput);
+export function classifyProbe({ rootDir, pluginRoot, toolName, toolInput, eligibilityOptions = {} }) {
+  const eligible = eligibility(rootDir, toolName, toolInput, eligibilityOptions);
   if (eligible.eligible === true) {
     let approval = { mode: "signature", scope: "default", source: "default" };
     try { approval = readHumanApprovalMode(rootDir, { legacyKind: "push" }) ?? approval; } catch { /* fail closed */ }
@@ -243,7 +260,13 @@ export function structuralRows({ rootDir, pluginRoot }) {
 export function buildRepairMap({ rootDir, pluginRoot = PLUGIN_ROOT } = {}) {
   const byCode = new Map();
   for (const probe of PROBES) {
-    const row = classifyProbe({ rootDir, pluginRoot, toolName: probe.toolName, toolInput: probe.toolInput });
+    const row = classifyProbe({
+      rootDir,
+      pluginRoot,
+      toolName: probe.toolName,
+      toolInput: probe.toolInput,
+      eligibilityOptions: probe.eligibilityOptions,
+    });
     if (!byCode.has(row.code)) byCode.set(row.code, { ...row, probes: [probe.label] });
     else byCode.get(row.code).probes.push(probe.label);
   }

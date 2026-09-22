@@ -29,11 +29,7 @@ const ROOT = process.cwd();
 // NOT been empirically confirmed to reach. AC-4: a class added to
 // eligibility() and not accounted for here (as either a covered row or a
 // listed-and-accepted gap) fails this test.
-const KNOWN_UNCOVERED_CODES = [
-  "HGO-AUTHOR-ROOT-MISMATCH",
-  "HGO-AUTHOR-SCOPE-MISMATCH",
-  "HGO-NONOVERRIDABLE-CROSS-BOUNDARY",
-].sort();
+const KNOWN_UNCOVERED_CODES = [];
 
 test("AC-4: eligibility() enumeration is exactly covered rows plus the documented, accepted gap", () => {
   const codes = extractEligibilityCodes(PLUGIN_ROOT);
@@ -49,7 +45,7 @@ test("AC-4: eligibility() enumeration is exactly covered rows plus the documente
 test("AC-7 (contract): every eligibility()-derived row matches a fresh, independent live call", () => {
   const map = buildRepairMap({ rootDir: ROOT });
   for (const probe of PROBES) {
-    const fresh = eligibility(ROOT, probe.toolName, probe.toolInput);
+    const fresh = eligibility(ROOT, probe.toolName, probe.toolInput, probe.eligibilityOptions);
     const expectedCode = fresh.eligible ? "HGO-ELIGIBLE" : fresh.code;
     const row = map.rows.find((candidate) => candidate.code === expectedCode);
     assert.ok(row, `probe "${probe.label}" resolved to ${expectedCode}, which has no row`);
