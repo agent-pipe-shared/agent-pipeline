@@ -9015,49 +9015,16 @@ test("regression: a repository already at ready (kickoff-apply's provisional aut
   } finally { dispose(path); }
 });
 
-test("pipelineScriptsRunnerAllowlistEntries() covers both runner lanes, and both path spellings whenever the two conversions actually differ", () => {
-  // Windows-style input: contains a backslash, so both the forward-slash and
-  // backslash spellings must appear, once per lane (Bash, PowerShell) --
-  // exactly the gap disclosed in commit 5f5bbfac's own commit body.
-  const windowsEntries = pipelineScriptsRunnerAllowlistEntries("D:\\Dev\\proj\\plugins\\pipeline-core\\scripts");
-  assert.deepEqual(windowsEntries, [
-    'Bash(node "D:/Dev/proj/plugins/pipeline-core/scripts/*")',
-    'Bash(node "D:\\Dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
-    'PowerShell(node "D:/Dev/proj/plugins/pipeline-core/scripts/*")',
-    'PowerShell(node "D:\\Dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
-  ]);
-  assert.equal(windowsEntries.filter((entry) => entry.startsWith("Bash(")).length, 2);
-  assert.equal(windowsEntries.filter((entry) => entry.startsWith("PowerShell(")).length, 2);
-  assert.equal(windowsEntries.filter((entry) => entry.includes("/")).length, 2);
-  assert.equal(windowsEntries.filter((entry) => entry.includes("\\")).length, 2);
-
-  // No-separator input: neither "/" nor "\" appears anywhere, so the
-  // forward-slash and backslash conversions are byte-identical and the
-  // function collapses to exactly one spelling per lane (the only case the
-  // real `forwardSlash === backslash` dedup check in
-  // pipelineScriptsRunnerAllowlistEntries() actually fires on -- a plain
-  // POSIX path such as "/home/dev/.../scripts" still yields BOTH spellings,
-  // since converting its forward slashes to backslashes produces a distinct
-  // string).
-  const noSeparatorEntries = pipelineScriptsRunnerAllowlistEntries("scripts");
-  assert.deepEqual(noSeparatorEntries, [
-    'Bash(node "scripts/*")',
-    'PowerShell(node "scripts/*")',
-  ]);
-  assert.equal(noSeparatorEntries.length, 2);
-  assert.equal(noSeparatorEntries.filter((entry) => entry.startsWith("Bash(")).length, 1);
-  assert.equal(noSeparatorEntries.filter((entry) => entry.startsWith("PowerShell(")).length, 1);
-
-  // A plain POSIX absolute path (forward slashes, no backslash) is NOT the
-  // dedup case: forwardSlash === trimmed but backslash is a distinct,
-  // fully-backslashed string, so both spellings are still emitted.
-  const posixEntries = pipelineScriptsRunnerAllowlistEntries("/home/dev/proj/plugins/pipeline-core/scripts");
-  assert.deepEqual(posixEntries, [
-    'Bash(node "/home/dev/proj/plugins/pipeline-core/scripts/*")',
-    'Bash(node "\\home\\dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
-    'PowerShell(node "/home/dev/proj/plugins/pipeline-core/scripts/*")',
-    'PowerShell(node "\\home\\dev\\proj\\plugins\\pipeline-core\\scripts\\*")',
-  ]);
+test("source and arbitrary paths cannot mint runner permissions", () => {
+  // A project source tree, a relative path, and a fabricated cache-like path
+  // must not create executable permissions. Only the exact installed plugin
+  // cache lineage may produce the narrow push-init entries at runtime.
+  for (const candidate of [
+    "D:\\Dev\\proj\\plugins\\pipeline-core\\scripts",
+    "scripts",
+    "/home/dev/proj/plugins/pipeline-core/scripts",
+  ]) assert.deepEqual(pipelineScriptsRunnerAllowlistEntries(candidate), []);
+  assert.deepEqual(expectedPipelineScriptsRunnerAllowlistEntries(), []);
 });
 
 test("fresh lifecycle keeps project settings portable and reports local runner permissions", () => {
@@ -9082,48 +9049,19 @@ test("fresh lifecycle keeps project settings portable and reports local runner p
   } finally { dispose(path); }
 });
 
-test("a ready one-entry consumer receives and completes the authenticated runner-permission merge", () => {
+test("a source consumer never receives an automatic runner-permission repair", () => {
   const path = root();
   try {
     initializeClaudeOnboardedRoot(path);
-    completeKickoff(path, "Repair runner permissions", fakeDeps, "ready", "claude");
-    const originalAction = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" }).nextAction;
-    const expectedEntries = expectedPipelineScriptsRunnerAllowlistEntries();
-    const partial = {
-      statusLine: { type: "command", command: "node user-statusline.mjs" },
-      permissions: { allow: ["Bash(git status *)", expectedEntries[1]] },
-    };
-    const projectSettingsBytes = readFileSync(join(path, ".claude", "settings.json"), "utf8");
-    writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify(partial, null, 2)}\n`);
-
-    const drifted = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
-    assert.equal(drifted.status, "ready");
-    assert.equal(drifted.runnerPermissions.status, "drifted");
-    assert.deepEqual(drifted.nextAction, originalAction);
-    assert.equal(drifted.runnerPermissions.optionalPlan.executable, "node");
-    assert.equal(drifted.runnerPermissions.optionalPlan.argv[1], "plan-runner-permissions");
-    assert.equal(drifted.runnerPermissions.optionalPlan.mutation, false);
-    const planned = spawnSync(process.execPath, drifted.runnerPermissions.optionalPlan.argv, { encoding: "utf8" });
-    assert.equal(planned.status, 0, planned.stderr);
-    assert.equal(JSON.parse(planned.stdout).status, "ready");
-    const optionalPlan = planSettingsAllowlistMerge({ rootDir: path, candidateSet: "runner-permissions" });
-    const applied = applySettingsAllowlistMerge({
-      rootDir: path,
-      candidateSet: "runner-permissions",
-      planSha256: optionalPlan.planSha256,
-      activate: true,
-    });
-    assert.equal(applied.status, "ready", JSON.stringify(applied));
-
-    assert.equal(readFileSync(join(path, ".claude", "settings.json"), "utf8"), projectSettingsBytes);
-    const merged = JSON.parse(readFileSync(join(path, ".claude", "settings.local.json"), "utf8"));
-    assert.deepEqual(merged.statusLine, partial.statusLine);
-    assert.equal(merged.permissions.allow.includes("Bash(git status *)"), true);
-    for (const entry of expectedEntries) assert.equal(merged.permissions.allow.includes(entry), true, entry);
-    const current = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
-    assert.equal(current.status, "ready");
-    assert.equal(current.runnerPermissions.status, "current");
-    assert.deepEqual(current.runnerPermissions.exactEntries, expectedEntries);
+    completeKickoff(path, "Source permissions stay ungranted", fakeDeps, "ready", "claude");
+    const settings = join(path, ".claude", "settings.local.json");
+    const bytes = "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(git status *)\"\n    ]\n  }\n}\n";
+    writeFileSync(settings, bytes);
+    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
+    assert.equal(observed.status, "ready");
+    assert.equal(observed.runnerPermissions.status, "current");
+    assert.deepEqual(observed.runnerPermissions.exactEntries, []);
+    assert.equal(readFileSync(settings, "utf8"), bytes);
   } finally { dispose(path); }
 });
 
@@ -9147,31 +9085,20 @@ test("a ready consumer with malformed permission shapes receives only the typed 
   }
 });
 
-test("optional runner permissions preserve lifecycle actions and ready-only fields", () => {
+test("source runner permission observation preserves lifecycle actions and ready-only fields", () => {
   const path = root();
   try {
     initializeClaudeOnboardedRoot(path);
-    completeKickoff(path, "Reject stale runner permissions", fakeDeps, "ready", "claude");
-    const originalActions = Object.fromEntries(["bootstrap", "session"].map((intent) => [intent,
-      inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent, runner: "claude" }).nextAction]));
-    writeFileSync(join(path, ".claude", "settings.local.json"), `${JSON.stringify({
-      permissions: { allow: ["Bash(git status *)"] },
-    }, null, 2)}\n`);
-
+    completeKickoff(path, "No source permission repair", fakeDeps, "ready", "claude");
+    writeFileSync(join(path, ".claude", "settings.local.json"), "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(git status *)\"\n    ]\n  }\n}\n");
     for (const intent of ["bootstrap", "session"]) {
       const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent, runner: "claude" });
       assert.equal(observed.status, "ready");
-      assert.equal(observed.runnerPermissions.status, "drifted");
-      assert.deepEqual(observed.nextAction, originalActions[intent]);
-      assert.equal(observed.runnerPermissions.optionalPlan.argv[1], "plan-runner-permissions");
+      assert.equal(observed.runnerPermissions.status, "current");
+      assert.deepEqual(observed.runnerPermissions.exactEntries, []);
       assert.equal(Object.prototype.hasOwnProperty.call(observed, "pushApprovalMode"), true);
       assert.equal(Object.prototype.hasOwnProperty.call(observed, "trustAnchorAvailability"), true);
-      assert.deepEqual(requireProjectOnboardingReady({
-        rootDir: path,
-        intent,
-        runner: "claude",
-        inspect: () => observed,
-      }), { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent });
+      assert.deepEqual(requireProjectOnboardingReady({ rootDir: path, intent, runner: "claude", inspect: () => observed }), { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent });
     }
   } finally { dispose(path); }
 });

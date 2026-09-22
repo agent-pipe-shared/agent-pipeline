@@ -597,7 +597,7 @@ test("exceptions, malformed envelopes, intent/root mismatch, and false-ready act
     } },
     { ...readyResultWithPushApprovalKeys(path, "dispatch"), runnerPermissions: {
       ...fieldPlaceholder("runnerPermissions", path, "dispatch", "codex"),
-      exactEntries: expectedPipelineScriptsRunnerAllowlistEntries().filter((entry) => !entry.includes("\\")),
+      exactEntries: [...expectedPipelineScriptsRunnerAllowlistEntries(), "Bash(node \"/untrusted/scripts/anything.mjs\" *)"],
     } },
     { ...readyResult(path, "dispatch"), nextAction: { kind: "command" } },
     { ...readyResult(path, "dispatch"), diagnostics: [{ code: "false-ready" }] },
