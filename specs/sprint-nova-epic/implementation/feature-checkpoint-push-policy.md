@@ -2,11 +2,10 @@
 
 Status: implementation evidence for the opt-in checkpoint lane. This artifact
 is bounded by the approved Sprint Nova specification and reviewed base commit
-`6fafa91200e542ba874a7bbdaeeb9cb29539f3b1`. The reviewed implementation
-input includes candidate commit `44e9a5f13a0f2e474a69ada56d238fbd9b887131`,
-but this artifact does not predeclare the final delivery candidate: the exact
-candidate and policy binding is produced by the detached protected-action
-request after this artifact is committed. It is not a release approval,
+`6fafa91200e542ba874a7bbdaeeb9cb29539f3b1`. It intentionally does not
+predeclare a delivery candidate: only a detached protected-action request,
+prepared after the implementation is committed, binds the current candidate and
+`git-boundary-threat-model.json` policy revision. It is not a release approval,
 signature, or authorization to publish.
 
 ## Decision and trust boundary

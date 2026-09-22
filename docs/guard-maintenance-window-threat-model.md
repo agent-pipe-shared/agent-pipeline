@@ -44,6 +44,14 @@ All other destinations and malformed or absent policies remain on the existing
 strict publication path. The checkpoint lane does not bypass publication,
 release, security, Verify, Critic, marketplace, approval, or signature gates
 when a feature branch is later promoted. The linked policy artifact records
+the operational detail. The machine-readable Git-boundary model at
+[`specs/sprint-nova-epic/implementation/git-boundary-threat-model.json`](../specs/sprint-nova-epic/implementation/git-boundary-threat-model.json)
+is the current policy revision for this lane: it records the
+`feature-checkpoint-push` boundary, the authority-confusion and unrecorded-
+delivery threats, and the exact-ref and pre-network-audit mitigations. A
+detached threat-model approval request must bind that revision and the exact
+delivery candidate before the policy can be treated as approved for a protected
+action; the model alone is never an approval.
 disablement/rollback and names an owner plus expiry for every deferred risk.
 
 ## What makes this different from HGO, and why that matters here

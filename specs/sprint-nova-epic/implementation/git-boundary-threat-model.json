@@ -4,7 +4,7 @@
     "commit": "1fa85422f66646857296fb605e094f8774af00ce",
     "tree": "55e5b1fc5d2e58ac8352453f92590a10335f64a8"
   },
-  "policyRevision": "nova-b-git-boundary-v2",
+  "policyRevision": "nova-b-git-boundary-v3",
   "classification": "public",
   "entities": [
     {
@@ -65,6 +65,51 @@
       "id": "mitigation-43b36d44f7742f65",
       "kind": "mitigation",
       "label": "onboarding-installed-commit-msg-validation",
+      "relationships": []
+    },
+    {
+      "id": "asset-c720c5cd517aee86",
+      "kind": "asset",
+      "label": "feature-checkpoint-integrity",
+      "relationships": [
+        "boundary-f7c70ccea8e5e3bc"
+      ]
+    },
+    {
+      "id": "boundary-f7c70ccea8e5e3bc",
+      "kind": "boundary",
+      "label": "feature-checkpoint-push",
+      "relationships": [
+        "threat-b7cccff8627e4492",
+        "threat-40aa5f9dbd16e477"
+      ]
+    },
+    {
+      "id": "threat-b7cccff8627e4492",
+      "kind": "threat",
+      "label": "checkpoint-authority-confusion",
+      "relationships": [
+        "mitigation-c3d72cfaa1e7e5ce"
+      ]
+    },
+    {
+      "id": "mitigation-c3d72cfaa1e7e5ce",
+      "kind": "mitigation",
+      "label": "exact-ref-policy-binding",
+      "relationships": []
+    },
+    {
+      "id": "threat-40aa5f9dbd16e477",
+      "kind": "threat",
+      "label": "unrecorded-checkpoint-delivery",
+      "relationships": [
+        "mitigation-06e16a97c0c5c1d5"
+      ]
+    },
+    {
+      "id": "mitigation-06e16a97c0c5c1d5",
+      "kind": "mitigation",
+      "label": "pre-network-local-audit",
       "relationships": []
     }
   ],

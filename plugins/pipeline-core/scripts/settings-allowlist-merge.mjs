@@ -65,13 +65,17 @@ export const RUNNER_PERMISSIONS_TARGET_RELATIVE = ".claude/settings.local.json";
 const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
 
 export function pipelineScriptsRunnerAllowlistEntries(scriptsDirAbsolute = SCRIPTS_DIR) {
+  // A checkout has no immutable plugin identity and must never mint a permission
+  // grant.  The only runner-local entry is the installed, documented push-init
+  // driver; its own closed parser remains responsible for every trailing argv.
+  if (runnerPermissionCacheLineage(scriptsDirAbsolute) === null) return [];
   const trimmed = scriptsDirAbsolute.replace(/[\\/]+$/u, "");
   const forwardSlash = trimmed.replace(/\\/gu, "/");
   const backslash = trimmed.replace(/\//gu, "\\");
   const spellings = forwardSlash === backslash ? [forwardSlash] : [forwardSlash, backslash];
   return ["Bash", "PowerShell"].flatMap((lane) => spellings.map((spelling) => {
-    const glob = spelling.includes("\\") ? `${spelling}\\*` : `${spelling}/*`;
-    return `${lane}(node "${glob}")`;
+    const script = spelling.includes("\\") ? `${spelling}\\push-init.mjs` : `${spelling}/push-init.mjs`;
+    return `${lane}(node "${script}" *)`;
   }));
 }
 
@@ -92,11 +96,11 @@ function runnerPermissionCacheLineage(scriptsDirAbsolute) {
 
 function runnerPermissionEntryVersion(entry, lineage) {
   if (typeof entry !== "string") return null;
-  const match = /^(?:Bash|PowerShell)\(node "([^"]*)"\)$/u.exec(entry);
+  const match = /^(?:Bash|PowerShell)\(node "([^"]*)" \*\)$/u.exec(entry);
   if (!match) return null;
   const normalized = normalizeRunnerPermissionPath(match[1]);
   const prefix = `${lineage.root}/`;
-  const suffix = "/scripts/*";
+  const suffix = "/scripts/push-init.mjs";
   if (!normalized.startsWith(prefix) || !normalized.endsWith(suffix)) return null;
   const version = normalized.slice(prefix.length, -suffix.length);
   return version.length > 0 && !version.includes("/") ? version : null;
@@ -136,6 +140,9 @@ export function classifyRunnerPermissionCacheFamilies(allow, scriptsDirAbsolute 
 // production always supplies this installed module's own SCRIPTS_DIR.
 export function canonicalizeRunnerPermissionAllowlist(allow, scriptsDirAbsolute = SCRIPTS_DIR) {
   const currentEntries = pipelineScriptsRunnerAllowlistEntries(scriptsDirAbsolute);
+  if (runnerPermissionCacheLineage(scriptsDirAbsolute) === null) {
+    return { status: "unrepairable", currentEntries, added: [], removed: [], canonicalizedFamilies: [], ambiguousVersions: ["source-checkout"] };
+  }
   const present = new Set(allow);
   const classification = classifyRunnerPermissionCacheFamilies(allow, scriptsDirAbsolute);
   if (classification.ambiguousVersions.length > 0) {

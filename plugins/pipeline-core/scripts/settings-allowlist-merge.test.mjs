@@ -202,14 +202,24 @@ test("foreign-lineage and broadened lookalike grants are retained and never clas
   assert.deepEqual(result.mergedAllow, [...foreign, broad, nonString, ...pipelineScriptsRunnerAllowlistEntries(currentScripts)]);
 });
 
-test("a source checkout has no cache lineage and never retires cache-looking entries", () => {
+test("a source checkout cannot mint or repair runner permissions", () => {
   const sourceScripts = "/work/agent-pipeline/plugins/pipeline-core/scripts";
   const oldScripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.6.0/scripts";
   const oldEntries = pipelineScriptsRunnerAllowlistEntries(oldScripts);
   const result = canonicalizeRunnerPermissionAllowlist(oldEntries, sourceScripts);
-  assert.equal(result.status, "ready");
+  assert.deepEqual(pipelineScriptsRunnerAllowlistEntries(sourceScripts), []);
+  assert.equal(result.status, "unrepairable");
+  assert.deepEqual(result.added, []);
   assert.deepEqual(result.removed, []);
-  assert.deepEqual(result.mergedAllow, [...oldEntries, ...pipelineScriptsRunnerAllowlistEntries(sourceScripts)]);
+});
+
+test("runner permissions name only installed push-init, never a source tree or all scripts", () => {
+  const scripts = "/home/user/.claude/plugins/cache/agent-pipeline/pipeline-core/0.7.0/scripts";
+  const entries = pipelineScriptsRunnerAllowlistEntries(scripts);
+  assert.equal(entries.length, 4);
+  assert.ok(entries.every((entry) => entry.replace(/\\/gu, "/").includes("/scripts/push-init.mjs")));
+  assert.ok(entries.every((entry) => !entry.replace(/\\/gu, "/").includes("scripts/*")));
+  assert.ok(entries.every((entry) => entry.endsWith(" *)")));
 });
 
 test("installed-cache fixture replaces an old permission family through the closed plan/apply contract", async () => {
@@ -298,24 +308,16 @@ test("plan and apply preserve present non-object permissions and non-array permi
   }
 });
 
-test("runner permissions are written only to ignored local settings and never dirty project policy", () => {
+test("a source checkout refuses runner-permission planning and leaves policy untouched", () => {
   const dir = freshDir("runner-local-target");
   try {
     const committedBytes = `${JSON.stringify({ permissions: { allow: ["Bash(git push *)"] } }, null, 2)}\n`;
     writeFileSync(settingsPath(dir), committedBytes, "utf8");
     const plan = planSettingsAllowlistMerge({ rootDir: dir, candidateSet: "runner-permissions" });
-    assert.equal(plan.status, "ready");
+    assert.equal(plan.status, "unrepairable");
     assert.equal(plan.target, ".claude/settings.local.json");
-    const applied = applySettingsAllowlistMerge({
-      rootDir: dir,
-      candidateSet: "runner-permissions",
-      planSha256: plan.planSha256,
-      activate: true,
-    });
-    assert.equal(applied.status, "ready");
     assert.equal(readFileSync(settingsPath(dir), "utf8"), committedBytes);
-    assert.equal(readFileSync(localSettingsPath(dir), "utf8"), plan.after.bytes);
-    assert.equal(planSettingsAllowlistMerge({ rootDir: dir, candidateSet: "runner-permissions" }).status, "no-op");
+    assert.equal(existsSync(localSettingsPath(dir)), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
