@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sessionStartDecision } from './codex-session-start-hint.mjs';
 import { resolvePluginManifestVersion } from '../scripts/pipeline-start-preflight.mjs';
@@ -35,6 +35,11 @@ function reportFailure(code, error) {
   }) + '\n');
 }
 
+export function antigravityRepositoryRoot(input) {
+  const candidate = Array.isArray(input?.workspacePaths) ? input.workspacePaths[0] : null;
+  return typeof candidate === 'string' && isAbsolute(candidate) ? resolve(candidate) : null;
+}
+
 function main() {
   let input;
   try {
@@ -51,9 +56,11 @@ function main() {
 
   let decision;
   try {
-    const rootDir = (input.workspacePaths && input.workspacePaths.length > 0)
-        ? input.workspacePaths[0]
-        : process.cwd();
+    const rootDir = antigravityRepositoryRoot(input);
+    if (!rootDir) {
+      reportFailure('AGY-REPOSITORY-CONTEXT-UNAVAILABLE');
+      return;
+    }
     decision = sessionStartDecision(rootDir, undefined, input.conversationId || input.session_id || null, 'antigravity');
 
     // A first-run directory is not yet a Git repository.  Never manufacture
