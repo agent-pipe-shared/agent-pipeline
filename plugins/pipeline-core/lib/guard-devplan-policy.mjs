@@ -96,6 +96,13 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
 
     if (!record) {
       // Missing advisory record: allow if we have a valid direct final ledger approval
+      const approval = state?.planApproval;
+      if (approval?.schema === "pipeline.plan-approval.v4" && state?.planApproved === true) {
+        if (approval.poGateAuthority?.planSha256 === planSha256 && approval.poGateAuthority?.specSha256 === specSha256) {
+          return { ok: true, id: "ledger-fallback-v4", mode: "unavailable" };
+        }
+      }
+
       const reference = state?.planApproval?.humanDecision;
       if (reference?.candidate?.commit && reference?.candidate?.tree) {
         const directApprovalValid = hasExactDesignAdvisorFinalApproval({
