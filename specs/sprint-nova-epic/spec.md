@@ -1616,10 +1616,29 @@ admitted mutation grammar.
 
 ### 7.3 Exact implementation paths
 
-Every slice may modify only the listed paths. A new need returns to the Spec
-gate with collision review. In this table, “schemas `<name>` under
+Every historical Nova slice may modify only the listed paths. A new need
+returns to the Spec gate with collision review. The table remains the
+authority for an individual Nova-slice delivery; it is not an allowlist for a
+later, PO-authorized integration candidate that combines completed Alfred and
+Nova work. In this table, “schemas `<name>` under
 `plugins/pipeline-core/scripts/`” means the exact path
 `plugins/pipeline-core/scripts/<name>.schema.json` for every listed name.
+
+#### 0.7.0 integrated-candidate supersession — PO decision 2026-09-22
+
+The Product Owner authorized the repository's **0.7.0 integrated local
+candidate** to combine the completed Alfred and Nova implementation lines.
+For that candidate only, the per-slice table above is superseded by this
+bounded integration scope: tracked source, tests, verification registration,
+documentation, configuration, backlog projections, and candidate evidence
+needed to reconcile those two completed lines may change together. This is an
+integration authorization, not a blanket future-Sprint allowlist.
+
+It does **not** authorize a release, tag, remote push, dependency addition,
+credential use, provider execution, or an exception to any independently
+enforced approval/security gate. Each such action still needs its own exact
+authority and readback. The 0.7.0 version denotes an installable local
+candidate; publication remains a separately approved release decision.
 
 | Slice | New paths | Existing paths allowed to change |
 | --- | --- | --- |
@@ -1720,7 +1739,9 @@ Nightwing or later work.
 - Product capability inventory remains authoritative; Nova runner reports are
   inputs, not a replacement.
 - Public Core remains forge-neutral and Git remains the only VCS.
-- Nova makes no release version bump.
+- Nova makes no release version bump, except for the PO-authorized 0.7.0
+  integrated local candidate described in §7.3. That exception is not release
+  authority and does not authorize publication, tagging or pushing.
 - During the current Design reconciliation Nova imports no `main` bytes and
   consumes no unpublished Cyborg output.
 - Before renewed implementation approval, Nova A increment acceptance,
