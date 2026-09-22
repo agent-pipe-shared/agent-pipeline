@@ -227,7 +227,7 @@
 | pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | closed | defect | pipeline | — | 2026-08-09 | 2026-09-08 | — |
-| pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy | open | requirement | pipeline | nova | 2026-09-14 | — | — |
+| pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy | closed | requirement | pipeline | nova | 2026-09-14 | — | — |
 | pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors | closed | defect | pipeline | nova-b | 2026-09-13 | — | Nova B — a completed local product can remain permanently implementing after a stopped release path, and Codex cannot always select its own session for close telemetry. |
 | pipeline.first-verify-run-is-red-with-four-failures | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | closed | defect | pipeline | — | 2026-08-12 | — | — |
@@ -353,7 +353,7 @@
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | closed | defect | pipeline | — | 2026-08-11 | 2026-08-25 | — |
 | pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | closed | defect | pipeline | nova-b | 2026-08-17 | — | Reassigned from phoenix to nova on 2026-08-28 by PO decision, after the Phoenix line was intaked into Nova |
 | pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | — | 2026-08-17 | — | — |
-| pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | alfred | 2026-08-07 | 2026-08-21 | — |
+| pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | closed | defect | pipeline | alfred | 2026-08-07 | 2026-08-21 | — |
 | pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | — | 2026-08-16 | — | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
@@ -691,8 +691,8 @@
 
 ## Counts
 
-- open: 29
+- open: 27
 - in_progress: 0
-- closed: 640
+- closed: 642
 - rejected: 3
 - deferred: 11

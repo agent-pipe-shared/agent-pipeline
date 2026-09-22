@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-09-14
 sprint: nova
 source: "PO requirement, 2026-09-14, after an Alfred-sprint feature-branch checkpoint push was blocked by release-grade marketplace attestation and push-authority prerequisites while the active external marketplace could not safely be replaced."
 done_when: manual
+closed_at: 2026-09-22
+closure_repository: self
+closure_commit: 7475f20965cab48f04eb7ffe50851b631df22287
+closure_evidence: plugins/pipeline-core/lib/push-destination-policy.test.mjs
 ---
 
 # A feature-branch checkpoint push needs a lower-rigor destination policy than a protected release push
@@ -99,3 +103,20 @@ active checkout owns.
   a rejection or implementation claim.
 - **Assignment (if accepted):** Nova
 - **Date:** 2026-09-15
+
+## Implementation and closure verification — 2026-09-22
+
+`push-destination-policy.mjs` provides the configuration-bound classifier;
+`checkpoint-push-audit.mjs`, `guard-push.mjs` and `push-init.mjs` consume it.
+The lane is limited to an exact non-force configured feature destination and
+records a local audit receipt. Protected branches, release/stable refs, tags,
+deletions, force/non-fast-forward forms, malformed refspecs and unknown
+destinations remain fail-closed on the strict publication lane. The policy,
+threat model and command path are documented in
+`feature-checkpoint-push-policy.md` and `docs/push-release-flow.md`.
+
+Focused policy, guard, preflight, threat-model and documentation-contract
+tests passed before this closure; the independent Critic identified no defect
+in those mechanics. Its only prior blocker — the historical Nova path/version
+scope — is addressed by the signed 0.7.0 integrated-candidate supersession in
+`specs/sprint-nova-epic/spec.md`.

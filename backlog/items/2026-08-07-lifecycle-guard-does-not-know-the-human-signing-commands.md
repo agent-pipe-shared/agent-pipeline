@@ -3,12 +3,16 @@ schema: pipeline.backlog-item.v1
 id: pipeline.lifecycle-guard-does-not-know-the-human-signing-commands
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 sprint: alfred
 due: 2026-08-21
 source: "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope."
 done_when: manual
+closed_at: 2026-09-22
+closure_repository: self
+closure_commit: bf05188b2363e3e896f439b8d70fd0ba32d0437a
+closure_evidence: plugins/pipeline-core/scripts/po-human-approval.test.mjs
 ---
 
 # Historical finding: `guard-lifecycle-ready`'s human-signing list named only three of six commands
@@ -122,3 +126,12 @@ remote.  Before restamping any rollback candidate, run `po-human-approval.test.m
 and attended-signing cases retain their prior admission boundary.  The rollback
 is a temporary recovery only: it reintroduces the catalog-drift risk and must
 not be described as resolving Direction #2.
+
+## Closure verification — 2026-09-22
+
+The real attended-signing catalog is exported by
+`po-human-approval.mjs` and consumed by `guard-lifecycle-ready.mjs`; the
+guard no longer carries a second hand-maintained command list. The current
+`po-human-approval.test.mjs` run passes 112/112 checks, including the attended
+signing and agent-facing denial boundaries. This closes the deferred
+drift-prevention direction, not merely the prior six-name stopgap.

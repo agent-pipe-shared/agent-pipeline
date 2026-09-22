@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "54d8e9d6ef3ae9b9c55193159b3f245566245ab6eb705534163df8add1ea5afb"
+    "transitionHead": "96c784df2c403dd21cf6618d9d24a9b943bea78d5a181bb7480bc30b3bb7e347"
   },
   "counts": {
-    "open": 29,
+    "open": 27,
     "in_progress": 0,
-    "closed": 640,
+    "closed": 642,
     "rejected": 3,
     "deferred": 11
   },
@@ -3048,13 +3048,17 @@
     },
     {
       "id": "pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-14",
       "source": "PO requirement, 2026-09-14, after an Alfred-sprint feature-branch checkpoint push was blocked by release-grade marketplace attestation and push-authority prerequisites while the active external marketplace could not safely be replaced.",
       "deferred": false,
-      "sprint": "nova"
+      "sprint": "nova",
+      "closedAt": "2026-09-22",
+      "closureRepository": "self",
+      "closureCommit": "7475f20965cab48f04eb7ffe50851b631df22287",
+      "closureEvidence": "plugins/pipeline-core/lib/push-destination-policy.test.mjs"
     },
     {
       "id": "pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors",
@@ -4770,14 +4774,18 @@
     },
     {
       "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope.",
       "deferred": true,
       "due": "2026-08-21",
-      "sprint": "alfred"
+      "sprint": "alfred",
+      "closedAt": "2026-09-22",
+      "closureRepository": "self",
+      "closureCommit": "bf05188b2363e3e896f439b8d70fd0ba32d0437a",
+      "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
     },
     {
       "id": "pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes",
