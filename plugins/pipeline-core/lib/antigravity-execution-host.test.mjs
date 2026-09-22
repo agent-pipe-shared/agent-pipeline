@@ -51,6 +51,7 @@ else if (prompt.includes("--slow-test")) setTimeout(() => console.log(JSON.strin
 else if (prompt.includes("--auth-test")) { console.error("Please login to Vertex"); process.exit(1); }
 else if (prompt.includes("--fail-test")) process.exit(2);
 else if (prompt.includes("--malformed-test")) console.log("no json for you");
+else if (prompt.includes("--permission-test")) console.error('jetski: a tool required the "command" permission and was auto-denied');
 else console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}));
 `;
 
@@ -205,7 +206,7 @@ check("EPH18 slow execution remains bound to the fixture", () => withFixture(asy
   assert.equal(result.ok, true);
 }));
 
-assert.equal(cases.length, 18, "the complete Antigravity execution host corpus must be registered before execution begins");
+assert.equal(cases.length, 19, "the complete Antigravity execution host corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
