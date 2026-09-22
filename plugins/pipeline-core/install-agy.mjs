@@ -11,6 +11,21 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const LOCAL_MARKETPLACE = join(process.env.HOME || process.env.USERPROFILE, "agent-pipeline-local-marketplace");
 const hasMarketplace = existsSync(join(LOCAL_MARKETPLACE, "plugins", "pipeline-core"));
 
+export function postInstallGuidanceLines() {
+  return [
+    "=== Environment verification ===",
+    "The pipeline's hooks require `node` in the PATH of the Antigravity host.",
+    "If Antigravity starts from an IDE, desktop launcher, or service, verify that host PATH directly.",
+    "Run: command -v node",
+    "If node is absent, correct the launcher or host PATH, then fully restart Antigravity.",
+    "Do not create a global sudo symlink merely for this plugin.",
+    "",
+    "=== Recommended next step ===",
+    "Restart Antigravity, open this workspace, then invoke /pipeline-core:pipeline-start.",
+    "Optional autonomous tool policy stays runner-local and grants no plan, release, remote, or human authority.",
+  ];
+}
+
 export function attestAntigravityMarketplaceCopy({ sourcePluginRoot, installedPluginRoot, writeReceipt = writeLocalDevelopmentInstalledPluginReceipt } = {}) {
   try {
     const source = realpathSync(sourcePluginRoot);
