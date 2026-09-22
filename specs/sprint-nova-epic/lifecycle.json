@@ -22,14 +22,14 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "45466db590868217b28d74ff551675c78490ddfa7d75ecaba8ef94de0ddff9ba",
+      "sha256": "d92c9cfcd3125fd5f1b2f286f1aab8dfe2f15ceb90f0b0709ca56b49e7bf735d",
       "authority": true,
       "mutability": "mutable",
       "retention": "active",
       "amendment": {
-        "at": "2026-09-22T06:09:12.440Z",
+        "at": "2026-09-22T06:36:15.137Z",
         "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
-        "previousSha256": "a98b7d3f52208cd7638d11b19e8888f60044422dc795506934cf1261afe8e1fa"
+        "previousSha256": "45466db590868217b28d74ff551675c78490ddfa7d75ecaba8ef94de0ddff9ba"
       }
     },
     {
