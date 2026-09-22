@@ -1,7 +1,7 @@
 ---
 name: close-block
 description: "Durable block-close ritual only: finalizes a stopped topic or a real runtime transfer. Normal same-topic restarts use handover-only and must not invoke this ritual."
-disable-model-invocation: true
+disable-model-invocation: false
 argument-hint: "<durable-stop|runtime-transfer> [block-id or short session label]"
 allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*), Bash(git diff:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
 ---
