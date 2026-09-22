@@ -1,0 +1,34 @@
+{
+  "schema": "pipeline.0.7-integration-scope-authorization-receipt.v1",
+  "authority": {
+    "schema": "pipeline.0.7-integration-scope-authorization.v1",
+    "decision": "authorize",
+    "candidate": {
+      "commit": "1091ac0a224432db6b505bc39d5518361f5b107b",
+      "tree": "c3a5fd4b979c9ad89672baa43d87e195f9855fd8"
+    },
+    "scope": {
+      "specPath": "specs/sprint-nova-epic/spec.md",
+      "section": "7.3 / 0.7.0 integrated-candidate supersession",
+      "completedLines": ["alfred", "nova", "nova-a", "nova-b"],
+      "permitted": ["tracked source", "tests", "verification registration", "documentation", "configuration", "backlog projections", "candidate evidence"],
+      "excluded": ["release", "tag", "remote push", "dependency addition", "credential use", "provider execution", "security-gate exception"]
+    },
+    "decidedAt": "2026-09-22",
+    "humanName": "André"
+  },
+  "intentSha256": "85162c58c7bd7f5eed3098aca7713ab3159dccc8d5bb0f932faaaa4a6caef33f",
+  "proof": {
+    "schema": "pipeline.po-approval-proof.v1",
+    "intentSha256": "85162c58c7bd7f5eed3098aca7713ab3159dccc8d5bb0f932faaaa4a6caef33f",
+    "keyReference": "local-po-key",
+    "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
+    "signatureBase64": "GoqNk6uHuF6HSTewFMYHNgNB/27jSdU/pQKKghWYg1h1jMAKgADTvat6B3b/mIGxPoxD9SpYrxhEA++sN6HKAQ=="
+  },
+  "verification": {
+    "code": "PO-APPROVAL-PROOF-VERIFIED",
+    "proofSha256": "9f5bf68e45216fc580e8b412549e8d5ae259ad9638246fde57d2b1dbd3c506ab",
+    "keyReference": "local-po-key",
+    "publicKeySha256": "2de20a39d0f1c13c15350e428ea0c70be50f8fbca26ec88758a8dcb1a880beee"
+  }
+}

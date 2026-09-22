@@ -1628,6 +1628,8 @@ Nova work. In this table, “schemas `<name>` under
 
 The Product Owner authorized the repository's **0.7.0 integrated local
 candidate** to combine the completed Alfred and Nova implementation lines.
+The cryptographically verified, candidate-bound authorization record is
+[`evidence/0.7-integration-scope-authorization.json`](evidence/0.7-integration-scope-authorization.json).
 For that candidate only, the per-slice table above is superseded by this
 bounded integration scope: tracked source, tests, verification registration,
 documentation, configuration, backlog projections, and candidate evidence
