@@ -39,6 +39,12 @@ export const STATE_APPROVED_SCOPED = "approved-scoped";
 export const STATE_DEFERRED = "deferred";
 export const STATE_PARTIAL = "partial";
 
+function contractExists(rootDir, contractPath) {
+  const directoryGlob = typeof contractPath === "string" && contractPath.endsWith("/**");
+  const relativePath = directoryGlob ? contractPath.slice(0, -3) : contractPath;
+  return fs.existsSync(path.join(rootDir, relativePath));
+}
+
 // Shipped validation: never depend on a source checkout's root schemas.
 function validateState(state) {
   const validation = validateAgainstSchema(state, stateSchema);
@@ -152,7 +158,7 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
         path: c,
         module: m.id,
         priority: isHottest ? "high" : "normal",
-        status: fs.existsSync(path.join(rootDir, c)) ? "available" : "pending"
+        status: contractExists(rootDir, c) ? "available" : "pending"
       });
     }
   }
@@ -446,8 +452,9 @@ function runCli() {
     } else if (arg === "--decision" && args[i + 1]) {
       decision = args[++i];
     } else if (arg === "--scope" && args[i + 1]) {
-      scope = args[++i];
-      taskScope = scope;
+      const suppliedScope = args[++i];
+      scope = scope === null ? suppliedScope : [...(Array.isArray(scope) ? scope : [scope]), suppliedScope];
+      taskScope = suppliedScope;
     } else if (arg === "--expires" && args[i + 1]) {
       expires = args[++i];
     } else if (arg === "--review-date" && args[i + 1]) {
