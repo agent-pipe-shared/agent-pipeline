@@ -90,7 +90,25 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
     const common = realpathSync(lines[1]);
     let record;
     try { record = JSON.parse(readFileSync(join(root, DESIGN_ADVISORY_RECORD_PATH), "utf8")); }
-    catch (error) { return { ok: false, code: error.code === "ENOENT" ? "DAA-PUBLIC-UNAVAILABLE" : "DAA-PUBLIC-INVALID" }; }
+    catch (error) {
+      if (error.code !== "ENOENT") return { ok: false, code: "DAA-PUBLIC-INVALID" };
+    }
+
+    if (!record) {
+      // Missing advisory record: allow if we have a valid direct final ledger approval
+      const reference = state?.planApproval?.humanDecision;
+      if (reference?.candidate?.commit && reference?.candidate?.tree) {
+        const directApprovalValid = hasExactDesignAdvisorFinalApproval({
+          state, projectDir: root, featureId, planPath, specPath,
+          planSha256, specSha256,
+          candidateCommit: reference.candidate.commit,
+          candidateTree: reference.candidate.tree,
+        });
+        if (directApprovalValid) return { ok: true, id: "ledger-fallback", mode: "unavailable" };
+      }
+      return { ok: false, code: "DAA-PUBLIC-UNAVAILABLE" };
+    }
+
     const unavailable = record?.admission?.advisor?.status === "unavailable";
     const workflow = record?.admission?.workflow;
     const finalApprovalValid = unavailable && hasExactDesignAdvisorFinalApproval({
