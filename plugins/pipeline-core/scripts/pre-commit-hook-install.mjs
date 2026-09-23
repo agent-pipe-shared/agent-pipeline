@@ -702,6 +702,7 @@ async function main() {
   let loadProtectedTestPathRules;
   let protectedTestPathRuleFor;
   let defaultHasConsumedCapabilityForPath;
+  let verifyQualityPackageCommitAuthorization;
   let resolveHandoverConfig;
   let isNeverLiftableKernelPath;
   let windowCoversRule;
@@ -709,6 +710,7 @@ async function main() {
     ({ gateStrengthRuleFor } = await import(pathToFileURL(resolve(PLUGIN_HOOKS_DIR, "guard-gate-strength.mjs")).href));
     ({ loadProtectedTestPathRules, protectedTestPathRuleFor } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "protected-test-paths.mjs")).href));
     ({ defaultHasConsumedCapabilityForPath } = await import(pathToFileURL(resolve(PLUGIN_SCRIPTS_DIR, "check-protected-path-integrity.mjs")).href));
+    ({ verifyQualityPackageCommitAuthorization } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "signed-quality-package.mjs")).href));
     ({ resolveHandoverConfig } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "handover-rotation.mjs")).href));
     ({ isNeverLiftableKernelPath, windowCoversRule } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "guard-maintenance-window.mjs")).href));
     ({ derivePlanLifecycle } = await import(pathToFileURL(resolve(PLUGIN_LIB_DIR, "plan-spec-state-v2.mjs")).href));
@@ -764,6 +766,12 @@ async function main() {
     ]);
   } catch { sanctionedVerifyPaths = new Set(); }
 
+  // A quality package is not a per-file exemption. The verifier only returns
+  // true after rechecking the detached proof, unchanged committed trust policy,
+  // base HEAD, and every staged path/blob of one whole package.
+  let qualityPackageAuthorized = false;
+  try { qualityPackageAuthorized = verifyQualityPackageCommitAuthorization({ repoRoot: projectRoot }).ok === true; } catch { qualityPackageAuthorized = false; }
+
   const findings = [];
   for (const relPath of paths) {
     let rule = null;
@@ -772,6 +780,7 @@ async function main() {
       try { rule = protectedTestPathRuleFor(testPathRules, relPath); } catch { rule = null; }
     }
     if (!rule) continue;
+    if (qualityPackageAuthorized) continue;
     if (sanctionedVerifyPaths.has(relPath) && (rule.id === "GS-10" || rule.id === "GS-11")) continue;
     let kernelPath = true;
     try { kernelPath = isNeverLiftableKernelPath(relPath, { rootDir: projectRoot, livePluginRoot: resolve(PLUGIN_LIB_DIR, "..") }); } catch { kernelPath = true; }

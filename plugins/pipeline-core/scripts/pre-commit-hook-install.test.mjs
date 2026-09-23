@@ -33,6 +33,7 @@ import {
 } from "./pre-commit-hook-install.mjs";
 import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../lib/signed-quality-package.mjs";
 
 const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLUGIN_LIB_DIR = join(PLUGIN_ROOT, "lib");
@@ -464,6 +465,40 @@ test("installed hook: staged path with a matching CONSUMED capability -> commit 
   git("add", "pipeline.user.yaml");
   const { code, stderr } = commit(dir, "authorized gate-strength change");
   assert.equal(code, 0, stderr);
+});
+
+test("installed hook: admits one complete proof-bound quality package, never a widened index", () => {
+  const { dir, git } = freshRepo("e2e-quality-package-commit");
+  const pair = generateKeyPairSync("ed25519");
+  const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
+  const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
+  writeTestPathConfig(dir, [{ pattern: "protected-suite\\.test\\.mjs$", reason: "fixture protected suite", id: "TP-QP" }]);
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [{ keyReference: "quality-test", publicKeySha256 }] }));
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// before\n");
+  git("add", ".claude/guard-config.json", "project/critical-human-proof.json", "protected-suite.test.mjs");
+  git("commit", "-q", "-m", "seed quality package fixture");
+  installHook(dir);
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// after\n");
+  const unifiedDiff = git("diff", "--binary").stdout;
+  const record = {
+    schema: SIGNED_QUALITY_PACKAGE_SCHEMA,
+    baseCommit: git("rev-parse", "HEAD").stdout.trim(),
+    unifiedDiff,
+    expectedDigests: { "protected-suite.test.mjs": createHash("sha256").update("// after\n").digest("hex") },
+  };
+  record.intentSha256 = qualityPackageIntentSha256(record);
+  const proof = { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: record.intentSha256, keyReference: "quality-test", publicKey, signatureBase64: sign(null, Buffer.from(record.intentSha256), pair.privateKey).toString("base64") };
+  git("add", "protected-suite.test.mjs");
+  assert.equal(authorizeQualityPackageCommit({ repoRoot: dir, packageIntent: record, proof }).ok, true);
+  let result = commit(dir, "commit proof-bound quality package");
+  assert.equal(result.code, 0, result.stderr);
+
+  // A receipt bound to the old HEAD cannot replay after that commit, even if a
+  // later staged change touches the same protected file.
+  writeFileSync(join(dir, "protected-suite.test.mjs"), "// replay\n"); git("add", "protected-suite.test.mjs");
+  result = commit(dir, "attempt receipt replay");
+  assert.notEqual(result.code, 0);
 });
 
 test("installed hook: matching signed GMW permits a non-kernel TP rewrite", () => {
