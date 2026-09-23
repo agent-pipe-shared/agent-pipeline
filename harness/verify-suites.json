@@ -58,8 +58,8 @@
     {
       "name": "module-inventory-tests",
       "file": "plugins/pipeline-core/scripts/module-inventory.test.mjs",
-      "invariantPinned": "Module inventory discovery, taxonomy, and dependency validation",
-      "nonOverlapNote": "Unique test suite for module-inventory.mjs"
+      "invariantPinned": "Module inventory discovery, taxonomy, dependencies, and derived architecture-overview freshness and safety",
+      "nonOverlapNote": "Module inventory and its human-readable derived view share one architecture-map suite"
     },
     {
       "name": "plan-authority-staging-guard-tests",

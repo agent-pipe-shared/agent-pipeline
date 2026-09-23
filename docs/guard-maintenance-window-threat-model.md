@@ -121,6 +121,7 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/runner-profile-migration-v3.mjs`, `lib/runner-profiles-v2.mjs`,
   `lib/runner-profiles-v3.mjs`, `lib/runtime-projection-v2.mjs`,
   `lib/runtime-projection-v3.mjs`, `lib/schema-lite.mjs`,
+  `lib/signed-quality-package.mjs`,
   `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
   `lib/successful-spawn.mjs`, `lib/windows-private-state.mjs`,
   `lib/worktree-lifecycle.mjs`,
@@ -269,8 +270,9 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/design-advisory-transaction.mjs`, `lib/governance-authority-resolver.mjs`,
   `lib/protected-baseline.mjs`, `scripts/architecture-adoption.mjs`,
   `scripts/architecture-fitness.mjs`, `scripts/architecture-remedy.mjs`,
-  `scripts/check-clone-provisioning.mjs`, `scripts/governance-authority.mjs`,
-  `scripts/module-inventory.mjs`, and `scripts/rigor-floor.mjs`.
+  `scripts/check-clone-provisioning.mjs`, `scripts/generate-architecture-overview.mjs`,
+  `scripts/governance-authority.mjs`, `scripts/module-inventory.mjs`, and
+  `scripts/rigor-floor.mjs`.
   Guards (`guard-lifecycle-ready.mjs`, `guard-devplan-policy.mjs`, etc.) import these
   delegates to enforce architecture compliance, advisor admission, and rigor floor gates.
 - The 2026-09-21 Alfred candidate close audit and critic verification lifecycle closure adds:

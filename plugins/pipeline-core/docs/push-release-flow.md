@@ -15,9 +15,9 @@
 > it replaced, because a repository running an older plugin build still walks the
 > old one. The version that ships this is `0.5.4`.
 
-This repo's own `pipeline.user.yaml` sets `gates.push_approval: signature`
-([ADR-0056](adr/0056-push-approval-mode.md)) — the strictest of the two
-supported modes. Everything below describes that mode. A repo configured for
+Your project's `pipeline.user.yaml` selects `gates.push_approval`. The
+`signature` setting is the strictest supported mode, and the main path below
+describes it. A project configured for
 `chat` mode skips layers 2+3 entirely: `pipeline-state.mjs approve-push`
 takes only `--by --remote --destination`, no proof files, and the human
 clears it by typing a confirmation in-session rather than signing anything.
@@ -80,8 +80,8 @@ human's behalf.
 ### Layer 1 — decide a push needs a signature at all
 
 Governed by `gates.push_approval` in `pipeline.user.yaml`. In `signature`
-mode (this repo), every push to a gated destination needs a detached Ed25519
-proof, signed with a private key that lives **outside this checkout**, before
+mode, every push to a gated destination needs a detached Ed25519 proof, signed
+with a private key that lives **outside the governed project checkout**, before
 `git push` will be allowed through. This is intentional and load-bearing:
 the agent is cryptographically incapable of producing this proof by design
 (`docs/adr/0055-critical-human-proof-waiver.md`,
@@ -91,7 +91,7 @@ the agent is cryptographically incapable of producing this proof by design
 
 An off-machine backup of an active feature branch is not a publication. The
 explicit, configuration-controlled checkpoint lane is available only when the
-destination is in this repository's exact `refs/heads/feat/` namespace, the
+destination is in the governed project's exact `refs/heads/feat/` namespace, the
 source is the same full feature ref, and the command names both the remote and
 destination. Before it is used, the candidate commit must contain exactly one
 short printable `Checkpoint-Intent: <reason>` trailer and the whole working
@@ -118,26 +118,24 @@ unchanged.
 
 ### Layer 1b — reconcile the range against the decisions that govern it (agent work, before anything is signed)
 
-```
-node harness/scripts/check-doc-reconciliation.mjs --base <base> --candidate <tip> [--record-ref <ref>]
-```
+If your project has explicitly adopted a project-local document-reconciliation
+check, run that project's documented command here. The distributed plugin does
+not assume that a consumer repository has this source-maintenance harness.
 
-Run this before preparing a request, not after. It fails when the range changed
-a path some ADR declares it governs and no entry in `docs/doc-reconciliation.md`
-names that exact candidate commit. `--base` and `--candidate` are both required
-by design and every output repeats the resolved range: a reconciliation claim
-that does not say which range it covers is not a claim.
+Run that project check before preparing a request, not after. Its policy should
+fail when the range changed a path a project decision governs without an
+exact-candidate reconciliation record. `--base` and `--candidate` (or their
+equivalent in the project's tool) must be explicit, and every result should
+repeat the resolved range: a reconciliation claim that does not say which
+range it covers is not a claim.
 
-`--record-ref` (optional, defaults to `HEAD`) is a SEPARATE ref from
-`--candidate`, on purpose: the reconciliation record naming candidate `<tip>`
-cannot live inside `<tip>`'s own tree, because writing the record changes the
-tree, which changes `<tip>`'s own commit hash. So the shape is always: commit
-the substantive work as `<tip>`, run this check with `--candidate <tip>`
-against a `docs/doc-reconciliation.md` that does not exist yet, resolve every
-finding, **commit the record last** as a new commit naming `<tip>` — writing it
-moves `HEAD`, so the record names the tip of the substantive work below it and
-the push carries one extra commit touching only that file — and `--record-ref`
-then defaults to that new `HEAD`. `push-init.mjs` follows this exact contract
+Where the local check accepts `--record-ref`, it is deliberately a SEPARATE
+ref from `--candidate`: a record naming candidate `<tip>` cannot live inside
+`<tip>`'s own tree, because writing it changes that commit hash. The safe shape
+is therefore: commit substantive work as `<tip>`, run the adopted check with
+`--candidate <tip>`, resolve every finding, **commit the record last** as a
+new descendant naming `<tip>`, then let `--record-ref` refer to that descendant.
+The installed `push-init.mjs` follows this exact contract
 (see above): it stopped inventing `--candidate` as the literal `HEAD` because
 that collapsed both refs onto the same commit and made the check unsatisfiable
 by construction. The format and this write-order rule are documented in the
@@ -169,8 +167,7 @@ given carefully.
 > command a session should hand the PO for push/deploy/publication approval.
 
 **Run this FIRST, before anything below in this section**
-(`plugins/pipeline-core/scripts/push-prepare.mjs`, backlog item
-`pipeline.full-push-preflight-before-signature`): a single READ-ONLY report
+(the installed `push-prepare.mjs` report): a single READ-ONLY report
 that atomically checks a clean/unchanged working tree, canonical
 candidate-bound `push`-mode Verify evidence, the push threat-model artifact, and the
 critical-human-proof trust-anchor posture (including the exact
@@ -181,7 +178,7 @@ green does it print the fully-formed `authorize-critical` command below,
 with a correct `--subject-sha256` already computed.
 
 ```
-node plugins/pipeline-core/scripts/push-prepare.mjs \
+node "${PIPELINE_PLUGIN_ROOT}/scripts/push-prepare.mjs" \
   --by <name> --remote <remote> --destination refs/heads/<branch>
 ```
 
@@ -189,7 +186,7 @@ A red check names its own remedy; nothing below this line needs running
 until the report is fully green.
 
 ```
-node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
+node "${PIPELINE_PLUGIN_ROOT}/scripts/po-human-approval.mjs" authorize-critical \
   --repo-root <repo> --directory <external-po-dir> \
   --feature-id <featureId> \
   --plan <repo-relative-PRD-path> --spec <repo-relative-spec-path> \
@@ -225,8 +222,9 @@ an explicit `--directory` always overrides it and behaves exactly as before.
 Export the variable once in your shell profile so the ceremony stops requiring
 this path to be retyped or re-located every time — the value itself is
 machine-specific and must never be committed (`pipeline.user.yaml` is tracked,
-and CLAUDE.md forbids machine-specific absolute paths in commits, docs, or
-prompts), so it belongs in shell configuration, never in this repository.
+and project instructions should forbid machine-specific absolute paths in
+commits, docs, or prompts), so it belongs in shell configuration, never in the
+governed repository.
 
 **`--repo-root` must be a checkout that is clean including untracked files**
 (`observeCleanCandidate`). A clean main checkout can satisfy this requirement;
@@ -249,7 +247,7 @@ path in every project, including a consumer's, never a sprint-specific one.
 If that file does not exist yet in the target project, create it first with:
 
 ```
-node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model
+node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-state.mjs" materialize-push-threat-model
 ```
 
 Takes no flags — run it from the project directory (or with
@@ -276,7 +274,7 @@ Decision 4). When `--subject` is supplied, `--subject-sha256` becomes
 optional and derived from it.
 
 ```
-node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
+node "${PIPELINE_PLUGIN_ROOT}/scripts/po-human-approval.mjs" authorize-critical \
   --repo-root <repo> --directory <external-po-dir> --feature-id <id> \
   --plan <repo-path> --spec <repo-path> \
   --kind release-preflight --subject <repo-path> --expires-at <ISO-8601>
@@ -299,8 +297,8 @@ work, Critic, candidate or push artifact cannot be promoted into that proof.
 
 The Agent Pipeline source release preflight also requires a current reader
 binding. This source-only rule is selected from committed calibration at the
-resolved base and candidate (`project: "agent-pipeline"` and
-`verify: "node harness/scripts/verify.mjs"`); an installed plugin or an
+resolved base and candidate (the source-only project identity and Verify
+configuration); an installed plugin or an
 ordinary consumer with a documentation inventory does not acquire the rule.
 The candidate must retain the committed checker, its protocol, the required
 harness members, governance input, and capability inventory. The local checker
@@ -332,8 +330,8 @@ the trusted source policy itself.
 
 **Finding the right external directory:** more than one candidate directory
 may exist on a machine (e.g. one per repo this Pipeline governs). Verify by
-comparing that directory's `po-public.pem` SHA-256 against this repo's own
-committed `project/critical-human-proof.json` → `trustAnchor.publicKeySha256`
+comparing that directory's `po-public.pem` SHA-256 against the governed
+project's committed `project/critical-human-proof.json` → `trustAnchor.publicKeySha256`
 — **never** by filesystem timestamps or guessing from directory naming. A
 mismatch fails closed with `CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH`; treat that
 error as the check, not a surprise.
@@ -358,12 +356,12 @@ that genuinely needs prepare and sign as separate steps (e.g. scripted
 preparation with signing deferred to later).
 
 ```
-node plugins/pipeline-core/scripts/po-approval-gate.mjs prepare-critical \
+node "${PIPELINE_PLUGIN_ROOT}/scripts/po-approval-gate.mjs" prepare-critical \
   --repo-root <repo> --directory <external-po-dir> \
   --feature-id <featureId> \
   --plan <repo-relative-PRD-path> --spec <repo-relative-spec-path> \
   --kind push --subject-sha256 <hash> --expires-at <ISO-8601>
-node plugins/pipeline-core/scripts/po-human-approval.mjs approve-critical \
+node "${PIPELINE_PLUGIN_ROOT}/scripts/po-human-approval.mjs" approve-critical \
   --repo-root <repo> --directory <external-po-dir> --kind push
 ```
 
@@ -397,10 +395,9 @@ start Layer 2/3.
 
 ### The identical binding applies to `guard-human-override.mjs`'s general override ceremony
 
-The `plan` / `prepare-authorization` / `emit-signature-digest` /
-`authorize-by-signature` chain in
-`plugins/pipeline-core/lib/human-guard-override.mjs` (CLI wrapper:
-`scripts/guard-human-override.mjs`) — used to obtain a signed PO override for
+The installed `guard-human-override.mjs` CLI's `plan` /
+`prepare-authorization` / `emit-signature-digest` / `authorize-by-signature`
+chain is used to obtain a signed PO override for
 an arbitrary guard denial (e.g. an edit to a protected path like
 `.claude/settings.json`/`hooks.json`), not specifically a push — binds the
 PO's signature to the repository's exact whole-tree HEAD (`{commit, tree}`
@@ -440,8 +437,8 @@ design rather than narrowed speculatively (see the code comment at the
   naming this risk every time, plus a heightened one when `git worktree
   list` shows other worktrees present. That heightened signal is partial
   only — it does not detect a concurrent commit landing directly into the
-  SAME (shared) checkout, which has been the more common case in this
-  repository's own history.
+  SAME shared checkout. Treat that as a risk for every governed project that
+  permits concurrent work in one checkout.
 - Seed the request, get the PO's signature, and consume it with
   `authorize-by-signature` as one uninterrupted sequence — do not interleave
   other work (including writing a briefing) between
@@ -451,7 +448,7 @@ design rather than narrowed speculatively (see the code comment at the
 ### Layer 4 — consume the proof into pipeline state (agent work)
 
 ```
-node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push \
+node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-state.mjs" approve-push \
   --by <name> --remote <remote> --destination refs/heads/<branch> \
   --proof-request <path-to-request-critical-push.json> \
   --proof-authority <path-to-trust-policy.json> \
@@ -556,13 +553,13 @@ for something not covered by an allow entry, the resolution remains the PO
 running the identical, already-Pipeline-authorized command in their own
 terminal.
 
-### Layer 6 — the GitHub repository ruleset (outside this repo, discovered by rejection)
+### Layer 6 — the GitHub repository ruleset (outside the project checkout, discovered by rejection)
 
 Everything above can pass and the remote can still refuse. `main` is covered by
 the repository ruleset `protect-main` (`gh api
 repos/<owner>/<repo>/rules/branches/main` lists what actually applies to a ref).
 It currently enforces `deletion` and `non_fast_forward` — both deliberate, both
-aligned with this repo's own hard rules. Since 2026-08-28 it also enforces
+aligned with the governed project's own hard rules. A project may also enforce
 `required_status_checks` on context `verify`, with `bypass_actors: []` and
 `current_user_can_bypass: "never"`. In practice: nothing reaches `main` while
 that check is red.

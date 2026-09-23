@@ -147,7 +147,6 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
   { file: "plugins/pipeline-core/roles/elephant.md", match: "harness/review-protocol.md` §2.1", reason: vendoredCanonAllowlistReason("roles/elephant.md") },
   { file: "plugins/pipeline-core/roles/elephant.md", match: "`+`harness/`", reason: vendoredCanonAllowlistReason("roles/elephant.md") },
   { file: "plugins/pipeline-core/templates/prompts/elephant-kickoff.md", match: "harness/review-protocol.md` §2.1 trigger decision table", reason: vendoredCanonAllowlistReason("templates/prompts/elephant-kickoff.md") },
-  { file: "plugins/pipeline-core/docs/push-release-flow.md", match: "node harness/scripts/check-doc-reconciliation.mjs", reason: vendoredCanonAllowlistReason("docs/push-release-flow.md") },
   // templates/prompts/goldfish-task.md (line 8)
   { file: "plugins/pipeline-core/templates/prompts/goldfish-task.md", match: "harness/", reason: vendoredCanonAllowlistReason("templates/prompts/goldfish-task.md") }, // L8
   // templates/prompts/kickoff-new-project.md (lines 4, 57, 115, 122, 227)
@@ -620,7 +619,6 @@ export const ALLOWLIST = Object.freeze([
   // from the source, same class as the pre-existing VENDORED_CANON_ALLOWLIST entries above.
   { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; user-facing", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L350 (EN)
   { file: "plugins/pipeline-core/docs/operating-model.md", match: "harness/scripts/check-po-gate-authority.mjs`; Nutzertexte", reason: vendoredCanonAllowlistReason("docs/operating-model.md") }, // L696 (DE reference translation)
-  { file: "plugins/pipeline-core/docs/push-release-flow.md", match: "verify: \"node harness/scripts/verify.mjs\"", reason: vendoredCanonAllowlistReason("docs/push-release-flow.md") },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "SOURCE_READER_CHECKER_PATH = \"harness/scripts/check-doc-reader-binding.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/verify.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },
   { file: "plugins/pipeline-core/scripts/release-preflight-cli.mjs", match: "\"harness/scripts/check-doc-contracts.mjs\"", reason: sourceReaderReleaseGateAllowlistReason() },

@@ -6,12 +6,12 @@ weighting as a reader would, and it does not assess implementation correctness.
 
 ## Fresh two-stage review
 
-1. Freeze the eleven documents named by `READER_REVIEW_PATHS` at a committed
+1. Freeze all documents named by `READER_REVIEW_PATHS` at a committed
    state `Y`. Before this stage, disclose neither the capability inventory,
    governance data, source, diff, nor history. A fresh reader reports only
    cuts, reorderings, and file/line findings; it does not provide replacement
    prose. Save its immutable report as `phase-one/<round>.md`.
-2. Give a second fresh reader the same frozen eleven documents and immutable
+2. Give a second fresh reader the same frozen documents and immutable
    phase-one report together with the committed capability inventory,
    governance data, and this protocol. It records weighting, order,
    granularity, and comprehensibility in immutable `phase-two/<round>.md`.
@@ -34,7 +34,7 @@ does not prove an independent reader review.
 ## Bound document state
 
 The fixed review set is exactly the lexical, unique `READER_REVIEW_PATHS`
-constant in `harness/scripts/check-doc-reader-binding.mjs`. It contains eleven
+constant in `harness/scripts/check-doc-reader-binding.mjs`. It contains sixteen
 approved public documents and excludes evidence, state, archives, ADRs, and
 backlog content. A reviewed state hashes raw Git-blob bytes for every covered
 file plus these raw committed inputs:

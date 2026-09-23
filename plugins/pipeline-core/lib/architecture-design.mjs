@@ -8,6 +8,7 @@ import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { resolveModuleForPath } from "../scripts/module-inventory.mjs";
+import { renderArchitectureOverview } from "../scripts/generate-architecture-overview.mjs";
 const moduleSchema = JSON.parse(readFileSync(new URL("../schemas/pipeline.module-inventory.v1.json", import.meta.url), "utf8"));
 
 export const ARCHITECTURE_DESIGN_SCHEMA = "pipeline.architecture-design.v1";
@@ -78,14 +79,30 @@ export function parseArchitectureDesign(prd) {
 }
 
 export function architectureDesignTargets(input) {
-  const targets = [{ path: "architecture/map/index.md", bytes: "# Architecture Navigation Map Index\n\n## Governed Modules\n\n"
+  const targets = [{ path: "architecture/map/index.md", bytes: "# Architecture Navigation Map Index\n\nOKF v0.1 concept bundle.\n\n[Generated architecture overview](overview.html) is a derived human view; edit the concepts, not the HTML.\n\n## Governed Modules\n\n"
     + input.modules.map(module => `- [${module.id}](${module.id}.md): ${module.responsibility}`).join("\n") + "\n" }];
   for (const module of input.modules) {
-    const lines = Object.entries(module).map(([key, value]) => Array.isArray(value)
+    const lines = Object.entries({ ...module, type: "Governed Module" }).map(([key, value]) => Array.isArray(value)
       ? (value.length ? `${key}:\n${value.map(item => `  - ${JSON.stringify(item)}`).join("\n")}` : `${key}: []`)
       : `${key}: ${JSON.stringify(value)}`);
-    targets.push({ path: `architecture/map/${module.id}.md`, bytes: `---\n${lines.join("\n")}\n---\n\n# Module: ${module.id}\n` });
+    const dependencies = module.allowedDependencies.length
+      ? `\n## Declared module dependencies\n${module.allowedDependencies.map(id => `- [${id}](${id}.md): Declared allowed dependency; rationale must be recorded by the project.\n`).join("")}`
+      : "";
+    targets.push({ path: `architecture/map/${module.id}.md`, bytes: `---\n${lines.join("\n")}\n---\n\n# Module: ${module.id}\n${dependencies}` });
   }
+  const digest = createHash("sha256");
+  digest.update("index\0");
+  digest.update(targets[0].bytes);
+  const conceptSources = new Map();
+  for (const module of [...input.modules].sort((a, b) => a.id.localeCompare(b.id))) {
+    const source = targets.find((target) => target.path === `architecture/map/${module.id}.md`).bytes;
+    digest.update(`${module.id}\0`);
+    digest.update(source);
+    conceptSources.set(module.id, source);
+  }
+  targets.push({ path: "architecture/map/overview.html", bytes: renderArchitectureOverview(
+    input.modules.map((module) => ({ ...module, type: "Governed Module" })), conceptSources, digest.digest("hex"),
+  ) });
   targets.push({ path: "architecture/fitness-model.json", bytes: json(input.fitnessModel) },
     { path: "architecture/baseline.json", bytes: json(input.baseline) });
   return targets;

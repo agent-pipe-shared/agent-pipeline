@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; script-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="generated-from" content="architecture/map/index.md and concept files"><meta name="source-sha256" content="14dae08628b884507a1831ad3fb89c254794012528d56d40aace9b9d356e5b77">
+<title>Architecture overview</title><style>
+:root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#101a22;color:#e8f1f3}*{box-sizing:border-box}body{margin:0}a{color:#8de7d6}a:focus-visible,summary:focus-visible{outline:3px solid #ffd47c;outline-offset:3px}
+header{padding:clamp(2rem,6vw,5rem) max(1.25rem,calc((100vw - 80rem)/2));background:linear-gradient(130deg,#173d4a,#1c2839 65%,#2c2840)}header h1{font-size:clamp(2.4rem,6vw,5rem);line-height:1.05;margin:.5rem 0 1rem}header p{max-width:70ch;color:#d0e2e3}.eyebrow{font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#96dfd4}
+main{max-width:90rem;margin:auto;padding:2rem 1.25rem 5rem}.module-grid,.contract-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:1rem}.module,.contract,.contract-section{background:#1a2b35;border:1px solid #45616b;border-radius:1rem;padding:1.25rem;scroll-margin-top:1rem}.module:target,.contract:target{border-color:#ffd47c;box-shadow:0 0 0 2px #ffd47c}.module h2,.contract h3{overflow-wrap:anywhere}.module h2{margin:.4rem 0}.module p{margin:.5rem 0 1rem}.module .source{display:inline-block;margin-top:1rem}.small{font-size:.85rem;color:#b7c8cd;overflow-wrap:anywhere}details{border-top:1px solid #45616b;padding-top:.7rem}summary{cursor:pointer;font-weight:650}.contract-section{margin-top:2rem}.contract-grid{margin:1rem 0}.contract{background:#10242d}.contract h3{font-size:1rem;margin:0}.contract p{margin:.5rem 0 0}footer{padding:1.5rem;max-width:90rem;margin:auto;border-top:1px solid #45616b;color:#b7c8cd}code{overflow-wrap:anywhere}
+</style></head><body><header><div class="eyebrow">Agent Pipeline · source-derived view</div><h1>Explore the architecture</h1>
+<p>Start with a module, then follow its declared dependencies and public contracts. Keyboard links and openable details work without scripts or a server.</p>
+<p><strong>4 governed modules.</strong> Unmapped areas and runtime call edges are not represented. <a href="index.md">Read the authoritative map</a>.</p><p class="small">Source SHA-256: <code>14dae08628b884507a1831ad3fb89c254794012528d56d40aace9b9d356e5b77</code></p></header>
+<main><section aria-labelledby="modules"><h2 id="modules">Modules and dependencies</h2><div class="module-grid"><article class="module" id="module-backlog"><span class="eyebrow">Governed Module</span>
+<h2>backlog</h2><p>Sprint backlog items, evidence records, interruption baseline, and ledger history.</p>
+<p><strong>Uses:</strong> none declared<br><strong>Used by:</strong> none declared</p>
+<p class="small">Authority effects: audit-trail-retention</p>
+<details><summary>Explore public contracts (2)</summary><ol><li><a href="#contract-backlog-0">backlog/transitions.ndjson</a></li><li><a href="#contract-backlog-1">backlog/items/**</a></li></ol></details>
+<a class="source" href="backlog.md">Open authoritative concept ↗</a></article>
+<article class="module" id="module-harness"><span class="eyebrow">Governed Module</span>
+<h2>harness</h2><p>Verification runner, test orchestration, suite registration validation, and CI checks.</p>
+<p><strong>Uses:</strong> <a href="#module-pipeline-core">pipeline-core</a>, <a href="#module-schemas">schemas</a><br><strong>Used by:</strong> none declared</p>
+<p class="small">Authority effects: execute-verify-suites, read-workspace-test-tree</p>
+<details><summary>Explore public contracts (3)</summary><ol><li><a href="#contract-harness-0">harness/scripts/verify.mjs</a></li><li><a href="#contract-harness-1">harness/scripts/check-verify-suite-registration.mjs</a></li><li><a href="#contract-harness-2">harness/verify-suites.json</a></li></ol></details>
+<a class="source" href="harness.md">Open authoritative concept ↗</a></article>
+<article class="module" id="module-pipeline-core"><span class="eyebrow">Governed Module</span>
+<h2>pipeline-core</h2><p>Core agent pipeline engine, hooks, lifecycle management, guards, and CLI scripts.</p>
+<p><strong>Uses:</strong> <a href="#module-schemas">schemas</a><br><strong>Used by:</strong> <a href="#module-harness">harness</a></p>
+<p class="small">Authority effects: read-write-workspace, execute-node-scripts</p>
+<details><summary>Explore public contracts (7)</summary><ol><li><a href="#contract-pipeline-core-0">plugins/pipeline-core/scripts/pipeline-start-preflight.mjs</a></li><li><a href="#contract-pipeline-core-1">plugins/pipeline-core/scripts/module-inventory.mjs</a></li><li><a href="#contract-pipeline-core-2">plugins/pipeline-core/scripts/generate-architecture-overview.mjs</a></li><li><a href="#contract-pipeline-core-3">plugins/pipeline-core/scripts/architecture-remedy.mjs</a></li><li><a href="#contract-pipeline-core-4">plugins/pipeline-core/scripts/architecture-fitness.mjs</a></li><li><a href="#contract-pipeline-core-5">plugins/pipeline-core/scripts/architecture-adoption.mjs</a></li><li><a href="#contract-pipeline-core-6">plugins/pipeline-core/scripts/finish-feature.mjs</a></li></ol></details>
+<a class="source" href="pipeline-core.md">Open authoritative concept ↗</a></article>
+<article class="module" id="module-schemas"><span class="eyebrow">Governed Module</span>
+<h2>schemas</h2><p>Canonical JSON schemas defining contracts, profiles, state, and receipts.</p>
+<p><strong>Uses:</strong> none declared<br><strong>Used by:</strong> <a href="#module-harness">harness</a>, <a href="#module-pipeline-core">pipeline-core</a></p>
+<p class="small">Authority effects: schema-validation-contract</p>
+<details><summary>Explore public contracts (8)</summary><ol><li><a href="#contract-schemas-0">schemas/pipeline.architecture-profile.v1.json</a></li><li><a href="#contract-schemas-1">schemas/pipeline.module-inventory.v1.json</a></li><li><a href="#contract-schemas-2">schemas/pipeline.module-interaction-receipt.v1.json</a></li><li><a href="#contract-schemas-3">schemas/pipeline.architecture-decision.v1.json</a></li><li><a href="#contract-schemas-4">schemas/pipeline.fitness-evidence.v1.json</a></li><li><a href="#contract-schemas-5">schemas/pipeline.architecture-baseline.v1.json</a></li><li><a href="#contract-schemas-6">schemas/pipeline.adoption-state.v1.json</a></li><li><a href="#contract-schemas-7">schemas/pipeline.adoption-proposal.v1.json</a></li></ol></details>
+<a class="source" href="schemas.md">Open authoritative concept ↗</a></article></div></section>
+<section aria-labelledby="contracts"><h2 id="contracts">Public contracts</h2><p>Select a contract for its purpose, owner and verification. These are declared interfaces, not an inferred function-call graph.</p><section class="contract-section" aria-labelledby="section-backlog">
+<h2 id="section-backlog"><a href="#module-backlog">backlog</a></h2>
+<p>Sprint backlog items, evidence records, interruption baseline, and ledger history.</p>
+<div class="contract-grid"><article class="contract" id="contract-backlog-0">
+<h3><a href="../../backlog/transitions.ndjson">backlog/transitions.ndjson ↗</a></h3>
+<p>Sprint backlog transitions ledger.</p>
+<p class="small">Owner: <a href="#module-backlog">backlog</a>. Verification: <a href="../../plugins/pipeline-core/scripts/check-backlog-state.mjs">plugins/pipeline-core/scripts/check-backlog-state.mjs</a>.</p>
+</article><article class="contract" id="contract-backlog-1">
+<h3>backlog/items/** <span class="small">(path pattern; no single source file)</span></h3>
+<p>Detailed specification and audit files for backlog tasks.</p>
+<p class="small">Owner: <a href="#module-backlog">backlog</a>. Verification: <a href="../../plugins/pipeline-core/scripts/check-backlog-state.mjs">plugins/pipeline-core/scripts/check-backlog-state.mjs</a>.</p>
+</article></div>
+<details><summary>Boundary and decision context</summary>
+<p><strong>Not responsible for:</strong> Runtime code; Execution hooks; Test harness scripts.</p>
+<p><strong>ADRs:</strong> ADR-0063.</p>
+<h3>Why this module depends on others</h3>
+<p>No outgoing module dependency declared.</p>
+</details></section>
+<section class="contract-section" aria-labelledby="section-harness">
+<h2 id="section-harness"><a href="#module-harness">harness</a></h2>
+<p>Verification runner, test orchestration, suite registration validation, and CI checks.</p>
+<div class="contract-grid"><article class="contract" id="contract-harness-0">
+<h3><a href="../../harness/scripts/verify.mjs">harness/scripts/verify.mjs ↗</a></h3>
+<p>Main test suite verification runner.</p>
+<p class="small">Owner: <a href="#module-harness">harness</a>. Verification: <a href="../../harness/scripts/check-verify-suite-registration.mjs">harness/scripts/check-verify-suite-registration.mjs</a>.</p>
+</article><article class="contract" id="contract-harness-1">
+<h3><a href="../../harness/scripts/check-verify-suite-registration.mjs">harness/scripts/check-verify-suite-registration.mjs ↗</a></h3>
+<p>Static and declarative suite registration completeness checker.</p>
+<p class="small">Owner: <a href="#module-harness">harness</a>. Verification: <a href="../../harness/scripts/check-verify-suite-registration.mjs">harness/scripts/check-verify-suite-registration.mjs</a>.</p>
+</article><article class="contract" id="contract-harness-2">
+<h3><a href="../../harness/verify-suites.json">harness/verify-suites.json ↗</a></h3>
+<p>Declarative suite registry.</p>
+<p class="small">Owner: <a href="#module-harness">harness</a>. Verification: <a href="../../harness/scripts/check-verify-suite-registration.mjs">harness/scripts/check-verify-suite-registration.mjs</a>.</p>
+</article></div>
+<details><summary>Boundary and decision context</summary>
+<p><strong>Not responsible for:</strong> Plugin runtime hooks; Schema definitions; Product capability business logic.</p>
+<p><strong>ADRs:</strong> ADR-0063.</p>
+<h3>Why this module depends on others</h3>
+<ul><li><a href="#module-pipeline-core">pipeline-core</a>: The harness runs checks against the plugin&#39;s public verification contracts.</li><li><a href="#module-schemas">schemas</a>: The harness validates evidence against canonical schemas.</li></ul>
+</details></section>
+<section class="contract-section" aria-labelledby="section-pipeline-core">
+<h2 id="section-pipeline-core"><a href="#module-pipeline-core">pipeline-core</a></h2>
+<p>Core agent pipeline engine, hooks, lifecycle management, guards, and CLI scripts.</p>
+<div class="contract-grid"><article class="contract" id="contract-pipeline-core-0">
+<h3><a href="../../plugins/pipeline-core/scripts/pipeline-start-preflight.mjs">plugins/pipeline-core/scripts/pipeline-start-preflight.mjs ↗</a></h3>
+<p>Runtime bootstrap and preflight inspection.</p>
+<p class="small">Owner: <a href="#module-pipeline-core">pipeline-core</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-remedy.test.mjs">plugins/pipeline-core/scripts/architecture-remedy.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-fitness.test.mjs">plugins/pipeline-core/scripts/architecture-fitness.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-adoption.test.mjs">plugins/pipeline-core/scripts/architecture-adoption.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/finish-feature.test.mjs">plugins/pipeline-core/scripts/finish-feature.test.mjs</a>.</p>
+</article><article class="contract" id="contract-pipeline-core-1">
+<h3><a href="../../plugins/pipeline-core/scripts/module-inventory.mjs">plugins/pipeline-core/scripts/module-inventory.mjs ↗</a></h3>
+<p>Architecture map bundle loading, validation, and module resolution.</p>
+<p class="small">Owner: <a href="#module-pipeline-core">pipeline-core</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-remedy.test.mjs">plugins/pipeline-core/scripts/architecture-remedy.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-fitness.test.mjs">plugins/pipeline-core/scripts/architecture-fitness.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-adoption.test.mjs">plugins/pipeline-core/scripts/architecture-adoption.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/finish-feature.test.mjs">plugins/pipeline-core/scripts/finish-feature.test.mjs</a>.</p>
+</article><article class="contract" id="contract-pipeline-core-2">
+<h3><a href="../../plugins/pipeline-core/scripts/generate-architecture-overview.mjs">plugins/pipeline-core/scripts/generate-architecture-overview.mjs ↗</a></h3>
+<p>Offline, deterministic HTML overview generated from the governed map; its default check detects stale output, and `--write` refreshes it for the consuming repository.</p>
+<p class="small">Owner: <a href="#module-pipeline-core">pipeline-core</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-remedy.test.mjs">plugins/pipeline-core/scripts/architecture-remedy.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-fitness.test.mjs">plugins/pipeline-core/scripts/architecture-fitness.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-adoption.test.mjs">plugins/pipeline-core/scripts/architecture-adoption.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/finish-feature.test.mjs">plugins/pipeline-core/scripts/finish-feature.test.mjs</a>.</p>
+</article><article class="contract" id="contract-pipeline-core-3">
+<h3><a href="../../plugins/pipeline-core/scripts/architecture-remedy.mjs">plugins/pipeline-core/scripts/architecture-remedy.mjs ↗</a></h3>
+<p>Architecture finding analysis and conformant remedy generation.</p>
+<p class="small">Owner: <a href="#module-pipeline-core">pipeline-core</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-remedy.test.mjs">plugins/pipeline-core/scripts/architecture-remedy.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-fitness.test.mjs">plugins/pipeline-core/scripts/architecture-fitness.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-adoption.test.mjs">plugins/pipeline-core/scripts/architecture-adoption.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/finish-feature.test.mjs">plugins/pipeline-core/scripts/finish-feature.test.mjs</a>.</p>
+</article><article class="contract" id="contract-pipeline-core-4">
+<h3><a href="../../plugins/pipeline-core/scripts/architecture-fitness.mjs">plugins/pipeline-core/scripts/architecture-fitness.mjs ↗</a></h3>
+<p>Architecture fitness evaluator and baseline ratchet store.</p>
+<p class="small">Owner: <a href="#module-pipeline-core">pipeline-core</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-remedy.test.mjs">plugins/pipeline-core/scripts/architecture-remedy.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-fitness.test.mjs">plugins/pipeline-core/scripts/architecture-fitness.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-adoption.test.mjs">plugins/pipeline-core/scripts/architecture-adoption.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/finish-feature.test.mjs">plugins/pipeline-core/scripts/finish-feature.test.mjs</a>.</p>
+</article><article class="contract" id="contract-pipeline-core-5">
+<h3><a href="../../plugins/pipeline-core/scripts/architecture-adoption.mjs">plugins/pipeline-core/scripts/architecture-adoption.mjs ↗</a></h3>
+<p>Architecture adoption demand, proposal generator, and state management.</p>
+<p class="small">Owner: <a href="#module-pipeline-core">pipeline-core</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-remedy.test.mjs">plugins/pipeline-core/scripts/architecture-remedy.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-fitness.test.mjs">plugins/pipeline-core/scripts/architecture-fitness.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-adoption.test.mjs">plugins/pipeline-core/scripts/architecture-adoption.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/finish-feature.test.mjs">plugins/pipeline-core/scripts/finish-feature.test.mjs</a>.</p>
+</article><article class="contract" id="contract-pipeline-core-6">
+<h3><a href="../../plugins/pipeline-core/scripts/finish-feature.mjs">plugins/pipeline-core/scripts/finish-feature.mjs ↗</a></h3>
+<p>Explicit feature-close driver over the durable coordinator; interrupted runs require an exact lifecycle ID to resume and never imply release authorization.</p>
+<p class="small">Owner: <a href="#module-pipeline-core">pipeline-core</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-remedy.test.mjs">plugins/pipeline-core/scripts/architecture-remedy.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-fitness.test.mjs">plugins/pipeline-core/scripts/architecture-fitness.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/architecture-adoption.test.mjs">plugins/pipeline-core/scripts/architecture-adoption.test.mjs</a>, <a href="../../plugins/pipeline-core/scripts/finish-feature.test.mjs">plugins/pipeline-core/scripts/finish-feature.test.mjs</a>.</p>
+</article></div>
+<details><summary>Boundary and decision context</summary>
+<p><strong>Not responsible for:</strong> Test harness orchestration outside plugins; Root schemas store; Sprint backlog ledger tracking.</p>
+<p><strong>ADRs:</strong> ADR-0063, ADR-0099.</p>
+<h3>Why this module depends on others</h3>
+<ul><li><a href="#module-schemas">schemas</a>: Runtime contracts and receipts are validated against canonical schemas.</li></ul>
+</details></section>
+<section class="contract-section" aria-labelledby="section-schemas">
+<h2 id="section-schemas"><a href="#module-schemas">schemas</a></h2>
+<p>Canonical JSON schemas defining contracts, profiles, state, and receipts.</p>
+<div class="contract-grid"><article class="contract" id="contract-schemas-0">
+<h3><a href="../../schemas/pipeline.architecture-profile.v1.json">schemas/pipeline.architecture-profile.v1.json ↗</a></h3>
+<p>Profile schema for agent-first architecture properties.</p>
+<p class="small">Owner: <a href="#module-schemas">schemas</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>.</p>
+</article><article class="contract" id="contract-schemas-1">
+<h3><a href="../../schemas/pipeline.module-inventory.v1.json">schemas/pipeline.module-inventory.v1.json ↗</a></h3>
+<p>Governed module inventory row schema.</p>
+<p class="small">Owner: <a href="#module-schemas">schemas</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>.</p>
+</article><article class="contract" id="contract-schemas-2">
+<h3><a href="../../schemas/pipeline.module-interaction-receipt.v1.json">schemas/pipeline.module-interaction-receipt.v1.json ↗</a></h3>
+<p>Module interaction receipt schema.</p>
+<p class="small">Owner: <a href="#module-schemas">schemas</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>.</p>
+</article><article class="contract" id="contract-schemas-3">
+<h3><a href="../../schemas/pipeline.architecture-decision.v1.json">schemas/pipeline.architecture-decision.v1.json ↗</a></h3>
+<p>Architecture decision record schema.</p>
+<p class="small">Owner: <a href="#module-schemas">schemas</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>.</p>
+</article><article class="contract" id="contract-schemas-4">
+<h3><a href="../../schemas/pipeline.fitness-evidence.v1.json">schemas/pipeline.fitness-evidence.v1.json ↗</a></h3>
+<p>Fitness evaluation evidence schema.</p>
+<p class="small">Owner: <a href="#module-schemas">schemas</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>.</p>
+</article><article class="contract" id="contract-schemas-5">
+<h3><a href="../../schemas/pipeline.architecture-baseline.v1.json">schemas/pipeline.architecture-baseline.v1.json ↗</a></h3>
+<p>Architecture baseline and ratchet store schema.</p>
+<p class="small">Owner: <a href="#module-schemas">schemas</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>.</p>
+</article><article class="contract" id="contract-schemas-6">
+<h3><a href="../../schemas/pipeline.adoption-state.v1.json">schemas/pipeline.adoption-state.v1.json ↗</a></h3>
+<p>Architecture adoption state schema.</p>
+<p class="small">Owner: <a href="#module-schemas">schemas</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>.</p>
+</article><article class="contract" id="contract-schemas-7">
+<h3><a href="../../schemas/pipeline.adoption-proposal.v1.json">schemas/pipeline.adoption-proposal.v1.json ↗</a></h3>
+<p>Architecture staged adoption proposal schema.</p>
+<p class="small">Owner: <a href="#module-schemas">schemas</a>. Verification: <a href="../../plugins/pipeline-core/scripts/module-inventory.test.mjs">plugins/pipeline-core/scripts/module-inventory.test.mjs</a>.</p>
+</article></div>
+<details><summary>Boundary and decision context</summary>
+<p><strong>Not responsible for:</strong> Execution logic; Dynamic state persistence; Test runner logic.</p>
+<p><strong>ADRs:</strong> ADR-0063, ADR-0099.</p>
+<h3>Why this module depends on others</h3>
+<p>No outgoing module dependency declared.</p>
+</details></section></section></main>
+<footer>Generated offline from the machine-readable map. Edit the concepts, never this HTML.</footer></body></html>

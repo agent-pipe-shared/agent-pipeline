@@ -12,43 +12,44 @@ coverage and manual responsibilities.
 
 ### Prerequisites
 
-For the pipeline hooks to securely intercept and evaluate commands, the Antigravity CLI daemon must be able to resolve `node` in its system `$PATH`. 
-If you manage Node.js via `fnm` or `nvm` and launch the daemon in the background (e.g. via an IDE, desktop app, or systemd), those environments typically do not source your `.bashrc`, causing hooks to fail silently ("Fail Open").
+For the pipeline hooks to intercept and evaluate commands, the Antigravity host
+must be able to resolve `node` in its PATH. A desktop or service launcher may
+have a different PATH from an interactive shell.
 
-**To ensure `node` is available globally to all background processes:**
+Check the environment that actually starts Antigravity:
+
 ```bash
 command -v node
 ```
 
-This condition has no code fix inside the plugin: a hook that never starts
-cannot report its own absence. Treat it as a host prerequisite and restore a
-system-visible Node installation before relying on Antigravity enforcement.
+If `node` is absent there, correct that host environment and fully restart
+Antigravity before relying on its hooks.
 
 ### Antigravity Installation (Workspace-Local)
 
-Unlike Codex, Antigravity does not rely on a global `plugin install` marketplace 
-command for local plugins. To install the Agent-Pipeline in an Antigravity project:
+Antigravity uses a workspace registration rather than a global plugin install
+command. From the project root:
 
-1. Run the Antigravity installer script from a locally available, approved
-   plugin directory obtained from the official GitHub distribution (for
-   example a released marketplace snapshot or release checkout), not an
-   un-released developer checkout:
+1. Run the installer from a locally available, approved plugin directory
+   obtained from the official GitHub distribution (for example a released
+   marketplace snapshot or release checkout). A developer checkout is only for
+   an explicit pre-release test:
+
    ```bash
-   node /path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs
+   node "/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs"
    ```
-   (Select "Workspace-Local" to generate the `.agents/plugins.json` for your project. The installer will also print the node PATH verification.)
-2. Initialize the pipeline in your project by invoking the agent and running the start command:
+   Select **Approved Plugin Directory** (the default), then
+   **Workspace-Local** to register the plugin in `.agents/plugins.json`.
+2. Fully restart Antigravity and open a new workspace session in the project
+   root. Launch the CLI if that is how you use the runner:
+
    ```bash
    agy
    ```
-   (`agy` itself does not bypass confirmation prompts. If appropriate for the
-   workspace, select the installer’s explicit autonomous-mode option; it
-   remains runner-local and grants no plan, release, remote, or human authority.)
+3. Invoke `/pipeline-core:pipeline-start` as the first Pipeline action in the
+   new session and follow its returned onboarding action.
 
-3. To enable autonomous execution (auto-apply edits & safe commands) permanently, the installer can write `.agents/settings.json`:
-   ```json
-   {
-     "toolExecutionPolicy": "always-proceed",
-     "artifactReviewMode": "always-proceed"
-   }
-   ```
+The installer also offers an optional autonomous tool policy while installing.
+If selected, it writes `.agents/settings.json`; this runner-local option does
+not grant plan, release, remote, or human authority. Launching `agy` alone does
+not select that option or bypass confirmation prompts.

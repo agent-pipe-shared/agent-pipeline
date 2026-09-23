@@ -1,4 +1,5 @@
 ---
+type: Governed Module
 id: harness
 responsibility: Verification runner, test orchestration, suite registration validation, and CI checks.
 nonResponsibilities:
@@ -24,6 +25,10 @@ adrReferences:
 ---
 
 # Module: harness
+
+## Declared module dependencies
+- [pipeline-core](pipeline-core.md): The harness runs checks against the plugin's public verification contracts.
+- [schemas](schemas.md): The harness validates evidence against canonical schemas.
 
 ## Responsibility
 Verification runner, test orchestration, suite registration validation, and CI checks.

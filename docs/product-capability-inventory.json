@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "755419f546e1134868a8bc5a58eeff239edd8ec4",
-    "tree": "9332d592a32a6563dd9d8c1aaffb189598789e50"
+    "commit": "defef222f4ae2849d11fff33a33fc17f7ea2ab49",
+    "tree": "50facc100d37354c2c7e5184df9f5ae4d35ef629"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -993,6 +993,8 @@
         "publication:plugins/pipeline-core/scripts/public-baseline-diagnose.mjs:public-baseline-diagnose",
         "publication:plugins/pipeline-core/scripts/publication-close-journal.mjs:publication-close-journal",
         "release:plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs:codex-plugin-validator-parity",
+        "verify-phase:harness/scripts/verify.mjs:check-runner-manifest-parity",
+        "verify-phase:harness/scripts/verify.mjs:install-agy-tests",
         "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-host-tests",
         "verify-phase:harness/scripts/verify.mjs:installed-plugin-attestation-tests"
       ],
@@ -1187,7 +1189,8 @@
       "benefit": "Setup validates and projects supported configuration into host-facing files.",
       "status": "shipped",
       "surfaceIds": [
-        "setup:setup.mjs:setup"
+        "setup:setup.mjs:setup",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-start-hint-tests"
       ],
       "runners": [
         "antigravity",
@@ -2120,7 +2123,8 @@
         "verify-phase:harness/scripts/verify.mjs:critical-action-approval-request-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-gate-tests",
-        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests"
+        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:signed-quality-package-tests"
       ],
       "runners": [
         "host-only"

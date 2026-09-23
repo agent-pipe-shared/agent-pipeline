@@ -429,6 +429,8 @@ The happy path loads no reference file. Load only the exact condition:
   authorized dispatcher constructs an Antigravity `invoke_subagent` call that
   includes a Pipeline role. This applies whether or not the dispatcher uses
   Workflow or worktrees.
+- `references/antigravity-feature-close.md` when an Antigravity session is
+  actually closing an approved feature, not for a normal restart.
 
 No happy-path reference is mandatory. Lazy loading never widens authority and
 must preserve lifecycle, V3 authority, calibration, handover, Verify and

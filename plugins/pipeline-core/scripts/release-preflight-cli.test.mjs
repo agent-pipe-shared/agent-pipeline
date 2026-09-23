@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ReleasePreflightCliError, buildReleasePreflight } from "./release-preflight-cli.mjs";
-import { snapshotReaderDocumentation } from "../../../harness/scripts/check-doc-reader-binding.mjs";
+import { READER_REVIEW_PATHS, snapshotReaderDocumentation } from "../../../harness/scripts/check-doc-reader-binding.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
 
@@ -85,11 +85,7 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
       "docs/product-capability-inventory.json",
       "plugins/pipeline-core/scripts/release-preflight.mjs",
     ]) write(path, readFileSync(join(SOURCE_ROOT, path), "utf8"));
-    for (const path of [
-      "PIPELINE_FLOW.md", "README.md", "SETUP.md", "docs/README.md", "docs/audit-and-evidence.md",
-      "docs/cost-and-measurement.md", "docs/enforcement.md", "docs/overview.md", "docs/parallel-work.md",
-      "docs/security-controls.md", "docs/usage.md",
-    ]) write(path, `# ${path}\n\nCommitted reader fixture.\n`);
+    for (const path of READER_REVIEW_PATHS) write(path, `# ${path}\n\nCommitted reader fixture.\n`);
   }
   // ADR-0064 Decision 6: a hand-supplied --consent claiming "approved" now requires an
   // explicit, committed release-preflight waiver. Every fixture that exercises that

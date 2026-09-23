@@ -23,7 +23,7 @@ evidence; they are not copy-and-run instructions for a consumer project.
 - [`../SETUP.md`](../SETUP.md) — routine consumer adoption, prerequisites, and
   later source-maintainer reference.
 - [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md) — route selection, gates,
-  recovery, and close.
+  recovery, and close. [Deutsche Lesefassung](../PIPELINE_FLOW.de.md).
 - [`usage.md`](usage.md) — the normal user journey after a project is ready.
 - [`usage.md#assess-architecture-adoption-in-an-existing-project`](usage.md#assess-architecture-adoption-in-an-existing-project)
   — read-only status and proposal before an existing project adopts the

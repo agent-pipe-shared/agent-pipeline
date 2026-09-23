@@ -9,9 +9,11 @@ import test from "node:test";
 import { recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { canonicalJson } from "./critic-packet-preflight.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
+import { finishFeature } from "./finish-feature.mjs";
 
 const ROOT = process.cwd();
 const CLI = new URL("./close-coordinator.mjs", import.meta.url).pathname;
+const FINISH = new URL("./finish-feature.mjs", import.meta.url).pathname;
 const STATE = new URL("./pipeline-state.mjs", import.meta.url).pathname;
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const h = (value) => value.repeat(64);
@@ -73,6 +75,33 @@ test("coordinator builds the README audit bundle and forwards only a readback-bo
   assert.match(closed, /Feature "audit-feature" closed/);
   const state = JSON.parse(readFileSync(f.statePath));
   assert.equal(state.closedFeatures.at(-1).auditReference.criticVerifyLifecycleId, f.lifecycle.receipt.id);
+});
+test("finish-feature drives the real coordinator and State writer through verified bundle readback", t => {
+  const f = fixture(t);
+  const call = spawnSync(process.execPath, [FINISH, "--root", f.root, "--by", "PO",
+    "--architecture-impact", "no-architecture-impact", "--audit-request", "evidence/audit-request.json",
+    "--critic-verify-lifecycle", f.lifecycle.receipt.id,
+    "--continuity-close-request", "evidence/close-request.json"], {
+    cwd: f.root, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: f.root },
+  });
+  assert.equal(call.status, 0, call.stderr || call.stdout);
+  const result = JSON.parse(call.stdout);
+  assert.equal(result.status, "closed");
+  assert.match(result.lifecycleId, /^audit-feature-[a-f0-9]{24}$/u);
+  assert.equal(existsSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), true);
+  const state = JSON.parse(readFileSync(f.statePath));
+  assert.equal(state.closedFeatures.at(-1).auditReference.criticVerifyLifecycleId, f.lifecycle.receipt.id);
+});
+test("finish-feature resumes a prepared real close without duplicating the audit bundle", t => {
+  const f = prepare(t);
+  const original = readFileSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md"));
+  const result = finishFeature({ rootDir: f.root, by: "PO", architectureImpact: "no-architecture-impact",
+    auditRequest: "evidence/audit-request.json", criticVerifyLifecycle: f.lifecycle.receipt.id,
+    continuityCloseRequest: "evidence/close-request.json", resumeLifecycleId: "close-audit" });
+  assert.equal(result.status, "closed");
+  assert.equal(result.coordinator.status, "replayed");
+  assert.deepEqual(readFileSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), original);
+  assert.equal(JSON.parse(readFileSync(f.statePath)).closedFeatures.length, 1);
 });
 test("altered public Verify bytes after preparation refuse the final State close without mutation", t => {
   const f = prepare(t); const before = readFileSync(f.statePath);

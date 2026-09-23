@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";

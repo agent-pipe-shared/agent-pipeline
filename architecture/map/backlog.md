@@ -1,4 +1,5 @@
 ---
+type: Governed Module
 id: backlog
 responsibility: Sprint backlog items, evidence records, interruption baseline, and ledger history.
 nonResponsibilities:

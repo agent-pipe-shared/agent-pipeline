@@ -92,6 +92,7 @@ export function loadConceptFile(filePath, schema = getModuleInventorySchema()) {
   }
 
   const moduleRow = {
+    type: parsedFrontmatter.type ?? null,
     id: parsedFrontmatter.id,
     responsibility: parsedFrontmatter.responsibility,
     nonResponsibilities: parsedFrontmatter.nonResponsibilities || [],
@@ -129,6 +130,7 @@ export function loadMapBundle(rootDir = process.cwd(), schema = getModuleInvento
 
   const indexFile = path.join(mapDir, "index.md");
   const indexFileExists = fs.existsSync(indexFile);
+  const declaresOkfV01 = indexFileExists && /\bOKF v0\.1\b/u.test(fs.readFileSync(indexFile, "utf8"));
   if (!indexFileExists) {
     errors.push(`Root map index missing: ${indexFile}`);
   }
@@ -149,6 +151,9 @@ export function loadMapBundle(rootDir = process.cwd(), schema = getModuleInvento
       if (seenIds.has(mod.id)) {
         errors.push(`Duplicate module ID "${mod.id}" in ${file}`);
       } else {
+        if (declaresOkfV01 && (typeof mod.type !== "string" || mod.type.trim() === "")) {
+          errors.push(`${file}: OKF v0.1 concept requires a non-empty type`);
+        }
         seenIds.add(mod.id);
         modules.push(mod);
       }

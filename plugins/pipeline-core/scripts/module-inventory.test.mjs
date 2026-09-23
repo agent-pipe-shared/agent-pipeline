@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { architectureOverview, checkArchitectureOverview, renderArchitectureOverview } from "./generate-architecture-overview.mjs";
 
 import {
   extractFrontmatter,
@@ -38,6 +40,7 @@ describe("module-inventory (WP-D2, AC-8, AC-22, AC-23)", () => {
       assert.equal(result.ok, true);
 
       for (const mod of result.modules) {
+        assert.equal(mod.type, "Governed Module", "claimed OKF v0.1 concepts need a non-empty type");
         assert.ok(typeof mod.id === "string" && mod.id.length > 0, "id must be non-empty string");
         assert.ok(typeof mod.responsibility === "string" && mod.responsibility.length > 0, "responsibility required");
         assert.ok(Array.isArray(mod.nonResponsibilities), "nonResponsibilities must be array");
@@ -165,6 +168,30 @@ describe("module-inventory (WP-D2, AC-8, AC-22, AC-23)", () => {
   });
 
   describe("4. Missing or malformed frontmatter detection", () => {
+    it("rejects a concept without type when its index claims OKF v0.1", () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "map-okf-test-"));
+      try {
+        const mapDir = path.join(tmpDir, "architecture/map");
+        fs.mkdirSync(mapDir, { recursive: true });
+        fs.writeFileSync(path.join(mapDir, "index.md"), "# Map\n\nOKF v0.1 concept bundle.\n", "utf8");
+        fs.writeFileSync(path.join(mapDir, "mod-a.md"), `---
+id: mod-a
+responsibility: Test module A
+nonResponsibilities: []
+ownedPaths:
+  - mod-a/**
+publicContracts: []
+allowedDependencies: []
+authorityEffects: []
+verificationEntryPoints: []
+adrReferences: []
+---
+# Mod A\n`, "utf8");
+        const result = loadMapBundle(tmpDir, schema);
+        assert.equal(result.ok, false);
+        assert.ok(result.errors.some((error) => error.includes("OKF v0.1 concept requires a non-empty type")));
+      } finally { fs.rmSync(tmpDir, { recursive: true, force: true }); }
+    });
     it("reports error for a markdown file with missing frontmatter", () => {
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "map-test-"));
       const testFile = path.join(tmpDir, "no-fm.md");
@@ -243,5 +270,72 @@ adrReferences: []
 
       assert.equal(readingOrder[5].step, 6);
     });
+  });
+});
+
+describe("generated architecture overview", () => {
+  const SHA = "a".repeat(64);
+
+  it("is current and deterministically derived from the live map", () => {
+    const first = architectureOverview(REPO_ROOT);
+    const second = architectureOverview(REPO_ROOT);
+    assert.equal(first.html, second.html);
+    assert.equal(checkArchitectureOverview(REPO_ROOT).ok, true);
+    assert.equal(fs.readFileSync(first.path, "utf8"), first.html);
+    assert.match(first.html, /source-sha256/u);
+    assert.match(first.html, /Public contracts/u);
+    assert.match(first.html, /The harness runs checks against the plugin/u);
+    assert.doesNotMatch(first.html, /Exact contract-to-contract calls are not yet declared/u);
+    assert.doesNotMatch(first.html, /rationale for each dependency/u);
+    assert.doesNotMatch(first.html, /<script\b/iu);
+    assert.match(first.html, /script-src 'none'/u);
+  });
+
+  it("escapes module prose and rejects unsafe contract links", () => {
+    const map = loadMapBundle(REPO_ROOT);
+    assert.equal(map.ok, true);
+    const modules = map.modules.map((module) => ({ ...module }));
+    modules[0].responsibility = '<img src=x onerror="alert(1)">';
+    const html = renderArchitectureOverview(modules, new Map(), SHA);
+    assert.doesNotMatch(html, /<img\b/iu);
+    assert.match(html, /&lt;img/u);
+    modules[0].publicContracts = ["../outside.mjs"];
+    assert.throws(() => renderArchitectureOverview(modules, new Map(), SHA), /unsafe path/u);
+    modules[0].publicContracts = ["https://example.com/x.mjs"];
+    assert.throws(() => renderArchitectureOverview(modules, new Map(), SHA), /unsafe path/u);
+  });
+
+  it("detects a source mutation until the generated view is refreshed", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "architecture-overview-"));
+    try {
+      const mapDir = path.join(root, "architecture/map");
+      fs.mkdirSync(mapDir, { recursive: true });
+      fs.writeFileSync(path.join(mapDir, "index.md"), "# Map\n\nOKF v0.1 concept bundle.\n\n- [alpha](alpha.md)\n");
+      const concept = `---
+type: Governed Module
+id: alpha
+responsibility: First version
+nonResponsibilities: []
+ownedPaths:
+  - src/**
+publicContracts:
+  - src/main.mjs
+allowedDependencies: []
+authorityEffects: []
+verificationEntryPoints:
+  - tests/main.test.mjs
+adrReferences: []
+---
+# Alpha\n`;
+      fs.writeFileSync(path.join(mapDir, "alpha.md"), concept);
+      const command = spawnSync(process.execPath, [fileURLToPath(new URL("./generate-architecture-overview.mjs", import.meta.url)), "--write"],
+        { cwd: root, encoding: "utf8" });
+      assert.equal(command.status, 0, command.stderr);
+      const generated = architectureOverview(root);
+      assert.equal(fs.readFileSync(generated.path, "utf8"), generated.html);
+      assert.equal(checkArchitectureOverview(root).ok, true);
+      fs.writeFileSync(path.join(mapDir, "alpha.md"), concept.replace("First version", "Second version"));
+      assert.equal(checkArchitectureOverview(root).ok, false);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 });

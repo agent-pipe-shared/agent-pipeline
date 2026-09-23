@@ -69,25 +69,6 @@ Around those roles:
   remain with the human where the project calibration and action require them;
   evidence never creates that authority.
 
-> **Documentation line: `0.7.0`.** This describes the next distributed
-> architecture capability. Until it is released, consumer repositories should
-> continue to use the approved GitHub-distributed version they already have;
-> a maintainer's local candidate is neither an installation source nor evidence
-> that its release gates passed.
-
-<a id="capability-architecture-adoption-and-fitness"></a>
-<!-- capability:architecture-adoption-and-fitness -->
-
-The next distributed architecture capability adds decision assessment, a module
-inventory, machine-readable maps, and baseline/fitness checks. In an existing
-repository, start with the read-only adoption status and proposal described in
-[Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
-Only then does the repository owner choose an explicitly bounded adoption
-decision. A valid deferred decision remains valid until its stated review or
-expiry date, explicit supersession, or a changed decision — an ordinary commit
-does not turn it into a partial lifecycle state. See the
-[release-scope overview](docs/overview.md).
-
 > **What you can inspect:** a candidate-bound Verify receipt, security-scan
 > status, review and approval records where the project requires them, and a
 > validated Feature Package or offline Audit Bundle. These artifacts support an
@@ -126,8 +107,27 @@ flowchart LR
     Gates -.->|"fail"| Goldfish
     Gates -->|"pass"| Critic["Critic<br/>(independent reviewer)"]
     Critic -->|"findings"| Elephant
-    Elephant -->|"decision"| PO
+    Elephant -->|"go/no-go recommendation"| PO
 ```
+
+> **Documentation line: `0.7.0`.** This describes the next distributed
+> architecture capability. Until it is released, consumer repositories should
+> continue to use the approved GitHub-distributed version they already have;
+> a maintainer's local candidate is neither an installation source nor evidence
+> that its release gates passed.
+
+<a id="capability-architecture-adoption-and-fitness"></a>
+<!-- capability:architecture-adoption-and-fitness -->
+
+The next distributed architecture capability adds decision assessment, a module
+inventory, machine-readable maps, and baseline/fitness checks. In an existing
+repository, start with the read-only adoption status and proposal described in
+[Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+Only then does the repository owner choose an explicitly bounded adoption
+decision. A valid deferred decision remains valid until its stated review or
+expiry date, explicit supersession, or a changed decision — an ordinary commit
+does not turn it into a partial lifecycle state. See the
+[release-scope overview](docs/overview.md).
 
 ## Bring your own architecture rules & guardrails
 
@@ -212,15 +212,9 @@ dauerhaften, später einsehbaren Nachweis.
 - Rigor, Rollen und Modellaufwand an Umfang und Risiko jedes Arbeitspakets anzupassen.
 
 > **Einstieg für Neue:** Lies diese Seite und folge dann [SETUP](SETUP.md) für
-> den normalen Consumer-Ablauf, nutze danach [PIPELINE_FLOW](PIPELINE_FLOW.md)
+> den normalen Consumer-Ablauf, nutze danach [PIPELINE_FLOW](PIPELINE_FLOW.de.md)
 > für den Lifecycle und lies anschließend [Usage](docs/usage.md). Die weiteren Links sind
 > Nachschlagewerk.
-
-> **Dokumentationslinie: `0.7.0`.** Sie beschreibt die nächste auszuliefernde
-> Architektur-Funktion. Bis zu ihrem Release verwenden Consumer-Repositories
-> weiter ihre bereits freigegebene GitHub-distribuierte Version; ein lokaler
-> Maintainer-Kandidat ist weder Installationsquelle noch Nachweis bestandener
-> Release-Gates.
 
 > **Was du prüfen kannst:** kandidatengebundene Verify-Receipts,
 > Security-Scan-Status sowie erforderliche Review- und Freigabe-Nachweise. Ein
@@ -248,8 +242,8 @@ Vier bewusst getrennte Rollen tragen das Modell:
 - **Product Owner (du)** — das menschliche Gate. Gibt die Richtung vor, prüft
   Ergebnisse, erteilt die finale Freigabe.
 - **Elephant** — die langlebige Orchestrator-Sitzung. Formt aus deiner Absicht eine
-  Spezifikation, zerlegt sie in kleine Aufgaben, delegiert sie und entscheidet am
-  Ende über Go/No-Go.
+  Spezifikation, zerlegt sie in kleine Aufgaben, delegiert sie und bereitet eine
+  Go/No-Go-Empfehlung für den Product Owner vor.
 - **Goldfish** — ein Subagent mit frischem Kontext. Führt genau eine klar
   umrissene Aufgabe aus und meldet sich nur mit Nachweis zurück, nie mit einer
   bloßen Behauptung.
@@ -280,19 +274,6 @@ Ergänzend dazu:
   bleiben dort beim Menschen, wo Projektkalibrierung und Aktion dies verlangen;
   Evidenz erzeugt diese Autorität nicht.
 
-## Wie es funktioniert
-
-```mermaid
-flowchart LR
-    PO["Product Owner<br/>(du)"] -->|"Absicht / Auftrag"| Elephant["Elephant<br/>(Orchestrator)"]
-    Elephant -->|"Spec + Dispatch"| Goldfish["Goldfish<br/>(frischer Kontext)"]
-    Goldfish -->|"Nachweis"| Gates["Deterministische Gates<br/>(Tests, Security, Lint)"]
-    Gates -.->|"fehlgeschlagen"| Goldfish
-    Gates -->|"bestanden"| Critic["Critic<br/>(unabhängiger Prüfer)"]
-    Critic -->|"Befunde"| Elephant
-    Elephant -->|"Entscheidung"| PO
-```
-
 ## Die Vordertür: optionale Design-Vorstufe
 
 Vor der eigentlichen Pipeline steht bewusst kein Pflichtschritt, sondern eine
@@ -312,6 +293,35 @@ eigenständige Backlog-Items vor und wartet auf Bestätigung oder Korrektur —
 das bestehende PRD-Review pro Item bleibt der einzige Prüfpunkt, es kommt
 nichts Neues hinzu. Details: [`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
 
+## Wie es funktioniert
+
+```mermaid
+flowchart LR
+    PO["Product Owner<br/>(du)"] -->|"Absicht / Auftrag"| Elephant["Elephant<br/>(Orchestrator)"]
+    Elephant -->|"Spec + Dispatch"| Goldfish["Goldfish<br/>(frischer Kontext)"]
+    Goldfish -->|"Nachweis"| Gates["Deterministische Gates<br/>(Tests, Security, Lint)"]
+    Gates -.->|"fehlgeschlagen"| Goldfish
+    Gates -->|"bestanden"| Critic["Critic<br/>(unabhängiger Prüfer)"]
+    Critic -->|"Befunde"| Elephant
+    Elephant -->|"Go/No-Go-Empfehlung"| PO
+```
+
+> **Dokumentationslinie: `0.7.0`.** Sie beschreibt die nächste auszuliefernde
+> Architektur-Funktion. Bis zu ihrem Release verwenden Consumer-Repositories
+> weiter ihre bereits freigegebene GitHub-distribuierte Version; ein lokaler
+> Maintainer-Kandidat ist weder Installationsquelle noch Nachweis bestandener
+> Release-Gates.
+
+Die nächste Architektur-Funktion ergänzt Entscheidungsbewertung,
+Modul-Inventar, maschinenlesbare Maps und Baseline-/Fitness-Checks. In einem
+bestehenden Repository beginnt die Übernahme mit dem lesenden Status und
+Vorschlag unter [Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+Erst danach wählt der Repository-Owner eine explizit begrenzte Entscheidung.
+Eine gültige Deferral-Entscheidung gilt bis zu ihrem Review-/Ablaufdatum,
+einer expliziten Ablösung oder einer geänderten Entscheidung; ein gewöhnlicher
+Commit macht sie nicht zu einem partiellen Lifecycle-Zustand. Siehe auch die
+[Release-Übersicht](docs/overview.md).
+
 ## Eigene Architekturvorgaben & Guardrails
 
 Ein Projekt kann eigene Hausregeln mitbringen — getrennt in zwei Klassen:
@@ -330,16 +340,6 @@ blockieren; menschenprüfbare Punkte werden explizite Pflichten im anwendbaren
 Review. Ein Muster komplett durchgespielt — von der
 Hausregel bis zur erzwungenen Regel — steht im
 [Worked Example](governance/examples/worked-example.md).
-
-Die nächste Architektur-Funktion ergänzt Entscheidungsbewertung,
-Modul-Inventar, maschinenlesbare Maps und Baseline-/Fitness-Checks. In einem
-bestehenden Repository beginnt die Übernahme mit dem lesenden Status und
-Vorschlag unter [Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
-Erst danach wählt der Repository-Owner eine explizit begrenzte Entscheidung.
-Eine gültige Deferral-Entscheidung gilt bis zu ihrem Review-/Ablaufdatum,
-einer expliziten Ablösung oder einer geänderten Entscheidung; ein gewöhnlicher
-Commit macht sie nicht zu einem partiellen Lifecycle-Zustand. Siehe auch die
-[Release-Übersicht](docs/overview.md).
 
 ## Drei Drehregler statt einer Einheitsgröße
 

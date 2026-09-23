@@ -16,6 +16,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
 export const READER_REVIEW_PATHS = Object.freeze([
   "GEMINI.md",
+  "PIPELINE_FLOW.de.md",
   "PIPELINE_FLOW.md",
   "README.md",
   "SETUP.md",

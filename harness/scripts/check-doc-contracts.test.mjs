@@ -43,6 +43,7 @@ const REPO = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const roots = [];
 const EXPECTED_READER_REVIEW_PATHS = [
   "GEMINI.md",
+  "PIPELINE_FLOW.de.md",
   "PIPELINE_FLOW.md",
   "README.md",
   "SETUP.md",

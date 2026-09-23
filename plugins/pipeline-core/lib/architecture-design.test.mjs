@@ -8,6 +8,7 @@ import { parseArchitectureDesign, architectureDesignTargets, materializeArchitec
 import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { generateAdoptionProposal } from "../scripts/architecture-adoption.mjs";
 import { loadConceptFile } from "../scripts/module-inventory.mjs";
+import { checkArchitectureOverview } from "../scripts/generate-architecture-overview.mjs";
 import moduleSchema from "../schemas/pipeline.module-inventory.v1.json" with { type: "json" };
 
 function design() {
@@ -28,8 +29,11 @@ test("architecture package explicitly carries bounded modules and renders only d
   const input = design();
   assert.deepEqual(parseArchitectureDesign(prd(input)), input);
   const targets = architectureDesignTargets(input);
-  assert.deepEqual(targets.map(target => target.path), ["architecture/map/index.md", "architecture/map/application.md", "architecture/fitness-model.json", "architecture/baseline.json"]);
+  assert.deepEqual(targets.map(target => target.path), ["architecture/map/index.md", "architecture/map/application.md", "architecture/map/overview.html", "architecture/fitness-model.json", "architecture/baseline.json"]);
   assert.match(targets[1].bytes, /responsibility: "Local application"/u);
+  assert.match(targets[0].bytes, /OKF v0\.1 concept bundle/u);
+  assert.match(targets[1].bytes, /type: "Governed Module"/u);
+  assert.match(targets[2].bytes, /id="module-application"/u);
   assert.equal(targets.some(target => target.path.startsWith("src/")), false);
   const root = mkdtempSync(join(tmpdir(), "architecture-frontmatter-"));
   try {
@@ -39,6 +43,11 @@ test("architecture package explicitly carries bounded modules and renders only d
     assert.equal(loaded.ok, true, JSON.stringify(loaded.errors));
     assert.equal(loaded.module.id, "application");
     assert.deepEqual(loaded.module.ownedPaths, input.modules[0].ownedPaths);
+    mkdirSync(join(root, "architecture/map"), { recursive: true });
+    for (const target of targets.filter((row) => row.path.startsWith("architecture/map/"))) {
+      writeFileSync(join(root, target.path), target.bytes);
+    }
+    assert.equal(checkArchitectureOverview(root).ok, true, "materialized human view must match exact map sources");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 test("closed package refuses missing, duplicate, brownfield, broad, escaping and debt-bearing input", () => {

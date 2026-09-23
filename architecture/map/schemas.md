@@ -1,4 +1,5 @@
 ---
+type: Governed Module
 id: schemas
 responsibility: Canonical JSON schemas defining contracts, profiles, state, and receipts.
 nonResponsibilities:

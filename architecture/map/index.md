@@ -2,6 +2,10 @@
 
 Root index of the agent-first architecture navigation map bundle for `agent-pipeline` (OKF v0.1 format, WP-D2, Issue #104, AC-8, AC-23, Spec §7.2, Doctrine §3).
 
+For a navigable human view, open the [generated architecture overview](overview.html).
+It is derived from this index and the concept files; edit those sources and
+regenerate the overview, never edit the HTML directly.
+
 ## Re-Entry Reading Order (Doctrine §3.2)
 
 Stateless context-budgeted agents and fresh sessions re-enter this repository by reading artifacts in the following strict order (bounded by task scope, without loading unrelated implementation):

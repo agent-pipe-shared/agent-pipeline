@@ -1,18 +1,20 @@
 # V3 consumer onboarding and Codex lifecycle V4
 
-This is the supported, preview-first path for a consumer project that has a
-valid legacy (`pipeline.user.v0`/`pipeline.user.v1`/V2) `pipeline.user.yaml`
-but intentionally has no generated `.claude/**` or `.codex/**` projections.
-It uses the Public Core migration authority; do not hand-author runtime files,
-an authority lock, or a projection plan.
+This guide covers runner installation, fresh Codex lifecycle V4 onboarding,
+and preview-first migration of a consumer project with a valid legacy
+(`pipeline.user.v0`/`pipeline.user.v1`/V2) `pipeline.user.yaml` and no generated
+`.claude/**` or `.codex/**` projections. Migration uses the Public Core
+authority; do not hand-author runtime files, an authority lock, or a
+projection plan.
 
 ## Preconditions
 
 - Resolve `<plugin-root>` to the installed directory of the approved
   GitHub-distributed Public Core; do not use a maintainer checkout.
-- Supply one real consumer project root containing `pipeline.user.yaml`.
-- Keep the project writable only for the final, explicit activation. `inspect`
-  and `plan` are read-only.
+- Supply one real consumer project root. Legacy migration additionally requires
+  its existing `pipeline.user.yaml`.
+- For legacy migration, keep the project writable only for the final, explicit
+  activation. `inspect` and `plan` are read-only.
 - Critic export is always limited to the configured allowlist: the bounded
   candidate packet, listed providers, and listed assurance classes. The fresh
   default records repository-scoped Advisor-export consent as `approved`, so a
@@ -22,6 +24,67 @@ an authority lock, or a projection plan.
   activate or bootstrap; Advisor capability preflight is model-free and
   consultation is on demand. A migration preview is not an approval, push, or
   release authorization.
+
+## Install the runner integration first
+
+Bind the approved GitHub-distributed plugin for the runner that will govern the
+consumer project. The commands differ by runner; run them from the project
+root, then fully end the host process and start a new session in that root.
+Invoke `/pipeline-core:pipeline-start` as the first Pipeline action. Its
+preflight supplies the exact onboarding action for the observed project state.
+
+### Claude Code
+
+Add the official GitHub marketplace and install the plugin at project scope:
+
+```sh
+claude plugin marketplace add agent-pipe-shared/agent-pipeline --scope project
+claude plugin install pipeline-core@agent-pipeline --scope project
+```
+
+Confirm the binding with `claude plugin list --json`. The first binding needs
+a full Claude Code restart before `/pipeline-core:pipeline-start`; a plugin
+reload within the old process is not that first restart. The project scope
+keeps the binding with the governed project.
+
+### Codex
+
+Use Codex's own Git marketplace and plugin commands:
+
+```sh
+codex plugin marketplace add https://github.com/agent-pipe-shared/agent-pipeline.git --ref main
+codex plugin marketplace upgrade agent-pipeline
+codex plugin add pipeline-core@agent-pipeline
+codex plugin list --marketplace agent-pipeline --json
+```
+
+The final command must show exactly one installed and enabled
+`pipeline-core@agent-pipeline`. Fully end the Codex host process, start a new
+thread in the project root, and invoke `/pipeline-core:pipeline-start`.
+Codex's binding does not use Claude's `--scope project` commands.
+
+### Antigravity (Agy)
+
+From the project root, run the installer in a locally available, approved
+plugin directory obtained from the official GitHub distribution (for example
+a released marketplace snapshot or release checkout):
+
+```sh
+node "/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs"
+```
+
+Select **Approved Plugin Directory** (the default), then **Workspace-Local**
+to register `.agents/plugins.json`. A developer checkout is only for an
+explicit pre-release test. Ensure `node` resolves in the PATH of the actual
+Agy host, fully restart it, open the project workspace, and invoke
+`/pipeline-core:pipeline-start`. The installer may offer a runner-local
+autonomous tool policy; that option grants no plan, release, remote, or human
+authority.
+
+The registry binds the exact selected plugin directory. On a fresh clone or
+after switching approved versions, run the installer again for that directory
+and restart Agy. Do not copy a previous machine's host receipt or edit the
+registry path by hand.
 
 ## Fresh Codex lifecycle V4
 
@@ -226,8 +289,8 @@ happy path, per `backlog/items/2026-07-25-managed-onboarding-success-contract.md
 
 ### Candidate and release boundary
 
-This page describes the 0.4.5 lifecycle candidate; it is not a version,
-installation, or release assertion. Onboarding inspect/plan/apply operations
+The lifecycle procedures here do not assert a particular installed version or
+release status. Onboarding inspect/plan/apply operations
 do not change `VERSION` or plugin manifests and do not commit, push, tag,
 publish, merge, close an Issue, or create a release. Those actions remain
 separate, explicitly accepted gates after same-candidate verification and the
@@ -377,48 +440,3 @@ descriptor without a cleanup manifest may be included in the same plan only
 when it separately proves normally retirable; it never inherits the archive
 exception. The recovery never accepts a scratch file, generated output,
 implementation worktree, present path, or path-prefix guess.
-
-## Installation across Runners
-
-The pipeline integrates differently depending on the active runner:
-
-### Codex / Claude Code
-Install the released Pipeline plugin from the official GitHub marketplace with
-project scope:
-```bash
-claude plugin marketplace add agent-pipe-shared/agent-pipeline --scope project
-claude plugin install pipeline-core@agent-pipeline --scope project
-```
-This binds the governed project to the released Pipeline plugin; it does not
-select a maintainer's local candidate marketplace.
-
-### Antigravity (AGY)
-Antigravity utilizes a decentralized, workspace-local GitOps approach for customizations. Instead of a global `install` command, you commit the plugin mapping directly into your repository:
-
-1. Run the Antigravity installer script from a locally available, approved
-   plugin directory obtained from the official GitHub distribution (for
-   example a released marketplace snapshot or release checkout). A developer
-   checkout is only for an explicit pre-release test:
-```bash
-node /absolute/path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs
-```
-(Select **Workspace-Local** to generate `.agents/plugins.json` for the
-project. The installer can optionally configure Agy's runner-local autonomous
-tool policy; that option grants no plan, release, remote, or human authority.)
-2. Ensure that `node` resolves in the PATH of the actual Agy host (desktop,
-service, or terminal), restart Agy after correcting that environment, then
-open the workspace and invoke `/pipeline-core:pipeline-start`.
-
-For an explicitly selected approved plugin directory obtained from the GitHub
-distribution, the registry's exact non-symlinked path is the installation
-provenance boundary. The bootstrap checks that binding; it does not manufacture
-a second source locator or treat a developer copy as equivalent to the
-approved distribution. Reinstall after an update rather than editing a
-registry path by hand.
-
-A committed workspace mapping is project configuration, not a portable host
-installation. Each fresh-clone operator binds the selected approved
-GitHub-distributed plugin directory through the installer, then restarts Agy
-so the host reads that binding. When switching among beta, stable, or local
-test versions, run the installer again for the selected directory; do not edit
-a registry path by hand or assume a prior machine's host receipt is portable.
