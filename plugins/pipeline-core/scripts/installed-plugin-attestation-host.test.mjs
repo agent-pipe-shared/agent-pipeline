@@ -418,7 +418,7 @@ check("an exact Codex local registry/cache binding needs no receipt and a diverg
   assert.match(rootEntrypoint, /\.\/plugins\/pipeline-core\/install-agy\.mjs/u);
   assert.match(rootEntrypoint, /runInteractiveInstaller\(\)/u);
   const shippedEntrypoint = readFileSync(new URL("../install-agy.mjs", import.meta.url), "utf8");
-  assert.match(shippedEntrypoint, /if \(isDirectInvocation\(import\.meta\.url\)\) \{[\s\S]*?runInteractiveInstaller\(\);/u);
+  assert.match(shippedEntrypoint, new RegExp(String.raw`if \(isDirectInvocation\(import\.meta\.url\)\) \{[\s\S]*?runInteractiveInstaller\(\);`, "u"));
 });
 
 assert.equal(cases.length, 9, "the complete installed-plugin-attestation host corpus must be registered before execution begins");

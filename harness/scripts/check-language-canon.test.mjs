@@ -12,7 +12,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
 const script = join(scriptDir, "check-language-canon.mjs");
 const marker = "<!-- DE-REFERENCE-BELOW | complete German reader copy -->";
-const bilingual = ["README.md", "PIPELINE_FLOW.md", "docs/operating-model.md"];
+const bilingual = ["README.md", "docs/operating-model.md"];
 const englishOnly = ["SETUP.md", "docs/README.md", "docs/overview.md", "docs/usage.md", "docs/migration.md"];
 
 function fixture({ mutate } = {}) {
@@ -23,6 +23,12 @@ function fixture({ mutate } = {}) {
     const text = `# English authority\n\nEnglish body.\n\n${marker}\n\n# Deutsche Lesefassung\n\nDeutscher Text.\n`;
     writeFileSync(file, mutate ? mutate(path, text) : text);
   }
+  writeFileSync(join(root, "PIPELINE_FLOW.md"), mutate
+    ? mutate("PIPELINE_FLOW.md", "# English flow\n\nEnglish body.\n\n[Deutsche Lesefassung](PIPELINE_FLOW.de.md)\n")
+    : "# English flow\n\nEnglish body.\n\n[Deutsche Lesefassung](PIPELINE_FLOW.de.md)\n");
+  writeFileSync(join(root, "PIPELINE_FLOW.de.md"), mutate
+    ? mutate("PIPELINE_FLOW.de.md", "# Deutscher Ablauf\n\nDeutscher Text.\n")
+    : "# Deutscher Ablauf\n\nDeutscher Text.\n");
   for (const path of englishOnly) {
     const file = join(root, path);
     mkdirSync(dirname(file), { recursive: true });
@@ -31,7 +37,7 @@ function fixture({ mutate } = {}) {
   return root;
 }
 
-test("Hawkeye audit passes for exactly the three bilingual user documents", () => {
+test("Hawkeye audit passes for two embedded translations and the linked German flow", () => {
   assert.deepEqual(auditLanguageCanon(repoRoot), []);
 });
 
@@ -39,14 +45,16 @@ test("Hawkeye audit rejects missing, incomplete, and misplaced translation bound
   const root = fixture({
     mutate(path, text) {
       if (path === "README.md") return text.replace(marker, "");
-      if (path === "PIPELINE_FLOW.md") return text.replace("# Deutsche Lesefassung", "Deutsche Lesefassung");
+      if (path === "PIPELINE_FLOW.md") return text.replace("](PIPELINE_FLOW.de.md)", "](missing.de.md)");
+      if (path === "PIPELINE_FLOW.de.md") return text.replace("# Deutscher Ablauf", "Deutscher Ablauf");
       return text;
     },
   });
   try {
     const findings = auditLanguageCanon(root).join("\n");
     assert.match(findings, /README\.md: expected exactly one DE-REFERENCE-BELOW marker/);
-    assert.match(findings, /PIPELINE_FLOW\.md: complete German reader copy must begin after the marker/);
+    assert.match(findings, /PIPELINE_FLOW\.md: missing link to the German reader copy/);
+    assert.match(findings, /PIPELINE_FLOW\.de\.md: complete German reader copy is missing/);
     writeFileSync(join(root, "SETUP.md"), `# English only\n\n${marker}\n`);
     assert.match(auditLanguageCanon(root).join("\n"), /SETUP\.md: English-only user document contains a German reference marker/);
   } finally {
@@ -54,9 +62,10 @@ test("Hawkeye audit rejects missing, incomplete, and misplaced translation bound
   }
 });
 
-test("Hawkeye language scope is fixed to the three maintained bilingual docs", () => {
+test("Hawkeye language scope is fixed to the maintained embedded and linked translations", () => {
   const source = readFileSync(script, "utf8");
-  assert.match(source, /const bilingualFrontDoors = \["README\.md", "PIPELINE_FLOW\.md", "docs\/operating-model\.md"\]/);
+  assert.match(source, /const bilingualFrontDoors = \["README\.md", "docs\/operating-model\.md"\]/);
+  assert.match(source, /const splitTranslation = \{ english: "PIPELINE_FLOW\.md", german: "PIPELINE_FLOW\.de\.md" \}/);
   assert.match(source, /const englishOnlyUserDocs = \["SETUP\.md", "docs\/README\.md", "docs\/overview\.md", "docs\/usage\.md", "docs\/migration\.md"\]/);
 });
 
