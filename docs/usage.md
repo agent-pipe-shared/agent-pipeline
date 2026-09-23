@@ -29,6 +29,30 @@ A refusal, recovery result, or restart boundary is also an action contract.
 Use its named public recovery step; do not edit generated state or guard files
 by hand to move past it.
 
+## Assess architecture adoption in an existing project
+
+Architecture adoption begins with two read-only commands from the installed
+plugin. Run them in the repository that you intend to govern; they inspect that
+repository only and do not create maps, baselines, or a decision.
+
+```bash
+node <plugin-root>/scripts/architecture-adoption.mjs status --root <project-root> --json
+node <plugin-root>/scripts/architecture-adoption.mjs propose --root <project-root> --json
+```
+
+`adoption-required` means the project has neither a usable architecture
+baseline nor a valid adoption decision. The proposal is a four-stage planning
+aid, not a pass or an authorization. The repository owner chooses whether to
+adopt a bounded scope, defer it with a review/expiry date, or record a partial
+scope through the normal human-decision route. Do not hand-write
+`architecture/adoption-state.json`.
+
+A deferred decision is not tied to an ordinary Git commit. It remains valid
+until its declared review or expiry date, explicit supersession, or a changed
+decision. Before work that depends on the architecture controls, the planning
+boundary checks the current decision and scope; it fails closed if the
+decision is absent, expired, malformed, or out of scope.
+
 ## Verify a consumer project
 
 Use the installed plugin's `scripts/verify-evidence-producer.mjs` as the
@@ -85,6 +109,10 @@ attempt cannot borrow an old green result as current evidence. Resolve
 
 Once the project is ready and any required plan gate is recorded, delivery
 continues autonomously within that approved scope:
+
+There is no cross-runner cost or delivery-time estimate for this project.
+Treat the [measurement boundary](cost-and-measurement.md) as transparency
+guidance, not as a reason to widen concurrency or autonomy.
 
 1. Split independent, non-overlapping packages so they may run in parallel.
 2. Give each implementor a bounded goal, exact context paths, acceptance checks,

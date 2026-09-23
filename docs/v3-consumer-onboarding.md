@@ -8,7 +8,8 @@ an authority lock, or a projection plan.
 
 ## Preconditions
 
-- Run the command from a trusted checkout of the released Public Core.
+- Resolve `<plugin-root>` to the installed directory of the approved
+  GitHub-distributed Public Core; do not use a maintainer checkout.
 - Supply one real consumer project root containing `pipeline.user.yaml`.
 - Keep the project writable only for the final, explicit activation. `inspect`
   and `plan` are read-only.
@@ -47,7 +48,7 @@ cache version heuristically.
 | Runner | Linux and macOS | Windows | Update/readback requirement |
 | --- | --- | --- | --- |
 | Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | After installing or updating, start a fresh Codex thread (or use the runner's plugin reload action when available), open `/hooks`, and trust the current plugin hook definitions. Reused/resumed threads may retain their old skill snapshot; accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
-| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Run the project-scoped marketplace/plugin update and the explicit clean-source attestation command in [Claude local plugin development](claude-local-plugin-development.md), then `/reload-plugins`. Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
+| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Run `claude plugin marketplace update agent-pipeline`, then `claude plugin update pipeline-core@agent-pipeline --scope project`, then `/reload-plugins`. Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
 
 The lifecycle planner returns an executable plus an argv array. Agents must
 render that exact action for the current shell when an operator has to execute
@@ -56,7 +57,7 @@ Windows. The digest and individual argv elements must not be reconstructed,
 split, or translated.
 
 ```sh
-node plugins/pipeline-core/scripts/project-onboarding-v3.mjs inspect --root /absolute/consumer/root --intent onboarding
+node <plugin-root>/scripts/project-onboarding-v3.mjs inspect --root /absolute/consumer/root --intent onboarding
 ```
 
 The normal progress sequence is ordered and fail-closed:
@@ -106,11 +107,11 @@ For the first two write stages, execute the complete `argv` returned by the
 plan rather than reconstructing flags:
 
 ```sh
-node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan --root /absolute/consumer/root
-node plugins/pipeline-core/scripts/project-onboarding-v3.mjs apply-portable-seed --root /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
+node <plugin-root>/scripts/project-onboarding-v3.mjs plan --root /absolute/consumer/root
+node <plugin-root>/scripts/project-onboarding-v3.mjs apply-portable-seed --root /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
 
-node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-runtime --root /absolute/consumer/root
-node plugins/pipeline-core/scripts/project-onboarding-v3.mjs initialize-runtime --root /absolute/consumer/root --plan-sha256 <digest-from-plan-runtime> --activate
+node <plugin-root>/scripts/project-onboarding-v3.mjs plan-runtime --root /absolute/consumer/root
+node <plugin-root>/scripts/project-onboarding-v3.mjs initialize-runtime --root /absolute/consumer/root --plan-sha256 <digest-from-plan-runtime> --activate
 ```
 
 Every plan is read-only. Every apply requires explicit activation, authenticates
@@ -125,7 +126,7 @@ without deleting or hand-editing the checkpoint. Re-submit the complete answer
 array through the separately named command:
 
 ```sh
-node plugins/pipeline-core/scripts/project-onboarding-v3.mjs intake-design-questions-replace --root /absolute/consumer/root --answers-json '<complete JSON array>' --activate
+node <plugin-root>/scripts/project-onboarding-v3.mjs intake-design-questions-replace --root /absolute/consumer/root --answers-json '<complete JSON array>' --activate
 ```
 
 The ordinary `intake-design-questions-apply` remains idempotent and refuses
@@ -139,13 +140,13 @@ Supply the validated goal to `kickoff plan` as one argv element. The command
 trims and validates 1–8192 bytes of NUL-free UTF-8 text and remains read-only:
 
 ```sh
-node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff plan --root /absolute/consumer/root --goal '<project goal>'
+node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff plan --root /absolute/consumer/root --goal '<project goal>'
 ```
 
 The returned plan contains the exact digest-bound apply `argv`:
 
 ```sh
-node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff apply --root /absolute/consumer/root --goal '<same validated project goal>' --plan-sha256 <digest-from-kickoff-plan> --activate
+node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff apply --root /absolute/consumer/root --goal '<same validated project goal>' --plan-sha256 <digest-from-kickoff-plan> --activate
 ```
 
 Execute the returned argument array without splitting or reinterpreting the
@@ -237,8 +238,8 @@ operator's live onboarding acceptance.
 First inspect and preview the exact migration:
 
 ```sh
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root /absolute/consumer/root
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root /absolute/consumer/root
+node <plugin-root>/scripts/runner-profile-migration-v3.mjs inspect --root /absolute/consumer/root
+node <plugin-root>/scripts/runner-profile-migration-v3.mjs plan --root /absolute/consumer/root
 ```
 
 For an accepted V0/V1/V2 source, the plan deterministically lists the
@@ -249,7 +250,7 @@ interrupted operation cannot present a converted source with old projections.
 Only after reviewing the emitted target list and hashes, activate it:
 
 ```sh
-node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root /absolute/consumer/root --activate
+node <plugin-root>/scripts/runner-profile-migration-v3.mjs apply --root /absolute/consumer/root --activate
 ```
 
 Before the first write the command emits a sanitized pre-write preview to
@@ -280,15 +281,15 @@ returns a digest; only the matching explicit activation may write. Any runtime
 projection drift is rejected rather than combined silently with the lock update.
 
 ```sh
-node plugins/pipeline-core/scripts/private-overlay-activation.mjs authority-plan --project-root /absolute/overlay/root --source-plugin-root /absolute/public/plugins/pipeline-core
-node plugins/pipeline-core/scripts/private-overlay-activation.mjs authority-activate --project-root /absolute/overlay/root --source-plugin-root /absolute/public/plugins/pipeline-core --expected-plan-sha256 <digest-from-authority-plan>
+node <plugin-root>/scripts/private-overlay-activation.mjs authority-plan --project-root /absolute/overlay/root --source-plugin-root <plugin-root>
+node <plugin-root>/scripts/private-overlay-activation.mjs authority-activate --project-root /absolute/overlay/root --source-plugin-root <plugin-root> --expected-plan-sha256 <digest-from-authority-plan>
 ```
 
 For Codex, use the host-attested wrapper instead of supplying a source root:
 
 ```sh
-node plugins/pipeline-core/scripts/codex-private-overlay-activation.mjs authority-plan --project-root /absolute/overlay/root
-node plugins/pipeline-core/scripts/codex-private-overlay-activation.mjs authority-activate --project-root /absolute/overlay/root --expected-plan-sha256 <digest-from-authority-plan>
+node <plugin-root>/scripts/codex-private-overlay-activation.mjs authority-plan --project-root /absolute/overlay/root
+node <plugin-root>/scripts/codex-private-overlay-activation.mjs authority-activate --project-root /absolute/overlay/root --expected-plan-sha256 <digest-from-authority-plan>
 ```
 
 After a successful activation, rerun `status`, then the normal private-overlay
@@ -312,9 +313,9 @@ authority to the runner-neutral `project/` layer only through its separate,
 preview-first cutover:
 
 ```sh
-node plugins/pipeline-core/scripts/project-authority-migration.mjs inspect --root /absolute/consumer/root
-node plugins/pipeline-core/scripts/project-authority-migration.mjs plan --root /absolute/consumer/root
-node plugins/pipeline-core/scripts/project-authority-migration.mjs apply --root /absolute/consumer/root --activate
+node <plugin-root>/scripts/project-authority-migration.mjs inspect --root /absolute/consumer/root
+node <plugin-root>/scripts/project-authority-migration.mjs plan --root /absolute/consumer/root
+node <plugin-root>/scripts/project-authority-migration.mjs apply --root /absolute/consumer/root --activate
 ```
 
 `plan` writes nothing and reports only path/digest metadata. `apply` writes a
@@ -343,8 +344,8 @@ If an interrupted cutover leaves a journal, do not delete it or hand-copy its
 files. First inspect the recorded recovery, then explicitly activate it:
 
 ```sh
-node plugins/pipeline-core/scripts/project-authority-migration.mjs recover --root /absolute/consumer/root
-node plugins/pipeline-core/scripts/project-authority-migration.mjs recover --root /absolute/consumer/root --activate
+node <plugin-root>/scripts/project-authority-migration.mjs recover --root /absolute/consumer/root
+node <plugin-root>/scripts/project-authority-migration.mjs recover --root /absolute/consumer/root --activate
 ```
 
 Recovery restores recorded preimages only after its own digest-bound preview;
@@ -357,8 +358,8 @@ session. If an emergency archival was already performed outside the checkout,
 first retain the archive and then inspect the normal recovery plan:
 
 ```sh
-node plugins/pipeline-core/scripts/session-cleanup.mjs plan-recovery --repo /absolute/consumer/root
-node plugins/pipeline-core/scripts/session-cleanup.mjs apply-recovery --repo /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
+node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo /absolute/consumer/root
+node <plugin-root>/scripts/session-cleanup.mjs apply-recovery --repo /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
 ```
 
 To retain the successful recovery as a non-authoritative governance action,
@@ -382,34 +383,42 @@ implementation worktree, present path, or path-prefix guess.
 The pipeline integrates differently depending on the active runner:
 
 ### Codex / Claude Code
-Installation relies on the global marketplace system:
+Install the released Pipeline plugin from the official GitHub marketplace with
+project scope:
 ```bash
-claude plugin install pipeline-core@agent-pipeline-local
+claude plugin marketplace add agent-pipe-shared/agent-pipeline --scope project
+claude plugin install pipeline-core@agent-pipeline --scope project
 ```
-This command links the active project or global environment to the pipeline.
+This binds the governed project to the released Pipeline plugin; it does not
+select a maintainer's local candidate marketplace.
 
 ### Antigravity (AGY)
 Antigravity utilizes a decentralized, workspace-local GitOps approach for customizations. Instead of a global `install` command, you commit the plugin mapping directly into your repository:
 
-1. Run the Antigravity installer script from the pipeline repository:
+1. Run the Antigravity installer script from a locally available, approved
+   plugin directory obtained from the official GitHub distribution (for
+   example a released marketplace snapshot or release checkout). A developer
+   checkout is only for an explicit pre-release test:
 ```bash
-node ../relative/path/to/agent-pipeline/install-agy.mjs
+node /absolute/path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs
 ```
-(Select "Workspace-Local" to generate the `.agents/plugins.json` for your project)
-2. Initialize the pipeline in your project by invoking the agent and running the start command:
-```bash
-agy --execute "/pipeline-start"
-```
+(Select **Workspace-Local** to generate `.agents/plugins.json` for the
+project. The installer can optionally configure Agy's runner-local autonomous
+tool policy; that option grants no plan, release, remote, or human authority.)
+2. Ensure that `node` resolves in the PATH of the actual Agy host (desktop,
+service, or terminal), restart Agy after correcting that environment, then
+open the workspace and invoke `/pipeline-core:pipeline-start`.
 
-When the selected path is a copied local-marketplace tree, the installer
-compares it with the clean source checkout and writes the same external,
-path-free installed-plugin receipt consumed by bootstrap on every runner. It
-writes the receipt before `.agents/plugins.json` or the global Gemini registry,
-so a stale or unverified copy is never newly registered. Run the installer from
-the source checkout; a legacy copied registration has no trustworthy source path
-that bootstrap can reconstruct from Antigravity's path-only registry. Every
-gitless loaded plugin root must have exactly one matching registry entry and a
-verified receipt; missing, duplicate, or mismatched entries remain
-`plugin-attestation-required` with no generated recovery action.
+For an explicitly selected approved plugin directory obtained from the GitHub
+distribution, the registry's exact non-symlinked path is the installation
+provenance boundary. The bootstrap checks that binding; it does not manufacture
+a second source locator or treat a developer copy as equivalent to the
+approved distribution. Reinstall after an update rather than editing a
+registry path by hand.
 
-This ensures that any team member who clones the repository immediately benefits from the pipeline logic without running local installation commands. When switching between beta, stable, or local test versions of the pipeline, simply update the `path` value in `.agents/plugins.json` and commit the change.
+A committed workspace mapping is project configuration, not a portable host
+installation. Each fresh-clone operator binds the selected approved
+GitHub-distributed plugin directory through the installer, then restarts Agy
+so the host reads that binding. When switching among beta, stable, or local
+test versions, run the installer again for the selected directory; do not edit
+a registry path by hand or assume a prior machine's host receipt is portable.

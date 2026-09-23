@@ -1,5 +1,9 @@
 # Claude local plugin development
 
+> Maintainer-only guide. Consumer repositories use the released
+> `pipeline-core@agent-pipeline` plugin from the official GitHub marketplace;
+> do not use this local-candidate procedure for ordinary project onboarding.
+
 See also: [Codex local plugin development](codex-local-plugin-development.md) for
 the Codex-runner counterpart of this document.
 

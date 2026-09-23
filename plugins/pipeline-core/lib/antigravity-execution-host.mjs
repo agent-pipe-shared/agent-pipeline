@@ -17,9 +17,15 @@ export const AGY_ERROR_TAXONOMY = {
   TIMEOUT: "AGY-TIMEOUT",
   NONZERO_EXIT: "AGY-NONZERO-EXIT",
   OUTPUT_MALFORMED: "AGY-OUTPUT-MALFORMED",
+  OUTPUT_TOO_LARGE: "AGY-OUTPUT-TOO-LARGE",
   MODEL_MISMATCH: "AGY-MODEL-MISMATCH",
   CANCELLED: "AGY-CANCELLED",
 };
+
+// Child process output is parser input, never a durable host-result field.
+// Keep enough to parse the normal JSON envelope, but fail closed before a
+// hostile or accidental stream can become an unbounded in-memory diagnostic.
+export const AGY_MAX_OUTPUT_BYTES = 64 * 1024;
 
 export function discoverAgyPath(env = process.env) {
   if (env.AGY_PATH && existsSync(env.AGY_PATH)) return env.AGY_PATH;
@@ -37,6 +43,11 @@ export function discoverAgyPath(env = process.env) {
 }
 
 export function parseAgyOutput(stdout) {
+  if (Buffer.byteLength(stdout ?? "", "utf8") > AGY_MAX_OUTPUT_BYTES) {
+    const error = new Error("Output exceeds bounded parser input");
+    error.code = AGY_ERROR_TAXONOMY.OUTPUT_TOO_LARGE;
+    throw error;
+  }
   if (!stdout) {
     const error = new Error("Output empty");
     error.code = AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED;
@@ -84,6 +95,8 @@ async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs
     };
     let stdoutData = "";
     let stderrData = "";
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
     const timeoutId = setTimeout(() => {
       child.kill();
       finish({ ok: false, code: AGY_ERROR_TAXONOMY.TIMEOUT, message: "Execution timed out" });
@@ -94,20 +107,35 @@ async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs
     };
     signal?.addEventListener("abort", cancel, { once: true });
 
-    child.stdout.on("data", (chunk) => { stdoutData += chunk.toString("utf8"); });
-    child.stderr.on("data", (chunk) => { stderrData += chunk.toString("utf8"); });
+    const appendBounded = (lane, chunk) => {
+      const bytes = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk), "utf8");
+      const current = lane === "stdout" ? stdoutBytes : stderrBytes;
+      if (bytes > AGY_MAX_OUTPUT_BYTES - current) {
+        child.kill();
+        finish({ ok: false, code: AGY_ERROR_TAXONOMY.OUTPUT_TOO_LARGE, message: "Antigravity output exceeds the bounded parser limit" });
+        return;
+      }
+      const text = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
+      if (lane === "stdout") { stdoutBytes += bytes; stdoutData += text; }
+      else { stderrBytes += bytes; stderrData += text; }
+    };
+    child.stdout.on("data", (chunk) => appendBounded("stdout", chunk));
+    child.stderr.on("data", (chunk) => appendBounded("stderr", chunk));
     
     child.on("error", (err) => {
-      finish({ ok: false, code: AGY_ERROR_TAXONOMY.NONZERO_EXIT, message: err.message });
+      finish({ ok: false, code: AGY_ERROR_TAXONOMY.NONZERO_EXIT, message: "Antigravity process failed" });
     });
 
     child.on("close", (code) => {
       if (settled) return;
       if (code !== 0) {
-        if (stderrData.toLowerCase().includes("auth") || stderrData.toLowerCase().includes("login")) {
-          finish({ ok: false, code: AGY_ERROR_TAXONOMY.AUTH_REQUIRED, message: "Authentication required", stderr: stderrData });
+        const stderrLower = stderrData.toLowerCase();
+        if (stderrLower.includes('a tool required the "command" permission') && stderrLower.includes("auto-denied")) {
+          finish({ ok: false, code: AGY_ERROR_TAXONOMY.PERMISSION_REQUIRED, message: "Antigravity requires attended command permission" });
+        } else if (stderrLower.includes("auth") || stderrLower.includes("login")) {
+          finish({ ok: false, code: AGY_ERROR_TAXONOMY.AUTH_REQUIRED, message: "Authentication required" });
         } else {
-          finish({ ok: false, code: AGY_ERROR_TAXONOMY.NONZERO_EXIT, message: `Exited with code ${code}`, stderr: stderrData });
+          finish({ ok: false, code: AGY_ERROR_TAXONOMY.NONZERO_EXIT, message: `Antigravity exited with code ${code}` });
         }
         return;
       }
@@ -116,12 +144,12 @@ async function invokeAgyProcess({ agyPath, prompt, model, effort, cwd, timeoutMs
         const payload = parseAgyOutput(stdoutData);
         const observedModel = payload.model || payload.modelIdentity || "unknown";
         if (model && observedModel !== "unknown" && observedModel !== model) {
-          finish({ ok: false, code: AGY_ERROR_TAXONOMY.MODEL_MISMATCH, message: `Model mismatch: requested ${model}, observed ${observedModel}` });
+          finish({ ok: false, code: AGY_ERROR_TAXONOMY.MODEL_MISMATCH, message: "Observed model does not match the requested model" });
           return;
         }
-        finish({ ok: true, payload, stdout: stdoutData, observedModel });
+        finish({ ok: true, payload, observedModel });
       } catch (err) {
-        finish({ ok: false, code: AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED, message: "Failed to parse JSON output", stdout: stdoutData });
+        finish({ ok: false, code: err?.code === AGY_ERROR_TAXONOMY.OUTPUT_TOO_LARGE ? AGY_ERROR_TAXONOMY.OUTPUT_TOO_LARGE : AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED, message: "Failed to parse Antigravity JSON output" });
       }
     });
   });

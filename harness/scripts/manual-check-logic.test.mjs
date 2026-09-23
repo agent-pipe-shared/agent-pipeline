@@ -37,6 +37,7 @@ test("a genuine filled-in manual-check note passes under its own distinct name",
   assert.equal(result.step.name, "verify-manual-check-declared");
   assert.equal(result.step.exitCode, 0);
   assert.equal(result.evidence.status, "declared");
+  assert.deepEqual(result.evidence, { status: "declared" }, "durable Verify evidence must not retain operator prose");
 });
 
 test("the three declared outcomes are pairwise distinguishable by step name", () => {

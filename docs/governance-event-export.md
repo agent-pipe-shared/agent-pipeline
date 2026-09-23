@@ -17,7 +17,7 @@ Use the read-only sanitation preview before a destination-specific outbox or
 transport operation:
 
 ```bash
-node plugins/pipeline-core/scripts/governance-export.mjs preview \
+node <plugin-root>/scripts/governance-export.mjs preview \
   --event-file <canonical-event.json> \
   --policy-file <export-policy.json|none>
 ```
@@ -37,7 +37,7 @@ The mapping command is also read-only and accepts only a prior sanitized
 projection, never a canonical payload:
 
 ```bash
-node plugins/pipeline-core/scripts/governance-export.mjs map \
+node <plugin-root>/scripts/governance-export.mjs map \
   --projection-file <sanitized-projection.json> \
   --profile-file <adapter-profile.json>
 ```
@@ -230,10 +230,10 @@ library functions directly:
 
 - **Preview whether an event/policy pair would export at all** (no queue or
   network side effect):
-  `node plugins/pipeline-core/scripts/governance-export.mjs preview --event-file <canonical-event.json> --policy-file <export-policy.json|none>`
+  `node <plugin-root>/scripts/governance-export.mjs preview --event-file <canonical-event.json> --policy-file <export-policy.json|none>`
   (`governance-export.mjs:14,19-22`).
 - **Preview how a sanitized projection renders under an adapter profile:**
-  `node plugins/pipeline-core/scripts/governance-export.mjs map --projection-file <sanitized-projection.json> --profile-file <adapter-profile.json>`
+  `node <plugin-root>/scripts/governance-export.mjs map --projection-file <sanitized-projection.json> --profile-file <adapter-profile.json>`
   (`governance-export.mjs:15,21`).
 - **Read current outbox state for a destination:**
   `loadGovernanceExportOutbox({ repositoryRoot, destinationProfile, policyRevision })`

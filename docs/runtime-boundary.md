@@ -8,21 +8,25 @@ between hosts.
 ## Supported integrations
 
 Claude Code uses the native plugin and hook integration. Codex uses the
-project's Codex plugin manifest and `PreToolUse` adapter. Antigravity uses its
-native hook integration and translates its tool envelopes into the same guard
-decisions. When installed and loaded, the Codex and Antigravity adapters can
+installed Codex plugin manifest and `PreToolUse` adapter. Antigravity uses its
+installed native hook integration and translates its tool envelopes into the
+same guard decisions. When installed and loaded, the Codex and Antigravity adapters can
 hard deny commands and file writes. A denied operation does not proceed through
 that adapter; adapter failures also fail closed. The adapters do not provide
 OS isolation, identity attestation, or a guarantee that every possible host
 path is covered.
 
-The implementation and tests are the authoritative coverage references:
+For consumers, the relevant fact is the installed adapter and its observed
+readback, not a maintainer checkout's source paths. Each distributed version
+has its own release validation evidence; your project still needs to verify
+that its selected integration is installed, enabled, and bound to the correct
+project root.
 
-| Runner | Blocking entry point | Relevant tests |
+| Runner | Installed integration to verify | What it can enforce when delivered |
 | --- | --- | --- |
-| Claude Code | Native plugin hooks in [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | Hook-specific suites under [`hooks/`](../plugins/pipeline-core/hooks/) |
-| Codex | [`codex-pretool-guard.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.mjs) and [`codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | [`codex-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs) |
-| Antigravity | [`antigravity-pretool-guard.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs) and [`hooks.json`](../plugins/pipeline-core/hooks.json) | [`antigravity-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs) |
+| Claude Code | Project-scoped native plugin binding | Recognized native hook events |
+| Codex | Installed Codex marketplace plugin | Recognized command and file-write events |
+| Antigravity | Workspace-local native plugin binding | Recognized native tool envelopes |
 
 These adapters invoke the configured provider-neutral guards for the tool
 operations they recognize. Coverage is bounded by the installed manifest,
@@ -36,21 +40,19 @@ See [`enforcement.md`](enforcement.md) for the generated guard registry and
 The project must use the current V3 authority and the runner's supported
 integration. Bind or install the runner plugin at the documented project scope,
 generate or refresh its runtime projection through the supported onboarding
-path, and restart the host when that path requires it. Keep source and runtime
-readbacks aligned. A source checkout's generated files are projections; do not
-hand-edit them. If the adapter is absent, stale, disabled, pointed at a
+path, and restart the host when that path requires it. Keep the installed
+GitHub-distributed plugin and runtime readbacks aligned. A maintainer source
+checkout's generated files are projections; consumers do not hand-edit their
+installed plugin. If the adapter is absent, stale, disabled, pointed at a
 different project root, or the host does not deliver its native hook event, the
 methodology still applies but that adapter cannot enforce the operation.
 
 The ordinary fresh-session Critic is the default supported autonomous review
 route. The optional native Codex selected-sandbox/App-Server route is
 deactivated on WSL: WSL runs may diagnose portable contracts, but they are
-neither readiness evidence nor a blocker for Nova B. Native execution and
-acceptance move to a separate future native-Windows package tracked by the
-existing `sprint: none` items for
-[worker sandbox selection](../backlog/items/2026-08-30-codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn.md),
-[Selected-Critic contract binding](../backlog/items/2026-09-06-the-selected-critic-lane-briefs-contract-files-it-neither-pins-nor-binds.md),
-and [fallback routing](../backlog/items/2026-09-06-the-t1-fallback-waits-for-failure-codes-the-route-collapses-before-they-arrive.md).
+neither readiness evidence nor a blocker for a governed project. Native
+execution and acceptance remain a separately planned native-Windows
+capability; do not infer its availability from a WSL run.
 No WSL result establishes native sandbox execution, OS isolation, model
 identity, or native-Windows readiness.
 
@@ -104,13 +106,17 @@ Dateischreibvorgänge hart ablehnen; Adapterfehler führen ebenfalls zu einer
 Ablehnung. Die Adapter liefern weder OS-Isolation noch Identitätsattestierung
 und garantieren keine Abdeckung jedes möglichen Hostpfads.
 
-Die maßgeblichen Abdeckungsquellen sind die Implementierung und ihre Tests:
+Für Consumer zählt der installierte Adapter mit seinem beobachteten Readback,
+nicht ein Source-Pfad in einem Maintainer-Checkout. Jede distribuierte Version
+hat eigene Release-Validierungsevidenz; das Projekt muss dennoch prüfen, dass
+seine gewählte Integration installiert, aktiviert und an das richtige
+Projektverzeichnis gebunden ist.
 
-| Runner | Blockierender Einstiegspunkt | Relevante Tests |
+| Runner | Zu prüfende installierte Integration | Durchsetzung bei zugestelltem Ereignis |
 | --- | --- | --- |
-| Claude Code | Native Plugin-Hooks in [`hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | Hook-spezifische Suiten unter [`hooks/`](../plugins/pipeline-core/hooks/) |
-| Codex | [`codex-pretool-guard.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.mjs) und [`codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | [`codex-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs) |
-| Antigravity | [`antigravity-pretool-guard.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs) und [`hooks.json`](../plugins/pipeline-core/hooks.json) | [`antigravity-pretool-guard.test.mjs`](../plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs) |
+| Claude Code | Projektgebundene native Plugin-Bindung | Erkannte native Hook-Ereignisse |
+| Codex | Installiertes Codex-Marketplace-Plugin | Erkannte Befehls- und Dateischreib-Ereignisse |
+| Antigravity | Workspace-lokale native Plugin-Bindung | Erkannte native Tool-Umschläge |
 
 Die Adapter rufen die konfigurierten, runnerneutralen Guards für erkannte
 Werkzeugoperationen auf. Ihre Abdeckung ist durch Manifest,

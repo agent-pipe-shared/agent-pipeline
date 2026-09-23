@@ -1,7 +1,7 @@
 # PO approval: one human action
 
-For the full list of every human intent/gate this repository implements and
-which ones sit on this shared contract versus a different mechanism, see
+For the full list of human intents/gates available to a governed project and
+which ones use this shared contract versus a different mechanism, see
 [`docs/human-authorization-inventory.md`](human-authorization-inventory.md).
 
 The agent owns every public preparation step: it creates the candidate-bound
@@ -18,7 +18,11 @@ key. OpenSSL prompts locally for the passphrase. This is the CLI fallback; it
 does not put a code word into chat, environment variables, or configuration.
 
 ```sh
-node "$HOME/src/agent-pipeline-share_cyborg/plugins/pipeline-core/scripts/po-human-approval.mjs" setup --repo-root "$HOME/src/agent-pipeline-share_cyborg" --directory "$HOME/agent-pipeline-po"
+REPO="/absolute/path/to/governed-project"
+PIPELINE_PLUGIN_ROOT="/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core"
+PO_DIR="$HOME/agent-pipeline-po"
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-human-approval.mjs" setup \
+  --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
 `setup` is idempotent. If an older attempt already left an encrypted private
@@ -32,7 +36,11 @@ verifies the public proof. When it presents a pending approval, the human runs
 only this command:
 
 ```sh
-node "$HOME/src/agent-pipeline-share_cyborg/plugins/pipeline-core/scripts/po-human-approval.mjs" approve-all --repo-root "$HOME/src/agent-pipeline-share_cyborg" --directory "$HOME/agent-pipeline-po"
+REPO="/absolute/path/to/governed-project"
+PIPELINE_PLUGIN_ROOT="/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core"
+PO_DIR="$HOME/agent-pipeline-po"
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-human-approval.mjs" approve-all \
+  --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
 `approve-all` is the only regular human step. It signs each already-prepared,
@@ -54,7 +62,7 @@ expiry for a critical action), or the intent digest for `sign-intent`.
 
 One exception to read carefully, because the line looks like a commit and is
 not: for the `governance-fork-disposition` kind the `candidate commit` field is
-a DERIVED binding value, not a Git commit that exists in this repository. A
+a DERIVED binding value, not a Git commit that exists in the governed project. A
 governance-stream fork is not commit-scoped (ADR-0072), so the disposition binds
 the repository fingerprint, stream, sequence and the content digests of the
 conflicting entries instead. Check the `action subject sha256` line against the
@@ -70,7 +78,7 @@ passphrase. `setup` creates key material and signs nothing, so it does not ask.
 
 The three framing lines of that prompt — the heading, the sentence naming the
 consequence, and the instruction to type the token — are printed in the
-human-facing language this repository is configured for
+human-facing language the governed project is configured for
 (`continuity.runtime.humanFacingLanguage` in the project-state artifact;
 `de` and `en` are the values that contract admits). A repository configured for
 `de` therefore opens with `PO-FREIGABE BESTÄTIGEN` and closes with `Tippen Sie
@@ -115,7 +123,7 @@ string does not currently say so and a relative path is rejected with the bare
 usage text.
 
 If more than one external directory exists on the machine, confirm you are
-using the one whose key this repository pins: `trust-policy.json`'s
+using the one whose key the governed project pins: `trust-policy.json`'s
 `publicKeySha256` must equal `trustAnchor.publicKeySha256` in
 `project/critical-human-proof.json`. The `keyReference` field does not
 discriminate — separate keys may both be called `local-po-key`, and signing
@@ -128,7 +136,7 @@ the Human Guard Override) present an already-computed intent digest rather than
 a request file. The human signs it directly:
 
 ```sh
-node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent \
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-human-approval.mjs" sign-intent \
   --repo-root "$REPO" --directory "$PO_DIR" --intent-sha256 "$INTENT_SHA256"
 ```
 
@@ -140,21 +148,21 @@ before confirming.
 
 ## Signing a GMW/HGO reconcile request from `scratch/`
 
-A GMW/HGO reconcile leaves its intent digest in a request file inside this
-repository's own `scratch/` tree instead of handing you a bare digest string.
+A GMW/HGO reconcile leaves its intent digest in a request file inside the
+governed project's own `scratch/` tree instead of handing you a bare digest string.
 Point `sign-intent` at that file with `--request` instead of
 `--intent-sha256` — the two are mutually exclusive: exactly one must be
 supplied, and supplying both (even a malformed digest alongside `--request`)
 is rejected outright:
 
 ```sh
-node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent \
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-human-approval.mjs" sign-intent \
   --repo-root "$REPO" --directory "$PO_DIR" \
   --request scratch/reconcile-request-42.json
 ```
 
-The request path must resolve inside this repository's own `scratch/`
-directory (never elsewhere in the repository, never outside it, and never
+The request path must resolve inside the governed project's own `scratch/`
+directory (never elsewhere in that project, never outside it, and never
 via a symlink that points outside `scratch/`), and its JSON content must
 carry an `intentSha256` field — 64 lowercase hexadecimal characters. Its
 basename must contain the literal word `request` (for example
@@ -179,14 +187,14 @@ read a private key or a passphrase. The agent executes these commands itself;
 they are not user recipes.
 
 ```sh
-node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" prepare-all --repo-root "$REPO" --directory "$PO_DIR"
-node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" verify-all --repo-root "$REPO" --directory "$PO_DIR"
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-approval-gate.mjs" prepare-all --repo-root "$REPO" --directory "$PO_DIR"
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-approval-gate.mjs" verify-all --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
 The same script also carries the public half of the fork-disposition ceremony —
 `prepare-fork-disposition` and `verify-fork-disposition`. `approve-fork-disposition`
 is absent from it on purpose, exactly like `approve-critical`: it reads the
-private key. Note the narrower separate limit inside this repository: the
+private key. Note the narrower separate limit in some installed releases: the
 lifecycle guard's agent allowlist admits only `prepare`, `prepare-all`, `verify`
 and `verify-all` through this script, so the `-critical` and `-fork-disposition`
 commands, though public, are run from an operator's terminal here until that
@@ -203,8 +211,8 @@ but cannot sign.
 
 The policy field behind this is `requiredKinds` in
 `project/critical-human-proof.json`. It is kind-scoped, it governs the State
-writer and the push guard, and this repository lists exactly `push`, `deploy`
-and `publication` in it. Removing a kind from that list does not stand the gate
+writer and the push guard; the governed project selects the applicable kinds.
+Removing a kind from that list does not stand the gate
 down — the writer action rejects instead (ADR-0055); standing the proof down
 takes an explicit, reasoned waiver.
 
@@ -223,13 +231,13 @@ a new request.
 
 ```sh
 # Agent/control plane: creates public external files only.
-node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" prepare-critical \
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-approval-gate.mjs" prepare-critical \
   --repo-root "$REPO" --directory "$PO_DIR" --feature-id sprint-nova-epic \
   --plan specs/sprint-nova-epic/prd_sprint-nova-epic.md --spec specs/sprint-nova-epic/spec.md \
   --kind publication --subject-sha256 "$SUBJECT_SHA256" --expires-at "$EXPIRES_AT"
 
 # Human-operated hardened terminal: the sole signing step.
-node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" approve-critical \
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-human-approval.mjs" approve-critical \
   --repo-root "$REPO" --directory "$PO_DIR" --kind publication
 ```
 
@@ -244,12 +252,12 @@ not a CYB-4-only mechanism, and not the only one this contract will ever have.
 The shipped adapter is the external encrypted Ed25519/SSH-style key path
 documented above; it exists to prove the contract, not to close it.
 Passkey/WebAuthn is the next expected **native** adapter — for a desktop
-consumer, built where that consumer lives, not in this repository, which has
-no desktop-app code. IAM, hardware-key, and password-manager adapters may
+consumer, built where that consumer lives, not in the Pipeline plugin, which
+has no desktop-app code. IAM, hardware-key, and password-manager adapters may
 follow the same shape. This section is what a conforming adapter — Passkey/
 WebAuthn or otherwise — is written against; it deliberately stops short of
 prescribing a UI, a platform API, or a credential format, because none of
-those are this repository's to decide.
+those are decisions of the governed project and its chosen platform.
 
 **What a conforming adapter must implement.** Every adapter, regardless of
 its key material or platform, produces a detached `proof` object with exactly
@@ -306,7 +314,7 @@ proof's `schema` tag, that `proof.intentSha256` equals the digest of the
 rebuilt approval intent (so the proof cannot be replayed against a different
 candidate/action/subject), that `sha256(proof.publicKey)` equals the
 `publicKeySha256` pinned in the repository's own trust policy (so the proof
-cannot substitute a different key than the one this repository was told to
+cannot substitute a different key than the one the governed project was told to
 trust), and finally that `proof.signatureBase64` is a valid signature over the
 `intentSha256` bytes under `proof.publicKey`. None of those four checks name
 Ed25519, OpenSSL, or any other adapter-specific detail — a Passkey/WebAuthn

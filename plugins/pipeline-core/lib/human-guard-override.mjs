@@ -2974,6 +2974,17 @@ export function humanGuardRouteUnavailableReason(subject, outcome = {}) {
     + ".";
 }
 
+/**
+ * Read-only companion for diagnostics. Unlike recordHumanGuardDenial(), this
+ * deliberately does not construct repository topology or append a request.
+ */
+export function previewHumanGuardRecovery({ rootDir, pluginRoot, toolName, toolInput, eligibilityOptions = {} } = {}) {
+  const root = physicalRoot(rootDir);
+  const eligible = eligibility(root, toolName, toolInput, eligibilityOptions);
+  if (eligible.eligible || eligible.authorCandidate) return null;
+  return recoveryRoute(eligible.code, toolName, toolInput, eligible.paths, { root, pluginRoot, repository: null });
+}
+
 export function recordHumanGuardDenial({
   rootDir,
   pluginRoot,

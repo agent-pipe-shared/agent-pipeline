@@ -15,17 +15,21 @@ import { canonicalJson } from "../../plugins/pipeline-core/scripts/release-prefl
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
 export const READER_REVIEW_PATHS = Object.freeze([
+  "GEMINI.md",
   "PIPELINE_FLOW.md",
   "README.md",
   "SETUP.md",
   "docs/README.md",
   "docs/audit-and-evidence.md",
+  "docs/audit-bundles.md",
   "docs/cost-and-measurement.md",
   "docs/enforcement.md",
   "docs/overview.md",
   "docs/parallel-work.md",
   "docs/security-controls.md",
+  "docs/sprint-alfred-completion-report.md",
   "docs/usage.md",
+  "docs/v3-consumer-onboarding.md",
 ]);
 export const READER_REVIEW_INPUT_PATHS = Object.freeze([
   "docs/product-capability-inventory.json",

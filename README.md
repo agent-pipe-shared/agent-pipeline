@@ -60,8 +60,8 @@ Around those roles:
   hooks. The exact live controls depend on the installed runner and project
   configuration; see [enforcement](docs/enforcement.md).
 - **A model/token policy** — role-tiered model routing (design / implement /
-  mechanic / review / optional advisor) configured to your own subscription, so
-  cost tracks task complexity instead of one model doing everything.
+  mechanic / review / optional advisor) configured to your own subscription.
+  It supports task-appropriate routing; it does not estimate your cost.
 - **Evidence discipline** — "done" means a machine-written log or output, the exact
   command, and its exit code — never a model-formulated claim that something
   "should work."
@@ -69,18 +69,24 @@ Around those roles:
   remain with the human where the project calibration and action require them;
   evidence never creates that authority.
 
-> **Documentation line: `0.7.0`.** This is the Alfred architecture scope being
-> exercised as a local candidate, not a tag, installation recommendation,
-> production-availability claim, or evidence that its release gates passed.
+> **Documentation line: `0.7.0`.** This describes the next distributed
+> architecture capability. Until it is released, consumer repositories should
+> continue to use the approved GitHub-distributed version they already have;
+> a maintainer's local candidate is neither an installation source nor evidence
+> that its release gates passed.
 
 <a id="capability-architecture-adoption-and-fitness"></a>
 <!-- capability:architecture-adoption-and-fitness -->
 
-The Alfred candidate adds architecture decision assessment, a module inventory,
-machine-readable maps, and baseline/fitness checks. Existing repositories use
-a staged adoption proposal and an explicit human decision for the agreed scope.
-See the [architecture decision workflow](plugins/pipeline-core/skills/architecture-decision/SKILL.md)
-and the [release-scope overview](docs/overview.md).
+The next distributed architecture capability adds decision assessment, a module
+inventory, machine-readable maps, and baseline/fitness checks. In an existing
+repository, start with the read-only adoption status and proposal described in
+[Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+Only then does the repository owner choose an explicitly bounded adoption
+decision. A valid deferred decision remains valid until its stated review or
+expiry date, explicit supersession, or a changed decision — an ordinary commit
+does not turn it into a partial lifecycle state. See the
+[release-scope overview](docs/overview.md).
 
 > **What you can inspect:** a candidate-bound Verify receipt, security-scan
 > status, review and approval records where the project requires them, and a
@@ -88,10 +94,9 @@ and the [release-scope overview](docs/overview.md).
 > audit trail; they do not certify compliance or replace an auditor. Start with
 > [audit and evidence](docs/audit-and-evidence.md).
 
-> **What it costs:** the [cost page](docs/cost-and-measurement.md) gives four
-> historical full-Verify examples, including two red receipts. They are
-> observations, not an onboarding estimate or a promise for your project.
-> Consumer administration overhead has not yet been measured across runners.
+> **Measurement boundary:** [measurement guidance](docs/cost-and-measurement.md)
+> documents what is and is not measured. It is not an onboarding estimate,
+> runner comparison, or promise for your project.
 
 ## The front door: optional design pre-stage
 
@@ -179,7 +184,7 @@ that shaped it:
 - [Addy Osmani, Shubham Saboo, Sokratis Kartakis, **“The New SDLC With Vibe Coding”**](https://addyosmani.com/blog/new-sdlc-vibe-coding/) — source of *Agent = Model + Harness*, the orchestrator capability model, and stakes-driven discipline;
 - [Google/Kaggle, **“Spec-Driven Production Grade Development in the Age of Vibe Coding”**](https://www.kaggle.com/whitepaper-spec-driven-production-grade-development-in-the-age-of-vibe-coding) — source of the approval-fatigue analysis behind the deliberately minimal set of human gates.
 
-Where this repository departs from these sources — for example, recasting the
+Where Agent-Pipeline departs from these sources — for example, recasting the
 Goldfish as an executor rather than a checker — it says so, and why, in
 [`docs/operating-model.md`](docs/operating-model.md) and
 [`docs/design-decisions.md`](docs/design-decisions.md).
@@ -211,10 +216,11 @@ dauerhaften, später einsehbaren Nachweis.
 > für den Lifecycle und lies anschließend [Usage](docs/usage.md). Die weiteren Links sind
 > Nachschlagewerk.
 
-> **Dokumentationslinie: `0.7.0`.** Sie beschreibt den Alfred-Architekturumfang,
-> der als lokaler Kandidat erprobt wird, keinen Tag, keine
-> Installationsempfehlung, keine Produktivverfügbarkeit und keinen Nachweis
-> bestandener Release-Gates.
+> **Dokumentationslinie: `0.7.0`.** Sie beschreibt die nächste auszuliefernde
+> Architektur-Funktion. Bis zu ihrem Release verwenden Consumer-Repositories
+> weiter ihre bereits freigegebene GitHub-distribuierte Version; ein lokaler
+> Maintainer-Kandidat ist weder Installationsquelle noch Nachweis bestandener
+> Release-Gates.
 
 > **Was du prüfen kannst:** kandidatengebundene Verify-Receipts,
 > Security-Scan-Status sowie erforderliche Review- und Freigabe-Nachweise. Ein
@@ -222,10 +228,9 @@ dauerhaften, später einsehbaren Nachweis.
 > zusammenstellen. Das unterstützt eine Audit-Spur, ersetzt aber weder Auditor
 > noch Compliance-Zertifizierung. Siehe [Audit und Evidenz](docs/audit-and-evidence.md).
 
-> **Was es kostet:** Die [Kostenseite](docs/cost-and-measurement.md) zeigt vier
-> historische vollständige Verify-Beispiele, darunter zwei rote Receipts. Das
-> sind Beobachtungen, keine Onboarding-Schätzung oder Zusage für dein Projekt.
-> Consumer-Verwaltungsaufwand über Runner hinweg ist noch nicht gemessen.
+> **Messgrenze:** Die [Messhinweise](docs/cost-and-measurement.md) benennen,
+> was gemessen ist und was nicht. Sie sind keine Onboarding-Schätzung,
+> kein Runner-Vergleich und keine Zusage für dein Projekt.
 
 ## Das Problem
 
@@ -326,6 +331,16 @@ Review. Ein Muster komplett durchgespielt — von der
 Hausregel bis zur erzwungenen Regel — steht im
 [Worked Example](governance/examples/worked-example.md).
 
+Die nächste Architektur-Funktion ergänzt Entscheidungsbewertung,
+Modul-Inventar, maschinenlesbare Maps und Baseline-/Fitness-Checks. In einem
+bestehenden Repository beginnt die Übernahme mit dem lesenden Status und
+Vorschlag unter [Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+Erst danach wählt der Repository-Owner eine explizit begrenzte Entscheidung.
+Eine gültige Deferral-Entscheidung gilt bis zu ihrem Review-/Ablaufdatum,
+einer expliziten Ablösung oder einer geänderten Entscheidung; ein gewöhnlicher
+Commit macht sie nicht zu einem partiellen Lifecycle-Zustand. Siehe auch die
+[Release-Übersicht](docs/overview.md).
+
 ## Drei Drehregler statt einer Einheitsgröße
 
 Die Methode nutzt kalibrierte Strenge: Teams können schriftlichen Vertrag und
@@ -367,7 +382,7 @@ ihren Autorinnen und Autoren für die Denkarbeit, die es geprägt hat:
 - [Addy Osmani, Shubham Saboo, Sokratis Kartakis, **„The New SDLC With Vibe Coding“**](https://addyosmani.com/blog/new-sdlc-vibe-coding/) — Quelle von *Agent = Model + Harness*, des Orchestrator-Capability-Modells und der stakes-getriebenen Disziplin;
 - [Google/Kaggle, **„Spec-Driven Production Grade Development in the Age of Vibe Coding“**](https://www.kaggle.com/whitepaper-spec-driven-production-grade-development-in-the-age-of-vibe-coding) — Quelle der Approval-Fatigue-Analyse hinter dem bewusst minimalen Satz an Human-Gates.
 
-Wo dieses Repository von diesen Quellen abweicht — etwa indem der Goldfish als
+Wo Agent-Pipeline von diesen Quellen abweicht — etwa indem der Goldfish als
 Ausführender statt als Prüfer neu geschnitten wird —, sagt es das und warum, in
 [`docs/operating-model.md`](docs/operating-model.md) und
 [`docs/design-decisions.md`](docs/design-decisions.md).

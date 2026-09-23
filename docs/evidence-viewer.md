@@ -5,10 +5,12 @@ Feature Package. It is deliberately a read-only derived view: opening,
 sharing, or editing the report cannot grant, revoke, or change governance
 authority.
 
-Build a new report from the repository root:
+Build a new report from the governed repository root. In this page,
+`<plugin-root>` means the installed GitHub-distributed plugin directory, not a
+maintainer checkout:
 
 ```bash
-node plugins/pipeline-core/scripts/evidence-viewer.mjs build \
+node <plugin-root>/scripts/evidence-viewer.mjs build \
   --root "$PWD" \
   --manifest specs/<feature-id>/lifecycle.json \
   --output evidence/<feature-id>.html \
@@ -38,7 +40,7 @@ An optional local status file can make outbound governance-export lag,
 delivery state, and a sanitized receipt class visible in the report:
 
 ```bash
-node plugins/pipeline-core/scripts/evidence-viewer.mjs build \
+node <plugin-root>/scripts/evidence-viewer.mjs build \
   --root "$PWD" \
   --manifest specs/<feature-id>/lifecycle.json \
   --output evidence/<feature-id>.html \

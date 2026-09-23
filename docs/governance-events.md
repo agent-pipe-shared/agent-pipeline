@@ -1,9 +1,10 @@
 # Governance events
 
-Phoenix records governance history as three distinct streams below
-`governance/events/`: `human`, `agent`, and `lifecycle`.  The stream registry
-is repository-bound genesis; event files are the canonical history.  A head or
-index is a replaceable projection and never an authority source.
+A governed project records governance history as three distinct streams below
+`governance/events/`: `human`, `agent`, and `lifecycle`. The stream registry is
+bound to that project's physical repository; event files are the canonical
+history. A head or index is a replaceable projection and never an authority
+source.
 
 ## Portable records
 
@@ -232,8 +233,8 @@ than double-spending the grant.
 
 As stated above, a corrupted or forked canonical chain has no automated
 repair and "requires the later human-ledger disposition flow." Honesty
-note: that disposition flow does not yet exist as runnable code in this
-repository, so a corrupted human-stream chain segment has no documented
+note: that disposition flow does not yet exist as runnable code in the
+installed plugin, so a corrupted human-stream chain segment has no documented
 repair procedure beyond discarding and rebuilding history outside this
 module; this document does not claim otherwise.
 
@@ -320,7 +321,9 @@ durability property, not a distinct threat mitigation, so it is not repeated
 here as a separate item. This section also does not claim a threat model for
 the disposition flow that would resolve a corrupted or forked chain: as
 already stated under "Human ledger: recovery," no such flow exists yet as
-runnable code in this repository.
+runnable code in the installed plugin. A consumer must not invent a recovery
+procedure from this limitation; preserve the failure evidence and use the
+project's declared escalation route.
 
 ## Human ledger: operator guidance
 
@@ -328,8 +331,8 @@ Inspecting the human decision stream uses the same shared surface as any
 other stream, scoped by `streamId: "human"`:
 
 ```text
-node plugins/pipeline-core/scripts/governance-event.mjs query --repo CHECKOUT --request-file REQUEST.json
-node plugins/pipeline-core/scripts/governance-event.mjs verify --repo CHECKOUT --request-file REQUEST.json
+node <plugin-root>/scripts/governance-event.mjs query --repo CHECKOUT --request-file REQUEST.json
+node <plugin-root>/scripts/governance-event.mjs verify --repo CHECKOUT --request-file REQUEST.json
 ```
 
 (`plugins/pipeline-core/scripts/governance-event.mjs:42-53`.) `query`

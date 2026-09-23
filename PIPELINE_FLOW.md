@@ -183,8 +183,9 @@ Each project uses the one full `verify` command named by its own calibration.
 For non-release boundaries, the evidence producer may run its fixed baseline
 plus registered impact commands; it does not authorize substituting a convenient
 partial command. [Choose the appropriate mode and reviewed base](docs/usage.md#verify-a-consumer-project).
-Maintainers can find this source checkout's release procedure in
-[push and release flow](docs/push-release-flow.md).
+> **Maintainer reference only:** the release procedure for the distributed
+> plugin itself is [push and release flow](docs/push-release-flow.md). It is
+> not a delivery step for a repository that merely uses the installed plugin.
 
 ## 4. Optional branches are explicit, not implied
 
@@ -196,7 +197,7 @@ Maintainers can find this source checkout's release procedure in
 | Security | The manifest declares the security phase or task risk requires its configured checks. | Deterministic security harness; Elephant owns disposition. | Scanner status and exact-candidate evidence. `SKIPPED` is not `PASS`; `ERROR` fails closed. | A policy-acceptable result rejoins Critic/close. Findings or unavailable required checks enter recovery or stop. |
 | UI design | The project has UI work (`has_ui`) or the task declares UI design. | Elephant and the appropriate design owner; human decides material experience trade-offs. | Design decision and UI acceptance criteria, not a visual assertion alone. | Rejoin Spec/readiness before implementation. No UI branch means no implied UI review. |
 | Governance | The project configures guidelines or policies under its governance paths. | Project/team owner supplies rules; Elephant applies them to the task. | Valid configured inputs, declared policy mode, and resulting review/gate evidence. | Advisory guidance informs design; enforcing requirements rejoin the relevant gate or block. This is not central IAM or a control plane. |
-| Release / promotion | The project declares a `release` section. | Release adapter and human promotion gate. | Per-environment evidence, rollback anchor, and deploy-log record. | Test promotion precedes production approval. Without a `release` section, this branch does not exist and adds no cost. |
+| Release / promotion | The project declares a `release` section. | Release adapter and human promotion gate. | Per-environment evidence, rollback anchor, and deploy-log record. | Test promotion precedes production approval. Without a `release` section, this branch does not exist or add a release gate. |
 | Human acceptance | Calibration or stakes require final acceptance. | Human decision-maker. | Explicit acceptance of the delivered candidate. | Delivery and acceptance remain distinct; rejection starts a new candidate or course decision. |
 
 ## Integration and update boundaries

@@ -26,7 +26,7 @@ stores only the provider-neutral binding and gate result.
 Evaluate one promotion tuple explicitly:
 
 ```bash
-node plugins/pipeline-core/scripts/change-control.mjs gate \
+node <plugin-root>/scripts/change-control.mjs gate \
   --repo <checkout> \
   --profile-file <profile.json> \
   --pipeline-authority-file <local-authority.json> \
@@ -39,9 +39,10 @@ The command is read-only. Its output is a gate result, not a deployment action.
 
 ## Threat model
 
-`evaluateChangeControlGate` (`plugins/pipeline-core/lib/change-control.mjs:
-52-84`) is built as a sequence of early-return checks, each closing one
-distinct attack surface:
+The installed Change-Control evaluator is built as a sequence of early-return
+checks, each closing one distinct attack surface. The implementation names
+below explain the behavior; they are not paths that a consumer repository must
+copy or run:
 
 - **Forged/mismatched Pipeline authority:** `matchesLocal` requires
   `pipelineAuthority.granted` plus an exact match of candidate, artifact,
@@ -54,8 +55,7 @@ distinct attack surface:
   `decisionReference` — its absence leaves everything above byte-for-byte
   unchanged (`validPipelineAuthority`, `change-control.mjs:18-31`). When
   present, `dualEvaluateDecisionReference`
-  (`plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs`) is
-  given `legacyOk: pipelineAuthority.granted`, `reference:
+  is given `legacyOk: pipelineAuthority.granted`, `reference:
   pipelineAuthority.decisionReference.reference`, and `ledgerOk:
   pipelineAuthority.decisionReference.resolved` — the caller's own
   already-resolved, ledger-backed second-reader verdict for that reference;
@@ -229,9 +229,8 @@ shape is `{ flagged, reason, proposedChangeClass, alternativeChangeClasses
 
 ## Migration
 
-Honesty note: no migration tooling exists for change-control.
-`plugins/pipeline-core/scripts/` has no change-control migration script, and
-neither `change-control.mjs` (lib) nor `scripts/change-control.mjs` version
+Honesty note: no migration tooling exists for change-control. The installed
+plugin has no change-control migration script, and its evaluator and CLI do not version
 the profile/receipt/journal schemas beyond the single
 `pipeline.change-control-profile.v1` / `pipeline.change-control-receipt.v1`
 / `pipeline.change-control-journal.v1` shapes (`change-control.mjs:43,47,
@@ -246,7 +245,7 @@ Evaluate one promotion (the actual required flag set, per the CLI parser at
 `scripts/change-control.mjs:10`):
 
 ```bash
-node plugins/pipeline-core/scripts/change-control.mjs gate \
+node <plugin-root>/scripts/change-control.mjs gate \
   --repo <checkout> \
   --profile-file <profile.json> \
   --pipeline-authority-file <local-authority.json> \

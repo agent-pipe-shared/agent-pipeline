@@ -1,5 +1,12 @@
 # Sprint Alfred — Umfassender technischer Abschluss- und Übergabebericht
 
+> **Maintainer-Evidenz, nicht Consumer-Anleitung.** Dieser historische
+> Abschlussbericht beschreibt die Entwicklung des verteilten Plugins. Ein
+> Anwendungsteam installiert die freigegebene GitHub-Version und folgt
+> [SETUP](../SETUP.md) sowie [Usage](usage.md); es übernimmt keine hier
+> genannten Checkout-Pfade, Commit-Referenzen oder Self-Application-Aussagen
+> als eigene Projekt-Evidenz.
+
 Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint Alfred** erbrachten technischen Leistungen, architektonischen Entscheidungen, Schemata, Guardrail-Verschärfungen, Modul-Karten und geschlossenen Backlog-Items gemäß dem **Operating Model §3.3** und der **Sprint Alfred Spezifikation** (`specs/sprint-alfred-epic/spec.md`).
 
 **Audit-Grenzen (14. September 2026):** Dieser Nachtrag wertet vorhandene Code- und Evidenzartefakte sowie einen begrenzten Audit-Lauf aus. Er ist weder ein Full-Workspace- noch ein Release-Verify und ersetzt weder Push- noch PO-Abnahme. Der Audit-Lauf im Work-Modus wählte und bestand 88 Journal-Schritte; diese Zahl ist keine Aussage darüber, dass sämtliche im Repository registrierten Suiten ausgeführt wurden. Die Suite-Registrierungsprüfung erfasste separat 529 Testdateien gegenüber 564 Registrierungs- beziehungsweise Opt-out-Einträgen; sie prüft Zuordnung, nicht den Erfolg jeder Suite.
@@ -102,7 +109,7 @@ Die Agent-Pipeline enthält Verdrahtung für drei Runner: **Claude Code**, **Ope
 | **Tool-Matching Dispatch**| `Task\|Agent\|Workflow` | `spawn_agent` | `invoke_subagent` (normalisiert auf `Task`) |
 | **Verweigerungs-Protokoll**| Prozess-Exit `2` (Stderr an Agenten) | Stdout JSON `{ permissionDecision: "deny" }`, Exit `0` | Stdout JSON `{ decision: "deny", reason: "..." }`, Exit `2` |
 | **Besonderheiten** | Multi-Command-Ketten im selben Matcher | `apply_patch` Multi-File-Inspektion via `guard-apply-patch.mjs` | Multi-Subagent-Array-Inspektion (D3-Fix) gegen Critic-Kontamination |
-| **System-Voraussetzung** | Node.js im `$PATH` der Shell | Node.js im `$PATH` der Shell | Globales `/usr/local/bin/node` erforderlich (Daemon liest `.bashrc` nicht) |
+| **System-Voraussetzung** | Node.js im `$PATH` der Shell | Node.js im `$PATH` der Shell | Node.js muss im tatsächlichen PATH des gestarteten Agy-Hosts auflösbar sein; Desktop-/Service-Starts können einen anderen PATH besitzen |
 
 ### Kritische Runner-Befunde & Schutzpfad-Absicherung
 
@@ -110,7 +117,7 @@ Die folgenden Befunde beschreiben implementierte Pfade und ihre fokussiert getes
 
 1. **Antigravity Daemon Fail-Open-Pfad:**
    - *Problem:* Der Antigravity CLI Daemon läuft im Hintergrund und sourct bei Desktop-/IDE-Starts nicht automatisch `.bashrc`. Wenn Node.js via `fnm`/`nvm` verwaltet wird, kann `node` im Daemon-$PATH fehlen, was zu stummem Ausfall von Hooks führen würde.
-   - *Lösung:* Dokumentierte und preflight-geprüfte Anforderung eines globalen Symlinks `/usr/local/bin/node`. `pipeline-start-preflight.mjs` prüft `antigravityHardEnforcement: true` und verweigert die Bereitschaft bei fehlendem Schutz.
+   - *Lösung:* Vor der Nutzung den PATH des tatsächlich gestarteten Agy-Hosts prüfen (`command -v node`), dessen Launcher-/Service-Umgebung bei Bedarf korrekt konfigurieren und Agy danach vollständig neu starten. Kein globaler `sudo`-Symlink wird als Pipeline-Lösung empfohlen. Ein fehlender Nachweis bleibt eine nicht-bereite Agy-Umgebung; diese historische Code-/Contract-Aussage ist keine native Live-Durchsetzungszertifizierung.
 2. **Codex Multi-File `apply_patch`:**
    - *Problem:* Codex modifiziert Dateien häufig im Block über `apply_patch`. Ein naives Tool-Hooking würde nur den ersten Pfad prüfen oder das Unified-Diff-Format nicht verstehen.
    - *Lösung:* `guard-apply-patch.mjs` parst das Diff deterministisch, extrahiert alle Zielpfade und evaluiert jeden Pfad sequentiell gegen `guard-testpath.mjs`, `guard-devplan.mjs` und `guard-gate-strength.mjs` unter einem erweiterten 36s-Budget.

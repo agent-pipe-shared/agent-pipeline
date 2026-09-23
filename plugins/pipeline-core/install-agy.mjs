@@ -11,6 +11,22 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const LOCAL_MARKETPLACE = join(process.env.HOME || process.env.USERPROFILE, "agent-pipeline-local-marketplace");
 const hasMarketplace = existsSync(join(LOCAL_MARKETPLACE, "plugins", "pipeline-core"));
 
+export function installerUsageLines() {
+  return [
+    "Usage: node install-agy.mjs",
+    "",
+    "Run this from an approved Agent-Pipeline plugin directory while your shell is in the project Antigravity will govern.",
+    "The interactive installer defaults to that approved directory. A local marketplace copy is an explicit pre-release development choice.",
+  ];
+}
+
+export function selectPluginSource({ answer = "", scriptDir = SCRIPT_DIR, marketplaceRoot = LOCAL_MARKETPLACE, marketplaceAvailable = hasMarketplace } = {}) {
+  if (answer.trim() === "2" && marketplaceAvailable) {
+    return { kind: "local-marketplace", pluginRoot: join(marketplaceRoot, "plugins", "pipeline-core") };
+  }
+  return { kind: "approved-directory", pluginRoot: scriptDir };
+}
+
 export function postInstallGuidanceLines() {
   return [
     "=== Environment verification ===",
@@ -39,23 +55,12 @@ export function attestAntigravityMarketplaceCopy({ sourcePluginRoot, installedPl
 export function runInteractiveInstaller() {
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 console.log("\n=== Antigravity Pipeline Installer ===\n");
-if (hasMarketplace) {
-  console.log(`Detected local marketplace: ${LOCAL_MARKETPLACE}`);
-}
+if (hasMarketplace) console.log(`Detected local development marketplace: ${LOCAL_MARKETPLACE}`);
 
-rl.question(`Use (1) Dev Source (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCAL_MARKETPLACE})? [Default: 2 if exists, else 1]: `, (sourceAnswer) => {
-  const useMarketplace = hasMarketplace && sourceAnswer.trim() !== "1";
-  
-  let corePluginPath;
-  if (useMarketplace) {
-    corePluginPath = join(LOCAL_MARKETPLACE, "plugins", "pipeline-core");
-  } else if (existsSync(join(SCRIPT_DIR, "plugin.json"))) {
-    // Executed directly from plugins/pipeline-core
-    corePluginPath = SCRIPT_DIR;
-  } else {
-    // Executed from repo root
-    corePluginPath = join(SCRIPT_DIR, "plugins", "pipeline-core");
-  }
+rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCAL_MARKETPLACE})? [Default: 1]: `, (sourceAnswer) => {
+  const selectedSource = selectPluginSource({ answer: sourceAnswer });
+  const useMarketplace = selectedSource.kind === "local-marketplace";
+  const corePluginPath = selectedSource.pluginRoot;
   
   console.log(`\nPipeline plugin target: ${corePluginPath}\n`);
   console.log("Antigravity uses GitOps/JSON configs instead of a global marketplace.");
@@ -128,19 +133,7 @@ rl.question(`Use (1) Dev Source (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCA
         console.log(`Autonomous sandboxed mode configured in: ${settingsFile}`);
       }
 
-      console.log("\n=== Important Environment Verification ===");
-      console.log("The Agent Pipeline uses platform-neutral hooks (e.g. `node hooks/...`).");
-      console.log("This requires `node` to be available in the PATH of the Antigravity Daemon.");
-      console.log("If you launch Antigravity via an IDE or desktop shortcut, it may not source your ~/.bashrc or ~/.zshrc.");
-      console.log("If the daemon cannot find `node`, security hooks will SILENTLY FAIL OPEN!");
-      
-      console.log("\nTo ensure node is permanently in your system path (e.g. for fnm users):");
-      console.log("  sudo ln -s $(which node) /usr/local/bin/node");
-      console.log("  (Or ensure your desktop environment loads your PATH correctly)\n");
-      
-      console.log("=== Recommended Launch Commands ===");
-      console.log("  agy              # Normal interactive mode");
-      console.log("  agy --yolo       # Fully autonomous mode\n");
+      for (const line of postInstallGuidanceLines()) console.log(line);
       
       rl.close();
     });
@@ -148,4 +141,10 @@ rl.question(`Use (1) Dev Source (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCA
 });
 }
 
-if (isDirectInvocation(import.meta.url)) runInteractiveInstaller();
+if (isDirectInvocation(import.meta.url)) {
+  if (process.argv.slice(2).includes("--help") || process.argv.slice(2).includes("-h")) {
+    for (const line of installerUsageLines()) console.log(line);
+  } else {
+    runInteractiveInstaller();
+  }
+}

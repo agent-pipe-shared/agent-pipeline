@@ -10,7 +10,7 @@ Use the explicit local CLI to emit a reviewable plan, build from that plan, and
 verify an existing bundle:
 
 ```bash
-node plugins/pipeline-core/scripts/audit-bundle.mjs plan \
+node <plugin-root>/scripts/audit-bundle.mjs plan \
   --repo "$PWD" --manifest specs/<feature>/lifecycle.json \
   --bundle-id <bundle-id> --core-version <core-version> \
   --pack-file <policy-pack.json>
@@ -19,6 +19,27 @@ node plugins/pipeline-core/scripts/audit-bundle.mjs plan \
 Persist the printed plan through an operator-controlled review boundary before
 calling `build --repo … --plan-file … --output …`; use `verify --bundle …` for
 the offline digest check. Signing remains a separate provider boundary.
+
+Choose the output path explicitly. The normal repository-relative convention
+is `audit-bundles/<bundle-id>`; it is not an implicit `dist/` directory, and a
+caller may select another safe repository-relative destination when its
+retention policy requires it. For example:
+
+```bash
+node <plugin-root>/scripts/audit-bundle.mjs build \
+  --repo "$PWD" --plan-file <approved-plan.json> \
+  --output "audit-bundles/<bundle-id>"
+
+node <plugin-root>/scripts/audit-bundle.mjs verify \
+  --bundle "./audit-bundles/<bundle-id>"
+```
+
+Each newly built bundle contains `README.md` beside `manifest.json`. It names
+the candidate and copied artifacts, gives the portable offline verification
+command and prerequisites, and states the assurance limits. The manifest
+binds that README's digest, so verification rejects a missing or modified
+guide. The guide does not claim that the bundle is self-contained, a signed
+approval, a deployment record, or release authorization.
 
 The bundle service refuses an invalid package, a missing candidate binding, an
 incompatible policy pack, changed source bytes, and an existing destination.

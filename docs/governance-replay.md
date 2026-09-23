@@ -29,7 +29,7 @@ event fields such as prompts, logs, credentials or private paths, uses a
 network-denying Content Security Policy, and never overwrites a report.
 
 ```sh
-node plugins/pipeline-core/scripts/governance-replay-viewer.mjs build \
+node <plugin-root>/scripts/governance-replay-viewer.mjs build \
   --root . \
   --replay evidence/governance-replay.json \
   --output evidence/governance-replay.html

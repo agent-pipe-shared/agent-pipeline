@@ -912,12 +912,20 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
     // runSuitePool's own comment) -- never completion order.
     const { steps, receiptBySuite } = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, serialLaneSuites, exclusiveSuites });
     const completedAt = now(clock);
+    const execution = deriveVerifyExecutionMetrics({
+      steps,
+      startedAt: run.manifest.startedAt,
+      completedAt,
+      concurrency,
+      serialLaneSuites,
+      exclusiveSuites,
+    });
     const terminal = { schema: RUN_TERMINAL_SCHEMA, runId, candidate, policySha256, planSha256: plan.planSha256, receipts: Object.values(receiptBySuite).map((receipt) => receipt.receiptSha256).sort(), status: steps.every((step) => step.exitCode === 0) ? "passed" : "failed", durability: run.manifest.durability, completedAt, journalSha256: sha(readFileSync(run.journalPath)), terminalSha256: null };
     const { terminalSha256: omittedTerminalSha256, ...terminalBody } = terminal;
     terminal.terminalSha256 = digestJson(terminalBody);
     atomicJson(join(run.runDir, "terminal.json"), terminal);
     terminalWritten = true;
-    return { runId, runDir: run.runDir, policySha256, cleanupRegistration, plan, terminal, steps };
+    return { runId, runDir: run.runDir, policySha256, cleanupRegistration, plan, terminal, steps, execution };
   } finally {
     const closed = Buffer.from(`${JSON.stringify(verifyRunLock(runId, "closed", clock))}\n`);
     try { ftruncateSync(run.lockFd, 0); writeSync(run.lockFd, closed, 0, closed.length, 0); fsyncSync(run.lockFd); } finally { closeSync(run.lockFd); }
@@ -930,4 +938,57 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
       });
     }
   }
+}
+export function deriveVerifyExecutionMetrics({ steps, startedAt, completedAt, concurrency, serialLaneSuites, exclusiveSuites }) {
+  if (!Array.isArray(steps)) throw new Error("VERIFY-EXECUTION-METRICS: steps must be an array");
+  if (!Number.isSafeInteger(concurrency) || concurrency < 0) {
+    throw new Error("VERIFY-EXECUTION-METRICS: concurrency must be a non-negative safe integer");
+  }
+  const startedAtMs = new Date(startedAt).getTime();
+  const completedAtMs = new Date(completedAt).getTime();
+  if (!Number.isSafeInteger(startedAtMs) || !Number.isSafeInteger(completedAtMs)) {
+    throw new Error("VERIFY-EXECUTION-METRICS: timestamps must be valid dates");
+  }
+  let executedSuiteDurationMs = 0;
+  let reusedSuiteDurationMs = 0;
+  const executed = { pool: 0, serial: 0, exclusive: 0 };
+  const reused = { pool: 0, serial: 0, exclusive: 0 };
+  const includes = (collection, suite) => collection?.has?.(suite) ?? collection?.includes?.(suite) ?? false;
+
+  for (const step of steps) {
+    if (typeof step?.name !== "string" || step.name.length === 0) {
+      throw new Error("VERIFY-EXECUTION-METRICS: every step needs a name");
+    }
+    if (!Number.isSafeInteger(step.durationMs) || step.durationMs < 0) {
+      throw new Error("VERIFY-EXECUTION-METRICS: every step duration must be a non-negative safe integer");
+    }
+    if (typeof step.reused !== "boolean") {
+      throw new Error("VERIFY-EXECUTION-METRICS: every step reused flag must be boolean");
+    }
+    if (step.reused) {
+      reusedSuiteDurationMs += step.durationMs;
+      if (includes(exclusiveSuites, step.name)) reused.exclusive++;
+      else if (includes(serialLaneSuites, step.name)) reused.serial++;
+      else reused.pool++;
+    } else {
+      executedSuiteDurationMs += step.durationMs;
+      if (includes(exclusiveSuites, step.name)) executed.exclusive++;
+      else if (includes(serialLaneSuites, step.name)) executed.serial++;
+      else executed.pool++;
+    }
+  }
+
+  const wallDurationMs = Math.max(0, completedAtMs - startedAtMs);
+  const parallelWorkRatio = wallDurationMs > 0 ? executedSuiteDurationMs / wallDurationMs : 0;
+
+  return {
+    schema: "pipeline.verify-execution-metrics.v1",
+    poolWidth: concurrency,
+    wallDurationMs,
+    executedSuiteDurationMs,
+    reusedSuiteDurationMs,
+    executed,
+    reused,
+    parallelWorkRatio
+  };
 }

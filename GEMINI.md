@@ -1,12 +1,14 @@
 # Agent-Pipeline Antigravity workspace entry
 
-Read and follow [AGENTS.md](AGENTS.md) before working in this repository. It
-is the sole workspace-instruction pointer and identifies the runtime manifest
-and Operating Model as the calibrated authorities.
+Read and follow the governed project's `AGENTS.md` before working in that
+project. It is the workspace-instruction pointer and identifies the runtime
+manifest and Operating Model as the calibrated authorities.
 
-Nova exposes Antigravity as a **first-class third runner** (`sprint_agy` / #69). 
-Antigravity executes identically to Codex and Claude Code, conforming strictly 
-to the `operating-model.md`.
+Nova exposes Antigravity as a **first-class third runner** (`sprint_agy` / #69).
+It follows the same portable operating model as Codex and Claude Code, while
+native hook delivery and enforcement remain runner-specific; see
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the supported
+coverage and manual responsibilities.
 
 ### Prerequisites
 
@@ -15,29 +17,33 @@ If you manage Node.js via `fnm` or `nvm` and launch the daemon in the background
 
 **To ensure `node` is available globally to all background processes:**
 ```bash
-sudo ln -s $(which node) /usr/local/bin/node
+command -v node
 ```
 
-This condition has no code fix from inside the plugin (a hook that never
-starts cannot report its own absence) and is tracked, with owner and
-expiry per QG-06, as
-`backlog/items/2026-08-23-antigravity-hard-enforcement-layer-has-two-fail-open-paths.md`.
+This condition has no code fix inside the plugin: a hook that never starts
+cannot report its own absence. Treat it as a host prerequisite and restore a
+system-visible Node installation before relying on Antigravity enforcement.
 
 ### Antigravity Installation (Workspace-Local)
 
 Unlike Codex, Antigravity does not rely on a global `plugin install` marketplace 
 command for local plugins. To install the Agent-Pipeline in an Antigravity project:
 
-1. Run the Antigravity installer script from the pipeline repository:
+1. Run the Antigravity installer script from a locally available, approved
+   plugin directory obtained from the official GitHub distribution (for
+   example a released marketplace snapshot or release checkout), not an
+   un-released developer checkout:
    ```bash
-   node /path/to/agent-pipeline/install-agy.mjs
+   node /path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs
    ```
    (Select "Workspace-Local" to generate the `.agents/plugins.json` for your project. The installer will also print the node PATH verification.)
 2. Initialize the pipeline in your project by invoking the agent and running the start command:
    ```bash
    agy
    ```
-   (Or run `agy --yolo` for fully autonomous execution without confirmation prompts).
+   (`agy` itself does not bypass confirmation prompts. If appropriate for the
+   workspace, select the installer’s explicit autonomous-mode option; it
+   remains runner-local and grants no plan, release, remote, or human authority.)
 
 3. To enable autonomous execution (auto-apply edits & safe commands) permanently, the installer can write `.agents/settings.json`:
    ```json

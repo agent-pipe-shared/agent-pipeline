@@ -360,8 +360,8 @@ same portable governance-event surface used by all three streams, scoped by
 `streamId: "agent"` in the request file:
 
 ```text
-node plugins/pipeline-core/scripts/governance-event.mjs query --repo CHECKOUT --request-file REQUEST.json
-node plugins/pipeline-core/scripts/governance-event.mjs verify --repo CHECKOUT --request-file REQUEST.json
+node <plugin-root>/scripts/governance-event.mjs query --repo CHECKOUT --request-file REQUEST.json
+node <plugin-root>/scripts/governance-event.mjs verify --repo CHECKOUT --request-file REQUEST.json
 ```
 
 (`plugins/pipeline-core/scripts/governance-event.mjs:42-53`, operations

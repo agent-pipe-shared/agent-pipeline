@@ -33,5 +33,9 @@ export function computeManualVerifyStep(calibration) {
   if (containsUnreplacedManualCheckPlaceholder(declared)) {
     return { step: { name: "verify-manual-check-placeholder-rejected", exitCode: 1 }, evidence: { status: "placeholder-rejected" } };
   }
-  return { step: { name: "verify-manual-check-declared", exitCode: 0 }, evidence: { status: "declared", note: declared.slice(0, 256) } };
+  // The calibration note is operator-supplied prose.  Preserve only the closed
+  // disposition in durable Verify evidence: free prose can contain private
+  // paths or other local context and is neither machine-verifiable nor needed
+  // to establish that the manual lane was explicitly declared.
+  return { step: { name: "verify-manual-check-declared", exitCode: 0 }, evidence: { status: "declared" } };
 }

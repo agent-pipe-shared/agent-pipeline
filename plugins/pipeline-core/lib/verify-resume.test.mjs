@@ -267,4 +267,7 @@ test("closed Verify schemas expose the exact Spec root keys and public run cover
   const evidence = JSON.parse(readFileSync(join(scriptDir, "verify-evidence.schema.json"), "utf8"));
   assert.deepEqual(evidence.$defs.verifyRun.required, ["runId", "policySha256", "resumePlanSha256", "terminalSha256", "registeredSuiteCount", "terminalReceiptCount", "receiptReuse", "status"]);
   assert.equal(evidence.$defs.verifyRun.additionalProperties, false);
+  assert.deepEqual(evidence.$defs.manualVerifyStatus.required, ["status"]);
+  assert.deepEqual(evidence.$defs.manualVerifyStatus.properties.status.enum, ["not-configured-yet", "placeholder-rejected", "declared"]);
+  assert.equal(evidence.$defs.manualVerifyStatus.additionalProperties, false);
 });

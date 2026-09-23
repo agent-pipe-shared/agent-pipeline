@@ -57,7 +57,7 @@ receives credentials, provider endpoints, raw external content, or a command
 to apply a write.
 
 ```sh
-node plugins/pipeline-core/scripts/external-reference.mjs preview \
+node <plugin-root>/scripts/external-reference.mjs preview \
   --root . \
   --reference evidence/reference.json \
   --capabilities evidence/adapter-capabilities.json \

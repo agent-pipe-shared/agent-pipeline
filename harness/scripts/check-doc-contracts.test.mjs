@@ -12,6 +12,8 @@ import {
   IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS,
   VENDORED_LINK_EXCLUSIONS,
   checkRepository,
+  checkConsumerRepositoryExamples,
+  checkMaintainerAudienceBoundaries,
   collectAnchors,
   extractMarkdownLinks,
   isExcludedRepoPath,
@@ -40,20 +42,84 @@ const READER_BINDING_SCRIPT = fileURLToPath(new URL("./check-doc-reader-binding.
 const REPO = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const roots = [];
 const EXPECTED_READER_REVIEW_PATHS = [
+  "GEMINI.md",
   "PIPELINE_FLOW.md",
   "README.md",
   "SETUP.md",
   "docs/README.md",
   "docs/audit-and-evidence.md",
+  "docs/audit-bundles.md",
   "docs/cost-and-measurement.md",
   "docs/enforcement.md",
   "docs/overview.md",
   "docs/parallel-work.md",
   "docs/security-controls.md",
+  "docs/sprint-alfred-completion-report.md",
   "docs/usage.md",
+  "docs/v3-consumer-onboarding.md",
 ];
 const READER_RECORD_PATH = "specs/reader-binding/evidence/reader-review/record.json";
 const READER_DISPOSITION_PATH = "specs/reader-binding/evidence/reader-review/disposition/round-1.json";
+
+test("consumer operation documents reject source-checkout plugin commands", () => {
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "docs/usage.md": "node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root>",
+    "docs/push-release-flow.md": "node \"${PIPELINE_PLUGIN_ROOT}/scripts/push-init.mjs\" --root <repo>",
+  }), []);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "docs/usage.md": "node plugins/pipeline-core/scripts/verify-evidence-producer.mjs --root <project-root>",
+  }), [
+    "consumer-command: docs/usage.md: use <plugin-root> or PIPELINE_PLUGIN_ROOT, never plugins/pipeline-core from a source checkout",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "docs/usage.md": "Run this repository's Verify command before release.",
+  }), [
+    "consumer-perspective: docs/usage.md: address the consuming project, not this source repository or checkout",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "GEMINI.md": "Read AGENTS.md before working in this repository.",
+  }), [
+    "consumer-perspective: GEMINI.md: address the consuming project, not this source repository or checkout",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "docs/v3-consumer-onboarding.md": "claude plugin install pipeline-core@agent-pipeline-local --scope project",
+  }), [
+    "consumer-marketplace: docs/v3-consumer-onboarding.md: consumer instructions must use the released GitHub marketplace selector, never agent-pipeline-local",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "SETUP.md": [
+      "node <plugin-root>/scripts/toolchain-preflight.mjs --root <project-root>",
+      "## B. Maintain a shared pipeline source (occasional)",
+      "node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root \"$PWD\"",
+    ].join("\n"),
+  }), []);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "SETUP.md": "node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root <project-root>",
+  }), [
+    "consumer-command: SETUP.md: use <plugin-root> or PIPELINE_PLUGIN_ROOT, never plugins/pipeline-core from a source checkout",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "SETUP.md": [
+      "Prepare this checkout before installation.",
+      "## B. Maintain a shared pipeline source (occasional)",
+      "This repository is the source-maintenance checkout.",
+    ].join("\n"),
+  }), [
+    "consumer-perspective: SETUP.md: address the consuming project, not this source repository or checkout",
+  ]);
+});
+
+test("local marketplace development guides retain an explicit maintainer boundary", () => {
+  assert.deepEqual(checkMaintainerAudienceBoundaries({
+    "docs/claude-local-plugin-development.md": "> Maintainer-only guide. Consumer repositories use the released plugin.",
+    "docs/codex-local-plugin-development.md": "> Maintainer-only guide. Consumer repositories use the released plugin.",
+  }), []);
+  assert.deepEqual(checkMaintainerAudienceBoundaries({
+    "docs/claude-local-plugin-development.md": "# Claude local plugin development\n\nUse a local marketplace.",
+  }), [
+    "maintainer-audience: docs/claude-local-plugin-development.md: local-development instructions must begin with the Maintainer-only guide marker",
+  ]);
+});
 
 function linkFixtureDirectory(target, path) {
   symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
@@ -883,9 +949,9 @@ test("current repository integration passes and excludes the instruction path", 
   assert.equal(result.stats.observationGovernance, "checked");
 });
 
-test("reader binding scope is the approved lexical set of eleven public documents", () => {
+test("reader binding scope is the approved lexical set of active public documents", () => {
   assert.deepEqual(READER_REVIEW_PATHS, EXPECTED_READER_REVIEW_PATHS);
-  assert.equal(new Set(READER_REVIEW_PATHS).size, 11);
+  assert.equal(new Set(READER_REVIEW_PATHS).size, EXPECTED_READER_REVIEW_PATHS.length);
 });
 
 test("reader binding accepts a record-only candidate and ignores worktree edits", () => {

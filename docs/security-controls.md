@@ -8,7 +8,13 @@ The [security control catalog](../governance/security-controls/catalog.json) def
 
 The Verify security scan combines configured adapters for secret detection, dependency vulnerability scanning, static analysis, and license checks. A skipped adapter is not a pass, and an adapter error fails closed in the completeness result. Scanner findings still have the limits of their rules, available inputs, and execution environment. They do not prove the absence of all vulnerabilities, insecure configuration, or operational exposure.
 
-Configuration and source checks establish what this checkout declares and what its tests exercised. Live enforcement is narrower: it depends on the runner, the installed integration, and the active project configuration. The runtime must be identified before treating a guard as live. The [runtime boundary](runtime-boundary.md) explains the difference between the portable methodology and host-specific hooks; [runner support](runner-support.md) states the separate runner and platform limits.
+Configuration and source checks establish what your project declares and what
+the selected plugin version tested. Live enforcement is narrower: it depends
+on the runner, the installed integration, and the active project
+configuration. Identify the runtime before treating a guard as live. The
+[runtime boundary](runtime-boundary.md) explains the difference between the
+portable methodology and host-specific hooks; [runner support](runner-support.md)
+states the separate runner and platform limits.
 
 ## Authority is separate from consent
 

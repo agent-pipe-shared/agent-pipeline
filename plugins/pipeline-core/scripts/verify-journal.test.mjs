@@ -11,7 +11,17 @@ import { fileURLToPath } from "node:url";
 import { digestJson } from "../lib/verify-resume.mjs";
 import { applyOnboardingKickoff, planOnboardingKickoff, readOnboardingSessionCleanupBinding } from "../lib/onboarding-continuity.mjs";
 import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
-import { compileVerifySuites, createVerifyRun, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
+import { compileVerifySuites, createVerifyRun, deriveVerifyExecutionMetrics, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
+
+// The journal deliberately emits one bounded public progress line per state
+// transition in production.  Most cases below exercise storage, scheduling,
+// or resume semantics rather than that channel; letting those lines through
+// makes a successful suite needlessly drown out its own assertion result.
+// The dedicated progress-contract case still replaces this muted sink and
+// asserts the real emitted values.
+const originalConsoleLog = console.log;
+test.before(() => { console.log = () => {}; });
+test.after(() => { console.log = originalConsoleLog; });
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "verify-journal-"));
@@ -27,6 +37,33 @@ const spawnPass = () => ({ status: 0, stdout: Buffer.from("complete private log\
 const registerRun = (request) => sealVerifyCleanupRegistration({ status: "registered", runId: request.runId, runPath: request.runPath, sessionId: "test-session", descriptorSha256: "d".repeat(64), resourceId: `verify-${request.runId}`, registeredAt: "2026-08-01T00:00:00.000Z" });
 const artifact = verifySuiteArtifactName("fixture-suite");
 const completionPolicy = { schema: "pipeline.verify-case-completion-policy.v1", caseIds: ["C01", "C02"], maxBytes: 4096 };
+
+test("execution metrics retain lane/reuse facts and reject malformed measurement inputs", () => {
+  const metrics = deriveVerifyExecutionMetrics({
+    steps: [
+      { name: "pool", durationMs: 50, reused: false },
+      { name: "serial", durationMs: 20, reused: true },
+      { name: "exclusive", durationMs: 30, reused: false },
+    ],
+    startedAt: "2026-09-23T10:00:00.000Z",
+    completedAt: "2026-09-23T10:00:00.100Z",
+    concurrency: 2,
+    // Exclusive deliberately also appears in the serial set: exclusive takes
+    // precedence, matching the scheduler's lane selection.
+    serialLaneSuites: new Set(["serial", "exclusive"]),
+    exclusiveSuites: new Set(["exclusive"]),
+  });
+  assert.equal(metrics.executedSuiteDurationMs, 80);
+  assert.equal(metrics.reusedSuiteDurationMs, 20);
+  assert.deepEqual(metrics.executed, { pool: 1, serial: 0, exclusive: 1 });
+  assert.deepEqual(metrics.reused, { pool: 0, serial: 1, exclusive: 0 });
+  assert.equal(metrics.parallelWorkRatio, 0.8);
+
+  const valid = { steps: [], startedAt: "2026-09-23T10:00:00.000Z", completedAt: "2026-09-23T10:00:00.001Z", concurrency: 1 };
+  assert.throws(() => deriveVerifyExecutionMetrics({ ...valid, steps: [{ name: "bad", durationMs: -1, reused: false }] }), /duration/u);
+  assert.throws(() => deriveVerifyExecutionMetrics({ ...valid, startedAt: "not-a-date" }), /timestamps/u);
+  assert.throws(() => deriveVerifyExecutionMetrics({ ...valid, concurrency: Number.MAX_SAFE_INTEGER + 1 }), /concurrency/u);
+});
 function completionStream() {
   const ordered = [{ id: "C01", disposition: "pass" }, { id: "C02", disposition: "skip" }];
   return Buffer.from(`${[
@@ -54,6 +91,10 @@ test("private journal writes bounded JSON progress and keeps complete logs off t
   try {
     const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-one", spawn: spawnPass, registerRun });
     assert.equal(result.terminal.status, "passed");
+    assert.deepEqual(result.execution.executed, { pool: 1, serial: 0, exclusive: 0 });
+    assert.deepEqual(result.execution.reused, { pool: 0, serial: 0, exclusive: 0 });
+    assert.equal(result.execution.schema, "pipeline.verify-execution-metrics.v1");
+    assert.ok(result.execution.wallDurationMs >= 0);
     assert.equal(output.length, 2);
     assert.equal(output.some((line) => line.includes("complete private log")), false);
     for (const line of output) assert.equal(JSON.parse(line).schema, "pipeline.verify-progress.v1");

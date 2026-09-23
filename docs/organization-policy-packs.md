@@ -9,7 +9,7 @@ conservatively, so an additional pack can only require more review.
 Inspect packs or create a named activation plan:
 
 ```bash
-node plugins/pipeline-core/scripts/organization-policy.mjs inspect \
+node <plugin-root>/scripts/organization-policy.mjs inspect \
   --core-version <core-version> --pack-file <pack.json>
 ```
 
@@ -168,7 +168,7 @@ plan's `expectedActiveSha256`, and returns a preview plan bound to a fresh
 `activationId`
 (`organization-policy-activation.mjs:31-35`). Nothing is written or
 authorized at this step — the CLI's `plan` mode
-(`node plugins/pipeline-core/scripts/organization-policy.mjs plan --repo
+(`node <plugin-root>/scripts/organization-policy.mjs plan --repo
 <repo> --core-version <core-version> --activation-id <id> --pack-file
 <pack.json>`) only ever produces this preview. `activateOrganizationPolicy`
 is the sole function that writes `governance/organization-policy-active.json`,

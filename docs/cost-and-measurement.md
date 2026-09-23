@@ -1,30 +1,48 @@
-# Cost and measurement
+# Measurement boundary
 
-Use measured receipts when weighing delivery assurance against elapsed time. The figures here describe bounded historical Verify runs in this repository; they are not a price list, a model recommendation, or a forecast for another project. The durable receipt identities and hashes are recorded in the [measurement evidence](../backlog/evidence/2026-09-08-adoption-reference-pages-and-verify-measurements.md).
+This page does **not** estimate the time, tokens, subscription cost, or
+administrative effort for your project. No comparable consumer measurement
+exists yet across runners. Do not use it to budget adoption, compare runners,
+or choose a model subscription.
 
-## Full-Verify envelopes
+What a future project measurement needs is a comparable workload, observed
+runner and environment conditions, wall-clock start/finish, task outcome,
+active work versus administration time, and tool-use or token counts where
+available. Missing measurements must remain `unavailable`, never be replaced
+by zero or an estimate.
 
-The table measures the whole-run envelope, from a receipt's `startedAt` to
-`finishedAt`. Each row names its exact candidate and receipt outcome so a clean
-result is not confused with a red gate.
+The historical source receipts behind the limited observations below are kept
+in the [measurement evidence](../backlog/evidence/2026-09-08-adoption-reference-pages-and-verify-measurements.md).
+They are traceability material, not a user-facing benchmark.
 
-| Receipt start date (UTC) and candidate commit | Envelope | Result |
-| --- | ---: | --- |
-| 2026-09-06, `1c03ab9cf306a26b73d6c552e93be2074e203c0d` | 446.923s | 516/516 |
-| 2026-09-07, `f94882ba6e59cc093b4500af3ad50c3fb50f818c` | 469.781s | 517/517 |
-| 2026-09-08, `12556ed0ead9ab9ad12cf4892f7886c36b0bc73b` | 595.413s | 515/517 |
-| 2026-09-08, `37aa24fc327b910e6b74ba26bdcb8e1601605e7a` | 697.804s | 514/517 |
+## Historical Verify observations
 
-The last two rows are red gates, so neither is a performance improvement.
-Timing variation is observational here: do not attribute it to a particular
-code change or host condition without a controlled experiment.
+Four historical Full-Verify receipts took roughly 447–698 seconds. Two of the
+four were red gates, so none establishes an improvement or a delivery-time
+expectation. The runs used different candidates and were not a controlled
+experiment; individual durations must not be attributed to a code change or a
+host condition.
 
-## Historical lane eviction
+Historical serial-lane scheduling also reduced one source-suite span from
+about 646 seconds to about 455 seconds. A suite span is not whole-run wall
+time: pool-suite durations overlap and must not be added to it. This is a
+source-maintenance observation, not a promise that a consumer project will
+reproduce it.
 
-On 2026-09-06, serial-lane eviction reduced the historical Verify **suite span** from 645.7 seconds to 482.5 seconds for the first eviction, and then to 454.9 seconds for the second. Suite span means the progress-stream interval from the first suite `startedAt` to the last suite `completedAt`. It is not the whole Verify run envelope. The first comparison retained one non-zero suite before and after; the later registration blocker was resolved separately.
+## 0.7 Verify execution metrics
 
-This was a historical change to serial scheduling, not a promise that every host or candidate will reproduce the result. Pool-suite durations overlap and must not be added to report wall time.
+The prepared 0.7 Verify evidence adds a machine-readable `execution` summary
+to each new exact-candidate receipt. It records the selected pool width, whole
+journal wall duration, executed and reused suite-duration sums, and counts for
+pool, serial, and exclusive lanes. `parallelWorkRatio` is the executed
+suite-duration sum divided by the journal wall duration. It is an overlap and
+utilization indicator, **not** a speedup, cost, capacity, or quality score.
+
+The fields make two candidate-bound runs comparable without adding overlapping
+suite durations to wall time. They do not authorize changing pool width,
+moving a suite out of a serial lane, or reusing a receipt. Those changes still
+need an independent input/output, isolation, and candidate-binding analysis.
 
 ## What remains unmeasured
 
-There is no verified public measurement of consumer administration overhead. A useful comparison would retain comparable workloads across at least two runners and record wall-clock start/finish, task outcome, active work versus administration time, tool-use or token counts where available, and the runner and environment conditions. A comparable two-runner measurement remains pending.
+A comparable two-runner consumer-overhead measurement remains pending.

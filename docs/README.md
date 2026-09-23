@@ -5,6 +5,19 @@ The canonical reader path is the top-level [README](../README.md),
 [`usage.md`](usage.md). Use the rest of this map as
 reference; `overview.md` is a short companion, not a competing front door.
 
+**Command convention:** In user-repository examples, `<plugin-root>` is the
+installed directory of the approved GitHub-distributed `pipeline-core` plugin.
+Run commands from the governed repository unless the example says otherwise.
+It never means a maintainer checkout.
+
+**Audience rule:** This map, Setup, Usage, the flow, enforcement, evidence,
+security, cost, onboarding, and operation pages describe what an application
+repository does with the installed plugin. Source-maintainer procedures are
+explicitly labelled and isolated in the maintainer sections, local-development
+guides, release records, architecture decision records, and state archives.
+Those durable records retain their original repository/commit context as
+evidence; they are not copy-and-run instructions for a consumer project.
+
 ## Adoption
 
 - [`../SETUP.md`](../SETUP.md) — routine consumer adoption, prerequisites, and
@@ -12,13 +25,16 @@ reference; `overview.md` is a short companion, not a competing front door.
 - [`../PIPELINE_FLOW.md`](../PIPELINE_FLOW.md) — route selection, gates,
   recovery, and close.
 - [`usage.md`](usage.md) — the normal user journey after a project is ready.
+- [`usage.md#assess-architecture-adoption-in-an-existing-project`](usage.md#assess-architecture-adoption-in-an-existing-project)
+  — read-only status and proposal before an existing project adopts the
+  architecture controls.
 - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
   preview-first migration and the Codex lifecycle V4.
 - [`runtime-boundary.md`](runtime-boundary.md) and
   [`runner-support.md`](runner-support.md) — what is shared methodology and
   what the installed runner can actually enforce.
 
-## Enforcement, evidence, security, and cost
+## Enforcement, evidence, security, and measurement
 
 - [`enforcement.md`](enforcement.md) — configured guard and lifecycle
   enforcement, including runner limits.
@@ -27,8 +43,9 @@ reference; `overview.md` is a short companion, not a competing front door.
   certification or authority.
 - [`security-controls.md`](security-controls.md) — scanner/control boundaries,
   framework mappings, waivers, and runtime limits.
-- [`cost-and-measurement.md`](cost-and-measurement.md) — historical Verify
-  envelopes and the explicit missing consumer-overhead comparison.
+- [`cost-and-measurement.md`](cost-and-measurement.md) — measurement boundary,
+  historical Verify observations, and the explicit missing consumer-overhead
+  comparison; not a cost estimate.
 - [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
   integration boundaries.
 
@@ -80,6 +97,11 @@ reference; `overview.md` is a short companion, not a competing front door.
   privacy routing, triage, and backlog-link governance.
 - [`github-issue-operations.md`](github-issue-operations.md) — project-scoped
   GitHub login, issue operations, and safety boundaries.
+- [`po-human-approval.md`](po-human-approval.md) — the one-time external-key
+  setup and the bounded human signing commands; agent-side preparation remains
+  agent work.
+- [`human-authorization-inventory.md`](human-authorization-inventory.md) —
+  reference inventory of every Pipeline authority mechanism and its limits.
 - [`design/README.md`](design/README.md) — optional design pre-stage.
 - [`deploy/README.md`](deploy/README.md) — optional release/promotion adapter.
 - [`adr/`](adr/) — durable decisions and rationale.

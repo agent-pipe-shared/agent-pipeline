@@ -73,6 +73,113 @@ const STATEFUL_DESIGN_CONTRACTS = [
 ];
 const ENFORCEMENT_DOCUMENT_PATH = "docs/enforcement.md";
 const ENFORCEMENT_SOURCE_MANIFESTS = Object.values(MANIFEST_PATHS);
+// These are the operational documents an application-repository user follows.
+// Historical ADRs, state archives and explicitly labelled maintainer guides are
+// deliberately outside this list: rewriting their recorded source context would
+// weaken evidence rather than improve consumer onboarding.
+export const CONSUMER_OPERATION_DOCUMENTS = Object.freeze([
+  "GEMINI.md",
+  "README.md",
+  "SETUP.md",
+  "PIPELINE_FLOW.md",
+  "docs/README.md",
+  "docs/usage.md",
+  "docs/v3-consumer-onboarding.md",
+  "docs/runtime-boundary.md",
+  "docs/audit-and-evidence.md",
+  "docs/audit-bundles.md",
+  "docs/cost-and-measurement.md",
+  "docs/enforcement.md",
+  "docs/evidence-viewer.md",
+  "docs/artifact-topology.md",
+  "docs/change-control.md",
+  "docs/external-traceability.md",
+  "docs/github-issue-operations.md",
+  "docs/governance-event-export.md",
+  "docs/governance-events.md",
+  "docs/governance-replay.md",
+  "docs/human-authorization-inventory.md",
+  "docs/organization-policy-packs.md",
+  "docs/overview.md",
+  "docs/parallel-work.md",
+  "docs/po-approval-proof-contract.md",
+  "docs/po-human-approval.md",
+  "docs/push-release-flow.md",
+  "docs/runner-support.md",
+  "docs/security-controls.md",
+  "docs/observation-intake.md",
+  "docs/operating-model.md",
+  "docs/design/README.md",
+  "docs/deploy/README.md",
+]);
+// These two documents intentionally describe a local marketplace topology.
+// Keep that exceptional procedure visibly separated from consumer onboarding:
+// it changes a shared runner selection and is never a project-repository
+// installation route.
+export const MAINTAINER_ONLY_DOCUMENTS = Object.freeze([
+  "docs/claude-local-plugin-development.md",
+  "docs/codex-local-plugin-development.md",
+]);
+const MAINTAINER_ONLY_MARKER = /^> Maintainer-only guide\./mu;
+const SOURCE_CHECKOUT_COMMAND = /\bnode\s+(?:["']?\.?(?:\.\/)?plugins\/pipeline-core\/)/u;
+// Operational guidance is addressed to the repository that consumes the
+// installed plugin.  A source-checkout noun in that guidance is nearly always
+// a hidden maintainer assumption (and a frequent precursor to a bad command
+// example).  Historical records and the explicitly separated SETUP maintainer
+// section keep their provenance and are intentionally not scanned here.
+const SOURCE_CHECKOUT_PERSPECTIVE = /\bthis\s+(?:repository|checkout|worktree)\b/iu;
+const LOCAL_MARKETPLACE_CONSUMER_SELECTOR = /\bpipeline-core@agent-pipeline-local\b/u;
+const SETUP_MAINTAINER_SECTION = "## B. Maintain a shared pipeline source (occasional)";
+
+function consumerInstructionText(path, text) {
+  if (path !== "SETUP.md") return text;
+  const boundary = text.indexOf(SETUP_MAINTAINER_SECTION);
+  // A missing boundary is itself not an exemption: scan the complete document
+  // so a renamed heading cannot silently turn source instructions into user
+  // onboarding guidance.
+  return boundary === -1 ? text : text.slice(0, boundary);
+}
+
+/**
+ * Consumer instructions must invoke an installed plugin, never a same-named
+ * directory in a source checkout. Callers supply only the document bytes so
+ * this rule remains independently testable and cannot inspect the host.
+ */
+export function checkConsumerRepositoryExamples(documents) {
+  const findings = [];
+  for (const path of CONSUMER_OPERATION_DOCUMENTS) {
+    const text = documents[path];
+    if (typeof text !== "string") continue;
+    if (SOURCE_CHECKOUT_COMMAND.test(consumerInstructionText(path, text))) {
+      findings.push(`consumer-command: ${path}: use <plugin-root> or PIPELINE_PLUGIN_ROOT, never plugins/pipeline-core from a source checkout`);
+    }
+    if (SOURCE_CHECKOUT_PERSPECTIVE.test(consumerInstructionText(path, text))) {
+      findings.push(`consumer-perspective: ${path}: address the consuming project, not this source repository or checkout`);
+    }
+    if (LOCAL_MARKETPLACE_CONSUMER_SELECTOR.test(consumerInstructionText(path, text))) {
+      findings.push(`consumer-marketplace: ${path}: consumer instructions must use the released GitHub marketplace selector, never agent-pipeline-local`);
+    }
+  }
+  return findings;
+}
+
+/**
+ * Local-development instructions are valid source-maintainer material, but
+ * only when their audience boundary is immediately visible.  This prevents a
+ * future edit from accidentally turning the local marketplace selector into
+ * an ordinary consumer installation recommendation.
+ */
+export function checkMaintainerAudienceBoundaries(documents) {
+  const findings = [];
+  for (const path of MAINTAINER_ONLY_DOCUMENTS) {
+    const text = documents[path];
+    if (typeof text !== "string") continue;
+    if (!MAINTAINER_ONLY_MARKER.test(text)) {
+      findings.push(`maintainer-audience: ${path}: local-development instructions must begin with the Maintainer-only guide marker`);
+    }
+  }
+  return findings;
+}
 function posixPath(value) {
   return value.split(sep).join("/");
 }
@@ -773,6 +880,19 @@ export function checkRepository(rootInput, options = {}) {
   const observationGovernance = checkObservationGovernance(root, { optionalWhenAbsent: true });
   for (const item of observationGovernance.findings) findings.push(`observation-governance: ${item}`);
 
+  const consumerDocuments = {};
+  for (const path of CONSUMER_OPERATION_DOCUMENTS) {
+    if (!trackedPaths.has(path)) continue;
+    try { consumerDocuments[path] = readRepoText(path); } catch { findings.push(`consumer-command: ${path}: required operational document unavailable`); }
+  }
+  findings.push(...checkConsumerRepositoryExamples(consumerDocuments));
+  const maintainerDocuments = {};
+  for (const path of MAINTAINER_ONLY_DOCUMENTS) {
+    if (!trackedPaths.has(path)) continue;
+    try { maintainerDocuments[path] = readRepoText(path); } catch { findings.push(`maintainer-audience: ${path}: required maintainer document unavailable`); }
+  }
+  findings.push(...checkMaintainerAudienceBoundaries(maintainerDocuments));
+
   // A tracked generated page is always pinned. The complete manifest set also
   // identifies this source checkout, so it remains required when a deletion
   // removes the page from the tracked set. Generic consumers and minimal
@@ -811,6 +931,7 @@ export function checkRepository(rootInput, options = {}) {
       observationGovernance: observationGovernance.applicable ? "checked" : "not-applicable",
       statefulDesignContracts,
       enforcementDocument,
+      consumerRepositoryExamples: CONSUMER_OPERATION_DOCUMENTS.filter((path) => trackedPaths.has(path)).length,
     },
   };
 }

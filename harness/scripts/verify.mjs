@@ -455,6 +455,10 @@ const TEST_SUITES = [
   { name: "document-identifier-tests", file: join(libDir, "document-identifiers.test.mjs") },
   { name: "document-lifecycle-tests", file: join(libDir, "document-lifecycle.test.mjs") },
   { name: "document-hooks-manifest-tests", file: join(pluginScriptsDir, "document-hooks-manifest.test.mjs") },
+  { name: "check-runner-manifest-parity", file: join(pluginScriptsDir, "check-runner-manifest-parity.test.mjs") },
+  { name: "install-agy-tests", file: join(repoRoot, "plugins", "pipeline-core", "install-agy.test.mjs") },
+  { name: "antigravity-start-hint-tests", file: join(hooksDir, "antigravity-start-hint.test.mjs") },
+  { name: "signed-quality-package-tests", file: join(libDir, "signed-quality-package.test.mjs") },
   { name: "private-document-binding-tests", file: join(pluginScriptsDir, "document-binding.test.mjs") },
   { name: "release-version-plan-tests", file: join(pluginScriptsDir, "release-version-plan.test.mjs") },
   { name: "product-capability-inventory-tests", file: join(scriptDir, "check-product-capability-inventory.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 28 }, (_, index) => `PCI${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
@@ -738,7 +742,7 @@ const TEST_SUITES = [
   { name: "test-tmpdir-budget-tests", file: join(libDir, "test-tmpdir-budget.test.mjs") },
   { name: "test-tmpdir-tests", file: join(libDir, "test-tmpdir.test.mjs") },
   { name: "transfer-classification-tests", file: join(libDir, "transfer-classification.test.mjs") },
-  { name: "antigravity-execution-host-tests", file: join(libDir, "antigravity-execution-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 18 }, (_, index) => `EPH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
+  { name: "antigravity-execution-host-tests", file: join(libDir, "antigravity-execution-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 24 }, (_, index) => `EPH${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "goldfish-antigravity-host-tests", file: join(pluginScriptsDir, "goldfish-antigravity-host.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 13 }, (_, index) => `E3H${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "antigravity-native-dispatch-coordinator-tests", file: join(libDir, "antigravity-native-dispatch-coordinator.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 20 }, (_, index) => `ANDC${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
   { name: "antigravity-native-dispatch-pretool-tests", file: join(hooksDir, "antigravity-native-dispatch-pretool.test.mjs"), caseCompletion: { schema: "pipeline.verify-case-completion-policy.v1", caseIds: Array.from({ length: 8 }, (_, index) => `ANDP${String(index + 1).padStart(2, "0")}`), maxBytes: 65_536 } },
@@ -918,6 +922,7 @@ if (manualVerifyResult.step && manualVerifyResult.step.name === "verify-manual-c
 const steps = [];
 let verifyRun = null;
 let verifyRunEvidence = null;
+let execution = null;
 let verifySelection = null;
 // A known dirty candidate cannot produce delivery evidence.  Fail before any
 // expensive or externally-dependent suite so this is an actionable preflight,
@@ -974,6 +979,7 @@ if (startedCandidate.status === "dirty") {
             reuseReceipts: invocation.reuseReceipts,
           });
           steps.push(...verifyRun.steps.map(({ name, exitCode, durationMs, reused }) => ({ name, exitCode, durationMs, reused })));
+          execution = verifyRun.execution;
           verifyRunEvidence = createPublicVerifyRunEvidence({
             runId: verifyRun.runId,
             policySha256: verifyRun.policySha256,
@@ -1017,6 +1023,7 @@ const commit = startedCandidate.commit ?? "unknown";
 
 const evidence = {
   schema: "pipeline.verify-evidence.v0",
+  execution,
   project: "agent-pipeline",
   command,
   commit,

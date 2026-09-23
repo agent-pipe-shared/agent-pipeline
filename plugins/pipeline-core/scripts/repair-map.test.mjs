@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 //
 // The contract test for repair-map.mjs (REPAIRMAP-1, AC-1..AC-7): drives the
-// REAL eligibility()/recordHumanGuardDenial()/isNeverLiftableKernelPath()/
+// REAL eligibility()/previewHumanGuardRecovery()/isNeverLiftableKernelPath()/
 // readPushApprovalMode() a second time, independently of repair-map.mjs's own
 // internals, and asserts the map's claim about each row is what those real
 // functions actually say right now -- never a hand-typed expectation.
@@ -18,7 +18,7 @@ import {
   PROBES,
   PLUGIN_ROOT,
 } from "./repair-map.mjs";
-import { humanGuardOverrideInternals, recordHumanGuardDenial } from "../lib/human-guard-override.mjs";
+import { humanGuardOverrideInternals, previewHumanGuardRecovery, recordHumanGuardDenial } from "../lib/human-guard-override.mjs";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { isNeverLiftableKernelPath } from "../lib/guard-maintenance-window.mjs";
 
@@ -67,8 +67,8 @@ test("AC-7 (contract): every eligibility()-derived row matches a fresh, independ
       assert.equal(row.liftable, "author-repair-required");
       assert.equal(row.command, null);
     } else {
-      const denials = [{ guard: "contract-test-probe", reason: "contract test probe" }];
-      const routed = recordHumanGuardDenial({ rootDir: ROOT, pluginRoot: PLUGIN_ROOT, toolName: probe.toolName, toolInput: probe.toolInput, denials });
+      const routed = previewHumanGuardRecovery({ rootDir: ROOT, pluginRoot: PLUGIN_ROOT, toolName: probe.toolName, toolInput: probe.toolInput, eligibilityOptions: probe.eligibilityOptions });
+      assert.ok(routed, `${expectedCode}: the pure recovery preview must be available`);
       const hasExecutableStep = Boolean(routed.nextAction?.action?.executable) && Array.isArray(routed.nextAction?.action?.argv);
       if (hasExecutableStep) {
         assert.ok(Array.isArray(row.command) && row.command.length === 1, `${expectedCode}: map claims no command but the real planner offers one`);

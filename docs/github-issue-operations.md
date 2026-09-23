@@ -1,15 +1,14 @@
 # Project-scoped GitHub Issue operations
 
-The matching pipeline skill is
-[`github-issue-operations`](../plugins/pipeline-core/skills/github-issue-operations/SKILL.md).
-It is the safe execution contract; this page is the operator setup and command
+The matching installed skill is `/pipeline-core:github-issue-operations`. It
+is the safe execution contract; this page is the operator setup and command
 reference.
 
 This guide describes the safe user setup for letting Agent-Pipeline work with
 Issues in a consuming project, such as a web application. It covers the
 authentication and command contract currently available to the project. The
-pipeline integration itself is tracked as
-[`2026-07-20-project-scoped-github-issue-operations.md`](../backlog/items/2026-07-20-project-scoped-github-issue-operations.md).
+installed plugin version, not by a consumer copying a source-checkout issue or
+backlog record into its own project.
 
 This is separate from the Public Core
 [`capture-observation`](observation-intake.md) workflow. Observation capture
@@ -51,7 +50,7 @@ project has multiple remotes, the user must explicitly select the intended
 **Re-check session capability proactively before the first GitHub-facing
 command that follows a commit in the same session.** A commit is exactly the
 kind of event that can invalidate session capability; running
-`node plugins/pipeline-core/scripts/project-onboarding-v3.mjs inspect --intent session --root <project-dir>`
+`node <plugin-root>/scripts/project-onboarding-v3.mjs inspect --intent session --root <project-dir>`
 before that first `gh`/`git remote`/SSH-key command turns a reactive
 `GUARD-LIFECYCLE-NOT-READY` recovery (one denied call, one diagnostic detour,
 one retry) into a proactive check that never hits the wall

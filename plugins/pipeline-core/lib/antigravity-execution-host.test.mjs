@@ -7,7 +7,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { AGY_ERROR_TAXONOMY, discoverAgyPath, invokeAgy, parseAgyOutput } from "./antigravity-execution-host.mjs";
+import { AGY_ERROR_TAXONOMY, AGY_MAX_OUTPUT_BYTES, discoverAgyPath, invokeAgy, parseAgyOutput } from "./antigravity-execution-host.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
@@ -51,7 +51,10 @@ else if (prompt.includes("--slow-test")) setTimeout(() => console.log(JSON.strin
 else if (prompt.includes("--auth-test")) { console.error("Please login to Vertex"); process.exit(1); }
 else if (prompt.includes("--fail-test")) process.exit(2);
 else if (prompt.includes("--malformed-test")) console.log("no json for you");
-else if (prompt.includes("--permission-test")) console.error('jetski: a tool required the "command" permission and was auto-denied');
+else if (prompt.includes("--permission-test")) { console.error('jetski: a tool required the "command" permission and was auto-denied'); process.exit(2); }
+else if (prompt.includes("--permission-noise-test")) { console.error("permission may be needed later: /home/alice/private.txt"); process.exit(2); }
+else if (prompt.includes("--oversized-stdout-test")) console.log("x".repeat(65537));
+else if (prompt.includes("--oversized-stderr-test")) { console.error("y".repeat(65537)); process.exit(2); }
 else console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}));
 `;
 
@@ -113,8 +116,11 @@ check("EPH02 parses the last valid JSON line", () => {
 check("EPH03 rejects malformed output", () => {
   assert.throws(() => parseAgyOutput("no json"), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED);
 });
+check("EPH04 rejects oversized parser input before attempting JSON", () => {
+  assert.throws(() => parseAgyOutput("x".repeat(AGY_MAX_OUTPUT_BYTES + 1)), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_TOO_LARGE);
+});
 
-check("EPH04 valid packet launches exactly once with its prompt byte-for-byte", () => withFixture(async (fixture) => {
+check("EPH05 valid packet launches exactly once with its prompt byte-for-byte", () => withFixture(async (fixture) => {
   const packet = packetFor(fixture);
   const result = await invokeAgy(launchArgs(fixture, packet));
   assert.equal(result.ok, true);
@@ -126,10 +132,10 @@ check("EPH04 valid packet launches exactly once with its prompt byte-for-byte", 
 }));
 
 const zeroSpawnCases = [
-  ["EPH05 invalid packet shape", (packet) => { delete packet.candidate; }, "RDP-PACKET-SHAPE"],
-  ["EPH06 stale candidate tree", (packet) => { packet.candidate.tree = "0".repeat(40); }, "RDP-CANDIDATE-TREE"],
-  ["EPH07 wrong transport", (packet) => { packet.transport = "direct"; }, "AGY-DISPATCH-TRANSPORT"],
-  ["EPH08 unusable result destination", (packet) => { packet.resultDestination = { kind: "file", path: "missing/result.json" }; }, "RDP-RESULT-DESTINATION"],
+  ["EPH06 invalid packet shape", (packet) => { delete packet.candidate; }, "RDP-PACKET-SHAPE"],
+  ["EPH07 stale candidate tree", (packet) => { packet.candidate.tree = "0".repeat(40); }, "RDP-CANDIDATE-TREE"],
+  ["EPH08 wrong transport", (packet) => { packet.transport = "direct"; }, "AGY-DISPATCH-TRANSPORT"],
+  ["EPH09 unusable result destination", (packet) => { packet.resultDestination = { kind: "file", path: "missing/result.json" }; }, "RDP-RESULT-DESTINATION"],
 ];
 for (const [name, mutate, code] of zeroSpawnCases) {
   check(`${name} fails under five seconds with zero spawn`, () => withFixture(async (fixture) => {
@@ -146,7 +152,7 @@ for (const [name, mutate, code] of zeroSpawnCases) {
   }));
 }
 
-check("EPH09 dirty required input fails under five seconds with zero spawn", () => withFixture(async (fixture) => {
+check("EPH10 dirty required input fails under five seconds with zero spawn", () => withFixture(async (fixture) => {
   const packet = packetFor(fixture);
   const before = spawnRows(fixture).length;
   writeFileSync(join(fixture.root, "input.txt"), "dirty\n");
@@ -160,7 +166,7 @@ check("EPH09 dirty required input fails under five seconds with zero spawn", () 
   } finally { writeFileSync(join(fixture.root, "input.txt"), "input\n"); }
 }));
 
-check("EPH10 all eight roles reject an invalid required path under five seconds with zero spawn", () => withFixture(async (fixture) => {
+check("EPH11 all eight roles reject an invalid required path under five seconds with zero spawn", () => withFixture(async (fixture) => {
   const before = spawnRows(fixture).length;
   const started = Date.now();
   for (const role of roles) {
@@ -174,10 +180,10 @@ check("EPH10 all eight roles reject an invalid required path under five seconds 
 }));
 
 const executionCases = [
-  ["EPH11 detects auth requirement", "--auth-test", undefined, AGY_ERROR_TAXONOMY.AUTH_REQUIRED],
-  ["EPH12 detects non-zero exit", "--fail-test", undefined, AGY_ERROR_TAXONOMY.NONZERO_EXIT],
-  ["EPH13 detects malformed output", "--malformed-test", undefined, AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED],
-  ["EPH14 detects model mismatch", "", "gemini-requested", AGY_ERROR_TAXONOMY.MODEL_MISMATCH],
+  ["EPH12 detects auth requirement", "--auth-test", undefined, AGY_ERROR_TAXONOMY.AUTH_REQUIRED],
+  ["EPH13 detects non-zero exit", "--fail-test", undefined, AGY_ERROR_TAXONOMY.NONZERO_EXIT],
+  ["EPH14 detects malformed output", "--malformed-test", undefined, AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED],
+  ["EPH15 detects model mismatch", "", "gemini-requested", AGY_ERROR_TAXONOMY.MODEL_MISMATCH],
 ];
 for (const [name, suffix, model, code] of executionCases) {
   check(name, () => withFixture(async (fixture) => {
@@ -187,26 +193,57 @@ for (const [name, suffix, model, code] of executionCases) {
     assert.equal(result.launcherCalls, 1);
   }));
 }
-check("EPH15 detects timeout", () => withFixture(async (fixture) => {
+check("EPH16 detects timeout", () => withFixture(async (fixture) => {
   const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--timeout-test"), { timeoutMs: 200 }));
   assert.equal(result.code, AGY_ERROR_TAXONOMY.TIMEOUT);
   assert.equal(result.launcherCalls, 1);
 }));
-check("EPH16 detects missing binary only after packet preparation", () => withFixture(async (fixture) => {
+check("EPH17 detects missing binary only after packet preparation", () => withFixture(async (fixture) => {
   const result = await invokeAgy(launchArgs(fixture, packetFor(fixture), { agyPath: "/does/not/exist/agy" }));
   assert.equal(result.code, AGY_ERROR_TAXONOMY.NOT_INSTALLED);
   assert.equal(result.launcherCalls, 0);
   assert.equal(result.modelCalls, 0);
 }));
-check("EPH17 accepts the observed model", () => withFixture(async (fixture) => {
+check("EPH18 accepts the observed model", () => withFixture(async (fixture) => {
   assert.equal((await invokeAgy(launchArgs(fixture, packetFor(fixture), { model: "gemini-observed" }))).ok, true);
 }));
-check("EPH18 slow execution remains bound to the fixture", () => withFixture(async (fixture) => {
+check("EPH19 slow execution remains bound to the fixture", () => withFixture(async (fixture) => {
   const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--slow-test"), { model: "gemini-observed", timeoutMs: 2500 }));
   assert.equal(result.ok, true);
 }));
 
-assert.equal(cases.length, 19, "the complete Antigravity execution host corpus must be registered before execution begins");
+check("EPH20 public failures never retain raw child diagnostics", () => withFixture(async (fixture) => {
+  for (const suffix of ["--auth-test", "--fail-test", "--malformed-test", "--permission-test"]) {
+    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", suffix)));
+    assert.equal(result.ok, false, suffix);
+    assert.equal(Object.hasOwn(result, "stdout"), false, suffix);
+    assert.equal(Object.hasOwn(result, "stderr"), false, suffix);
+    assert.doesNotMatch(JSON.stringify(result), /\/home\/|[A-Za-z]:\\|\\\\wsl\$|jetski/i, suffix);
+  }
+}));
+check("EPH21 exact permission denial is typed without child text", () => withFixture(async (fixture) => {
+  const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--permission-test")));
+  assert.equal(result.code, AGY_ERROR_TAXONOMY.PERMISSION_REQUIRED);
+  assert.equal(result.message, "Antigravity requires attended command permission");
+  assert.equal(Object.hasOwn(result, "stderr"), false);
+}));
+check("EPH22 arbitrary permission prose is not reclassified", () => withFixture(async (fixture) => {
+  const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--permission-noise-test")));
+  assert.equal(result.code, AGY_ERROR_TAXONOMY.NONZERO_EXIT);
+  assert.doesNotMatch(JSON.stringify(result), /private|permission may/i);
+}));
+for (const [id, suffix] of [["EPH23", "--oversized-stdout-test"], ["EPH24", "--oversized-stderr-test"]]) {
+  check(`${id} oversized child stream fails closed`, () => withFixture(async (fixture) => {
+    const result = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", suffix)));
+    assert.equal(result.code, AGY_ERROR_TAXONOMY.OUTPUT_TOO_LARGE);
+    assert.equal(result.launcherCalls, 1);
+    assert.equal(Object.hasOwn(result, "stdout"), false);
+    assert.equal(Object.hasOwn(result, "stderr"), false);
+    assert.equal(spawnRows(fixture).length, 1);
+  }));
+}
+
+assert.equal(cases.length, 24, "the complete Antigravity execution host corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

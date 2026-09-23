@@ -41,15 +41,17 @@
 // additional central HGO boundary, verified below with a non-writing direct
 // route; the kernel case remains its own guard predicate. Neither appears in
 // eligibility()'s source enumeration, so both need an explicit row.
-// (`isNeverLiftableKernelPath`, and a direct drive of
-// `evaluateLifecycleReadyGuard` in the contract test). The dispatch report
+// (`isNeverLiftableKernelPath`, and the lifecycle guard's documented stable
+// refusal code). The map deliberately does not call a denial recorder for
+// that structural row: diagnostics must not create durable override state.
+// The dispatch report
 // states exactly what this enumeration does and does not cover.
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { recordHumanGuardDenial, humanGuardOverrideInternals } from "../lib/human-guard-override.mjs";
+import { humanGuardOverrideInternals, previewHumanGuardRecovery } from "../lib/human-guard-override.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { isNeverLiftableKernelPath } from "../lib/guard-maintenance-window.mjs";
 
@@ -197,10 +199,8 @@ export function classifyProbe({ rootDir, pluginRoot, toolName, toolInput, eligib
       candidateSourceRoot: "<pipeline-source-root>",
     };
   }
-  // Not eligible and not an author candidate: the real, non-writing branch of
-  // recordHumanGuardDenial() (module header) returns recoveryRoute()'s answer directly.
-  const denials = [{ guard: "repair-map-probe", reason: "repair-map probe (never a real denial)" }];
-  const routed = recordHumanGuardDenial({ rootDir, pluginRoot, toolName, toolInput, denials });
+  const routed = previewHumanGuardRecovery({ rootDir, pluginRoot, toolName, toolInput, eligibilityOptions });
+  if (routed === null) throw new Error("REPAIRMAP-CLASSIFICATION-DRIFT");
   const command = renderNextAction(routed.nextAction);
   return {
     code: eligible.code,
@@ -224,13 +224,6 @@ export function structuralRows({ rootDir, pluginRoot }) {
   } catch (error) {
     kernelHit = { error: String(error?.message ?? error) };
   }
-  const lifecycleRoute = recordHumanGuardDenial({
-    rootDir,
-    pluginRoot,
-    toolName: "Edit",
-    toolInput: { file_path: "repair-map-lifecycle-probe.md" },
-    denials: [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }],
-  });
   const continuityRepairPlanner = {
     executable: process.execPath,
     argv: [join(pluginRoot, "scripts", "project-onboarding-v3.mjs"), "plan-repair", "--root", rootDir],
@@ -241,7 +234,7 @@ export function structuralRows({ rootDir, pluginRoot }) {
       liftable: "narrower-recovery",
       by: "this-session-agent",
       command: [continuityRepairPlanner],
-      reason: `the general lifecycle override remains unavailable (${lifecycleRoute.status}/${lifecycleRoute.code}); `
+      reason: "the general lifecycle override remains unavailable (non-liftable-recovery-required/HGO-NONOVERRIDABLE-LIFECYCLE-NOT-READY); "
         + "the read-only continuity planner may diagnose one shared close-evidence path and return the only "
         + "digest-bound apply-repair command the guard admits. An agent in this session can execute that returned action.",
     },

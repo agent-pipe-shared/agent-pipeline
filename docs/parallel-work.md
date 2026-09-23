@@ -17,8 +17,9 @@ all of the following are true:
   commit, or sequence commits in a shared checkout.
 
 This can shorten independent review, documentation, or implementation work.
-It adds coordination cost, so small, overlapping, or dependent work is often
-better kept sequential.
+It also adds coordination and integration work, so small, overlapping, or
+dependent work is often better kept sequential. No cross-runner speed or cost
+estimate is currently available.
 
 ## Runner boundary
 

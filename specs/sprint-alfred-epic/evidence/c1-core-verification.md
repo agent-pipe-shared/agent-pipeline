@@ -66,6 +66,14 @@ normal continuation.
 
 ## Required continuation
 
+> **Supersession note — 2026-09-13:** This checkpoint predates the recorded PO
+> decision in [the decision queue](po-decision-queue.md#c1-evidence-cadence--fixed-14-day-releasepromotion-gate-removed-continuous-quality-retained--resolved-2026-09-13).
+> Its phrase “measured 14-day requirement remains” below is historical, not
+> current normative policy. The decision removed only a fixed calendar wait;
+> it retained continuous collection, honest coverage states, sufficient
+> measured calibration evidence where thresholds depend on it, and explicit PO
+> promotion authority.
+
 Run fresh Full Verify on the exact unchanged resulting clean candidate.
 Independent T1 Critic review and PO acceptance remain pending. A1 native
 measurements remain pending; [offline evidence](a1-matrix-verification.md)

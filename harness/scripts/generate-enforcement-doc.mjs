@@ -195,8 +195,8 @@ export function renderEnforcementDocument({ rootDir = REPO_ROOT } = {}) {
   put();
   put("# Enforcement registrations");
   put();
-  put("This page is a reproducible reference to the hook registrations in this source");
-  put("checkout. It is for teams that need to inspect which runner event names which");
+  put("This page is a reproducible reference to the hook registrations shipped with the");
+  put("installed Pipeline release. It is for teams that need to inspect which runner event names which");
   put("command before they rely on a documented rail.");
   put();
   put("## What these registrations establish");
@@ -227,7 +227,7 @@ export function renderEnforcementDocument({ rootDir = REPO_ROOT } = {}) {
   put();
   put(`- **Direct hooks and native bridges.** Claude Code registers direct hook commands in ${sourceLink(MANIFEST_PATHS["Claude Code"])}. Codex and Antigravity register their own native bridge/wrapper commands in ${sourceLink(MANIFEST_PATHS.Codex)} and ${sourceLink(MANIFEST_PATHS.Antigravity)}; neither registration imports Claude Code coverage into another runner.`);
   put("- **Advisory slicing.** The slicing adapters are expressly advisory: [Codex](../plugins/pipeline-core/hooks/codex-slicing-hint.mjs), [Antigravity](../plugins/pipeline-core/hooks/antigravity-slicing-hint.mjs), and [the Claude Code slicing hook](../plugins/pipeline-core/hooks/guard-slicing.mjs). Their registrations therefore do not establish a blocking rail. The table does not classify any other registered command as blocking.");
-  put("- **Missing or unavailable native coverage.** A missing row means only that this source manifest has no matching registration. It does not prove a provider lacks a hook API, that an adapter is absent elsewhere, or that a local installed plugin has the same bytes. Confirm installed delivery and candidate-specific behavior separately.");
+  put("- **Missing or unavailable native coverage.** A missing row means only that the installed release manifest has no matching registration. It does not prove a provider lacks a hook API, that an adapter is absent elsewhere, or that a local installed plugin has the same bytes. Confirm installed delivery and candidate-specific behavior separately.");
   put();
   put("## Source hashes");
   put();

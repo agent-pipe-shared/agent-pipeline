@@ -38,19 +38,20 @@ environment variables, stdin, repository files, or local pipeline state. A
 plain CLI may implement steps 1 and 3 everywhere Node runs; it cannot itself
 be the trusted signing boundary when the agent controls that CLI session.
 
-For Cyborg, the portable command is:
+For a governed project, the portable command shape is:
 
 ```sh
-REPO="$HOME/src/agent-pipeline-share_cyborg"
+REPO="/absolute/path/to/governed-project"
+PIPELINE_PLUGIN_ROOT="/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core"
 PO_DIR="$HOME/agent-pipeline-po"
 mkdir -p "$PO_DIR"
 
-node "$REPO/plugins/pipeline-core/scripts/po-approval-request.mjs" prepare \
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-approval-request.mjs" prepare \
   --repo-root "$REPO" \
-  --feature-id cyb-4 \
-  --plan specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md \
-  --spec specs/2026-07-24-sprint-cyborg-epic/spec.md \
-  --model specs/cyb-4/threat-model.json \
+  --feature-id "<feature-id>" \
+  --plan "specs/<feature-id>/prd.md" \
+  --spec "specs/<feature-id>/spec.md" \
+  --model "specs/<feature-id>/threat-model.json" \
   > "$PO_DIR/request.json"
 ```
 
@@ -61,7 +62,7 @@ outside the repository. Have the trusted signer inspect and sign
 outside the checkout:
 
 ```sh
-node "$REPO/plugins/pipeline-core/scripts/po-approval-request.mjs" verify \
+node "$PIPELINE_PLUGIN_ROOT/scripts/po-approval-request.mjs" verify \
   --repo-root "$REPO" \
   --request "$PO_DIR/request.json" \
   --authority "$PO_DIR/trust-policy.json" \
@@ -111,8 +112,9 @@ A waived kind stays in `requiredKinds` — the action is still gated, only the
 detached proof is no longer demanded, and the recorded approval carries
 `criticalProofWaiver` so it never claims authority a proof did not give it. A
 waiver is never inferred: no policy file, an unreadable policy, and a kind merely
-absent from `requiredKinds` all mean "still required". This repository ships no
-waiver, and a test enforces that.
+absent from `requiredKinds` all mean "still required". Pipeline never invents a
+waiver: a governed project without an explicit waiver remains proof-required,
+and the contract tests enforce that behavior.
 
 Remote provisional receipts are intentionally not this contract. They are
 short-lived, one-time acknowledgements for local continuation only and never

@@ -18,7 +18,7 @@ those files import, for every `approve-*`/`submit-*`/`authorize-*` CLI
 subcommand and every `createPoApprovalIntent(...)` call site. First compiled
 2026-08-18, re-verified and extended 2026-08-25; re-derive it from the code
 rather than trusting it stale after a material change to any cited artifact,
-per this repository's own "code beats spec" convention. It supersedes the
+using Pipeline's "code beats spec" convention. It supersedes the
 backlog item's own prose where the two disagree: several gates below
 (`publication`, `feature-package-reconcile`) moved onto the shared contract by
 commits landed after the 2026-08-18 scoping pass was written (notably
@@ -55,7 +55,8 @@ in `lib/human-guard-override.mjs` as a scoped, reported deviation, not a gap.
 
 `project/critical-human-proof.json` (`pipeline.critical-human-proof-policy.v3`)
 is the live source of truth for which kinds are mandatory: currently
-`["push", "deploy", "publication"]`, none waived in this repository.
+`["push", "deploy", "publication"]`. A governed project without an explicit
+waiver remains proof-required.
 
 ## NOT on the shared contract (a different mechanism)
 
@@ -159,7 +160,8 @@ a producer migration and cannot be inferred in this inventory.
   primitive; this pass did not trace whether every one of the five
   `CRITICAL_ACTION_KINDS` is reachable through both shapes end-to-end.
 - **ADR-0056's 2026-08-16 correction**: the committed trust anchor is now a
-  SET (`trustAnchors`, schema `.v3`) and, in this repository, currently
+  SET (`trustAnchors`, schema `.v3`) and, in the documented default policy,
+  currently
   **empty** — meaning "any well-formed Ed25519 key may sign" rather than a
   pinned identity, per `docs/adr/0056-push-approval-mode.md`'s own correction
   section. The repository-local `lib/critical-human-proof-policy.mjs` does not
@@ -182,7 +184,7 @@ a producer migration and cannot be inferred in this inventory.
   addition, and was not attempted in this pass.
 - **Passkey/WebAuthn or other adapters** — none exist beyond the shipped
   external encrypted Ed25519/SSH-style key adapter (`po-human-approval.mjs`,
-  0.5.0). No desktop application currently exists in this repository to
+  0.5.0). The shipped Pipeline plugin contains no desktop application to
   consume a WebAuthn adapter; building one without a real consumer would be
   speculative.
 - **Cross-platform conformance** — unverified in this pass; would need

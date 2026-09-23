@@ -31,15 +31,17 @@ terminology, continue with this setup guide, then read the operator-facing
   platform-appropriate install command for whatever is missing. After binding
   the plugin, replace `<absolute-plugin-root>` with its installed directory
   and run this from the governed project root.
-- Keep the pipeline source and each governed repository under version control.
+- Keep each governed repository under version control. The pipeline itself is
+  obtained from its approved GitHub distribution; do not copy a maintainer
+  checkout or its generated files into the governed repository.
 - Treat credentials, account mappings, local paths, and private marketplace
   details as machine-local configuration. Do not commit them into the pipeline
   source, a generated projection, or a project calibration.
 
-- **Measured cost boundary.** The project publishes bounded historical Verify
-  envelopes, not a time or token promise for your project. Consumer overhead
-  across runners is still unmeasured; see [cost and
-  measurement](docs/cost-and-measurement.md) before estimating adoption work.
+- **Measurement boundary.** There is no time, token, or administration-cost
+  estimate for your project yet. The historical observations in [measurement
+  guidance](docs/cost-and-measurement.md) are transparency material, not an
+  adoption forecast.
 
 ## A. Activate the pipeline in one project repository
 
@@ -98,7 +100,7 @@ refresh inside the existing host is insufficient for the first binding.
 
 #### Claude Code: project-scoped binding
 
-In the project repository, add the marketplace that hosts your pipeline source
+In the project repository, add the official Agent-Pipeline GitHub marketplace
 and install the plugin at project scope:
 
 ```sh
@@ -157,6 +159,39 @@ For a later refresh, fully end the Codex host process and start a new Codex
 thread in the project root as well. Do not hand-edit Codex
 marketplace or cache files.
 
+#### Antigravity (Agy): workspace-local binding
+
+Run the installer from a locally available, approved plugin directory obtained
+from the official GitHub distribution (for example a released marketplace
+snapshot or release checkout), while your shell is in the project that Agy
+will govern. A developer's un-released local checkout is only for an explicit
+pre-release test:
+
+```sh
+node "/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs"
+```
+
+At the first prompt choose **Approved Plugin Directory** (the default). Choose
+**Local Marketplace** only for an explicitly validated pre-release developer
+copy. Then choose **Workspace-Local** when the installer asks where to bind
+the plugin.
+It writes the supported workspace registration; do not hand-edit Agy registry
+or plugin files. The installer may offer a runner-local autonomous tool policy,
+but that option grants no plan, release, remote, or human authority.
+
+Before opening the governed workspace, verify Node.js in the environment that
+actually starts Agy — a desktop or service launcher can have a different PATH
+than an interactive terminal:
+
+```sh
+command -v node
+```
+
+Correct that host environment if the command has no result, then fully restart
+Agy and open a new workspace session in the project root. Invoke
+`/pipeline-core:pipeline-start` as the first Pipeline action. Do not use an
+unattended permission-bypass mode as an installation or recovery shortcut.
+
 ### 1. Let `pipeline-start` classify the consumer root
 
 Do not copy `setup.mjs` into a consumer project or start a blank directory by
@@ -204,8 +239,8 @@ readback, propose project-specific calibration choices to the repository owner
 and apply them through the normal reviewed workflow.
 
 For an existing project, follow the reviewed, additive adoption plan. Use
-`templates/pipeline.json.example` and `templates/CLAUDE.project.md` in the
-Pipeline source as references. Create only absent targets; merge the needed
+the installed plugin's `templates/pipeline.json.example` and
+`templates/CLAUDE.project.md` as references. Create only absent targets; merge the needed
 calibration and guidance into existing files while preserving project settings
 and instructions. Never copy a template over an existing `CLAUDE.md` or
 calibration file.
@@ -409,6 +444,10 @@ It never loops or changes repository state. If it fails, run `codex doctor` in
 an attended local Codex session and retain the result in the handover.
 
 ## B. Maintain a shared pipeline source (occasional)
+
+> Maintainer path, not consumer onboarding. A project using Agent-Pipeline
+> installs the released plugin from its official GitHub distribution and does
+> not run these source-maintenance commands.
 
 <!-- capability:setup-and-runtime-projection -->
 <a id="capability-setup-and-runtime-projection"></a>

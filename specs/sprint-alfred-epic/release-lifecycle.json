@@ -1,0 +1,9 @@
+{
+  "featureId": "sprint-alfred-epic",
+  "documents": {
+    "prd": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+    "spec": "specs/sprint-alfred-epic/spec.md",
+    "acceptance": "specs/sprint-alfred-epic/acceptance.md",
+    "result": "specs/sprint-alfred-epic/result.md"
+  }
+}

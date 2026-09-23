@@ -8,12 +8,15 @@ trail; they do not certify compliance or replace an auditor.
 
 ## The next release line: 0.7.0
 
-`0.7.0` names the Alfred architecture scope currently exercised as a local
-candidate. It is not a tag, installation recommendation, production-
-availability claim, or proof that release gates passed. The scope adds a
-staged adoption route for existing repositories, a machine-readable
-architecture map, baseline and fitness checks, and typed architecture impact
-at feature close.
+`0.7.0` names the next distributed Alfred architecture scope. Until that
+version is released, an application repository continues to use its approved
+GitHub-distributed plugin version; a maintainer candidate is not an
+installation recommendation, production-availability claim, or proof that
+release gates passed. The scope adds a staged adoption route for existing
+repositories, a machine-readable architecture map, baseline and fitness
+checks, and typed architecture impact at feature close. Begin with the
+read-only [adoption status and proposal](usage.md#assess-architecture-adoption-in-an-existing-project)
+in the repository you intend to govern.
 
 | Product strand | What it contributes to this release scope | Status |
 | --- | --- | --- |
