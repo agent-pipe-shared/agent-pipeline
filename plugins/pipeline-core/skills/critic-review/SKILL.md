@@ -35,18 +35,24 @@ passed to this skill. The caller adds only its route metadata (`project:`,
 `verdict:` and `assurance:`); it must not reconstruct or omit any preflight
 field. The `coordinatorOnly.priorCriticEvidence` binding is retained for range
 and lineage checks and must never be copied into the reviewer input. This
-preflight is read-only. After the session returns a schema-shaped verdict, the
-coordinator uses `scripts/session-critic-finalizer.mjs`; that normal path
-creates and claims its private candidate packet automatically, records and
-consumes the result, and accepts the receipt only after an identical second
-consume readback. A caller must not invent Git blob references for ignored
-local evidence: the complete preflight digest binds that evidence to the
-session packet instead.
+preflight is read-only. Before the fresh Critic starts, the coordinator calls
+`session-critic-finalizer.mjs admit` with the exact closed request below. This
+rechecks preflight and the retained feature-package course, then creates and
+claims one private candidate packet and publishes a digest-bound prelaunch
+admission. An `admitted` result does not itself launch a model or replace the
+ordinary session orchestrator's fresh read-only dispatch. After the session
+returns a schema-shaped verdict, `finalize` consumes that *same* preclaimed
+packet; it never creates a replacement after return. The receipt is accepted
+only after an identical second consume readback. A caller must not invent
+Git blob references for ignored local evidence: the complete preflight digest
+binds that evidence to the session packet instead.
 
-The canonical finalization command is:
+The canonical before/after commands are:
 
 ```bash
-node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" finalize --root . --request scratch/session-critic-finalization-request.json
+node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" admit --root "$PWD" --request scratch/session-critic-finalization-request.json
+# Dispatch one fresh, independent, read-only Critic only after `admitted` readback.
+node "${PIPELINE_PLUGIN_ROOT}/scripts/session-critic-finalizer.mjs" finalize --root "$PWD" --request scratch/session-critic-finalization-request.json
 ```
 
 The request file is closed `pipeline.session-critic-finalization-request.v1`
@@ -55,15 +61,19 @@ JSON with exactly `schema`, `taskId`, `projectId`, `sessionId`, `packetId`,
 exactly `base`, `candidate`, `specPath`, `guardrailPaths`, `evidencePaths`, and
 `priorCriticEvidencePath`; `route` contains exactly `routeId`, `runner`,
 `adapter`, `provider`, `modelTier`, and `effortTier`. `verdictPath` names the
-bounded repository-relative JSON verdict returned by this fresh session.
+bounded repository-relative JSON verdict that will be returned by this fresh
+session; it need not exist for `admit`, but must exist for `finalize`.
 `event` is either `null` or exactly `{ "eventOutPath": "...", "featureId":
-"..." }`; use a `null` feature ID when none applies. The CLI emits one
-`pipeline.session-critic-finalization.v1` JSON result and exits 0 only for
+"..." }`; use a `null` feature ID when none applies. `admit` emits one
+`pipeline.session-critic-prelaunch-admission.v1` result; `finalize` emits one
+`pipeline.session-critic-finalization.v1` result and exits 0 only for
 `completed`; a durable review whose optional event write failed exits 2 with
 `source-complete/event-unavailable` and an identical-only retry. Any malformed
 argv, request, or verdict exits 2 with a closed
 `pipeline.session-critic-finalization-error.v1` object.
-A rejected packet is a coordinator defect, not Critic work: do not spawn a child, create a packet or substitute prose/evidence.
+A rejected prelaunch admission is a coordinator defect, not Critic work: do
+not spawn a child or substitute prose/evidence. A returned verdict without
+the exact prelaunch admission cannot mint a passing receipt.
 
 **Opt-in named-requirement admission:** a feature Spec may place
 `<spec-basename>.requirements.json` beside itself. When present, the preflight

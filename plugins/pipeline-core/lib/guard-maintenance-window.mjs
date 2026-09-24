@@ -490,6 +490,12 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
   "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
   "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+  // Intake and Critic admission are now imported by existing kernel entry points.
+  // They must remain protected from the same maintenance-window bypass.
+  "plugins/pipeline-core/lib/onboarding-initial-answers-state.mjs",
+  "plugins/pipeline-core/lib/onboarding-initial-answers-transaction.mjs",
+  "plugins/pipeline-core/lib/onboarding-later-language.mjs",
+  "plugins/pipeline-core/lib/critic-course-admission.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

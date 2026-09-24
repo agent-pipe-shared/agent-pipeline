@@ -195,9 +195,10 @@ export function renderEnforcementDocument({ rootDir = REPO_ROOT } = {}) {
   put();
   put("# Enforcement registrations");
   put();
-  put("This page is a reproducible reference to the hook registrations shipped with the");
-  put("installed Pipeline release. It is for teams that need to inspect which runner event names which");
-  put("command before they rely on a documented rail.");
+  put("This page is a reproducible reference to the hook registrations declared by");
+  put("the candidate's source manifests. It is not an installed-release");
+  put("inventory: before relying on a rail, read back the version and manifest of");
+  put("the plugin actually installed in your project, then check its host boundary.");
   put();
   put("## What these registrations establish");
   put();

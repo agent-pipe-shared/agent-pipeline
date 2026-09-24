@@ -6,9 +6,10 @@ Pinned by: harness/scripts/check-doc-contracts.mjs (byte equality).
 
 # Enforcement registrations
 
-This page is a reproducible reference to the hook registrations shipped with the
-installed Pipeline release. It is for teams that need to inspect which runner event names which
-command before they rely on a documented rail.
+This page is a reproducible reference to the hook registrations declared by
+the candidate's source manifests. It is not an installed-release
+inventory: before relying on a rail, read back the version and manifest of
+the plugin actually installed in your project, then check its host boundary.
 
 ## What these registrations establish
 

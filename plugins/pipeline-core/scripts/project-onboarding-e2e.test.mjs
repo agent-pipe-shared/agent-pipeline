@@ -435,7 +435,9 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(applied.status, 0);
     assert.equal(applied.json.status, "intake-required");
     assert.equal(applied.json.runtime.status, "plugin-managed-unattested");
-    assert.equal(applied.json.nextAction.kind, "collect-input");
+    assert.equal(applied.json.nextAction.kind, "command");
+    assert.ok(applied.json.nextAction.pendingAsks?.some((ask) =>
+      ask.inputs?.some((input) => input.name === "language")));
     const goal = "Build one small HTML game from the supplied design";
     // Matches the fixture's own CLI runner (run()'s isolated env resolves
     // "codex") -- see the comment on the equivalent call in makeReady().
@@ -800,11 +802,12 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
       const initialAsk = first.pendingAsks[0];
       assert.equal(initialAsk.applyAction?.kind, "command");
-      assert.deepEqual(initialAsk.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode"]);
+      assert.deepEqual(initialAsk.inputs.map((input) => input.name), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"]);
       const initial = invokeAction(initialAsk.applyAction, new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield E2E PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-e2e@example.invalid"],
         ["<signature|chat>", "signature"],
+        ["<de|en>", "en"],
       ]), path, env);
       assert.equal(initial.json.initialAnswers?.code, "INITIAL-ANSWERS-APPLIED", `${runner}: ${JSON.stringify(initial.json)}`);
       assert.equal(initial.json.initialAnswers?.trustAnchor, "not-requested");
@@ -814,6 +817,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.equal(heldInitialAnswers.root, path);
       assert.equal(heldInitialAnswers.gitAuthorName, "Greenfield E2E PO");
       assert.equal(heldInitialAnswers.gitAuthorEmail, "greenfield-e2e@example.invalid");
+      assert.equal(heldInitialAnswers.language, "en");
       assert.equal(fixtureGitConfig.has(`${path}\u0000user.name`), false);
       assert.equal(fixtureGitConfig.has(`${path}\u0000user.email`), false);
       const readback = run(onboarding, ["inspect", "--root", path, "--runner", runner], path);

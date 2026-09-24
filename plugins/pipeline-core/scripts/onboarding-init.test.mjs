@@ -22,7 +22,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
@@ -30,6 +30,10 @@ import { createHash, generateKeyPairSync } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import { DEFAULT_STEP_CAP, SCHEMA, applyInitialOnboardingAnswers, applyTrustAnchorBootstrap, driveOnboardingInit } from "./onboarding-init.mjs";
+import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
+import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
+import { projectConfirmedIntakeLanguage } from "../lib/onboarding-later-language.mjs";
+import { readMachinePlane } from "../lib/machine-plane.mjs";
 
 const PROJECT_ONBOARDING_SCRIPT_PATH = fileURLToPath(new URL("./project-onboarding-v3.mjs", import.meta.url));
 
@@ -229,6 +233,367 @@ test("driveOnboardingInit: Claude, Codex, and Antigravity converge across fresh 
   }
 });
 
+test("initial answer CLI refuses absent or invalid language before any source or receipt write", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "claude");
+    const first = driveOnboardingInit({ rootDir: root, runner: "claude", env });
+    assert.equal(first.outcome, "pending-asks");
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const before = readFileSync(sourcePath);
+    const args = [
+      "--root", root, "--runner", "claude", "--git-author-name", "Language PO",
+      "--git-author-email", "language@example.invalid", "--human-approval", "chat",
+    ];
+    for (const suffix of [[], ["--language", "fr"], ["--language", ""]]) {
+      const call = spawnSync(process.execPath, [new URL("./onboarding-init.mjs", import.meta.url).pathname, ...args, ...suffix], {
+        encoding: "utf8", shell: false, env,
+      });
+      assert.equal(call.status, 2, call.stderr || call.stdout);
+      assert.deepEqual(readFileSync(sourcePath), before);
+      assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
+    }
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+test("an earlier intake language cannot be mislabeled as a later override", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "claude");
+    const first = driveOnboardingInit({ rootDir: root, runner: "claude", env });
+    assert.equal(first.outcome, "pending-asks");
+    applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "de", activate: true });
+    const mismatch = applyInitialOnboardingAnswers({
+      rootDir: root, runner: "claude", env, pushApproval: "chat", language: "en",
+      gitAuthorName: "Language PO", gitAuthorEmail: "language@example.invalid",
+    });
+    assert.equal(mismatch.ok, false, JSON.stringify(mismatch));
+    assert.equal(mismatch.code, "INITIAL-ANSWERS-INTAKE-LANGUAGE-CONFLICT");
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
+    assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).value.values.language, "de");
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+test("a later explicit intake language override is reported by the real CLI", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "claude");
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "claude", env }).outcome, "pending-asks");
+    const initial = applyInitialOnboardingAnswers({
+      rootDir: root, runner: "claude", env, pushApproval: "chat", language: "en",
+      gitAuthorName: "Language PO", gitAuthorEmail: "language@example.invalid",
+    });
+    assert.equal(initial.ok, true, JSON.stringify(initial));
+    const call = spawnSync(process.execPath, [PROJECT_ONBOARDING_SCRIPT_PATH,
+      "intake-consent-apply", "--root", root, "--granted", "--language", "de",
+      "--activate", "--runner", "claude"], { encoding: "utf8", shell: false, env });
+    assert.equal(call.status, 0, call.stderr || call.stdout);
+    const output = JSON.parse(call.stdout);
+    assert.deepEqual(output.languageAudit, {
+      schema: "pipeline.onboarding-language-decision.v1",
+      status: "later-intake-supersedes-initial",
+      initialLanguage: "en",
+      intakeLanguage: "de",
+    });
+    assert.equal(output.languageProjection?.status, "completed");
+    assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).value.values.language, "de");
+    assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_facing:\s*"de"/u);
+    assert.equal(readMachinePlane({ homedirFn: () => home }).plane.language, "de");
+    const receipt = JSON.parse(readFileSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json"), "utf8"));
+    assert.equal(receipt.language, "en");
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+test("host-managed initial answers publish privately and never write reserved Git or Codex controls", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    for (const name of [".git", ".codex"]) {
+      mkdirSync(join(root, name));
+      chmodSync(join(root, name), 0o555);
+    }
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+    const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
+    assert.equal(first.outcome, "pending-asks");
+    assert.deepEqual(actionInputNames(first.pendingAsks[0]),
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"]);
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const sourceBefore = readFileSync(sourcePath);
+    const missingIdentity = applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env, pushApproval: "chat", language: "de" });
+    assert.deepEqual(missingIdentity, { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-REQUIRED" });
+    assert.deepEqual(readFileSync(sourcePath), sourceBefore);
+    const answers = { rootDir: root, runner: "codex", env, gitAuthorName: "Host User",
+      gitAuthorEmail: "host@example.invalid", pushApproval: "chat", language: "de" };
+    const applied = applyInitialOnboardingAnswers(answers);
+    assert.equal(applied.code, "INITIAL-ANSWERS-APPLIED", JSON.stringify(applied));
+    const state = resolveInitialAnswersState(root, "host-managed");
+    assert.equal(JSON.parse(readFileSync(state.receipt, "utf8")).gitAuthorName, "Host User");
+    assert.equal(existsSync(state.pending), false);
+    assert.equal(applyInitialOnboardingAnswers(answers).code, "INITIAL-ANSWERS-APPLIED");
+    const next = driveOnboardingInit({ rootDir: root, runner: "codex", env });
+    assert.equal(next.outcome, "collect-input", JSON.stringify(next));
+    assert.deepEqual(actionInputNames(next.collectInput), ["language", "profile", "projectDescription"]);
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
+    assert.deepEqual(readdirSync(join(root, ".git")), []);
+    assert.deepEqual(readdirSync(join(root, ".codex")), []);
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+test("host-managed first stop asks identity, approval and language before intake consent", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    for (const name of [".git", ".codex"]) {
+      mkdirSync(join(root, name));
+      chmodSync(join(root, name), 0o555);
+    }
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+    const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
+    assert.equal(first.outcome, "pending-asks");
+    assert.equal(first.pendingAsks.length, 1);
+    assert.deepEqual(actionInputNames(first.pendingAsks[0]),
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"]);
+    assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
+  } finally {
+    dispose(root);
+    dispose(home);
+  }
+});
+
+test("host-managed consent CLI routes its later explicit language into private intake state", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    for (const name of [".git", ".codex"]) {
+      mkdirSync(join(root, name));
+      chmodSync(join(root, name), 0o555);
+    }
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+    const first = applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env,
+      gitAuthorName: "Host User", gitAuthorEmail: "host@example.invalid",
+      pushApproval: "chat", language: "en" });
+    assert.equal(first.code, "INITIAL-ANSWERS-APPLIED");
+    const consent = spawnSync(process.execPath, [PROJECT_ONBOARDING_SCRIPT_PATH,
+      "intake-consent-apply", "--root", root, "--granted", "--language", "de",
+      "--profile", "mini", "--text", "Build a bounded fixture", "--activate", "--runner", "codex",
+    ], { encoding: "utf8", env });
+    assert.equal(consent.status, 0, consent.stderr || consent.stdout);
+    const output = JSON.parse(consent.stdout);
+    assert.equal(output.languageAudit?.status, "later-intake-supersedes-initial");
+    assert.equal(output.languageAudit?.initialLanguage, "en");
+    assert.equal(output.languageAudit?.intakeLanguage, "de");
+    assert.equal(output.languageProjection?.status, "completed");
+    assert.equal(output.languageProjection?.audit?.initialLanguage, "en");
+    assert.equal(output.languageProjection?.audit?.intakeLanguage, "de");
+    const checkpoint = readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: "host-managed" });
+    assert.equal(checkpoint.value.values.language, "de");
+    assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_facing:\s*"de"/u);
+    assert.equal(readMachinePlane({ homedirFn: () => home }).plane.language, "de");
+    const sourceAfter = readFileSync(join(root, "pipeline.user.yaml"));
+    const machineAfter = readFileSync(join(home, ".agent-pipeline", "machine.json"));
+    const replay = spawnSync(process.execPath, [PROJECT_ONBOARDING_SCRIPT_PATH,
+      "intake-consent-apply", "--root", root, "--granted", "--language", "de",
+      "--profile", "mini", "--text", "Build a bounded fixture", "--activate", "--runner", "codex",
+    ], { encoding: "utf8", env });
+    assert.equal(replay.status, 0, replay.stderr || replay.stdout);
+    assert.equal(JSON.parse(replay.stdout).languageProjection?.status, "replayed");
+    assert.equal(projectConfirmedIntakeLanguage({ rootDir: root, repositoryCapability: "host-managed",
+      runner: "claude", deps: { homedir: () => home } }).status, "replayed");
+    assert.deepEqual(readFileSync(join(root, "pipeline.user.yaml")), sourceAfter);
+    assert.deepEqual(readFileSync(join(home, ".agent-pipeline", "machine.json")), machineAfter);
+    assert.equal(checkpoint.value.transactionState, "design-questions-pending");
+    assert.equal(checkpoint.value.materialInput.length, 1);
+    const questions = spawnSync(process.execPath, [PROJECT_ONBOARDING_SCRIPT_PATH,
+      "intake-design-questions-apply", "--root", root,
+      "--answers-json", JSON.stringify([{ question: "What is in scope?", answer: "One bounded fixture." }]),
+      "--activate", "--runner", "codex",
+    ], { encoding: "utf8", env });
+    assert.equal(questions.status, 0, questions.stderr || questions.stdout);
+    assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: "host-managed" })
+      .value.transactionState, "ready-to-generate");
+    const generation = spawnSync(process.execPath, [PROJECT_ONBOARDING_SCRIPT_PATH,
+      "intake-generate-plan", "--root", root, "--runner", "codex",
+    ], { encoding: "utf8", env });
+    assert.equal(generation.status, 0, generation.stderr || generation.stdout);
+    const generationPlan = JSON.parse(generation.stdout);
+    assert.equal(generationPlan.repositoryCapability, "host-managed");
+    assert.match(generationPlan.planSha256, /^[a-f0-9]{64}$/u);
+    const generated = spawnSync(process.execPath, [PROJECT_ONBOARDING_SCRIPT_PATH,
+      "intake-generate-apply", "--root", root, "--plan-sha256", generationPlan.planSha256,
+      "--activate", "--runner", "codex",
+    ], { encoding: "utf8", env });
+    assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+    assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: "host-managed" })
+      .value.transactionState, "generated");
+    assert.deepEqual(readdirSync(join(root, ".git")), []);
+    assert.deepEqual(readdirSync(join(root, ".codex")), []);
+  } finally { dispose(root); dispose(home); }
+});
+
+test("later intake language projection resumes after each target publication", () => {
+  for (const stoppedRole of ["source", "machine", "receipt"]) {
+    const root = freshRoot();
+    const home = freshHome();
+    try {
+      for (const name of [".git", ".codex"]) {
+        mkdirSync(join(root, name));
+        chmodSync(join(root, name), 0o555);
+      }
+      const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+      assert.equal(applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env,
+        gitAuthorName: "Projection User", gitAuthorEmail: "projection@example.invalid",
+        pushApproval: "chat", language: "en" }).code, "INITIAL-ANSWERS-APPLIED");
+      applyOnboardingIntakeConsent({ rootDir: root, repositoryCapability: "host-managed",
+        granted: true, language: "de", profile: "mini", activate: true });
+      const args = { rootDir: root, repositoryCapability: "host-managed", runner: "codex",
+        deps: { homedir: () => home } };
+      assert.throws(() => projectConfirmedIntakeLanguage({ ...args, afterPublication(role) {
+        if (role === stoppedRole) throw new Error("simulated-process-stop");
+      } }), /simulated-process-stop/u);
+      const resumed = projectConfirmedIntakeLanguage({ ...args, runner: "claude" });
+      assert.ok(["completed", "replayed"].includes(resumed.status));
+      assert.equal(resumed.audit.intakeLanguage, "de");
+      assert.equal(readMachinePlane({ homedirFn: () => home }).plane.language, "de");
+      assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_facing:\s*"de"/u);
+      assert.deepEqual(readdirSync(join(root, ".git")), []);
+      assert.deepEqual(readdirSync(join(root, ".codex")), []);
+    } finally { dispose(root); dispose(home); }
+  }
+});
+
+test("public re-entry repairs consent recorded before language projection", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    for (const name of [".git", ".codex"]) {
+      mkdirSync(join(root, name));
+      chmodSync(join(root, name), 0o555);
+    }
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+    assert.equal(applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env,
+      gitAuthorName: "Recovery User", gitAuthorEmail: "recovery@example.invalid",
+      pushApproval: "chat", language: "en" }).code, "INITIAL-ANSWERS-APPLIED");
+    applyOnboardingIntakeConsent({ rootDir: root, repositoryCapability: "host-managed",
+      granted: true, language: "de", profile: "mini", activate: true });
+    const bypass = spawnSync(process.execPath, [PROJECT_ONBOARDING_SCRIPT_PATH,
+      "intake-generate-plan", "--root", root, "--runner", "codex",
+    ], { encoding: "utf8", env });
+    assert.notEqual(bypass.status, 0);
+    assert.match(bypass.stderr, /INTAKE-LANGUAGE-PROJECTION-REQUIRED/u);
+    const resumed = driveOnboardingInit({ rootDir: root, runner: "codex", env });
+    assert.notEqual(resumed.outcome, "error", JSON.stringify(resumed));
+    assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_facing:\s*"de"/u);
+    assert.equal(readMachinePlane({ homedirFn: () => home }).plane.language, "de");
+    assert.deepEqual(readdirSync(join(root, ".git")), []);
+    assert.deepEqual(readdirSync(join(root, ".codex")), []);
+  } finally { dispose(root); dispose(home); }
+});
+
+test("later-language recovery refuses foreign edits without publishing an audit", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    for (const name of [".git", ".codex"]) {
+      mkdirSync(join(root, name));
+      chmodSync(join(root, name), 0o555);
+    }
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+    assert.equal(applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env,
+      gitAuthorName: "Drift User", gitAuthorEmail: "drift@example.invalid",
+      pushApproval: "chat", language: "en" }).code, "INITIAL-ANSWERS-APPLIED");
+    applyOnboardingIntakeConsent({ rootDir: root, repositoryCapability: "host-managed",
+      granted: true, language: "de", profile: "mini", activate: true });
+    const args = { rootDir: root, repositoryCapability: "host-managed", runner: "codex",
+      deps: { homedir: () => home } };
+    assert.throws(() => projectConfirmedIntakeLanguage({ ...args, afterPublication(role) {
+      if (role === "source") throw new Error("simulated-process-stop");
+    } }), /simulated-process-stop/u);
+    const sourcePath = join(root, "pipeline.user.yaml");
+    writeFileSync(sourcePath, `${readFileSync(sourcePath, "utf8")}# foreign edit\n`);
+    assert.throws(() => projectConfirmedIntakeLanguage(args), /INITIAL-ANSWERS-JOURNAL-DRIFT/u);
+    assert.equal(readMachinePlane({ homedirFn: () => home }).plane.language, "en");
+    assert.equal(existsSync(join(root, ".claude", ".runtime", "agent-pipeline", "onboarding", "language-projection.json")), false);
+  } finally { dispose(root); dispose(home); }
+});
+
+test("host-managed first answers recover after every publication boundary", () => {
+  for (const stoppedRole of ["source", "machine", "receipt"]) {
+    const root = freshRoot();
+    const home = freshHome();
+    try {
+      for (const name of [".git", ".codex"]) {
+        mkdirSync(join(root, name));
+        chmodSync(join(root, name), 0o555);
+      }
+      const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+      assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+      const answers = { rootDir: root, runner: "codex", env, gitAuthorName: "Interrupted User",
+        gitAuthorEmail: "interrupted@example.invalid", pushApproval: "chat", language: "de" };
+      const interrupted = applyInitialOnboardingAnswers({ ...answers, afterInitialPublication(role) {
+        if (role === stoppedRole) throw new Error("simulated-process-stop");
+      } });
+      assert.deepEqual(interrupted, { ok: false, code: "INITIAL-ANSWERS-TRANSACTION-RECOVERY-REQUIRED" });
+      const state = resolveInitialAnswersState(root, "host-managed");
+      assert.equal(existsSync(state.pending), true);
+      const recovered = applyInitialOnboardingAnswers(answers);
+      assert.equal(recovered.code, "INITIAL-ANSWERS-APPLIED", `${stoppedRole}: ${JSON.stringify(recovered)}`);
+      assert.equal(existsSync(state.pending), false);
+      assert.equal(JSON.parse(readFileSync(state.receipt, "utf8")).gitAuthorName, "Interrupted User");
+      assert.deepEqual(readdirSync(join(root, ".git")), []);
+      assert.deepEqual(readdirSync(join(root, ".codex")), []);
+    } finally { dispose(root); dispose(home); }
+  }
+});
+
+test("host-managed recovery refuses changed answers and foreign post-interruption bytes", () => {
+  const root = freshRoot();
+  const home = freshHome();
+  try {
+    for (const name of [".git", ".codex"]) {
+      mkdirSync(join(root, name));
+      chmodSync(join(root, name), 0o555);
+    }
+    const env = withConflictingAmbientRunner({ ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home }, "codex");
+    assert.equal(driveOnboardingInit({ rootDir: root, runner: "codex", env }).outcome, "pending-asks");
+    const answers = { rootDir: root, runner: "codex", env, gitAuthorName: "Bound User",
+      gitAuthorEmail: "bound@example.invalid", pushApproval: "chat", language: "de" };
+    assert.equal(applyInitialOnboardingAnswers({ ...answers, afterInitialPublication(role) {
+      if (role === "source") throw new Error("simulated-process-stop");
+    } }).code, "INITIAL-ANSWERS-TRANSACTION-RECOVERY-REQUIRED");
+    const state = resolveInitialAnswersState(root, "host-managed");
+    assert.equal(applyInitialOnboardingAnswers({ ...answers, language: "en" }).code,
+      "INITIAL-ANSWERS-TRANSACTION-ANSWER-CONFLICT");
+    assert.equal(existsSync(state.pending), true);
+    const sourcePath = join(root, "pipeline.user.yaml");
+    writeFileSync(sourcePath, `${readFileSync(sourcePath, "utf8")}# foreign edit\n`);
+    assert.equal(applyInitialOnboardingAnswers(answers).code,
+      "INITIAL-ANSWERS-TRANSACTION-DRIFT");
+    assert.equal(existsSync(state.receipt), false);
+    assert.equal(existsSync(state.pending), true);
+    assert.deepEqual(readdirSync(join(root, ".git")), []);
+    assert.deepEqual(readdirSync(join(root, ".codex")), []);
+  } finally { dispose(root); dispose(home); }
+});
+
 test("public onboarding driver keeps chat keyless and reaches a separate signature-anchor action", () => {
   const fixtures = [];
   try {
@@ -256,14 +621,15 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
       assert.equal(first.outcome, "pending-asks", runner);
       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
       const initialAsk = first.pendingAsks[0];
-      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode"],
-        `${runner}/${pushApproval}: initial action contains only identity and the shared approval mode`);
+      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"],
+        `${runner}/${pushApproval}: initial action must confirm identity, shared approval mode and language together`);
       assert.match(initialAsk.guidance, /design\/plan approval as well as push approval/u,
         `${runner}/${pushApproval}: the shared mode must never be presented as push-only`);
       const replacements = new Map([
         ["<PO_GIT_AUTHOR_NAME>", "Greenfield Anchor PO"],
         ["<PO_GIT_AUTHOR_EMAIL>", "greenfield-anchor@example.invalid"],
         ["<signature|chat>", pushApproval],
+        ["<de|en>", "de"],
       ]);
       const argv = initialAsk.applyAction.argv.map((value) => replacements.get(value) ?? value);
       assert.equal(argv[0].endsWith("onboarding-init.mjs"), true, `${runner}: no internal setup script is guessed`);
@@ -280,6 +646,7 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
         ok: true,
         code: "INITIAL-ANSWERS-APPLIED",
         pushApprovalPreference: pushApproval,
+        language: "de",
         trustAnchor: "not-requested",
       });
       assertPinnedRunner(result, runner, `${runner}/post-bootstrap`);
@@ -290,14 +657,47 @@ test("public onboarding driver keeps chat keyless and reaches a separate signatu
       assert.equal(held.root, root);
       assert.equal(held.gitAuthorName, "Greenfield Anchor PO");
       assert.equal(held.gitAuthorEmail, "greenfield-anchor@example.invalid");
+      assert.equal(held.language, "de");
+      assert.equal(readOnboardingIntakeCheckpoint({ rootDir: root }).status, "absent",
+        `${runner}: first-round answers must not manufacture intake consent`);
+      const effectivePlane = JSON.parse(readFileSync(join(home, ".agent-pipeline", "machine.json"), "utf8"));
+      assert.equal(effectivePlane.language, "de", `${runner}: confirmed language reaches the runtime plane`);
       const gitCalls = [];
+      const confirmedReceiptBytes = readFileSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json"));
+      const confirmedSourceBytes = readFileSync(join(root, "pipeline.user.yaml"));
       const replay = applyInitialOnboardingAnswers({
-        rootDir: root, runner, env, pushApproval,
+        rootDir: root, runner, env, pushApproval, language: "de",
         gitAuthorName: held.gitAuthorName, gitAuthorEmail: held.gitAuthorEmail,
         runGit: (...args) => { gitCalls.push(args); throw new Error("initial answers must never invoke Git config"); },
       });
       assert.equal(replay.ok, true, JSON.stringify(replay));
       assert.deepEqual(gitCalls, [], "the actual apply function persists answers without any Git config invocation");
+      assert.deepEqual(readFileSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), confirmedReceiptBytes,
+        "the same confirmed first answer is a zero-write replay");
+      assert.deepEqual(readFileSync(join(root, "pipeline.user.yaml")), confirmedSourceBytes);
+      const planePath = join(home, ".agent-pipeline", "machine.json");
+      const planeBytes = readFileSync(planePath);
+      for (const drift of [
+        { language: null },
+        { pushApprovalDefault: pushApproval === "chat" ? "signature" : "chat" },
+      ]) {
+        writeFileSync(planePath, `${JSON.stringify({ ...JSON.parse(planeBytes.toString("utf8")), ...drift }, null, 2)}\n`);
+        const driftedReplay = applyInitialOnboardingAnswers({
+          rootDir: root, runner, env, pushApproval, language: "de",
+          gitAuthorName: held.gitAuthorName, gitAuthorEmail: held.gitAuthorEmail,
+        });
+        assert.equal(driftedReplay.code, "INITIAL-ANSWERS-MACHINE-DRIFT", `${runner}/${pushApproval}: ${JSON.stringify(drift)}`);
+        assert.deepEqual(readFileSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), confirmedReceiptBytes);
+        assert.deepEqual(readFileSync(join(root, "pipeline.user.yaml")), confirmedSourceBytes);
+      }
+      writeFileSync(planePath, planeBytes);
+      const changedLanguage = applyInitialOnboardingAnswers({
+        rootDir: root, runner, env, pushApproval,
+        language: "en", gitAuthorName: held.gitAuthorName, gitAuthorEmail: held.gitAuthorEmail,
+      });
+      assert.equal(changedLanguage.code, "INITIAL-ANSWERS-RECEIPT-CONFLICT");
+      assert.deepEqual(readFileSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), confirmedReceiptBytes);
+      assert.deepEqual(readFileSync(join(root, "pipeline.user.yaml")), confirmedSourceBytes);
       assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`^\\s*push_approval:\\s*"${pushApproval}"\\s*$`, "mu"));
       assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), new RegExp(`^\\s*human_approval:\\s*"${pushApproval}"\\s*$`, "mu"));
       assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), true);
@@ -371,11 +771,13 @@ test("a failed separate signature-anchor action preserves the completed initial 
       "gitAuthorName",
       "gitAuthorEmail",
       "humanApprovalMode",
+      "language",
     ]);
     const initial = spawnSync(initialAction.applyAction.executable, initialAction.applyAction.argv.map((value) => new Map([
       ["<PO_GIT_AUTHOR_NAME>", "Rollback PO"],
       ["<PO_GIT_AUTHOR_EMAIL>", "rollback@example.invalid"],
       ["<signature|chat>", "signature"],
+      ["<de|en>", "en"],
     ]).get(value) ?? value), {
       encoding: "utf8", shell: false, env, maxBuffer: 8 * 1024 * 1024,
     });
@@ -402,6 +804,7 @@ test("a failed separate signature-anchor action preserves the completed initial 
     const initialAnswers = JSON.parse(readFileSync(initialAnswersPath, "utf8"));
     assert.equal(initialAnswers.gitAuthorName, "Rollback PO");
     assert.equal(initialAnswers.gitAuthorEmail, "rollback@example.invalid");
+    assert.equal(initialAnswers.language, "en");
     assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.name"], { encoding: "utf8" }).status, 1);
     assert.equal(spawnSync("git", ["-C", root, "config", "--local", "--get", "user.email"], { encoding: "utf8" }).status, 1);
     assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /^\s*push_approval:\s*"signature"\s*$/mu);

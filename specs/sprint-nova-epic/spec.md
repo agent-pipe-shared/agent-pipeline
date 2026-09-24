@@ -366,8 +366,15 @@ feature package to the canonical portfolio. Its exact keys are `schema`,
 `recordSha256`. Bindings sort by `(increment,id)`; each has exact keys `id`,
 `issue`, `increment`, `acceptanceIds`, `closureMode` and
 `expiryDisposition`. Closure mode is
-`candidate-evidence`, `separate-pilot-required`, `cyborg-input-only` or
-`later-sprint-input-only`.
+`candidate-evidence`, `separate-pilot-required`, `cyborg-input-only`,
+`later-sprint-input-only` or `po-withdrawn-scope`. Only the last mode has the
+additional `poWithdrawal` object. It is limited to Issue #8 / NVA-A8-5 and
+binds the PO's 2026-08-19 scope reversal by exact backlog item path,
+reachable source commit and source-byte SHA-256, plus canonical ledger event
+sequence and entry hash. The source must attest the closed PO-reversal text;
+the current item and ledger must still agree. A withdrawn scope is neither
+candidate delivery nor a pilot result and cannot authorize `assign` or
+`close` through the normal delivery planner.
 
 The feature-package lifecycle and close path automatically emit a preview when
 an accepted Spec activates an item or accepted delivery satisfies an item's
@@ -382,7 +389,8 @@ record and emits an `assign` preview for each still-open
 the same digest and emits `close` previews only for
 `candidate-evidence` bindings whose complete acceptance and non-expired
 evidence set is present. It emits a retained `blocked` preview for
-`separate-pilot-required`, input-only, expired or incomplete bindings.
+`separate-pilot-required`, input-only, withdrawn, expired or incomplete
+bindings.
 `check-artifact-lifecycle` rejects a feature `completed` projection when a
 candidate-evidence binding lacks either an applied close receipt or explicit
 PO scope-change authority. This is the enforcement that prevents a delivered
@@ -723,8 +731,12 @@ Per-task measures are typed and separated:
 Serial and runner-native baselines use the same fixtures/scoring. Nova B may
 add local-pool/external observations but cannot rewrite prior results. A
 recommendation requires task-level benefit inside the recorded resource
-envelope; it is not universal. Delivery of this framework does not close
-`pipeline.multi-cli-efficiency-pilots`.
+envelope; it is not universal. Delivery of this framework cannot attest that
+either bespoke pilot ran or met its threshold. The PO withdrew both pilots
+and their follow-up on 2026-08-19, superseding the 2026-08-18 go decision;
+that historical scope change is accepted only through the separate source-
+and ledger-bound `po-withdrawn-scope` disposition, not through a benchmark
+PASS.
 
 Scoring version `nova-efficiency-v1` is fixed:
 

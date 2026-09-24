@@ -32,7 +32,8 @@ Vier Begriffe verhindern die meisten Missverständnisse:
 - Eine **Phase** ist eine Lebenszyklusstelle: `design_phase` formt und
   genehmigt Arbeit, `execution_phase` liefert sie. Eine Phase ist kein Profil.
 
-Nutze vor der Arbeit `/pipeline-core:pipeline-start`. Seine Bestätigungszeile ist
+Bestätige zuerst das aktive Profil für diese Aufgabe und nutze dann vor der
+Lieferarbeit `/pipeline-core:pipeline-start`. Seine Bestätigungszeile ist
 der Bootstrap-Nachweis: Sie validiert V3-Quelle und Runtime-Projektion,
 Kalibrierung, anwendbaren Status und das verfügbare Verify-Gate. Sie nutzt Profil
 und Phase der aktiven Aufgabe; ein angefragtes Modell ist kein Nachweis des
@@ -42,10 +43,10 @@ tatsächlich gelaufenen Modells.
 
 ```mermaid
 flowchart TD
-    I[Absicht: Feature, Fix oder Refactoring] --> B[Session bootstrappen]
-    B --> P{V3-Profil wählen}
-    P -->|Epic oder Feature| A[Modellfreier Advisor-Capability-Preflight]
-    P -->|Mini| T[Triage]
+    I[Absicht: Feature, Fix oder Refactoring] --> P{Aktives V3-Profil bestätigen}
+    P --> B[Session mit diesem Profil bootstrappen]
+    B -->|Epic oder Feature| A[Modellfreier Advisor-Capability-Preflight]
+    B -->|Mini| T[Triage]
     A --> T
     T --> D{Design sinnvoll oder nötig?}
     D -->|ja| DS[Design-Phase: Optionen, gegebenenfalls UI und Akzeptanzkriterien]
@@ -69,17 +70,23 @@ flowchart TD
     TA -->|ja| TT[Test-Autor und Testvertrag]
     TA -->|nein| IM[Goldfish implementiert ein begrenztes Paket]
     TT --> IM
-    IM --> V[Konfiguriertes Verify liefert Maschinen-Nachweis]
+    IM --> CM[Koordinator integriert und committet; sauberer Kandidat]
+    CM --> V[Konfiguriertes Verify liefert Maschinen-Nachweis]
     V -->|rot| RC[Ursache einordnen und recovern]
-    V -->|grün| O{Optionale Phase konfiguriert oder ausgelöst?}
-    O -->|Security| SEC[Security-Nachweis]
-    O -->|Governance| GOV[Guideline- oder Policy-Prüfung]
-    O -->|keine| C[Frischer unabhängiger Critic]
-    SEC --> C
+    V -->|grün| SQ{Security erforderlich?}
+    SQ -->|ja| SEC[Security-Nachweis]
+    SQ -->|nein| GQ{Governance erforderlich?}
+    SEC --> GQ
+    GQ -->|ja| GOV[Guideline- oder Policy-Prüfung]
+    GQ -->|nein| C[Frischer unabhängiger Critic]
     GOV --> C
     C --> CR[Critic-Ergebnis und Disposition]
     CR -->|Korrektur nötig| RC
-    CR -->|klar oder Disposition festgehalten| CL[Feature-Lifecycle abschließen]
+    CR -->|klar oder Disposition festgehalten| HA{Menschliche Abnahme erforderlich?}
+    HA -->|nein| CL[Feature-Lifecycle abschließen]
+    HA -->|ja| HD[Menschliche Entscheidung zum gelieferten Kandidaten]
+    HD -->|angenommen| CL
+    HD -->|abgelehnt| RC
     CL --> REL{Release-Phase deklariert?}
     REL -->|ja| RP[Release-Nachweis und menschliches Promotion-Gate]
     REL -->|nein| DONE[Änderung abgeschlossen]
@@ -139,7 +146,8 @@ flowchart LR
     TD -->|ja| T[Separater Test-Autor]
     TD -->|nein| G[Goldfish implementiert]
     T --> G
-    G --> VE[Ein konfigurierter Verify-Befehl]
+    G --> CM[Koordinator committet sauberen Kandidaten]
+    CM --> VE[Ein konfigurierter Verify-Befehl]
     VE -->|grüner Nachweis| CR[Frischer lesender Critic]
     VE -->|roter Nachweis| RE[Eingeordnete Recovery]
     CR -->|klar / Disposition| CO[Close]
@@ -154,7 +162,8 @@ flowchart LR
 | Preflight | Elephant und deterministische Checks. | Aktuelles PRD/Spec, Profil-/Phasenroute, Kapazität, Scope und Authority-Bindungen passen weiterhin zusammen. | Ein Mismatch vertagt oder öffnet eine Kursentscheidung; er wird nie zum informellen Dispatch. |
 | Test-Autor — optional | Eine separat gebriefte Test-Autoren-Duty. | Nutze sie, wenn sich Test- oder Gate-Vertrag selbst ändern muss. | Der Implementierende schwächt oder schreibt die Tests nicht um, die seine Umsetzung bewerten. Sein Ergebnis ist separat prüfbar. |
 | Implementieren | Goldfish. | Ein frisches, eigenständiges Implementierungspaket. Unabhängige Pakete dürfen parallel laufen, wenn Dateien und Daten nicht überlappen. | Ein Sechs-Felder-Briefing liefert Ziel, Kontext, Definition of Done, Verbote, Stopp-Bedingungen und Dispatch-Metadaten. |
-| Verify — Pflicht | Goldfish fährt den Evidence-Producer als konfiguriertes Projekt-Gate. | Für Releases fährt der Producer den einen konfigurierten Projektbefehl; dokumentierte grenzbewusste Modi fahren die feste Baseline plus registrierte Befehle für geänderte Bereiche. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
+| Kandidaten-Commit | Koordinator oder autorisierter Host nach Prüfung der Rückgabe. | Begrenztes Ergebnis integrieren und vor kandidatengebundenem Verify einen sauberen Commit-Kandidaten schaffen. | Tatsächlichen Commit und Tree festhalten; ein vorgeschlagener Child-Commit oder schmutziger Checkout ersetzt sie nicht. |
+| Verify — Pflicht | Der Koordinator ruft den konfigurierten Evidence-Producer für den committeten Kandidaten auf. | Für Releases fährt der Producer den einen konfigurierten Projektbefehl; dokumentierte grenzbewusste Modi fahren die feste Baseline plus registrierte Befehle für geänderte Bereiche. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
 | Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Der Critic bekommt Verweise auf Kandidat, Spec, Guardrails und Nachweis — nicht den Implementierungschat oder dessen Begründung. | Er läuft nach deterministischen Checks. Befunde brauchen Nachweis, Regel/Kriterium und Konsequenz. Eine Korrektur erhält ein frisches Delta-Re-Gate. Die Goldfish-Lieferung bleibt ohne unabhängigen Critic-Nachweis als Review-ausstehend markiert. |
 
 Jedes Projekt verwendet den einen vollständigen `verify`-Befehl seiner eigenen
@@ -208,6 +217,24 @@ Migrationsbefehle für die Pipeline-Source gehören in den gelegentlichen
 Maintainer-Pfad und nicht in diesen Consumer-Lifecycle. [SETUP](SETUP.md)
 beschreibt diesen Pfad sowie die geordnete Runner-Bindung, den Neustart, die
 Klassifizierung und die Übernahme eines Projekts.
+
+## Optionale Ausführungs- und Host-Grenzen
+
+Der Claude-spezifische AFK-Worker kann nach Aktivierung einen begrenzten
+Analyse-Vorschlag aus freigegebenen Repository-Eingaben liefern. Er führt
+keine Befehle aus, ändert keine Dateien und erteilt keine Freigaben.
+Lokale Worker-Aufsicht ist ein optionaler Host-Vorgang; ein Provider-Worker
+braucht ein eigenes ausdrückliches Flag. Daraus folgt weder OS-Isolation noch
+ein Standard für Hintergrundausführung.
+
+Bewahre für prüfbare Lieferungen den kandidatengebundenen Verify-Beleg auf.
+Rot, übersprungen, veraltet oder nicht passend bedeutet nicht grün; die
+[Audit- und Evidenzgrenzen](docs/audit-and-evidence.md) gelten weiter. Wo
+Claude- oder Antigravity-Hooks aktiv installiert sind, prüfen konfigurierte
+Guards Host-Aktionen. Codex nutzt nur die Command- und Write-Path-Kontrollen,
+die sein Host-Bridge tatsächlich bereitstellt; gleiche Hook-Ereignisse oder
+universelle Durchsetzung sind damit nicht behauptet. Einzelheiten stehen in
+der [englischen Host-Grenzen-Referenz](PIPELINE_FLOW.md#optional-execution-and-host-boundary-reference).
 
 ## Supportgrenze und aktueller Scope
 

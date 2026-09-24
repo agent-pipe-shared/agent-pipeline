@@ -87,9 +87,12 @@ No prior gate implies a later gate.
   retry and cleanup overhead.
 - NVA-A8-4: No concurrency recommendation is made without observed task-level
   benefit and a resource envelope.
-- NVA-A8-5: `pipeline.multi-cli-efficiency-pilots` remains an input until its
-  separately PO-gated pilot and evidence criteria are satisfied; benchmark
-  framework delivery alone cannot close it.
+- NVA-A8-5: The bespoke `pipeline.multi-cli-efficiency-pilots` scope is
+  explicitly withdrawn by the PO's 2026-08-19 closure, which supersedes the
+  2026-08-18 pilot go decision. Admission requires a reachable, byte-bound
+  withdrawal source and matching canonical backlog ledger closure; benchmark
+  framework delivery alone cannot establish this disposition, and the
+  withdrawal is never evidence that either pilot ran or met its threshold.
 
 ### `#12` Bounded scheduling
 

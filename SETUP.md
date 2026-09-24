@@ -46,11 +46,15 @@ terminology, continue with this setup guide, then read the operator-facing
 ## A. Activate the pipeline in one project repository
 
 Repeat this routine path for every application or service repository. It uses
-the public onboarding Driver: bind the supported runner integration, start a
-new session in the project root, invoke `/pipeline-core:pipeline-start`, and
-follow the returned structured action. Supply only its named human inputs; do
-not copy this source repository's `setup.mjs`, generated projections, or
-machine-local configuration into the consumer project.
+the public onboarding Driver. In a folder without Pipeline governance, first
+explain the proposed installation and ask for explicit consent; stop before
+installing, invoking `pipeline-start`, or writing project files until the user
+agrees. Then bind the supported runner integration, start a new session in the
+project root, invoke `/pipeline-core:pipeline-start`, and follow its returned
+structured action. An already-governed project may enter through bootstrap
+directly. Supply only named human inputs; do not copy this source repository's
+`setup.mjs`, generated projections, or machine-local configuration into the
+consumer project.
 
 The Driver classifies fresh, existing, legacy, partial, and host-managed roots
 before it offers a write. An explicit request to initialize is required for a
@@ -153,13 +157,19 @@ release tag on `main` (ADR-0078 D2) — it was never a branch.
 
 The final command must report exactly one installed and enabled
 `pipeline-core@agent-pipeline`. A Git marketplace snapshot is not the running
-plugin: after the first binding, fully end the Codex host process and start a
-new thread in the project root before invoking `/pipeline-core:pipeline-start`.
-For a later refresh, fully end the Codex host process and start a new Codex
-thread in the project root as well. Do not hand-edit Codex
+plugin: after the first binding or any later refresh, fully end the Codex
+host process and start a new thread in the project root before invoking
+`/pipeline-core:pipeline-start`. A fresh thread in the old process or a plugin
+reload alone does not prove that the cached skill snapshot changed. Do not hand-edit Codex
 marketplace or cache files.
 
 #### Antigravity (Agy): workspace-local binding
+
+For a currently approved release before `v0.7.0` is published, use the
+[version-independent Agy installation path](GEMINI.md#antigravity-installation-workspace-local)
+with its approved GitHub-distributed plugin directory. The pinned example
+below applies only after the `v0.7.0` tag actually exists; it is not a
+pre-release installation command.
 
 After the `v0.7.0` release tag is published on the official GitHub repository,
 run these commands with your shell in the **consumer project root**. The tag
@@ -211,20 +221,23 @@ The installer refuses an unverifiable, Pipeline-shaped stale path instead of
 deleting an entry it cannot prove it owns; do not work around this by editing
 the registry by hand.
 
-Before opening the governed workspace, verify Node.js in the environment that
-actually starts Agy — a desktop or service launcher can have a different PATH
-than an interactive terminal:
+If launching Agy from this same terminal, check Node.js immediately before
+launching it:
 
 ```sh
 command -v node
 ```
 
-Correct that host environment if the command has no result, then fully restart
-Agy and open a new workspace session in the project root. Invoke
+For a desktop or service launch, this shell result does **not** prove the Agy
+host's PATH. Inspect that launcher/service environment and confirm that Agy's
+own command tool can resolve and run `node --version` in a new session. If
+that readback is unavailable or denied, treat hook readiness as unknown;
+correct the host environment and fully restart Agy before relying on hooks.
+Then open a new workspace session in the project root and invoke
 `/pipeline-core:pipeline-start` as the first Pipeline action. Do not use an
 unattended permission-bypass mode as an installation or recovery shortcut.
 
-### 1. Let `pipeline-start` classify the consumer root
+### 1. After consent, let `pipeline-start` classify the consumer root
 
 Do not copy `setup.mjs` into a consumer project or start a blank directory by
 manually creating Git/V3 runtime files. After completing the binding and full
@@ -257,6 +270,15 @@ or V3 authority checks and has these outcomes:
   host-owned, non-writable `.git`/`.codex` controls (and `.agents` when
   present) is the supported `fresh-host-managed` variant; never delete,
   overwrite, chmod, ignore, or silently bypass those paths.
+
+This step only classifies and, when you explicitly approve a seed, creates the
+portable starting state. It does **not** finish onboarding. After this
+classification, Codex users continue at the [Fresh Codex lifecycle V4
+section](docs/v3-consumer-onboarding.md#fresh-codex-lifecycle-v4). Claude and
+Antigravity users follow their installed Driver's returned runtime/restart,
+intake, and binding action rather than repeating runner installation. Stop at
+each requested confirmation. Treat the project as ready only when a fresh
+`pipeline-start` readback explicitly says so.
 
 The Codex `SessionStart` registration provides an onboarding hint. The
 mandatory `pipeline-start` invocation remains proactive for the user's first
@@ -316,6 +338,15 @@ delivery-ready repository lifecycle.
 
 <!-- capability:starter-templates -->
 <a id="capability-starter-templates"></a>
+
+Starter templates are optional examples for a consuming project to copy and
+adapt deliberately. Copying a template does not install a plugin, activate a
+guard or create approval authority; choose one configuration owner before
+adopting it.
+Review every copied path and command against the consuming repository before
+running it. Keep project-specific identities, destinations and verification
+commands explicit rather than inheriting the examples as production defaults.
+
 <!-- capability:generated-agent-obligations -->
 <a id="capability-generated-agent-obligations"></a>
 
@@ -382,6 +413,33 @@ Migration changes the project's process, so review it like any architectural
 change. Do not paste a pipeline source's `pipeline.user.yaml` into an
 application repository or make a legacy authority look current by copying
 generated runtime files.
+
+### Missing prerequisite guidance in a consumer project
+
+The installed plugin's read-only toolchain preflight reports each configured
+tool, observed version, blocked claim and a copyable platform command. From
+the governed project root, run:
+
+```sh
+node "<absolute-plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
+```
+
+Replace `<absolute-plugin-root>` with the installed Pipeline plugin directory.
+Review any offered installer command under your host/package-management
+policy, then repeat the preflight. npm is never substituted for non-npm
+scanners; bounded Semgrep settings avoid treating ordinary home-directory
+writes as a missing installation.
+
+## Where to go next
+
+- [README](README.md) — why the pipeline exists and its core capabilities.
+- [PIPELINE_FLOW.md](PIPELINE_FLOW.md) — the maintained V3 flow and boundaries.
+- [Usage guide](docs/usage.md) — operator-facing commands and routine work.
+- [Operating Model](docs/operating-model.md) — normative roles, gates, and
+  lifecycle rules.
+- [Runtime boundary](docs/runtime-boundary.md) — exact controls, prerequisites,
+  and manual responsibilities for each supported runner integration.
+- [Documentation map](docs/README.md) — focused reference links.
 
 ## Optional advanced setup
 
@@ -533,23 +591,6 @@ not authorize secrets, unrelated paths, raw-answer retention, model
 substitution, or a runner fallback. Source and runtime readback remain
 authoritative for the selected route; see [runtime boundary](docs/runtime-boundary.md).
 
-### Missing prerequisite guidance
-
-`node setup.mjs` runs the read-only toolchain check after V3 validation. It
-reports each configured tool, observed version, blocked claim, and a copyable
-platform command. The standalone form remains:
-
-```sh
-node "<absolute-plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
-```
-
-Replace `<absolute-plugin-root>` with the installed Pipeline plugin directory;
-run the command from the governed project root. Review an offered installer
-command under your host/package-management policy,
-then repeat setup or the preflight. npm is never substituted for non-npm
-scanners; bounded Semgrep settings prevent ordinary home-directory writes from
-being reported as a missing installation.
-
 ### Transaction and rollback boundary
 
 The migration records preimages before activation. After an interrupted or
@@ -558,14 +599,3 @@ recovery; do not delete a pending transaction directory or repair its files by
 hand. This is not a general revert: change completed authority in a reviewed
 working copy, then run a new inspect → plan → explicit activation cycle and
 read it back with `node setup.mjs`.
-
-## Where to go next
-
-- [README](README.md) — why the pipeline exists and its core capabilities.
-- [PIPELINE_FLOW.md](PIPELINE_FLOW.md) — the maintained V3 flow and boundaries.
-- [Usage guide](docs/usage.md) — operator-facing commands and routine work.
-- [Operating Model](docs/operating-model.md) — normative roles, gates, and
-  lifecycle rules.
-- [Runtime boundary](docs/runtime-boundary.md) — exact controls, prerequisites,
-  and manual responsibilities for each supported runner integration.
-- [Documentation map](docs/README.md) — focused reference links.

@@ -14,6 +14,7 @@ import {
   normalizeRealExecutionOutcome,
   reduceExecutionState,
   reduceRealExecutionState,
+  reduceRealVerifiedExecutionState,
 } from "./execution-plane-contract.mjs";
 
 const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64), E = "e".repeat(64), F = "f".repeat(64);
@@ -128,4 +129,24 @@ check("rejects a stale real outcome and a malformed real worker shape without fa
   assert.equal(normalizeRealExecutionOutcome(running, realOutcome({ result: { status: "completed" } })).code, "SHAPE:real-worker-result");
 });
 
-console.log(`${passed}/5 checks passed.`);
+check("a separate matching verifier receipt promotes only the delivered real result", () => {
+  const running = runningState();
+  const delivered = reduceRealExecutionState(running, realOutcome()).state;
+  const receipt = {
+    schema: "pipeline.real-execution-verification.v1",
+    dispatchId: subject.dispatchId, attempt: subject.attempt, candidateCommit: subject.candidateCommit,
+    subjectSha256: delivered.subjectSha256, resultSha256: delivered.result.resultSha256,
+    outputPath: subject.writePaths[0], outputBytes: delivered.result.bytes,
+    outputSha256: B, expectedSha256: B,
+  };
+  const verified = reduceRealVerifiedExecutionState(delivered, receipt);
+  assert.equal(verified.ok, true, JSON.stringify(verified));
+  assert.equal(verified.state.state, "verified");
+  assert.equal(verified.state.result.status, "verified");
+  assert.equal(verified.state.observation.source, "local-fixture-verifier");
+  assert.equal(reduceRealVerifiedExecutionState(running, receipt).code, "AUTHORITY:verifier-predecessor");
+  assert.equal(reduceRealVerifiedExecutionState(delivered, { ...receipt, resultSha256: C }).code, "AUTHORITY:verifier-evidence");
+  assert.equal(reduceRealVerifiedExecutionState(delivered, { ...receipt, outputSha256: C }).code, "AUTHORITY:verifier-evidence");
+});
+
+console.log(`${passed}/6 checks passed.`);

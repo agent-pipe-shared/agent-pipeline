@@ -27,7 +27,7 @@ const EXCLUDED_PATH = "AGENTS.md";
 // Reader-review reports are immutable review evidence, not public navigation.
 // Fresh reviewers may return local absolute source links; preserving the report
 // byte-for-byte must not make those links part of the public-doc contract.
-const EXCLUDED_PREFIXES = ["docs/state-archive", "specs/sprint-nova-epic/evidence/reader-review"];
+const EXCLUDED_PREFIXES = ["docs/state-archive", "specs/sprint-alfred-epic/evidence/reader-review", "specs/sprint-nova-epic/evidence/reader-review"];
 const STATEFUL_DESIGN_SURFACES = ["templates/spec.md", "roles/elephant.md"];
 const STATEFUL_DESIGN_OPERATIVE_HEADINGS = [
   "### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)",

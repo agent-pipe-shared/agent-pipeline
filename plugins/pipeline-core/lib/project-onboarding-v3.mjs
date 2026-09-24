@@ -56,6 +56,8 @@ import {
   reconstructOnboardingKickoffPlan,
   reconstructOnboardingKickoffPromotionPlan,
 } from "./onboarding-continuity.mjs";
+import { resolveInitialAnswersState } from "./onboarding-initial-answers-state.mjs";
+import { inspectConfirmedIntakeLanguageProjection } from "./onboarding-later-language.mjs";
 import { applyRunnerProfileMigrationV3, inspectRunnerProfileMigrationV3, planRunnerProfileMigrationV3, renderCanonicalV3Manifest } from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { loadManifest, validateManifest } from "./manifest.mjs";
@@ -2494,11 +2496,13 @@ const INTAKE_PROFILE_PLACEHOLDER = "<PO_INTAKE_PROFILE>";
 const INTAKE_DESIGN_ANSWERS_PLACEHOLDER = "<PO_INTAKE_DESIGN_ANSWERS_JSON>";
 const INTAKE_TEXT_FILE = "scratch/onboarding-intake.txt";
 
-function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity) {
+function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, initialLanguage = null) {
   const values = checkpoint.status === "present"
     ? checkpoint.value.values
     : { gitAuthor: null, language: null, profile: null };
   const needsGitAuthor = values.gitAuthor === null && missingAuthorIdentity.length > 0;
+  // Intake is its own later explicit PO consent. The first-round answer is a
+  // reviewed default here, not a forced value: a later different answer wins.
   const needsLanguage = values.language === null;
   const needsProfile = values.profile === null;
   const inputs = [
@@ -2520,7 +2524,8 @@ function intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity) {
     inputs,
     mutation: false,
     requiresConfirmation: false,
-    guidance: `ask once for explicit consent, the still-unresolved typed values listed in inputs, and the first project description. Write the projectDescription bytes verbatim to ${INTAKE_TEXT_FILE} inside this repository (create scratch/ if absent); the returned applyAction deliberately uses only --text-file, never --text, so multiline text remains copy-safe and the two mutually exclusive forms can never collide. Replace only the typed placeholders present in applyAction.argv with the matching verbatim single-line answers, then execute that exact action. Git author fields are omitted when repository-local Git already resolves them; do not ask for them again or reconstruct intake-consent-apply yourself.`,
+    ...(needsLanguage && initialLanguage !== null ? { reviewedDefaults: { language: { value: initialLanguage, source: "confirmed-initial-answer", requiresConfirmation: true } } } : {}),
+    guidance: `ask once for explicit consent, the still-unresolved typed values listed in inputs, and the first project description. ${needsLanguage && initialLanguage !== null ? `The earlier confirmed onboarding language was ${initialLanguage}; present it as a default, but accept a different explicitly confirmed intake language. The later intake answer governs project material, and the CLI reports the difference for audit. ` : ""}Write the projectDescription bytes verbatim to ${INTAKE_TEXT_FILE} inside this repository (create scratch/ if absent); the returned applyAction deliberately uses only --text-file, never --text, so multiline text remains copy-safe and the two mutually exclusive forms can never collide. Replace only the typed placeholders present in applyAction.argv with the matching verbatim single-line answers, then execute that exact action. Git author fields are omitted when repository-local Git already resolves them; do not ask for them again or reconstruct intake-consent-apply yourself.`,
     applyAction: commandAction(argv, true, true, INTAKE_CONSENT_APPLY_SCHEMA, ["applied"]),
     expected: { schema: SCHEMA, statuses: ["intake-required"] },
   };
@@ -3081,12 +3086,51 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
     });
     const consentMissing = checkpoint.status === "absent" || checkpoint.value.consent === null;
     const transactionState = checkpoint.status === "present" ? checkpoint.value.transactionState : null;
+    if (!consentMissing) {
+      const languageProjection = inspectConfirmedIntakeLanguageProjection({
+        rootDir: root, repositoryCapability: repository.mode, deps: fs,
+      });
+      if (["required", "pending", "invalid"].includes(languageProjection.status)) {
+        const recoverable = languageProjection.status !== "invalid";
+        return lifecycleResult({
+          status: "intake-required",
+          root, runner, intent, repository, runtime, continuity, appServer,
+          nextAction: recoverable ? commandAction(
+            [ONBOARDING_SCRIPT, "intake-consent-apply", "--root", root, "--granted",
+              "--language", languageProjection.language, "--activate", "--runner", runner],
+            true, false, INTAKE_CONSENT_APPLY_SCHEMA, ["applied"],
+          ) : null,
+          diagnostics: [lifecycleDiagnostic(
+            "$.continuity", "intake_language_projection_required",
+            recoverable
+              ? "later confirmed intake language has not reached all source, machine and audit targets"
+              : "later intake language projection has invalid or drifting evidence",
+            recoverable
+              ? "replay the already recorded consent through the exact returned recovery action"
+              : "inspect the private language projection marker and target bytes before any further onboarding mutation",
+          )],
+        });
+      }
+    }
     if (consentMissing) {
+      const firstAnswers = initialAnswersReceipt(root, fs, repository.mode);
+      if (repository.mode === "host-managed" && firstAnswers === null) {
+        return lifecycleResult({
+          status: "intake-required",
+          root, runner, intent, repository, runtime, continuity, appServer,
+          nextAction: hostManagedFirstAnswersAction(root, runner, repository, fs),
+          diagnostics: [lifecycleDiagnostic(
+            "$.continuity", "initial_answers_required",
+            "host-managed repository has no private first-answer receipt",
+            "collect and apply the bundled identity, approval and language answers before separate intake consent",
+          )],
+        });
+      }
       const missingAuthorIdentity = unresolvedAuthorIdentityKeys(root, repository.mode !== "local", fs);
       return lifecycleResult({
         status: "intake-required",
         root, runner, intent, repository, runtime, continuity, appServer,
-        nextAction: intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity),
+        nextAction: intakeConsentAction(root, runner, checkpoint, missingAuthorIdentity, firstAnswers?.language ?? null),
         diagnostics: [lifecycleDiagnostic(
           "$.continuity",
           "intake_required",
@@ -5130,6 +5174,7 @@ const AUTHOR_IDENTITY_FIELD_MAX_BYTES = 320;
 const INITIAL_GIT_AUTHOR_NAME_PLACEHOLDER = "<PO_GIT_AUTHOR_NAME>";
 const INITIAL_GIT_AUTHOR_EMAIL_PLACEHOLDER = "<PO_GIT_AUTHOR_EMAIL>";
 const INITIAL_PUSH_APPROVAL_PLACEHOLDER = "<signature|chat>";
+const INITIAL_LANGUAGE_PLACEHOLDER = "<de|en>";
 
 // Same `collect-input` shape as `collectGoalAction()`, asking for both fields
 // at once: the PO's own wording asks once for both, never one at a time and
@@ -5281,20 +5326,44 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault)
   };
 }
 
-function initialAnswersReceipt(root, fs) {
+function initialAnswersReceipt(root, fs, repositoryCapability = "local") {
   try {
-    const path = safePath(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH, fs);
+    const path = repositoryCapability === "host-managed"
+      ? resolveInitialAnswersState(root, "host-managed").receipt
+      : safePath(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH, fs);
     if (!fs.existsSync(path)) return null;
     const stat = fs.lstatSync(path);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) return null;
     const parsed = JSON.parse(fs.readFileSync(path, "utf8"));
     if (parsed?.schema !== PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
       || parsed.root !== root
-      || !["signature", "chat"].includes(parsed.pushApprovalPreference)) return null;
+      || !["signature", "chat"].includes(parsed.pushApprovalPreference)
+      || (parsed.language !== undefined && parsed.language !== null && !["de", "en"].includes(parsed.language))) return null;
     return parsed;
   } catch {
     return null;
   }
+}
+
+function hostManagedFirstAnswersAction(root, runner, repository, fs) {
+  const ask = collectInitialAnswersAction({
+    root,
+    runner,
+    repository,
+    authorIdentityAction: collectAuthorIdentityAction(["user.name", "user.email"]),
+    pushApprovalSetupAction: collectPushApprovalPreferenceAction(
+      defaultPoKeyDirectoryHint(fs), machinePushApprovalPreference(fs),
+    ),
+    trustAnchorGuidanceAction: null,
+  }, fs);
+  // The driver already has a generic contract for published pending asks on
+  // a non-mutating command. It stops before running that command, and on the
+  // next invocation the private first-answer receipt moves this branch to
+  // the separate, explicit intake-consent question.
+  return { ...commandAction(
+    [ONBOARDING_SCRIPT, "inspect", "--root", root, "--runner", runner],
+    false, false, SCHEMA, ["intake-required"],
+  ), pendingAsks: [ask] };
 }
 
 /**
@@ -6182,6 +6251,19 @@ function withPendingVerifyContractAsk(observed) {
 // existing tests and any caller already reading them directly.
 function collectInitialAnswersAction(observed, fs) {
   if (!observed.pushApprovalSetupAction) return null;
+  let answeredLanguage = null;
+  try {
+    const checkpoint = (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)({
+      rootDir: observed.root,
+      repositoryCapability: observed.repository.mode,
+      spawn: fs.spawnSync,
+    });
+    if (checkpoint.status === "present" && ["de", "en"].includes(checkpoint.value.values.language)) {
+      answeredLanguage = checkpoint.value.values.language;
+    }
+  } catch {
+    // An unavailable private checkpoint never authorizes a guessed answer.
+  }
   const authorInputs = observed.authorIdentityAction?.inputs ?? [];
   const trustSetup = observed.trustAnchorGuidanceAction?.applyAction?.argv?.[0] === ONBOARDING_INIT_DRIVER
     ? observed.trustAnchorGuidanceAction
@@ -6189,6 +6271,7 @@ function collectInitialAnswersAction(observed, fs) {
   const inputs = [
     ...authorInputs,
     observed.pushApprovalSetupAction.input,
+    ...(answeredLanguage === null ? [{ name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true }] : []),
     ...(trustSetup?.inputs ?? []),
   ];
   const identityProvenance = gitIdentityProvenance(observed.root, fs);
@@ -6203,6 +6286,7 @@ function collectInitialAnswersAction(observed, fs) {
   // `--push-approval` as a read-compatible alias for old copied commands, but
   // every newly rendered action names the shared policy it actually applies.
   argv.push("--human-approval", INITIAL_PUSH_APPROVAL_PLACEHOLDER);
+  argv.push("--language", answeredLanguage ?? INITIAL_LANGUAGE_PLACEHOLDER);
   if (trustSetup) {
     argv.push(
       "--trust-anchor-mode", TRUST_ANCHOR_MODE_PLACEHOLDER,
@@ -6218,11 +6302,13 @@ function collectInitialAnswersAction(observed, fs) {
     requiresConfirmation: false,
     reviewedDefaults: {
       runner: { value: observed.runner, source: "explicit-caller", requiresConfirmation: true },
-      language: { value: "en", source: "fresh-project-default", requiresConfirmation: true },
+      language: answeredLanguage === null
+        ? { value: "en", source: "fresh-project-default", requiresConfirmation: true }
+        : { value: answeredLanguage, source: "confirmed-intake-checkpoint", requiresConfirmation: false },
       gitIdentity: identityProvenance,
       humanApproval: { value: machinePushApprovalPreference(fs) ?? "signature", source: "machine-plane-or-fail-closed-default", requiresConfirmation: true },
     },
-    guidance: `collect this one initial PO round, replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
+    guidance: `${answeredLanguage === null ? "Collect the initial PO round, including an explicit de|en language choice." : `Collect the initial PO round; the existing intake checkpoint already confirms ${answeredLanguage}, so do not ask language again.`} Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. It records the repository-local Git author and confirmed language, applies the shared human-approval policy for design/plan and push, ${trustSetup ? "imports an existing PEM key or creates one new key and materializes its public anchor, " : "reuses the already materialized public anchor, "}and re-enters the public onboarding driver. Later intake still requires explicit consent when not already recorded, but reuses this language instead of asking it again. Do not reconstruct git config, machine-plane, intake, or key-setup commands. The real verify command is intentionally deferred until the approved design-to-implementation handover can offer the project's actual test command.`,
     applyAction: commandAction(
       argv,
       true,

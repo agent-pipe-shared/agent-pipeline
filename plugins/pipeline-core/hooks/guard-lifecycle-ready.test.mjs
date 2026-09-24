@@ -1259,14 +1259,21 @@ test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survive
         lifecycleStatus: "projection-drift",
       });
     };
+    // This fixture tests runner-permission recovery, not Codex postinstall
+    // attestation. Keep the unrelated preflight observation explicit and
+    // nonmatching rather than spawning its real, bounded 10-second host probe
+    // for every one of the negative command variants below.
+    const unrelatedPreflight = () => ({ schema: "pipeline.start-preflight.v1", status: "ready" });
     const run = (command, observed = observation) => evaluateLifecycleReadyGuard(
       { tool_name: "Bash", tool_input: { command } },
-      { projectDir: path, requireProjectOnboardingReadyFn: invalidObservation, inspectProjectOnboardingV3Fn: () => observed },
+      { projectDir: path, requireProjectOnboardingReadyFn: invalidObservation,
+        inspectProjectOnboardingV3Fn: () => observed, observePipelineStartPreflightFn: unrelatedPreflight },
     );
     assert.equal(run(`node ${argv.join(" ")}`).exitCode, 0);
     assert.equal(evaluateLifecycleReadyGuard(
       { tool_name: "Bash", tool_input: { command: `node ${argv.join(" ")}` } },
-      { projectDir: path, requireProjectOnboardingReadyFn: projectionDrift, inspectProjectOnboardingV3Fn: () => observation },
+      { projectDir: path, requireProjectOnboardingReadyFn: projectionDrift,
+        inspectProjectOnboardingV3Fn: () => observation, observePipelineStartPreflightFn: unrelatedPreflight },
     ).exitCode, 0, "the producer's ordinary projection-drift state admits its exact repair");
     assert.equal(evaluateLifecycleReadyGuard(
       { tool_name: "Bash", tool_input: { command: `node ${argv.join(" ")}` } },
@@ -1279,6 +1286,7 @@ test("NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survive
           });
         },
         inspectProjectOnboardingV3Fn: () => observation,
+        observePipelineStartPreflightFn: unrelatedPreflight,
       },
     ).exitCode, 2, "the repair remains unavailable for every other non-ready lifecycle state");
     assert.equal(run(`node ${[...argv.slice(0, 5), "b".repeat(64), ...argv.slice(6)].join(" ")}`).exitCode, 2);
@@ -2625,7 +2633,7 @@ test("OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("LND-5 admits only the canonical session Critic finalizer request under the project scratch root", () => {
+test("LND-5 admits only canonical session Critic prelaunch and finalization requests under the project scratch root", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "session-critic-finalizer-outside-"));
   try {
@@ -2639,15 +2647,19 @@ test("LND-5 admits only the canonical session Critic finalizer request under the
       requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
     };
     const script = join(SCRIPTS_DIR, "session-critic-finalizer.mjs");
-    const canonical = `node '${script}' finalize --root '${path}' --request scratch/session-critic-finalization-request.json`;
-    assert.equal(isSanctionedLifecycleCommand(canonical, path), true);
-    assert.deepEqual(evaluateLifecycleReadyGuard(bash(canonical), nonReady), { exitCode: 0, stderr: "" });
-    const skillCommand = `node '${script}' finalize --root . --request scratch/session-critic-finalization-request.json`;
-    assert.equal(isSanctionedLifecycleCommand(skillCommand, path), true);
-    assert.deepEqual(evaluateLifecycleReadyGuard(bash(skillCommand), nonReady), { exitCode: 0, stderr: "" });
+    for (const action of ["admit", "finalize"]) {
+      const canonical = `node '${script}' ${action} --root '${path}' --request scratch/session-critic-finalization-request.json`;
+      assert.equal(isSanctionedLifecycleCommand(canonical, path), true);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(canonical), nonReady), { exitCode: 0, stderr: "" });
+      const skillCommand = `node '${script}' ${action} --root . --request scratch/session-critic-finalization-request.json`;
+      assert.equal(isSanctionedLifecycleCommand(skillCommand, path), true);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(skillCommand), nonReady), { exitCode: 0, stderr: "" });
+    }
 
     for (const command of [
       `node '${script}' inspect --root '${path}' --request scratch/session-critic-finalization-request.json`,
+      `node '${script}' admit --root '${path}' --request scratch/session-critic-finalization-request.json --force`,
+      `node '${script}' admit --root '${path}' --request scratch/linked-request.json`,
       `node '${script}' finalize --root '${path}' --request scratch/session-critic-finalization-request.json --force`,
       `node '${script}' finalize --root '${path}' --request '${join(outside, "request.json")}'`,
       `node '${script}' finalize --root '${path}' --request ../request.json`,

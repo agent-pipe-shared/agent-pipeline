@@ -2243,7 +2243,7 @@ function sanctionedSessionCriticFinalizerArgs(args, root) {
     || (args[1] === "--root" && args[2] === "."
       && resolve(root, args[2]) === resolve(root)
       && isRealpathedWithinBoundary(resolve(root, args[2]), root));
-  if (args[0] !== "finalize" || !exactProjectRoot
+  if (!(["admit", "finalize"].includes(args[0])) || !exactProjectRoot
     || args[3] !== "--request" || args.length !== 5) return false;
   const request = args[4];
   if (typeof request !== "string" || request.length === 0 || request.length > 256

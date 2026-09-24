@@ -29,30 +29,6 @@ A refusal, recovery result, or restart boundary is also an action contract.
 Use its named public recovery step; do not edit generated state or guard files
 by hand to move past it.
 
-## Assess architecture adoption in an existing project
-
-Architecture adoption begins with two read-only commands from the installed
-plugin. Run them in the repository that you intend to govern; they inspect that
-repository only and do not create maps, baselines, or a decision.
-
-```bash
-node <plugin-root>/scripts/architecture-adoption.mjs status --root <project-root> --json
-node <plugin-root>/scripts/architecture-adoption.mjs propose --root <project-root> --json
-```
-
-`adoption-required` means the project has neither a usable architecture
-baseline nor a valid adoption decision. The proposal is a four-stage planning
-aid, not a pass or an authorization. The repository owner chooses whether to
-adopt a bounded scope, defer it with a review/expiry date, or record a partial
-scope through the normal human-decision route. Do not hand-write
-`architecture/adoption-state.json`.
-
-A deferred decision is not tied to an ordinary Git commit. It remains valid
-until its declared review or expiry date, explicit supersession, or a changed
-decision. Before work that depends on the architecture controls, the planning
-boundary checks the current decision and scope; it fails closed if the
-decision is absent, expired, malformed, or out of scope.
-
 ## Verify a consumer project
 
 Use the installed plugin's `scripts/verify-evidence-producer.mjs` as the
@@ -75,7 +51,16 @@ work, review, candidate, or push boundary. `release` always runs the full
 project command. Unknown paths, missing bindings and incomplete policies fall
 back to full.
 
-Run the evidence producer once with the reviewed base:
+Choose **one** command for the boundary you are at; the five lines below are
+alternatives, not a sequence. Supply that boundary's reviewed base and run
+the evidence producer once:
+
+Obtain the base from the boundary already under review: the task's starting
+commit for `work`, the Critic packet's review base for `critic`, the approved
+integration base for `candidate`, the verified remote preimage for `push`, or
+the release plan's base for `release`. Resolve it to an exact commit before
+invocation; do not guess `HEAD~1` or use a moving remote ref. If there is no
+reviewed base, omit `--base` and accept the producer's full-run fallback.
 
 ```bash
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode work --base <work-base>
@@ -109,6 +94,10 @@ attempt cannot borrow an old green result as current evidence. Resolve
 
 Once the project is ready and any required plan gate is recorded, delivery
 continues autonomously within that approved scope:
+
+The human-approval strength is a separate, deliberately configured choice;
+the default is the signature path. The [selector reference](#choose-the-human-approval-strength-deliberately)
+explains its limits. No delivery step silently changes the approval mode.
 
 There is no cross-runner cost or delivery-time estimate for this project.
 Treat the [measurement boundary](cost-and-measurement.md) as transparency
@@ -168,6 +157,37 @@ Do not use `chat` for security-sensitive, regulated, production-critical,
 financially consequential, or otherwise valuable repositories. Tests, action
 bindings, and other safety rules still apply, but none turn the chat answer
 into an attestation.
+
+## Assess architecture adoption in an existing project
+
+This is a preview of the forthcoming `0.7.0` distribution, not an instruction
+to run commands that may be absent from an older installed release. First
+read back the installed plugin version and root in a fresh `pipeline-start`
+session. Use these commands only when that installed version contains the
+architecture-adoption CLI; otherwise follow the currently installed release's
+documented path and wait for the approved update.
+
+Architecture adoption begins with two read-only commands from the installed
+plugin. Run them in the repository that you intend to govern; they inspect that
+repository only and do not create maps, baselines, or a decision.
+
+```bash
+node <plugin-root>/scripts/architecture-adoption.mjs status --root <project-root> --json
+node <plugin-root>/scripts/architecture-adoption.mjs propose --root <project-root> --json
+```
+
+`adoption-required` means the project has neither a usable architecture
+baseline nor a valid adoption decision. The proposal is a four-stage planning
+aid, not a pass or an authorization. The repository owner chooses whether to
+adopt a bounded scope, defer it with a review/expiry date, or record a partial
+scope through the normal human-decision route. Do not hand-write
+`architecture/adoption-state.json`.
+
+A deferred decision is not tied to an ordinary Git commit. It remains valid
+until its declared review or expiry date, explicit supersession, or a changed
+decision. Before work that depends on the architecture controls, the planning
+boundary checks the current decision and scope; it fails closed if the
+decision is absent, expired, malformed, or out of scope.
 
 ## Private review export
 

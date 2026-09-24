@@ -6913,7 +6913,9 @@ test("a recognized read-only host control layout receives portable onboarding wi
     });
     assert.equal(postSeed.status, "intake-required");
     assert.equal(postSeed.runtime.status, "plugin-managed-unattested");
-    assert.equal(postSeed.nextAction.kind, "collect-input");
+    assert.equal(postSeed.nextAction.kind, "command");
+    assert.deepEqual(postSeed.nextAction.pendingAsks[0].inputs.map((input) => input.name),
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "language"]);
     const kickoff = completeKickoff(
       path,
       "Build one small HTML game from the supplied design",
@@ -8513,6 +8515,39 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
     assert.equal(afterGenerate.nextAction.kind, "command");
     assert.equal(afterGenerate.nextAction.argv[1], "bootstrap-bind-plan");
   } finally { dispose(path); }
+});
+
+test("a confirmed first-round language is visible as a default, not forced on later intake", () => {
+  const paths = [];
+  try {
+    for (const runner of ["claude", "codex", "antigravity"]) {
+      const path = root();
+      paths.push(path);
+      const barrier = initializeRestartRequiredRoot(path);
+      clearRuntimeBarrier(path, barrier);
+      mkdirSync(join(path, ".git", "agent-pipeline"), { recursive: true });
+      writeFileSync(join(path, ".git", "agent-pipeline", "onboarding-initial-answers.json"), JSON.stringify({
+        schema: "pipeline.onboarding-initial-answers.v1",
+        root: path,
+        runner,
+        pushApprovalPreference: "chat",
+        language: "de",
+        gitAuthorName: "Confirmed PO",
+        gitAuthorEmail: "confirmed@example.invalid",
+        updatedAt: "2026-09-24T00:00:00.000Z",
+      }));
+      const observed = inspectProjectOnboardingV3({ rootDir: path, runner, deps: fakeDeps });
+      assert.equal(observed.status, "intake-required", runner);
+      assert.equal(observed.nextAction.inputs.some((input) => input.name === "language"), true, runner);
+      assert.deepEqual(observed.nextAction.reviewedDefaults.language, {
+        value: "de", source: "confirmed-initial-answer", requiresConfirmation: true,
+      }, runner);
+      const argv = observed.nextAction.applyAction.argv;
+      assert.equal(argv[argv.indexOf("--language") + 1], "<PO_INTAKE_LANGUAGE>", runner);
+    }
+  } finally {
+    for (const path of paths) dispose(path);
+  }
 });
 
 test("all three runners execute the exact returned consent and design-question actions without repeating durable Git identity", () => {

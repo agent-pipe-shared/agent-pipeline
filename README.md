@@ -7,14 +7,25 @@ inspect later.
 
 **At a glance, Agent-Pipeline helps you to:**
 
-- turn an idea or change request into a scoped delivery path with checkable acceptance criteria;
-- split implementation into bounded, fresh-context tasks instead of one opaque agent session;
-- run configured Verify and security checks against the exact candidate before delivery;
-- apply your project's guidelines, policies, and Git/write boundaries where they are configured;
-- obtain an independent Critic review before a human makes the go/no-go decision;
-- keep human approval explicit for plans and consequential external actions, rather than inferring it from evidence;
-- retain candidate-bound evidence, review records, and offline audit bundles for later inspection;
-- calibrate rigor, roles, and model effort to the scope and stakes of each piece of work.
+- **Specify what can be checked:** turn an idea into a scoped brief and, when its
+  stakes warrant it, a PRD or spec with EARS-style acceptance criteria linked
+  to tests and review.
+- **Preserve architecture across sessions:** assess the impact of a change,
+  record significant choices in ADRs, and use an OKF-based, machine-readable
+  map and architecture-fitness checks where the project has adopted them.
+- **Keep agent work bounded:** split implementation into fresh-context tasks
+  with explicit scope, handovers, and role/model effort matched to the work.
+- **Verify the actual candidate:** apply configured project policies and
+  Git/write guardrails, then run tests and security checks against the exact
+  candidate. Depending on the project's setup, these cover secrets,
+  dependency vulnerabilities, licenses, and static analysis; optional SBOM
+  and provenance checks make supply-chain inputs inspectable.
+- **Separate review from authority:** obtain independent Critic findings,
+  while people retain plan acceptance, go/no-go, and approval of consequential
+  external actions.
+- **Leave an inspectable trail:** retain candidate-bound receipts, decision
+  records, and offline audit bundles; missing or unavailable checks stay
+  visible rather than becoming an implied pass.
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
@@ -22,6 +33,15 @@ inspect later.
 > normal consumer adoption flow, continue with [PIPELINE_FLOW](PIPELINE_FLOW.md)
 > for the lifecycle, and then use [Usage](docs/usage.md). The links below are
 > optional reference.
+
+> **Beta licensing outlook:** The current license permits internal use by a
+> commercial company; monetizing Agent-Pipeline itself already requires a
+> separate agreement. If Agent-Pipeline proves useful at broader scale, a
+> future version of this product may require payment for commercial use under
+> a clearly published, proportionate fair-use policy. No such fee, threshold,
+> or change is in force today. This notice does not amend the current license
+> or retroactively change the terms for copies already received. See
+> [Licensing](docs/licensing.md).
 
 ## The problem
 
@@ -150,14 +170,19 @@ rule to enforced rule — lives in the
 ## Three dials, not one size fits all
 
 The method uses calibrated strictness: teams can match the written contract
-and review depth to the delivery's actual stakes. Three independent dials set
-that:
+and implementation effort to the delivery's actual stakes. Three configuration
+choices shape that work:
 
 - **Rigor per task** — issue-only / delta-spec / spec-anchored
 - **Governance mode per rule set** — advisory / enforcing / off
 - **Work profile per topic** — epic / feature / mini (model and effort per
   phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
   bootstrap and consultation is on demand)
+
+**Risk is assessed separately.** Security, architecture, guardrail, irreversible,
+costly or externally visible impact can require stronger independent review
+and human approval even for a short change or a `mini` profile. See
+[Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review).
 
 ## Learn more
 
@@ -202,19 +227,43 @@ dauerhaften, später einsehbaren Nachweis.
 
 **Kurz gesagt hilft dir Agent-Pipeline dabei:**
 
-- aus einer Idee oder Änderungsanfrage einen begrenzten Lieferweg mit prüfbaren Akzeptanzkriterien zu machen;
-- die Umsetzung in klar eingegrenzte Aufgaben mit frischem Kontext zu teilen, statt alles einer undurchsichtigen Agentensitzung zu überlassen;
-- konfigurierte Verify- und Sicherheitsprüfungen gegen genau den Kandidaten vor der Lieferung auszuführen;
-- die Richtlinien, Policies sowie Git-/Schreibgrenzen deines Projekts dort anzuwenden, wo sie konfiguriert sind;
-- eine unabhängige Critic-Prüfung einzuholen, bevor ein Mensch Go oder No-Go entscheidet;
-- menschliche Freigaben für Pläne und folgenreiche externe Aktionen explizit zu halten, statt sie aus Evidenz abzuleiten;
-- kandidatengebundene Evidenz, Review-Nachweise und Offline-Audit-Bundles für spätere Prüfung vorzuhalten;
-- Rigor, Rollen und Modellaufwand an Umfang und Risiko jedes Arbeitspakets anzupassen.
+- **Prüfbar spezifizieren:** aus einer Idee einen begrenzten Auftrag und,
+  wenn die Tragweite es verlangt, PRD oder Spec mit EARS-artigen
+  Akzeptanzkriterien ableiten, die mit Tests und Review verknüpft sind.
+- **Architektur über Sitzungen hinweg bewahren:** Auswirkungen vor Änderungen
+  beurteilen, wichtige Entscheidungen in ADRs festhalten und – wo eingeführt –
+  eine OKF-basierte, maschinenlesbare Map samt Architektur-Fitness nutzen.
+- **Agentenarbeit begrenzen:** Umsetzung in Aufgaben mit frischem Kontext,
+  klarem Umfang und Übergaben aufteilen; Rollen und Modellaufwand passend
+  wählen.
+- **Den echten Kandidaten prüfen:** konfigurierte Projekt-Policies sowie Git-
+  und Schreibgrenzen anwenden; Tests und Sicherheitsprüfungen gegen genau
+  diesen Kandidaten ausführen. Je nach Projekteinstellung prüfen sie Secrets,
+  Schwachstellen in Abhängigkeiten, Lizenzen und statische Codebefunde;
+  optionale SBOM- und Provenienzprüfungen machen Lieferketten-Eingaben
+  nachvollziehbar.
+- **Review und Autorität trennen:** unabhängige Critic-Befunde einholen;
+  Planfreigabe, Go/No-Go und folgenreiche externe Aktionen bleiben menschliche
+  Entscheidungen.
+- **Eine prüfbare Spur hinterlassen:** kandidatengebundene Receipts,
+  Entscheidungsnachweise und Offline-Audit-Bundles erhalten; fehlende oder
+  nicht verfügbare Prüfungen werden nicht stillschweigend zu einem Pass.
 
 > **Einstieg für Neue:** Lies diese Seite und folge dann [SETUP](SETUP.md) für
 > den normalen Consumer-Ablauf, nutze danach [PIPELINE_FLOW](PIPELINE_FLOW.de.md)
 > für den Lifecycle und lies anschließend [Usage](docs/usage.md). Die weiteren Links sind
 > Nachschlagewerk.
+
+> **Lizenzausblick für die Beta:** Die geltende Lizenz erlaubt auch die interne
+> Nutzung in Unternehmen; wer Agent-Pipeline selbst vermarktet, benötigt schon
+> heute eine gesonderte Vereinbarung. Wenn sich Agent-Pipeline in breiterer
+> Nutzung bewährt, könnte eine künftige Version dieses Produkts für
+> kommerzielle Nutzung unter einer klar veröffentlichten, verhältnismäßigen
+> Fair-Use-Regelung kostenpflichtig werden. Heute gilt weder eine solche
+> Gebühr noch ein Schwellenwert oder eine entsprechende Lizenzänderung. Dieser
+> Hinweis ändert die geltende Lizenz nicht und stellt bereits erhaltene Kopien
+> nicht rückwirkend unter andere Bedingungen. Siehe
+> [Lizenzierung](docs/licensing.md).
 
 > **Was du prüfen kannst:** kandidatengebundene Verify-Receipts,
 > Security-Scan-Status sowie erforderliche Review- und Freigabe-Nachweise. Ein
@@ -264,9 +313,9 @@ Ergänzend dazu:
   übersprungene Hooks verweigern. Die aktiven Kontrollen hängen von Runner und
   Projektkonfiguration ab; siehe [Enforcement](docs/enforcement.md).
 - **Eine Modell-/Token-Policy** — rollenabgestuftes Modell-Routing (Design /
-  Implementierung / Mechanik / Review / optionaler Advisor), die du auf dein
-  eigenes Abo einstellst, sodass sich die Kosten nach der Aufgabenkomplexität
-  richten, statt dass ein einziges Modell alles übernimmt.
+  Implementierung / Mechanik / Review / optionaler Advisor), das du auf dein
+  eigenes Abo einstellst. Es unterstützt aufgabengerechtes Routing, liefert
+  aber keine Kostenschätzung.
 - **Nachweispflicht** — „fertig" heißt: ein maschinell geschriebenes Log oder
   Ergebnis, dazu der exakte Befehl und dessen Exit-Code — nie eine vom Modell
   formulierte Behauptung, etwas „sollte funktionieren".
@@ -344,14 +393,20 @@ Hausregel bis zur erzwungenen Regel — steht im
 ## Drei Drehregler statt einer Einheitsgröße
 
 Die Methode nutzt kalibrierte Strenge: Teams können schriftlichen Vertrag und
-Review-Tiefe an die tatsächlichen Stakes einer Lieferung anpassen. Drei
-unabhängige Regler stellen das ein:
+Umsetzungsaufwand an die tatsächlichen Stakes einer Lieferung anpassen. Drei
+Konfigurationsentscheidungen prägen diese Arbeit:
 
 - **Rigor pro Aufgabe** — Issue-only / Delta-Spec / Spec-verankert
 - **Governance-Modus pro Regelwerk** — advisory / enforcing / off
 - **Arbeitsprofil pro Thema** — Epic / Feature / Mini (Modell und Effort je
   Phase/Runner in `pipeline.user.yaml`; Advisor-Capability ist im Bootstrap
   modellfrei und Consultation läuft on demand)
+
+**Risiko wird zusätzlich beurteilt.** Sicherheits-, Architektur- und
+Guardrail-Wirkung sowie irreversible, teure oder extern sichtbare Folgen
+können auch bei einer kurzen Änderung oder einem `Mini`-Profil stärkeren
+unabhängigen Review und menschliche Freigabe verlangen. Siehe
+[Pipeline Flow](PIPELINE_FLOW.de.md#2-umfang-von-design-und-review-entscheiden).
 
 ## Source-Maintainer-Referenz
 

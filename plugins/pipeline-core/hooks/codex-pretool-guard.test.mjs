@@ -188,7 +188,7 @@ function createReadyLifecycleFixture(mode = "chat") {
   // fail-closed to signature, which keeps this fixture focused on HGO's two policy
   // continuations instead of duplicating the full detached-proof ceremony
   // covered by project-onboarding-e2e.test.mjs.
-  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "codex", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat"], { cwd: root, encoding: "utf8", shell: false });
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "codex", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat", "--language", "en"], { cwd: root, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
   assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /push_approval: "chat"/u);
   assert.match(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), /human_approval: "chat"/u);

@@ -65,7 +65,10 @@ test("Critic policy permits autonomous review only after the standard green Veri
   assert.match(skill, /deterministic Verify chain is green/);
   assert.doesNotMatch(skill, /only the PO \(or the Elephant relaying the PO's explicit instruction/);
   assert.match(skill, /immediately before every Critic\s+spawn, run `scripts\/critic-dispatch-preflight\.mjs`/);
-  assert.match(skill, /not Critic work: do\s+not spawn a child, create a packet or substitute prose\/evidence/);
+  assert.match(skill, /Before the fresh Critic starts, the coordinator calls\s+`session-critic-finalizer\.mjs admit`/);
+  assert.match(skill, /Dispatch one fresh, independent, read-only Critic only after `admitted` readback/);
+  assert.match(skill, /A rejected prelaunch admission is a coordinator defect, not Critic work: do\s+not spawn a child or substitute prose\/evidence/);
+  assert.match(skill, /A returned verdict without\s+the exact prelaunch admission cannot mint a passing receipt/);
 });
 
 class MemoryPersistence {

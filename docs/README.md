@@ -30,6 +30,9 @@ evidence; they are not copy-and-run instructions for a consumer project.
   architecture controls.
 - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
   preview-first migration and the Codex lifecycle V4.
+- [`onboarding-recovery.md`](onboarding-recovery.md) — exceptional, explicitly
+  returned recovery paths after a typed onboarding or migration failure; not
+  a routine first-install checklist.
 - [`runtime-boundary.md`](runtime-boundary.md) and
   [`runner-support.md`](runner-support.md) — what is shared methodology and
   what the installed runner can actually enforce.
@@ -38,8 +41,8 @@ evidence; they are not copy-and-run instructions for a consumer project.
 
 - [`enforcement.md`](enforcement.md) — configured guard and lifecycle
   enforcement, including runner limits.
-- [`audit-and-evidence.md`](audit-and-evidence.md) — candidate-bound receipts,
-  Audit Bundles, and offline evidence viewing; artifacts are not compliance
+- [`audit-and-evidence.md`](audit-and-evidence.md) — candidate-bound receipts
+  and offline evidence viewing; artifacts are not compliance
   certification or authority.
 - [`security-controls.md`](security-controls.md) — scanner/control boundaries,
   framework mappings, waivers, and runtime limits.

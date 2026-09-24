@@ -25,12 +25,16 @@ projection plan.
   consultation is on demand. A migration preview is not an approval, push, or
   release authorization.
 
-## Install the runner integration first
+## After installation consent, bind the runner integration
 
-Bind the approved GitHub-distributed plugin for the runner that will govern the
+In an ungoverned folder, ask for and receive explicit installation consent
+before installing, invoking `pipeline-start`, or writing project files. For an
+already-governed project, continue with its configured update path. Bind the
+approved GitHub-distributed plugin for the runner that will govern the
 consumer project. The commands differ by runner; run them from the project
-root, then fully end the host process and start a new session in that root.
-Invoke `/pipeline-core:pipeline-start` as the first Pipeline action. Its
+root, then follow that runner's restart or reload requirement below and start
+a new session in that root.
+After consent, invoke `/pipeline-core:pipeline-start` as the first Pipeline action. Its
 preflight supplies the exact onboarding action for the observed project state.
 
 ### Claude Code
@@ -65,54 +69,11 @@ Codex's binding does not use Claude's `--scope project` commands.
 
 ### Antigravity (Agy)
 
-After the `v0.7.0` release tag is published on the official GitHub repository,
-run these commands with your shell in the **consumer project root**. The tag
-must be available on GitHub before this released-version example can be used.
-The clone lives in a durable physical directory outside the governed project
-and any temporary or runner cache directory. Choose a different durable
-location if `$HOME/.local/share` is unsuitable:
-
-```sh
-mkdir -p "$HOME/.local/share"
-pipeline_release_dir="$HOME/.local/share/agent-pipeline-v0.7.0"
-git clone --branch v0.7.0 --depth 1 https://github.com/agent-pipe-shared/agent-pipeline.git "$pipeline_release_dir"
-git -C "$pipeline_release_dir" switch -c pipeline-release-v0.7.0
-git -C "$pipeline_release_dir" remote get-url origin
-git -C "$pipeline_release_dir" describe --tags --exact-match
-```
-
-Confirm the two Git readbacks show the official URL above and `v0.7.0` before
-running the installer from the same consumer project root. The local branch is
-required because cloning a tag otherwise leaves a detached HEAD, which the
-plugin's clean-source observer refuses; creating the branch does not move the
-checked-out release commit.
-
-```sh
-node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs"
-```
-
-Select **Approved Plugin Directory** (the default), then **Workspace-Local**
-to register the exact physical plugin directory in the consumer project's
-`.agents/plugins.json`. Keep the clone at that path while it is registered.
-The installer may offer a runner-local autonomous tool policy; that option
-grants no plan, release, remote, or human authority. Ensure `node` resolves in
-the PATH of the actual Agy host, fully restart it, open the project workspace,
-and invoke `/pipeline-core:pipeline-start`.
-
-To upgrade after a newer final release tag is published, clone that tag into
-a **different** durable directory and run its `install-agy.mjs` from each
-consumer project root. Choose Approved Plugin Directory and Workspace-Local
-again. Read back each project's `.agents/plugins.json`: it must contain the
-new exact plugin path and no previous Pipeline registration, while unrelated
-entries remain. Keep the old checkout until that readback succeeds, then
-retire it and fully restart Agy. A developer checkout is only for an explicit
-pre-release test. Do not copy a previous machine's host receipt or edit the
-registry path by hand.
-
-If the old checkout was already deleted while its registry entry remains,
-restore that exact approved plugin directory first and rerun the installer.
-The installer refuses an unverifiable, Pipeline-shaped stale path rather than
-deleting an entry it cannot prove it owns.
+Use the one maintained [Agy workspace-local installation and upgrade
+procedure](../SETUP.md#antigravity-agy-workspace-local-binding). It covers
+the approved GitHub distribution, exact path readback, restart, and stale
+registration recovery. Do not repeat the Codex lifecycle V4 steps below for
+Antigravity; follow the installed Agy Driver's returned classification action.
 
 ## Fresh Codex lifecycle V4
 
@@ -123,8 +84,9 @@ classification and progression. Read the result as
 
 ### Session entry, consent, and loaded version
 
-The installed plugin exposes a `SessionStart` hint on both runners. In a folder
-without Pipeline governance, the first assistant response must briefly explain
+The installed integration exposes a session-entry hint where the runner host
+supports it; the three runner integrations do not have identical host hooks.
+In a folder without Pipeline governance, the first assistant response must briefly explain
 that Agent Pipeline provides a structured, verifiable delivery workflow and ask
 whether the user wants to install it. It must then stop. Before an affirmative
 answer it does not invoke `pipeline-start`, inspect onboarding, initialize Git,
@@ -138,7 +100,7 @@ cache version heuristically.
 
 | Runner | Linux and macOS | Windows | Update/readback requirement |
 | --- | --- | --- | --- |
-| Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | After installing or updating, start a fresh Codex thread (or use the runner's plugin reload action when available), open `/hooks`, and trust the current plugin hook definitions. Reused/resumed threads may retain their old skill snapshot; accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
+| Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | After installing or updating, fully end the Codex host process, then start a new thread in the project root and inspect `/hooks`. A fresh thread or reload inside the old process does not prove its cached skill snapshot changed; accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
 | Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Run `claude plugin marketplace update agent-pipeline`, then `claude plugin update pipeline-core@agent-pipeline --scope project`, then `/reload-plugins`. Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
 
 The lifecycle planner returns an executable plus an argv array. Agents must
@@ -162,37 +124,9 @@ The normal progress sequence is ordered and fail-closed:
 | `intake-design-questions-required` | Answer the one bundled question round, correct wrong answers before generation when needed, then run the returned read-only generation plan and its digest-bound apply. | The complete input is durable and staging generation is bound to its digest. |
 | `bootstrap-binding-required` | Review the generated PRD/Spec, add the requested acknowledgement, then run the returned bind plan/apply. | The generated package becomes the initial project authority only after its own validation and binding readback. |
 | `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan. | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
+| `host-repository-init-required` | For a Codex host-managed root with valid continuity, follow the exact host-repository-init plan and confirmed action described below. It can follow either the fresh binding path or the earlier kickoff route; it is not a second kickoff. | The host initializes local Git without a commit. A fresh readback is still required, and dispatch remains blocked until the first commit. |
 | `continuity-damaged` | Run the exact read-only `plan-repair`. A supported bounded repair requires a separate digest-bound confirmation; an unsupported result stops with no next action. | Only the recognized active-turn resume mismatch or an established PO-bound pre-continuity state is repairable. Kickoff history is never rewritten. |
 | `ready` | No onboarding mutation. Continue through the intent-appropriate bootstrap/session/dispatch gate. | Repository capability, current source/runtime/readback, continuity, and every capability required by that intent passed together. |
-
-### Runner permission readback
-
-Claude Code's own command permission layer is separate from Pipeline guards.
-Fresh runtime initialization writes `.claude/settings.json` with the exact
-`Bash(node "<plugin-scripts>/*")` and
-`PowerShell(node "<plugin-scripts>/*")` entries needed for Pipeline commands.
-For a path whose forward-slash and backslash forms differ, both spellings are
-included. This runner setting allows the command to reach the Pipeline; it does
-not weaken or bypass any lifecycle, Git, push, plan, or path guard.
-
-Every V4 lifecycle result exposes the readback as `runnerPermissions`:
-
-- `target` names `.claude/settings.json`.
-- `status` is `pending-runtime-initialization`, `current`, `drifted`,
-  `unavailable`, `not-observed`, or `not-applicable`.
-- `lanes` lists the covered command lanes (`Bash` and `PowerShell`).
-- `exactEntries` lists the entries onboarding requires and has verified when
-  the status is `current`.
-
-A fresh project needs no separate manual permission edit: continue the returned
-runtime-initialization action and require the later readback to report
-`current`. If an otherwise-ready existing consumer has only part of the exact
-set, inspection reports `projection-drift` and returns a digest-bound merge
-action. That action preserves unrelated settings and existing allow entries;
-run the returned command unchanged and require the next inspection to read back
-`current`. A host-managed Codex project does not use this project-owned Claude
-permission layer, so its result explicitly reports `not-applicable` with empty
-lanes and entries.
 
 For the first two write stages, execute the complete `argv` returned by the
 plan rather than reconstructing flags:
@@ -249,71 +183,27 @@ byte-null; a changed goal, digest, calibration, preimage, or target fails closed
 
 ### Host-managed Codex handoff
 
-The recognized Codex host-managed layout contains only inert host-owned
-`.git`, `.codex`, and optional `.agents` controls. Portable seeding preserves
-them and never initializes or mutates Git or `.codex/**` inside the workspace
-sandbox. When `.codex` is the exact empty read-only Codex control mount,
-successful seed readback advances directly to `kickoff-required`, but the
-mount alone is not runtime authority. Until host initialization is durably
-bound, V3 reports `runtimeProjection: "plugin-managed-unattested"` with
-`runtimeReadback: "absent"` and the V4 lifecycle cannot report `ready`. This
-does not claim a project-local Codex runtime projection and needs no
-runtime-readback restart.
+Codex may present host-owned `.git` and `.codex` controls that the project
+workspace cannot write. The portable seed preserves those controls. Once
+continuity is valid, whether via fresh binding or the earlier kickoff route,
+`pipeline-start` may report `host-repository-init-required` and return
+one reviewed, confirmation-required `codex-host-repository-init.mjs` action.
+Run only the exact returned argument array at the host boundary; do not create
+or repair `.git` or `.codex` by hand. The action initializes local `main`
+without a commit and preserves the host controls. A partial or changed target
+stops with a diagnostic rather than becoming a fresh onboarding request.
 
-After kickoff, V4 reports `host-repository-init-required` and `pipeline-start`
-plans one separate
-`codex-host-repository-init.mjs` action. The plan is read-only, binds the exact
-portable preimage, and marks the apply as both confirmation-required and
-host-bound. Only that exact apply runs outside the workspace sandbox. It
-initializes `main` without a commit and moves the private kickoff continuity
-receipt into the new Git control path. It never runs the full onboarding
-inspector at the host boundary and never writes `.codex/**`. Before Git
-initialization it persists an exact private transaction intent. A process
-interruption resumes only that same plan/root intent instead of treating the
-resulting Git path as a fresh repository. The helper exclusively reserves the
-Git control directory and binds its physical identity before initialization;
-retry requires that same identity plus the successfully initialized closed
-core-tree digest. A partial or replaced control directory is never admission.
+After a successful host apply, fully restart the ordinary project session
+**once** so Codex remounts the new repository, then run `pipeline-start`
+again. A successful fresh readback advances the project without asking for a
+second runtime-readback restart. A `projection-drift` or target/layout
+diagnostic is a stop, not permission to rerun initialization with new
+arguments. Initial main-session scaffold work can begin after the restart;
+dispatch, worktrees and delivery remain blocked until the repository has its
+first commit. This path creates no remote, push, merge, tag or release claim.
 
-The successful host apply requires exactly one ordinary project-session
-restart so Codex remounts the new repository. Only the exact durable host-init
-admission bound to the current root, authority, kickoff artifacts, and private
-history promotes the fresh session to `local-valid-writable` plus
-`plugin-managed`; it must not request a runtime initialization, native
-readback, or second restart. The initializer assembles intent, receipt, and
-receipt-digest marker below the exact pending transaction, fsyncs them, and
-publishes the admission directory with one atomic rename plus exact
-descriptor-bound readback. A process interruption before that rename resumes
-the same pending intent. A present invalid/drifted admission directory, or any
-counterpart missing after publication, maps to terminal `projection-drift`
-with no repeat-init action. A different read-only target or any
-non-empty/colliding reserved path still fails closed with the typed
-target/layout diagnostic.
-
-This argv contract is runner- and platform-neutral. Codex uses the host action
-only for its reserved-control-mount case; Claude keeps its normal local Git
-path. Bash/Zsh on Linux and macOS and PowerShell on Windows render the returned
-argv with platform quoting, but never reconstruct its digest or arguments.
-Neither path creates a remote, commit, push, merge, tag, publication, or
-release claim. Initial main-session scaffold work is allowed after the restart;
-dispatch/worktrees and delivery remain blocked until the repository has its
-first commit.
-
-The optional-install wording, localization, and broader first-use interaction
-tuning remain owned by Issue #25. This hotfix documents the new lifecycle so
-that Issue #25 does not tune against the superseded multi-restart flow.
-
-### Testing a new host-owned layout
-
-Every future addition of a host-owned onboarding layout (alongside the
-Codex host-managed layout above) requires a disposable-root test that
-asserts the end-to-end success contract: the public inspect/plan/apply/
-readback transaction actually completes, the exact allowed write set is
-proven, and every host control (`.git`, `.codex`, `.agents`, or the new
-layout's own) is preserved untouched. A rejection-only test (asserting the
-initializer refuses the layout) is valid solely for an explicitly
-unsupported layout — never as a stand-in for proving a supported layout's
-happy path, per `backlog/items/2026-07-25-managed-onboarding-success-contract.md`.
+The exact private transaction, crash-recovery and host-control checks are
+documented in the [Codex onboarding threat model](codex-onboarding-threat-model.md).
 
 ### Candidate and release boundary
 
@@ -323,6 +213,35 @@ do not change `VERSION` or plugin manifests and do not commit, push, tag,
 publish, merge, close an Issue, or create a release. Those actions remain
 separate, explicitly accepted gates after same-candidate verification and the
 operator's live onboarding acceptance.
+
+## Claude Code permission readback reference
+
+Claude Code's own command permission layer is separate from Pipeline guards.
+Fresh runtime initialization writes `.claude/settings.json` with the exact
+`Bash(node "<plugin-scripts>/*")` and
+`PowerShell(node "<plugin-scripts>/*")` entries needed for Pipeline commands.
+For a path whose forward-slash and backslash forms differ, both spellings are
+included. This runner setting allows the command to reach the Pipeline; it does
+not weaken or bypass any lifecycle, Git, push, plan, or path guard.
+
+Every V4 lifecycle result exposes the readback as `runnerPermissions`:
+
+- `target` names `.claude/settings.json`.
+- `status` is `pending-runtime-initialization`, `current`, `drifted`,
+  `unavailable`, `not-observed`, or `not-applicable`.
+- `lanes` lists the covered command lanes (`Bash` and `PowerShell`).
+- `exactEntries` lists the entries onboarding requires and has verified when
+  the status is `current`.
+
+A fresh Claude project needs no separate manual permission edit: continue the
+returned runtime-initialization action and require the later readback to report
+`current`. If an otherwise-ready existing consumer has only part of the exact
+set, inspection reports `projection-drift` and returns a digest-bound merge
+action. That action preserves unrelated settings and existing allow entries;
+run the returned command unchanged and require the next inspection to read back
+`current`. A host-managed Codex project does not use this project-owned Claude
+permission layer, so its result explicitly reports `not-applicable` with empty
+lanes and entries.
 
 ## Legacy consumer with no projections
 
@@ -351,120 +270,10 @@ write is rejected unless `--activate` is present. On completion, rerunning
 `plan` is a no-op; interruption recovery remains preview-first and
 transaction-bound.
 
-## Typed failure and the Slim Overlay boundary
+## Recovery and exceptional migrations
 
-`invalid-source`, `invalid-baseline`, and `recovery-required` are non-success
-states with actionable diagnostics. Repair the named prerequisite or complete
-the recovery preview; do not create a baseline, lock, or generated file by
-hand.
-
-The Slim Private Overlay activation path is intentionally stricter. It is for
-an already V3-valid overlay and requires an authenticated
-`.agent-pipeline/core.lock.json` verified against the selected Public Core.
-That sealed lock is not a substitute for legacy onboarding and must never be
-hand-authored.
-
-When a previously valid Slim Overlay lock is stale after a Public-Core update,
-use the Core-owned authority-update flow. It observes the selected Public Core
-and installed plugin, accepts only the existing lock's safe topology and source
-channel, and derives the replacement lock itself. The preview is read-only and
-returns a digest; only the matching explicit activation may write. Any runtime
-projection drift is rejected rather than combined silently with the lock update.
-
-```sh
-node <plugin-root>/scripts/private-overlay-activation.mjs authority-plan --project-root /absolute/overlay/root --source-plugin-root <plugin-root>
-node <plugin-root>/scripts/private-overlay-activation.mjs authority-activate --project-root /absolute/overlay/root --source-plugin-root <plugin-root> --expected-plan-sha256 <digest-from-authority-plan>
-```
-
-For Codex, use the host-attested wrapper instead of supplying a source root:
-
-```sh
-node <plugin-root>/scripts/codex-private-overlay-activation.mjs authority-plan --project-root /absolute/overlay/root
-node <plugin-root>/scripts/codex-private-overlay-activation.mjs authority-activate --project-root /absolute/overlay/root --expected-plan-sha256 <digest-from-authority-plan>
-```
-
-After a successful activation, rerun `status`, then the normal private-overlay
-`plan`/`activate` lifecycle only when it reports projection work. Commit the
-overlay's new binding through the overlay's own reviewed workflow; never copy
-or edit the lock bytes manually.
-
-## Ownership
-
-`pipeline.user.yaml` is the portable project source. `.claude/**` and
-`.codex/**` are regenerable runner projections: Core-owned keys are refreshed
-and unrelated user settings are preserved. The migration does not move local
-credentials, host settings, caches, or private coordinates into the consumer
-repository.
-
-## Neutral project authority migration
-
-Legacy project gates and lifecycle state may still live in
-the manifest and lifecycle State at the legacy tier. Move that portable
-authority to the runner-neutral `project/` layer only through its separate,
-preview-first cutover:
-
-```sh
-node <plugin-root>/scripts/project-authority-migration.mjs inspect --root /absolute/consumer/root
-node <plugin-root>/scripts/project-authority-migration.mjs plan --root /absolute/consumer/root
-node <plugin-root>/scripts/project-authority-migration.mjs apply --root /absolute/consumer/root --activate
-```
-
-`plan` writes nothing and reports only path/digest metadata. `apply` writes a
-sanitized pre-write preview to standard error before it can activate. The
-legacy files are retained for the compatibility reader; the neutral files are
-the only migration writes. A changed legacy source, changed neutral
-destination, or pending journal rejects activation.
-
-An ordinary `git fetch` never changes a checkout. Do not follow it with
-`git checkout --force` or `git switch --force`: those commands can overlay the
-untracked kickoff authority with a remote legacy authority. If an older host
-already left exactly that mixed state, `plan` returns the explicit
-`adopt-legacy-after-remote-checkout` recovery. Its activated apply preserves
-the existing neutral preimages under the repository's private Git common-dir,
-then copies the exact legacy authority into the neutral layer and verifies the
-result. It is a PO-confirmed recovery, not a precedence rule or a normal
-fetch-side effect.
-
-If migration is blocked solely by a previously completed, no-longer-live
-session-cleanup binding, use `session-cleanup.mjs release-binding --repo
-<root>`. This exact closure-receipt CAS is intentionally available before
-general onboarding readiness: it releases only the already persisted tuple and
-cannot create a session, delete a worktree, or bypass a missing closure proof.
-
-If an interrupted cutover leaves a journal, do not delete it or hand-copy its
-files. First inspect the recorded recovery, then explicitly activate it:
-
-```sh
-node <plugin-root>/scripts/project-authority-migration.mjs recover --root /absolute/consumer/root
-node <plugin-root>/scripts/project-authority-migration.mjs recover --root /absolute/consumer/root --activate
-```
-
-Recovery restores recorded preimages only after its own digest-bound preview;
-it never resumes an unreviewed write.
-
-## Externally archived temporary-worktree recovery
-
-Do not remove a Pipeline-owned worktree by hand during an active cleanup
-session. If an emergency archival was already performed outside the checkout,
-first retain the archive and then inspect the normal recovery plan:
-
-```sh
-node <plugin-root>/scripts/session-cleanup.mjs plan-recovery --repo /absolute/consumer/root
-node <plugin-root>/scripts/session-cleanup.mjs apply-recovery --repo /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
-```
-
-To retain the successful recovery as a non-authoritative governance action,
-add `--event-out evidence/actions/session-recovery.json`. The target is
-preflighted before recovery begins. A failed recovery emits no event; a failure
-after successful recovery returns an event-only retry and does not undo the
-recovery. Omitting the flag preserves the ordinary no-output flow.
-
-Every externally archived descriptor must prove a missing, non-sole-copy
-`disposable-control` worktree under `branch/detached`; its descriptor digest
-and manifest digest must still match and its recorded owner must not be live.
-Activation records `WT-EXTERNALLY-ARCHIVED` in the completed closure receipt
-and retires only that exact descriptor/manifest. A stale capability-only
-descriptor without a cleanup manifest may be included in the same plan only
-when it separately proves normally retirable; it never inherits the archive
-exception. The recovery never accepts a scratch file, generated output,
-implementation worktree, present path, or path-prefix guess.
+If inspection returns a typed failure, stop the normal onboarding sequence.
+Use only the named, preview-first recovery action. The separate
+[onboarding recovery reference](onboarding-recovery.md) covers Slim Overlay
+authority updates, neutral authority migration, and externally archived
+worktree recovery; these are not routine steps after `ready`.

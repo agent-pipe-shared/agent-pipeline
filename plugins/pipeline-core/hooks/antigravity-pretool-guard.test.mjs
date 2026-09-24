@@ -122,7 +122,7 @@ function readyLifecycleFixture(mode = "chat") {
   // Build the shared lifecycle through its explicit chat-only fixture route.
   // Individual guard cases select the policy under test after this fixture is
   // ready, so this helper does not duplicate the detached-proof E2E ceremony.
-  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat"], { cwd: root, env, encoding: "utf8", shell: false });
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat", "--language", "en"], { cwd: root, env, encoding: "utf8", shell: false });
   assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
   for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]]) {
     const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
@@ -319,8 +319,12 @@ check("Antigravity pretool guard blocks chained commands (&&, ;, pipes)", () => 
   rmSync(root, { recursive: true, force: true });
 });
 
+// Reuse the real ready fixture across Cwd-selection cases. Each unready
+// workspace is fresh; the case that can record a denial on the ready root is
+// deliberately last, before cleanup.
+const cwdReadyRoot = readyLifecycleFixture();
 check("Antigravity run_command uses its absolute Cwd instead of the first workspace", () => {
-  const readyRoot = readyLifecycleFixture();
+  const readyRoot = cwdReadyRoot;
   const unreadyRoot = fixture();
   try {
     const res = decision(run({
@@ -333,13 +337,12 @@ check("Antigravity run_command uses its absolute Cwd instead of the first worksp
     assert.equal(res.decision, "deny");
     assert.match(res.reason, /GUARD-LIFECYCLE-NOT-READY/);
   } finally {
-    rmSync(readyRoot, { recursive: true, force: true });
     rmSync(unreadyRoot, { recursive: true, force: true });
   }
 });
 
 check("Antigravity run_command resolves a relative Cwd from the adapter working directory", () => {
-  const readyRoot = readyLifecycleFixture();
+  const readyRoot = cwdReadyRoot;
   const unreadyRoot = fixture();
   try {
     const res = decision(run({
@@ -352,13 +355,12 @@ check("Antigravity run_command resolves a relative Cwd from the adapter working 
     assert.equal(res.decision, "deny");
     assert.match(res.reason, /GUARD-LIFECYCLE-NOT-READY/);
   } finally {
-    rmSync(readyRoot, { recursive: true, force: true });
     rmSync(unreadyRoot, { recursive: true, force: true });
   }
 });
 
 check("Antigravity run_command falls back to workspacePaths when Cwd is missing", () => {
-  const readyRoot = readyLifecycleFixture();
+  const readyRoot = cwdReadyRoot;
   const unreadyRoot = fixture();
   try {
     const res = decision(run({
@@ -367,25 +369,22 @@ check("Antigravity run_command falls back to workspacePaths when Cwd is missing"
     }, readyRoot, { hookCwd: unreadyRoot }));
     assert.equal(res.decision, "allow");
   } finally {
-    rmSync(readyRoot, { recursive: true, force: true });
     rmSync(unreadyRoot, { recursive: true, force: true });
   }
 });
 
 check("Antigravity run_command fails closed for a malformed explicit Cwd", () => {
-  const readyRoot = readyLifecycleFixture();
-  try {
-    const res = decision(run({
-      workspacePaths: [readyRoot],
-      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: 42 } },
-    }, readyRoot));
-    assert.equal(res.decision, "deny");
-    assert.match(res.reason, /project root is unavailable/);
-  } finally { rmSync(readyRoot, { recursive: true, force: true }); }
+  const readyRoot = cwdReadyRoot;
+  const res = decision(run({
+    workspacePaths: [readyRoot],
+    toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: 42 } },
+  }, readyRoot));
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /project root is unavailable/);
 });
 
 check("Antigravity run_command refuses a relative passive read outside the selected project root", () => {
-  const firstWorkspace = readyLifecycleFixture();
+  const firstWorkspace = cwdReadyRoot;
   const executedWorkspace = readyLifecycleFixture();
   try {
     const res = decision(run({
@@ -398,10 +397,10 @@ check("Antigravity run_command refuses a relative passive read outside the selec
     assert.equal(res.decision, "deny");
     assert.match(res.reason, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
   } finally {
-    rmSync(firstWorkspace, { recursive: true, force: true });
     rmSync(executedWorkspace, { recursive: true, force: true });
   }
 });
+rmSync(cwdReadyRoot, { recursive: true, force: true });
 
 check("Antigravity pretool guard blocks writes outside project root (GUARD-CROSS-REPO-MUTATION)", () => {
   const root = fixture();

@@ -8,6 +8,15 @@ export const BACKLOG_SPEC_BINDING_SCHEMA = "pipeline.backlog-spec-binding.v1";
 export const BACKLOG_RECONCILIATION_PREVIEW_SCHEMA = "pipeline.backlog-reconciliation-preview.v1";
 export const BACKLOG_RECONCILIATION_RECEIPT_SCHEMA = "pipeline.backlog-reconciliation-receipt.v1";
 
+/** The accepted historical PO reversal is one specific source, not a generic closure shortcut. */
+export const NOVA_A8_PO_WITHDRAWAL = Object.freeze({
+  itemPath: "backlog/items/2026-07-20-multi-cli-efficiency-pilots.md",
+  sourceCommit: "f98f05b52635a172526407d3a5e99490dca8104c",
+  sourceSha256: "7a0f0cfa653a76f9205f3373da19dcec75be21c0bc0679d98feff90e46d6c264",
+  ledgerSequence: 793,
+  ledgerEntryHash: "c43cb511d0c6dd6ce2e846162c3b56ec8ec5ab3231b27e48b03f8f68e958b4d7",
+});
+
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40}$/u;
 const ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u;
@@ -127,13 +136,33 @@ function validateSnapshot(value, errors) {
   if (!Array.isArray(value.itemFileSha256) || !value.itemFileSha256.every((entry) => plain(entry) && Object.keys(entry).sort().join(",") === "id,sha256" && ID.test(entry.id) && SHA.test(entry.sha256)) || !sortedUnique(value.itemFileSha256.map((entry) => entry.id))) errors.push(finding("BOUND", "backlogSnapshot.itemFileSha256 must be sorted canonical item digests"));
 }
 function validateBinding(value, index, errors) {
-  if (!exact(value, ["id", "issue", "increment", "acceptanceIds", "closureMode", "expiryDisposition"], `bindings[${index}]`, errors)) return;
+  const withdrawn = value?.closureMode === "po-withdrawn-scope";
+  const keys = ["id", "issue", "increment", "acceptanceIds", "closureMode", "expiryDisposition", ...(withdrawn ? ["poWithdrawal"] : [])];
+  if (!exact(value, keys, `bindings[${index}]`, errors)) return;
   checkString(value.id, ID, `bindings[${index}].id`, errors, "SHAPE", 128);
   if (!Number.isSafeInteger(value.issue) || value.issue < 1) errors.push(finding("BOUND", `bindings[${index}].issue is invalid`));
   if (!/^[A-Z]$/u.test(value.increment ?? "")) errors.push(finding("SHAPE", `bindings[${index}].increment is invalid`));
   if (!Array.isArray(value.acceptanceIds) || value.acceptanceIds.length === 0 || !sortedUnique(value.acceptanceIds) || !value.acceptanceIds.every((id) => /^NVA-[AB]\d+-\d+$/u.test(id))) errors.push(finding("BOUND", `bindings[${index}].acceptanceIds must be sorted and unique`));
-  if (!(["candidate-evidence", "separate-pilot-required", "cyborg-input-only", "later-sprint-input-only"].includes(value.closureMode))) errors.push(finding("BOUND", `bindings[${index}].closureMode is invalid`));
-  if (!(value.expiryDisposition === "not-applicable" || /^revalidate:\d{4}-\d{2}-\d{2}$/u.test(value.expiryDisposition ?? ""))) errors.push(finding("BOUND", `bindings[${index}].expiryDisposition is invalid`));
+  if (!(["candidate-evidence", "separate-pilot-required", "cyborg-input-only", "later-sprint-input-only", "po-withdrawn-scope"].includes(value.closureMode))) errors.push(finding("BOUND", `bindings[${index}].closureMode is invalid`));
+  const reviewDate = typeof value.expiryDisposition === "string" && value.expiryDisposition.startsWith("revalidate:")
+    ? value.expiryDisposition.slice("revalidate:".length) : null;
+  if (!(value.expiryDisposition === "not-applicable" || (reviewDate !== null
+    && /^\d{4}-\d{2}-\d{2}$/u.test(reviewDate)
+    && !Number.isNaN(Date.parse(`${reviewDate}T00:00:00.000Z`))
+    && new Date(`${reviewDate}T00:00:00.000Z`).toISOString().slice(0, 10) === reviewDate)))
+    errors.push(finding("BOUND", `bindings[${index}].expiryDisposition is invalid`));
+  if (withdrawn) {
+    if (value.id !== "pipeline.multi-cli-efficiency-pilots" || value.issue !== 8 || value.increment !== "A"
+      || !Array.isArray(value.acceptanceIds) || !value.acceptanceIds.includes("NVA-A8-5") || value.expiryDisposition !== "not-applicable") {
+      errors.push(finding("BOUND", `bindings[${index}] PO withdrawal is not bound to the accepted Nova A8 scope`));
+    }
+    const source = value.poWithdrawal;
+    if (exact(source, Object.keys(NOVA_A8_PO_WITHDRAWAL), `bindings[${index}].poWithdrawal`, errors)) {
+      for (const [key, expected] of Object.entries(NOVA_A8_PO_WITHDRAWAL)) {
+        if (source[key] !== expected) errors.push(finding("AUTHORITY", `bindings[${index}].poWithdrawal.${key} is not the accepted PO reversal`));
+      }
+    }
+  }
 }
 export function validateBacklogSpecBinding(value) {
   const errors = [];
@@ -226,7 +255,7 @@ function targetDigests(state, intent, event, postSnapshot) {
   }));
 }
 
-export function planBacklogDeliveryReconciliation({ intent, binding, state } = {}) {
+export function planBacklogDeliveryReconciliation({ intent, binding, state, observedAt = null } = {}) {
   const findings = [...validateBacklogDeliveryIntent(intent).findings, ...validateBacklogSpecBinding(binding).findings];
   if (!plain(state)) return reject([...findings, finding("SHAPE", "state must be an object")]);
   if (findings.length) return reject(findings);
@@ -248,12 +277,23 @@ export function planBacklogDeliveryReconciliation({ intent, binding, state } = {
     if (intent.authority.kind !== "implementation-activation" || !intent.specification.approvalReceiptSha256) findings.push(finding("AUTHORITY", "assign requires approved Spec activation authority"));
     const selected = binding.bindings.find((entry) => entry.id === intent.item.id && entry.increment === intent.sprint.increment);
     if (!selected) findings.push(finding("BOUND", "assign requires an exact Spec-binding row"));
+    else if (!["candidate-evidence", "separate-pilot-required"].includes(selected.closureMode))
+      findings.push(finding("BOUND", "assign requires an implementation-eligible closure mode"));
   } else if (intent.operation === "close") {
     from = "in_progress"; to = "closed";
     if (intent.item.expectedStatus !== "in_progress" || state.item?.status !== "in_progress") findings.push(finding("CAS", "close requires the item to remain in_progress"));
     if (!intent.candidate || intent.authority.kind !== "closure") findings.push(finding("AUTHORITY", "close requires candidate and closure authority"));
     const selected = binding.bindings.find((entry) => entry.id === intent.item.id && entry.increment === intent.sprint.increment);
     if (!selected) findings.push(finding("BOUND", "close requires an exact Spec-binding row"));
+    else if (selected.closureMode !== "candidate-evidence")
+      findings.push(finding("BOUND", "close requires candidate-evidence closure mode"));
+    if (selected?.expiryDisposition?.startsWith("revalidate:")) {
+      const reviewDate = selected.expiryDisposition.slice("revalidate:".length);
+      if (typeof observedAt !== "string" || !ISO_INSTANT.test(observedAt))
+        findings.push(finding("BOUND", "close requires a trusted observed time for review-date disposition"));
+      else if (observedAt.slice(0, 10) >= reviewDate)
+        findings.push(finding("BOUND", "close binding review date has arrived; revalidation is required"));
+    }
     const required = [...(selected?.acceptanceIds ?? []).map((id) => `acceptance:${id}`), "verify"].sort();
     const actual = intent.gates.map((gate) => gate.gate).sort();
     if (required.join("\n") !== actual.join("\n") || !intent.gates.every((gate) => gate.status === "passed" && sameCandidate(gate.candidate, intent.candidate))) findings.push(finding("BOUND", "close requires every accepted passed gate for the candidate"));

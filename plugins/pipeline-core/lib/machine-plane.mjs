@@ -24,7 +24,8 @@
  * accepted as `null` (not yet configured) or an opaque plain object; validating their
  * insides is out of this task's scope and is not invented here.
  */
-import { existsSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, statSync, closeSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { existsSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, statSync, closeSync, writeFileSync, fstatSync, fsyncSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 
@@ -227,11 +228,32 @@ export function writeMachinePlane(plane, dependencies = {}) {
   const open = dependencies.openSyncFn ?? openSync;
   const write = dependencies.writeFileSyncFn ?? writeFileSync;
   const close = dependencies.closeSyncFn ?? closeSync;
+  const fstat = dependencies.fstatSyncFn ?? fstatSync;
+  const sync = dependencies.fsyncSyncFn ?? fsyncSync;
+  const unlink = dependencies.unlinkSyncFn ?? unlinkSync;
   const rename = dependencies.renameSyncFn ?? renameSync;
-  const temporary = `${path}.tmp`;
-  const fd = open(temporary, "wx", 0o600);
-  try { write(fd, `${JSON.stringify(plane, null, 2)}\n`, "utf8"); }
-  finally { close(fd); }
-  rename(temporary, path);
+  const temporary = `${path}.tmp-${randomBytes(12).toString("hex")}`;
+  let fd;
+  let opened;
+  try {
+    fd = open(temporary, "wx", 0o600);
+    opened = fstat(fd);
+    write(fd, `${JSON.stringify(plane, null, 2)}\n`, "utf8");
+    sync(fd);
+    close(fd);
+    fd = undefined;
+    rename(temporary, path);
+  } catch (error) {
+    if (fd !== undefined) {
+      try { close(fd); } catch { /* preserve the original failure */ }
+    }
+    // Remove only the exact temporary inode this call created. A replacement
+    // belongs to another actor and must never be deleted during recovery.
+    try {
+      const current = lstat(temporary);
+      if (opened && current.dev === opened.dev && current.ino === opened.ino) unlink(temporary);
+    } catch { /* a missing or unreadable temporary is not ours to repair */ }
+    throw error;
+  }
   return plane;
 }

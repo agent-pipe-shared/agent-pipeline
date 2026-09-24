@@ -334,6 +334,7 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
           ["<PO_GIT_AUTHOR_NAME>", DEFAULT_ANSWERS.gitAuthorName],
           ["<PO_GIT_AUTHOR_EMAIL>", DEFAULT_ANSWERS.gitAuthorEmail],
           ["<signature|chat>", "signature"],
+          ["<de|en>", DEFAULT_ANSWERS.language],
         ]);
         const argv = initialAsk.applyAction.argv.map((v) => replacements.get(v) ?? v);
         const applied = run([initialAsk.applyAction.executable ?? process.execPath, ...argv], dir, env);

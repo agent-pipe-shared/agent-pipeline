@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { spawnSync as hostSpawnSync } from "node:child_process";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
+import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
+import { inspectConfirmedIntakeLanguageProjection, projectConfirmedIntakeLanguage } from "../lib/onboarding-later-language.mjs";
 import { chatAttributionRecord, requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import { USER_SOURCE_PATH, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadManifestSafe, resolveHumanFacingLanguage, gateConfig } from "../lib/manifest.mjs";
@@ -47,6 +49,7 @@ import {
   planProjectRemoteAdoptionV4,
   applyProjectRemoteAdoptionV4,
   planProjectOnboardingSourceRecoveryV4,
+  PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
 } from "../lib/project-onboarding-v3.mjs";
 // NVA-INTAKEARGV-1: the mutating-onboarding argv shape table and its argv renderer moved to
 // lib/onboarding-argv-shapes.mjs so the third consumer -- the `nextAction.guidance` string in
@@ -58,6 +61,43 @@ import {
 import { MUTATING_ONBOARDING_ARGV_SHAPES, automatedMutatingApplyArgv } from "../lib/onboarding-argv-shapes.mjs";
 
 export { MUTATING_ONBOARDING_ARGV_SHAPES, automatedMutatingApplyArgv };
+
+function laterIntakeLanguageAudit(root, repositoryCapability, intakeLanguage) {
+  if (!["de", "en"].includes(intakeLanguage)) return null;
+  try {
+    const physicalRoot = resolve(root);
+    const path = resolveInitialAnswersState(physicalRoot, repositoryCapability).receipt;
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 4096) return null;
+    const first = JSON.parse(readFileSync(path, "utf8"));
+    if (first?.schema !== PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
+      || first.root !== physicalRoot || !["de", "en"].includes(first.language)
+      || first.language === intakeLanguage) return null;
+    return {
+      schema: "pipeline.onboarding-language-decision.v1",
+      status: "later-intake-supersedes-initial",
+      initialLanguage: first.language,
+      intakeLanguage,
+    };
+  } catch { return null; }
+}
+
+const PRIVATE_INTAKE_COMMANDS = new Set([
+  "intake-consent-apply", "intake-capture-apply", "intake-design-questions-apply",
+  "intake-design-questions-replace", "intake-generate-plan", "intake-generate-apply",
+  "bootstrap-bind-plan", "bootstrap-bind-apply",
+]);
+
+function privateIntakeRepositoryCapability(options, deps) {
+  if (!PRIVATE_INTAKE_COMMANDS.has(options.command)) return null;
+  const observe = deps?.observeCodexOnboardingCapabilities ?? observeCodexOnboardingCapabilities;
+  const result = observe({ rootDir: options.root, intent: "onboarding" });
+  if (result?.mode !== "local" && result?.mode !== "host-managed") {
+    throw Object.assign(new Error("private onboarding state requires a supported repository capability"),
+      { code: "INTAKE-REPOSITORY-CAPABILITY-UNAVAILABLE" });
+  }
+  return result.mode;
+}
 
 /**
  * NVA-INTAKEARGV-1: resolve one PO material-input chunk from exactly one of its two routes.
@@ -687,6 +727,16 @@ export function main(args = process.argv.slice(2), {
   }
   let output;
   try {
+    const repositoryCapability = privateIntakeRepositoryCapability(options, deps);
+    if (repositoryCapability !== null && options.command !== "intake-consent-apply") {
+      const projection = inspectConfirmedIntakeLanguageProjection({
+        rootDir: options.root, repositoryCapability, deps,
+      });
+      if (["required", "pending", "invalid"].includes(projection.status)) {
+        throw Object.assign(new Error("confirmed intake language projection must be repaired before continuing"),
+          { code: "INTAKE-LANGUAGE-PROJECTION-REQUIRED" });
+      }
+    }
     if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent, runner: options.runner });
     else if (options.command === "plan-reinstall") output = planProjectOnboardingReinstall({ rootDir: options.root, deps });
     else if (options.command === "apply-reinstall") output = applyProjectOnboardingReinstall({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
@@ -734,41 +784,60 @@ export function main(args = process.argv.slice(2), {
       planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, designInputPath: options.designInputPath,
       runner: options.runner, planSha256: options.planSha256, activate: options.activate, deps,
     });
-    else if (options.command === "intake-consent-apply") output = applyOnboardingIntakeConsent({
-      rootDir: options.root,
-      granted: options.granted === true,
-      gitAuthor: options.gitAuthorName && options.gitAuthorEmail
-        ? { name: options.gitAuthorName, email: options.gitAuthorEmail } : null,
-      language: options.language ?? null,
-      profile: options.profile ?? null,
-      // NVA-V10B-INTAKEONEROUND: optional -- resolveIntakeCaptureText() returns undefined when
-      // neither --text nor --text-file was supplied, and applyOnboardingIntakeConsent treats
-      // that identically to omitting `text` altogether (behaviour/shape unchanged).
-      text: resolveIntakeCaptureText(options) ?? null,
-      activate: options.activate,
-      deps,
-    });
+    else if (options.command === "intake-consent-apply") {
+      output = applyOnboardingIntakeConsent({
+        rootDir: options.root,
+        repositoryCapability,
+        granted: options.granted === true,
+        gitAuthor: options.gitAuthorName && options.gitAuthorEmail
+          ? { name: options.gitAuthorName, email: options.gitAuthorEmail } : null,
+        language: options.language ?? null,
+        profile: options.profile ?? null,
+        // NVA-V10B-INTAKEONEROUND: optional -- resolveIntakeCaptureText() returns undefined when
+        // neither --text nor --text-file was supplied, and applyOnboardingIntakeConsent treats
+        // that identically to omitting `text` altogether (behaviour/shape unchanged).
+        text: resolveIntakeCaptureText(options) ?? null,
+        activate: options.activate,
+        deps,
+      });
+      const languageAudit = laterIntakeLanguageAudit(options.root, repositoryCapability, output.checkpoint?.values?.language);
+      if (languageAudit !== null) output = { ...output, languageAudit };
+      let languageProjection;
+      try {
+        languageProjection = projectConfirmedIntakeLanguage({
+          rootDir: options.root, repositoryCapability, runner: options.runner, deps,
+        });
+      } catch (error) {
+        const code = typeof error?.code === "string" && /^LATER-LANGUAGE-[A-Z-]+$/u.test(error.code)
+          ? error.code
+          : typeof error?.message === "string" && /^INITIAL-ANSWERS-JOURNAL-[A-Z-]+$/u.test(error.message)
+            ? error.message
+            : "LATER-LANGUAGE-PROJECTION-FAILED";
+        throw Object.assign(new Error(code), { code });
+      }
+      if (languageProjection.status !== "not-required") output = { ...output, languageProjection };
+    }
     else if (options.command === "intake-capture-apply") output = applyOnboardingIntakeCapture({
-      rootDir: options.root, text: resolveIntakeCaptureText(options), activate: options.activate, deps,
+      rootDir: options.root, repositoryCapability, text: resolveIntakeCaptureText(options), activate: options.activate, deps,
     });
     else if (["intake-design-questions-apply", "intake-design-questions-replace"].includes(options.command)) {
       let answers;
       try { answers = JSON.parse(options.answersJson ?? "null"); } catch { answers = null; }
       output = applyOnboardingIntakeDesignQuestions({
-        rootDir: options.root, answers, replace: options.command === "intake-design-questions-replace", activate: options.activate, deps,
+        rootDir: options.root, repositoryCapability, answers, replace: options.command === "intake-design-questions-replace", activate: options.activate, deps,
       });
     }
     else if (options.command === "intake-generate-plan") output = planOnboardingIntakeGenerate({
-      rootDir: options.root, deps,
+      rootDir: options.root, repositoryCapability, deps,
     });
     else if (options.command === "intake-generate-apply") output = applyOnboardingIntakeGenerate({
-      rootDir: options.root, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
+      rootDir: options.root, repositoryCapability, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
     });
     else if (options.command === "bootstrap-bind-plan") output = planOnboardingBootstrapBind({
-      rootDir: options.root, runner: options.runner, deps,
+      rootDir: options.root, repositoryCapability, runner: options.runner, deps,
     });
     else if (options.command === "bootstrap-bind-apply") output = applyOnboardingBootstrapBind({
-      rootDir: options.root, runner: options.runner, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
+      rootDir: options.root, repositoryCapability, runner: options.runner, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
     });
     else if (options.command === "bootstrap-acknowledge-plan") {
       if (!options.activate) throw Object.assign(new Error("signature acknowledgement request requires explicit activation"), { code: "BOOTSTRAP-ACK-ACTIVATION-REQUIRED" });

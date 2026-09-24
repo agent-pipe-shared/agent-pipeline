@@ -238,8 +238,11 @@ and cannot retroactively redefine either Sprint's acceptance.
   unknown-usage treatment, stop conditions and rollback.
 - Establish serial and runner-native baselines in Nova A; Nova B may append
   supervised/async observations without changing scoring.
-- Treat `pipeline.multi-cli-efficiency-pilots` as an input until its own
-  pilot-specific closure evidence exists.
+- Preserve the historical `pipeline.multi-cli-efficiency-pilots` input and
+  its 2026-08-18 pilot go decision in the audit trail. The PO's subsequent
+  2026-08-19 closure withdrew both bespoke pilots; recognize that decision
+  only through a source- and ledger-bound scope disposition. Do not report
+  pilot results or measured savings from the withdrawal.
 
 ### A4. Bounded scheduling and execution contract — `#12`, `#14`
 
@@ -537,7 +540,8 @@ concurrency is a separately measured capability.
 
 ## Cyborg and backlog boundary
 
-- The 13 active Nova backlog reconciliations are sliced explicitly:
+- The 13 originally active Nova backlog reconciliations were sliced explicitly
+  at intake; their later statuses are determined by the canonical backlog:
   - **Nova A:** `pipeline.execution-model-switchback`,
     `pipeline.multi-cli-efficiency-pilots`,
     `pipeline.closed-input-channel-review-economics`,
@@ -552,6 +556,9 @@ concurrency is a separately measured capability.
     `pipeline.canonical-worktree-lifecycle`,
     `pipeline.po-gate-worktree-authority`, and
     `pipeline.project-scoped-github-issue-operations`.
+- `pipeline.multi-cli-efficiency-pilots` remains in that historical intake
+  list, but the PO withdrew its bespoke pilot scope on 2026-08-19. Its
+  closed status is a scope disposition, not evidence of a measured pilot.
 - Cyborg is independently closable and is never a prerequisite for Nova A,
   Nova B or Nova Epic acceptance.
 - Identical paths on independent branches are later merge collisions, not

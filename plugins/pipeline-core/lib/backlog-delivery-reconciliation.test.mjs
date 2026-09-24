@@ -469,6 +469,13 @@ check("BDR01 exports the exact A1 schema identities", [
         bindings: [{ ...binding.bindings[0], expiryDisposition: "forever" }],
       }),
     },
+    {
+      validator: validateBacklogSpecBinding,
+      value: rebindSpecBinding({
+        ...binding,
+        bindings: [{ ...binding.bindings[0], expiryDisposition: "revalidate:2026-02-31" }],
+      }),
+    },
   ];
   check("BDR04 identifiers, canonical paths, evidence cardinality, and timestamps enforce Spec bounds",
     invalid.every(({ validator, value }) => rejectsWithDomain(validator, value)));
@@ -686,6 +693,39 @@ function previewShape(result, intent, from, to) {
 }
 
 {
+  const bindingWithMode = (closureMode) => {
+    const binding = specBinding();
+    return rebindSpecBinding({ ...binding, bindings: [{ ...binding.bindings[0], closureMode }] });
+  };
+  const assign = operationIntent("assign");
+  const close = operationIntent("close");
+  const separatePilotClose = plan(close, stateFor(close), bindingWithMode("separate-pilot-required"));
+  const cyborgAssign = plan(assign, stateFor(assign), bindingWithMode("cyborg-input-only"));
+  const laterSprintAssign = plan(assign, stateFor(assign), bindingWithMode("later-sprint-input-only"));
+  check("BDR10a closure mode admits only implementation bindings to assign and candidate-evidence to close",
+    previewShape(plan(assign, stateFor(assign), bindingWithMode("separate-pilot-required")), assign, "open", "in_progress")
+      && [separatePilotClose, cyborgAssign, laterSprintAssign].every(rejectedPlan)
+      && [separatePilotClose, cyborgAssign, laterSprintAssign]
+        .every((result) => result.findings.some((finding) => finding.startsWith("BOUND:"))));
+}
+
+{
+  const intent = operationIntent("close");
+  const binding = specBinding();
+  const expired = rebindSpecBinding({ ...binding, bindings: [{
+    ...binding.bindings[0], expiryDisposition: "revalidate:2020-01-01",
+  }] });
+  const result = plan(intent, stateFor(intent), expired);
+  check("BDR10b an expired binding cannot mint a close preview",
+    rejectedPlan(result) && result.findings.some((finding) => finding.startsWith("BOUND:")));
+  const before = planBacklogDeliveryReconciliation({ intent, binding: expired, state: stateFor(intent), observedAt: "2019-12-31T23:59:59.000Z" });
+  const boundary = planBacklogDeliveryReconciliation({ intent, binding: expired, state: stateFor(intent), observedAt: "2020-01-01T00:00:00.000Z" });
+  const malformed = planBacklogDeliveryReconciliation({ intent, binding: expired, state: stateFor(intent), observedAt: "not-a-clock" });
+  check("BDR10c review-date boundary is inclusive and malformed or missing time fails closed",
+    previewShape(before, intent, "in_progress", "closed") && [result, boundary, malformed].every(rejectedPlan));
+}
+
+{
   const intent = operationIntent("amend-evidence");
   const state = stateFor(intent);
   const result = plan(intent, state);
@@ -789,6 +829,7 @@ function schemaAccepts(schema, value, root = schema) {
   if (typeof value === "string" && schema?.pattern && !(new RegExp(schema.pattern, "u")).test(value)) return false;
   if (Array.isArray(value)) {
     if ((schema.minItems !== undefined && value.length < schema.minItems) || (schema.maxItems !== undefined && value.length > schema.maxItems)) return false;
+    if (schema.contains && !value.some((entry) => schemaAccepts(schema.contains, entry, root))) return false;
     return !schema.items || value.every((entry) => schemaAccepts(schema.items, entry, root));
   }
   if (value !== null && typeof value === "object") {
@@ -839,7 +880,7 @@ function noOpenObjectPlaceholder(schema, root = schema, visited = new Set()) {
     targets: preview?.targets, eventSequences: [41], appliedAt: "2026-07-24T12:00:00.000Z", recordSha256: SHA.authority,
   };
   const byId = Object.fromEntries(contracts.map((entry) => [entry.id, entry.value]));
-  check("BDR15 all four A1 JSON Schemas close every §7.2 object shape and agree with core runtime fixtures",
+check("BDR15 all four A1 JSON Schemas close every §7.2 object shape and agree with core runtime fixtures",
     contracts.every(({ id, required, value }) => value.$id === id
       && value.additionalProperties === false
       && Object.keys(value.properties ?? {}).toSorted().join(",") === [...required].toSorted().join(",")
@@ -857,6 +898,42 @@ function noOpenObjectPlaceholder(schema, root = schema, visited = new Set()) {
       && !schemaAccepts(byId[BACKLOG_RECONCILIATION_PREVIEW_SCHEMA], { ...preview, preSnapshot: { ...preview?.preSnapshot, extra: true } })
       && schemaAccepts(byId[BACKLOG_RECONCILIATION_RECEIPT_SCHEMA], receipt)
       && !schemaAccepts(byId[BACKLOG_RECONCILIATION_RECEIPT_SCHEMA], { ...receipt, postSnapshot: { ...receipt.postSnapshot, extra: true } }));
+}
+
+{
+  const withdrawal = {
+    itemPath: "backlog/items/2026-07-20-multi-cli-efficiency-pilots.md",
+    sourceCommit: "f98f05b52635a172526407d3a5e99490dca8104c",
+    sourceSha256: "7a0f0cfa653a76f9205f3373da19dcec75be21c0bc0679d98feff90e46d6c264",
+    ledgerSequence: 793,
+    ledgerEntryHash: "c43cb511d0c6dd6ce2e846162c3b56ec8ec5ab3231b27e48b03f8f68e958b4d7",
+  };
+  const row = {
+    id: "pipeline.multi-cli-efficiency-pilots", issue: 8, increment: "A",
+    acceptanceIds: ["NVA-A8-5"], closureMode: "po-withdrawn-scope",
+    expiryDisposition: "not-applicable", poWithdrawal: withdrawal,
+  };
+  const binding = specBinding({ bindings: [row] });
+  const schema = JSON.parse(readFileSync(new URL("../scripts/backlog-spec-binding.schema.json", import.meta.url), "utf8"));
+  const altered = [
+    { ...row, poWithdrawal: { ...withdrawal, sourceCommit: "not-an-oid" } },
+    { ...row, poWithdrawal: { ...withdrawal, sourceCommit: "a".repeat(40) } },
+    { ...row, poWithdrawal: { ...withdrawal, sourceSha256: "a".repeat(64) } },
+    { ...row, poWithdrawal: { ...withdrawal, ledgerSequence: 794 } },
+    { ...row, poWithdrawal: { ...withdrawal, ledgerEntryHash: "a".repeat(64) } },
+    { ...row, poWithdrawal: { ...withdrawal, itemPath: "backlog/items/unrelated.md" } },
+    { ...row, id: "pipeline.unrelated" },
+    { ...row, acceptanceIds: ["NVA-A8-4"] },
+    { ...row, poWithdrawal: undefined },
+  ];
+  check("BDR16 PO-withdrawn scope is a distinct closed, digest-bound binding, never pilot delivery",
+    validates(validateBacklogSpecBinding, binding)
+      && schemaAccepts(schema, binding)
+      && altered.every((candidate) => {
+        const changed = rebindSpecBinding({ ...binding, bindings: [candidate] });
+        return rejectsWithDomain(validateBacklogSpecBinding, changed) && !schemaAccepts(schema, changed);
+      })
+      && rejectedPlan(plan(operationIntent("close"), stateFor(operationIntent("close")), binding)));
 }
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);

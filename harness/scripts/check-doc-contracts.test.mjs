@@ -14,6 +14,7 @@ import {
   checkRepository,
   checkConsumerRepositoryExamples,
   checkMaintainerAudienceBoundaries,
+  checkStatefulDesignContracts,
   collectAnchors,
   extractMarkdownLinks,
   isExcludedRepoPath,
@@ -488,6 +489,8 @@ test("isExcludedRepoPath: archived and immutable reader evidence are directory-p
   assert.equal(isExcludedRepoPath("docs/state-archive-not-really/foo.md"), false);
   assert.equal(isExcludedRepoPath("specs/sprint-nova-epic/evidence/reader-review/phase-one/r5.md"), true);
   assert.equal(isExcludedRepoPath("specs/sprint-nova-epic/evidence/reader-review-notes/r5.md"), false);
+  assert.equal(isExcludedRepoPath("specs/sprint-alfred-epic/evidence/reader-review/phase-one/r5.md"), true);
+  assert.equal(isExcludedRepoPath("specs/sprint-alfred-epic/evidence/reader-review-notes/r5.md"), false);
   assert.equal(isExcludedRepoPath("AGENTS.md"), true);
   assert.equal(isExcludedRepoPath("AGENTS.mdx"), false);
 });
@@ -512,13 +515,15 @@ test("a Markdown source under docs/state-archive/ is never scanned, even when it
 });
 
 test("an immutable reader-review report is never scanned as public documentation", () => {
-  const report = "specs/sprint-nova-epic/evidence/reader-review/phase-one/r5.md";
-  const { root } = fixture({ [report]: "# Report\n\n[Local](/private/reader/path.md)\n" });
-  const result = runFixture(root, {
-    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", report],
-    markdownPaths: ["CLAUDE.md", "docs/state.md", "README.md", report],
-  });
-  assert.deepEqual(result.findings, []);
+  for (const featureId of ["sprint-nova-epic", "sprint-alfred-epic"]) {
+    const report = `specs/${featureId}/evidence/reader-review/phase-one/r5.md`;
+    const { root } = fixture({ [report]: "# Report\n\n[Local](/private/reader/path.md)\n" });
+    const result = runFixture(root, {
+      trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", report],
+      markdownPaths: ["CLAUDE.md", "docs/state.md", "README.md", report],
+    });
+    assert.deepEqual(result.findings, []);
+  }
 });
 
 test("a link into a specific docs/state-archive/ file resolves via the exclusion, not the pre-existing trackedDescendant fallback", () => {
@@ -759,6 +764,11 @@ test("CLI fails closed when Git enumeration is unavailable", () => {
   assert.match(result.stderr, /git ls-files failed/);
 });
 
+function liveStatefulDesignSurfaces() {
+  return Object.fromEntries(["templates/spec.md", "roles/elephant.md"]
+    .map((surface) => [surface, readFileSync(join(REPO, surface), "utf8")]));
+}
+
 test("stateful design checklist is complete on both required documentation surfaces", () => {
   const baseline = checkRepository(REPO);
   assert.deepEqual(baseline.findings, []);
@@ -768,25 +778,34 @@ test("stateful design checklist is complete on both required documentation surfa
     "the repository result must attest that both stateful-design documentation surfaces were checked",
   );
 
+  const surfaces = liveStatefulDesignSurfaces();
   for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
     for (const [surface, phrase] of [
       ["templates/spec.md", requirement.template],
       ["roles/elephant.md", requirement.elephant],
     ]) {
-      const result = checkRepository(REPO, {
-        readText(file) {
-          const text = readFileSync(file, "utf8");
-          if (relative(REPO, file).split("\\").join("/") !== surface) return text;
-          assert(text.includes(phrase), `${surface} fixture must contain ${requirement.id}`);
-          return text.replace(phrase, `[intentionally omitted: ${requirement.id}]`);
-        },
-      });
+      const text = surfaces[surface];
+      assert(text.includes(phrase), `${surface} fixture must contain ${requirement.id}`);
+      const findings = checkStatefulDesignContracts({ ...surfaces,
+        [surface]: text.replace(phrase, `[intentionally omitted: ${requirement.id}]`) });
       assert(
-        result.findings.some((finding) => finding.includes(`stateful-design-contract: ${surface}: ${requirement.id}`)),
-        `${surface} must reject an omitted ${requirement.id} checklist concept; got: ${result.findings.join(" | ")}`,
+        findings.includes(`stateful-design-contract: ${surface}: ${requirement.id}`),
+        `${surface} must reject an omitted ${requirement.id} checklist concept; got: ${findings.join(" | ")}`,
       );
     }
   }
+});
+
+test("repository documentation gate still enforces a missing operative stateful-design phrase", () => {
+  const requirement = STATEFUL_DESIGN_CONTRACTS[0];
+  const surface = "templates/spec.md";
+  const result = checkRepository(REPO, { readText(file) {
+    const text = readFileSync(file, "utf8");
+    if (relative(REPO, file).split("\\").join("/") !== surface) return text;
+    assert(text.includes(requirement.template));
+    return text.replace(requirement.template, `[intentionally omitted: ${requirement.id}]`);
+  } });
+  assert(result.findings.includes(`stateful-design-contract: ${surface}: ${requirement.id}`));
 });
 
 const statefulDesignBaseTrackedPaths = [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"];
@@ -858,22 +877,18 @@ for (const [context, conceal] of [
     ["roles/elephant.md", "elephant"],
   ]) {
     test(`stateful-design phrases hidden only in ${context} fail on ${surface}`, () => {
-      const result = checkRepository(REPO, {
-        readText(file) {
-          let text = readFileSync(file, "utf8");
-          if (relative(REPO, file).split("\\").join("/") !== surface) return text;
-          for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
-            const phrase = requirement[phraseKey];
-            assert(text.includes(phrase), `${surface} fixture must contain ${requirement.id}`);
-            text = text.replaceAll(phrase, conceal(phrase));
-          }
-          return text;
-        },
-      });
+      const surfaces = liveStatefulDesignSurfaces();
+      let text = surfaces[surface];
+      for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+        const phrase = requirement[phraseKey];
+        assert(text.includes(phrase), `${surface} fixture must contain ${requirement.id}`);
+        text = text.replaceAll(phrase, conceal(phrase));
+      }
+      const findings = checkStatefulDesignContracts({ ...surfaces, [surface]: text });
       for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
         assert(
-          result.findings.includes(`stateful-design-contract: ${surface}: ${requirement.id}`),
-          `${surface} must reject ${requirement.id} hidden only in ${context}; got: ${result.findings.join(" | ")}`,
+          findings.includes(`stateful-design-contract: ${surface}: ${requirement.id}`),
+          `${surface} must reject ${requirement.id} hidden only in ${context}; got: ${findings.join(" | ")}`,
         );
       }
     });
@@ -919,24 +934,18 @@ function moveStatefulPhrasesToRejectedExample(text, section) {
 
 for (const section of statefulDesignOperativeSections) {
   test(`stateful-design phrases moved from the operative section fail on ${section.surface}`, () => {
-    let rejectedExample = "";
-    const result = checkRepository(REPO, {
-      readText(file) {
-        const text = readFileSync(file, "utf8");
-        if (relative(REPO, file).split("\\").join("/") !== section.surface) return text;
-        const moved = moveStatefulPhrasesToRejectedExample(text, section);
-        rejectedExample = moved.rejectedExample;
-        return moved.text;
-      },
-    });
+    const surfaces = liveStatefulDesignSurfaces();
+    const moved = moveStatefulPhrasesToRejectedExample(surfaces[section.surface], section);
+    const rejectedExample = moved.rejectedExample;
+    const findings = checkStatefulDesignContracts({ ...surfaces, [section.surface]: moved.text });
 
     for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
       const phrase = requirement[section.phraseKey];
       assert(rejectedExample.includes(phrase), `${section.surface} must leave ${requirement.id} visible outside its operative section`);
       assert(!rejectedExample.includes("<!--") && !rejectedExample.includes("```"), "the rejected example must remain ordinary Markdown");
       assert(
-        result.findings.includes(`stateful-design-contract: ${section.surface}: ${requirement.id}`),
-        `${section.surface} must reject ${requirement.id} when it appears only in a non-operative rejected example; got: ${result.findings.join(" | ")}`,
+        findings.includes(`stateful-design-contract: ${section.surface}: ${requirement.id}`),
+        `${section.surface} must reject ${requirement.id} when it appears only in a non-operative rejected example; got: ${findings.join(" | ")}`,
       );
     }
   });

@@ -85,9 +85,12 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
   existsSync,
+  fstatSync,
+  fsyncSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -103,6 +106,10 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
+import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
+import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
+import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
 import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
   CRITICAL_HUMAN_PROOF_POLICY_PATH,
@@ -136,9 +143,18 @@ const PO_HUMAN_APPROVAL_SCRIPT_PATH = fileURLToPath(new URL("./po-human-approval
 const TRUST_ANCHOR_MODES = new Set(["existing", "new"]);
 const PUSH_APPROVAL_MODES = new Set(["signature", "chat"]);
 const TRUST_ANCHOR_RECOVERY_SCHEMA = "pipeline.first-anchor-bootstrap-recovery.v1";
+const INITIAL_JOURNAL_FAILURES = new Map([
+  ["INITIAL-ANSWERS-JOURNAL-ANSWER-CONFLICT", "INITIAL-ANSWERS-TRANSACTION-ANSWER-CONFLICT"],
+  ["INITIAL-ANSWERS-JOURNAL-DRIFT", "INITIAL-ANSWERS-TRANSACTION-DRIFT"],
+  ["INITIAL-ANSWERS-JOURNAL-PREIMAGE-DRIFT", "INITIAL-ANSWERS-TRANSACTION-PREIMAGE-DRIFT"],
+]);
+function initialJournalFailure(error) {
+  return { ok: false, code: INITIAL_JOURNAL_FAILURES.get(error?.message)
+    ?? "INITIAL-ANSWERS-TRANSACTION-RECOVERY-REQUIRED" };
+}
 
 function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --human-approval signature|chat] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
+  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --human-approval signature|chat --language de|en] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
 }
 
 // The runner lane, pinned rather than inherited.
@@ -218,6 +234,11 @@ function parseArgs(argv) {
       if (!PUSH_APPROVAL_MODES.has(value)) return { error: "--human-approval requires signature or chat" };
       output.pushApproval = value;
       index += 1;
+    } else if (arg === "--language") {
+      const value = argv[index + 1];
+      if (value !== "de" && value !== "en") return { error: "--language requires de or en" };
+      output.language = value;
+      index += 1;
     } else if (arg === "--help" || arg === "-h") {
       output.help = true;
     } else {
@@ -233,6 +254,8 @@ function parseArgs(argv) {
   if ((identityValues.some((value) => value !== undefined) || output.pushApproval !== undefined) && !output.pushApproval) {
     return { error: "initial answers require --human-approval" };
   }
+  if (output.pushApproval !== undefined && output.language === undefined) return { error: "initial answers require --language" };
+  if (output.language !== undefined && output.pushApproval === undefined) return { error: "--language requires --human-approval" };
   if (output.pushApproval !== undefined && !output.runner) return { error: "initial answers require an explicit --runner" };
   if (output.pushApproval !== undefined && output.stepCap !== undefined) return { error: "initial answers do not accept --step-cap" };
   if (output.pushApproval !== undefined && setupValues.some((value) => value !== undefined)) {
@@ -294,11 +317,25 @@ function fileSnapshot(path, { exists, lstat, read }) {
 
 function atomicReplaceFile(path, bytes, mode = 0o600) {
   mkdirSync(dirname(path), { recursive: true });
-  const temporary = `${path}.trust-anchor-bootstrap-${process.pid}`;
-  const fd = openSync(temporary, "wx", mode);
-  try { writeFileSync(fd, bytes); }
-  finally { closeSync(fd); }
-  renameSync(temporary, path);
+  const temporary = `${path}.trust-anchor-bootstrap-${randomBytes(12).toString("hex")}`;
+  let fd;
+  let created;
+  try {
+    fd = openSync(temporary, "wx", mode);
+    created = fstatSync(fd);
+    writeFileSync(fd, bytes);
+    fsyncSync(fd);
+    closeSync(fd);
+    fd = undefined;
+    renameSync(temporary, path);
+  } catch (error) {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* preserve first failure */ } }
+    try {
+      const current = lstatSync(temporary);
+      if (created && current.dev === created.dev && current.ino === created.ino) unlinkSync(temporary);
+    } catch { /* unknown replacement is not ours to remove */ }
+    throw error;
+  }
 }
 
 function restoreSnapshots(snapshots, exists = existsSync) {
@@ -558,16 +595,22 @@ export function applyInitialOnboardingAnswers({
   gitAuthorName = null,
   gitAuthorEmail = null,
   pushApproval,
+  language,
   trustAnchor = null,
   env = null,
   runGit = spawnSync,
   applyTrustAnchor = applyTrustAnchorBootstrap,
+  afterInitialPublication = null,
 } = {}) {
   const root = resolve(rootDir);
   const effectiveEnv = childEnvironment(env) ?? process.env;
   if (!RUNNERS.has(runner)) return { ok: false, code: "INITIAL-ANSWERS-RUNNER-INVALID" };
   if (!PUSH_APPROVAL_MODES.has(pushApproval)) return { ok: false, code: "INITIAL-ANSWERS-PUSH-APPROVAL-INVALID" };
+  if (language !== "de" && language !== "en") return { ok: false, code: "INITIAL-ANSWERS-LANGUAGE-INVALID" };
   if (trustAnchor !== null) return { ok: false, code: "INITIAL-ANSWERS-TRUST-ANCHOR-CONFLICT" };
+  if (afterInitialPublication !== null && typeof afterInitialPublication !== "function") {
+    return { ok: false, code: "INITIAL-ANSWERS-PUBLISH-HOOK-INVALID" };
+  }
   if ((gitAuthorName === null) !== (gitAuthorEmail === null)) return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-INCOMPLETE" };
   if (gitAuthorName !== null && (![gitAuthorName, gitAuthorEmail].every((value) => typeof value === "string"
     && value.trim().length > 0 && value.length <= 320 && !/[\r\n\0]/u.test(value)))) {
@@ -575,7 +618,9 @@ export function applyInitialOnboardingAnswers({
   }
 
   const sourcePath = join(root, "pipeline.user.yaml");
-  const receiptPath = join(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH);
+  let receiptPath = join(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH);
+  let pendingPath = null;
+  let hostManaged = false;
   const home = effectiveEnv.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE
     ?? effectiveEnv.HOME
     ?? effectiveEnv.USERPROFILE
@@ -583,6 +628,46 @@ export function applyInitialOnboardingAnswers({
   const machineDependencies = { homedirFn: () => home };
   const machinePath = machinePlaneFilePath(machineDependencies);
   if (machinePath === null || !existsSync(sourcePath)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-MISSING" };
+  let priorIntake;
+  try {
+    const repository = observeCodexOnboardingCapabilities({ rootDir: root, intent: "onboarding" });
+    if (repository.mode !== "local" && repository.mode !== "host-managed") {
+      return { ok: false, code: "INITIAL-ANSWERS-REPOSITORY-UNAVAILABLE" };
+    }
+    hostManaged = repository.mode === "host-managed";
+    if (hostManaged) {
+      const state = resolveInitialAnswersState(root, "host-managed");
+      receiptPath = state.receipt;
+      pendingPath = state.pending;
+    }
+    priorIntake = readOnboardingIntakeCheckpoint({ rootDir: root, repositoryCapability: repository.mode });
+  } catch { return { ok: false, code: "INITIAL-ANSWERS-INTAKE-UNAVAILABLE" }; }
+  if (hostManaged && gitAuthorName === null) {
+    return { ok: false, code: "INITIAL-ANSWERS-GIT-IDENTITY-REQUIRED" };
+  }
+  const answerSha256 = createHash("sha256").update(JSON.stringify({
+    root, runner, gitAuthorName, gitAuthorEmail, pushApproval, language,
+  })).digest("hex");
+  const transactionTargets = [
+    { role: "source", path: sourcePath },
+    { role: "machine", path: machinePath },
+    { role: "receipt", path: receiptPath },
+  ];
+  const publishHostEntry = (role, path, bytes, mode) => {
+    if (role === "machine") writeMachinePlane(JSON.parse(bytes.toString("utf8")), machineDependencies);
+    else atomicReplaceFile(path, bytes, mode);
+    afterInitialPublication?.(role);
+  };
+  if (hostManaged && existsSync(pendingPath)) {
+    try {
+      completeInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256,
+        targets: transactionTargets, publish: publishHostEntry });
+    } catch (error) { return initialJournalFailure(error); }
+  }
+  const intakeLanguage = priorIntake.status === "present" ? priorIntake.value.values.language : null;
+  if (intakeLanguage !== null && intakeLanguage !== language) {
+    return { ok: false, code: "INITIAL-ANSWERS-INTAKE-LANGUAGE-CONFLICT" };
+  }
   const snapshots = [sourcePath, machinePath, receiptPath]
     .map((path) => fileSnapshot(path, { exists: existsSync, lstat: lstatSync, read: readFileSync }));
   if (snapshots.some((snapshot) => snapshot === null)) return { ok: false, code: "INITIAL-ANSWERS-PREIMAGE-UNSAFE" };
@@ -600,6 +685,33 @@ export function applyInitialOnboardingAnswers({
   const humanApprovalLines = sourceBytes.match(/^\s*human_approval:\s*"(?:signature|chat)"\s*$/gmu) ?? [];
   if (pushApprovalLines.length !== 1 || humanApprovalLines.length > 1) {
     return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" };
+  }
+  if (snapshots[2].present) {
+    let prior;
+    try { prior = JSON.parse(snapshots[2].bytes.toString("utf8")); }
+    catch { return { ok: false, code: "INITIAL-ANSWERS-RECEIPT-INVALID" }; }
+    if (prior?.schema !== PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
+      || prior.root !== root || prior.runner !== runner
+      || prior.pushApprovalPreference !== pushApproval
+      || prior.gitAuthorName !== gitAuthorName || prior.gitAuthorEmail !== gitAuthorEmail
+      || (prior.language !== undefined && prior.language !== language)) {
+      return { ok: false, code: "INITIAL-ANSWERS-RECEIPT-CONFLICT" };
+    }
+    if (prior.language === language) {
+      const selected = JSON.stringify(pushApproval);
+      if (!pushApprovalLines[0].trim().endsWith(`: ${selected}`)
+        || humanApprovalLines.length !== 1
+        || !humanApprovalLines[0].trim().endsWith(`: ${selected}`)) {
+        return { ok: false, code: "INITIAL-ANSWERS-SOURCE-DRIFT" };
+      }
+      if (currentPlane.status !== "valid"
+        || currentPlane.plane.pushApprovalDefault !== pushApproval
+        || currentPlane.plane.language !== language) {
+        return { ok: false, code: "INITIAL-ANSWERS-MACHINE-DRIFT" };
+      }
+      return { ok: true, code: "INITIAL-ANSWERS-APPLIED", pushApprovalPreference: pushApproval,
+        language, trustAnchor: "not-requested" };
+    }
   }
   let nextSource = sourceBytes.replace(
     /^(\s*)push_approval:\s*"(?:signature|chat)"\s*$/mu,
@@ -619,32 +731,55 @@ export function applyInitialOnboardingAnswers({
   catch { return { ok: false, code: "INITIAL-ANSWERS-SOURCE-SHAPE-INVALID" }; }
   if (!validatePipelineUserV3(parsedSource).ok) return { ok: false, code: "INITIAL-ANSWERS-SOURCE-VALIDATION-FAILED" };
 
-  try { atomicReplaceFile(sourcePath, nextSource, lstatSync(sourcePath).mode & 0o777); }
-  catch { return rollback("INITIAL-ANSWERS-SOURCE-WRITE-FAILED"); }
   const nextPlane = currentPlane.status === "valid"
-    ? { ...currentPlane.plane, pushApprovalDefault: pushApproval, updatedAt: new Date().toISOString() }
+    ? { ...currentPlane.plane, pushApprovalDefault: pushApproval, language, updatedAt: new Date().toISOString() }
     : {
       schema: MACHINE_PLANE_SCHEMA,
       poKeyDirectory: null,
       pushApprovalDefault: pushApproval,
       routing: null,
-      language: null,
+      language,
       session: null,
       usage: null,
       updatedAt: new Date().toISOString(),
     };
+  const nextReceipt = `${JSON.stringify({
+    schema: PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
+    root,
+    runner,
+    pushApprovalPreference: pushApproval,
+    language,
+    gitAuthorName,
+    gitAuthorEmail,
+    updatedAt: new Date().toISOString(),
+  }, null, 2)}\n`;
+  if (hostManaged) {
+    try {
+      const state = resolveInitialAnswersState(root, "host-managed", { create: true });
+      if (state.receipt !== receiptPath || state.pending !== pendingPath) {
+        return { ok: false, code: "INITIAL-ANSWERS-PRIVATE-STATE-DRIFT" };
+      }
+      const targets = [
+        { ...transactionTargets[0], postBytes: Buffer.from(nextSource), postMode: snapshots[0].mode,
+          expectedPre: { bytes: snapshots[0].bytes, mode: snapshots[0].mode } },
+        { ...transactionTargets[1], postBytes: Buffer.from(`${JSON.stringify(nextPlane, null, 2)}\n`), postMode: 0o600,
+          expectedPre: { bytes: snapshots[1].bytes, mode: snapshots[1].mode } },
+        { ...transactionTargets[2], postBytes: Buffer.from(nextReceipt), postMode: 0o600,
+          expectedPre: { bytes: snapshots[2].bytes, mode: snapshots[2].mode } },
+      ];
+      beginInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256, targets });
+      completeInitialAnswersJournal({ markerPath: pendingPath, root, runner, answerSha256,
+        targets, publish: publishHostEntry });
+    } catch (error) { return initialJournalFailure(error); }
+    return { ok: true, code: "INITIAL-ANSWERS-APPLIED", pushApprovalPreference: pushApproval,
+      language, trustAnchor: "not-requested" };
+  }
+  try { atomicReplaceFile(sourcePath, nextSource, lstatSync(sourcePath).mode & 0o777); }
+  catch { return rollback("INITIAL-ANSWERS-SOURCE-WRITE-FAILED"); }
   try { writeMachinePlane(nextPlane, machineDependencies); }
   catch { return rollback("INITIAL-ANSWERS-MACHINE-WRITE-FAILED"); }
   try {
-    atomicReplaceFile(receiptPath, `${JSON.stringify({
-      schema: PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA,
-      root,
-      runner,
-      pushApprovalPreference: pushApproval,
-      gitAuthorName,
-      gitAuthorEmail,
-      updatedAt: new Date().toISOString(),
-    }, null, 2)}\n`);
+    atomicReplaceFile(receiptPath, nextReceipt);
   } catch {
     return rollback("INITIAL-ANSWERS-RECEIPT-WRITE-FAILED");
   }
@@ -658,6 +793,7 @@ export function applyInitialOnboardingAnswers({
     ok: true,
     code: "INITIAL-ANSWERS-APPLIED",
     pushApprovalPreference: pushApproval,
+    language,
     trustAnchor: bootstrap?.code ?? "not-requested",
   };
 }
@@ -823,6 +959,7 @@ function isTrustAnchorAction(action) {
 
 function initialAnswersActionWithoutTrustAnchor(action) {
   if (!isTrustAnchorAction(action) || !action.applyAction.argv.includes("--human-approval")) return action;
+  const asksLanguage = action.inputs?.some((input) => input?.name === "language") === true;
   const argv = [];
   for (let index = 0; index < action.applyAction.argv.length; index += 1) {
     const part = action.applyAction.argv[index];
@@ -835,13 +972,16 @@ function initialAnswersActionWithoutTrustAnchor(action) {
   return {
     ...action,
     inputs: (action.inputs ?? []).filter((input) => !String(input?.name ?? "").startsWith("trustAnchor")),
-    guidance: "collect this initial PO round: the repository-local Git author and the shared human-approval policy. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected value is written consistently as gates.human_approval and gates.push_approval. A selected \"chat\" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected \"signature\" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.",
+    guidance: `Collect this initial PO round: the repository-local Git author and shared human-approval policy${asksLanguage ? ", plus an explicit de|en language choice" : "; the already-confirmed intake language is carried forward without another question"}. The one signature|chat answer governs design/plan approval as well as push approval; it is not a push-only preference. Replace each placeholder in applyAction.argv with the matching verbatim answer, then execute that exact returned action once. The selected values are held in a repository-bound receipt; approval is written consistently as gates.human_approval and gates.push_approval, and later intake consent reuses the confirmed language without asking again. A selected "chat" route is terminal-free attributed approval and completes without a signing key or trust anchor. A selected "signature" route keeps detached proofs and re-enters this public driver before it surfaces the separate existing/new trust-anchor action. Do not reconstruct git config, machine-plane, intake, or key-setup commands.`,
     applyAction: { ...action.applyAction, argv },
   };
 }
 
-function persistedInitialPushApproval(root) {
-  const receipt = parseJsonFile(join(root, PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_PATH), readFileSync);
+function persistedInitialPushApproval(root, repositoryCapability = "local") {
+  let receiptPath;
+  try { receiptPath = resolveInitialAnswersState(root, repositoryCapability).receipt; }
+  catch { return null; }
+  const receipt = parseJsonFile(receiptPath, readFileSync);
   return receipt?.schema === PROJECT_ONBOARDING_INITIAL_ANSWERS_RECEIPT_SCHEMA
     && receipt.root === root
     && PUSH_APPROVAL_MODES.has(receipt.pushApprovalPreference)
@@ -852,7 +992,7 @@ function persistedInitialPushApproval(root) {
 function normalizeOnboardingDriverOutput(output, root) {
   const nextAction = output?.nextAction;
   if (!nextAction || typeof nextAction !== "object" || !Array.isArray(nextAction.pendingAsks)) return output;
-  const pushApproval = persistedInitialPushApproval(root);
+  const pushApproval = persistedInitialPushApproval(root, output?.repository?.mode ?? "local");
   const pendingAsks = nextAction.pendingAsks
     .map(initialAnswersActionWithoutTrustAnchor)
     .filter((action) => pushApproval !== "chat" || !isTrustAnchorAction(action));
@@ -1223,6 +1363,7 @@ export function main(args = process.argv.slice(2), {
       gitAuthorName: options.gitAuthorName ?? null,
       gitAuthorEmail: options.gitAuthorEmail ?? null,
       pushApproval: options.pushApproval,
+      language: options.language,
       trustAnchor: options.trustAnchorMode ? {
         mode: options.trustAnchorMode,
         directory: options.trustAnchorDirectory,

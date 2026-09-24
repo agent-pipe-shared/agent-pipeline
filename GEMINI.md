@@ -16,14 +16,19 @@ For the pipeline hooks to intercept and evaluate commands, the Antigravity host
 must be able to resolve `node` in its PATH. A desktop or service launcher may
 have a different PATH from an interactive shell.
 
-Check the environment that actually starts Antigravity:
+If Antigravity is launched from this same terminal, check before launching it:
 
 ```bash
 command -v node
 ```
 
-If `node` is absent there, correct that host environment and fully restart
-Antigravity before relying on its hooks.
+For a desktop or service launch, this shell command does **not** establish the
+launcher PATH. Inspect the host's launcher/service environment and confirm
+that Antigravity's own command tool can resolve and run `node --version` in a
+new session. If that readback is unavailable or denied, treat hook readiness
+as unknown; correct the host environment and fully restart Antigravity before
+relying on its hooks. Do not use an unattended permission bypass to obtain the
+readback.
 
 ### Antigravity Installation (Workspace-Local)
 

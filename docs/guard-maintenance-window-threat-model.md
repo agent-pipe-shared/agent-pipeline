@@ -283,6 +283,10 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/requirement-traceability.mjs`, `scripts/check-critic-skip-coverage.mjs`,
   `scripts/critic-dispatch-preflight.mjs`, `scripts/critic-packet-preflight.mjs`, and
   `scripts/session-critic-finalizer.mjs`.
+  The intake and Critic admission dependencies reached from those kernel paths
+  also remain protected: `lib/onboarding-initial-answers-state.mjs`,
+  `lib/onboarding-initial-answers-transaction.mjs`,
+  `lib/onboarding-later-language.mjs`, and `lib/critic-course-admission.mjs`.
   Guards and close coordination import these modules to enforce verified feature close audit and critic lifecycle readback.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap

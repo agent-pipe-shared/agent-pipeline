@@ -17,7 +17,7 @@ import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
 import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { retryGovernanceVerificationAction } from "../lib/governance-verification-action.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
-import { finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
+import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
 
 function run(executable, args, options = {}) {
@@ -83,12 +83,14 @@ async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict 
       appliedRow: "T1",
     },
   }, null, 2));
-  const final = finalizeSessionCriticReview({
+  const review = {
     preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/critic-candidate.json"], priorCriticEvidencePath: null },
     taskId: "release-verify", projectId: "fixture", sessionId: "release-review-1", packetId,
     route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
     verdict: verdict ?? { findings: [], deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: true },
-  });
+  };
+  admitSessionCriticReview(review);
+  const final = finalizeSessionCriticReview(review);
   const observed = readConsumedCandidateReceipt({ controlRoot: join(root, ".git", "agent-pipeline", "critic-packets"), packetId });
   assert.equal(observed.receipt.packetId, packetId);
   return { packetId, candidate, final };

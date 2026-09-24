@@ -87,6 +87,7 @@
           "docs/licensing.md",
           "docs/macos-support.md",
           "docs/observation-intake.md",
+          "docs/onboarding-recovery.md",
           "docs/operating-model.md",
           "docs/organization-policy-packs.md",
           "docs/parallel-work.md",
@@ -119,6 +120,7 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/artifact-topology.md",
+          "docs/audit-bundles-technical.md",
           "docs/bootstrap-step-accounting.md",
           "docs/claude-local-plugin-development.md",
           "docs/codex-local-plugin-development.md",

@@ -1,6 +1,6 @@
 # Pipeline Flow — the V3 option guide
 
-> _An expandable German reader version follows below · Eine ausklappbare deutsche Lesefassung folgt weiter unten._
+> _German reader version: [Pipeline Flow auf Deutsch](PIPELINE_FLOW.de.md)._
 
 This is the **one maintained visual guide to the user-facing V3 flow**. It helps
 you choose a route and understand who does what. It is not permission to skip a
@@ -15,6 +15,15 @@ disagrees with one of them, use that source.
 
 <!-- capability:session-and-delivery-skills -->
 <a id="capability-session-and-delivery-skills"></a>
+
+The plugin ships skills for starting a session, bounded advice and observation
+intake, technical and reader-facing review, and deliberate closeout. They make
+those steps discoverable, but a skill does not itself approve a plan, commit,
+or release.
+In a consuming repository, use the relevant skill at its named lifecycle step;
+its output still needs the repository's configured checks and any applicable
+human decision before the next protected action.
+
 <!-- capability:specialist-agent-roles -->
 <a id="capability-specialist-agent-roles"></a>
 
@@ -37,7 +46,8 @@ Four terms prevent most confusion:
 - A **Phase** is a lifecycle position: `design_phase` shapes and approves work;
   `execution_phase` delivers it. A phase is not a profile.
 
-Use `/pipeline-core:pipeline-start` before work. Its confirmation is bootstrap
+Confirm the active profile for this task, then use
+`/pipeline-core:pipeline-start` before delivery work. Its confirmation is bootstrap
 evidence: it validates the V3 source/runtime projection, calibration, applicable
 state, and available verify gate. It uses the active profile and phase; a
 requested model is not proof of the model that actually ran.
@@ -46,10 +56,10 @@ requested model is not proof of the model that actually ran.
 
 ```mermaid
 flowchart TD
-    I[Intent: feature, fix, or refactor] --> B[Bootstrap session]
-    B --> P{Choose V3 profile}
-    P -->|Epic or Feature| A[Model-free Advisor capability preflight]
-    P -->|Mini| T[Triage]
+    I[Intent: feature, fix, or refactor] --> P{Confirm active V3 profile}
+    P --> B[Bootstrap session using that profile]
+    B -->|Epic or Feature| A[Model-free Advisor capability preflight]
+    B -->|Mini| T[Triage]
     A --> T
     T --> D{Design useful or required?}
     D -->|yes| DS[Design phase: options, UI when applicable, and acceptance criteria]
@@ -73,17 +83,23 @@ flowchart TD
     TA -->|yes| TT[Test-author task and test contract]
     TA -->|no| IM[Goldfish implements one bounded package]
     TT --> IM
-    IM --> V[Configured verify creates machine evidence]
+    IM --> CM[Coordinator integrates and commits; clean candidate]
+    CM --> V[Configured verify creates machine evidence]
     V -->|red| RC[Classify and recover]
-    V -->|green| O{Optional phase configured or triggered?}
-    O -->|security| SEC[Security evidence]
-    O -->|governance| GOV[Guideline or policy evaluation]
-    O -->|none| C[Fresh independent Critic]
-    SEC --> C
+    V -->|green| SQ{Security required?}
+    SQ -->|yes| SEC[Security evidence]
+    SQ -->|no| GQ{Governance required?}
+    SEC --> GQ
+    GQ -->|yes| GOV[Guideline or policy evaluation]
+    GQ -->|no| C[Fresh independent Critic]
     GOV --> C
     C --> CR[Critic result and disposition]
     CR -->|correction needed| RC
-    CR -->|clear or disposition recorded| CL[Close feature lifecycle]
+    CR -->|clear or disposition recorded| HA{Human acceptance required?}
+    HA -->|no| CL[Close feature lifecycle]
+    HA -->|yes| HD[Human decision on delivered candidate]
+    HD -->|accepted| CL
+    HD -->|rejected| RC
     CL --> REL{Release phase declared?}
     REL -->|yes| RP[Release evidence and human promotion gate]
     REL -->|no| DONE[Closed change]
@@ -97,10 +113,20 @@ The arrows do not promise that every change visits every box. The tables state
 when a branch exists, who owns it, the evidence that makes it real, and where it
 returns.
 
-## 1. Choose the V3 profile after bootstrap
+## 1. Confirm the V3 profile before bootstrap
 
 <!-- capability:v3-routed-duties -->
 <a id="capability-v3-routed-duties"></a>
+
+V3 routes name the duty, selected runner, required evidence and declared
+unavailability behavior before work is dispatched. The route is a declared
+contract; availability still has
+to be observed on the current host, and an unavailable route is not silently
+replaced with a different provider.
+Check the route's runner capability and evidence requirements for the current
+repository and host before relying on it. A route declaration alone is neither
+a successful dispatch nor proof that the selected model actually ran.
+
 <!-- capability:v3-work-profiles -->
 <a id="capability-v3-work-profiles"></a>
 
@@ -134,26 +160,6 @@ a *new* reviewer checks it again. Neither an optional readiness decision nor a
 
 ## 3. Deliver in independently checkable packages
 
-<!-- capability:afk-capability-workers -->
-<a id="capability-afk-capability-workers"></a>
-<!-- capability:local-worker-supervision -->
-<a id="capability-local-worker-supervision"></a>
-
-<!-- capability:deterministic-verification -->
-<a id="capability-deterministic-verification"></a>
-
-For an audit-facing delivery, retain the candidate-bound Verify receipt with
-the package: it identifies the command, candidate, tree, suites, and result.
-A red, skipped, stale, or mismatched receipt is evidence of its limitation,
-not a green result. [Audit and evidence](docs/audit-and-evidence.md) explains
-what a review package can contain and what it cannot prove.
-
-<!-- capability:claude-hook-safety -->
-<a id="capability-claude-hook-safety"></a>
-
-<!-- capability:codex-host-hook-bridge -->
-<a id="capability-codex-host-hook-bridge"></a>
-
 ```mermaid
 flowchart LR
     SP[Approved current Spec] --> PF[Preflight: route, authority, capacity, scope]
@@ -161,7 +167,8 @@ flowchart LR
     TD -->|yes| T[Separate test-author]
     TD -->|no| G[Goldfish implementor]
     T --> G
-    G --> VE[One configured verify command]
+    G --> CM[Coordinator commits a clean candidate]
+    CM --> VE[One configured verify command]
     VE -->|green evidence| CR[Fresh read-only Critic]
     VE -->|red evidence| RE[Classified recovery]
     CR -->|clear / disposition| CO[Close]
@@ -176,7 +183,8 @@ flowchart LR
 | Preflight | Elephant and deterministic checks. | Current PRD/Spec, profile/phase route, capacity, scope, and authority bindings still match. | A mismatch defers or opens a course decision; it never becomes an informal dispatch. |
 | Test author — optional | A separately briefed test-author duty. | Use it when the test or gate contract itself must change. | The implementor does not weaken or rewrite the tests that judge its own implementation. Its output is separately reviewable. |
 | Implement | Goldfish. | One fresh-context, self-contained implementation package. Independent packages may run in parallel when files and data do not overlap. | A six-field briefing supplies goal, context, Definition of Done, prohibitions, stop conditions, and dispatch metadata. |
-| Verify — mandatory | Goldfish runs the evidence producer as the configured project gate. | For release, the producer runs the one configured project command; documented boundary-aware modes run the fixed baseline plus registered changed-area commands. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
+| Candidate commit | Coordinator or authorized host, after validating the returned package. | Integrate the bounded result and create a clean committed candidate before candidate-bound Verify. | Record the actual commit and tree; a Child's proposed commit or a dirty checkout is not a substitute. |
+| Verify — mandatory | Coordinator invokes the configured evidence producer on the committed candidate. | For release, the producer runs the one configured project command; documented boundary-aware modes run the fixed baseline plus registered changed-area commands. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
 | Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | The Critic receives references to candidate, Spec, guardrails, and evidence — not implementation chat or rationale. | It runs after deterministic checks. Findings need evidence, a rule/criterion, and a consequence. A correction gets a fresh delta re-gate. Goldfish delivery stays review-pending until independent Critic evidence exists. |
 
 Each project uses the one full `verify` command named by its own calibration.
@@ -219,8 +227,6 @@ choosing an update does not itself install, activate, or verify it.
 
 ## 5. Close deliberately; recover with a bound
 
-<!-- capability:handover-hard-size-gate -->
-<a id="capability-handover-hard-size-gate"></a>
 <!-- capability:continuity-and-handover -->
 <a id="capability-continuity-and-handover"></a>
 
@@ -239,9 +245,71 @@ follows the close boundary under its own evidence and approval rules.
 | Spec, scope, evidence, or authority drift | Elephant and human as needed. | Re-plan or re-approve; never carry stale approval into a changed contract. | Return to triage, Spec, readiness, or approval — whichever became stale. |
 | Unknown cause, repeated signature, exhausted budget, or conflict | Human decision-maker. | Continue with a new direction, defer, or stop. | No unbounded retry loop and no success claim without required evidence. |
 
+<!-- capability:handover-hard-size-gate -->
+<a id="capability-handover-hard-size-gate"></a>
+
+For a proposed handover write, the configured cap refuses when the computed
+post-write size—or the guard's non-exact `NotebookEdit` size estimate—reaches
+its hard limit and is not provably smaller than the current file. A proven
+net decrease remains allowed so an oversized handover can be repaired.
+Unreadable tool-input shapes are admitted by this guard; it is not a universal
+write boundary.
+For a refused write, shorten or split the handover and retry with a bounded
+replacement. Do not treat a permitted edit as evidence that every other
+handover or repository policy has passed.
+
 Pipeline-source migration commands belong to the occasional maintainer path,
 not this consumer lifecycle. See [SETUP](SETUP.md) for that path and for the
 ordered runner binding, restart, classification, and adoption procedure.
+
+## Optional execution and host-boundary reference
+
+<!-- capability:afk-capability-workers -->
+<a id="capability-afk-capability-workers"></a>
+
+The Claude-only AFK worker can return one bounded analysis proposal from
+allowlisted repository inputs after activation. It cannot run commands,
+change files, approve, commit or dispatch more workers.
+The orchestrating session remains responsible for checking the proposal
+against current project evidence and deciding whether to act. No background
+proposal becomes project authority merely because the worker returned it.
+
+<!-- capability:local-worker-supervision -->
+<a id="capability-local-worker-supervision"></a>
+
+Local worker supervision is an opt-in host operation for planning, inspecting,
+cancelling and cleaning up worker leases. Running a provider-backed worker
+requires a separate explicit flag; the supervisor does not claim OS isolation
+or make background execution the default.
+Use its status and recovery receipts to distinguish a finished worker from
+one that is still running or requires cleanup. A completed process does not by
+itself establish that the product result was verified or delivered.
+
+<!-- capability:deterministic-verification -->
+<a id="capability-deterministic-verification"></a>
+
+For an audit-facing delivery, retain the candidate-bound Verify receipt with
+the package: it identifies the command, candidate, tree, suites, and result.
+A red, skipped, stale, or mismatched receipt is evidence of its limitation,
+not a green result. [Audit and evidence](docs/audit-and-evidence.md) explains
+what a review package can contain and what it cannot prove.
+
+<!-- capability:claude-hook-safety -->
+<a id="capability-claude-hook-safety"></a>
+
+Where the Claude or Antigravity hook integration is installed and active,
+configured guards check command, write-path, plan, test-path, push and
+lifecycle-readiness actions at the host boundary. These controls do not imply
+that a different runner exposes the same hook events.
+Confirm the installed plugin copy and the host's active hook registration
+before relying on a denial or approval. Repository source code alone cannot
+prove that a particular user's runner enforced the hook during a session.
+
+<!-- capability:codex-host-hook-bridge -->
+<a id="capability-codex-host-hook-bridge"></a>
+
+Codex's host bridge applies only the command and write-path policy exposed by
+that host. It does not imply Claude-style hook delivery or universal enforcement.
 
 ## Support boundary and current scope
 

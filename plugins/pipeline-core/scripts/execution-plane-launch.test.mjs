@@ -26,6 +26,10 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
@@ -36,6 +40,7 @@ import {
   buildRunnerFixture,
   main,
   parseFixtureExitCode,
+  verifyFixtureSuccess,
 } from "./execution-plane-launch.mjs";
 
 let passed = 0;
@@ -61,10 +66,10 @@ check("no-flag fixture block equals the pre-change literal, key order included",
   assert.deepEqual(Object.keys(fixture), Object.keys(ORIGINAL_FIXTURE_LITERAL));
 });
 
-check("only exitCode is parameterized -- delayMs and behavior are not reachable from the CLI", () => {
+check("zero selects the authorized-write fixture while the failure default remains unchanged", () => {
   const fixture = buildRunnerFixture(0);
   assert.equal(fixture.delayMs, ORIGINAL_FIXTURE_LITERAL.delayMs);
-  assert.equal(fixture.behavior, ORIGINAL_FIXTURE_LITERAL.behavior);
+  assert.equal(fixture.behavior, "first-authorized");
 });
 
 // --- (b) --fixture-exit-code 0 is accepted and threaded through -------------
@@ -79,7 +84,7 @@ check("--fixture-exit-code=0 (equals form) parses to 0", () => {
 
 check("the parsed 0 is threaded into the fixture block the supervisor receives", () => {
   const fixture = buildRunnerFixture(parseFixtureExitCode([FIXTURE_EXIT_CODE_FLAG, "0"]));
-  assert.deepEqual(fixture, { delayMs: 200, exitCode: 0, behavior: "none" });
+  assert.deepEqual(fixture, { delayMs: 200, exitCode: 0, behavior: "first-authorized" });
 });
 
 check("a non-default nonzero value is threaded through unchanged", () => {
@@ -122,6 +127,32 @@ check("a non-array argv is refused", () => {
 check("importing the launcher does not make it the entrypoint", () => {
   assert.equal(isDirectInvocation(new URL("./execution-plane-launch.mjs", import.meta.url).href), false);
   assert.equal(typeof main, "function");
+});
+
+check("host fixture verification binds actual bytes, supervisor manifest and candidate", () => {
+  const stateRoot = mkdtempSync(join(tmpdir(), "a4-verifier-fixture-"));
+  try {
+    const workspace = join(stateRoot, "workspaces", "lease-a");
+    mkdirSync(join(workspace, "src"), { recursive: true });
+    const subject = { dispatchId: "dispatch-a", attempt: 0, subjectSha256: "a".repeat(64) };
+    const output = Buffer.from(`e2e\n\nfixture:task-a:${subject.subjectSha256.slice(0, 12)}\n`);
+    writeFileSync(join(workspace, "src", "e2e.txt"), output);
+    const digest = createHash("sha256").update(output).digest("hex");
+    const worker = { taskId: "task-a", workspaceMember: "lease-a", state: "completed", result: {
+      taskId: "task-a", subjectSha256: subject.subjectSha256, candidateCommit: "b".repeat(40),
+      status: "completed", exitCode: 0, signal: null, resultSha256: "c".repeat(64),
+      changed: [{ path: "src/e2e.txt", kind: "modified", bytes: output.length, sha256: digest }],
+    } };
+    const input = { stateRoot, worker, subject, candidateCommit: "b".repeat(40) };
+    const receipt = verifyFixtureSuccess(input);
+    assert.equal(receipt.outputSha256, digest);
+    assert.equal(receipt.expectedSha256, digest);
+    assert.throws(() => verifyFixtureSuccess({ ...input, candidateCommit: "d".repeat(40) }), /A4-VERIFY-WORKER-BINDING/);
+    assert.throws(() => verifyFixtureSuccess({ ...input, worker: { ...worker, result: { ...worker.result,
+      changed: [{ ...worker.result.changed[0], sha256: "e".repeat(64) }] } } }), /A4-VERIFY-OUTPUT-MISMATCH/);
+    writeFileSync(join(workspace, "src", "e2e.txt"), "unexpected output\n");
+    assert.throws(() => verifyFixtureSuccess(input), /A4-VERIFY-OUTPUT-MISMATCH/);
+  } finally { rmSync(stateRoot, { recursive: true, force: true }); }
 });
 
 console.log(`\nexecution-plane-launch: ${passed}/${passed + failures.length} checks passed.`);

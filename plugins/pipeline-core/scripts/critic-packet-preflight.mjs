@@ -47,11 +47,13 @@ export const PACKET_SCHEMA = "pipeline.critic-candidate-packet.v1";
 export const STATE_SCHEMA = "pipeline.critic-candidate-state.v1";
 export const RECORD_SCHEMA = "pipeline.critic-candidate-record.v1";
 export const SESSION_PACKET_BINDING_SCHEMA = "pipeline.session-critic-packet-binding.v1";
+export const SESSION_ADMISSION_SCHEMA = "pipeline.session-critic-admission.v1";
 export const PACKET_TTL_SECONDS = 900;
+export const SESSION_REVIEW_TTL_SECONDS = 24 * 60 * 60;
 export const PACKET_DIFF_PATH = ".git/agent-pipeline-review.diff";
 export const PACKET_FILES = Object.freeze([
   "packet.json", "state.json", "claim.json", "export-native.json", "export-fallback.json",
-  "result.json", "receipt.json", "cleanup.json",
+  "session-admission.json", "result.json", "receipt.json", "cleanup.json",
 ]);
 
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{1,79}$/;
@@ -531,9 +533,80 @@ export function claimCandidatePacket({ controlRoot, packetId, adapter, claimantN
   return { ok: true, code: "CPP-CLAIMED", packet, claim };
 }
 
+/** Read back the exact durable claim without issuing a new one. */
+export function inspectClaimedCandidatePacket({ controlRoot, packetId }, { now = new Date() } = {}) {
+  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  revalidateCandidate(packet);
+  const state = currentState(packetDir, packet);
+  if (state.phase !== "claimed" || state.revision !== 2) fail("CPP-CLAIM-READ", "Packet is not in its claimed phase.");
+  const claim = readJson(join(packetDir, "claim.json"));
+  if (claim.schema !== RECORD_SCHEMA || claim.packetId !== packetId
+    || claim.packetDigest !== sha256(canonicalJson(packet)) || claim.revision !== 2
+    || claim.priorStateDigest !== state.priorStateDigest
+    || claim.timestamp !== state.timestamp
+    || canonicalJson(claim.body) !== canonicalJson(state.body)) fail("CPP-CLAIM-READ", "Claim and state differ.");
+  if (packet.request.sessionBinding === undefined) assertLive(packet, now);
+  else {
+    const timestamp = new Date(now).getTime();
+    const claimedAt = Date.parse(claim.timestamp);
+    if (!Number.isFinite(timestamp) || !Number.isFinite(claimedAt)
+      || timestamp < claimedAt || timestamp > claimedAt + SESSION_REVIEW_TTL_SECONDS * 1000) {
+      fail("CPP-EXPIRED", "Claimed session review completion window expired.");
+    }
+  }
+  return { ok: true, code: "CPP-CLAIM-READ", packet, claim, state };
+}
+
+/** Publish one session-only prelaunch admission bound to the durable claim. */
+export function publishClaimedSessionAdmission({ controlRoot, packetId, preflightSha256, courseSourceSha256, courseDecisionSha256 }, { now = new Date() } = {}) {
+  if (![preflightSha256, courseSourceSha256, courseDecisionSha256].every((value) => typeof value === "string" && SHA256.test(value))) {
+    fail("CPP-SESSION-ADMISSION", "Admission digests are invalid.");
+  }
+  const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now });
+  assertLive(packet, now);
+  const binding = packet.request.sessionBinding;
+  if (!binding || binding.preflightSha256 !== preflightSha256
+    || packet.route.projectionDigest !== preflightSha256) fail("CPP-SESSION-ADMISSION", "Session preflight binding differs.");
+  const { packetDir } = packetContext(controlRoot, packetId);
+  const admission = {
+    schema: SESSION_ADMISSION_SCHEMA,
+    packetId,
+    packetDigest: sha256(canonicalJson(packet)),
+    claimSha256: sha256(canonicalJson(claim)),
+    sessionId: binding.sessionId,
+    preflightSha256,
+    courseSourceSha256,
+    courseDecisionSha256,
+    createdAt: nowIso(now),
+  };
+  publishExclusive(join(packetDir, "session-admission.json"), admission);
+  return inspectClaimedSessionAdmission({ controlRoot, packetId }, { now });
+}
+
+/** Re-read the exact admission while the packet is still claimed. */
+export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now = new Date() } = {}) {
+  const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now });
+  const { packetDir } = packetContext(controlRoot, packetId);
+  const admissionPath = join(packetDir, "session-admission.json");
+  if (!existsSync(admissionPath)) fail("CPP-SESSION-ADMISSION", "Session admission is absent.");
+  const admission = readJson(admissionPath, "CPP-SESSION-ADMISSION");
+  const binding = packet.request.sessionBinding;
+  if (!exactKeys(admission, ["schema", "packetId", "packetDigest", "claimSha256", "sessionId", "preflightSha256", "courseSourceSha256", "courseDecisionSha256", "createdAt"])
+    || admission.schema !== SESSION_ADMISSION_SCHEMA || admission.packetId !== packetId
+    || admission.packetDigest !== sha256(canonicalJson(packet))
+    || admission.claimSha256 !== sha256(canonicalJson(claim))
+    || !binding || admission.sessionId !== binding.sessionId
+    || admission.preflightSha256 !== binding.preflightSha256
+    || admission.preflightSha256 !== packet.route.projectionDigest
+    || !SHA256.test(admission.courseSourceSha256) || !SHA256.test(admission.courseDecisionSha256)
+    || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
+    fail("CPP-SESSION-ADMISSION", "Session admission is absent or drifted.");
+  }
+  return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet, claim, admission };
+}
+
 export function recordCandidateResult({ controlRoot, packetId, result }, { now = new Date() } = {}) {
   const { packetDir, packet } = packetContext(controlRoot, packetId);
-  assertLive(packet, now);
   revalidateCandidate(packet);
   if (!isObject(result)) fail("CPP-RESULT", "Result must be an object.");
   const state = currentState(packetDir, packet);
@@ -543,6 +616,8 @@ export function recordCandidateResult({ controlRoot, packetId, result }, { now =
     return { ok: true, code: "CPP-RESULT-RECORDED", replay: true, packet, record: existing };
   }
   if (state.phase !== "claimed") fail("CPP-RESULT", "Packet has not been claimed.");
+  if (packet.request.sessionBinding === undefined) assertLive(packet, now);
+  else inspectClaimedSessionAdmission({ controlRoot, packetId }, { now });
   const timestamp = nowIso(now);
   const record = { schema: RECORD_SCHEMA, packetId, packetDigest: sha256(canonicalJson(packet)), revision: state.revision + 1, priorStateDigest: sha256(canonicalJson(state)), timestamp, phase: "result-recorded", body: result };
   publishExclusive(join(packetDir, "result.json"), record);

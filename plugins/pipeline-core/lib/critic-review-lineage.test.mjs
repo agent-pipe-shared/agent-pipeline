@@ -269,6 +269,23 @@ check("preserves stable finding IDs and accepts No findings only after explicit 
   }), /CRL-HISTORY-FINDING-DROPPED/u);
 });
 
+check("accepts two actual correction commits in one exact parent-to-candidate review range", () => {
+  const first = compile({ coverage: completeCoverage(), verdict: findingsVerdict, findings: [findingOpen] });
+  const second = compile({
+    packet: packet2,
+    reviewId: "review-two-commits",
+    parent: first,
+    coverage: completeCoverage(packet2),
+    verdict: findingsVerdict,
+    findings: [{ ...findingOpen, priorFindingId: findingOpen.id }],
+    correction: correction(),
+    invalidation: none,
+    reviewAttempt: deltaAttempt(2, 2),
+  });
+  assert.equal(second.course.correctionCommitCount, 2);
+  assert.equal(validateCriticReviewHistory([first, second]).ok, true);
+});
+
 check("requires fresh lane and context identities for every correction review", () => {
   const first = compile({
     coverage: completeCoverage(),
@@ -473,7 +490,7 @@ check("enforces the hard four-round/three-correction course and emits no fifth b
   }), /CRL-HISTORY-COURSE-GATE/u);
 });
 
-check("accepts only an exact next 3-to-4 correction gate", () => {
+check("accepts a correction-budget crossing even when the exact Git range adds two commits", () => {
   const records = fourRoundHistory();
   const parent = records.at(-1);
   const packet = {
@@ -499,6 +516,28 @@ check("accepts only an exact next 3-to-4 correction gate", () => {
   });
   assert.equal(gate.course.status, "po-course-gate");
   assert.equal(validateCriticReviewHistory([...records, gate]).ok, true);
+
+  const first = compile({ coverage: completeCoverage(), verdict: findingsVerdict, findings: [findingOpen] });
+  const second = compile({
+    packet: packet2, reviewId: "review-two-commits", parent: first,
+    coverage: completeCoverage(packet2), verdict: findingsVerdict,
+    findings: [{ ...findingOpen, priorFindingId: findingOpen.id }],
+    correction: correction(), invalidation: none, reviewAttempt: deltaAttempt(2, 2),
+  });
+  const overrunPacket = {
+    ...packet1,
+    packetId: "8".repeat(32),
+    candidate: { base: second.diff.base, ...structuredClone(second.candidate) },
+    diff: { ...packet1.diff, base: second.diff.base, commit: second.candidate.commit, sha256: second.diff.sha256 },
+  };
+  const overrun = compile({
+    packet: overrunPacket, reviewId: "review-two-more-commits-gate", parent: second,
+    findings: structuredClone(second.findings), invalidation: none,
+    reviewAttempt: { round: 3, correctionCommits: 4, requestedMode: "full" },
+    lane: { laneId: "overrun-lane", contextSha256: H("d"), evidenceSha256: H("e") },
+  });
+  assert.equal(overrun.course.status, "po-course-gate");
+  assert.equal(validateCriticReviewHistory([first, second, overrun]).ok, true);
 });
 
 check("requires a parent for a course gate and accepts simultaneous exact 4/3 to 5/4 exhaustion", () => {
@@ -643,4 +682,5 @@ check("release corrections bind the previous reviewed candidate, impact closure 
   assert.equal(validateReleaseCriticScopeAdmission(broad, packet2, broadScope).ok, true);
 });
 
-console.log(`${passed}/13 checks passed.`);
+assert.equal(passed, 14);
+console.log(`${passed}/14 checks passed.`);

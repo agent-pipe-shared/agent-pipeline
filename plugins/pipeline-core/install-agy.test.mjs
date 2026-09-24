@@ -28,10 +28,11 @@ test("Agy release-tag checkout creates a named branch without changing the signe
   assert.equal(git(["symbolic-ref", "--short", "HEAD"]), "pipeline-release-v0.7.0");
   assert.equal(git(["rev-parse", "HEAD"]), tagCommit);
   assert.equal(git(["describe", "--tags", "--exact-match"]), "v0.7.0");
-  for (const document of ["SETUP.md", "docs/v3-consumer-onboarding.md"]) {
-    const content = readFileSync(new URL(`../../${document}`, import.meta.url), "utf8");
-    assert.match(content, /git -C "\$pipeline_release_dir" switch -c pipeline-release-v0\.7\.0/u, document);
-  }
+  const setup = readFileSync(new URL("../../SETUP.md", import.meta.url), "utf8");
+  const onboarding = readFileSync(new URL("../../docs/v3-consumer-onboarding.md", import.meta.url), "utf8");
+  assert.match(setup, /git -C "\$pipeline_release_dir" switch -c pipeline-release-v0\.7\.0/u);
+  assert.match(onboarding, /\.\.\/SETUP\.md#antigravity-agy-workspace-local-binding/u,
+    "consumer onboarding links to the single maintained GitHub installation procedure");
 });
 
 test("Agy installer guidance verifies the host PATH without normalizing sudo or yolo", () => {

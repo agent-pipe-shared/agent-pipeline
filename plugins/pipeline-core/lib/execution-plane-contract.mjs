@@ -230,3 +230,39 @@ export function normalizeRealExecutionOutcome(expected, realOutcome) {
   return { ok: true, code: "OUTCOME:normalized", state: map[kind], result: null, reason, observation };
 }
 export function reduceRealExecutionState(current, realOutcome, history = undefined) { if (stateCode(current)) throw new Error("SHAPE:state-current"); if (!TRUSTED_STATES.has(current)) { const checked = validateExecutionState(current, history); if (!checked.ok) return { ok: false, code: checked.code, state: null }; } const n = normalizeRealExecutionOutcome(current, realOutcome); if (!n.ok || n.state === null) return n; if (TERMINAL.has(current.state) || !TRANSITIONS[current.state]?.has(n.state)) return { ok: false, code: "CONFLICT:transition", state: null }; const next = { ...clone(current), state: n.state, revision: current.revision + 1, observation: n.observation, result: n.result ?? current.result, reason: n.reason, previousSha256: executionStateDigest(current) }; if (stateCode(next)) return { ok: false, code: "INTERNAL:state", state: null }; const sealed = freeze(next); TRUSTED_STATES.add(sealed); return { ok: true, code: "STATE:applied", state: sealed }; }
+
+/** Admit a separate host verifier observation only after a real delivered result. */
+export function reduceRealVerifiedExecutionState(current, verification, history = undefined) {
+  if (stateCode(current)) throw new Error("SHAPE:state-current");
+  if (!TRUSTED_STATES.has(current)) {
+    const checked = validateExecutionState(current, history);
+    if (!checked.ok) return { ok: false, code: checked.code, state: null };
+  }
+  if (current.state !== "succeeded-unverified" || current.result?.status !== "delivered") {
+    return { ok: false, code: "AUTHORITY:verifier-predecessor", state: null };
+  }
+  const keys = ["schema", "dispatchId", "attempt", "candidateCommit", "subjectSha256", "resultSha256", "outputPath", "outputBytes", "outputSha256", "expectedSha256"];
+  if (!exact(verification, keys) || verification.schema !== "pipeline.real-execution-verification.v1"
+    || verification.dispatchId !== current.subject.dispatchId || verification.attempt !== current.subject.attempt
+    || verification.candidateCommit !== current.subject.candidateCommit
+    || verification.subjectSha256 !== current.subjectSha256
+    || verification.resultSha256 !== current.result.resultSha256
+    || !current.subject.writePaths.includes(verification.outputPath)
+    || !Number.isSafeInteger(verification.outputBytes) || verification.outputBytes !== current.result.bytes
+    || !SHA.test(verification.outputSha256) || verification.outputSha256 !== verification.expectedSha256) {
+    return { ok: false, code: "AUTHORITY:verifier-evidence", state: null };
+  }
+  const evidenceSha256 = hash(verification);
+  const observedAtMs = Date.now();
+  const next = {
+    ...clone(current), state: "verified", revision: current.revision + 1,
+    observation: { source: "local-fixture-verifier", monotonicMs: observedAtMs, wallTime: new Date(observedAtMs).toISOString(),
+      rawSha256: evidenceSha256, adapterState: "verified", rawStateSha256: evidenceSha256 },
+    result: { ...current.result, status: "verified" }, reason: null,
+    previousSha256: executionStateDigest(current),
+  };
+  if (stateCode(next)) return { ok: false, code: "INTERNAL:verifier-state", state: null };
+  const sealed = freeze(next);
+  TRUSTED_STATES.add(sealed);
+  return { ok: true, code: "STATE:applied", state: sealed };
+}

@@ -6,8 +6,11 @@ import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync }
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkEntryPointReachability, discoverEntryPoints, discoverSurfaces, targetAnchorExists, validateInventory } from "./check-product-capability-inventory.mjs";
+import { checkEntryPointReachability, discoverEntryPoints, discoverSurfaces, targetAnchorExists, validateFinalCriticReadback, validateFinalCriticTransition, validateInventory } from "./check-product-capability-inventory.mjs";
 import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
+import { produceCriticDiagnostic } from "../../plugins/pipeline-core/lib/critic-diagnostic-producer.mjs";
+import { canonicalJson, sha256 } from "../../plugins/pipeline-core/scripts/critic-packet-preflight.mjs";
+import { admitSessionCriticReview, finalizeSessionCriticReview } from "../../plugins/pipeline-core/scripts/session-critic-finalizer.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const inventoryPath = join(repoRoot, "docs", "product-capability-inventory.json");
@@ -237,9 +240,94 @@ check("HAW-A04 final phase rejects pending front-door claims before documentatio
   assert.match(result.findings.join("\n"), /must be active during final phase/);
 });
 
-check("HAW-A04a accepts active public-target fixtures against actual documentation anchors", () => {
+check("HAW-A04a rejects an invented Critic digest even with active public targets", () => {
   const result = validated(inventory({ targets: "active" }), "final");
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, false);
+  assert.match(result.findings.join("\n"), /Critic receipt.*readback|Critic receipt.*unavailable/i);
+});
+
+check("HAW-A04b permits only a reviewed pending-to-active inventory transition", () => {
+  const reviewed = inventory({ review: "pending", targets: "pending" });
+  const final = inventory({ review: "attested", targets: "active" });
+  const input = { reviewed, final, changedPaths: ["docs/product-capability-inventory.json"] };
+  assert.equal(validateFinalCriticTransition(input), true);
+  const sourceEdit = structuredClone(final);
+  sourceEdit.capabilities[0].benefit += " Unreviewed claim.";
+  assert.equal(validateFinalCriticTransition({ ...input, final: sourceEdit }), false);
+  assert.equal(validateFinalCriticTransition({ ...input, changedPaths: ["docs/product-capability-inventory.json", "README.md"] }), false);
+  const forgedReview = structuredClone(reviewed);
+  forgedReview.criticReview = final.criticReview;
+  assert.equal(validateFinalCriticTransition({ ...input, reviewed: forgedReview }), false);
+});
+
+check("HAW-A04c reads a genuinely consumed private Critic receipt across a committed activation successor", () => {
+  const root = mkdtempSync(join(tmpdir(), "haw-critic-readback-"));
+  const git = (args) => {
+    const result = run(root, "git", args);
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  const commit = (message) => {
+    git(["add", "."]);
+    git(["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+    return git(["rev-parse", "HEAD"]);
+  };
+  try {
+    git(["init", "-q"]);
+    for (const path of [".claude", "specs", "evidence", "docs"]) mkdirSync(join(root, path));
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    writeFileSync(join(root, "specs", "spec.md"), "# Spec\n");
+    const inventoryPath = "docs/product-capability-inventory.json";
+    const pending = {
+      schema: "fixture.inventory.v1",
+      criticReview: structuredClone(PENDING_REVIEW),
+      capabilities: [{ id: "fixture", targets: [{ document: "README", anchorId: "fixture", status: "pending" }] }],
+    };
+    writeFileSync(join(root, inventoryPath), `${JSON.stringify(pending)}\n`);
+    const base = commit("base");
+    writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nCandidate.\n");
+    const candidate = commit("review candidate");
+    const tree = git(["rev-parse", "HEAD^{tree}"]);
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({
+      root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
+      command: [process.execPath, "-e", "console.log('fixture check')"], logPath: "evidence/targeted.log",
+    }))}\n`);
+    writeFileSync(join(root, "evidence", "dispatch-record-nova-b-lnd5.json"), JSON.stringify({
+      schema: "pipeline.dispatch-record.v3", taskId: "nova-b-lnd5", agentType: "default",
+      model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+      dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate,
+      resultSha256: "a".repeat(64), log: [], report: { text: "done", changedFiles: ["specs/spec.md"] },
+      criticRequired: {
+        schema: "pipeline.critic-required-decision.v1",
+        trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true,
+          diff: { mechanical: false, architecture: false, guardrails: true, security: false } },
+        appliedRow: "T1",
+      },
+    }));
+    const criticRequest = {
+      preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [],
+        evidencePaths: ["evidence/verify.json"], priorCriticEvidencePath: null },
+      taskId: "nova-b-lnd5", projectId: "pipeline", sessionId: "session-inventory-1", packetId: "7".repeat(32),
+      route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent",
+        provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
+      verdict: { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent",
+        trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true },
+    };
+    assert.equal(admitSessionCriticReview(criticRequest).status, "admitted");
+    const result = finalizeSessionCriticReview(criticRequest);
+    assert.equal(result.status, "completed");
+    const final = structuredClone(pending);
+    final.criticReview = { status: "attested", receiptSha256: sha256(canonicalJson(result.receipt)), reason: null };
+    final.capabilities[0].targets[0].status = "active";
+    writeFileSync(join(root, inventoryPath), `${JSON.stringify(final)}\n`);
+    git(["add", inventoryPath]);
+    git(["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "activate reviewed inventory"]);
+    assert.equal(validateFinalCriticReadback(root, inventoryPath, final), null);
+    const tampered = structuredClone(final);
+    tampered.capabilities[0].id = "unreviewed";
+    writeFileSync(join(root, inventoryPath), `${JSON.stringify(tampered)}\n`);
+    assert.match(validateFinalCriticReadback(root, inventoryPath, tampered), /committed inventory/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 check("HAW-A05 accepts an ancestor baseline and still requires every discovered surface to be categorized", () => {
@@ -471,16 +559,16 @@ check("an early failed case still emits dispositions for the complete declared c
   const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
   const disposed = records.filter((record) => record.event === "DISPOSED");
   assert.equal(records[0].event, "DECLARED");
-  assert.equal(records[0].caseCount, 28);
-  assert.equal(disposed.length, 28);
+  assert.equal(records[0].caseCount, 30);
+  assert.equal(disposed.length, 30);
   assert.equal(disposed.find((record) => record.id === "PCI02")?.disposition, "fail");
-  assert.equal(disposed.find((record) => record.id === "PCI28")?.disposition, "pass");
-  assert.deepEqual(records.at(-1).counts, { pass: 27, fail: 1, skip: 0, todo: 0 });
-  assert.equal(records.at(-1).declaredCount, 28);
-  assert.equal(records.at(-1).disposedCount, 28);
+  assert.equal(disposed.find((record) => record.id === "PCI30")?.disposition, "pass");
+  assert.deepEqual(records.at(-1).counts, { pass: 29, fail: 1, skip: 0, todo: 0 });
+  assert.equal(records.at(-1).declaredCount, 30);
+  assert.equal(records.at(-1).disposedCount, 30);
 });
 
-assert.equal(cases.length, 28, "the complete product capability inventory corpus must be registered before execution begins");
+assert.equal(cases.length, 30, "the complete product capability inventory corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

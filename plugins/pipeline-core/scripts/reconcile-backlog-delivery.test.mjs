@@ -14,7 +14,7 @@ import {
   canonicalJson,
   validateBacklogReconciliationReceipt,
 } from "../lib/backlog-delivery-reconciliation.mjs";
-import { applyBacklogDelivery, materializeBacklogDelivery, previewBacklogDelivery, recoverBacklogDelivery } from "./reconcile-backlog-delivery.mjs";
+import { applyBacklogDelivery, checkPoWithdrawalProvenance, materializeBacklogDelivery, previewBacklogDelivery, recoverBacklogDelivery } from "./reconcile-backlog-delivery.mjs";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const semanticDigest = (schema, value) => sha256(`${schema}\0${canonicalJson(value)}`);
@@ -97,6 +97,41 @@ test("emits a preview only after the exact authority, specification, and evidenc
     assert.equal(result.ok, true);
     assert.equal(result.preview.status, "preview");
     assert.equal(canonicalJson({ intent: JSON.parse(readFileSync(join(root, "intent.json"))), authority: readFileSync(join(root, "authority.json"), "utf8") }), before);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a close preview expires at the review date and locked apply refuses its stale pre-expiry digest", () => {
+  const { root, intent, binding } = fixture();
+  try {
+    intent.operation = "close";
+    intent.item.expectedStatus = "in_progress";
+    intent.item.draft = null;
+    intent.authority.kind = "closure";
+    intent.candidate = { commit: OID, tree: OID };
+    intent.gates = ["acceptance:NVA-A57-1", "verify"].map((gate) => ({
+      gate, candidate: { commit: OID, tree: OID }, status: "passed",
+      evidence: { kind: "acceptance", path: "evidence.md", fileSha256: intent.evidence[0].fileSha256, recordSha256: null },
+    }));
+    intent.idempotencyKey = semanticDigest(BACKLOG_DELIVERY_INTENT_SCHEMA, { operation: intent.operation, authority: intent.authority, expected: intent.expected });
+    binding.bindings[0].expiryDisposition = "revalidate:2026-09-24";
+    binding.recordSha256 = semanticDigest(BACKLOG_SPEC_BINDING_SCHEMA, Object.fromEntries(Object.entries(binding).filter(([key]) => key !== "recordSha256")));
+    write(root, "intent.json", `${JSON.stringify(intent)}\n`);
+    write(root, "binding.json", `${JSON.stringify(binding)}\n`);
+    const readState = () => ({ ok: true, findings: [], state: {
+      ...stateFor(intent), item: { id: intent.item.id, path: intent.item.path, status: "in_progress", fileSha256: intent.item.expectedFileSha256 },
+      itemFileSha256: [{ id: intent.item.id, sha256: intent.item.expectedFileSha256 }],
+    } });
+    const options = { intentPath: "intent.json", bindingPath: "binding.json" };
+    const before = previewBacklogDelivery(root, options, { readState, now: () => "2026-09-23T23:59:59.000Z" });
+    assert.equal(before.ok, true, before.findings?.join("\n"));
+    const onDate = previewBacklogDelivery(root, options, { readState, now: () => "2026-09-24T00:00:00.000Z" });
+    assert.equal(onDate.ok, false);
+    assert.match(onDate.findings.join("\n"), /review date has arrived/);
+    const staleApply = applyBacklogDelivery(root, { ...options, preview: before.preview, postimages: postimages(before.preview) }, {
+      readState, now: () => "2026-09-24T00:00:00.000Z",
+    });
+    assert.equal(staleApply.ok, false);
+    assert.match(staleApply.findings.join("\n"), /review date has arrived/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -281,4 +316,21 @@ test("committed recovery accepts only a closed receipt whose transaction postima
       assert.equal(existsSync(transactionPath), false);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }
+});
+
+test("a PO-withdrawn binding cannot be admitted from a changed source or unreachable commit", () => {
+  const { root } = fixture();
+  try {
+    const source = {
+      itemPath: "backlog/items/2026-07-20-multi-cli-efficiency-pilots.md",
+      sourceCommit: "f98f05b52635a172526407d3a5e99490dca8104c",
+      sourceSha256: "7a0f0cfa653a76f9205f3373da19dcec75be21c0bc0679d98feff90e46d6c264",
+      ledgerSequence: 793,
+      ledgerEntryHash: "c43cb511d0c6dd6ce2e846162c3b56ec8ec5ab3231b27e48b03f8f68e958b4d7",
+    };
+    const binding = { bindings: [{ id: "pipeline.multi-cli-efficiency-pilots", closureMode: "po-withdrawn-scope", poWithdrawal: source }] };
+    assert.match(checkPoWithdrawalProvenance(root, binding, { git() { throw new Error("unreachable"); } })[0], /^AUTHORITY: PO withdrawal source is not reachable/u);
+    binding.bindings[0].poWithdrawal = { ...source, sourceSha256: "a".repeat(64) };
+    assert.match(checkPoWithdrawalProvenance(root, binding)[0], /^AUTHORITY: PO withdrawal reference is not the accepted historical decision/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

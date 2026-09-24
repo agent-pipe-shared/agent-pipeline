@@ -25,22 +25,26 @@ import {
   claimCandidatePacket,
   cleanupCandidatePacket,
   consumeCandidatePacket,
+  inspectClaimedSessionAdmission,
   prepareCandidatePacket,
+  publishClaimedSessionAdmission,
   recordCandidateResult,
   sha256,
 } from "./critic-packet-preflight.mjs";
 
 export const SESSION_CRITIC_RESULT_SCHEMA = "pipeline.session-critic-result.v1";
+export const SESSION_CRITIC_ADMISSION_RESULT_SCHEMA = "pipeline.session-critic-prelaunch-admission.v1";
 export const SESSION_CRITIC_RECEIPT_SCHEMA = "pipeline.session-critic-receipt.v1";
 export const SESSION_CRITIC_FINALIZE_RESULT_SCHEMA = "pipeline.session-critic-finalization.v1";
 export const SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA = "pipeline.session-critic-finalization-request.v1";
 export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finalization-error.v1";
 export const SESSION_CRITIC_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
 const CLI_HELP = [
+  "Usage: session-critic-finalizer.mjs admit --root <repository-root> --request <repo-relative request.json>",
   "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json>",
   "       session-critic-finalizer.mjs --help",
   "",
-  "Validates and consumes one bounded Critic request and verdict, then emits its durable receipt.",
+  "Admit and claim before the fresh Critic starts; finalize only the same preclaimed packet after return.",
 ].join("\n");
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -154,6 +158,75 @@ function candidateFor(preflight) {
     tree: preflight.candidate.tree,
   };
 }
+function referencesFor(preflight) {
+  return [
+    { kind: "spec", path: preflight.spec.path },
+    ...preflight.guardrails.map(({ path }) => ({ kind: "guardrail", path })),
+  ].filter((entry, index, all) => all.findIndex((candidate) => candidate.kind === entry.kind && candidate.path === entry.path) === index);
+}
+function courseDigestsFor(preflight) {
+  const course = preflight.coordinatorOnly.courseAdmission;
+  if (course !== null && course !== undefined) {
+    if (!SHA256.test(course.sourceSha256) || !SHA256.test(course.decisionSha256)) fail("SCF-COURSE");
+    return { courseSourceSha256: course.sourceSha256, courseDecisionSha256: course.decisionSha256 };
+  }
+  // Legacy non-feature-package reviews have no Nova A5 course authority.
+  // Bind that explicit absence to this exact candidate; never call it PASS.
+  const subject = { kind: "unversioned-review", candidate: preflight.candidate, base: preflight.base ?? null };
+  return {
+    courseSourceSha256: sha256(canonicalJson(subject)),
+    courseDecisionSha256: sha256(canonicalJson({ ...subject, decision: "course-not-applicable" })),
+  };
+}
+
+/** Prepare and claim the exact session packet before any fresh Critic spawn. */
+export function admitSessionCriticReview(options, deps = {}) {
+  const preflight = (deps.preflightCriticDispatchFn ?? preflightCriticDispatch)(options.preflightInput);
+  if (preflight?.status !== "packet-ready" || preflight.dispatch?.requiredNextGate !== "session-critic-dispatch") fail("SCF-PREFLIGHT");
+  const root = realpathSync(resolve(options.preflightInput.root));
+  const id = sessionId(options.sessionId);
+  if (options.eventOutPath !== undefined) {
+    (deps.preflightGovernanceReviewActionOutputFn ?? preflightGovernanceReviewActionOutput)({ rootDir: root, eventOutPath: options.eventOutPath });
+    if (!actionIdentity(options.featureId ?? { state: "not-applicable" })) fail("SCF-EVENT-FEATURE");
+  }
+  const packetId = options.packetId;
+  if (!PACKET_ID.test(packetId ?? "")) fail("SCF-PACKET-ID");
+  const preflightSha256 = sha256(canonicalJson(preflight));
+  const controlRoot = controlRootFor(root);
+  const prepared = (deps.prepareCandidatePacketFn ?? prepareCandidatePacket)({
+    repoRoot: root,
+    controlRoot,
+    packetId,
+    taskId: options.taskId,
+    projectId: options.projectId,
+    baseCommit: candidateFor(preflight).base,
+    candidateCommit: preflight.candidate.commit,
+    rulesetOid: preflight.dispatch.reviewerInput.rulesetSha,
+    trigger: options.trigger ?? "T1",
+    route: routeFor(options.route, preflightSha256),
+    references: referencesFor(preflight),
+    evidencePaths: options.preflightInput.evidencePaths,
+    sessionBinding: {
+      schema: SESSION_PACKET_BINDING_SCHEMA,
+      sessionId: id,
+      preflightSha256,
+      assurance: SESSION_CRITIC_ASSURANCE,
+      freshContext: true,
+      historyInherited: false,
+      mayDelegate: false,
+    },
+  }, deps.packetDependencies);
+  (deps.claimCandidatePacketFn ?? claimCandidatePacket)({
+    controlRoot, packetId, adapter: prepared.packet.route.adapter,
+    claimantNonce: (deps.randomBytesFn ?? randomBytes)(32).toString("hex"),
+  }, deps.packetDependencies);
+  const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({
+    controlRoot, packetId, preflightSha256, ...courseDigestsFor(preflight),
+  }, deps.packetDependencies);
+  return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA,
+    status: "admitted", packetId, packetDigest: prepared.packetDigest,
+    admissionSha256: sha256(canonicalJson(admission.admission)) });
+}
 function buildResult({ packet, packetDigest, session, verdict }) {
   return Object.freeze({
     schema: SESSION_CRITIC_RESULT_SCHEMA,
@@ -218,10 +291,7 @@ export function validateSessionCriticReceipt(receipt) {
   return receipt;
 }
 
-/**
- * Complete the normal lane after its fresh session returns. Preflight stays
- * read-only; packet preparation and claim are internal and need no PO action.
- */
+/** Complete one fresh session against its *pre-existing* prelaunch admission. */
 export function finalizeSessionCriticReview(options, deps = {}) {
   const preflight = (deps.preflightCriticDispatchFn ?? preflightCriticDispatch)(options.preflightInput);
   if (preflight?.status !== "packet-ready" || preflight.dispatch?.requiredNextGate !== "session-critic-dispatch") fail("SCF-PREFLIGHT");
@@ -229,7 +299,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
   const id = sessionId(options.sessionId);
   assertVerdict(options.verdict);
   const preflightSha256 = sha256(canonicalJson(preflight));
-  const packetId = options.packetId ?? (deps.randomBytesFn ?? randomBytes)(16).toString("hex");
+  const packetId = options.packetId;
   if (!PACKET_ID.test(packetId)) fail("SCF-PACKET-ID");
   const eventRequested = options.eventOutPath !== undefined;
   if (eventRequested) {
@@ -238,37 +308,32 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     if (!actionIdentity(featureId)) fail("SCF-EVENT-FEATURE");
     if (!options.verdict.pass && options.verdict.findings.length === 0) fail("SCF-EVENT-VERDICT");
   }
-  const references = [
-    { kind: "spec", path: preflight.spec.path },
-    ...preflight.guardrails.map(({ path }) => ({ kind: "guardrail", path })),
-  ].filter((entry, index, all) => all.findIndex((candidate) => candidate.kind === entry.kind && candidate.path === entry.path) === index);
-  const prepared = (deps.prepareCandidatePacketFn ?? prepareCandidatePacket)({
-    repoRoot: root,
-    controlRoot: controlRootFor(root),
-    packetId,
-    taskId: options.taskId,
-    projectId: options.projectId,
-    baseCommit: candidateFor(preflight).base,
-    candidateCommit: preflight.candidate.commit,
-    rulesetOid: preflight.dispatch.reviewerInput.rulesetSha,
-    trigger: options.trigger ?? "T1",
-    route: routeFor(options.route, preflightSha256),
-    references,
-    evidencePaths: options.preflightInput.evidencePaths,
-    sessionBinding: {
-      schema: SESSION_PACKET_BINDING_SCHEMA,
-      sessionId: id,
-      preflightSha256,
-      assurance: SESSION_CRITIC_ASSURANCE,
-      freshContext: true,
-      historyInherited: false,
-      mayDelegate: false,
-    },
-  }, deps.packetDependencies);
-  const claimantNonce = (deps.randomBytesFn ?? randomBytes)(32).toString("hex");
-  (deps.claimCandidatePacketFn ?? claimCandidatePacket)({
-    controlRoot: controlRootFor(root), packetId, adapter: prepared.packet.route.adapter, claimantNonce,
-  }, deps.packetDependencies);
+  const controlRoot = controlRootFor(root);
+  let admitted;
+  try {
+    admitted = (deps.inspectClaimedSessionAdmissionFn ?? inspectClaimedSessionAdmission)({ controlRoot, packetId }, deps.packetDependencies);
+  } catch { fail("SCF-PRELAUNCH-ADMISSION"); }
+  const packet = admitted.packet;
+  const expectedReferences = referencesFor(preflight).sort((left, right) => {
+    const a = `${left.kind}:${left.path}`;
+    const b = `${right.kind}:${right.path}`;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  const actualReferences = packet.references.map(({ kind, path }) => ({ kind, path }));
+  const expectedCourse = courseDigestsFor(preflight);
+  if (admitted.admission.preflightSha256 !== preflightSha256
+    || admitted.admission.courseSourceSha256 !== expectedCourse.courseSourceSha256
+    || admitted.admission.courseDecisionSha256 !== expectedCourse.courseDecisionSha256
+    || packet.request.taskId !== options.taskId || packet.request.projectId !== options.projectId
+    || packet.request.trigger !== (options.trigger ?? "T1")
+    || packet.request.sessionBinding?.sessionId !== id
+    || packet.candidate.base !== candidateFor(preflight).base
+    || packet.candidate.commit !== preflight.candidate.commit
+    || packet.candidate.tree !== preflight.candidate.tree
+    || packet.ruleset.oid !== preflight.dispatch.reviewerInput.rulesetSha
+    || canonicalJson(packet.route) !== canonicalJson(routeFor(options.route, preflightSha256))
+    || canonicalJson(actualReferences) !== canonicalJson(expectedReferences)) fail("SCF-PRELAUNCH-BINDING");
+  const prepared = { packet, packetDigest: sha256(canonicalJson(packet)) };
 
   let event = null;
   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict });
@@ -320,11 +385,10 @@ export function finalizeSessionCriticReview(options, deps = {}) {
 /** Closed CLI adapter. The request and verdict stay as bounded local files. */
 export function runSessionCriticFinalizerCli(argv, deps = {}) {
   try {
-    if (!Array.isArray(argv) || argv.length !== 5 || argv[0] !== "finalize" || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+    if (!Array.isArray(argv) || argv.length !== 5 || !["admit", "finalize"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
     const root = realpathSync(resolve(argv[2]));
     const request = validateCliRequest(readBoundedJson(root, argv[4], "SCF-REQUEST-FILE"));
-    const verdict = readBoundedJson(root, request.verdictPath, "SCF-VERDICT-FILE");
-    const result = finalizeSessionCriticReview({
+    const common = {
       preflightInput: {
         root,
         base: request.review.base,
@@ -340,12 +404,16 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
       packetId: request.packetId,
       trigger: request.trigger,
       route: request.route,
-      verdict,
       ...(request.event === null ? {} : {
         eventOutPath: request.event.eventOutPath,
         featureId: request.event.featureId ?? { state: "not-applicable" },
       }),
-    }, deps);
+    };
+    if (argv[0] === "admit") {
+      return Object.freeze({ exitCode: 0, output: admitSessionCriticReview(common, deps) });
+    }
+    const verdict = readBoundedJson(root, request.verdictPath, "SCF-VERDICT-FILE");
+    const result = finalizeSessionCriticReview({ ...common, verdict }, deps);
     return Object.freeze({ exitCode: result.status === "completed" ? 0 : 2, output: result });
   } catch (error) {
     return Object.freeze({

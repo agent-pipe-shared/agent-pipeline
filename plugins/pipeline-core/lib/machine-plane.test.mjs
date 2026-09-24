@@ -12,7 +12,7 @@
  * and nothing here is ever written to the real `~/.agent-pipeline/` (briefing field 4).
  */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -138,6 +138,35 @@ test("AC-1: a well-formed, schema-valid plane is 'valid' and returns the plane e
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
+});
+
+test("machine writer is not deadlocked by an interrupted legacy fixed-name temporary", () => {
+  const { home, target } = homeFixture();
+  try {
+    mkdirSync(join(target, ".."), { recursive: true });
+    writeFileSync(`${target}.tmp`, "historical interrupted attempt\n");
+    const plane = validPlane({ language: "de" });
+    assert.deepEqual(writeMachinePlane(plane, { homedirFn: () => home }), plane);
+    assert.equal(readFileSync(`${target}.tmp`, "utf8"), "historical interrupted attempt\n");
+    assert.deepEqual(readMachinePlane({ homedirFn: () => home }), { status: "valid", plane });
+    assert.deepEqual(readdirSync(join(target, "..")).filter((name) => name.startsWith("machine.json.tmp-")), []);
+  } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+test("machine writer removes only its own exclusive temporary after a write failure", () => {
+  const { home, target } = homeFixture();
+  let openedPath = null;
+  try {
+    const original = validPlane();
+    writeMachinePlane(original, { homedirFn: () => home });
+    assert.throws(() => writeMachinePlane(validPlane({ language: "en" }), {
+      homedirFn: () => home,
+      openSyncFn(path, flags, mode) { openedPath = path; return openSync(path, flags, mode); },
+      writeFileSyncFn() { throw new Error("injected-write-failure"); },
+    }), /injected-write-failure/u);
+    assert.equal(existsSync(openedPath), false);
+    assert.deepEqual(readMachinePlane({ homedirFn: () => home }), { status: "valid", plane: original });
+  } finally { rmSync(home, { recursive: true, force: true }); }
 });
 
 /* -------------------------------------------------------------------- *

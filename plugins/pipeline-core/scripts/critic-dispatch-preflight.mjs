@@ -27,6 +27,8 @@ import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
 } from "../lib/requirement-traceability.mjs";
+import { deriveRegisteredCriticCourseSource, CriticCourseAdmissionError } from "../lib/critic-course-admission.mjs";
+import { admitReviewAttempt, sha256Canonical } from "../lib/review-economy.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
 export const EVIDENCE_SWEEP_SCHEMA = "pipeline.critic-dispatch-preflight-evidence-sweep.v1";
@@ -347,6 +349,43 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   const priorReadback = prior === null ? null : { path: prior, sha256: sha256(localEvidence(realRoot, prior)) };
   const sourceCoverage = scope === null ? null : currentArtifactCoverage(realRoot, candidateCommit, byPath, scope);
 
+  // A feature package's retained immutable Critic lineage, not a caller's
+  // declared round number, controls whether another model invocation is due.
+  // Keep this read-only: the later session gate still owns packet/launch.
+  let courseAdmission = null;
+  const featureMatch = /^specs\/([^/]+)\//u.exec(spec);
+  const featureId = featureMatch?.[1] ?? null;
+  if (featureId !== null && byPath.has(`specs/${featureId}/lifecycle.json`)) {
+    stage = "critic-course";
+    if (scope !== null) fail("CDP-COURSE-SCOPE", "A versioned feature Critic review requires an exact base-to-candidate range.");
+    let source;
+    try {
+      source = deriveRegisteredCriticCourseSource({ repoRoot: realRoot, featureId,
+        baseCommit: baseCommit ?? baseTree, candidateCommit });
+    } catch (error) {
+      if (error instanceof CriticCourseAdmissionError) fail("CDP-COURSE-SOURCE", "Retained Critic course or candidate range is invalid.");
+      throw error;
+    }
+    if ((source.history.length > 0) !== (priorReadback !== null)) {
+      fail("CDP-COURSE-PARENT", "Prior Critic evidence and retained course disagree.");
+    }
+    const round = source.history.length + 1;
+    const correctionCommits = source.history.length === 0 ? 0
+      : source.history.at(-1).course.correctionCommitCount + source.rangeCommits.length;
+    const course = admitReviewAttempt({ round, correctionCommits, requestedMode: "full" });
+    if (!course.ok) fail(course.courseGateRequired === true ? "CDP-COURSE-GATE" : "CDP-COURSE-INVALID",
+      "Critic course does not admit another dispatch.");
+    courseAdmission = Object.freeze({
+      featureId,
+      sourceSha256: sha256Canonical({ manifestSha256: source.manifestSha256,
+        historySha256: source.historySha256, baseCommit: source.baseCommit,
+        candidateCommit: source.candidateCommit, rangeCommits: source.rangeCommits }),
+      decisionSha256: sha256Canonical({ round, correctionCommits, code: course.code, mode: course.mode }),
+      round,
+      correctionCommits,
+    });
+  }
+
   const result = {
     schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
     // This remains read-only. The ordinary session orchestrator is the next
@@ -360,7 +399,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     governance,
     requirementTraceability,
     evidence: evidenceReadback,
-    coordinatorOnly: { priorCriticEvidence: priorReadback },
+    coordinatorOnly: { priorCriticEvidence: priorReadback, courseAdmission },
     dispatch: {
       mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
       spawnAuthorized: false, requiredNextGate: "session-critic-dispatch",

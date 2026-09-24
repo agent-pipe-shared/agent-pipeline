@@ -28,12 +28,17 @@ rewritten; Nova Issue #57 owns an append-only repair.
 
 ## Complete 35-item disposition
 
-### Nova A — direct delivery reconciliation claimants, `in_progress` (7)
+### Nova A — original direct delivery reconciliation claimants, `in_progress` at intake (7)
+
+Later canonical backlog transitions, including the PO's 2026-08-19
+withdrawal of the bespoke multi-CLI pilots, supersede these intake-time
+status and closure descriptions. The table is an inventory of original
+bindings, not a current instruction to run a withdrawn pilot.
 
 | Backlog ID | Primary Nova relationship | Closure boundary |
 | --- | --- | --- |
 | `pipeline.execution-model-switchback` | `#7`, `#38` | Requested/observed route and phase switchback evidence; no inferred effective model identity. |
-| `pipeline.multi-cli-efficiency-pilots` | `#8` | Framework delivery is insufficient; the record's separately PO-gated pilots and evidence remain required. |
+| `pipeline.multi-cli-efficiency-pilots` | `#8` | Originally separate PO-gated pilots; the PO withdrew both on 2026-08-19. The current scope disposition must bind the closed item and ledger, and cannot claim pilot evidence. |
 | `pipeline.closed-input-channel-review-economics` | `#54` | Closed structured request channels, free-text rejection and correction-delta evidence. |
 | `pipeline.evidence-bound-review-retry-economics` | `#54` | Exact retained-stage receipts, typed infrastructure aborts, invalidation and bounded reuse/rerun evidence. |
 | `pipeline.codex-plugin-validator-host-parity` | `#7` | Exact native validator/conformance acceptance; synthetic parity alone cannot close it. |

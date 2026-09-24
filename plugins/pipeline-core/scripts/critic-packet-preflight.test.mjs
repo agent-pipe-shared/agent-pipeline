@@ -13,7 +13,10 @@ import {
   claimCandidatePacket,
   cleanupCandidatePacket,
   consumeCandidatePacket,
+  inspectClaimedCandidatePacket,
+  inspectClaimedSessionAdmission,
   prepareCandidatePacket,
+  publishClaimedSessionAdmission,
   recordCandidateResult,
 } from "./critic-packet-preflight.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
@@ -195,9 +198,11 @@ check("claims once, records once, consumes once and capability-cleans only its c
     const prepared = prepareCandidatePacket(options(f, "2".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 8) });
     const claim = claimCandidatePacket(claimInput(prepared, "b".repeat(64)), { now: new Date("2026-07-18T12:01:00.000Z") });
     assert.equal(claim.code, "CPP-CLAIMED");
+    assert.deepEqual(inspectClaimedCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId }, { now: new Date("2026-07-18T12:01:00.000Z") }).claim, claim.claim);
     assert.throws(() => claimCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, adapter: prepared.packet.route.adapter, claimantNonce: "c".repeat(64) }, { now: new Date("2026-07-18T12:01:01.000Z") }), expectCode("CPP-CLAIM"));
     const result = recordCandidateResult({ controlRoot: f.control, packetId: prepared.packet.packetId, result: { verdict: "pass" } }, { now: new Date("2026-07-18T12:02:00.000Z") });
     assert.equal(result.replay, false);
+    assert.throws(() => inspectClaimedCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId }, { now: new Date("2026-07-18T12:02:00.000Z") }), expectCode("CPP-CLAIM-READ"));
     assert.throws(() => recordCandidateResult({ controlRoot: f.control, packetId: prepared.packet.packetId, result: { verdict: "ignored" } }, { now: new Date("2026-07-18T12:03:00.000Z") }), expectCode("CPP-RESULT-REPLAY"));
     assert.equal(recordCandidateResult({ controlRoot: f.control, packetId: prepared.packet.packetId, result: { verdict: "pass" } }, { now: new Date("2026-07-18T12:03:00.000Z") }).replay, true);
     const consumed = consumeCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, receipt: { verdictStatus: "pass" } }, { now: new Date("2026-07-18T12:04:00.000Z") });
@@ -206,6 +211,18 @@ check("claims once, records once, consumes once and capability-cleans only its c
     assert.equal(consumeCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, receipt: { verdictStatus: "pass" } }).replay, true);
     assert.throws(() => cleanupCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, cleanupCapability: "0".repeat(64) }), expectCode("CPP-CLEANUP"));
     assert.equal(cleanupCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, cleanupCapability: prepared.packet.cleanupCapability }).code, "CPP-CLEANUP-COMPLETE");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("claimed packet readback rejects claim/state drift without minting a replacement", () => {
+  const f = fixture();
+  try {
+    const prepared = prepareCandidatePacket(options(f, "c".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 19) });
+    claimCandidatePacket(claimInput(prepared, "d".repeat(64)), { now: new Date("2026-07-18T12:01:00.000Z") });
+    const claimPath = join(prepared.packetDir, "claim.json");
+    const claim = JSON.parse(readFileSync(claimPath, "utf8"));
+    writeFileSync(claimPath, `${JSON.stringify({ ...claim, body: { ...claim.body, claimantNonce: "e".repeat(64) } })}\n`);
+    assert.throws(() => inspectClaimedCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId }, { now: new Date("2026-07-18T12:01:00.000Z") }), expectCode("CPP-CLAIM-READ"));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
@@ -267,17 +284,57 @@ check("binds an admissible closed Nova A5 lineage at claim and rejects a forged 
     const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
     const disposed = records.filter((record) => record.event === "DISPOSED");
     assert.equal(records[0].event, "DECLARED");
-    assert.equal(records[0].caseCount, 8);
-    assert.equal(disposed.length, 8);
+    assert.equal(records[0].caseCount, 10);
+    assert.equal(disposed.length, 10);
     assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
-    assert.equal(disposed.find((record) => record.id === "CPP08")?.disposition, "pass");
-    assert.deepEqual(records.at(-1).counts, { pass: 7, fail: 1, skip: 0, todo: 0 });
-    assert.equal(records.at(-1).declaredCount, 8);
-    assert.equal(records.at(-1).disposedCount, 8);
+    assert.equal(disposed.find((record) => record.id === "CPP09")?.disposition, "pass");
+    assert.equal(disposed.find((record) => record.id === "CPP10")?.disposition, "pass");
+    assert.deepEqual(records.at(-1).counts, { pass: 9, fail: 1, skip: 0, todo: 0 });
+    assert.equal(records.at(-1).declaredCount, 10);
+    assert.equal(records.at(-1).disposedCount, 10);
   }
 });
 
-assert.equal(cases.length, 8, "the complete candidate packet corpus must be registered before execution begins");
+check("binds one exclusive prelaunch session admission to its claimed packet and rejects drift", () => {
+  const f = fixture();
+  try {
+    const request = options(f, "e".repeat(32));
+    request.route.projectionDigest = "f".repeat(64);
+    request.sessionBinding = {
+      schema: SESSION_PACKET_BINDING_SCHEMA,
+      sessionId: "session-critic-one",
+      preflightSha256: request.route.projectionDigest,
+      assurance: "functional-equivalent-read-only; OS isolation not asserted",
+      freshContext: true,
+      historyInherited: false,
+      mayDelegate: false,
+    };
+    const prepared = prepareCandidatePacket(request, { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 14) });
+    claimCandidatePacket(claimInput(prepared, "3".repeat(64)), { now: new Date("2026-07-18T12:01:00.000Z") });
+    assert.throws(() => inspectClaimedSessionAdmission({ controlRoot: f.control, packetId: prepared.packet.packetId }, { now: new Date("2026-07-18T12:01:00.000Z") }), expectCode("CPP-SESSION-ADMISSION"));
+    const input = {
+      controlRoot: f.control,
+      packetId: prepared.packet.packetId,
+      preflightSha256: request.route.projectionDigest,
+      courseSourceSha256: "4".repeat(64),
+      courseDecisionSha256: "5".repeat(64),
+    };
+    const admission = publishClaimedSessionAdmission(input, { now: new Date("2026-07-18T12:01:01.000Z") });
+    assert.equal(admission.code, "CPP-SESSION-ADMISSION-READ");
+    assert.equal(inspectClaimedSessionAdmission({ controlRoot: f.control, packetId: input.packetId }, { now: new Date("2026-07-18T12:01:02.000Z") }).admission.courseSourceSha256, input.courseSourceSha256);
+    assert.equal(inspectClaimedSessionAdmission({ controlRoot: f.control, packetId: input.packetId }, { now: new Date("2026-07-18T12:16:00.000Z") }).ok, true,
+      "a claimed long-running Critic remains finalizable after the 15-minute prelaunch expiry");
+    assert.throws(() => inspectClaimedSessionAdmission({ controlRoot: f.control, packetId: input.packetId }, { now: new Date("2026-07-19T12:01:01.001Z") }), expectCode("CPP-EXPIRED"));
+    assert.throws(() => publishClaimedSessionAdmission(input, { now: new Date("2026-07-18T12:01:03.000Z") }), expectCode("CPP-OVERWRITE"));
+    const path = join(f.control, input.packetId, "session-admission.json");
+    const drifted = JSON.parse(readFileSync(path, "utf8"));
+    drifted.claimSha256 = "0".repeat(64);
+    writeFileSync(path, `${JSON.stringify(drifted)}\n`);
+    assert.throws(() => inspectClaimedSessionAdmission({ controlRoot: f.control, packetId: input.packetId }, { now: new Date("2026-07-18T12:01:04.000Z") }), expectCode("CPP-SESSION-ADMISSION"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 10, "the complete candidate packet corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

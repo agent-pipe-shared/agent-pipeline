@@ -17,6 +17,8 @@ import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
 import { planVerifySelection, verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
+import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+import { sha256Canonical } from "../lib/review-economy.mjs";
 
 function verifyValue(commit, tree, exitCode = 0) {
   return { schema: "pipeline.verify-evidence.v0", commit, tree, exitCode, steps: [{ name: "fixture-check", exitCode }], selection: planVerifySelection({ mode: "critic", candidateCommit: commit, registeredSuiteIds: ["fixture-check"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["fixture-check"], areas: [{ id: "all", paths: ["**"], suites: ["fixture-check"] }] } }) };
@@ -67,6 +69,113 @@ function input(fx, overrides = {}) {
     ...overrides,
   };
 }
+
+function registeredFourRoundFixture() {
+  const fx = fixture();
+  const featureId = "course-feature";
+  const specPath = `specs/${featureId}/spec.md`;
+  const manifestPath = `specs/${featureId}/lifecycle.json`;
+  mkdirSync(join(fx.root, "specs", featureId, "evidence"), { recursive: true });
+  const manifest = (artifacts) => ({ schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", artifacts });
+  writeFileSync(join(fx.root, specPath), "# Course feature\nround one\n");
+  writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest([]))}\n`);
+  const commits = [commit(fx.root, "course round one candidate")];
+  for (let round = 2; round <= 4; round += 1) {
+    writeFileSync(join(fx.root, specPath), `# Course feature\nround ${round}\n`);
+    commits.push(commit(fx.root, `course round ${round} candidate`));
+  }
+  const lineage = [];
+  const invariantMap = { [specPath]: ["INV-1"] };
+  for (let index = 0; index < commits.length; index += 1) {
+    const base = index === 0 ? fx.candidate : commits[index - 1];
+    const candidate = commits[index];
+    const diffSha256 = sha256(`course-diff-${index}`);
+    const packet = {
+      packetId: String(index + 1).repeat(32),
+      request: { projectId: "pipeline", taskId: "course-review", trigger: "T1" },
+      candidate: { base, commit: candidate, tree: git(fx.root, ["rev-parse", `${candidate}^{tree}`]) },
+      diff: { base, commit: candidate, path: ".git/review.diff", bytes: 1, sha256: diffSha256 },
+      diffPaths: [specPath],
+      bindings: { requestSha256: "a".repeat(64), diffPathsSha256: "b".repeat(64), governanceSha256: "c".repeat(64) },
+    };
+    const parent = lineage.at(-1) ?? null;
+    lineage.push(compileCriticReviewLineage({
+      packet, reviewId: `course-review-${index + 1}`, parent,
+      packages: [{ id: featureId, subjectSha256: "d".repeat(64), changedPaths: [specPath], integrationEdges: ["course-edge"] }],
+      coverage: { changedPaths: [specPath], acceptanceIds: ["NVA-A54-5"], integrationEdges: ["course-edge"], complete: true, receiptSha256: "e".repeat(64) },
+      lane: { laneId: `independent-${index + 1}`, contextSha256: String(index + 1).repeat(64), evidenceSha256: "1".repeat(64) },
+      verdict: { status: "findings", schemaValid: true, resultSha256: "2".repeat(64), failure: null },
+      findings: [{ id: "finding-1", priorFindingId: index === 0 ? null : "finding-1", severity: "high", status: "open", evidenceSha256: "3".repeat(64) }],
+      correction: index === 0 ? null : { commit: candidate, deltaSha256: diffSha256, impactSha256: sha256Canonical(["course-edge"]) },
+      invalidation: { kind: "none", reason: null, evidenceSha256: null },
+      reviewAttempt: index === 0 ? { round: 1, correctionCommits: 0, requestedMode: "full" } : {
+        round: index + 1, correctionCommits: index, requestedMode: "delta",
+        base, head: candidate, tree: packet.candidate.tree,
+        changedPaths: [specPath], changedBehaviorClaims: ["behavior-one"],
+        priorReceipt: { id: "receipt-1", sha256: "4".repeat(64) },
+        pathInvariantMap: invariantMap, pathInvariantMapSha256: sha256Canonical(invariantMap),
+        coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false,
+      },
+    }));
+  }
+  const artifacts = lineage.map((record, index) => {
+    const path = `specs/${featureId}/evidence/critic-review-${index + 1}.json`;
+    const bytes = `${JSON.stringify(record)}\n`;
+    writeFileSync(join(fx.root, path), bytes);
+    return { class: "candidate-evidence", path, sha256: sha256(bytes), authority: false, mutability: "immutable", retention: "retain" };
+  });
+  writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest(artifacts))}\n`);
+  commit(fx.root, "register four immutable course rounds");
+  writeFileSync(join(fx.root, specPath), "# Course feature\nround five candidate\n");
+  const fifth = commit(fx.root, "fifth candidate");
+  const tree = git(fx.root, ["rev-parse", `${fifth}^{tree}`]);
+  writeFileSync(join(fx.root, "evidence", "verify-course.json"), `${JSON.stringify(verifyValue(fifth, tree))}\n`);
+  return { ...fx, specPath, priorPath: artifacts.at(-1).path, reviewedCommit: commits.at(-1), fifth };
+}
+
+test("a fifth feature-package review is refused before packet-ready from retained Git lineage", () => {
+  const fx = registeredFourRoundFixture();
+  try {
+    const proposed = input(fx, {
+      base: fx.reviewedCommit,
+      candidate: fx.fifth,
+      specPath: fx.specPath,
+      evidencePaths: ["evidence/verify-course.json"],
+      priorCriticEvidencePath: fx.priorPath,
+    });
+    assert.throws(() => preflightCriticDispatch(proposed), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-GATE");
+    assert.throws(() => preflightCriticDispatch({ ...proposed, priorCriticEvidencePath: null }), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-PARENT");
+    assert.throws(() => preflightCriticDispatch({ ...proposed, base: fx.candidate }), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-SOURCE");
+    assert.throws(() => preflightCriticDispatch({ ...proposed, base: null,
+      reviewScope: { kind: "current-artifacts", paths: [fx.specPath] } }),
+    (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-SCOPE");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("a first versioned feature-package review remains admissible without a fabricated parent", () => {
+  const fx = fixture();
+  try {
+    mkdirSync(join(fx.root, "specs", "fresh-feature"), { recursive: true });
+    writeFileSync(join(fx.root, "specs", "fresh-feature", "spec.md"), "# Fresh feature\n");
+    writeFileSync(join(fx.root, "specs", "fresh-feature", "lifecycle.json"), `${JSON.stringify({
+      schema: "pipeline.feature-package.v1", feature: { id: "fresh-feature", rigor: 2 }, state: "approved", artifacts: [],
+    })}\n`);
+    const candidate = commit(fx.root, "fresh feature candidate");
+    const tree = git(fx.root, ["rev-parse", `${candidate}^{tree}`]);
+    writeFileSync(join(fx.root, "evidence", "verify-fresh.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
+    const result = preflightCriticDispatch(input(fx, {
+      base: fx.candidate, candidate,
+      specPath: "specs/fresh-feature/spec.md",
+      evidencePaths: ["evidence/verify-fresh.json"],
+      priorCriticEvidencePath: null,
+    }));
+    assert.equal(result.status, "packet-ready");
+    assert.equal(result.coordinatorOnly.courseAdmission.featureId, "fresh-feature");
+    assert.equal(result.coordinatorOnly.courseAdmission.round, 1);
+    assert.match(result.coordinatorOnly.courseAdmission.sourceSha256, /^[a-f0-9]{64}$/u);
+    assert.match(result.coordinatorOnly.courseAdmission.decisionSha256, /^[a-f0-9]{64}$/u);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
 
 test("read-only dispatch preflight binds candidate, candidate-tree governance, and separate evidence", () => {
   const fx = fixture();

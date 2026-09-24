@@ -9,10 +9,12 @@
  * and (until the documentation reduction lands) a pending public anchor.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseYaml } from "../../plugins/pipeline-core/lib/yaml-lite.mjs";
+import { canonicalJson, readConsumedCandidateReceipt } from "../../plugins/pipeline-core/scripts/critic-packet-preflight.mjs";
+import { readBoundConsumedCriticReceipt } from "../../plugins/pipeline-core/lib/critic-verify-lifecycle.mjs";
 
 // v3 (NVA-INVDERIVE-1, 2026-08-28): the `surfaces` array was removed from the
 // inventory and is now DERIVED from `discoverSurfaces()` on every run.
@@ -52,6 +54,82 @@ const DOCUMENTS = new Set(["README", "FLOW", "OPERATING_MODEL", "SETUP"]);
 const TARGET_STATUS = new Set(["pending", "active"]);
 const REASON_CODE = /^[a-z]+(?:-[a-z]+)*$/;
 const CRITIC_REVIEW_STATUS = new Set(["required-before-publication", "attested"]);
+const CRITIC_PACKET_ID = /^[a-f0-9]{32}$/;
+
+/** Only the final attestation and target activation may follow the reviewed candidate. */
+export function validateFinalCriticTransition({ reviewed, final, changedPaths, inventoryPath = INVENTORY_PATH }) {
+  if (!isObject(reviewed) || !isObject(final) || !Array.isArray(changedPaths)) return false;
+  if (reviewed.criticReview?.status !== "required-before-publication"
+    || reviewed.criticReview?.receiptSha256 !== null
+    || final.criticReview?.status !== "attested") return false;
+  if (changedPaths.some((path) => path !== inventoryPath
+    && !/^specs\/sprint-alfred-epic\/evidence\/reader-review\/[a-zA-Z0-9._/-]+$/.test(path))) return false;
+  const normalized = structuredClone(reviewed);
+  normalized.criticReview = final.criticReview;
+  if (!Array.isArray(normalized.capabilities) || !Array.isArray(final.capabilities)
+    || normalized.capabilities.length !== final.capabilities.length) return false;
+  for (let index = 0; index < normalized.capabilities.length; index += 1) {
+    const oldTargets = normalized.capabilities[index].targets;
+    const newTargets = final.capabilities[index].targets;
+    if (!Array.isArray(oldTargets) || !Array.isArray(newTargets) || oldTargets.length !== newTargets.length) return false;
+    for (let targetIndex = 0; targetIndex < oldTargets.length; targetIndex += 1) {
+      if (newTargets[targetIndex]?.status !== "active" || !["pending", "active"].includes(oldTargets[targetIndex]?.status)) return false;
+      oldTargets[targetIndex].status = "active";
+    }
+  }
+  return canonicalJson(normalized) === canonicalJson(final);
+}
+
+function gitRead(root, args, encoding = "utf8") {
+  return execFileSync("git", args, { cwd: root, encoding, stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
+}
+
+export function validateFinalCriticReadback(root, inventoryPath, inventory) {
+  try {
+    const checkoutInventory = JSON.parse(readFileSync(repoPath(root, inventoryPath), "utf8"));
+    if (canonicalJson(checkoutInventory) !== canonicalJson(inventory)) return "final Critic receipt readback requires the exact checkout inventory";
+    const common = realpathSync(resolve(root, gitRead(root, ["rev-parse", "--git-common-dir"]).trim()));
+    const packetRoot = join(common, "agent-pipeline", "critic-packets");
+    if (!existsSync(packetRoot) || !lstatSync(packetRoot).isDirectory()) return "final Critic receipt readback is unavailable";
+    const matches = [];
+    const entries = readdirSync(packetRoot, { withFileTypes: true });
+    if (entries.length > 4096) return "final Critic receipt readback exceeds its bounded packet inventory";
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !CRITIC_PACKET_ID.test(entry.name)) continue;
+      let packet;
+      try { packet = readConsumedCandidateReceipt({ controlRoot: packetRoot, packetId: entry.name }).packet; }
+      catch { continue; }
+      let bound;
+      try {
+        bound = readBoundConsumedCriticReceipt({
+          gitCommonDir: common,
+          criticPacketId: entry.name,
+          candidate: { commit: packet.candidate.commit, tree: packet.candidate.tree },
+        });
+      } catch { continue; }
+      if (bound.criticReceiptSha256 === inventory.criticReview.receiptSha256) matches.push(bound);
+    }
+    if (matches.length !== 1) return "final Critic receipt readback is unavailable or ambiguous";
+    const reviewedCommit = matches[0].critic.candidate.commit;
+    const head = gitRead(root, ["rev-parse", "HEAD"]).trim();
+    if (canonicalJson(JSON.parse(gitRead(root, ["show", `HEAD:${inventoryPath}`]))) !== canonicalJson(inventory)) {
+      return "final Critic receipt requires the committed inventory, not a working-tree claim";
+    }
+    if (gitRead(root, ["rev-parse", `${reviewedCommit}^{tree}`]).trim() !== matches[0].critic.candidate.tree) {
+      return "final Critic receipt candidate tree does not match Git";
+    }
+    if (reviewedCommit === head) return "final Critic receipt requires a later inventory activation commit";
+    gitRead(root, ["merge-base", "--is-ancestor", reviewedCommit, "HEAD"]);
+    const reviewed = JSON.parse(gitRead(root, ["show", `${reviewedCommit}:${inventoryPath}`]));
+    const changedPaths = gitRead(root, ["diff", "--name-only", "-z", reviewedCommit, "HEAD"]).split("\0").filter(Boolean);
+    if (!validateFinalCriticTransition({ reviewed, final: inventory, changedPaths, inventoryPath })) {
+      return "final Critic receipt candidate is stale or inventory activation changed unreviewed content";
+    }
+    return null;
+  } catch {
+    return "final Critic receipt readback failed or candidate is not an ancestor";
+  }
+}
 
 function utf8Compare(left, right) {
   return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
@@ -552,6 +630,10 @@ export function validateInventory({
       fail(findings, "attested criticReview requires a lowercase receiptSha256 digest");
     }
     if (inventory.criticReview.reason !== null) fail(findings, "attested criticReview must have null reason");
+    if (phase === "final" && SHA256_RE.test(inventory.criticReview.receiptSha256 ?? "")) {
+      const criticFinding = validateFinalCriticReadback(root, inventoryPath, inventory);
+      if (criticFinding) fail(findings, criticFinding);
+    }
   } else {
     if (inventory.criticReview.receiptSha256 !== null) fail(findings, "pending criticReview must not contain a fabricated receipt digest");
     if (typeof inventory.criticReview.reason !== "string" || inventory.criticReview.reason.length < 20) fail(findings, "pending criticReview requires a concrete reason");

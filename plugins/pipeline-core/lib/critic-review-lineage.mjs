@@ -392,18 +392,18 @@ function transitionCode(parent, current) {
     const roundStep = current.course.reviewRound - parent.course.reviewRound;
     const correctionStep = current.course.correctionCommitCount - parent.course.correctionCommitCount;
     const boundedNextStep = [0, 1].includes(roundStep)
-      && [0, 1].includes(correctionStep)
+      && Number.isSafeInteger(correctionStep) && correctionStep >= 0
       && roundStep + correctionStep >= 1;
     const crossesRound = parent.course.reviewRound === REVIEW_LIMITS.criticRounds
       && current.course.reviewRound === REVIEW_LIMITS.criticRounds + 1;
-    const crossesCorrection = parent.course.correctionCommitCount === REVIEW_LIMITS.correctionCommits
-      && current.course.correctionCommitCount === REVIEW_LIMITS.correctionCommits + 1;
+    const crossesCorrection = parent.course.correctionCommitCount <= REVIEW_LIMITS.correctionCommits
+      && current.course.correctionCommitCount > REVIEW_LIMITS.correctionCommits;
     return boundedNextStep && (crossesRound || crossesCorrection) ? null : "CRL-HISTORY-COURSE-GATE";
   }
   if (current.course.reviewRound !== parent.course.reviewRound + 1) return "CRL-HISTORY-ROUND";
   const correctionDelta = current.course.correctionCommitCount - parent.course.correctionCommitCount;
-  if (![0, 1].includes(correctionDelta)) return "CRL-HISTORY-CORRECTIONS";
-  if (correctionDelta === 1) {
+  if (!Number.isSafeInteger(correctionDelta) || correctionDelta < 0) return "CRL-HISTORY-CORRECTIONS";
+  if (correctionDelta > 0) {
     if (current.correction === null
       || current.diff.base !== parent.candidate.commit
       || current.correction.commit !== current.candidate.commit) {

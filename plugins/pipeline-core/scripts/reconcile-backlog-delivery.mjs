@@ -14,7 +14,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { canonicalJson, planBacklogDeliveryReconciliation, validateBacklogReconciliationReceipt } from "../lib/backlog-delivery-reconciliation.mjs";
+import { NOVA_A8_PO_WITHDRAWAL, canonicalJson, planBacklogDeliveryReconciliation, validateBacklogReconciliationReceipt } from "../lib/backlog-delivery-reconciliation.mjs";
 import { checkBacklogState, DEFAULT_ROOT, loadBacklogState } from "./check-backlog-state.mjs";
 import { projectBacklog, renderBacklogItem, transitionHash } from "../lib/backlog-state.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -86,6 +86,56 @@ function gitOid(root, expression) {
     const value = execFileSync("git", ["rev-parse", expression], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     return OID.test(value) ? value : null;
   } catch { return null; }
+}
+
+/** A scope withdrawal must be read from immutable Git history and the canonical ledger. */
+export function checkPoWithdrawalProvenance(root, binding, deps = {}) {
+  const rows = Array.isArray(binding?.bindings)
+    ? binding.bindings.filter((row) => row?.closureMode === "po-withdrawn-scope") : [];
+  if (rows.length === 0) return [];
+  const findings = [];
+  const git = deps.git ?? ((args) => execFileSync("git", args, {
+    cwd: root, encoding: "utf8", maxBuffer: 1024 * 1024,
+    stdio: ["ignore", "pipe", "ignore"],
+  }));
+  for (const row of rows) {
+    const source = row.poWithdrawal;
+    if (!plain(source) || Object.keys(source).sort().join(",") !== Object.keys(NOVA_A8_PO_WITHDRAWAL).sort().join(",")
+      || Object.entries(NOVA_A8_PO_WITHDRAWAL).some(([key, value]) => source[key] !== value)) {
+      findings.push(finding("AUTHORITY", "PO withdrawal reference is not the accepted historical decision"));
+      continue;
+    }
+    let historical;
+    try {
+      git(["merge-base", "--is-ancestor", source.sourceCommit, "HEAD"]);
+      historical = git(["show", `${source.sourceCommit}:${source.itemPath}`]);
+    } catch {
+      findings.push(finding("AUTHORITY", "PO withdrawal source is not reachable and readable from this candidate"));
+      continue;
+    }
+    if (sha256(historical) !== source.sourceSha256
+      || !/^id: "pipeline\.multi-cli-efficiency-pilots"$/mu.test(historical)
+      || !/^status: "closed"$/mu.test(historical)
+      || !/^## Closure, 2026-08-19 — supersedes the 2026-08-18 "go" decision$/mu.test(historical)
+      || !/^PO decision: close, topic discarded\. This reverses /mu.test(historical)) {
+      findings.push(finding("AUTHORITY", "PO withdrawal source bytes do not attest the closed scope decision"));
+    }
+    const current = observeFile(root, source.itemPath, "current PO withdrawal item", deps);
+    if (!current.ok) findings.push(current.finding);
+    else if (!/^status: "closed"$/mu.test(current.raw.toString("utf8"))
+      || !/^## Closure, 2026-08-19 — supersedes the 2026-08-18 "go" decision$/mu.test(current.raw.toString("utf8"))) {
+      findings.push(finding("STALE", "current backlog item no longer carries the PO withdrawal"));
+    }
+    const ledger = observeFile(root, "backlog/transitions.ndjson", "PO withdrawal ledger", deps);
+    if (!ledger.ok) { findings.push(ledger.finding); continue; }
+    let event;
+    try { event = JSON.parse(ledger.raw.toString("utf8").split("\n")[source.ledgerSequence - 1]); }
+    catch { findings.push(finding("AUTHORITY", "PO withdrawal ledger event is unavailable")); continue; }
+    if (event?.sequence !== source.ledgerSequence || event?.entryHash !== source.ledgerEntryHash
+      || event?.id !== row.id || event?.from !== "in_progress" || event?.to !== "closed"
+      || event?.at !== "2026-08-19") findings.push(finding("AUTHORITY", "PO withdrawal ledger event does not attest this item closure"));
+  }
+  return findings;
 }
 
 function receiptIndex(root) {
@@ -175,6 +225,8 @@ export function previewBacklogDelivery(root = DEFAULT_ROOT, { intentPath, bindin
   const intent = intentRecord.value;
   const binding = bindingRecord.value;
 
+  findings.push(...checkPoWithdrawalProvenance(root, binding, deps));
+
   checkAuthority(root, intent, findings, deps);
   checkObservedDigest(root, intent?.specification, "specification", findings, deps);
   if (Array.isArray(intent?.evidence)) intent.evidence.forEach((entry, index) => checkObservedDigest(root, entry, `evidence[${index}]`, findings, deps));
@@ -197,7 +249,8 @@ export function previewBacklogDelivery(root = DEFAULT_ROOT, { intentPath, bindin
     amendment = value.evidence;
     amendmentTarget = current.state.events?.[amendment.targetSequence - 1] ?? null;
   }
-  return planBacklogDeliveryReconciliation({ intent, binding, state: { ...current.state, item, amendment, amendmentTarget } });
+  const now = deps.now ?? (() => new Date().toISOString());
+  return planBacklogDeliveryReconciliation({ intent, binding, state: { ...current.state, item, amendment, amendmentTarget }, observedAt: now() });
 }
 
 function receiptPathFor(intent) { return `${RECEIPTS_DIR}/${intent.idempotencyKey}.json`; }
@@ -337,7 +390,7 @@ export function materializeBacklogDelivery(root = DEFAULT_ROOT, { intentPath, bi
     if (onlyUnreachableHistory) { current = repairRead; repairReadAccepted = true; }
   }
   if (!current.ok && !repairReadAccepted) return { ok: false, findings: current.findings.map((entry) => finding("UNAVAILABLE", `canonical backlog state rejected: ${entry}`)), postimages: null };
-  const fresh = previewBacklogDelivery(root, { intentPath, bindingPath }, { readState: deps.readState, readFile: fs.readFileSync });
+  const fresh = previewBacklogDelivery(root, { intentPath, bindingPath }, { readState: deps.readState, readFile: fs.readFileSync, now: deps.now });
   if (!fresh.ok || fresh.preview.previewSha256 !== preview.previewSha256 || canonicalJson(fresh.preview) !== canonicalJson(preview)) return { ok: false, findings: [...(fresh.findings ?? []), finding("CAS", "preview no longer matches canonical state")], postimages: null };
 
   const existing = current.items.find((entry) => entry.metadata.id === intent.item.id);
@@ -455,7 +508,7 @@ export function applyBacklogDelivery(root = DEFAULT_ROOT, { intentPath, bindingP
     return rejectApply([finding("CONFLICT", "reconciliation transaction lock is busy or unavailable")]);
   }
   try {
-    const fresh = previewBacklogDelivery(root, { intentPath, bindingPath }, { readState: deps.readState, readFile: fs.readFileSync });
+    const fresh = previewBacklogDelivery(root, { intentPath, bindingPath }, { readState: deps.readState, readFile: fs.readFileSync, now });
     if (!fresh.ok || fresh.preview.previewSha256 !== preview.previewSha256 || canonicalJson(fresh.preview) !== canonicalJson(preview)) return rejectApply([...(fresh.findings ?? []), finding("CAS", "preview no longer matches the locked canonical state")]);
     const targets = postimages.toSorted((left, right) => left.path.localeCompare(right.path)).map((postimage) => ({ path: postimage.path, pre: readImage(root, postimage.path, fs), post: textImage(postimage.bytes) }));
     const receipt = receiptRecord(intent, preview, now());

@@ -7,7 +7,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { consumeCandidatePacket } from "./critic-packet-preflight.mjs";
+import { consumeCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 
 import {
@@ -16,6 +16,7 @@ import {
   SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA,
   SESSION_CRITIC_RECEIPT_SCHEMA,
   SessionCriticFinalizerError,
+  admitSessionCriticReview,
   finalizeSessionCriticReview,
   runSessionCriticFinalizerCli,
   validateSessionCriticReceipt,
@@ -146,6 +147,11 @@ function options(fx, overrides = {}) {
     ...overrides,
   };
 }
+function preadmitted(fx, overrides = {}) {
+  const request = options(fx, overrides);
+  admitSessionCriticReview(request);
+  return request;
+}
 function cleanup(fx) { rmSync(fx.root, { recursive: true, force: true }); }
 function cliRequest(fx, overrides = {}) {
   return {
@@ -170,11 +176,28 @@ function cliRequest(fx, overrides = {}) {
   };
 }
 
-test("normal fresh-session finalization automatically prepares, claims, records, consumes, reads back, and emits", () => {
+test("prelaunch admission creates one claimed, digest-bound packet before the verdict exists", () => {
+  const fx = fixture();
+  try {
+    const request = options(fx, { packetId: "9".repeat(32) });
+    const admitted = admitSessionCriticReview(request);
+    assert.equal(admitted.status, "admitted");
+    assert.equal(admitted.packetId, request.packetId);
+    assert.match(admitted.admissionSha256, /^[a-f0-9]{64}$/u);
+    const common = git(fx.root, ["rev-parse", "--git-common-dir"]);
+    const controlRoot = join(fx.root, common, "agent-pipeline", "critic-packets");
+    const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
+    assert.equal(readback.admission.sessionId, request.sessionId);
+    assert.equal(readback.packet.candidate.commit, fx.candidate);
+    assert.throws(() => admitSessionCriticReview(request), (error) => error.code === "CPP-OVERWRITE");
+  } finally { cleanup(fx); }
+});
+
+test("normal fresh-session finalization consumes the prelaunch packet, reads back, and emits", () => {
   const fx = fixture({ targetedExitCode: 1 });
   try {
     let consumeCalls = 0;
-    const result = finalizeSessionCriticReview(options(fx, { eventOutPath: "evidence/review-action.json", featureId: "nova-b" }), {
+    const result = finalizeSessionCriticReview(preadmitted(fx, { eventOutPath: "evidence/review-action.json", featureId: "nova-b" }), {
       consumeCandidatePacketFn: (...args) => { consumeCalls += 1; return consumeCandidatePacket(...args); },
     });
     assert.equal(result.status, "completed");
@@ -210,7 +233,7 @@ test("a schema-invalid or contradictory verdict fails before packet or event pub
 test("an event write failure reports source-complete and a closed identical-only retry", () => {
   const fx = fixture();
   try {
-    const result = finalizeSessionCriticReview(options(fx, { packetId: "3".repeat(32), eventOutPath: "evidence/review-action.json" }), {
+    const result = finalizeSessionCriticReview(preadmitted(fx, { packetId: "3".repeat(32), eventOutPath: "evidence/review-action.json" }), {
       writeGovernanceReviewActionFn: () => { throw Object.assign(new Error("disk"), { code: "GRA-OUTPUT-WRITE" }); },
     });
     assert.equal(result.status, "source-complete/event-unavailable");
@@ -227,7 +250,7 @@ test("review action construction cannot occur before identical consume readback"
   try {
     let consumes = 0;
     let builds = 0;
-    assert.throws(() => finalizeSessionCriticReview(options(fx, {
+    assert.throws(() => finalizeSessionCriticReview(preadmitted(fx, {
       packetId: "7".repeat(32),
       eventOutPath: "evidence/review-action.json",
     }), {
@@ -248,7 +271,7 @@ test("findings emit REVIEW_FINDINGS and a root candidate keeps its real empty-tr
   const fx = fixture({ rootCandidate: true });
   try {
     const finding = { gap: "missing edge", risk: "failure", severity: "minor", evidence: "specs/spec.md:1", spec_ref: "AC-1" };
-    const result = finalizeSessionCriticReview(options(fx, {
+    const result = finalizeSessionCriticReview(preadmitted(fx, {
       packetId: "4".repeat(32),
       verdict: verdict({ findings: [finding], pass: false }),
       eventOutPath: "evidence/review-action.json",
@@ -262,20 +285,36 @@ test("findings emit REVIEW_FINDINGS and a root candidate keeps its real empty-tr
 test("receipt validation is closed and refuses provider metadata", () => {
   const fx = fixture();
   try {
-    const receipt = finalizeSessionCriticReview(options(fx, { packetId: "5".repeat(32) })).receipt;
+    const receipt = finalizeSessionCriticReview(preadmitted(fx, { packetId: "5".repeat(32) })).receipt;
     assert.throws(() => validateSessionCriticReceipt({ ...receipt, provider: "openai" }), (error) => error instanceof SessionCriticFinalizerError && error.code === "SCF-RECEIPT");
   } finally { cleanup(fx); }
 });
 
-test("closed CLI request produces the same versioned durable result without node-e imports", () => {
+test("closed CLI admits before verdict and finalizes only that durable packet", () => {
+  const fx = fixture();
+  try {
+    writeFileSync(join(fx.root, "evidence", "finalize-request.json"), `${JSON.stringify(cliRequest(fx))}\n`);
+    const admission = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", "evidence/finalize-request.json"]);
+    assert.equal(admission.exitCode, 0);
+    assert.equal(admission.output.schema, "pipeline.session-critic-prelaunch-admission.v1");
+    assert.equal(admission.output.packetId, "6".repeat(32));
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", "evidence/finalize-request.json"]);
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.output.status, "completed");
+    assert.equal(result.output.receipt.session.id, "session-cli-1");
+  } finally { cleanup(fx); }
+});
+
+test("CLI refuses a valid returned verdict when no prelaunch admission exists", () => {
   const fx = fixture();
   try {
     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
     writeFileSync(join(fx.root, "evidence", "finalize-request.json"), `${JSON.stringify(cliRequest(fx))}\n`);
     const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", "evidence/finalize-request.json"]);
-    assert.equal(result.exitCode, 0);
-    assert.equal(result.output.status, "completed");
-    assert.equal(result.output.receipt.session.id, "session-cli-1");
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.output.code, "SCF-PRELAUNCH-ADMISSION");
+    assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "6".repeat(32))), false);
   } finally { cleanup(fx); }
 });
 

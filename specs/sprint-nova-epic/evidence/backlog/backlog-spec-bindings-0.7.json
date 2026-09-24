@@ -1,0 +1,3045 @@
+{
+  "schema": "pipeline.backlog-spec-binding.v1",
+  "featureId": "sprint-nova-epic",
+  "specification": {
+    "path": "specs/sprint-nova-epic/spec.md",
+    "sha256": "a5491e86612e7df1737b46116b454fdd1094c924616066ca84c7fd73a119abf4"
+  },
+  "backlogSnapshot": {
+    "commit": "26bff28c5b207974425a1d012c5beac834248395",
+    "tree": "77738fa363c6ee7a34daf3b52174c91184891d0a",
+    "backlogSubtree": "d46d6e5693daf060ed3f7343e21d9c7b7cac1c0ce704f0961ec662d9aa8a9fb7",
+    "ledgerHead": "96c784df2c403dd21cf6618d9d24a9b943bea78d5a181bb7480bc30b3bb7e347",
+    "indexFileSha256": "0f3b599ed43abf2da3cd49fec59b32a37b648a85ba08d0d02d0266bb3a055ddc",
+    "statusFileSha256": "e0af0d73d1050b112c89542fb4aacfc074cadecf824a39e5f2bbb22ebc1c8515",
+    "itemFileSha256": [
+      {
+        "id": "pipeline.a-briefing-prohibition-on-advisor-consultation-is-unenforced",
+        "sha256": "84bf0b957dd4ead6e16f07b014bbc426248d3e1166543bc6c272439184fb919c"
+      },
+      {
+        "id": "pipeline.a-captured-resume-hint-card-reds-the-verify-gate-until-another-session-consumes-it",
+        "sha256": "01ebaab52e54e65dd2c19482035dd5fe21894ff928cfe807da75d6c2b1a306f0"
+      },
+      {
+        "id": "pipeline.a-change-creates-an-obligation-elsewhere-that-only-a-gate-run-reveals",
+        "sha256": "50e6dbb19c0318af35277d29cce1738dd5657b26cc42995e578ec813f3f446bb"
+      },
+      {
+        "id": "pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate",
+        "sha256": "70b42239e8fef91a7bfd2d2cb7ee444e59c3fdb172fe654dfcd1e9ede4efcc87"
+      },
+      {
+        "id": "pipeline.a-closed-result-can-be-amended-after-close-with-no-detection-and-no-repair",
+        "sha256": "e2bc970adceaa17dc53ee38e6f4218a45fbefd7fc81613fbd3ce81c3456a3909"
+      },
+      {
+        "id": "pipeline.a-critic-has-no-writable-location-for-its-own-report",
+        "sha256": "407f5db6a2acbe4944b8bf1b0c879593409d09fe1a20507fc1827374adba3d4b"
+      },
+      {
+        "id": "pipeline.a-damaged-continuity-locks-the-session-out-of-the-repair-it-needs",
+        "sha256": "3bb48b1f95d89890b9f7723c7b0520aa8c417ffcf2b83ea85a51b2fb19ef4e9f"
+      },
+      {
+        "id": "pipeline.a-deferred-item-is-terminal-so-a-live-defect-can-be-parked-invisibly",
+        "sha256": "6f6a49c108e2f7a8d2756f3397de487b6d261adfef688af104c7b077f03423db"
+      },
+      {
+        "id": "pipeline.a-dirty-claude-directory-blocks-verify-which-blocks-push-approval",
+        "sha256": "8383bd131b6a310d57caa4d379ea84a6c3874cbc823420a2a243a23866267ea7"
+      },
+      {
+        "id": "pipeline.a-dispatch-cannot-authenticate-a-mid-task-correction-from-its-dispatcher",
+        "sha256": "4fa6ca5264e58f9138a3f2655ca9d34aba59a87be2e6ae5ac213187b3a2c0005"
+      },
+      {
+        "id": "pipeline.a-dispatch-record-carries-implementor-prose-into-a-critic-that-must-not-read-it",
+        "sha256": "d1f9fa697c9fceb973568aee5bb9af7ac76f8aa028909659dc14e12035fd173d"
+      },
+      {
+        "id": "pipeline.a-doc-edit-silently-obligates-its-vendored-copy",
+        "sha256": "e5a6bad7f734512168d034c16b63a43079ca4346b788beef5cb4d8c325ed97d7"
+      },
+      {
+        "id": "pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback",
+        "sha256": "eef57be401eb130e0a58737800f04cd057ea64bac0e7805b67922dab9be75d85"
+      },
+      {
+        "id": "pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path",
+        "sha256": "302e3d4d105eccc8980091550632b5d409f04377ee61da6b38047c05be650aeb"
+      },
+      {
+        "id": "pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair",
+        "sha256": "47ef0ecb29b76dbd24fb8390462084afc465070c2849b187ec9edd085a11053f"
+      },
+      {
+        "id": "pipeline.a-node-script-defeats-every-file-protection-guard",
+        "sha256": "260cfa4a9b0eb5e6fd481289d235efb1c923e022b36f9715938e820be0c238a8"
+      },
+      {
+        "id": "pipeline.a-promoted-feature-can-never-pass-the-plan-gate",
+        "sha256": "bc6fb4fd744721791361a6f69955ae6b2a70cdea65b03a3e4f0067ad25bf78da"
+      },
+      {
+        "id": "pipeline.a-push-approval-occupies-a-single-slot-so-destinations-cannot-be-prepared-together",
+        "sha256": "6ba9fe506491519ffcae450f9b84a8dfd4f2aeea570bd233bf07d6c629ca76bb"
+      },
+      {
+        "id": "pipeline.a-read-only-command-is-refused-for-naming-a-protected-path",
+        "sha256": "275e38b6b65a316c2698edf730b557600435821cac7acf7d010953e56d52bd28"
+      },
+      {
+        "id": "pipeline.a-registered-but-abandoned-worktree-is-never-retired",
+        "sha256": "e8ba663ce8edf4342d07a86fa1e4d4bba60e626996b09702aa0383826de6312a"
+      },
+      {
+        "id": "pipeline.a-runner-improvised-the-po-signature-instructions",
+        "sha256": "ea13d4ae760978bf4f76c7282e6e71058c62afdc0cb04701a9b9d976421bb310"
+      },
+      {
+        "id": "pipeline.a-runner-proposed-abandoning-pipeline-setup-as-too-laborious",
+        "sha256": "1c044d9d2f3d7cda0f04704ed8fc98fbcdcc52da702b8b2aca9b5650b73c5f16"
+      },
+      {
+        "id": "pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path",
+        "sha256": "ae93dec8d37302dc0269ba3925ae3f04b24838827f61676bf817a2f93e3506d1"
+      },
+      {
+        "id": "pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote",
+        "sha256": "7063739231a0dc567ac08396f4e86449d3acb2f2dcf693e1aef32f5c990c01a0"
+      },
+      {
+        "id": "pipeline.a-stale-verify-opt-out-entry-costs-a-po-signature-for-work-already-done",
+        "sha256": "6d8f3a4148345e1323dc57ff637b10a925e26912bd7e14f9081cae64799b26bc"
+      },
+      {
+        "id": "pipeline.a-stale-version-stamp-makes-a-plugin-reload-a-silent-no-op",
+        "sha256": "c42c31acb9f439c40a4752a538ac4feaee888fe6c86c4dfdff7f65306e340340"
+      },
+      {
+        "id": "pipeline.a-throwing-temp-unlink-reports-rolled-back-while-the-target-stays-published",
+        "sha256": "d0ba42b9a9aa6bd25458ace251d0d81479eb08140b3a701ee3b15dafacd2b9ac"
+      },
+      {
+        "id": "pipeline.a-torn-audit-append-has-disabled-every-human-guard-override-since-august-20",
+        "sha256": "0a1ebbd3c90f9ac6dc9d3e3d7fab8e82ba10314beb0a279a244e1f62e7f86db0"
+      },
+      {
+        "id": "pipeline.a-tree-snapshot-races-gits-own-background-maintenance-lock",
+        "sha256": "5f594448e802256ca54638e1408bccc84d96536a88a32213b07bb743c53ce647"
+      },
+      {
+        "id": "pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question",
+        "sha256": "c8b163b8051aadfa44d01fd1011cafa8d343c36e9867a423c2d4e1e6282b8292"
+      },
+      {
+        "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
+        "sha256": "dbcd2b05281c7ed3989ef1216e437de1d12d657d241ce83d0308fb7a4fcc89ac"
+      },
+      {
+        "id": "pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest",
+        "sha256": "5f79be6d6b0a0fb9cfe3fe25ab87ddd388fff30b50449d67cc8b0b8a15d3b816"
+      },
+      {
+        "id": "pipeline.accepted-adrs-drift-from-implementation-undetected",
+        "sha256": "3dab5f75b577cfcfb07cef96c5b83ebc07123ed728cf5339dcb8bd6881d928c9"
+      },
+      {
+        "id": "pipeline.adr-0045-topology-divergence-from-package-and-skill",
+        "sha256": "7da1e8dbfd688f4522a60cbff20097f96b0807da857e240d316ab3d33d82a6f8"
+      },
+      {
+        "id": "pipeline.adr-0047-numbering-collision",
+        "sha256": "4c2605383b0b01bdfed7a815ef64108b10343dea2b2f6065226752d15d903bec"
+      },
+      {
+        "id": "pipeline.adr-0047-renumber-left-live-references-behind",
+        "sha256": "e3cef732e05fb0eef97223931d738341dfd776fffb5fe037779f1726beb22832"
+      },
+      {
+        "id": "pipeline.adr-0051-follow-up-gaps-untracked",
+        "sha256": "28b6c28f8690eafa5cb590e4a030f8058c94472b91f0ef9a90f19b7814ddc913"
+      },
+      {
+        "id": "pipeline.adr-0056-conflict-scope-text-narrower-than-code",
+        "sha256": "c51b2d05d80e0864529f4bf61f08120bc1fafe0548423e34df7d697378e9407d"
+      },
+      {
+        "id": "pipeline.advisor-consent-is-requested-before-the-readiness-preflight",
+        "sha256": "e783114d92d7f66a7b606b32cedd0940cf9a374f900c860a9b8d8c12d5396be7"
+      },
+      {
+        "id": "pipeline.afk-assumption-mode",
+        "sha256": "2886d0a87d4b8dc1ed32354d12fd08add14aaa80c914c1e9b4aa1fbacbeaf312"
+      },
+      {
+        "id": "pipeline.agent-binding-guards-are-not-os-level-sandboxing",
+        "sha256": "87da40f6b2893faebf462c44a8bc1a266dd53b7cd01639087cb5e8c2869f4a0e"
+      },
+      {
+        "id": "pipeline.agent-can-self-arm-the-git-override",
+        "sha256": "02dc53e2def8f2bbd8103bf03691931a6639a9b46481add42cdb37c9c2bcbc6e"
+      },
+      {
+        "id": "pipeline.agent-decision-journal-code-pattern-array-coercion",
+        "sha256": "72d0f9a6a81cc24fe7a346f1718bf39720a0f2bd9e79927d51c82da270474261"
+      },
+      {
+        "id": "pipeline.agent-decision-journal-no-production-producer",
+        "sha256": "08f73bc93f56a28d4559c3d0e9b205ef48592f8122edbf2a5e2ec2b304063724"
+      },
+      {
+        "id": "pipeline.agent-definitions-pin-the-review-tier-model",
+        "sha256": "c34e018a4607df8e2ed38a5e284f49cbeb2395032b495be869e4e50909b9365c"
+      },
+      {
+        "id": "pipeline.agent-never-asks-po-for-key-directory-invents-one-instead",
+        "sha256": "518ddbe6adc5f694003ee4ad8f1819847024446dcf0b5887d32ee04411e0888c"
+      },
+      {
+        "id": "pipeline.agent-talks-itself-out-of-the-pipeline",
+        "sha256": "fba4e7e5587a3804d29ca703bf80db1e22abb1ae03ab400753434dc490077880"
+      },
+      {
+        "id": "pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref",
+        "sha256": "68ff2b47bb1f1bce68398e265881292ba8b45a2a261a2718108728ff115ade5d"
+      },
+      {
+        "id": "pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them",
+        "sha256": "8269b4eb55a16f2af8aa64ee8db424c3de4005be5e58f1776461ed3bc9341536"
+      },
+      {
+        "id": "pipeline.agents-read-the-source-because-nothing-describes-the-interface",
+        "sha256": "f9a536d8684b9504bfee252af1db2e3cf5d5197945678162dd5c95107d02be3e"
+      },
+      {
+        "id": "pipeline.agents-talk-the-po-out-of-the-signature",
+        "sha256": "fb2de1c546540e295a197d788e03c075097a42f34c0860e2ee10faf2c21915cd"
+      },
+      {
+        "id": "pipeline.all-three-runners-should-install-against-the-stable-branch",
+        "sha256": "6d4b9804bd7bd58d836e9ff757b75ce1ae78864256ae40d988c01a1d56bf4969"
+      },
+      {
+        "id": "pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict",
+        "sha256": "273d8d924e0ca90501841bad17c1edfe855233e40ad9c8114e1ce20d3e7c6a89"
+      },
+      {
+        "id": "pipeline.an-expired-override-is-armed-instead-of-refused",
+        "sha256": "6bc6d4455e3c0007b51242a91e5b78467102b4dc7ad08ec16d145420cb997260"
+      },
+      {
+        "id": "pipeline.an-onboarding-test-depends-on-a-clean-working-tree-through-a-security-scan-subprocess",
+        "sha256": "76aa9194e236ca7de8ff64227abdd7b3d5a0fa7ef5d303f2057a67b4f4e282be"
+      },
+      {
+        "id": "pipeline.an-orchestrator-write-into-a-running-dispatchs-tree-is-undetectable",
+        "sha256": "c69e2b757bf9bb8688f263ac1ea2c5e8d8a77ffd587fbea6f39b49d8a0eeb8fb"
+      },
+      {
+        "id": "pipeline.an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run",
+        "sha256": "7316343d4005efaf0c3408e51aaf5ef58f2d7f578a0812de6fe13bc64188f597"
+      },
+      {
+        "id": "pipeline.an-unparseable-done-when-is-counted-as-undeclared-not-malformed",
+        "sha256": "9e7f74f71859dc9548540d68a8c45eff5560b8cf3b563cb57440c419b74bbf76"
+      },
+      {
+        "id": "pipeline.anchor-check-passes-on-wrong-language-content",
+        "sha256": "deeabf1423ca7768052e894385e9220ac9df8a601f1fa2180440eb4f29a1f697"
+      },
+      {
+        "id": "pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths",
+        "sha256": "7e00716a29ff5467261efb4daacfaacf1be4d089d90e69f414417bcf6756bb04"
+      },
+      {
+        "id": "pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root",
+        "sha256": "d128acfcd0d03243beb747d2f8939b06fc9a108aaa0fe68198e91d4ebd729b7b"
+      },
+      {
+        "id": "pipeline.antigravity-sandbox-containment-push-escape-route-unclosed",
+        "sha256": "8069424f880d41d8a41bcd03edf0f65aa2352d80b59b86cce63ddf8ec9b65030"
+      },
+      {
+        "id": "pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones",
+        "sha256": "40cc8e178c6a683700830f3a103170a5fa11f3dd08d2b1984ef19b2ab4e35f45"
+      },
+      {
+        "id": "pipeline.approval-mechanisms-require-out-of-session-po-acts",
+        "sha256": "b15e644aef87b7d8257baf726bf3c1d647833bd8e9d7e898e9ed856aab8ffebb"
+      },
+      {
+        "id": "pipeline.approve-announce-test-fixture-missing-present-plan-step",
+        "sha256": "13da3d0923bef465275938f8481719b07b31198aae8d0e47767af36a55999e50"
+      },
+      {
+        "id": "pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file",
+        "sha256": "6aa31b9165b57d3480ff6c319333a7edd4736c099a78674eeb787dc17182ce38"
+      },
+      {
+        "id": "pipeline.approved-not-implementing-is-a-silent-trap",
+        "sha256": "1a83798eeb91b282741e5fd405aa730b421558331a9ee05ee83a95f94e80ecc6"
+      },
+      {
+        "id": "pipeline.atomic-prd-approval-without-mutation",
+        "sha256": "42a437b6ecd78ce579b60935b545437c19604477fbbcfd6acb0975b9c86c1df7"
+      },
+      {
+        "id": "pipeline.attended-po-acknowledge-gate-defaults-to-an-unsatisfiable-runner",
+        "sha256": "10b26db095c9a2c70087bcac0bd0bb7f57ba5da7662f5dca99a258a3e72da94f"
+      },
+      {
+        "id": "pipeline.attestation-git-presence-gate-not-gs8-protected",
+        "sha256": "bfe0fbfbe3f3256a3a81eb8940a78047d6ab4116b8efa43b3ae4a8285f0cdf0c"
+      },
+      {
+        "id": "pipeline.author-repair-route-has-no-signed-event-chain",
+        "sha256": "6e9a3d6c3b6bcddef07fcd8e5b2bc832b08a0a3b23bdfa09566922566be8bf48"
+      },
+      {
+        "id": "pipeline.authority-decision-apply-defaults-to-codex",
+        "sha256": "5ff959999644caf6bf4695525ee107cbb124ebce751bb6d31d304fbab68392ac"
+      },
+      {
+        "id": "pipeline.authority-decision-candidate-is-a-literal",
+        "sha256": "58de2de785e03c6968ca76be4856865d08ff391c3578f47958810502846cb12f"
+      },
+      {
+        "id": "pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool",
+        "sha256": "834d5c83696c2388fea2ab965aaf7dd64f5fb199c9aa6dce5fae048480f13a3c"
+      },
+      {
+        "id": "pipeline.authority-gate-verdict-need-not-survive-checkout",
+        "sha256": "f4e47f83858bf9e294e4c821b068d8a8961790e5ec7d5f459182d062385547af"
+      },
+      {
+        "id": "pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had",
+        "sha256": "ab176c45cba41794ee2789508f11407d4d47a4c33f9a794e92eec9bb8b4fcda1"
+      },
+      {
+        "id": "pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps",
+        "sha256": "559d9eb09ca8a7c7a9712dc86a37a50335f137f7a5526210c3bbc29bc195c552"
+      },
+      {
+        "id": "pipeline.authority-signing-terminal-contract",
+        "sha256": "783793f46b455081f4f82277fb649f82eeb8ff03b25f86323b557c416985d445"
+      },
+      {
+        "id": "pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy",
+        "sha256": "8aa138544e7ce2e32489e365f539f36781ef4ebfc9db6685f89209d62696bad8"
+      },
+      {
+        "id": "pipeline.backlog-closure-metadata-missing-across-historical-items",
+        "sha256": "2988524bcc70b1d6a176b5dc49702a393a443e2dcf2e3622e574c50322aa11d0"
+      },
+      {
+        "id": "pipeline.backlog-delivery-status-reconciliation",
+        "sha256": "1ada264bd0979a7a5d6fa24addeaeea4ed21860ecd6250a1678f0bdf9fb4215b"
+      },
+      {
+        "id": "pipeline.backlog-index-json-does-not-project-tracking-or-deferred-status",
+        "sha256": "d72742dfce48c8188cb9c2af2aa528c8cc98e4a1d1a07bf9e9ecfb4a01b056cb"
+      },
+      {
+        "id": "pipeline.backlog-ledger-baseline-migration-commit-unreachable",
+        "sha256": "c1314e6dba38fe0a0e37a3fcc2dd38046faa27b7548684884b48c69e7db8cb75"
+      },
+      {
+        "id": "pipeline.backlog-ledger-closure-reason-misleading",
+        "sha256": "4d12ad17a1e511e813c1cffdb6bb00ee1a146a7ed32671dc391c9aa621b95cd2"
+      },
+      {
+        "id": "pipeline.backlog-plan-writers-skip-drift-classification",
+        "sha256": "79a6e4f9883506060c4451eb108a91d8188f6415741095f093766137a732ffb9"
+      },
+      {
+        "id": "pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values",
+        "sha256": "e694d3899e51bc9d9b95922528b2e38967227d41edf4a63408a25a147f8f06d7"
+      },
+      {
+        "id": "pipeline.backlog-status-drifts-from-code-across-compaction-with-no-hardening",
+        "sha256": "a695ad06bf793585352c101403c8ffa94cd8c92afdcbc549b99a8a871ca10aed"
+      },
+      {
+        "id": "pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage",
+        "sha256": "f9c2e4ab0bd39dd5a079594ed77e57fa5d161840ded56bef425f42a7e331bbdc"
+      },
+      {
+        "id": "pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code",
+        "sha256": "c2f7dd7cb06c26f3d183d77577990c6ca3f316437fe73f362735427d0b164603"
+      },
+      {
+        "id": "pipeline.baseline-only-verify-needs-an-actionable-release-recovery",
+        "sha256": "932966b27c82f0af44f1546088b9213c2501a790295cbbf75b0ab87425141d18"
+      },
+      {
+        "id": "pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code",
+        "sha256": "11cf4535db4515ca5023d9589ead1500cc48cf9e6559fb65ad1a5f3af6a8aae1"
+      },
+      {
+        "id": "pipeline.blind-session-zero-followable-steps-on-push-path",
+        "sha256": "87d05f9617bef0eb8815e0c3eb375adb7e1ad293afa709b1141bee43a6d1459e"
+      },
+      {
+        "id": "pipeline.blocking-push-gate-has-no-terminal-exception-boundary",
+        "sha256": "e1ec6461ca76ba8a36d3f3cd6f6c02617582c20bbff4a75df022a7ed26d81b00"
+      },
+      {
+        "id": "pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection",
+        "sha256": "01f870b6183b8c25c98234424e8c086999a9233ae049177d653b1c5fda9ce5b4"
+      },
+      {
+        "id": "pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block",
+        "sha256": "8e26a4c746001c91f4b23878c030e990599f1740d5ea890c1f817cf396582e6f"
+      },
+      {
+        "id": "pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module",
+        "sha256": "949ae781b069549a87f85ad605b4e8ddc869f09e201df98b2aab7ad40d0d12aa"
+      },
+      {
+        "id": "pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason",
+        "sha256": "f52e902d8f77927f1ca7f23a220a2c85476f9e7f7b6aee327bf4363a3c0c858b"
+      },
+      {
+        "id": "pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff",
+        "sha256": "b2148c5b749925cedf208bfdb8687ccff1484e047d300b1feb4932bc14621f3d"
+      },
+      {
+        "id": "pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them",
+        "sha256": "2e98eb1c99fece9e7d67b2e12d9484a1dc1dda004f06c17d9c8c1a70a76fe8dc"
+      },
+      {
+        "id": "pipeline.briefing-bundling-two-findings-asks-for-two-dispatches",
+        "sha256": "c0bfd90b80b1b57deddda6f47333beb242dca71ce2554dd2c104091aeb57f156"
+      },
+      {
+        "id": "pipeline.briefing-model-field-contradicts-agent-definition",
+        "sha256": "eee4acc4b7bf74be516c54592af048edae388e26452ea913cc576a211b9ba1e5"
+      },
+      {
+        "id": "pipeline.budget-guard-test-suite-silent-pass",
+        "sha256": "a9782073723851377e527733d044d03bf2e23b7a3c2d89e7c48b534487bb3f68"
+      },
+      {
+        "id": "pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy",
+        "sha256": "c4c3827a3ca01b34ef9fcfc62b53b2dbbaf847ed8bc137ceb67b466dbdaa28b0"
+      },
+      {
+        "id": "pipeline.canonical-verify-evidence-path",
+        "sha256": "a317c2768c5bb48d393437af310c444ded788788e1ec51a8a344696512f552e0"
+      },
+      {
+        "id": "pipeline.canonical-worktree-lifecycle",
+        "sha256": "e1b439d82b566c8e001e5b21f7742c6bce86054c6dd45639a6bee0a87e320182"
+      },
+      {
+        "id": "pipeline.capability-first-advisor-critic-dispatch",
+        "sha256": "753ca627e4c1c42296d5a1fbccc02e8489a57c014444c84d8f19a4e41d257836"
+      },
+      {
+        "id": "pipeline.capability-is-built-tested-and-declared-ahead-of-anything-that-could-call-it",
+        "sha256": "1ec1572d4daf02444eb4e71376e5fa23ed3936853d616b20f86ced1cd2e250a4"
+      },
+      {
+        "id": "pipeline.capture-evidence-refuses-fixture-literal-as-host-path",
+        "sha256": "1e8a64bf8e7858f4cb4bdeb2a6b73708b537e944ef766f70d5822c0a07cc5864"
+      },
+      {
+        "id": "pipeline.chat-gate-non-ascii-name-windows",
+        "sha256": "45d9497e358f2194895ffbeeeed20664517bedda684dda1b9d4e4cf7038f1310"
+      },
+      {
+        "id": "pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary",
+        "sha256": "ba5d08b3057b22ee0396799041abc5c440dedf0a9727c740efffd285de71ca6d"
+      },
+      {
+        "id": "pipeline.ci-failure-reporter-has-no-recorded-requirement",
+        "sha256": "4194c467a28655c0b32c42b6319f76e04a82bc9bedb9f6eafc027584a1cd4132"
+      },
+      {
+        "id": "pipeline.ci-path-allowlist-omits-the-editor-the-guards-own-continuation-names",
+        "sha256": "41bd8f7aeb046c6a4fbe1110d00ca06d5c672f06fa8809cd8a173535b8a8a77f"
+      },
+      {
+        "id": "pipeline.ci-topology-preflight-cannot-pass-on-this-branch",
+        "sha256": "a9a54b023a846d8e69520fadd3e8f78b8be3736258b0b030f87ccecbc82916d2"
+      },
+      {
+        "id": "pipeline.citation-coordinate-checker-bare-basename",
+        "sha256": "ff013c784d1fb731cce366c960ba441a7659ddc97b47237c86d30d9d14f9353d"
+      },
+      {
+        "id": "pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook",
+        "sha256": "de7795464ef63939d26a2525c1ee585fe350ef8cbe17ac2046205e24aea374cc"
+      },
+      {
+        "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
+        "sha256": "83a6ee15d6a8499fb4808f718e534aebddc635720341cb5deb5501674ddc7cca"
+      },
+      {
+        "id": "pipeline.claude-greenfield-run-happy-path-findings",
+        "sha256": "81c0383a68348b8c1030af857efde2081524f385fff64efe4b806f9cd582f291"
+      },
+      {
+        "id": "pipeline.claude-has-no-start-time-opt-in-adoption-path",
+        "sha256": "d42e7850db29ebc16337c9d54ba5a622a3d112efa50b183e99247078080fc92e"
+      },
+      {
+        "id": "pipeline.cli-docs-generated-from-parser",
+        "sha256": "8db8175b1e54ec7cf7aa0ea7e892847016f382b21cbc17be5870d38c1181edf5"
+      },
+      {
+        "id": "pipeline.close-spec-retention-and-consent",
+        "sha256": "52906465a9495dffa69d3fa61c76f5a35d9d4b920a21a26753d04c441f343231"
+      },
+      {
+        "id": "pipeline.closed-grammar-rejects-git-subcommand-piped-to-head",
+        "sha256": "56eb479913ab72473126beb49574bbe3db4339181200c0c6441370d7df5c0801"
+      },
+      {
+        "id": "pipeline.closed-input-channel-review-economics",
+        "sha256": "1ea408f441d1ded1495be7bb08af08d8218bc07ac7a8ec9908f2a19dde0890fe"
+      },
+      {
+        "id": "pipeline.closed-shell-grammar-still-rejects-common-readonly-composition",
+        "sha256": "90a5027f4078f079b3d9b12aecd456a43b57b56c3477485ae243c8968b44c8bd"
+      },
+      {
+        "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",
+        "sha256": "89e81fe63899ba3d4d38e9bae23a24fa16fef571de0b1b4f9935ca0ac9901d65"
+      },
+      {
+        "id": "pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap",
+        "sha256": "c5a0e4eb273357ce4a5dcb0b4e31fe071d5bf437e5e90c9ddaeaf3ad5e498d09"
+      },
+      {
+        "id": "pipeline.codex-plugin-validator-host-parity",
+        "sha256": "aeaab2d61e4c08ca8fbd77a8a80d145dacf3d4b79404c06a05b05269695ffc31"
+      },
+      {
+        "id": "pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo",
+        "sha256": "30437caab6632d206bc2855f316b7a57dc40e149f6f872686931872dc6cd7803"
+      },
+      {
+        "id": "pipeline.codex-read-only-steps-escalate-individually-instead-of-once",
+        "sha256": "3492a754e7ff25b984b9ce65f7cb71783bd0d61e45b43c1d5f7a5b07f05f42b3"
+      },
+      {
+        "id": "pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript",
+        "sha256": "7ee4417fcd0c93b4eb27ce574ce7f6690bab0909902f3ae93ec89d4de207d5f8"
+      },
+      {
+        "id": "pipeline.codex-restart-context-loss-needs-a-different-approach",
+        "sha256": "e978f0ba48bb6f6693795c6120b33f6ad7f5cc932bb9eb6d067c9b0be078e9af"
+      },
+      {
+        "id": "pipeline.codex-runner-has-no-real-support-on-native-windows",
+        "sha256": "71a851e353c5ee29010f59cd5a98fde969319eca73cdec65c751b16b6072d2c6"
+      },
+      {
+        "id": "pipeline.codex-runner-needed-three-sessions-for-one-small-feature",
+        "sha256": "abd31215b625a0a3805e40f6ab192e3ff7a6820337d3af06b2bfdfc6579e5db3"
+      },
+      {
+        "id": "pipeline.codex-runtime-fixture-assumes-wsl2-in-ci",
+        "sha256": "3c4cf24357f37b5f18235c7d0f9d0f4a5cc9c9c2f462a8b8346d86ba686f3c0f"
+      },
+      {
+        "id": "pipeline.codex-sandbox-critic-longterm",
+        "sha256": "878d3da3072ae2ad754f530ea9b345a12753dc71309757e5092b7a9d40d2878b"
+      },
+      {
+        "id": "pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set",
+        "sha256": "00ba08dadb9f6956384a34cd19164487d7894cc7fbf042c043054e980f518240"
+      },
+      {
+        "id": "pipeline.codex-worker-dispatch-fails-session-capability-probe-root-does-not",
+        "sha256": "76c1ad8417f62ca26290105cedba5e4d85fee4b893ddffdf582a5d2859926f32"
+      },
+      {
+        "id": "pipeline.codex-worker-subagent-dispatch-capability-is-broken",
+        "sha256": "f6a9fe1572daf2f5a0670c77bd04ebb077f498c3d8ce94d9b6d11ee70a76c225"
+      },
+      {
+        "id": "pipeline.codex-worker-supervisor-hardcodes-a-sandbox-mode-that-blocks-git-spawn",
+        "sha256": "c34ca4ecc6626862aabd593d452481953b2a56f09eb39c10154c7dca0b8542a9"
+      },
+      {
+        "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",
+        "sha256": "9c36b67c605611666219765dd0f29603061127532727abcaeb42cd31748d9d04"
+      },
+      {
+        "id": "pipeline.command-offer-schema-has-no-displayed-generated-asserted-states",
+        "sha256": "6959d8951793328da27d71b636d9f823164634010a440006b5555101a51690bb"
+      },
+      {
+        "id": "pipeline.commandpath-sibling-tilde-gap-and-test-pins",
+        "sha256": "b4bb62bdc8798e79f2886f54411ba6c6a9d2291437a8e2c5c56cbd2f9ff4f24c"
+      },
+      {
+        "id": "pipeline.commit-guards-reject-safe-literal-multiline-messages",
+        "sha256": "16dc73fe9c85e9be0fc9aa96060705ddfb33a7ed701f1378b650d912e7545dce"
+      },
+      {
+        "id": "pipeline.commit-trailer-authoring-needs-a-typed-single-command-route",
+        "sha256": "fdce2197367df429b767e1f132001743ddfe99eb4e9aa07d446d5d68f4ff1fd1"
+      },
+      {
+        "id": "pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty",
+        "sha256": "31fd42e1a2a4fb2be8173fa670cedb7060e6fd3256eea4f4cdf773f7a13f216c"
+      },
+      {
+        "id": "pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act",
+        "sha256": "1ed65065906169d1c4529bf2307608a5a1df632387776c02da89f86eba38dbf0"
+      },
+      {
+        "id": "pipeline.compact-nudge-cadence-too-aggressive-and-not-configurable",
+        "sha256": "e9d81f070706563762da9e2744386e7e4b8142fe2989226d8c7f540939f6f164"
+      },
+      {
+        "id": "pipeline.compaction-stable-bootstrap-lease",
+        "sha256": "7341fea1db3d1a7f878396091cbd8b9305455390743b444a0ef8e696365c58bb"
+      },
+      {
+        "id": "pipeline.compare-three-parallel-happy-path-tests-in-detail",
+        "sha256": "a1f2cda005044fee2e08453187aac6d1fec6681beaf4033ac57a2e41c38526ed"
+      },
+      {
+        "id": "pipeline.complete-adr-governs-coverage-before-reader-review-binding",
+        "sha256": "b0ed68ee1b42e88515caa15aed349e32435ee3789c95f35c7d309f94e36c2418"
+      },
+      {
+        "id": "pipeline.concurrent-dispatches-in-one-shared-checkout-collide-in-ways-no-guard-catches",
+        "sha256": "bc2b9535ecf2a25f0d37fea340f79c76da3cb7d9840247304931042d7ef5cae8"
+      },
+      {
+        "id": "pipeline.concurrent-dispatches-share-one-index",
+        "sha256": "ec077a730018d6b526a9ff5d167bc0de2fc085487e4087b614db8cb460797a10"
+      },
+      {
+        "id": "pipeline.concurrent-session-prevention-supersedes-a-ac-01",
+        "sha256": "6fb11d404cf3add4ed6001fc177614cb74594f11588e94fc8c15692a230148fb"
+      },
+      {
+        "id": "pipeline.consumer-must-allowlist-every-runner-lane",
+        "sha256": "1fc470f1901fb0085fa0a7a45ff4d69cb1c42d2573d03ece3babcdff19d457b8"
+      },
+      {
+        "id": "pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation",
+        "sha256": "e71987f7ad94e3e7436eb2166395815c018483dc67e0a4e4d788ad1e178b0b42"
+      },
+      {
+        "id": "pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json",
+        "sha256": "5af56cf547d36bf51f823561ff90aca09472beea1047d35a7e0c71e9323a6657"
+      },
+      {
+        "id": "pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file",
+        "sha256": "e45a07ebb9ee79f9b91ab79e448564c0baff6401d286e95ffa9e46302061994e"
+      },
+      {
+        "id": "pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race",
+        "sha256": "361d62c27fb9d93bf2155504bd70c692d8a7637692275a38ed578b7504395392"
+      },
+      {
+        "id": "pipeline.copy-safe-renderer-wrap-point-is-path-length-sensitive",
+        "sha256": "e0db69824737abd06feb0881cc44868f9fe6756c3ed4393f8beb611a9f4c17e6"
+      },
+      {
+        "id": "pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path",
+        "sha256": "1312b70c9eee199dd92e6215634e2eb8ab5d3d3501b6b4da7548003d69f7a8ac"
+      },
+      {
+        "id": "pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock",
+        "sha256": "e5708dbdb15f991a48d50385630e3962aa3c26bd789eff8753fde2e7949e97a2"
+      },
+      {
+        "id": "pipeline.critic-and-verify-cadence-may-be-too-fine-grained",
+        "sha256": "18574ebf8b68aca9c5370f3dc75ffb5c36f065ed96ca719be6492157bc83299f"
+      },
+      {
+        "id": "pipeline.critic-context-isolation",
+        "sha256": "999e46245a026b0a3a9fdf37d2cd2cddc378da34c78f8b564b744efdf283ba0f"
+      },
+      {
+        "id": "pipeline.critic-dispatches-cannot-persist-their-scratch-notes",
+        "sha256": "493cd77244e5370d840ec1e659780d7b93784f79b1364037f4e0a64c8ec25f99"
+      },
+      {
+        "id": "pipeline.critic-md-protected-preimage-drift",
+        "sha256": "13d160b3939de7f7d6c11e87d64dca1ad04d7928bba5a564d95c3dc14b942366"
+      },
+      {
+        "id": "pipeline.critic-review-has-no-defined-path-for-a-root-commit",
+        "sha256": "a01b8145d208e5038c2f0da00a72727a9e5a9ae0bb0faf1aca66c77867bece41"
+      },
+      {
+        "id": "pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate",
+        "sha256": "1dab9fdec958952c3c482ff8674a99d190fee2d93c4e223446be5ba11988a792"
+      },
+      {
+        "id": "pipeline.critic-route-pre-check-not-in-force-in-installed-plugin",
+        "sha256": "c79c038768b03a4ffd9020211d39490f12b866b0b9f276a960bd8a477b5c202a"
+      },
+      {
+        "id": "pipeline.critic-skip-not-an-explicit-logged-decision",
+        "sha256": "b833442a11f0131c8d481241dcd2e0363d338abfc7b395f17eb4d4946befc5d3"
+      },
+      {
+        "id": "pipeline.critical-command-kinds-excludes-feature-package-reconcile",
+        "sha256": "416ac0838e87a67a865e4a062bdf09e5aa8fdc893f933b8030d288369024c437"
+      },
+      {
+        "id": "pipeline.critical-human-proof-not-materialized-for-signature-mode",
+        "sha256": "4440eceb3a3cd3abbfee47c1cc55685e4750e853fe930f3a1b1c0ee438f58f0e"
+      },
+      {
+        "id": "pipeline.critical-human-proof-not-wired-to-push-and-prd-gates",
+        "sha256": "6ebe7d8ca36e08cf1f1a3fd40bf4a281a85af84142d829f332ac26457dd0da5d"
+      },
+      {
+        "id": "pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization",
+        "sha256": "41275cb6b1f3ce1dd0f8eb1e1c017389b3c590ae684a34f21824c832ec1ee70e"
+      },
+      {
+        "id": "pipeline.critical-human-proof-policy-seeded-without-trust-anchor",
+        "sha256": "656b1a6869a94c3803794248c9ec557bba89f871b5a90557f50fc3cc79789c8d"
+      },
+      {
+        "id": "pipeline.critical-push-signing-ceremony-gives-no-path-feedback",
+        "sha256": "74bda09a6e5897f6fbfc841cc9ead73e1959256a3bb2ed02d9895012b216e2df"
+      },
+      {
+        "id": "pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command",
+        "sha256": "8e6d041d9c2c57dbd59d74e7164710341894dd4d148bc435e6aa2f1f6dfb5a83"
+      },
+      {
+        "id": "pipeline.cross-repository-override-ledger-binding",
+        "sha256": "03220862f6ad694f9fb450853014a788090ac8740f69e0e2ba6b381cbafd49f1"
+      },
+      {
+        "id": "pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary",
+        "sha256": "82bae8bacab90b9c8ba09d2167fb1a6e42ee113ceaf004289e53d8a90a3e0206"
+      },
+      {
+        "id": "pipeline.dead-key-directory-pointer-is-permanent-and-silent",
+        "sha256": "8c4016d3bd4debc19700426de1a19be148d24d9bb2c5c6c81a241e7550549e01"
+      },
+      {
+        "id": "pipeline.decouple-hosted-project-document-language-from-operator-facing-language",
+        "sha256": "58e4791d50ca3536820f1f70eabd45be7f2f81a741b47d3f0133111c6d6e1a80"
+      },
+      {
+        "id": "pipeline.delivery-is-not-always-a-git-push",
+        "sha256": "331c20267c6edcee29570875fa68365f88eaba4f6769f5911491dbbfd419398c"
+      },
+      {
+        "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
+        "sha256": "6e93cf6ffbc5b33739b26bf9f1808b459142cc104a2c5c3d186165a90fff2d0a"
+      },
+      {
+        "id": "pipeline.design-to-implementation-path-has-no-driver",
+        "sha256": "03554a7d94f43b7fd8c3f56427138bd555a83d7a92632834a4e8a1ee6b61343a"
+      },
+      {
+        "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",
+        "sha256": "31aa1fa8fd1cace885c0895ef1b04c089661fd1efa4fff240cbd8725898d0592"
+      },
+      {
+        "id": "pipeline.discarded-feature-dead-end",
+        "sha256": "427ad5053695eae890cacd343b3b93c3a91cff82cbab79fa4933eeb920331255"
+      },
+      {
+        "id": "pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome",
+        "sha256": "05823c4af1859fa33e1bec500c71de07aeef19924a9824546ee409078a7b0462"
+      },
+      {
+        "id": "pipeline.dispatch-provenance",
+        "sha256": "33eec32efcdac3d57633af1c16793a2fb3446d64401d9c0bc8014c3d10a03029"
+      },
+      {
+        "id": "pipeline.dispatch-record-contaminates-every-critic-review",
+        "sha256": "dcadbc141f80fa56d76d2b80b1fec110fa8ec320a4d902a8abde1c1f26df72fb"
+      },
+      {
+        "id": "pipeline.dispatch-record-does-not-bind-to-its-commit",
+        "sha256": "f8a5e526f33a9176d36aa6e9aa960ac68f7e6362b10d8513b4047bd218435714"
+      },
+      {
+        "id": "pipeline.dispatch-records-are-written-to-a-name-the-verifier-cannot-find",
+        "sha256": "17817fd044f0623e155326e8108690506a60d18da927701fac81889f6698345c"
+      },
+      {
+        "id": "pipeline.dispatch-reported-creating-a-record-it-never-created",
+        "sha256": "b9e3336db0190b41ce9eb0657a189fefb813c02841d766eab4fade90ae9a4e14"
+      },
+      {
+        "id": "pipeline.dispatch-templates-cite-restructured-operating-model-sections",
+        "sha256": "7936d704fc6387734182869eb59d56231d455b3f0515f7ac9d7545590b64b43e"
+      },
+      {
+        "id": "pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin",
+        "sha256": "48e23b3a425404ef8dde3d121aad9fbaad58c199a9a5768b2ed35f2d86260443"
+      },
+      {
+        "id": "pipeline.dispatched-agents-return-truncated-mid-step",
+        "sha256": "2f183e103ccd6a88f1e47fb1d8e0193ce072ae5e678ea76686ddb2b786dae5a4"
+      },
+      {
+        "id": "pipeline.dispatches-report-completed-on-a-truncated-fragment",
+        "sha256": "485f2ae89a46ec1622ddb3b0ce76faf1de7ae6dc0cb56be4fc05dc24a344a077"
+      },
+      {
+        "id": "pipeline.doc-reconciliation-blind-to-adr-corpus-changes",
+        "sha256": "ee0ccadac968994cef82843fca98e1365553aecd6a8e103e8a97a49284eda145"
+      },
+      {
+        "id": "pipeline.docs-state-human-summary-diverges-from-machine-next-action",
+        "sha256": "09f4398f88e3b191d1069043157f2729a604cf35ef1e5e26312e4072f98d06ca"
+      },
+      {
+        "id": "pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync",
+        "sha256": "609bf37893fe02cbae1b6eb7f0b0b399f9f00424c5bbb8c61f20e0278897a3dd"
+      },
+      {
+        "id": "pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path",
+        "sha256": "1d94fdfd8a9d60cb7adaf36a9cda551c741c74fd586d230f7062a5ea0b348612"
+      },
+      {
+        "id": "pipeline.documentation-has-no-reader-facing-review-and-no-machine-binding-for-one",
+        "sha256": "aa40305e28559734081a32edce62300f3f8f8bddf8913aa92fad7f5cba532240"
+      },
+      {
+        "id": "pipeline.documentation-information-architecture",
+        "sha256": "f744c0f6d365bd0f1c8e9c08c1915863d438df2c937d957d27137ade5609a8c8"
+      },
+      {
+        "id": "pipeline.documenting-the-maxturns-cliff-did-not-stop-dispatches-falling-off-it",
+        "sha256": "fccb07270ea0e7984131e1b10794add950b818d8337cccd12382e8fc9f3c4763"
+      },
+      {
+        "id": "pipeline.dual-channel-publication",
+        "sha256": "5faad98b98b80c97a954b55bdf0cd2a8a3365c2e42ccb5cb1d25abbcf836b9cb"
+      },
+      {
+        "id": "pipeline.el-01-has-no-in-session-tripwire",
+        "sha256": "4441adf136ee806500f659a12e73594d9c6e7b34ab9175d7fc079299f5cdd85a"
+      },
+      {
+        "id": "pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion",
+        "sha256": "dcaa410a997ee15daa83a0d652a5c8f493fe29b06c0ee4180f81512b30a13292"
+      },
+      {
+        "id": "pipeline.elephant-direct-implementation-under-afk-authorization",
+        "sha256": "359b87fa320323bb82ab5a0512724f21f81a4b3197be0d4e76ffcc568c5fa833"
+      },
+      {
+        "id": "pipeline.elephant-notes-and-critic-scratch-share-one-directory",
+        "sha256": "d41f438fb08df9325f15876727045e3c722c5f17629b5dbf495caf7f46604b6c"
+      },
+      {
+        "id": "pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch",
+        "sha256": "9166d4574a3752540044ae8e861f7959ac0f170880b77eb0c1810eeffac29e36"
+      },
+      {
+        "id": "pipeline.enforce-kickoff-po-questions",
+        "sha256": "9d5949d4b7c16109f9cb0d58facadc5ad0ef90953594d8c31e49441d93433ded"
+      },
+      {
+        "id": "pipeline.entry-point-reachability-check-substring-matches-whole-source-files",
+        "sha256": "ed5a88d059dd02c18c48d359535cfad8d48cbc7257464a13bb987650fa863665"
+      },
+      {
+        "id": "pipeline.epic-file-contract-has-no-drift-check",
+        "sha256": "3f4b9170477b1cb4abdfd4feb5f221f1eeb1c57c4ad893facb3a9fa11568b166"
+      },
+      {
+        "id": "pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it",
+        "sha256": "38be4f21f717de477285fccf07500c480cf114483b7c6f015a1b84b7e77f4a66"
+      },
+      {
+        "id": "pipeline.every-small-correction-costs-a-new-human-interaction",
+        "sha256": "20bd7c637dc764cf5eedd7b9fe64dff258d0cc6d86fdeb1396423d7f2de480dc"
+      },
+      {
+        "id": "pipeline.every-stage-0-commit-loses-its-assistance-marker-to-a-blank-line",
+        "sha256": "b1bd88cb2d8d5d3eb3d206e1a138e6ad8d0549449ec80a115cdcfbda6f3e567d"
+      },
+      {
+        "id": "pipeline.evidence-bound-review-retry-economics",
+        "sha256": "ccfcaeafe31280abc43323dc942eaf8779bc7ba216ec9987f8e23b825f872a89"
+      },
+      {
+        "id": "pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked",
+        "sha256": "62e33254ceb2f9b98195466b493627f30c689037d45332db11a582fb8d156e03"
+      },
+      {
+        "id": "pipeline.evslotfix-1-broke-verify-fixture-module-lists",
+        "sha256": "2c670a29e2dabb76cd9a6a96279a3401e51c4b4e0e2ede71831dd373cd634430"
+      },
+      {
+        "id": "pipeline.execution-model-switchback",
+        "sha256": "3c851193202a1b101d8e1a45f34cd404f33c35787e13f1e44f52b73afeffea28"
+      },
+      {
+        "id": "pipeline.existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration",
+        "sha256": "67486409dc767aba306508fe65531f04b1f239313b1ce41eda14f79d5ca62c48"
+      },
+      {
+        "id": "pipeline.expires-at-rejects-a-non-round-trip-timestamp-and-the-doc-says-otherwise",
+        "sha256": "bd50e4f7dee2ad743164ad2dd2e0378b18a032b056cddb15f9c7e36d37db6ae0"
+      },
+      {
+        "id": "pipeline.explicit-final-acceptance-gate",
+        "sha256": "9e7a2a4523f3ffdcf66828529a69a6af684cee97e029d365005788922bf468ad"
+      },
+      {
+        "id": "pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root",
+        "sha256": "411dbcb8ca746feb7d5ff30b1e71e9d5ab8886dccb4d3626a4c65a754a7a1e01"
+      },
+      {
+        "id": "pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system",
+        "sha256": "113df0a62986c66fb914b3f2c306a915697365cf20f9334057d847b0689b8370"
+      },
+      {
+        "id": "pipeline.feature-branch-checkpoint-push-needs-a-lower-rigor-destination-policy",
+        "sha256": "7d02a3ace1c786dd7c608247600c46d4f729967a4de2a86ec6e4deecc9b38345"
+      },
+      {
+        "id": "pipeline.feature-close-recovery-and-usage-ledger-need-runner-selectors",
+        "sha256": "9285020462e3935bf528498fb96d3b51d4d107d87d4279c9dbd4e586d66237de"
+      },
+      {
+        "id": "pipeline.first-verify-run-is-red-with-four-failures",
+        "sha256": "14aab792db57f4d8f9864e7940c5f01f590d1f25edf3d62f77a3092e3c4c06e8"
+      },
+      {
+        "id": "pipeline.four-critic-preimage-pins-drifted-or-never-valid",
+        "sha256": "f47e82d3b3286d2aceb30481476973c3f49483324d3f47a0793d895692cad47c"
+      },
+      {
+        "id": "pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry",
+        "sha256": "c6056f4f8793747d68f32e921cabe6e3fdd3583eebb6b67748beb5b947443997"
+      },
+      {
+        "id": "pipeline.fourteen-evidence-files-are-tracked-inside-a-gitignored-directory",
+        "sha256": "a1ad68944dc05c3800ccc73cb9ab14cb80f246004ba882af81da4df55102ac5d"
+      },
+      {
+        "id": "pipeline.fresh-repo-onboarding-intake-first-transaction",
+        "sha256": "20dc5a6e0cad465c1c2694a42da595b94fc5b5e29c09d404e703efc5b143dd94"
+      },
+      {
+        "id": "pipeline.fresh-repo-onboarding-never-asks-for-git-identity",
+        "sha256": "7552e48e06a9224a43cd2e84e1ab7fbdf41a6dcddaec2ecf8348b93ad6acf648"
+      },
+      {
+        "id": "pipeline.fresh-worktree-indistinguishable-from-abandoned",
+        "sha256": "532d48d851b071bee48aed3975e5505d6fad5cdb702f58c4109ab5efc898c228"
+      },
+      {
+        "id": "pipeline.full-push-preflight-before-signature",
+        "sha256": "326dd643c5680c11cfeb41485a98dd17912473e30fb2f20303bc686285304f66"
+      },
+      {
+        "id": "pipeline.gate-should-not-demand-a-human-name",
+        "sha256": "1e5d0f5989b3c6fc8d948e6bab64854a181d4f63470ebeb65985a9620f5b87dc"
+      },
+      {
+        "id": "pipeline.gate-strength-override-route-advertised-not-offered",
+        "sha256": "3c41f43d225580103d09c81f8b96ceeeeb7cbb5205ba50a13c74154d6428d0f5"
+      },
+      {
+        "id": "pipeline.gate-strength-shell-comment-understates-its-own-scope",
+        "sha256": "71f1f0c9273ce968e5c7eec2e91854c33383ce929317507e626f15639ca4d44c"
+      },
+      {
+        "id": "pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard",
+        "sha256": "40aa71d1a13cb9c6f267bba17e83319e70dc262801032c42aa0bb6bedd2b568a"
+      },
+      {
+        "id": "pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit",
+        "sha256": "10b4a85561a8ab6d8cd7e7cbf442424f3bc5819a3c7bb8bd3911c34e831e8e53"
+      },
+      {
+        "id": "pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt",
+        "sha256": "2364d34753798b20dfd7aa2933e032251943e49d366c2e1497c5212e22c9da04"
+      },
+      {
+        "id": "pipeline.gg22-normalization-false-blocks-trailing-slash-pathspec",
+        "sha256": "4a68038cff5357f12c00dc8cc233aa5acef23d278bebcd0c9e25771baec8bd74"
+      },
+      {
+        "id": "pipeline.gg22-pathspec-fix-lacks-permanent-test",
+        "sha256": "3acc96971e70ad5161fa8661d2aae36b44cc4bd2de09209fb3a63b320eb2f316"
+      },
+      {
+        "id": "pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file",
+        "sha256": "415c6a58a21c37efe6e5003d0965e4ffd44b8525dea07dfcda1a2593423ffcd0"
+      },
+      {
+        "id": "pipeline.git-appears-despite-initializes-git-false",
+        "sha256": "008cc999d0148a04c2928c75f546dd57eed70be8f24defb0f4ddd191ab9b2bf4"
+      },
+      {
+        "id": "pipeline.git-commit-multiple-message-trailers-are-misparsed",
+        "sha256": "3f581298258f622ee2079d9f4d2c04d5ad150327def1ef824663d0abeba15e4d"
+      },
+      {
+        "id": "pipeline.git-identity-ask-step-unreachable-through-live-cli-path",
+        "sha256": "539e6b3132e8a07d554488d335d7162ac428e35d03143cbe8549e67338e8e38e"
+      },
+      {
+        "id": "pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time",
+        "sha256": "6e9899edce1b1d62169e43fc7279555dccab6f6fa307c3929b7c199cd552372c"
+      },
+      {
+        "id": "pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation",
+        "sha256": "8e7210eacf5827b5ec52bfcbe4ef31934fca4ccdce590c9aa42ea310b7ea9b1c"
+      },
+      {
+        "id": "pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts",
+        "sha256": "263328b71b9f6c938ee1c84e754869f4adb8e90707f8b6ac6eb8da3539f466e8"
+      },
+      {
+        "id": "pipeline.gitleaks-content-fingerprint-breaks-on-any-line-insertion-above-it",
+        "sha256": "9fa8f20f972e432570837cba5265981be3355c8b01b31b52e6aeaa4bba872969"
+      },
+      {
+        "id": "pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag",
+        "sha256": "ccee95b6b4eaa63ad9c2aaee9c3fd4168fd2308966eb60ff8540edb12a537031"
+      },
+      {
+        "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
+        "sha256": "f8939bd7203b838343e32d0ec30c646a744097add5dfcc3e6f005b6f6588b1ab"
+      },
+      {
+        "id": "pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema",
+        "sha256": "a1e0dc89d8c33f578490222a48676a328184e7b044ff1f312cdf6b0df86ce1ab"
+      },
+      {
+        "id": "pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges",
+        "sha256": "bf2eb9c6177c36c2a9d143398181cac79eb43e06a166e90eeda68ae26fc66f59"
+      },
+      {
+        "id": "pipeline.gmw-precommit-kernel-precedence-diverges",
+        "sha256": "2b59186bce972e4425b47861b2de9933b5584d6076bb2d969e13f820040a67e4"
+      },
+      {
+        "id": "pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call",
+        "sha256": "504c407fa6d72fd0eb4f4a5b2b683c5903f7efcfc3b0b5ca2a37e4fb77bcbe32"
+      },
+      {
+        "id": "pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs",
+        "sha256": "db6e99b68d40890244f7a74c702d8649e59f75d067d729ce826e9e7e4a1f36b6"
+      },
+      {
+        "id": "pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate",
+        "sha256": "23b8ffd7218639ae67afce647dc5e2fdac3e968ac5f417a05f9095973ef0677c"
+      },
+      {
+        "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
+        "sha256": "5111c7ad9ca7b31de27f2409ef0f3eade52676c537a398ab3ff27bb2845c2ac2"
+      },
+      {
+        "id": "pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths",
+        "sha256": "cef5c6a887f48a54fb214eeeb31783b876e0895d4b6651f0027b97347a3e8b51"
+      },
+      {
+        "id": "pipeline.governance-product-verify-suites-deregistered",
+        "sha256": "e06e90ff7a2ab4f7190fc9a892613d51b52b88169785b855d61857e58e698e8b"
+      },
+      {
+        "id": "pipeline.grammar-refusal-does-not-say-which-part-failed",
+        "sha256": "6fb31c4808d3e53e25c1ed349f3fe4e51e727f0a94a037673e02506bdc1fcbbc"
+      },
+      {
+        "id": "pipeline.greenfield-ask-before-install-duty-ignored-live",
+        "sha256": "2c1336f30a0a0109dee9f89a3bf58d8325a14cf155a734c16e44adf0aa7eab30"
+      },
+      {
+        "id": "pipeline.greenfield-browser-evidence-is-not-portably-provisioned",
+        "sha256": "146dedd5cd5a713c11399bf16f99a990cfbfd9948d8fc4b092726fe35b7cd0d6"
+      },
+      {
+        "id": "pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference",
+        "sha256": "45b8b5c91b900214647b5b9c37af0636a1aad1b188d94848bee55f296a3bda49"
+      },
+      {
+        "id": "pipeline.greenfield-onboarding-writes-mixed-authority-tiers",
+        "sha256": "2e3ad45cf76ce8b630574c362849da81f64761baf7556a6f8b6d845c5679df2d"
+      },
+      {
+        "id": "pipeline.greenfield-seeded-with-private-overlay-calibration",
+        "sha256": "725b1335286bda73fbe6d326156e935c2fed63d8abc1d66d3275cdc47068576b"
+      },
+      {
+        "id": "pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit",
+        "sha256": "7e32326bbe01e2ebd35542f331fdd9a23dc4ab451c027e99799d8f19b87e1da1"
+      },
+      {
+        "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
+        "sha256": "903d4f64701e342220c7d3bf0239804157a005adfa6c9a681126848dbd42eccd"
+      },
+      {
+        "id": "pipeline.guard-bypass-paths-have-no-negative-regression-suite",
+        "sha256": "dab55dcbe506f27c06113d8e43bfeefb887954310cfc1753dc6290d992ad1ce4"
+      },
+      {
+        "id": "pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell",
+        "sha256": "41ba1874541842f3603af73d55f6b593b5d1640e56518fd56853caa3e5840cf1"
+      },
+      {
+        "id": "pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal",
+        "sha256": "fe107dd68093fc8a730991c8e83a6966d21f14385fc48dc25a0979d61cf91f07"
+      },
+      {
+        "id": "pipeline.guard-denial-messages-repeat-70-lines-of-boilerplate",
+        "sha256": "ee003745ca13cc6e66548aeeb4f876648e3f2ca340d353cf7cd2a944bfa35435"
+      },
+      {
+        "id": "pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane",
+        "sha256": "27b163309d776c944182f4340d110a42ba8c6693b26f615f0a3a57a45a77e369"
+      },
+      {
+        "id": "pipeline.guard-dispatch-budget-does-not-distinguish-invalid-identity-from-unresolved",
+        "sha256": "92dc8450843d8ec14d0fba2165af321e4ea3b97e856711e24d260d6552c88889"
+      },
+      {
+        "id": "pipeline.guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape",
+        "sha256": "1aaec62e116f7443e77251bbdc452cb8e1558aafd6700417285c3e4b1bcc93c4"
+      },
+      {
+        "id": "pipeline.guard-dispatch-has-no-workflow-tool-awareness",
+        "sha256": "a2ce141c7a6d9dbd37e162bdf4bd7979f0befb766f72ea9cc3f8969d5c7613c3"
+      },
+      {
+        "id": "pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally",
+        "sha256": "5b9f49808b4970ad76d0fe7d6370e0a5b8ed1e0e8a2ded49c8c3885022bdbfef"
+      },
+      {
+        "id": "pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table",
+        "sha256": "d2974f4c13e8101a6d1ab1cdc44fcf67700d203284c3416c3c80da440b4d21d0"
+      },
+      {
+        "id": "pipeline.guard-lifecycle-ready-blocks-claude-memory-writes",
+        "sha256": "fb647cdb8c627858a52cc00d49b5dd7a52121db206929e4758131d06f92d226a"
+      },
+      {
+        "id": "pipeline.guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands",
+        "sha256": "814c174d2e376fe23d23ebe01d15eba4082efb5f91e440321b0364e7e088003d"
+      },
+      {
+        "id": "pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv",
+        "sha256": "d8b7e5bb460d8275eba0d26558c88a4480dc4df8750436118a11c735ffa44117"
+      },
+      {
+        "id": "pipeline.guard-lifecycle-ready-runner-allowlist-incomplete",
+        "sha256": "56bbc944c2226ee7f07a038efd5aed0ea1e4c829bfe0315117a48aef7a4e6b86"
+      },
+      {
+        "id": "pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file",
+        "sha256": "c55ac6f21aa429760869ab9c8dd7225585f82a44b38912ac6845d7ecd0915bb1"
+      },
+      {
+        "id": "pipeline.guard-maintenance-window-repofingerprint-shares-the-fixed-path-bound-defect",
+        "sha256": "3e0930e1e7efea712e7c44af9abf23cc1d9ca816f280be01d73901b787c946ed"
+      },
+      {
+        "id": "pipeline.guard-override-message-misassigns-roles-and-omits-signing",
+        "sha256": "2d3e28ba330322a4a6b5cc52287622c459c3fcd55b0a8c33f95c1f7161efb992"
+      },
+      {
+        "id": "pipeline.guard-reclassification-changed-what-a-signature-can-lift",
+        "sha256": "fe22e75a74f1d67206a875b01d58a58a4fcb0026a413461601a9bcced0bf497c"
+      },
+      {
+        "id": "pipeline.guard-refuses-documented-bounded-diagnostic",
+        "sha256": "b875f8d0e08402c809b8deffe69dea1eb55c15e888673af8285c9ab9b863b9e7"
+      },
+      {
+        "id": "pipeline.guard-refuses-the-prescribed-recovery",
+        "sha256": "08177111bde8dbfbabd55356b2ec3ec49bc5584ac3a5f6ec93f08adca8e51e7f"
+      },
+      {
+        "id": "pipeline.guard-root-admission-compares-typed-to-realpathed",
+        "sha256": "a1b07072022b50e79aca3f60fc10b58a4a49f26274d80f8666de0bf7a56edc12"
+      },
+      {
+        "id": "pipeline.guard-string-match-makes-a-file-uncommittable",
+        "sha256": "9e770929baa38ff6e3e28adbf7c50f0ccd8dc82fb219f5b30e6941fc03ed1dda"
+      },
+      {
+        "id": "pipeline.guard-sweep-completion-report",
+        "sha256": "8f1d014e808bb05ca6c726dd9992b1499fd17e154fa1a56a3817bcf3c099252a"
+      },
+      {
+        "id": "pipeline.guard-testpath-not-kernel-protected",
+        "sha256": "4043bc66609dd1da6173fa96c48689312ec7e7b846268e39c92a2091e877de26"
+      },
+      {
+        "id": "pipeline.guard-testpath-override-ot09-stale-literal-pattern",
+        "sha256": "88a59c7ede09f4719b00af5dbe24b6261e6a61748f7a0ee2aceafea66dbdf377"
+      },
+      {
+        "id": "pipeline.guided-driver-neither-discoverable-nor-runnable",
+        "sha256": "b5511e0f6d729b8fadbbcaf39218ba11a6f03d854766bc41d46a7794f4cbebc5"
+      },
+      {
+        "id": "pipeline.guided-init-ends-in-error-not-a-question",
+        "sha256": "d709af874bd345805dd4155bd5b7198f74a58fdaa6355f5f4ad1c0163f4af38b"
+      },
+      {
+        "id": "pipeline.guided-init-human-rounds-above-floor",
+        "sha256": "61f356d391f46bcf3fdad15e24a0f61b7c2901b50b32bfc6e5ec799906253ab2"
+      },
+      {
+        "id": "pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array",
+        "sha256": "89b9f31e3f98447e9c7a18e25ecabef8fdbdec8944697edb7f3ec116f1640a6c"
+      },
+      {
+        "id": "pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2",
+        "sha256": "317da41bf764abd1ebb66f38085a9f103709d22d62a1b041c2d6a3e47d98d2f4"
+      },
+      {
+        "id": "pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit",
+        "sha256": "b8edc891afb24f5336c0b1d14172441c85b41afcd09cf3c315f68454c3a1c96a"
+      },
+      {
+        "id": "pipeline.handover-file-exceeds-its-own-size-cap-after-the-phoenix-merge",
+        "sha256": "4b4f708bae1a8714de23d402dc903549ac9012c74aadedb50f432b5bfcfd8b80"
+      },
+      {
+        "id": "pipeline.handover-file-has-no-rotation-obligation",
+        "sha256": "3eb67d431d27dd32779f64e70b43cd0b1bebe4e244acaa65429810a4dbb61ed5"
+      },
+      {
+        "id": "pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped",
+        "sha256": "1ba24c36a06c0930f7eba502edc91b3ec99b8597244899e008192d30afb81cc7"
+      },
+      {
+        "id": "pipeline.happy-path-key-onboarding-must-install-directly-as-critical-human-proof",
+        "sha256": "3329e11be0343b66d530bfa1bc0c91bf3b5ca0b3672ee1f0e18ac934370ddbd9"
+      },
+      {
+        "id": "pipeline.happy-path-local-telemetry",
+        "sha256": "f399bec4257b25fd72722a81c43ea4d31cfe2117c8652bcf267baf01c138afbe"
+      },
+      {
+        "id": "pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible",
+        "sha256": "02bf9839f15c02460cd9e709b4a0f75f58b559c7b715fa01355dddfa9f9916a5"
+      },
+      {
+        "id": "pipeline.hardening-round-cannot-register-its-own-suites",
+        "sha256": "4da9b3a3ddaa346c95df9355fef8144cbb15e0a9adaf47fe7d007eb94ddfd80b"
+      },
+      {
+        "id": "pipeline.harness-classifier-blocks-authorized-onboarding-action",
+        "sha256": "fd9a70cb4816119f1cd6114289213c2364dde58b0c495969ec34f30c55bfd0c3"
+      },
+      {
+        "id": "pipeline.hash-chained-ledger-collides-with-the-secret-scanner",
+        "sha256": "b672f9aa00989b509c3871407b16663ee70294bf233b76b3df3409b92e6021c4"
+      },
+      {
+        "id": "pipeline.heredoc-refusal-teaches-no-substitute",
+        "sha256": "6b648d39265a0c308301a77342d40f1bd44dea3bd05df044977643fa30bbdd91"
+      },
+      {
+        "id": "pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store",
+        "sha256": "1afce9a5b26fdcebf55ac3e8c6c2b036fd41dcb4242fbf072df488debabecbf1"
+      },
+      {
+        "id": "pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit",
+        "sha256": "5cfa3a1f7f92c750f30c9ba7664ffcb232a0604a3a1991e5d2e72d0b70d972a8"
+      },
+      {
+        "id": "pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step",
+        "sha256": "7e972b6c70c0ec29cf199295736d7cc4bc6c638bc3dd4c0f2eba967cfd42b0b6"
+      },
+      {
+        "id": "pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check",
+        "sha256": "00bf1d71475f1491a3ffd9823a683b4d09b1b9a4eb8dae5a50aec66e93e5a06f"
+      },
+      {
+        "id": "pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs",
+        "sha256": "6a50e446cfcb1347ad68544c4a24fab19319ed4d77e4ef17ee1eeee99007c1f2"
+      },
+      {
+        "id": "pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw",
+        "sha256": "97edd1167b17bb1a833c22402b9e60ce09c71e43744bec1e91c0539841e4a5b0"
+      },
+      {
+        "id": "pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test",
+        "sha256": "7b0d55910eaae702a75b45233be98620e9d0f5b8686aae1998f38b0d0699b2f9"
+      },
+      {
+        "id": "pipeline.hook-bypass-rules-are-overridable-against-the-stated-policy",
+        "sha256": "88f01239c9818bff9699257500abf137166449933b2344bf6fdd800d80036222"
+      },
+      {
+        "id": "pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant",
+        "sha256": "0ab0a5496f5be2637355423291b1add341c59c0e20e44520186fc416914536d4"
+      },
+      {
+        "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
+        "sha256": "8b658b1fb8534d4f4c533b01e4e4f51eb8a41e39aa80b2644ff952b5312729e9"
+      },
+      {
+        "id": "pipeline.human-authorization-prompts-ignore-the-configured-language-profile",
+        "sha256": "1cff35ad045664a7024cb1a8d8a3911423de550a13c11bc593cff8ae7903fe10"
+      },
+      {
+        "id": "pipeline.human-guard-override-shares-the-po-human-approval-posix-normalization-bug",
+        "sha256": "0a47069906710c3e7f81565d78d1c6edfe916658188cfe692b129cf96669f412"
+      },
+      {
+        "id": "pipeline.human-legible-approval-record",
+        "sha256": "b98005eec085056f2108e8b92fa3e3545daae540c851065f3951bfabbc956b80"
+      },
+      {
+        "id": "pipeline.identical-lifecycle-argv-must-have-shell-lane-parity",
+        "sha256": "5391e968f1f3ba964782bd600140b299006245302388a5f92eb1f607c84fd77e"
+      },
+      {
+        "id": "pipeline.identity-attestation-fails-open-on-unresolved-transcript-path",
+        "sha256": "2242c4961c1af1302f74e81ab9ce63ea04faca568fe36e218f709ed045ab3edb"
+      },
+      {
+        "id": "pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record",
+        "sha256": "686703c13b19084968eabce0da7b8142ee89874977f1a353183b334786f0133f"
+      },
+      {
+        "id": "pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home",
+        "sha256": "d2e4e275d6a37c1ea4115b15c547855619bfd9eb0d05f0950473f7cb77e71037"
+      },
+      {
+        "id": "pipeline.inode-identity-decides-deletion-in-a-second-rollback-path",
+        "sha256": "1b1badda488f1485d4f86bdcd4174ac8c2cf9b78ee5afa33ed1409b4fd2ce32e"
+      },
+      {
+        "id": "pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source",
+        "sha256": "741837900dd98cff518a9e6df125822cf1753e5534e7514542f8ff073da51b42"
+      },
+      {
+        "id": "pipeline.installed-plugin-copy-stale-vs-repo-source",
+        "sha256": "48df2c137ad1cac23d57a8cef55fa55c9202e9a9425b624261b82cca2b5ca6b7"
+      },
+      {
+        "id": "pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits",
+        "sha256": "badfb1176f7e1b09e081609d3018a1a9576df373c8d8a937dd7b0a33b32bb9fd"
+      },
+      {
+        "id": "pipeline.installing-consumer-is-never-asked-any-setup-decision",
+        "sha256": "2537edc3b7b6220b70440a7c7c21316bfafd88c7759cb5ce6d72bc2e6a27bb98"
+      },
+      {
+        "id": "pipeline.intake-generate-coordinator-path-undocumented-in-skill-references",
+        "sha256": "d43af6bdd21ddd6ede288ca698a833fc079b0f4473f6385264ea2e92c897c49d"
+      },
+      {
+        "id": "pipeline.intake-values-restart-resilient-immediately",
+        "sha256": "77c40286b9518bc6f9a4df2e520f04dc4006ef87f81e45806e1e9a2d76594351"
+      },
+      {
+        "id": "pipeline.invalid-channel-value-blocks-unrelated-alpha-ref-write",
+        "sha256": "b548ec21544d997da0b5ff837ee7c7eb63f45a9dfba33280f92e5d159a00d0b8"
+      },
+      {
+        "id": "pipeline.isrealpathedwithinboundary-file-boundary-uncaveated",
+        "sha256": "767cf5d29df97460da38d6008d88d275d317b90f1e3a6af426c060c7b8fae23f"
+      },
+      {
+        "id": "pipeline.kickoff-apply-action-drops-runner",
+        "sha256": "ac4830b6fc4f46b88527f093c0a8ef498be3d2c9101823cb81a86c8c184b5e26"
+      },
+      {
+        "id": "pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift",
+        "sha256": "6d1d3e7c9460cc03c64a9391b6df099ef3e0dca01470c16a06fbd8f0e3884ff4"
+      },
+      {
+        "id": "pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery",
+        "sha256": "b7f30341dfa887240dab1fa5a2dd858f6b63cc31c93eff306ef3d84a579ee2ed"
+      },
+      {
+        "id": "pipeline.kickoff-staging-directory-mismatch",
+        "sha256": "57a0e5a8e48c3d246b2592e8d1fb2c9f4d778f0c11cb7f92b1fd2f3dea9df1a6"
+      },
+      {
+        "id": "pipeline.kickoff-untracked-files-missing-from-commits",
+        "sha256": "521a1df085336058fe98df738d94ee03b57cba3e8c9cdb625e69ae0e3b38513f"
+      },
+      {
+        "id": "pipeline.language-selection-scope-is-unclear-and-arrives-too-late",
+        "sha256": "fab87f3e6ddef8e847f87995c27509b689e4cecc9ae7a6db356b2b4e32f09974"
+      },
+      {
+        "id": "pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base",
+        "sha256": "07625aa8f1a374211366677af27e335e6fd5793c0dc039f63d27d2c6ca7d45bb"
+      },
+      {
+        "id": "pipeline.ledger-commit-discipline-rules-live-only-in-checkpoint-prose",
+        "sha256": "7ad0b642658c0195e375ca17a410aa1d76b61c26faedd85cf031f1b9f7e5cc95"
+      },
+      {
+        "id": "pipeline.ledger-drift-classification-has-no-reachability-cutoff",
+        "sha256": "6ec3e08c7c89239a3b338026c61f88cf275b33514b3ca08733f3088c99a5267e"
+      },
+      {
+        "id": "pipeline.ledger-event-403-has-a-short-hash-evidence-commit",
+        "sha256": "60154805fc6f449ee8752bbf01f77622fd11679643b54822d9bcc00273d4f2cf"
+      },
+      {
+        "id": "pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism",
+        "sha256": "79bd2262cde37c4e8fae2d6cb0d1dfa4b51b3829f8e6576c594c4749b2b0b937"
+      },
+      {
+        "id": "pipeline.license-check-declared-path-absence-still-reads-as-scanner-error",
+        "sha256": "c924825a3accfcc92cf36b92d855908e4813016e44f2824bd1dcf57259902c8c"
+      },
+      {
+        "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
+        "sha256": "cb01b2b07728c1d4c4395f5f4e75d8d08bb006b1c5502b84f10158137fc264d8"
+      },
+      {
+        "id": "pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote",
+        "sha256": "665b4c1f93f1d3e7e30a044cbde34aa969f264eb216bb72b0a86e489a87cf78e"
+      },
+      {
+        "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",
+        "sha256": "2ce16db30baff86f466495167a11635299e4694f1028061d2f7fdb48ed5a3f1c"
+      },
+      {
+        "id": "pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes",
+        "sha256": "70cf58844ebc5bfd6267d56aeca447a57d567892d85b8224dbfe32576f7c25b4"
+      },
+      {
+        "id": "pipeline.live-plugin-root-undefended-in-the-shell-lane",
+        "sha256": "c3cc9992bca72f59c262e511ed81fab956327ddbdc964c87f3db5ed3c9488ddc"
+      },
+      {
+        "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
+        "sha256": "d6cd722b339cdfe5ca960d3127f5718c4aa40e2fee5c9607e70a5e0badf5976f"
+      },
+      {
+        "id": "pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify",
+        "sha256": "2dcdda50a2f649f82ba42ebc308c52db2d16b573b4dffcf54baddbebe0023519"
+      },
+      {
+        "id": "pipeline.long-dispatches-truncate-before-emitting-their-report",
+        "sha256": "75b84afcfe274c2e3fe47ad4daf8a41655cb971b8bad7de2208e7b1772eb5392"
+      },
+      {
+        "id": "pipeline.lossless-pre-restart-checkpoint",
+        "sha256": "1aa7e2458a75c4c44ce84285cec928f4be4fa5f24d2a2c14af8826109fc7ec42"
+      },
+      {
+        "id": "pipeline.maintenance-window-selectivity-is-untested-at-both-levels",
+        "sha256": "2a45a08189f51a77501feceba859405a878daaa0b584728b37ec5442f367d059"
+      },
+      {
+        "id": "pipeline.maintenance-window-signature-voided-by-unrelated-write",
+        "sha256": "a7c6eb4304924b36e7714035432381dc637e717694921f16d630820d34f5cfc2"
+      },
+      {
+        "id": "pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits",
+        "sha256": "8134efdcd82eea2d4dbd04cb14e38b0dcf7f204123c63bf15e5c9f94ed0b5a5b"
+      },
+      {
+        "id": "pipeline.managed-onboarding-success-contract",
+        "sha256": "4c48ae79d93de4d3a9f11a175c7bdeab02a2175e4d4a5acff490281d1c6e5f1d"
+      },
+      {
+        "id": "pipeline.mandatory-verify-gate-has-no-path-for-a-project-with-no-tests-yet",
+        "sha256": "933d71c01eb9ba892d28fec367dcf61dfee94430886a42e06b642fb9f1ebbf9c"
+      },
+      {
+        "id": "pipeline.manifest-language-repair-demands-a-full-process-restart",
+        "sha256": "76d0a8748d4c1eb077cf4b2d61399b59c28740d6994cd12453139162b3a7089e"
+      },
+      {
+        "id": "pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex",
+        "sha256": "1950ca18c9cf070fec33718997a15b2f0f711d127975b2967d7f1e5be969bfeb"
+      },
+      {
+        "id": "pipeline.marketplace-install-topology-unattested",
+        "sha256": "77665a80a66c129f941b1a209540eb6cb4f1d7d40703851c4cfe2c32ddbb39f3"
+      },
+      {
+        "id": "pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate",
+        "sha256": "0d38b29d10f7e6e1539e13175e85b180283be239bcd76f5995504fa0e5ccc895"
+      },
+      {
+        "id": "pipeline.mechanical-proof-of-complete-prior-input-consumption-across-restart",
+        "sha256": "2b777ca3099dbc7a28633dd3e3df9207b04eb9b0c78c23e0364c5f5482b2a21f"
+      },
+      {
+        "id": "pipeline.merged-into-frontmatter-key-documented-but-unsupported",
+        "sha256": "decba5a6204922aa5a856600af2377bab6b05ead20a2e79427425845e656ade6"
+      },
+      {
+        "id": "pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have",
+        "sha256": "232eaa2ad02621ef87fcf21bc76d00e82134d2e6dcf0cbe1faa66d9e4df343bb"
+      },
+      {
+        "id": "pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault",
+        "sha256": "afc5fb3d5075bf3e6ddf49acbebbd489e282b4948d87a2f3c57257bd6feca3ca"
+      },
+      {
+        "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
+        "sha256": "8a86ceb6c20ace7ac91139399ebc2a0a2370ebdea0148c51d36f6d6562c952c3"
+      },
+      {
+        "id": "pipeline.multi-cli-efficiency-pilots",
+        "sha256": "7a0f0cfa653a76f9205f3373da19dcec75be21c0bc0679d98feff90e46d6c264"
+      },
+      {
+        "id": "pipeline.native-windows-verify-red-suite-class",
+        "sha256": "b7cb39b7128a44e3e32749d4ae7b4e2bd7efc9d27bcb468dd08243e6ca9f9154"
+      },
+      {
+        "id": "pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates",
+        "sha256": "62b2851c49531da34645ec98940cd8136c78daafe8dfb0a512dc74fbad01c0fe"
+      },
+      {
+        "id": "pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home",
+        "sha256": "b2d64aa2b8287cc420d7adeb7dbef7611899af85e763b7256c5edad7a17d30c2"
+      },
+      {
+        "id": "pipeline.nine-test-suites-run-in-no-verify-invocation",
+        "sha256": "bac188734990f75ce894756b2ab4385fde2f50385db8ab2015542d5225f52863"
+      },
+      {
+        "id": "pipeline.no-check-holds-the-shipped-copies-of-push-release-flow-in-agreement",
+        "sha256": "0c6b84a240eb4e51e5a446b4a39667bf7b2518692b859be9f8bf4a1342d8842a"
+      },
+      {
+        "id": "pipeline.no-check-validates-prose-section-citations",
+        "sha256": "333997b2f539d11bf8129d35e702fb169aa1c6580a51179b60f71c84711d2bfd"
+      },
+      {
+        "id": "pipeline.no-design-to-implementation-handover-exists",
+        "sha256": "7fd9cc9241d6d0d571d03a355a2885502c0993bd6f45aa5130bc1f7c55ee10a7"
+      },
+      {
+        "id": "pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects",
+        "sha256": "eb145079dd944dfd4bc284dc17b7841dc0c973564f95b420090ed3864a7583b2"
+      },
+      {
+        "id": "pipeline.no-gate-catches-a-named-design-requirement-silently-absent-from-shipped-code",
+        "sha256": "063ca95e1d5eea5e60bea972504561afe19f1369b5ac04a163f55f30b4c72750"
+      },
+      {
+        "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
+        "sha256": "f211e667fa40cead3ab3c4bfac0f10e5f8f57669ba16697bb015e5920f2b7d88"
+      },
+      {
+        "id": "pipeline.no-governed-directory-contract",
+        "sha256": "875d0533e6b8be40a690793452d218bcc0a0177d87f43f43eea1ad2afca66dd9"
+      },
+      {
+        "id": "pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing",
+        "sha256": "d16bf23437f15c601d01fb77d8fba6668759dbf4e5e459476f88895542040b3a"
+      },
+      {
+        "id": "pipeline.no-push-preflight-before-requesting-a-signature",
+        "sha256": "031f19e70270ac858c2141f23ecdff13e90fb286c5407ce7b92ae53516ef1f45"
+      },
+      {
+        "id": "pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed",
+        "sha256": "bdc2628dd10e2500e4e5c101db1fba8e8ac7e1a022c0790df3dbb8036922c2c1"
+      },
+      {
+        "id": "pipeline.no-sanctioned-dispatch-trailer-form-exists-for-direct-elephant-design-commits",
+        "sha256": "bdf85a238948ca4eaebbe9cd5f0a181866b666e38325b39fcab357a2471fbaf7"
+      },
+      {
+        "id": "pipeline.no-sanctioned-way-to-start-over",
+        "sha256": "635eab591e34c5c3b01bc2db92d3f65f6742701d4a346f5b06f4559b312ea406"
+      },
+      {
+        "id": "pipeline.no-technical-gate-enforces-critic-review-before-done",
+        "sha256": "7d454180fd07a863621d53b06c53bad1de04ca9271168d5790518f829565f727"
+      },
+      {
+        "id": "pipeline.no-test-pins-the-ungoverned-path-rule-stand-down",
+        "sha256": "0540cb4bcd06691755b6114f6b59abccaf2e8893114cbbae94a103c06ac80414"
+      },
+      {
+        "id": "pipeline.nonblocking-interaction-continuity",
+        "sha256": "05c820e8d892f08efee5dd1599e671df86b1ec26ce486b9d4b98cef56a493a98"
+      },
+      {
+        "id": "pipeline.nothing-checks-that-a-capability-is-reachable",
+        "sha256": "57c07f6464e09f464827262d13828d0c062e06def02c87e2ba3cfcdd3f896c87"
+      },
+      {
+        "id": "pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs",
+        "sha256": "c03baceb5caf2654881360bc9d639d69f4464ed75d725555d9dd824b97a9f8d6"
+      },
+      {
+        "id": "pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects",
+        "sha256": "6ec532fab8de50faf3e7975f7c4114b99d9da2e21e1c222b9498f178f272d9df"
+      },
+      {
+        "id": "pipeline.observation-intake-document-governance",
+        "sha256": "85e185101098b29eb85b2f6054007a741fc652c329793c4ba7e61e57d9d7e701"
+      },
+      {
+        "id": "pipeline.observerunner-has-no-test-coverage",
+        "sha256": "c4c930eadaa8f02898dcb9f908decce24244deb921c29af796e85bea20d34a8f"
+      },
+      {
+        "id": "pipeline.onboarding-asks-published-in-one-window-only",
+        "sha256": "dc9d3d5b99bfae779f12bdcedf517e8d5b7a8f2d6b1946faafaf2f3c72e6599b"
+      },
+      {
+        "id": "pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string",
+        "sha256": "74bd78e36f7e7b8a2138ac7c845fc73ace4c3b3754c0643aad827a0eaa60aca2"
+      },
+      {
+        "id": "pipeline.onboarding-design-answers-have-no-pre-generation-correction-path",
+        "sha256": "5edc0b64cd730eb3939b017990aeeeb740d37c310b9506af5e18a022579fd063"
+      },
+      {
+        "id": "pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates",
+        "sha256": "b7fd23c32de136cfdf70b3c54b1945d540ab60dcaeb6fc9e13f2e5f6b2371534"
+      },
+      {
+        "id": "pipeline.onboarding-guidance-never-asks-about-an-existing-signing-key",
+        "sha256": "cb4c76fb0b3946e5fe5b762420afbe04a8e8592942e3aad89b40c7de85e8edd8"
+      },
+      {
+        "id": "pipeline.onboarding-has-no-happy-path-for-an-existing-signing-key",
+        "sha256": "0de49ce48b51aefb157da49b427255c33e9b2d9ad843814c2e68c2c45e360ee0"
+      },
+      {
+        "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
+        "sha256": "e32085a869b8c3beb1b8ecba81965e3032b5388c37f9163809195c3b47a7483b"
+      },
+      {
+        "id": "pipeline.onboarding-must-bootstrap-the-trust-anchor-once",
+        "sha256": "6b58f88605d9898b2881d7e8adf3f742585d6acf887c90cd407c8af2798a9676"
+      },
+      {
+        "id": "pipeline.onboarding-must-elicit-the-real-verify-contract",
+        "sha256": "d6534ff84f184444b58ebce87a51cbb8fd06b0110ccc6032503c831efbcbed7e"
+      },
+      {
+        "id": "pipeline.onboarding-needs-one-guided-init",
+        "sha256": "77156e3a0875e8dbf4bcf34d72353cce9486866369b65726f4c5c974202a35dd"
+      },
+      {
+        "id": "pipeline.onboarding-produces-drift-it-then-has-to-repair",
+        "sha256": "2ba97f9c94e1cb89248dac30956cb380e612f315ffb28788da2fa7b191aa61ba"
+      },
+      {
+        "id": "pipeline.onboarding-ready-path-unconditional-restart-barrier-read",
+        "sha256": "2a79a9dbaf455209ddc7dad7d80b2e07030b536d8269d64b872983da8fae720d"
+      },
+      {
+        "id": "pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware",
+        "sha256": "3c1e419d60f3f25480f84538ead7cd14138d712a2d7050445068dbf4befbfb08"
+      },
+      {
+        "id": "pipeline.operating-model-not-shipped-with-the-plugin",
+        "sha256": "bbc37376d38343415bec2e754f189892b835e7df10cd05717fbcb4f362a22bba"
+      },
+      {
+        "id": "pipeline.orchestrator-added-file-undisclosed-in-dispatch-commit",
+        "sha256": "37f24b8f5aa86df2f493766a9c06d0200084973c37e6f9fcdcfbed939ebe29b1"
+      },
+      {
+        "id": "pipeline.orchestrator-authored-production-commits-have-no-deterministic-control",
+        "sha256": "da54552c7eaeef110b0b5cae232e82a87d2f854da42051904797f90491b9c43a"
+      },
+      {
+        "id": "pipeline.over-broad-ignore-rule-swallows-closure-evidence",
+        "sha256": "0f33b46a816f18260f3deb112b4a02a4fc9af15497d7abbf7ef8f9b27feb4f55"
+      },
+      {
+        "id": "pipeline.p-ac-11-four-dimensions-declared-but-inert",
+        "sha256": "f5b4e134a34c7ac2e72643ba205369dab1ba5f77597a310815784f1945629ca5"
+      },
+      {
+        "id": "pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry",
+        "sha256": "add3d3a9b326d8b185672a37b08e38990d18afbd1e2e7cde9a85937321a7fedf"
+      },
+      {
+        "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
+        "sha256": "57c5ba633b5bbcb86789e50f5f86ba378841a255a6677b52d39b9b723ffdc315"
+      },
+      {
+        "id": "pipeline.part-a-limitation-2-orphaned-by-the-r2-rework",
+        "sha256": "848d8a9c92358fde756384aa8bbce04546ddbd95039f863ab9c78dadf04a72ed"
+      },
+      {
+        "id": "pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback",
+        "sha256": "6418382aa47ad7fb2ba082fdf308401dce58c895c0f45242d582d648a930c200"
+      },
+      {
+        "id": "pipeline.path-bound-fingerprints-break-across-windows-wsl-access",
+        "sha256": "c9ffe7f79c872f4029ae587dc417bdf74899e6d728f3bb18a2c9cbf83e4972d5"
+      },
+      {
+        "id": "pipeline.path-bound-repository-fingerprints-break-between-windows-and-wsl",
+        "sha256": "ab38d5247e51064fb905c57d0723252aa2154c106057ff94a7625c592d207d75"
+      },
+      {
+        "id": "pipeline.per-phase-progress-message-budget",
+        "sha256": "6838a57b2758c5d63f31fa227dcd2bf6163055e33068121d3711e8a31314630d"
+      },
+      {
+        "id": "pipeline.permitted-edit-drops-session-into-unrecoverable-readiness",
+        "sha256": "85d79a12c45164b004c0009d4db552c5fd0e8f61ab590b9ca9bff865ff39b304"
+      },
+      {
+        "id": "pipeline.phase-aware-bootstrap-readiness",
+        "sha256": "5c950ef5e7855f7a3beb0afacff9406092a7e124344bce028e295f9cfcd51731"
+      },
+      {
+        "id": "pipeline.phoenix-merge-re-critic-minor-findings",
+        "sha256": "51c884d52d0e5dfad04f06d13c790b770faffec3ace9d7e2a7b6265023ce337e"
+      },
+      {
+        "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",
+        "sha256": "dfd88f0a3b7071b3e349fbe2e6af121f257d3fc48d3db46a194786dd06e52a3c"
+      },
+      {
+        "id": "pipeline.pipeline-defaults-to-sequential-work-with-no-enforced-task-slicing",
+        "sha256": "51fafb73d68a181a0b7cd84da87eea8da90c6d583aa32ca116fd4ea3ab7c8250"
+      },
+      {
+        "id": "pipeline.pipeline-start-hardcodes-a-stale-copy-of-the-elephant-role-prohibitions",
+        "sha256": "670342d53d7b90086f42582ac0fe37be0cbd0dc22a1dc3a095f44d0cd56698dd"
+      },
+      {
+        "id": "pipeline.pipeline-state-rebind-codex-default-runner",
+        "sha256": "36bb2d03853032992e4ce2489c459411f5c360c512d98358527d2eff9f22c0f7"
+      },
+      {
+        "id": "pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify",
+        "sha256": "37508983603d0e0553b4e952a9f4cc03f5f0ab2e2b6a0e51d3c519c3187f8855"
+      },
+      {
+        "id": "pipeline.pipeline-user-yaml-file-level-protection-forces-signature-ceremony",
+        "sha256": "90d31623f5273fb25918240813fca6ec26adb724a73da9de3f9fd1d5c5f6b503"
+      },
+      {
+        "id": "pipeline.plan-approval-binds-a-staging-draft-as-project-authority",
+        "sha256": "127a24fbde819eea2ba373c8713b01be76333a49ca1a4a8879e608eeeda965d8"
+      },
+      {
+        "id": "pipeline.plan-approval-is-recorded-without-a-check-that-the-design-was-shown",
+        "sha256": "0f7434ab00bc1e716adbdb154db609a5724e8ab518b7b7ca5ab59abfc391c9d3"
+      },
+      {
+        "id": "pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags",
+        "sha256": "1c5988f2878a089c9900c1637fab76905983a93ff8d9efffd24e44e206c06ae2"
+      },
+      {
+        "id": "pipeline.plan-path-guidance-attached-to-unlike-causes",
+        "sha256": "c8698143e689fd8438daffc86d165e2bc0ff1673df65a8f0837f312314475800"
+      },
+      {
+        "id": "pipeline.plan-result-publishes-no-next-action",
+        "sha256": "c2d38ffbffcfbea62713556672d6052f10ba82e053e13ed647fcf4dc1ac60ef4"
+      },
+      {
+        "id": "pipeline.plugin-package-should-vendor-canon-references-via-build-step",
+        "sha256": "84fc16b2f01a9f3379248974028822e34a244503aa84a2028e36aa8f40d25ea7"
+      },
+      {
+        "id": "pipeline.plugin-update-under-an-onboarded-project-derails-the-next-session-into-repair",
+        "sha256": "2e888188111d14dbf1eb029214518c413e52c7f0922c480691df583f63bb0d90"
+      },
+      {
+        "id": "pipeline.po-approval-confirmation-missing-intent-digest",
+        "sha256": "f025e79d58deba379a670a997065dd8f64e1e378ede9c058dcad599f9b62d7bf"
+      },
+      {
+        "id": "pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority",
+        "sha256": "cd2d630516a108ccc10011cf7931d37b3feb7274a47da672560b96af82044a9c"
+      },
+      {
+        "id": "pipeline.po-authority-decision-prd-candidate-static",
+        "sha256": "18573be8943eacac36a1c7be62159c90a17ec4a36128cb608d440d742ad15136"
+      },
+      {
+        "id": "pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version",
+        "sha256": "4be290e829b3f18efe87e7bea4250c19f276b08c377079a27fb229916b4e2b20"
+      },
+      {
+        "id": "pipeline.po-ceremony-resolves-the-wrong-runner",
+        "sha256": "b74450127a40476d82ab987733b63cd4fbb4df5c594c947b9e144b394ee48cb0"
+      },
+      {
+        "id": "pipeline.po-decision-bs26-unsatisfiable-under-the-phoenix-ledger-split",
+        "sha256": "33f58ea5ffb84cf4a74aa7ee271fb6523f456ec7979af061a4357854aedde701"
+      },
+      {
+        "id": "pipeline.po-decision-claude-start-time-item-closed-on-a-rejected-approach",
+        "sha256": "413a0510ff9cb8a9b76c7767cbd34d087bfb5d315cb8fc50c53bc461837a0d91"
+      },
+      {
+        "id": "pipeline.po-facing-commands-are-not-uniformly-rendered-break-safe",
+        "sha256": "c5480b51cc83d58309af8301ecb5ee4ad956f5d2022408727c4ca1e15efddb4d"
+      },
+      {
+        "id": "pipeline.po-gate-authority-path-canonicalization",
+        "sha256": "182bd2b882ff38514beff7ed6d9d50613498280379d6bbab4eb662260b60fb4a"
+      },
+      {
+        "id": "pipeline.po-gate-authority-receipt-readback",
+        "sha256": "afd8b581f7b713dae4b0a4816df58753f119b220ac526fdefaa76a8fcad4bf66"
+      },
+      {
+        "id": "pipeline.po-gate-worktree-authority",
+        "sha256": "3e50e25a32521a287cb3545fcb89f0203a0b577e2ef07dbeb27ade5068740490"
+      },
+      {
+        "id": "pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows",
+        "sha256": "e5f99e20d34e977a5d3ecfde06dbd91e48ef41b9beeca2ae467894fbf0d0cd5f"
+      },
+      {
+        "id": "pipeline.po-human-approval-setup-silently-swallows-writemachineplane-error",
+        "sha256": "7451e5a8e0253914f17c1a7f89a044c7274ff2df4beec409c35321a7886b1513"
+      },
+      {
+        "id": "pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide",
+        "sha256": "0d896e949d86a4d8b759b5540a28e1b409c5f733a1b0dea11f404897d153574a"
+      },
+      {
+        "id": "pipeline.po-key-trust-anchor-onboarding",
+        "sha256": "8a533a75961a64893999e2c9dce1ab21d4b11372b80522833d03df5ab6daa193"
+      },
+      {
+        "id": "pipeline.po-language-is-set-without-asking-and-cannot-be-changed",
+        "sha256": "a6bae1b8f511e824327aa2b2806c7857e7ac61cafd06fea4fe1b250d1f417f08"
+      },
+      {
+        "id": "pipeline.po-signing-key-pointer-does-not-cross-wsl-windows-boundary",
+        "sha256": "c2f30d785d57a9a24862e7eaf721dfc212ae2ca6bd2a427aab28d6205c0f5963"
+      },
+      {
+        "id": "pipeline.post-compact-reground-carries-no-state-md-narrative",
+        "sha256": "4ebcda597707ba4bbe3ebf3e8f7c764960be6293f738b1859de575f98cc63bf7"
+      },
+      {
+        "id": "pipeline.prd-binding-precedes-framing-with-no-reopen-path-back",
+        "sha256": "c2db8f5db67c36b6cc14f45c8eb6fa835109e6a9f7e6c16997b89fca80abab0f"
+      },
+      {
+        "id": "pipeline.prd-framing-precondition-is-prose-not-a-check",
+        "sha256": "763a0e9a4985682af3684d08835dee08ce99c2f99f3b701f94b83b0d20766d1e"
+      },
+      {
+        "id": "pipeline.prd-language-gate-reads-a-field-intake-never-writes",
+        "sha256": "024ffc4871af113adf178c7635e2ccc62710084cc0e5f78e6e85c172258a2e8b"
+      },
+      {
+        "id": "pipeline.prd-spec-content-language-can-drift-mid-authoring-undetected",
+        "sha256": "b86fd0b4ee5a51fabfaac10dfce50c0ea035988c1fc82f5e04361bffafe2e83a"
+      },
+      {
+        "id": "pipeline.prd-spec-depth-collapses-relative-to-design-input",
+        "sha256": "b25d72c62bb23e9d503b783705ffb4014ebd887750825a7f3a55f48ec8647981"
+      },
+      {
+        "id": "pipeline.pre-existing-failure-claims-need-evidence",
+        "sha256": "e9806bf76bd179b76da026b8a7984fb871882ed2b95978bd0de861d035e4f5eb"
+      },
+      {
+        "id": "pipeline.pre-push-hook-is-offered-not-installed",
+        "sha256": "f5ddcee3ab1a5eee69625d858bb1d3013c81dfd02627def74ea4fb38ee11eba7"
+      },
+      {
+        "id": "pipeline.precommit-hook-refusal-diagnostics-are-not-observable-in-verify",
+        "sha256": "06ceacebadd66b660c1a1a44cf7665f9e362188cd96a3c3f6300bbeecc2e6e09"
+      },
+      {
+        "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
+        "sha256": "824723200873fbfef7b4a80b9b9b29a142a3b812bc8fa351e965c738daee8590"
+      },
+      {
+        "id": "pipeline.preimage-repin-disclosure-incomplete-for-roles-critic",
+        "sha256": "1233fc55aa87ac9f1f00eecd150ec7eb79bf1ac3c67571aed5b98a0600a2ca72"
+      },
+      {
+        "id": "pipeline.prepared-maintenance-window-dies-at-the-next-commit",
+        "sha256": "4e7004dd6d72e04b177036937b99af2dc2a47183ce32b8bcbd2a6623b5733823"
+      },
+      {
+        "id": "pipeline.pretooluse-guards-do-not-fire-in-dispatched-subagents",
+        "sha256": "0d989905c5d251b4ed2257da501268ac6ae1d224ebbc3b9b804ade5027db2a7c"
+      },
+      {
+        "id": "pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive",
+        "sha256": "2c77f345ac17659bc4d4bf6f2e76121b87a86fa8298cf8658b029bf2191f06f3"
+      },
+      {
+        "id": "pipeline.private-overlay-activation-bridge",
+        "sha256": "7a09cb7de1c581d06c431166f8ef5e246cf34b634a6bc70cddb1a43ab474dd2f"
+      },
+      {
+        "id": "pipeline.product-capability-inventory-missing-two-new-guard-hooks",
+        "sha256": "e96fcd78453f002780fe8d24bb08ff0d79dc2587c6df6bf041a97840b97c1468"
+      },
+      {
+        "id": "pipeline.product-capability-inventory-two-guard-hooks-uncategorized",
+        "sha256": "85fafbe724bd464242e86e06f95484e6012dbc479d2960bc2f5da90e37635a7a"
+      },
+      {
+        "id": "pipeline.project-audit-evidence-overview-for-external-review",
+        "sha256": "8e5dc749e892c995a690c1253e1dcfc897e2f3365ae2175d45de2815fab3c527"
+      },
+      {
+        "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
+        "sha256": "d7d221e2901da1ce01ef6e28feecd7625b7bd946b757ea75bbd6caf3abb787ba"
+      },
+      {
+        "id": "pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep",
+        "sha256": "fd319f7c92177065bcd703ea8effd882092f61e3018db28e6945560d1adef000"
+      },
+      {
+        "id": "pipeline.project-reset-does-not-classify-the-proof-policy-artifact",
+        "sha256": "fef64cbb0e32f64ce45fd18890cf6df0cf47c7734236d6d0e5a3b2c4df195483"
+      },
+      {
+        "id": "pipeline.project-scoped-github-issue-operations",
+        "sha256": "292cb8bef957057d54399b446aa8663956eb9b05b8482767386b201069cedaca"
+      },
+      {
+        "id": "pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once",
+        "sha256": "6f4057347e965a0d5001f89f1a72172e101d7d37e21770cbbf3151f2927d6ea1"
+      },
+      {
+        "id": "pipeline.projection-drift-fault-after-design-implementation-transition-forces-restart",
+        "sha256": "295ddd13a0dd22441f7cf7def2da3ddf7f654ef6d4f7dc29e4897e0900ced4ce"
+      },
+      {
+        "id": "pipeline.promotion-freezes-a-prd-the-po-gate-will-reject",
+        "sha256": "8c766c21988948123a71e48c851132dd3c6d04679fea4f1a2e925bb12b70e0c4"
+      },
+      {
+        "id": "pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff",
+        "sha256": "7427d9f7494a29124bef59d8f0260ff5bda5430147e434eb6a75446e90d59c77"
+      },
+      {
+        "id": "pipeline.publication-authority-lacks-execution-time-criticalproof-reverification",
+        "sha256": "c108ae7185c75f768b61167e2637b85e9d27d350f366b1bed93c55d640a06482"
+      },
+      {
+        "id": "pipeline.published-lifecycle-event-schema-still-enumerates-cancellation",
+        "sha256": "f5836fe89c712f638fa5c26251ca8011bab00aeccbe0f07052f8cf57805ba22a"
+      },
+      {
+        "id": "pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination",
+        "sha256": "5a1eda7124ffb02bfac2bf052235a69d49541d9a3aab5daf5f9f97c312db3670"
+      },
+      {
+        "id": "pipeline.push-approval-mode-is-not-chosen-at-onboarding",
+        "sha256": "9758129c7ee30cd0243ab8c652bb85d2959c6c0faea6afcd4922fafdcb7b2f8f"
+      },
+      {
+        "id": "pipeline.push-approval-record-always-trails-the-signed-commit",
+        "sha256": "dabdaee9d389618efb99670f2c430d709e88cc4ccb1583a3645b8b0a2ae873b6"
+      },
+      {
+        "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",
+        "sha256": "d611ae328e9e099e38d070095bdca3ab3a99e67bab91ccc65c34d7773a6f13ef"
+      },
+      {
+        "id": "pipeline.push-approval-signature-commands-also-line-wrap",
+        "sha256": "d46bf044e29bf6f57c9623a7004b81a2054f98ef4072bfa74f532b3f7a6e1683"
+      },
+      {
+        "id": "pipeline.push-approval-skill-reference-predates-adr-0061",
+        "sha256": "781ba40b2433b893edc54ae1ebf20c7a3c3e5ff68b3a680550b05dac142378b3"
+      },
+      {
+        "id": "pipeline.push-artifacts-precede-operator-intent",
+        "sha256": "5ed7f0426d23b4e04a39171d2f62697130a84c439f80078d451b7048fb6adeab"
+      },
+      {
+        "id": "pipeline.push-flow-needs-one-remote-readback-transaction",
+        "sha256": "7f0777f476847e286eb990e15d22dd18d1501925e169a02f8f045b89653cb7ff"
+      },
+      {
+        "id": "pipeline.push-gate-is-silent-in-every-consumer-project",
+        "sha256": "8dfd749f7983fa6091f488614abf41d05756f1e0ec685ccba0b5cc055302f264"
+      },
+      {
+        "id": "pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to",
+        "sha256": "2c56bab32bb83e498c3cac74453fdc20cd5d8d08345fe8f0910b9eeb0b9e0554"
+      },
+      {
+        "id": "pipeline.push-gate-unsatisfiable-in-consumer-deployment",
+        "sha256": "4274578b78cb496dfe0cf4ff50de7f1d7d8f15431b6f2d7ba1d3a9b1a656c282"
+      },
+      {
+        "id": "pipeline.push-guard-worktree-target",
+        "sha256": "9a041b86dbc4212155e84a4042e352520da1c31fdd58e863789ed034c5f8df7b"
+      },
+      {
+        "id": "pipeline.push-init-cannot-satisfy-its-own-doc-reconciliation-check",
+        "sha256": "a0fb3df1248f5dfda0fb298881c28d6dd3bfae6cfa425a0f24d17cbc53d501b2"
+      },
+      {
+        "id": "pipeline.push-init-hardcodes-candidate-head-which-layer-1b-can-never-satisfy",
+        "sha256": "b893092bdc7348f331b6d689cb7ae0be1de910dae1ca4fcd178bf7d8eedadc73"
+      },
+      {
+        "id": "pipeline.push-path-has-no-driver",
+        "sha256": "44edc2e4ee672c3a6cb2e5ef3db5c3bf490c47d1f35c3462ed825cda547b7439"
+      },
+      {
+        "id": "pipeline.push-release-flow-unusable-for-third-party-adopters",
+        "sha256": "f725df5cc8641b879bd0ab753f63a67e89e00c21e24cf170e49f29329a26c715"
+      },
+      {
+        "id": "pipeline.quote-style-fragility-in-shell-command-admission",
+        "sha256": "10371f6f7ba92ed0ee994a87f9bc92f76d5009ae3b8b41e971d08e8e0ee8fe00"
+      },
+      {
+        "id": "pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate",
+        "sha256": "710c0a3a9e7026866c57a895462c980034e1e75ff82da567a0a489ca5c01a15f"
+      },
+      {
+        "id": "pipeline.read-containment-removed-with-no-recorded-decision",
+        "sha256": "4ff2a373f65e0cf9acea0f0bc7d2225c43b8ef8cf7ed31f3355880bab77194d8"
+      },
+      {
+        "id": "pipeline.read-scope-denial-code-accuracy-f3",
+        "sha256": "ad7de0e14a8e228be1d2c553d50273dc31251de63cbb36c908f2bcba679cefa8"
+      },
+      {
+        "id": "pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form",
+        "sha256": "4c752f0e9acbbf58eda49ff1999521ed63eeff69406fdf9fa5ed4348f7b90cab"
+      },
+      {
+        "id": "pipeline.read-scope-tilde-expansion-mismatch",
+        "sha256": "b77d4cedfc347e55ab06de1d063bb6c38f14e7d245565e7a4611cf114353a2d1"
+      },
+      {
+        "id": "pipeline.readiness-guard-blocks-its-own-recovery",
+        "sha256": "5ee80e3e3f0d2a86e647a1e7ee05825c93fa77f744ae06583e4dfe6636eff175"
+      },
+      {
+        "id": "pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented",
+        "sha256": "0da4489d6034635f7e1da34cf2933b09b092f69179b6ead0bf61b7150f56becd"
+      },
+      {
+        "id": "pipeline.readonly-command-guard-classification",
+        "sha256": "9da92c21638a51fcbd361247a67abf2718c0402cc0dbbb878f47fa41bf46c707"
+      },
+      {
+        "id": "pipeline.ready-gate-env-var-runner-authority",
+        "sha256": "97942b88d2dd3a1f123e554b2a2eb965dcf95bf5c9cb9f1a0a6b020b14acc338"
+      },
+      {
+        "id": "pipeline.ready-gate-hand-maintained-shape-mirror",
+        "sha256": "0a2ba83ba25a2b7a9a160b71dd90d93526e50c9dfe0d592ff8651f77ce600a31"
+      },
+      {
+        "id": "pipeline.rebind-rollback-names-no-predicate",
+        "sha256": "aca2afc8a49f77fdb328e7808d6a09ffadac82bda545db402c64a07be77ffd57"
+      },
+      {
+        "id": "pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file",
+        "sha256": "e9a068631c5a4d5f399765aa7c9f1b2de15fd8cafd6e8883b4fc2ad0baa53a29"
+      },
+      {
+        "id": "pipeline.reconcile-lock-reuse-lexical-path-comparison",
+        "sha256": "46f2bc88277108e468590f7454db09e014eaa142f7a050ffa1a34b2859c95763"
+      },
+      {
+        "id": "pipeline.reconcile-lock-reuse-regression-test-needs-a-tp5-window",
+        "sha256": "c8aaa2dc9727fe85c2edbcfce304c7b1c9cb6a93487d7bb68f104bf30a3ae072"
+      },
+      {
+        "id": "pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger",
+        "sha256": "db1e63a89766b986bf925f147249fef7c2fb20935184598dc96a99bd10166a27"
+      },
+      {
+        "id": "pipeline.recovery-preview-callback-attestation",
+        "sha256": "7886c48cfb177d523fe08fcdad3157a656d2e07d924e7bb05494ad3f68b2729a"
+      },
+      {
+        "id": "pipeline.red-evidence-from-node-test-embeds-the-absolute-repository-path",
+        "sha256": "3c16a5b82a4f6b947c33294296e7db54244ecd8077f95b5266e6b46ac7e2c4a3"
+      },
+      {
+        "id": "pipeline.registering-a-verify-suite-silently-creates-an-inventory-obligation",
+        "sha256": "20db1a11f622a54aece39a65ed143fc23c1397ef633659c1d65d4b0b1aa37e4b"
+      },
+      {
+        "id": "pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory",
+        "sha256": "c018b4a490e7898ce4ea5ff708e43dd03537402d2137d0fb7f4a8cae4fc9a7e3"
+      },
+      {
+        "id": "pipeline.regulated-document-hooks",
+        "sha256": "211bad9926cf7866e65564356b53eeafff763ba5292db079e1eff18c4b8552dd"
+      },
+      {
+        "id": "pipeline.relative-commit-message-file-unreadable-from-a-worktree",
+        "sha256": "57c57e3c39173b6d1325853fcf95222461f1c969749baabb37886443e8e33156"
+      },
+      {
+        "id": "pipeline.release-evidence-promotion-repeats-full-qualification",
+        "sha256": "757e9d4663f764f129d2f788f5779da15ac57a2f74978dd28607e6eb2ecbe61a"
+      },
+      {
+        "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
+        "sha256": "1c1ddac9bc03fc47f403d6aa83027d895d1b9c5edd210cc0eb75d4a36f7fd87b"
+      },
+      {
+        "id": "pipeline.release-preflight-has-a-builder-but-no-cli",
+        "sha256": "1f27ef1a1ecd95ee5a10bbbf52e461d4b53c8ae0a22726d807591d5cabc0b9ab"
+      },
+      {
+        "id": "pipeline.remote-side-enforcement-is-the-last-instance",
+        "sha256": "6c409872a3f361a5e775c2d107837370010c4ec593d2b1b800ec1f491fbc7899"
+      },
+      {
+        "id": "pipeline.reopen-design-invites-the-edit-that-ends-the-session",
+        "sha256": "6900d919f4871389d844081fc6dc2e11845010b12319392615ac8528d5972036"
+      },
+      {
+        "id": "pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head",
+        "sha256": "1619b68d2df7ca9fced1db8aa27203105f47e886cd9c6d7989c11da0e2c317db"
+      },
+      {
+        "id": "pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice",
+        "sha256": "624e375a1665d0e223db7b6700543449dafe4c1e3348685ab2a34a4bd807c7b5"
+      },
+      {
+        "id": "pipeline.repository-agent-definition-is-inert-runtime-loads-installed-copy",
+        "sha256": "ad20c1696575eca19917afa6fe695bf152c768e0bf6406d9a8e011deb3e7c4b8"
+      },
+      {
+        "id": "pipeline.resolved-backlog-items-can-keep-status-open-indefinitely",
+        "sha256": "5bb37b4af9d57ad01a8fb4251e3aeb01d3e6e18dd63638bc2fc197056a67f30e"
+      },
+      {
+        "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
+        "sha256": "b942b7f13a996be94a9766ebe42673b352a045b0599db636fd69e5380c872ed9"
+      },
+      {
+        "id": "pipeline.restart-resume-hint-write-misses-the-project-prefix",
+        "sha256": "1f5694b37a843abed3db9fc5fc50c183b0b2e032e34fa14237db676c3a92fef3"
+      },
+      {
+        "id": "pipeline.restricted-store-files-exceed-the-spec-inventory-the-privacy-contract-asserts",
+        "sha256": "02dfb394aacd934f3a0fb4588a1c1666f8add5116b9640acf890d38d8aabba07"
+      },
+      {
+        "id": "pipeline.restricted-store-rationale-field-lacks-adversarial-variant-coverage",
+        "sha256": "7ff65e40530463fc0e5ac4b0c2d9f81e3c4875458a7d4b905fd75c4d2e05c6fb"
+      },
+      {
+        "id": "pipeline.resume-hint-capture-consumes-card-that-failed-schema-validation",
+        "sha256": "278518fef5b237efcf44cd01133743ff6f985c2e13cbb54e9ca53ffd8ccca396"
+      },
+      {
+        "id": "pipeline.resume-hint-opaque-token-rejects-hyphenated-english",
+        "sha256": "97d49126ca2fbd27b08bab198ca4c83d79ed33a26df5a5002a813ec36e67f386"
+      },
+      {
+        "id": "pipeline.resume-hint-test-unregistered-in-verify-gate",
+        "sha256": "faf463328f5683d81ebd0198d930e1839131129c9a550c8049df86374ed231d5"
+      },
+      {
+        "id": "pipeline.rg-pipe-lexical-containment-gap",
+        "sha256": "40687eb1c918be2a164fdccf3aaf002d96355006b50680987d8717e89494aec9"
+      },
+      {
+        "id": "pipeline.role-dispatch-payload-errors-fail-before-model-launch",
+        "sha256": "89c1905817676977d66a392bba4c1a88e9760f9f7601fbf9128507bc75ea7972"
+      },
+      {
+        "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
+        "sha256": "8e6c79169de44e46624087370c0d7c305b4cdeee54fa9eb2f4b913b2dd3be4d1"
+      },
+      {
+        "id": "pipeline.ruleset-source-test-unregistered-in-the-verify-gate",
+        "sha256": "16ec2d848939e903e65dac97587e4125a656957d482fc8c064584ef8d15546df"
+      },
+      {
+        "id": "pipeline.runner-fallback-defaults-to-codex-without-explicit-signal",
+        "sha256": "8371d3c16aab30c2ff29e9e93123f5838b23d9c48b6f5a5e0232d23cb8d2c44d"
+      },
+      {
+        "id": "pipeline.runner-native-subagent-tool-identity-is-not-portable",
+        "sha256": "ae45d6105c2a98874012b33fc655590b0b031537ef4d95b0d79077c1af76c263"
+      },
+      {
+        "id": "pipeline.runner-neutrality-before-third-runner",
+        "sha256": "a4ed932207dd2fea4ea66e97799adab79a72adc89c8a44340319375dd905a294"
+      },
+      {
+        "id": "pipeline.runtime-projection-v2-eager-manifest-load",
+        "sha256": "b222e2494b68a7e9d39955b76adc095e444da2973e22072efbe896a4ff922e6f"
+      },
+      {
+        "id": "pipeline.runtime-projections-drift-after-v3-refresh",
+        "sha256": "d886746e22f1132828b4ed649a58bafaad6f5c563a60457bfda4a70ee9620711"
+      },
+      {
+        "id": "pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop",
+        "sha256": "e0c2f06199132f85e441aff6fa17d510992349fe1d462e3a359bfbd31c2cb1de"
+      },
+      {
+        "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",
+        "sha256": "23b246bf38a7e391e4537730170127c21a0a19bf7e85753d94105a92cac65a23"
+      },
+      {
+        "id": "pipeline.scratch-cleanup-mechanism-not-wired-to-any-event",
+        "sha256": "1ef93e939cfb81f5137ed40d56a65efa114646fe2c25ccaa9ab9a75941b13b05"
+      },
+      {
+        "id": "pipeline.scratch-write-exemption-does-not-cover-restart-required",
+        "sha256": "be7b3f0e1e28dfb20402fd6124d0bb528a1f7937228b8c8ed5740dd232996930"
+      },
+      {
+        "id": "pipeline.scratch-write-refused-during-intake-against-documented-exemption",
+        "sha256": "a47b877831e7457fb076a61868039f62d5fefe76abf82afcfec5e05b52b93e5a"
+      },
+      {
+        "id": "pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates",
+        "sha256": "7da886f213e5d66a9516c6a9fb56d915f38302665758c2f5b93f81172ae338f3"
+      },
+      {
+        "id": "pipeline.security-scan-cross-branch-gitleaks-findings",
+        "sha256": "0c6f8ef0a9d143747a4669a4f4308bd0707016e35c10d548828caf036af59f27"
+      },
+      {
+        "id": "pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository",
+        "sha256": "10273b89c3b51c7644dbc0a2344bc2fa9d5609832a969b07d1b4aeba038a0e0a"
+      },
+      {
+        "id": "pipeline.sed-regex-address-is-misread-as-an-absolute-path",
+        "sha256": "8e0a639112cc719f6ffbc3fe250be8af359083b7aa30ccdd6cc01456e1dc4b13"
+      },
+      {
+        "id": "pipeline.seed-security-gate-on",
+        "sha256": "ad562432d199885f1a643a4680c998a3021a58105658dac39b06223c1901353b"
+      },
+      {
+        "id": "pipeline.seeded-verify-contract-is-always-green",
+        "sha256": "6f0c00eed4d7d782a92be12466d17a28da7dc20e2a6bfdc635193e0b1757b2db"
+      },
+      {
+        "id": "pipeline.selected-critic-lane-contracts-unpinned",
+        "sha256": "2e08b1b26894fe785f0b6a380f08188c6e1912611bae7296049a75bc4c241d87"
+      },
+      {
+        "id": "pipeline.self-application-integrity-check-absent",
+        "sha256": "385cd106dc7a19112e481bc2857cc3ab2e23b33ec420c9cdfafcf95b4d8cf4d5"
+      },
+      {
+        "id": "pipeline.self-healing-local-cleanup-recovery",
+        "sha256": "752e750a0686c2d0b6d5c555cbe035b0c60c1583614e8ce73edb7d38cc389b26"
+      },
+      {
+        "id": "pipeline.semgrep-timeout-oversized-pipeline-state-test",
+        "sha256": "d677f5d69671b5632f37129e2435beb101c1672f0edae24bbdf2edf3a8de21ce"
+      },
+      {
+        "id": "pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home",
+        "sha256": "c7fa6faf2fa9662737e8bd162c6349621b9ba24c0de2e0e8e07ef4298f8e4d90"
+      },
+      {
+        "id": "pipeline.sentinel-epic-acceptance-matrix-archive-drift",
+        "sha256": "749b230164bca9bb36564e3c5527e56849a87350f12e4896de1a878d90584083"
+      },
+      {
+        "id": "pipeline.sentinel-go-live-completion",
+        "sha256": "d4c7680f27dbb453a5e3a43821542196237d38b0a994f0be605b4fc87de0cd80"
+      },
+      {
+        "id": "pipeline.session-keep-awake",
+        "sha256": "b6c1d648a29cad1e711a40874effd7fa03facc2794e1b600768aab34730caa3e"
+      },
+      {
+        "id": "pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard",
+        "sha256": "6ad23214a13c6c529d9d37bd3fe6f44107f076db7aa8a27c32c81b83c52d3b93"
+      },
+      {
+        "id": "pipeline.session-told-ready-but-not-how-to-repair",
+        "sha256": "ccc4eaae77f38f0e8ecdba819a224d53b0c23c1aea011a6c22d3dcbfc84b467a"
+      },
+      {
+        "id": "pipeline.set-feature-to-submit-plan-is-not-closed-without-a-coordinator-only-continuity-init",
+        "sha256": "6a95ac6de53f75fecd2f06729c05dfac1f2dc993b179e1a4a4cf8929a8fd0e5e"
+      },
+      {
+        "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
+        "sha256": "df2ed628e5ca6fcb4751e2eb303bd613ac34063a3658a0ee248f53cc807ada4f"
+      },
+      {
+        "id": "pipeline.setup-promises-a-human-name-repair-it-cannot-perform",
+        "sha256": "761b2242369628c3b823df22d16c848f64c31c7ea2505735dc68d3f3cc7768e2"
+      },
+      {
+        "id": "pipeline.seven-unregistered-suites-are-red",
+        "sha256": "6fadc5115453585b5fcc98b4fed5760273646fe5fa32ce76d13a810a37bbab0f"
+      },
+      {
+        "id": "pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof",
+        "sha256": "e89877e8181c8133c089c634a9357606219ebd2299d1ffa3d5494a299bc54018"
+      },
+      {
+        "id": "pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches",
+        "sha256": "34a4fb7617714b5ef097c53358fdadfc2b769facb2ea8567220c9a59a2ea6609"
+      },
+      {
+        "id": "pipeline.shell-grammar-reads-quoted-content-as-shell-syntax",
+        "sha256": "1679703be01c2821b0b4f012d27bd1742c3cd143b6bfa673b4a89efa8acb600b"
+      },
+      {
+        "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
+        "sha256": "16b0ec2cf728562ac097e79d0dc5b92899b0d042c23aef9365c4e0084d2ac14a"
+      },
+      {
+        "id": "pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses",
+        "sha256": "75536456848757eb7059ce7ba2cca94798840012ec083b14034d7dbc9ec6b1ba"
+      },
+      {
+        "id": "pipeline.signed-authority-binding-durability",
+        "sha256": "76346f4e44f41cff6b63f02a8eda734c0160f4441b010ea23a20eb22e1faf4fc"
+      },
+      {
+        "id": "pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign",
+        "sha256": "976447f94c6996e06d2ba67ed6d85178d0717b0c647ddd95d26c00e04eabb5d7"
+      },
+      {
+        "id": "pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer",
+        "sha256": "8776494532698f452f9e84b1682ba59e403b4325bf179085f8e35fc37f229786"
+      },
+      {
+        "id": "pipeline.signing-ceremony-tty-check-has-no-windows-fallback",
+        "sha256": "943e56f2349651bf23869f1e0cfee4f56b0b217946d03c12bff2305c24d1e185"
+      },
+      {
+        "id": "pipeline.signing-fails-without-a-tty-and-the-error-reads-as-a-wrong-passphrase",
+        "sha256": "695ea30b8e48e820f44f61e45e4822055c734695f09373c364fc5d82e2dbe4be"
+      },
+      {
+        "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
+        "sha256": "36248c95caeed3ae4047ce5e9987e5331d52cac3a022f8648421db2f7bb98360"
+      },
+      {
+        "id": "pipeline.skill-arguments-and-bootstrap-length",
+        "sha256": "c0ed03ca3a7b516339d1155f3f36b5eaf0887e21b1bbc8ae1831172676e1ba04"
+      },
+      {
+        "id": "pipeline.source-available-commercial-licensing",
+        "sha256": "1106637377822e589df7b01eb7d1c0223030c93722c5cda5d180c3b4ef339f40"
+      },
+      {
+        "id": "pipeline.spec-retention-on-close",
+        "sha256": "bbaec2f41b65824b6c528e0bcd5c80562499f1ccb89eb356bd48983922942f99"
+      },
+      {
+        "id": "pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy",
+        "sha256": "c66385381f8d31a650d79eabf5d7222ccbf322a263aea32d172920d5d63019f5"
+      },
+      {
+        "id": "pipeline.stale-worktree-directories-accumulate-with-no-sweep",
+        "sha256": "55c524791d8905f6729e01084d5666a852cc90a34f9e2cb8c661e3fe5f72db1e"
+      },
+      {
+        "id": "pipeline.staleness-check-unsettled-top-level-await-warning",
+        "sha256": "8410e3ab444cca96ad602d91ca72cc6f2cf13378a6ea2dcad103cca21557781f"
+      },
+      {
+        "id": "pipeline.standing-critic-consent-reprompts-host-approval",
+        "sha256": "4fca2e980c4ba5110a71ca0625a695d63690a30ae5f38ba5f1170d2fcee40130"
+      },
+      {
+        "id": "pipeline.stateful-design-contract-template",
+        "sha256": "fcb06270af1956b85c17767a231fb42713319c2a61939b3a36cca7a3c50b5ad1"
+      },
+      {
+        "id": "pipeline.strip-for-dispatch-misses-resolution-heading",
+        "sha256": "348a2e57262f5cd985661fb3235bc10c1230e2e260cf5a98887520ff3d1b1931"
+      },
+      {
+        "id": "pipeline.subagent-identity-may-never-resolve-so-per-agent-scoping-is-inert",
+        "sha256": "af8d1e5826e5e499fb8efbdff476bd357aeb86f39e2ff874072d28f60f6e906d"
+      },
+      {
+        "id": "pipeline.sweep-remaining-guards-for-fail-open-identity-and-pipe-unpiped-scope-asymmetry",
+        "sha256": "d682fa40b4f3d9b28abd96a5e6ad3912cf128c3e816b99f6b5401bd79cb01b91"
+      },
+      {
+        "id": "pipeline.t1-governance-path-preflight",
+        "sha256": "31f503102ef95f0beb888ad3702f989895337fc0e568a059e0d5daf98e5ccab8"
+      },
+      {
+        "id": "pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete",
+        "sha256": "0694bac8ded3ed7ae7eaa12e7129a7399af0a1e9fd0ccda32d16a66131692fdc"
+      },
+      {
+        "id": "pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write",
+        "sha256": "37b91711cda0a063e75a5c551c6a0488d42e39bc93d46db7438048ecfccfee45"
+      },
+      {
+        "id": "pipeline.template-scripts-for-human-terminal-actions",
+        "sha256": "d2ff5db471c21c62b4275f9e179fd625e642039f84f1d0bd18a9018ad7590840"
+      },
+      {
+        "id": "pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route",
+        "sha256": "dda12200ae8d7aee640936aa8654712c976e467200f102f6ef740dc4cae03dda"
+      },
+      {
+        "id": "pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention",
+        "sha256": "23aafc575e88b611903a97262a90415f98b47924937d5aef9b5761c9ea1db1a4"
+      },
+      {
+        "id": "pipeline.the-ai-hardening-gate-has-no-home-in-any-approved-feature-package",
+        "sha256": "2b1be39e8dc5c82689a97c5ed7ae9dc9dd6cf5178d3fc40e3996601b0300d269"
+      },
+      {
+        "id": "pipeline.the-budget-guard-carries-a-dead-branch-and-an-unbounded-sink",
+        "sha256": "605f0577f0148376b69973964b6d4ffe502ac56929ffd43f423423a879220aba"
+      },
+      {
+        "id": "pipeline.the-denial-trim-state-is-keyed-per-session-not-per-agent-as-its-comment-claims",
+        "sha256": "d00a602d85796b23e972bfca5a7c049ee1935b05ca0a69034e762ccd5f70dd55"
+      },
+      {
+        "id": "pipeline.the-dispatch-budget-guard-identifies-a-subagent-by-a-path-no-payload-carries",
+        "sha256": "1a114e032488b9898b9d4c3da7ea9172807008a89c3a4f57138590cf6eecebff"
+      },
+      {
+        "id": "pipeline.the-dispatch-record-field-enumeration-omits-a-field-the-checker-requires",
+        "sha256": "3099baf37a8c9697840402241fd9c737f9c299d7bf224a7530297e53e09e8ad6"
+      },
+      {
+        "id": "pipeline.the-handover-size-guard-only-sees-one-of-two-write-paths",
+        "sha256": "6098e8ab4c1f12bbeab6a9388e6f4dc073a556c037dfabf3c33493bf50a8eba1"
+      },
+      {
+        "id": "pipeline.the-handover-size-guards-header-comment-contradicts-its-own-registration",
+        "sha256": "b2f6d10bfbd8ab5896eba4ce62d9c6028cd797a024578247e2aca00425ddb072"
+      },
+      {
+        "id": "pipeline.the-ledger-commit-rule-was-given-a-second-home-in-a-different-voice",
+        "sha256": "2198d34b143ccbf1f8408dfd48281685cd1dc602018583bb0e834a7a7c50be15"
+      },
+      {
+        "id": "pipeline.the-ledger-reconciler-writes-before-the-items-are-validated",
+        "sha256": "1d45cb45dd716e2cfe4d3b345624f028a9e676675944757d12c782e355f8ea34"
+      },
+      {
+        "id": "pipeline.the-marketplace-attestation-compares-more-than-the-property-it-protects",
+        "sha256": "c3c6832147e458a9dabc4f6c06e0b3133569057939be2f701a0f50b289b1d071"
+      },
+      {
+        "id": "pipeline.the-opaque-payload-lane-refuses-a-mention-not-a-write",
+        "sha256": "7ca8e3852d75b0cb005bfcc30e466e811783526198de9a67f1728625f8537168"
+      },
+      {
+        "id": "pipeline.the-pipeline-cannot-merge-two-parallel-sprint-ledgers",
+        "sha256": "e70a30d0688d55006c97544f2dd80d8de63ad2492620fa4866f4463ef2932320"
+      },
+      {
+        "id": "pipeline.the-privacy-sign-off-is-bound-to-a-superseded-candidate",
+        "sha256": "159e4fce68bc880d748c1f00fec012930ab3cd54b20017083ff606f1df7f2198"
+      },
+      {
+        "id": "pipeline.the-push-authority-surface-cannot-be-bounded-by-static-enumeration",
+        "sha256": "f5262152212ea8c7af1fb13b80847ebb6b40f1ba111f44f5dc7b8c5d498ff1ee"
+      },
+      {
+        "id": "pipeline.the-rebase-authority-is-resolved-and-advertised-but-not-executable",
+        "sha256": "eefbb211e26c1353e21ab6b8e4770bee23a677338935d4e4b284d6cd1942a7ca"
+      },
+      {
+        "id": "pipeline.the-sandbox-preflight-app-server-handshake-is-a-race",
+        "sha256": "c0c346042e8207b9961a38f574e5e718f82e5589bb11439eb9a919aee9440550"
+      },
+      {
+        "id": "pipeline.the-t1-fallback-waits-for-failure-codes-the-route-collapses",
+        "sha256": "78cf68ad8d2c57f75f17c96818c3bffd69c9cd63a2af3c6104ffb1c121e268c3"
+      },
+      {
+        "id": "pipeline.the-two-suite-registration-checkers-disagree",
+        "sha256": "5d00c924890a9c6e209241a6c67ef14dcac501856f2234906c9059f3f3481384"
+      },
+      {
+        "id": "pipeline.the-unparsed-command-lane-still-carries-the-false-denial-claim",
+        "sha256": "15a35f0b9b9538a2b556ad7066c7901b05d08e205bc552467a071aa1b1e06a92"
+      },
+      {
+        "id": "pipeline.the-unregistered-suite-detector-is-not-itself-a-gate-step",
+        "sha256": "84b0df5cde8ef6645315f0b39aabde033594531ff1236fc3fad0e5cf70553e46"
+      },
+      {
+        "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",
+        "sha256": "57ae24a10d672c25d3a8ba6bd616bf0186ee9aca24eb49559c6f58b3cf7214e8"
+      },
+      {
+        "id": "pipeline.three-doc-and-adr-checkers-never-run-in-verify",
+        "sha256": "7b82b30cf9cf86c0858b216e95248c25d5fb8ccc35786e5c79843befa21fd469"
+      },
+      {
+        "id": "pipeline.three-independent-copies-of-the-wsl-windows-path-normalization",
+        "sha256": "c35e801811c04d6cbd6625c8661674c5c3225e2d5a6202e34fb734f6b6d3cfd1"
+      },
+      {
+        "id": "pipeline.three-onboarding-suites-pass-locally-and-fail-in-ci",
+        "sha256": "a3cf23820311e142441e402b493e617508d029cba7891387157652aee50ca057"
+      },
+      {
+        "id": "pipeline.three-runners-showed-wide-pipeline-administration-overhead-variance",
+        "sha256": "9d5d76b1cd961653985de97e46bdb7a77174a470aacc28f18d8db6fb9bdb05ee"
+      },
+      {
+        "id": "pipeline.three-smaller-greenfield-defects",
+        "sha256": "dd0052870e210b951b61af03769445f18a520895536fcec0cba3faa4545fd354"
+      },
+      {
+        "id": "pipeline.tool-budget-stop-condition-cannot-fire",
+        "sha256": "699b22c4cce68f145061daec03c837c3fcb1353762be01f29a9511aedd579b63"
+      },
+      {
+        "id": "pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default",
+        "sha256": "ead84aa5a7c28b79720ccda959eb056afc45576e6e45dd9b36b168aa58a81978"
+      },
+      {
+        "id": "pipeline.tp-guard-rules-lifted-on-the-merging-machine-must-be-restored",
+        "sha256": "e8bdb6a9c502abcf214f1bef8d0131282e36810dc904dc293e8aa0b6561391c0"
+      },
+      {
+        "id": "pipeline.transactional-readbacks-not-status-cascades",
+        "sha256": "e28a5bc43c4bf98b88123947d42b6384898372eeb416eebc743e4d289940f302"
+      },
+      {
+        "id": "pipeline.transcript-root-child-path-admission",
+        "sha256": "cc53a8a72084f3e256bd28939f49fd15114c68d70c21ddc0b45316e04a453330"
+      },
+      {
+        "id": "pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference",
+        "sha256": "4ba0f3827fee3c2ba65685fbfade5fc31c9026fb3c47d720292bebf48e6a03da"
+      },
+      {
+        "id": "pipeline.trust-anchor-bootstrap-confirmed-still-circular-live",
+        "sha256": "fa0048ec7cef71b79d115435e08a350f0c92bf063da7c7d50878d0e486ba4256"
+      },
+      {
+        "id": "pipeline.trust-anchor-bootstrap-test-never-registered-in-verify",
+        "sha256": "b4e332837f2b5e292ef7e0532e58f118ddaf2c6f8b4a291cb85d74bdaa377e9f"
+      },
+      {
+        "id": "pipeline.trust-mismatch-names-neither-key-nor-directory",
+        "sha256": "08f33540b691cbf17af0e8566e6b37db5abb04531036897c2b1638f641b451b9"
+      },
+      {
+        "id": "pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key",
+        "sha256": "6f83e92808d73bb0728b324d7b5e355b5ec6523b7bac58ef35882be20a643731"
+      },
+      {
+        "id": "pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof",
+        "sha256": "19ed99202a78f6440b1e0b336d9dddf26be9e9dfd7788f2a7f98eaa12d0c41e8"
+      },
+      {
+        "id": "pipeline.twin-manifest-files-can-drift-without-detection",
+        "sha256": "355bacff19b10a4a6f0cd1306d5e77e16b3d8920dd936024ddefb251bb4df667"
+      },
+      {
+        "id": "pipeline.two-guard-hook-test-files-unregistered-in-verify",
+        "sha256": "5d943fda991060f4778027cb0b5cda982af972f8ae1ce73994afa647e942cf78"
+      },
+      {
+        "id": "pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching",
+        "sha256": "c2d42e8d78747cf858453ff968ee5aa801d66b8d7f52ef1b9c5b44edb9188472"
+      },
+      {
+        "id": "pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions",
+        "sha256": "b4ed737f8f745bcbb2e0a53abedb3e45becfd5ca06b177cd5cb4929004cf95a8"
+      },
+      {
+        "id": "pipeline.two-manifest-literals-bypass-the-single-seed-owner",
+        "sha256": "b10f2f49d2879501f91e3e0c067321c1418465223bc3811b9ee2d290979b04ef"
+      },
+      {
+        "id": "pipeline.two-minor-happy-path-retries-in-the-final-codex-run",
+        "sha256": "13e6b79190edeb005c2ffe07df858820b529bfb87c8d06f395ebc5fba8b5e3de"
+      },
+      {
+        "id": "pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix",
+        "sha256": "2b7aa5ad1d88ad5e2614b794be2a37767765d8813464b4d6a0c65e22f33fbb8f"
+      },
+      {
+        "id": "pipeline.two-signature-ceremonies-overwrite-each-others-proof",
+        "sha256": "0c984054e080452c112c593d7c5dce02c9764b3c1d116afb9fc1e0da5a8f2c4f"
+      },
+      {
+        "id": "pipeline.two-v3-scripts-admitted-but-unnamed",
+        "sha256": "5d190e0bfe4a6033cd035fc0d62045217784994dbb16c7c57be57e86a594077f"
+      },
+      {
+        "id": "pipeline.undocumented-transcript-fallback-selects-wrong-file-by-mtime",
+        "sha256": "951d3493ef6f5baa19911ffbc27ef92b9187977e4da037f5751c032056b11a52"
+      },
+      {
+        "id": "pipeline.unenforced-process-rules-vary-by-runner",
+        "sha256": "e6bbefb4e881a35e44bb8c4c563e0309fa061b955c2d7824f37d7fa465343e52"
+      },
+      {
+        "id": "pipeline.unified-human-authorization-ux",
+        "sha256": "f18ead1a8cf50fd3b53661f1ec62b0b562108b6d21a09be2fe66e9a8cb6ba7f4"
+      },
+      {
+        "id": "pipeline.universal-human-command-renderer",
+        "sha256": "6fc170744059c21fcc33a930e93b694d19ff53d2b58dcbf9be23c22d86523ea6"
+      },
+      {
+        "id": "pipeline.unregistered-suite-is-red-and-invisible-to-verify",
+        "sha256": "fc6c10b6b6ca8cd55e84e371ecc8efcaf2d340c011ad9ba3b68b5cf637137cd7"
+      },
+      {
+        "id": "pipeline.v1-trust-anchor-makes-signature-push-functionless",
+        "sha256": "37dc67329ba77c0040e26bf81787ac04bf8dde3a174e74f0fc3cf359acd0ce36"
+      },
+      {
+        "id": "pipeline.vendored-dispatch-templates-drift-from-canon",
+        "sha256": "45ee7ddb8f29456148310b9e27d71fafd1e3e03b4147eabaab0bd91213ac59a0"
+      },
+      {
+        "id": "pipeline.verify-authorship-defaults-to-source-markers-not-behavior",
+        "sha256": "47425733d08621f2c6083b79224f1ce92d9dda6ece8c8a565d70d9cd63c82552"
+      },
+      {
+        "id": "pipeline.verify-cannot-rerun-fresh-at-unchanged-tree",
+        "sha256": "1229f92ffcad64ad506b0f44e1b86a7b41314cce693051c3fab662b5365c00fa"
+      },
+      {
+        "id": "pipeline.verify-contract-fails-until-configured-but-gs-10-blocks-configuring-it",
+        "sha256": "d0dd9c601d07292c1e48af9e7b871c75e2e3a5a4b4102b44f9596b02a28cb30c"
+      },
+      {
+        "id": "pipeline.verify-evidence-has-no-producer",
+        "sha256": "b501d30f97504075a07e9d6c9df552f5dc16d1e680331080d090062c54274807"
+      },
+      {
+        "id": "pipeline.verify-evidence-is-trusted-on-read-and-was-forged",
+        "sha256": "46f974642ee9f66bb2d624fda3737aa4734408ddf24adf6c1fb2814f51915c7d"
+      },
+      {
+        "id": "pipeline.verify-evidence-needs-an-explicit-strength-class",
+        "sha256": "f9adf2b1ffacdd15b325fbeb1db1bd28e553272a9bc499a5e03873247eacd5c1"
+      },
+      {
+        "id": "pipeline.verify-gate-scoped-registration",
+        "sha256": "a017fc75cb159875d49093ae0c7d5b94a1143be559600e7b92e8fbc5f37083cb"
+      },
+      {
+        "id": "pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls",
+        "sha256": "596521e74692a04326d45b915a5e1e6ecae9315738a40432608e32c2a61e64ea"
+      },
+      {
+        "id": "pipeline.verify-gate-unreachable-without-a-session-cleanup-binding",
+        "sha256": "ee8589d6a4da70e956a055f289d2bc6968fbe61ce817c90dddeffef2cfe97cd4"
+      },
+      {
+        "id": "pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost",
+        "sha256": "28d0ab47f37d625b4ade398458bae501d38864a99504c89c818788d5c5d1555e"
+      },
+      {
+        "id": "pipeline.verify-marketplace-attestation-blocks-normal-active-development",
+        "sha256": "dbbc3fa59aa126880750d42b7c2670acd0b224a7c6276dd5c6e3a3875860446e"
+      },
+      {
+        "id": "pipeline.verify-mjs-runs-385-suites-strictly-sequentially",
+        "sha256": "18d07cc810fd8b01d62f49a8b5a91b84e92758eb92d114c71e7afad349ec4725"
+      },
+      {
+        "id": "pipeline.verify-placeholder-manual-check-required-accepted-by-gate",
+        "sha256": "3bad5f31fa742aa90eebe12558ed8f2b61fda0634cba7e52793cf010f682b468"
+      },
+      {
+        "id": "pipeline.verify-range-mode-registration-for-orchestrator-commit-control",
+        "sha256": "c90c052b178c0d19e84652358d8ac600e1628fd6f91a9bc49724ae9a168063e9"
+      },
+      {
+        "id": "pipeline.verify-registration-check-fixtures-lack-real-git-topology",
+        "sha256": "4a04a087315e297f1df7a401794894b0456e229e12a44384559f10edf1263d25"
+      },
+      {
+        "id": "pipeline.verify-runtime-concentrated-in-ten-suites",
+        "sha256": "403c31d4a4ac711a56dfa4fd2845619bedfc2b1e42123c1e141da37e17691917"
+      },
+      {
+        "id": "pipeline.verify-suite-reads-real-machine-state",
+        "sha256": "e507e548dea310f50c32fecb974ac4eec8cb8ba24c54c4c77b2cdc6115194e61"
+      },
+      {
+        "id": "pipeline.warn-security-gate-hard-blocks-every-push",
+        "sha256": "392e7fac5e755a44ea028201600c4db3440abac495c75d2b0ed4c54ee0ab6a15"
+      },
+      {
+        "id": "pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals",
+        "sha256": "4c5073061fbb5a1915125d8b5f4088112b3eb5a80bc7ade48cb58b9d0882f935"
+      },
+      {
+        "id": "pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory",
+        "sha256": "6611765593003dd4b05a982a98575f9669499765b3edb390f74f3db3e3aad441"
+      },
+      {
+        "id": "pipeline.windows-directory-durability",
+        "sha256": "59ad5dd56c5a16ca20cfeeec08de8b43911ce34abecf50630815efa4c01bdb86"
+      },
+      {
+        "id": "pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs",
+        "sha256": "c8ad1a77f6e2492960d175be05c4c0f1ef9b2355fc95192aae68fb18ef570460"
+      },
+      {
+        "id": "pipeline.windows-private-state-assurance",
+        "sha256": "08a4367f48bbbeda0bf560d91caa3896760d4c153687ff4f61332f3d9bb09b17"
+      },
+      {
+        "id": "pipeline.windows-runtime-baseline-containment",
+        "sha256": "62ac9ead2e3d87d91e3f436778c3f5b73fc6e30ce244044c0da97b105d823dd3"
+      },
+      {
+        "id": "pipeline.windows-trusted-tool-resolution",
+        "sha256": "67ed62667ef72bff6f497edc20d6a244b8b13c762b1cbf9ad269ccb66ad8172b"
+      },
+      {
+        "id": "pipeline.windows-verify-brittle-test-hygiene",
+        "sha256": "4aa8ac44cb6809f0454c75c603a39d6bfafaa05354cd04329f9aaefe6524515d"
+      },
+      {
+        "id": "pipeline.windows-verify-reproducibility",
+        "sha256": "05e2743a7f780eb89bd699f6667cdf9f8eaefb6b4e1e9560939e838fdbd7b005"
+      },
+      {
+        "id": "pipeline.worker-cancellation-is-denied-when-the-record-digest-ages-between-read-and-cancel",
+        "sha256": "59cf5a5b6b73973d955342576356d423ad429d11c17b760995e1bdd420ea1232"
+      },
+      {
+        "id": "pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact",
+        "sha256": "e5780d57e99f213d6e1dcf6432ff62323eb06b644ba740ac816c027430577d99"
+      },
+      {
+        "id": "pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session",
+        "sha256": "05ede30b77a44f5232e5377d85228bd083651b7fa0663eef31ea49610b2b15c5"
+      },
+      {
+        "id": "pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty",
+        "sha256": "0cc3931f48e613f5282cede1845fc17056ec580c3e3bad4f36004ae3f3149c49"
+      },
+      {
+        "id": "pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify",
+        "sha256": "910b1329255bf24122c728a568d48d5392a28c3f8ffc383316e8c4d97f82b975"
+      },
+      {
+        "id": "pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name",
+        "sha256": "6d929bf188df3f924563e36335def20a1d38f1474e565e89feadcfe68cadfd1d"
+      },
+      {
+        "id": "pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass",
+        "sha256": "93c70fcee7f0148c939ab99d2029f7cd65f0e071fa0e0eb0922e8fd9cd753238"
+      }
+    ]
+  },
+  "bindings": [
+    {
+      "id": "pipeline.backlog-delivery-status-reconciliation",
+      "issue": 57,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A57-1",
+        "NVA-A57-2",
+        "NVA-A57-3",
+        "NVA-A57-4",
+        "NVA-A57-5",
+        "NVA-A57-6"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.bounded-scheduling",
+      "issue": 12,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A12-1",
+        "NVA-A12-2",
+        "NVA-A12-3",
+        "NVA-A12-4"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.closed-input-channel-review-economics",
+      "issue": 54,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A54-1",
+        "NVA-A54-2",
+        "NVA-A54-4",
+        "NVA-A54-7",
+        "NVA-A54-9"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "revalidate:2026-08-17"
+    },
+    {
+      "id": "pipeline.codex-plugin-validator-host-parity",
+      "issue": 7,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A7-1",
+        "NVA-A7-2",
+        "NVA-A7-3",
+        "NVA-A7-4",
+        "NVA-A7-5",
+        "NVA-A7-6"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.codex-sandbox-critic-longterm",
+      "issue": 29,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A29-1",
+        "NVA-A29-2",
+        "NVA-A29-3",
+        "NVA-A29-4",
+        "NVA-A29-5",
+        "NVA-A29-6"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.evidence-bound-review-retry-economics",
+      "issue": 54,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A54-3",
+        "NVA-A54-4",
+        "NVA-A54-5",
+        "NVA-A54-6",
+        "NVA-A54-7"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "revalidate:2026-08-10"
+    },
+    {
+      "id": "pipeline.execution-model-switchback",
+      "issue": 38,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A38-1",
+        "NVA-A38-2",
+        "NVA-A38-3",
+        "NVA-A38-4",
+        "NVA-A38-5",
+        "NVA-A38-6",
+        "NVA-A7-1",
+        "NVA-A7-2",
+        "NVA-A7-3",
+        "NVA-A7-4",
+        "NVA-A7-5"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.execution-plane-contract",
+      "issue": 14,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A14-1",
+        "NVA-A14-2",
+        "NVA-A14-3",
+        "NVA-A14-4",
+        "NVA-A14-5"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.multi-cli-efficiency-pilots",
+      "issue": 8,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A8-1",
+        "NVA-A8-2",
+        "NVA-A8-3",
+        "NVA-A8-4",
+        "NVA-A8-5"
+      ],
+      "closureMode": "po-withdrawn-scope",
+      "expiryDisposition": "not-applicable",
+      "poWithdrawal": {
+        "itemPath": "backlog/items/2026-07-20-multi-cli-efficiency-pilots.md",
+        "sourceCommit": "f98f05b52635a172526407d3a5e99490dca8104c",
+        "sourceSha256": "7a0f0cfa653a76f9205f3373da19dcec75be21c0bc0679d98feff90e46d6c264",
+        "ledgerSequence": 793,
+        "ledgerEntryHash": "c43cb511d0c6dd6ce2e846162c3b56ec8ec5ab3231b27e48b03f8f68e958b4d7"
+      }
+    },
+    {
+      "id": "pipeline.t1-governance-path-preflight",
+      "issue": 56,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A54-1",
+        "NVA-A54-2",
+        "NVA-A54-7",
+        "NVA-A56-1",
+        "NVA-A56-2",
+        "NVA-A56-3",
+        "NVA-A56-4",
+        "NVA-A56-5",
+        "NVA-A56-6"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.afk-assumption-mode",
+      "issue": 16,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B16-1",
+        "NVA-B16-2",
+        "NVA-B16-3",
+        "NVA-B16-4",
+        "NVA-B16-5"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.antigravity-alpha-boundary",
+      "issue": 15,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B15-1",
+        "NVA-B15-2",
+        "NVA-B15-3",
+        "NVA-B15-4",
+        "NVA-B15-5",
+        "NVA-B15-6"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.canonical-worktree-lifecycle",
+      "issue": 21,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B21-4",
+        "NVA-B21-5",
+        "NVA-B21-6",
+        "NVA-B21-7"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.credential-leases",
+      "issue": 18,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B18-1",
+        "NVA-B18-2",
+        "NVA-B18-3",
+        "NVA-B18-4"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.nonblocking-interaction-continuity",
+      "issue": 49,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B21-4",
+        "NVA-B49-8"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.po-gate-worktree-authority",
+      "issue": 21,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B21-2",
+        "NVA-B21-3",
+        "NVA-B21-7"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.project-scoped-github-issue-operations",
+      "issue": 51,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B51-1",
+        "NVA-B51-2",
+        "NVA-B51-3",
+        "NVA-B51-4",
+        "NVA-B51-5",
+        "NVA-B51-6",
+        "NVA-B51-7",
+        "NVA-B51-8",
+        "NVA-B51-9"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "revalidate:2026-08-17"
+    },
+    {
+      "id": "pipeline.runner-native-continuation",
+      "issue": 60,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B60-1",
+        "NVA-B60-10",
+        "NVA-B60-11",
+        "NVA-B60-12",
+        "NVA-B60-13",
+        "NVA-B60-14",
+        "NVA-B60-15",
+        "NVA-B60-16",
+        "NVA-B60-2",
+        "NVA-B60-3",
+        "NVA-B60-4",
+        "NVA-B60-5",
+        "NVA-B60-6",
+        "NVA-B60-7",
+        "NVA-B60-8",
+        "NVA-B60-9"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.session-keep-awake",
+      "issue": 49,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B49-5",
+        "NVA-B49-6",
+        "NVA-B49-7"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    }
+  ],
+  "recordSha256": "88a8b702869a9fe267590d0c6f9665fae5338fc7b768d3252f69a1f0842c2447"
+}

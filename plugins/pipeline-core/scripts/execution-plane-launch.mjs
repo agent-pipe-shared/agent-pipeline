@@ -14,12 +14,10 @@
  * plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs rather than
  * inventing new supervisor-driving or lifecycle-composing code.
  *
- * Deliberately drives the fixture worker to a nonzero exit code so the real
- * observed outcome reaches "failed" -- a genuine TERMINAL_STATE for both
- * execution-plane-contract.mjs and scheduling-lifecycle.mjs, reachable
- * without fabricating a verifier pass (which this consumer has no real
- * capability to produce). A real failure is an acceptable, honestly reported
- * result (briefing NVA-A1214-EXEC-01, field 3/4).
+ * The default nonzero exit preserves the historical real failure observation.
+ * Exit zero uses a real authorized workspace write followed by a separate
+ * host readback of exact expected bytes and the supervisor's result manifest;
+ * only that verified successor can enter scheduling-lifecycle as completed.
  *
  * USAGE (briefing NVA-A1214-SUCCESS-1). The fixture exit code above used to be
  * a literal, so selecting any other real outcome meant editing this file:
@@ -35,21 +33,14 @@
  * the default -- silently sealing evidence under the wrong exit code is the
  * one failure this parameter must not be able to cause.
  *
- * WHAT --fixture-exit-code 0 ACTUALLY REACHES, stated plainly because it is a
- * property of the frozen contract and not of this flag: exit code 0 makes the
- * real worker record "completed", which normalizeRealExecutionOutcome maps to
- * "succeeded-unverified" (execution-plane-contract.mjs ~L213). That is a real
- * success-path observation, but it is NOT in that file's TERMINAL set, and
- * scheduling-lifecycle.mjs's terminal-outcome vocabulary admits only
- * {"verified"} u TERMINAL_STATE (~L130). Step 5 below therefore rejects it --
- * correctly. Reaching "verified" needs a real verifier pass this consumer
- * cannot produce, and asserting one would be exactly the fabrication the
- * paragraph above refuses. The flag exposes the choice; it does not, and must
- * not, invent the authority the contract is missing.
+ * WHAT --fixture-exit-code 0 REACHES: the real worker first produces
+ * "succeeded-unverified". A distinct fixture-specific host verifier then
+ * reads the isolated workspace bytes and the supervisor change manifest.
+ * It rejects mismatches rather than promoting process exit alone to verified.
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, uptime } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,6 +64,7 @@ import {
   executionSubjectDigest,
   reduceExecutionState,
   reduceRealExecutionState,
+  reduceRealVerifiedExecutionState,
 } from "../lib/execution-plane-contract.mjs";
 import { planParallelDispatch } from "../lib/parallel-dispatch-planner.mjs";
 import { composeSchedulingLifecycle, schedulingLifecycleDigest, schedulingPackageSetDigest } from "../lib/scheduling-lifecycle.mjs";
@@ -138,7 +130,36 @@ export function parseFixtureExitCode(argv = process.argv.slice(2)) {
  * reading of the diff.
  */
 export function buildRunnerFixture(exitCode) {
-  return { delayMs: 200, exitCode, behavior: "none" };
+  return { delayMs: 200, exitCode, behavior: exitCode === 0 ? "first-authorized" : "none" };
+}
+
+/** Fixture-specific verifier: independent readback, never process-exit inference. */
+export function verifyFixtureSuccess({ stateRoot, worker, subject, candidateCommit }) {
+  const result = worker?.result;
+  const relativePath = "src/e2e.txt";
+  if (worker?.state !== "completed" || result?.status !== "completed" || result.exitCode !== 0 || result.signal !== null
+    || result.taskId !== worker.taskId || result.subjectSha256 !== subject.subjectSha256
+    || result.candidateCommit !== candidateCommit || !Array.isArray(result.changed) || result.changed.length !== 1
+    || result.changed[0].path !== relativePath || result.changed[0].kind !== "modified") {
+    throw new Error("A4-VERIFY-WORKER-BINDING");
+  }
+  const workspacePath = join(stateRoot, "workspaces", worker.workspaceMember);
+  const outputPath = join(workspacePath, relativePath);
+  if (!lstatSync(outputPath).isFile() || lstatSync(outputPath).isSymbolicLink()
+    || !realpathSync(outputPath).startsWith(`${realpathSync(workspacePath)}/`)) throw new Error("A4-VERIFY-PATH");
+  const actual = readFileSync(outputPath);
+  const expected = Buffer.from(`e2e\n\nfixture:${worker.taskId}:${subject.subjectSha256.slice(0, 12)}\n`, "utf8");
+  const actualSha256 = createHash("sha256").update(actual).digest("hex");
+  const expectedSha256 = createHash("sha256").update(expected).digest("hex");
+  const change = result.changed[0];
+  if (!actual.equals(expected) || change.bytes !== actual.length || change.sha256 !== actualSha256) {
+    throw new Error("A4-VERIFY-OUTPUT-MISMATCH");
+  }
+  return {
+    schema: "pipeline.real-execution-verification.v1", dispatchId: subject.dispatchId, attempt: subject.attempt,
+    candidateCommit, subjectSha256: subject.subjectSha256, resultSha256: result.resultSha256,
+    outputPath: relativePath, outputBytes: actual.length, outputSha256: actualSha256, expectedSha256,
+  };
 }
 
 function git(args, cwd) {
@@ -303,8 +324,17 @@ async function main({ fixtureExitCode = DEFAULT_FIXTURE_EXIT_CODE } = {}) {
     const realOutcome = { dispatchId, attempt: 0, candidateCommit: fixture.commit, worker: recordWorker };
     const finalReduction = reduceRealExecutionState(running.state, realOutcome);
     if (!finalReduction.ok) throw new Error(`EPC-REAL-OUTCOME:${finalReduction.code}`);
-    const finalState = finalReduction.state;
+    let finalState = finalReduction.state;
     log.steps.push({ step: "execution-plane-real-outcome", state: finalState.state, code: finalReduction.code, observationSource: finalState.observation.source });
+    if (finalState.state === "succeeded-unverified") {
+      const verification = verifyFixtureSuccess({ stateRoot, worker: recordWorker,
+        subject: { ...executionSubject, subjectSha256 }, candidateCommit: fixture.commit });
+      const verified = reduceRealVerifiedExecutionState(finalState, verification);
+      if (!verified.ok) throw new Error(`A4-VERIFY-REDUCTION:${verified.code}`);
+      finalState = verified.state;
+      log.steps.push({ step: "execution-plane-host-verification", state: finalState.state,
+        outputSha256: verification.outputSha256, observationSource: finalState.observation.source });
+    }
 
     // --- 5. Project into scheduling-lifecycle's simpler terminal-outcome shape
     // and drive composeSchedulingLifecycle for real (fixture-construction
@@ -335,8 +365,10 @@ async function main({ fixtureExitCode = DEFAULT_FIXTURE_EXIT_CODE } = {}) {
 
     const projectedOutcome = { packageId, state: finalState.state, evidenceSha256: executionStateDigest(finalState), subjectSha256 };
     const queue1 = { ...queue0, revision: 1 };
-    const plannerInput1 = { ...plannerInput0, completed: [] };
-    const effectivePackages = packages.filter((entry) => entry.id !== packageId);
+    const plannerInput1 = { ...plannerInput0, completed: finalState.state === "verified" ? [packageId] : [] };
+    const effectivePackages = finalState.state === "verified"
+      ? packages
+      : packages.filter((entry) => entry.id !== packageId);
     const plannerReceipt1 = planParallelDispatch({ ...plannerInput1, packages: effectivePackages });
     const lifecycle1 = composeSchedulingLifecycle({
       queue: queue1,
