@@ -701,6 +701,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
       consumed = consumeHumanGuardOverride({
         rootDir: projectRoot,
         pluginRoot: PLUGIN_ROOT,
+        provider: "antigravity",
         toolName,
         toolInput: toolInput ?? {},
         denials,
@@ -727,6 +728,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
         const planned = recordHumanGuardDenial({
           rootDir: projectRoot,
           pluginRoot: PLUGIN_ROOT,
+          provider: "antigravity",
           toolName,
           toolInput: toolInput ?? {},
           denials,

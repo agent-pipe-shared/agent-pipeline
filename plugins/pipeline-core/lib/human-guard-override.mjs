@@ -773,7 +773,10 @@ function readJson(path) {
   return value;
 }
 
-function pluginIdentity(pluginRoot) {
+function pluginIdentity(pluginRoot, provider = "codex") {
+  if (provider !== "codex" && provider !== "antigravity") {
+    fail("HGO-PLUGIN", "loaded plugin provider is invalid");
+  }
   const root = physicalRoot(pluginRoot);
   const manifestPath = join(root, ".codex-plugin", "plugin.json");
   const agyManifestPath = join(root, "plugin.json");
@@ -798,14 +801,20 @@ function pluginIdentity(pluginRoot) {
     }
   }
   let manifest;
-  const activeManifestPath = existsSync(manifestPath) ? manifestPath : (existsSync(agyManifestPath) ? agyManifestPath : null);
+  const activeManifestPath = provider === "antigravity"
+    ? (existsSync(agyManifestPath) ? agyManifestPath : null)
+    : (existsSync(manifestPath) ? manifestPath : (existsSync(agyManifestPath) ? agyManifestPath : null));
   if (!activeManifestPath) fail("HGO-PLUGIN", "loaded plugin manifest is missing");
   try { manifest = JSON.parse(readFileSync(activeManifestPath, "utf8")); }
   catch { fail("HGO-PLUGIN", "loaded plugin manifest is malformed"); }
-  if ((manifest?.name !== "pipeline-core" && manifest?.name !== "agent-pipeline-core") || (typeof manifest.version !== "string" && !existsSync(agyManifestPath))) {
+  if ((provider === "antigravity" && manifest?.name !== "agent-pipeline-core")
+    || (provider === "codex" && manifest?.name !== "pipeline-core" && manifest?.name !== "agent-pipeline-core")
+    || (provider === "antigravity" && (typeof manifest.version !== "string" || manifest.version.trim() === ""))
+    || (provider === "codex" && typeof manifest.version !== "string" && !existsSync(agyManifestPath))) {
     fail("HGO-PLUGIN", "loaded plugin identity is invalid");
   }
   return {
+    ...(provider === "antigravity" ? { provider } : {}),
     root,
     name: manifest.name,
     version: manifest.version || "0.0.0",
@@ -816,6 +825,12 @@ function pluginIdentity(pluginRoot) {
     windowsPrivateSha256: sha(readFileSync(windowsPrivatePath)),
     cliSha256: sha(readFileSync(cliPath)),
   };
+}
+
+function boundPluginProvider(plugin) {
+  if (plugin?.provider === undefined) return "codex";
+  if (plugin.provider === "antigravity") return "antigravity";
+  fail("HGO-PLUGIN", "bound plugin provider is invalid");
 }
 
 function policyIdentity(root, pluginRoot, denials) {
@@ -970,7 +985,7 @@ function armTimeFreshnessCheck({ repo, pluginRoot, planned, spawn }) {
   if (canonical(policy) !== canonical(planned.policy)) {
     fail("HGO-DRIFT", "override policy identity drifted before arming");
   }
-  const plugin = pluginIdentity(pluginRoot);
+  const plugin = pluginIdentity(pluginRoot, boundPluginProvider(planned.plugin));
   if (canonical(plugin) !== canonical(planned.plugin)) {
     fail("HGO-PLUGIN-DRIFT", "override machinery plugin identity drifted before arming");
   }
@@ -2988,6 +3003,7 @@ export function previewHumanGuardRecovery({ rootDir, pluginRoot, toolName, toolI
 export function recordHumanGuardDenial({
   rootDir,
   pluginRoot,
+  provider = "codex",
   toolName,
   toolInput,
   denials,
@@ -3072,7 +3088,7 @@ export function recordHumanGuardDenial({
   const request = {
     schema: REQUEST_SCHEMA,
     root: repo.root,
-    plugin: pluginIdentity(pluginRoot),
+    plugin: pluginIdentity(pluginRoot, provider),
     repository,
     toolName,
     toolInputSha256: sha(toolInput),
@@ -3214,7 +3230,7 @@ export function planHumanGuardOverride({
   const isLocalPluginInstall = request.mode === "global-plugin-install";
   if (topologyError !== null && !isLocalPluginInstall) throw topologyError;
   assertRequestNotExpired(request, repo, nowMs);
-  const plugin = pluginIdentity(pluginRoot);
+  const plugin = pluginIdentity(pluginRoot, boundPluginProvider(request.plugin));
   const repository = isLocalPluginInstall
     ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
     : repositoryObservation(repo.root, spawn);
@@ -3306,7 +3322,7 @@ export function refreezeHumanGuardOverridePlan({
   const repository = repositoryObservation(repo.root, spawn);
   const policy = policyIdentity(repo.root, pluginRoot, request.denials);
   assertNoRequestDrift(repository, policy, request);
-  const plugin = pluginIdentity(pluginRoot);
+  const plugin = pluginIdentity(pluginRoot, boundPluginProvider(request.plugin));
   if (canonical(plugin) !== canonical(request.plugin)) {
     fail("HGO-DRIFT", "override plugin identity drifted before refreeze");
   }
@@ -4049,6 +4065,7 @@ export function authorizeHumanGuardOverrideBySignature({
 export function consumeHumanGuardOverride({
   rootDir,
   pluginRoot,
+  provider = "codex",
   toolName,
   toolInput,
   denials,
@@ -4128,7 +4145,7 @@ export function consumeHumanGuardOverride({
       if (!authorized) {
         return { status: "invalid", code: "HGO-AUDIT" };
       }
-      const plugin = pluginIdentity(pluginRoot);
+      const plugin = pluginIdentity(pluginRoot, provider);
       const policy = policyIdentity(repo.root, pluginRoot, denials);
       const isLocalPluginInstall = capability.mode === "global-plugin-install";
       if (isLocalPluginInstall && !exactLocalPluginInstall(toolName, toolInput, repo.root)) {

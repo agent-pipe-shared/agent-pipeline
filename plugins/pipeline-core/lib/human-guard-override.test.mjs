@@ -2925,6 +2925,80 @@ test("policy-library and override-CLI drift invalidate the loaded plugin identit
   }
 });
 
+test("Antigravity HGO binds its own manifest through planning, arming, and consumption", () => {
+  const root = fixture();
+  const plugin = mkdtempSync(join(tmpdir(), "human-guard-agy-plugin-"));
+  const codexVersion = "0.7.0+codex.fixture";
+  const agyVersion = "0.7.0+antigravity.fixture";
+  try {
+    for (const relative of [
+      ["hooks", "codex-pretool-guard.mjs"],
+      ["hooks", "guard-command-grammar.mjs"],
+      ["lib", "human-guard-override.mjs"],
+      ["lib", "windows-private-state.mjs"],
+      ["scripts", "guard-human-override.mjs"],
+    ]) {
+      mkdirSync(join(plugin, relative[0]), { recursive: true });
+      copyFileSync(join(PLUGIN_ROOT, ...relative), join(plugin, ...relative));
+    }
+    mkdirSync(join(plugin, ".codex-plugin"));
+    writeFileSync(join(plugin, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "pipeline-core", version: codexVersion }));
+    const agyManifest = join(plugin, "plugin.json");
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: agyVersion }));
+    const scriptPath = join(plugin, "scripts", "guard-human-override.mjs");
+    const toolInput = { file_path: "notes.md", content: "Agy manifest binding\n" };
+    const shared = { rootDir: root, pluginRoot: plugin, toolName: "Write", toolInput, denials: denial };
+
+    unlinkSync(agyManifest);
+    assert.throws(() => recordHumanGuardDenial({ ...shared, provider: "antigravity", nowMs: 1000 }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLUGIN");
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: "" }));
+    assert.throws(() => recordHumanGuardDenial({ ...shared, provider: "antigravity", nowMs: 1000 }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLUGIN");
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: agyVersion }));
+
+    const request = recordHumanGuardDenial({ ...shared, provider: "antigravity", nowMs: 1000 });
+    assert.equal(request.status, "planned");
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const storedRequest = JSON.parse(readFileSync(join(common, "agent-pipeline", "human-guard-overrides", "requests", `${request.requestSha256}.json`), "utf8"));
+    assert.equal(storedRequest.plugin.provider, "antigravity");
+    assert.equal(storedRequest.plugin.version, agyVersion);
+    assert.notEqual(storedRequest.plugin.version, codexVersion);
+    assert.equal(storedRequest.plugin.manifestSha256, createHash("sha256").update(readFileSync(agyManifest)).digest("hex"));
+
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: "0.7.1+antigravity.fixture" }));
+    assert.throws(() => planHumanGuardOverride({ rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, nowMs: 1500, scriptPath }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DRIFT");
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: agyVersion }));
+
+    const plan = planHumanGuardOverride({ rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, nowMs: 2000, scriptPath });
+    assert.equal(plan.plugin.provider, "antigravity");
+    assert.equal(plan.plugin.version, agyVersion);
+    const reason = "Attended Agy manifest binding";
+    const prepared = prepareHumanGuardOverrideAuthorization({ rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 2500, scriptPath });
+    const authorization = {
+      rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+      nowMs: 3000, scriptPath,
+    };
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: "0.7.1+antigravity.fixture" }));
+    assert.throws(() => authorizeHumanGuardOverride(authorization),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLUGIN-DRIFT");
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: agyVersion }));
+    const armed = authorizeHumanGuardOverride(authorization);
+    assert.equal(armed.status, "armed");
+    assert.deepEqual(consumeHumanGuardOverride({ ...shared, nowMs: 3500 }), { status: "replan", code: "HGO-DRIFT" });
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: "0.7.1+antigravity.fixture" }));
+    assert.deepEqual(consumeHumanGuardOverride({ ...shared, provider: "antigravity", nowMs: 3750 }), { status: "replan", code: "HGO-DRIFT" });
+    writeFileSync(agyManifest, JSON.stringify({ name: "agent-pipeline-core", version: agyVersion }));
+    assert.equal(consumeHumanGuardOverride({ ...shared, provider: "antigravity", nowMs: 4000 }).status, "consumed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(plugin, { recursive: true, force: true });
+  }
+});
+
 test("missing or replaced audit keys fail closed without silent regeneration", () => {
   for (const mode of ["missing", "replaced"]) {
     const root = fixture();
