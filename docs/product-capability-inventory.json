@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "defef222f4ae2849d11fff33a33fc17f7ea2ab49",
-    "tree": "50facc100d37354c2c7e5184df9f5ae4d35ef629"
+    "commit": "e2713f8c7c0001adb046e718f2f7e5b38b0ccc5d",
+    "tree": "6cd2326100a4fb8b7241132f3718d4d996597154"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -304,6 +304,7 @@
         "verify-phase:harness/scripts/verify.mjs:copy-safe-command-tests",
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-course-admission-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-diagnostic-packet-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
@@ -402,6 +403,8 @@
         "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
+        "verify-phase:harness/scripts/verify.mjs:initial-answers-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:initial-answers-transaction-tests",
         "verify-phase:harness/scripts/verify.mjs:interruption-receipts-tests",
         "verify-phase:harness/scripts/verify.mjs:language-canon-check",
         "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
