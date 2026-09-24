@@ -184,7 +184,13 @@ export function applyQualityPackage({ repoRoot, packageIntent, proof, trustPolic
     runGit(root, ["worktree", "add", "--detach", worktreeDir, packageIntent.baseCommit]);
     runGit(worktreeDir, ["apply", "--check", "--whitespace=error", "-"], packageIntent.unifiedDiff);
     runGit(worktreeDir, ["apply", "--whitespace=error", "-"], packageIntent.unifiedDiff);
-    const changed = runGit(worktreeDir, ["diff", "--name-only"]).trim().split("\n").filter(Boolean).sort();
+    // `git apply` leaves added paths untracked in this detached checkout.
+    // Read both tracked modifications and every untracked path (including an
+    // ignored path explicitly added by the signed patch) before byte readback.
+    const changed = [
+      ...runGit(worktreeDir, ["diff", "--name-only", "-z"]).split("\0").filter(Boolean),
+      ...runGit(worktreeDir, ["ls-files", "--others", "-z"]).split("\0").filter(Boolean),
+    ].sort();
     if (changed.length !== paths.length || changed.some((path, index) => path !== paths[index]) || !verifyResultingFiles(worktreeDir, paths, packageIntent.expectedDigests)) return fail("QUALITY-PACKAGE-READBACK-MISMATCH");
     if (!applyToMain) return { ok: true, code: "QUALITY-PACKAGE-VERIFIED", intentSha256: packageIntent.intentSha256 };
     runGit(root, ["apply", "--check", "--whitespace=error", "-"], packageIntent.unifiedDiff);

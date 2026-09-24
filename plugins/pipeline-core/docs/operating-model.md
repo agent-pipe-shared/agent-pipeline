@@ -1,36 +1,5 @@
 # Agent-Pipeline Operating Model (V3)
 
-<!-- capability:governance-event-ledger -->
-<a id="capability-governance-event-ledger"></a>
-<!-- capability:agent-decision-journal -->
-<a id="capability-agent-decision-journal"></a>
-<!-- capability:audit-and-evidence-cli -->
-<a id="capability-audit-and-evidence-cli"></a>
-<!-- capability:change-control-cli -->
-<a id="capability-change-control-cli"></a>
-<!-- capability:security-control-catalog -->
-<a id="capability-security-control-catalog"></a>
-<!-- capability:supply-chain-provenance -->
-<a id="capability-supply-chain-provenance"></a>
-<!-- capability:ai-assisted-hardening -->
-<a id="capability-ai-assisted-hardening"></a>
-<!-- capability:critical-human-authorization -->
-<a id="capability-critical-human-authorization"></a>
-<!-- capability:repair-guidance-cli -->
-<a id="capability-repair-guidance-cli"></a>
-<!-- capability:human-override-and-maintenance-window -->
-<a id="capability-human-override-and-maintenance-window"></a>
-<!-- capability:cost-and-benchmark-cli -->
-<a id="capability-cost-and-benchmark-cli"></a>
-<!-- capability:error-register-quality-gate -->
-<a id="capability-error-register-quality-gate"></a>
-<!-- capability:organization-policy-packs -->
-<a id="capability-organization-policy-packs"></a>
-<!-- capability:external-traceability-adapters -->
-<a id="capability-external-traceability-adapters"></a>
-<!-- capability:documentation-quality-gates -->
-<a id="capability-documentation-quality-gates"></a>
-
 > _A German reader copy follows below. English is the normative text._
 
 Agent-Pipeline is a versioned operating model for building software with AI
@@ -447,6 +416,123 @@ and evidence remain exactly `po`; omitted configuration renders the default
 compiled runtime. The PO-gate language projection is checked with
 `node harness/scripts/check-po-gate-authority.mjs`; user-facing copies must not
 invent a competing language or approval form.
+
+### Local capability reference: availability is not activation
+
+The following entries name bounded product surfaces, not steps every project
+must run. Except where stated as shipped, they are optional explicit local
+tools. A source file, test, or inventory entry does not prove that a runner
+invoked the tool, that an external service accepted an action, or that a
+consumer repository enabled it. Follow the linked command documentation and
+your project's authority settings before using one.
+
+<!-- capability:governance-event-ledger -->
+<a id="capability-governance-event-ledger"></a>
+
+- **Governance event ledger (optional, host-only):** validates bounded,
+  hash-bound decision events when a caller explicitly uses it; it is not an
+  automatically active runner hook.
+
+<!-- capability:agent-decision-journal -->
+<a id="capability-agent-decision-journal"></a>
+
+- **Agent decision journal (optional, host-only):** validates constrained
+  decision-event classes and an unavailable-journaling disposition; it does
+  not silently record every agent decision.
+
+<!-- capability:audit-and-evidence-cli -->
+<a id="capability-audit-and-evidence-cli"></a>
+
+- **Audit and evidence CLIs (optional, host-only):** explicitly capture, view,
+  replay, export, and bundle local evidence. Running them does not publish an
+  artifact or prove that an external auditor accepted it. The repository's
+  `docs/audit-and-evidence.md` gives further guidance; that guide is not
+  bundled into a plugin-only consumer checkout.
+
+<!-- capability:change-control-cli -->
+<a id="capability-change-control-cli"></a>
+
+- **Change-control CLI (optional, host-only):** checks a local,
+  candidate-bound request. Any external change authorization is separate.
+
+<!-- capability:security-control-catalog -->
+<a id="capability-security-control-catalog"></a>
+
+- **Security control catalog (optional, host-only):** resolves applicability,
+  evaluation receipts, and waiver expiry. It is neither an automatically
+  running scanner nor a substitute for the configured Security gate.
+
+<!-- capability:supply-chain-provenance -->
+<a id="capability-supply-chain-provenance"></a>
+
+- **SBOM and provenance contracts (optional, host-only):** inspect component
+  inputs and validate local provenance structures; they do not install
+  scanners or create an external attestation.
+
+<!-- capability:ai-assisted-hardening -->
+<a id="capability-ai-assisted-hardening"></a>
+
+- **AI-assisted change hardening (optional, host-only):** explicitly evaluates
+  untrusted change inputs. Its presence as a library or test is not proof that
+  a particular runner invoked it as a hook.
+
+<!-- capability:critical-human-authorization -->
+<a id="capability-critical-human-authorization"></a>
+
+- **Critical human authorization (shipped, attended, host-only):** a human
+  uses the configured local key for consequential actions. Agent inference,
+  chat text, and a passing unit test do not mint that proof.
+
+<!-- capability:repair-guidance-cli -->
+<a id="capability-repair-guidance-cli"></a>
+
+- **Refusal repair guidance (optional, host-only):** explains which declared
+  recovery route, if any, applies to a denial. The explanation grants no
+  override and cannot turn a refusal into permission.
+
+<!-- capability:cost-and-benchmark-cli -->
+<a id="capability-cost-and-benchmark-cli"></a>
+
+- **Cost and benchmark CLIs (optional, host-only):** inspect admitted local
+  usage inputs or run fixed benchmark fixtures. These results are not a
+  cross-runner cost forecast for a new consumer project. The repository's
+  `docs/cost-and-measurement.md` records the measurement limits; that guide
+  is not bundled into a plugin-only consumer checkout.
+
+<!-- capability:error-register-quality-gate -->
+<a id="capability-error-register-quality-gate"></a>
+
+- **Error-register quality gate (shipped, host-only):** checks that recurring
+  failures have a mechanism, lesson, or explicit deferral. It is a repository
+  quality check, not a runner hook.
+
+<!-- capability:organization-policy-packs -->
+<a id="capability-organization-policy-packs"></a>
+
+- **Organization policy packs (optional, host-only):** a local CLI evaluates
+  or activates a selected pack through its declared contract; merely storing
+  a pack does not activate organization-wide controls.
+
+<!-- capability:external-traceability-adapters -->
+<a id="capability-external-traceability-adapters"></a>
+
+- **External traceability adapters (optional, host-only):** represent external
+  references locally. Provider credentials and external writes require their
+  own explicit configuration and authorization.
+
+<!-- capability:human-override-and-maintenance-window -->
+<a id="capability-human-override-and-maintenance-window"></a>
+
+- **Human override and maintenance window (optional, attended, host-only):**
+  prepare and evaluate bounded exception ceremonies; neither is an agent's
+  standing bypass of a guard.
+
+<!-- capability:documentation-quality-gates -->
+<a id="capability-documentation-quality-gates"></a>
+
+- **Documentation quality gates (optional, host-only):** explicitly run
+  contract, identifier, lifecycle, and reconciliation checks. Passing them
+  does not publish the documentation or replace a reader review.
 
 ## 8. Operating shapes
 
@@ -867,6 +953,61 @@ für die menschlich sichtbare Sprache der kompilierten Laufzeit. Die
 PO-Gate-Sprachprojektion prüft
 `node harness/scripts/check-po-gate-authority.mjs`; Nutzertexte dürfen keine
 zweite Sprache oder Freigabeform erfinden.
+
+### Lokale Funktionen: Verfügbarkeit ist keine Aktivierung
+
+Diese Funktionen sind begrenzte Produktbausteine, keine Pflichtschritte für
+jedes Projekt. Außer den ausdrücklich als ausgeliefert bezeichneten
+Funktionen sind es optionale, explizit aufzurufende lokale Werkzeuge. Quellcode,
+Tests und Inventareinträge beweisen weder eine Runner-Ausführung noch eine
+externe Freigabe oder die Aktivierung in einem Nutzer-Repository.
+
+- **Governance-Event-Ledger (optional, nur Host):** prüft gebundene
+  Entscheidungsereignisse bei explizitem Aufruf; kein automatisch aktiver Hook.
+- **Agenten-Entscheidungsjournal (optional, nur Host):** prüft begrenzte
+  Ereignisklassen und ein „nicht verfügbar“; es protokolliert nicht heimlich
+  jede Agentenentscheidung.
+- **Audit- und Evidenz-CLIs (optional, nur Host):** erfassen, zeigen, spielen
+  und bündeln lokale Evidenz bei explizitem Aufruf. Das ist keine
+  Veröffentlichung oder externe Anerkennung. Weitere Hinweise stehen im
+  Repository unter `docs/audit-and-evidence.md`; dieser Leitfaden gehört
+  nicht zum reinen Plugin-Checkout eines Nutzerprojekts.
+- **Change-Control-CLI (optional, nur Host):** prüft eine lokale,
+  kandidatengebundene Anfrage; externe Autorisierung bleibt getrennt.
+- **Security-Control-Katalog (optional, nur Host):** prüft Anwendbarkeit,
+  Receipts und Waiver-Ablauf; er ist weder ein automatisch laufender Scanner
+  noch Ersatz für das konfigurierte Security-Gate.
+- **SBOM- und Provenienzverträge (optional, nur Host):** prüfen lokale
+  Komponenten- und Provenienzangaben, installieren aber keine Scanner und
+  erstellen keine externe Attestierung.
+- **KI-gestützte Härtung (optional, nur Host):** bewertet nicht vertrauenswürdige
+  Änderungseingaben explizit; ein vorhandener Test bedeutet keinen aktiven
+  Runner-Hook.
+- **Kritische menschliche Autorisierung (ausgeliefert, begleitet, nur Host):**
+  Der Mensch nutzt den konfigurierten lokalen Schlüssel. Agentenannahmen,
+  Chattext und Tests erzeugen keinen solchen Nachweis.
+- **Reparaturhinweise nach Ablehnung (optional, nur Host):** zeigen einen
+  deklarierten Recovery-Weg an, falls es einen gibt; sie erteilen keine
+  Ausnahmegenehmigung.
+- **Kosten- und Benchmark-CLIs (optional, nur Host):** prüfen zugelassene lokale
+  Nutzungsdaten oder feste Benchmark-Fixtures. Daraus folgt keine Kostenprognose
+  für ein neues Nutzerprojekt. Die Messgrenzen stehen im Repository unter
+  `docs/cost-and-measurement.md`; dieser Leitfaden gehört nicht zum reinen
+  Plugin-Checkout eines Nutzerprojekts.
+- **Error-Register-Qualitätsgate (ausgeliefert, nur Host):** prüft Mechanismus,
+  Lehre oder explizite Vertagung bei wiederkehrenden Fehlern; kein Runner-Hook.
+- **Organisations-Policy-Pakete (optional, nur Host):** werden über den lokalen
+  Vertrag geprüft oder aktiviert; ihre Ablage aktiviert noch keine
+  organisationsweite Kontrolle.
+- **Externe Traceability-Adapter (optional, nur Host):** stellen externe
+  Referenzen lokal dar; Zugangsdaten und externe Schreibaktionen brauchen
+  getrennte Konfiguration und Autorisierung.
+- **Menschlicher Override und Maintenance Window (optional, begleitet, nur
+  Host):** begrenzte Ausnahme-Zeremonien, kein dauerhafter Guard-Bypass für
+  Agenten.
+- **Dokumentations-Qualitätsgates (optional, nur Host):** führen Vertrags-,
+  Identifier-, Lifecycle- und Abgleichprüfungen explizit aus; ein grüner Check
+  ist weder Veröffentlichung noch Reader-Review.
 
 ## 8. Betriebsformen
 

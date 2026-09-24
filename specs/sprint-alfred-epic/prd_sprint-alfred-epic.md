@@ -291,8 +291,9 @@ Mapping to issues/backlog: intake docs. Summary:
 - **C1 Interruption receipts (#103).** Five-way classification (planned-gate /
   unplanned-interrupt / external-wait / terminal-blocker / unknown), lineage
   correlation, blocked-wall-time, privacy-bounded local aggregation;
-  two-week dogfood starts in the first implementation wave (it gates B1/D2
-  calibration).
+  real dogfood starts in the first implementation wave. B1/D2 calibration
+  depends on sufficient measured evidence and explicit promotion authority,
+  not a fixed collection age (PO decision 2026-09-13).
 - **C2 Dispatch and Verify economics.** Dispatch bootstrap token breakdown
   (measure before optimizing); truncation closing-allowance (budget as
   handover, not cliff — PO direction); selective-Verify set design from the
@@ -400,7 +401,7 @@ flowchart TD
     A2 --> A4[A4 authority sealing]
     A2 --> A5[A5 evidence closure]
     E1 --> C1[C1 interruption receipts]
-    C1 -->|two-week baseline| B1[B1 rigor floor]
+    C1 -->|sufficient measured calibration evidence| B1[B1 rigor floor]
     A3 --> B1
     D1[D1 decision continuity] --> D2[D2 architecture standard]
     D2 --> D3[D3 fitness enforcement]
@@ -517,9 +518,12 @@ named in `spec.md` §12 and `acceptance.md`:
    from 24 by this design phase's own filed defects — and the live set, read
    via `check-backlog-sprint-assignment.mjs`, is authoritative over any count
    written here.
-5. Report-only phases produce at least the #103-mandated two-week dogfood
-   baseline before any blocking promotion; no blocking behavior lands
-   without its fixture set green.
+5. Report-only phases collect real #103 interruption evidence from the first
+   implementation wave. Before any threshold-dependent blocking promotion,
+   establish sufficient measured coverage and calibration evidence, record the
+   actual collection window and limits, obtain the existing PO promotion
+   decision, and keep the fixture set green. No fixed two-week wait applies;
+   missing evidence or elapsed time alone cannot establish calibrated PASS.
 6. E3 has an injected-executable suite proving a runner-neutral Goldfish
    packet reaches the AGY boundary with candidate/input/result isolation and
    typed success, malformed-output, model-mismatch, timeout, and cancellation

@@ -289,7 +289,8 @@ source-projection fixtures. Assert computed values, status and rejection codes.
 These fixtures cover #103's episode counting, grouping, recurrence ranking,
 recovery-cost visibility, explicit denominators, missing-versus-zero and privacy.
 Existing classification and join tests remain mandatory; this step adds no claim
-of real collection or of the two-week acceptance criterion.
+of real collection or of sufficient measured calibration evidence. There is
+no fixed two-week acceptance wait (PO decision 2026-09-13).
 
 ## Small delivery sequence and remaining gates
 
@@ -328,15 +329,17 @@ Emission/local reports remain a separate step 3 delivery: validate actual source
 bytes, project safe identifiers, wire existing orchestrator observations, write
 ignored `evidence/` receipts and `telemetry/` aggregates, and specify retention
 and user/reference documentation. Step 4 records the real collection start and
-availability and requires measured `windowDays >= 14`; no fixture, elapsed plan
-age or this explicit analytical window creates/backdates that baseline. Full
+availability. Qualification requires sufficient measured coverage and
+calibration evidence with its actual window and limits recorded, not a fixed
+`windowDays` minimum; no fixture, elapsed plan age or this explicit analytical
+window creates/backdates that baseline. Full
 Verify, required independent review, real baseline, documentation acceptance and
 PO acceptance remain open; no implementation or wave completion is claimed.
 
 Field names, conservative ordering, category-based families, historical group
 membership and descriptive ratios are bounded implementation choices under
 approved semantics. Reclassification, replacement join identities, causal repair
-claims, discarded unknowns, baseline shortening, new policy thresholds or new
+claims, discarded unknowns, weakened evidence-quality qualification, new policy thresholds or new
 collection/authority effects require the existing PO-visible scope decision.
 
 Plan checks: stage this new path before running

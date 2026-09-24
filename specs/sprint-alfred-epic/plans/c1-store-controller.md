@@ -742,7 +742,9 @@ gaps. Unknown outranks a narrower estimated statement because supported-source
 acquisition/population qualification has not been established. Operational access
 can separately be unavailable. No file self-certifies live authenticity,
 uninterrupted coverage, all seed categories, measured-zero population or a
->=14-day baseline. Baseline start/qualification is a later owner-managed step.
+qualified calibration baseline. Its actual window, coverage and limits must be
+recorded; no fixed duration alone qualifies it. Baseline start/qualification
+is a later owner-managed step.
 
 ## 9. Planned paths, tests and delivery gates
 

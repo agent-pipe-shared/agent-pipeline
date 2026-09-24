@@ -263,6 +263,8 @@ be green before Critic launch under the current review protocol.
 Actual collection and `interruption-baseline.json` are step 4 of the parent plan,
 after working and qualified emission. Do not backdate to this design, seed
 incidents, fixtures or the pure core/aggregate commits. Require the existing
-measured >=14-day rule before B1 promotion/D2 thresholds. Missing collection is
-not repaired by calendar time. Routine adapter/storage choices do not require a
+measured coverage and calibration evidence before B1 promotion/D2 thresholds,
+with the actual window and limitations recorded and the existing PO promotion
+decision retained. No fixed 14-day rule applies; missing collection is not
+repaired by calendar time. Routine adapter/storage choices do not require a
 new PO decision; semantic expansion follows the existing PO route.

@@ -65,26 +65,54 @@ Codex's binding does not use Claude's `--scope project` commands.
 
 ### Antigravity (Agy)
 
-From the project root, run the installer in a locally available, approved
-plugin directory obtained from the official GitHub distribution (for example
-a released marketplace snapshot or release checkout):
+After the `v0.7.0` release tag is published on the official GitHub repository,
+run these commands with your shell in the **consumer project root**. The tag
+must be available on GitHub before this released-version example can be used.
+The clone lives in a durable physical directory outside the governed project
+and any temporary or runner cache directory. Choose a different durable
+location if `$HOME/.local/share` is unsuitable:
 
 ```sh
-node "/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs"
+mkdir -p "$HOME/.local/share"
+pipeline_release_dir="$HOME/.local/share/agent-pipeline-v0.7.0"
+git clone --branch v0.7.0 --depth 1 https://github.com/agent-pipe-shared/agent-pipeline.git "$pipeline_release_dir"
+git -C "$pipeline_release_dir" switch -c pipeline-release-v0.7.0
+git -C "$pipeline_release_dir" remote get-url origin
+git -C "$pipeline_release_dir" describe --tags --exact-match
+```
+
+Confirm the two Git readbacks show the official URL above and `v0.7.0` before
+running the installer from the same consumer project root. The local branch is
+required because cloning a tag otherwise leaves a detached HEAD, which the
+plugin's clean-source observer refuses; creating the branch does not move the
+checked-out release commit.
+
+```sh
+node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs"
 ```
 
 Select **Approved Plugin Directory** (the default), then **Workspace-Local**
-to register `.agents/plugins.json`. A developer checkout is only for an
-explicit pre-release test. Ensure `node` resolves in the PATH of the actual
-Agy host, fully restart it, open the project workspace, and invoke
-`/pipeline-core:pipeline-start`. The installer may offer a runner-local
-autonomous tool policy; that option grants no plan, release, remote, or human
-authority.
+to register the exact physical plugin directory in the consumer project's
+`.agents/plugins.json`. Keep the clone at that path while it is registered.
+The installer may offer a runner-local autonomous tool policy; that option
+grants no plan, release, remote, or human authority. Ensure `node` resolves in
+the PATH of the actual Agy host, fully restart it, open the project workspace,
+and invoke `/pipeline-core:pipeline-start`.
 
-The registry binds the exact selected plugin directory. On a fresh clone or
-after switching approved versions, run the installer again for that directory
-and restart Agy. Do not copy a previous machine's host receipt or edit the
+To upgrade after a newer final release tag is published, clone that tag into
+a **different** durable directory and run its `install-agy.mjs` from each
+consumer project root. Choose Approved Plugin Directory and Workspace-Local
+again. Read back each project's `.agents/plugins.json`: it must contain the
+new exact plugin path and no previous Pipeline registration, while unrelated
+entries remain. Keep the old checkout until that readback succeeds, then
+retire it and fully restart Agy. A developer checkout is only for an explicit
+pre-release test. Do not copy a previous machine's host receipt or edit the
 registry path by hand.
+
+If the old checkout was already deleted while its registry entry remains,
+restore that exact approved plugin directory first and rerun the installer.
+The installer refuses an unverifiable, Pipeline-shaped stale path rather than
+deleting an entry it cannot prove it owns.
 
 ## Fresh Codex lifecycle V4
 

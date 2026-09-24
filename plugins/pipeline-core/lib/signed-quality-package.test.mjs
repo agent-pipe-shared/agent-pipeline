@@ -39,6 +39,51 @@ test("quality package requires matching human proof and only applies verified by
   } finally { rmSync(item.root, { recursive: true, force: true }); }
 });
 
+test("isolated readback includes new, mixed, and explicitly ignored added paths without writing to main", () => {
+  for (const { mixed, ignored } of [
+    { mixed: false, ignored: false },
+    { mixed: true, ignored: false },
+    { mixed: false, ignored: true },
+  ]) {
+    const item = fixture();
+    try {
+      if (ignored) {
+        writeFileSync(join(item.root, ".gitignore"), "created.txt\n");
+        git(item.root, ["add", ".gitignore"]);
+        git(item.root, ["commit", "-qm", "ignore generated path"]);
+      }
+      writeFileSync(join(item.root, "created.txt"), "created\n");
+      git(item.root, ignored ? ["add", "-f", "created.txt"] : ["add", "created.txt"]);
+      const expectedDigests = { "created.txt": sha("created\n") };
+      if (mixed) {
+        writeFileSync(join(item.root, "subject.txt"), "after\n");
+        git(item.root, ["add", "subject.txt"]);
+        expectedDigests["subject.txt"] = sha("after\n");
+      }
+      const record = {
+        schema: SIGNED_QUALITY_PACKAGE_SCHEMA,
+        baseCommit: git(item.root, ["rev-parse", "HEAD"]),
+        unifiedDiff: execFileSync("git", ["diff", "--cached", "--binary", "HEAD"], { cwd: item.root, encoding: "utf8" }),
+        expectedDigests,
+      };
+      record.intentSha256 = qualityPackageIntentSha256(record);
+      const proof = proofFor(record, item);
+      git(item.root, ["restore", "--staged", "--source=HEAD", "--", "created.txt"]);
+      if (mixed) git(item.root, ["restore", "--staged", "--source=HEAD", "--", "subject.txt"]);
+      rmSync(join(item.root, "created.txt"));
+      if (mixed) writeFileSync(join(item.root, "subject.txt"), "before\n");
+      assert.equal(applyQualityPackage({ repoRoot: item.root, packageIntent: record, proof, trustPolicy: item.trustPolicy }).code, "QUALITY-PACKAGE-VERIFIED");
+      assert.equal(readFileSync(join(item.root, "subject.txt"), "utf8"), "before\n");
+      const badDigestRecord = { ...record, expectedDigests: { ...record.expectedDigests, "created.txt": sha("wrong\n") } };
+      badDigestRecord.intentSha256 = qualityPackageIntentSha256(badDigestRecord);
+      assert.equal(applyQualityPackage({
+        repoRoot: item.root, packageIntent: badDigestRecord,
+        proof: proofFor(badDigestRecord, item), trustPolicy: item.trustPolicy,
+      }).code, "QUALITY-PACKAGE-READBACK-MISMATCH");
+    } finally { rmSync(item.root, { recursive: true, force: true }); }
+  }
+});
+
 test("quality package commit authorization binds the whole staged index and committed trust policy", () => {
   const item = fixture();
   try {

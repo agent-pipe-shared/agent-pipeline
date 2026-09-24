@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { join, dirname, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join, dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { isDirectInvocation } from "./lib/entrypoint.mjs";
@@ -52,6 +53,98 @@ export function attestAntigravityMarketplaceCopy({ sourcePluginRoot, installedPl
   } catch { return { status: "rejected", reason: "IPA-AGY-SOURCE-UNAVAILABLE" }; }
 }
 
+function isPipelineRegistration(path, currentRoot) {
+  if (path === currentRoot) return true;
+  if (!isAbsolute(path) || resolve(path) !== path) return false;
+  const pipelineShaped = path.endsWith(`${sep}plugins${sep}pipeline-core`);
+  try {
+    const info = lstatSync(path);
+    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path) {
+      if (pipelineShaped) throw new Error("Unverifiable existing Pipeline registration");
+      return false;
+    }
+    const manifestInfo = lstatSync(join(path, "plugin.json"));
+    if (!manifestInfo.isFile() || manifestInfo.isSymbolicLink()) throw new Error("Unverifiable existing Pipeline registration");
+    const manifest = JSON.parse(readFileSync(join(path, "plugin.json"), "utf8"));
+    return manifest?.name === "agent-pipeline-core";
+  } catch {
+    // A deleted or unreadable directory cannot prove which plugin owned its
+    // registry entry. Never remove it merely because its path looks familiar.
+    // Restore the old checkout before upgrading; the documented path keeps
+    // it until the new exact binding is read back.
+    if (pipelineShaped) throw new Error("Unverifiable existing Pipeline registration: restore the old plugin directory before retrying");
+    return false;
+  }
+}
+
+/** Replace this plugin's registry binding while retaining unrelated entries. */
+export function updatePluginRegistry({ targetFile, corePluginPath }) {
+  if (typeof corePluginPath !== "string" || !isAbsolute(corePluginPath) || resolve(corePluginPath) !== corePluginPath) {
+    throw new Error("Unsafe Pipeline plugin path");
+  }
+  const sourceInfo = lstatSync(corePluginPath);
+  if (!sourceInfo.isDirectory() || sourceInfo.isSymbolicLink() || realpathSync(corePluginPath) !== corePluginPath) {
+    throw new Error("Unsafe Pipeline plugin path");
+  }
+  const manifestPath = join(corePluginPath, "plugin.json");
+  let sourceManifest;
+  try {
+    const manifestInfo = lstatSync(manifestPath);
+    if (!manifestInfo.isFile() || manifestInfo.isSymbolicLink() || manifestInfo.nlink !== 1) {
+      throw new Error("Unsafe Pipeline source manifest");
+    }
+    sourceManifest = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(manifestPath)));
+  } catch {
+    throw new Error("Unverifiable Pipeline source manifest");
+  }
+  if (sourceManifest === null || typeof sourceManifest !== "object" || Array.isArray(sourceManifest)
+    || sourceManifest.name !== "agent-pipeline-core"
+    || typeof sourceManifest.version !== "string" || sourceManifest.version.trim() === "") {
+    throw new Error("Unverifiable Pipeline source manifest");
+  }
+
+  if (typeof targetFile !== "string" || !isAbsolute(targetFile) || resolve(targetFile) !== targetFile) {
+    throw new Error("Unsafe plugin registry path");
+  }
+  const parent = dirname(targetFile);
+  const parentInfo = lstatSync(parent);
+  if (!parentInfo.isDirectory() || parentInfo.isSymbolicLink() || realpathSync(parent) !== parent) {
+    throw new Error("Unsafe plugin registry parent");
+  }
+  if (existsSync(targetFile)) {
+    const targetInfo = lstatSync(targetFile);
+    if (!targetInfo.isFile() || targetInfo.isSymbolicLink()) throw new Error("Unsafe plugin registry target");
+  } else {
+    try { lstatSync(targetFile); throw new Error("Unsafe plugin registry target"); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
+
+  const config = existsSync(targetFile)
+    ? JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(targetFile)))
+    : { entries: [] };
+  if (config === null || typeof config !== "object" || Array.isArray(config) || !Array.isArray(config.entries)
+    || !config.entries.every((entry) => entry !== null && typeof entry === "object" && !Array.isArray(entry) && typeof entry.path === "string")) {
+    throw new Error(`Malformed plugin registry: ${targetFile}`);
+  }
+  const retained = config.entries.filter((entry) => !isPipelineRegistration(entry.path, corePluginPath));
+  const nextEntries = [...retained, { path: corePluginPath }];
+  if (JSON.stringify(config.entries) === JSON.stringify(nextEntries)) return;
+  const temporary = join(parent, `.${basename(targetFile)}.${randomUUID()}.tmp`);
+  let descriptor;
+  try {
+    descriptor = openSync(temporary, "wx", 0o600);
+    writeFileSync(descriptor, JSON.stringify({ ...config, entries: nextEntries }, null, 2) + "\n");
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = undefined;
+    if (realpathSync(parent) !== parent) throw new Error("Unsafe plugin registry parent");
+    renameSync(temporary, targetFile);
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+    rmSync(temporary, { force: true });
+  }
+}
+
 export function runInteractiveInstaller() {
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 console.log("\n=== Antigravity Pipeline Installer ===\n");
@@ -84,21 +177,13 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
       process.exit(1);
     }
 
-    let config = { entries: [] };
-    if (existsSync(targetFile)) {
-      try {
-        config = JSON.parse(readFileSync(targetFile, "utf-8"));
-        if (!Array.isArray(config.entries)) {
-          config.entries = [];
-        }
-      } catch (e) {
-        console.log(`Warning: Could not parse existing ${targetFile}, overwriting.`);
-      }
-    }
-
-    // Prevent duplicate entries
-    if (!config.entries.some(entry => entry.path === corePluginPath)) {
-      config.entries.push({ path: corePluginPath });
+    try {
+      updatePluginRegistry({ targetFile, corePluginPath });
+    } catch (error) {
+      console.error(`Installation refused: ${error.message}`);
+      rl.close();
+      process.exitCode = 1;
+      return;
     }
 
     if (useMarketplace) {
@@ -110,7 +195,6 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
       console.log("Direct local marketplace root selected; registry binding is the provenance boundary.");
     }
 
-    writeFileSync(targetFile, JSON.stringify(config, null, 2) + "\n");
     console.log(`\nSuccess! Pipeline registered in: ${targetFile}`);
 
     rl.question("\nEnable Autonomous Execution Mode (auto-apply edits & safe commands without prompt)? [y/N]: ", (autoAnswer) => {

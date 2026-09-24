@@ -324,13 +324,15 @@ Implementation commit sequence, each independently green:
 4. Separate actual-collection/baseline increment: only after working emission
    record the real `interruption-baseline.json` start and collection availability.
    No backdating to this plan, seed incidents, fixture runs or pure-core commit.
-   Require measured `windowDays >= 14` before B1 promotion/D2 thresholds; failed
-   or absent collection never qualifies through elapsed calendar time alone.
+   Before B1 promotion/D2 thresholds, require sufficient measured coverage and
+   calibration evidence, record the actual window and limitations, and retain
+   the existing PO promotion decision. No fixed 14-day wait applies; failed or
+   absent collection never qualifies through elapsed calendar time alone.
 
 The complete #103 requirements remain mapped: fields/classifier/privacy/joins
 and per-lineage metrics → step 1; local recurrence/resolution effectiveness →
 step 2; emitted receipts, reports, retention and user/reference docs → step 3;
-two-week dogfood and threshold qualification → step 4. No hosted service in any
+real dogfood and evidence-based threshold qualification → step 4. No hosted service in any
 step. Exact-candidate documentation verification and issue closure remain E2
 delivery work, not a result of this plan.
 

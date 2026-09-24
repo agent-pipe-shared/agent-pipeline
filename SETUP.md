@@ -161,23 +161,55 @@ marketplace or cache files.
 
 #### Antigravity (Agy): workspace-local binding
 
-Run the installer from a locally available, approved plugin directory obtained
-from the official GitHub distribution (for example a released marketplace
-snapshot or release checkout), while your shell is in the project that Agy
-will govern. A developer's un-released local checkout is only for an explicit
-pre-release test:
+After the `v0.7.0` release tag is published on the official GitHub repository,
+run these commands with your shell in the **consumer project root**. The tag
+must be available on GitHub before this released-version example can be used.
+The clone lives in a durable physical directory outside the governed project
+and any temporary or runner cache directory. Choose a different durable
+location if `$HOME/.local/share` is unsuitable:
 
 ```sh
-node "/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs"
+mkdir -p "$HOME/.local/share"
+pipeline_release_dir="$HOME/.local/share/agent-pipeline-v0.7.0"
+git clone --branch v0.7.0 --depth 1 https://github.com/agent-pipe-shared/agent-pipeline.git "$pipeline_release_dir"
+git -C "$pipeline_release_dir" switch -c pipeline-release-v0.7.0
+git -C "$pipeline_release_dir" remote get-url origin
+git -C "$pipeline_release_dir" describe --tags --exact-match
+```
+
+Confirm the two Git readbacks show the official URL above and `v0.7.0` before
+running the installer from the same consumer project root. The local branch is
+required because cloning a tag otherwise leaves a detached HEAD, which the
+plugin's clean-source observer refuses; creating the branch does not move the
+checked-out release commit.
+
+```sh
+node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs"
 ```
 
 At the first prompt choose **Approved Plugin Directory** (the default). Choose
 **Local Marketplace** only for an explicitly validated pre-release developer
 copy. Then choose **Workspace-Local** when the installer asks where to bind
-the plugin.
-It writes the supported workspace registration; do not hand-edit Agy registry
-or plugin files. The installer may offer a runner-local autonomous tool policy,
-but that option grants no plan, release, remote, or human authority.
+the plugin. The installer registers that exact physical plugin directory in
+the consumer project's `.agents/plugins.json`; keep the clone at the same path
+while it is registered. Do not hand-edit Agy registry or plugin files. The
+installer may offer a runner-local autonomous tool policy, but that option
+grants no plan, release, remote, or human authority.
+
+To upgrade after a newer final release tag is published, clone that tag into
+a **different** durable directory and run its `install-agy.mjs` from each
+consumer project root. Choose Approved Plugin Directory and Workspace-Local
+again. Read back each project's `.agents/plugins.json`: it must contain the
+new exact plugin path and no previous Pipeline registration, while unrelated
+entries remain. Keep the old checkout until that readback succeeds, then
+retire it and fully restart Agy. A developer checkout is only for an explicit
+pre-release test.
+
+If the old checkout was already deleted while its registry entry remains,
+restore that exact approved plugin directory first and rerun the installer.
+The installer refuses an unverifiable, Pipeline-shaped stale path instead of
+deleting an entry it cannot prove it owns; do not work around this by editing
+the registry by hand.
 
 Before opening the governed workspace, verify Node.js in the environment that
 actually starts Agy — a desktop or service launcher can have a different PATH
