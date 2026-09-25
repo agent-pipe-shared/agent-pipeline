@@ -9,8 +9,14 @@ agent: critic
 
 # critic-review — independent review run (standard stage)
 
-The normal call site dispatches one fresh session Critic after the deterministic
-gates and packet preflight pass. It does not launch an external process, export
+The normal call site dispatches one fresh session Critic after the applicable
+deterministic Critic-boundary checks and packet preflight pass. A passing
+candidate-bound `--mode critic` Verify receipt may use impact selection; a
+validated Critic diagnostic may instead disclose targeted failures and a
+still-pending full Verify. Neither is a full release qualification. The full
+`--mode release` Verify follows the first substantive Critic review and binds
+its consumed packet; an unchanged deterministic rerun may use only the exact
+content-bound Critic/Verify lifecycle receipt. It does not launch an external process, export
 a separately assembled packet, or ask the PO for an additional review decision.
 Runner-native hosts and external launchers remain available only when project
 policy explicitly configures them or the user requests stronger or detached
@@ -18,7 +24,7 @@ execution. Their unavailability never invalidates the ordinary session route.
 
 You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, read-only). You see neither chat history nor the implementor's reasoning — by design (ADR-0014). This skill body plus the path arguments below are your ENTIRE dispatch. Canon pointers (agent-pipeline repo, not runtime reads — repo-root paths shown; `roles/critic.md` and `templates/prompts/critic-review.md` also have a plugin-root vendored copy per `pipeline-start` SKILL.md's canon-reference rule, for a hosted project that does read them): `docs/operating-model.md` (*Roles and boundaries* — Critic row; *Evidence, review and recovery*), `harness/review-protocol.md` §2.1 (*Trigger decision table*), `roles/critic.md`, `templates/prompts/critic-review.md`.
 
-`disable-model-invocation: false` permits the Elephant to dispatch this standard review gate autonomously after the applicable plan gate is recorded and the deterministic Verify chain is green. A Critic still does not replace a PO decision, final acceptance, or an explicitly configured gate. `context: fork` + `agent: critic` is deliberate: no conversation history can leak in. Fallback if fork dispatch is unavailable: the Elephant dispatches the `critic` agent directly with the path-only briefing template (`templates/prompts/critic-review.md`, agent-pipeline repo — plugin-root fallback per `pipeline-start` SKILL.md's canon-reference rule for a hosted project).
+`disable-model-invocation: false` permits the Elephant to dispatch this standard review gate autonomously after the applicable plan gate and the Critic-boundary evidence/preflight requirements are met; it does not require a prior full release Verify. A Critic still does not replace a PO decision, final acceptance, or an explicitly configured gate. `context: fork` + `agent: critic` is deliberate: no conversation history can leak in. Fallback if fork dispatch is unavailable: the Elephant dispatches the `critic` agent directly with the path-only briefing template (`templates/prompts/critic-review.md`, agent-pipeline repo — plugin-root fallback per `pipeline-start` SKILL.md's canon-reference rule for a hosted project).
 
 **Dispatch admission (Elephant, mandatory):** immediately before every Critic
 spawn, run `scripts/critic-dispatch-preflight.mjs` against the fixed base and
@@ -85,39 +91,17 @@ Critic is dispatched. The map is included in the returned candidate guardrail
 paths. Never execute or infer a requirement from its prose. An absent map keeps
 the existing review behavior.
 
-**Evidence artifact shape (confirmed from source, hard — not free-form text):**
-each `evidence:{{PATH}}` file must be JSON (plain text is rejected as
-`CDP-EVIDENCE-JSON`, `scripts/critic-dispatch-preflight.mjs` line 147) whose
-parsed object binds the EXACT frozen candidate commit and tree that the same
-preflight run just resolved via `git rev-parse <candidate>^{commit}` and
-`git rev-parse <that-commit>^{tree}` — not a guess, not the base, not a short
-hash. A well-formed but non-matching or wrongly-shaped object (including a
-naive ad hoc `{commit, tree}` block whose values are placeholders, stale, or
-resolved against the wrong ref) is rejected as `CDP-EVIDENCE-BINDING`
-(`scripts/critic-dispatch-preflight.mjs` lines 152-157). Two forms are valid,
-both keyed on the same `commit`/`tree` pair (`lib/critical-action-approval-request.mjs`
-lines 23-24: full 40- or 64-hex object IDs, `commit !== tree`):
-
-Root form (the binding IS the whole object):
-
-```json
-{ "commit": "<candidate commit oid>", "tree": "<candidate tree oid>" }
-```
-
-Nested form (Security/gate evidence style — additional observation metadata
-allowed alongside `candidate`, per the comment at
-`scripts/critic-dispatch-preflight.mjs` lines 148-150):
-
-```json
-{
-  "candidate": { "commit": "<candidate commit oid>", "tree": "<candidate tree oid>" },
-  "...": "any additional observation metadata"
-}
-```
-
-Both `commit` and `tree` must equal the preflight's own resolved
-`candidateCommit`/`candidateTree` for THIS dispatch exactly — recompute them
-freshly for each candidate rather than reusing a prior run's values.
+**Evidence artifact shape (hard — not free-form text):** each
+`evidence:{{PATH}}` must be JSON bound to the exact frozen candidate commit
+and tree that this preflight resolves. Only the validated
+`pipeline.verify-evidence.v0` Critic-mode receipt (top-level commit/tree and
+selection) or `pipeline.critic-diagnostic-evidence.v1` (nested candidate,
+source digests, targeted log and pending full-Verify status) is accepted.
+Security/gate-shaped JSON, a bare `{commit, tree}` assertion and an
+implementor-written status claim are not substitute evidence, even when their
+commit/tree values match. A mismatched candidate fails binding; an unsupported
+schema fails schema admission. Recompute the candidate binding for each review
+and let preflight validate the concrete artifact before dispatch.
 
 **Closed bootstrap role:** this skill is itself an authoritative Critic role
 carrier. If a SessionStart reminder requires `pipeline-core:pipeline-start`,

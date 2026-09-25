@@ -3599,6 +3599,23 @@ function defaultGitHead(dir) {
   return { ok: true, commit: res.stdout.trim() };
 }
 
+// The persisted approval is an audit record, not an inspect API. In particular
+// its detached proof and remote coordinates must not be copied into a routine
+// bootstrap readback. Candidate equality is only a freshness observation;
+// push authorization remains the responsibility of the push guard.
+function inspectPushApproval(state, readHead) {
+  if (state.pushApproval === undefined) return { present: false, relevance: "absent" };
+  const approval = state.pushApproval?.lastApproved;
+  if (!approval || typeof approval !== "object" || Array.isArray(approval)
+    || typeof approval.forCommit !== "string" || !/^[0-9a-f]{40,64}$/u.test(approval.forCommit)
+    || !safeIso(approval.approvedAt)) return { present: true, relevance: "malformed" };
+  const head = readHead();
+  if (!head?.ok || typeof head.commit !== "string" || !/^[0-9a-f]{40,64}$/u.test(head.commit)) {
+    return { present: true, relevance: "head-unavailable" };
+  }
+  return { present: true, relevance: approval.forCommit === head.commit ? "candidate-match" : "stale-candidate" };
+}
+
 function defaultGitCandidate(dir) {
   const commit = defaultGitHead(dir);
   if (!commit.ok) return commit;
@@ -11476,7 +11493,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         planApproved: base.planApproved === true,
         lifecycle: { ok: lifecycle.ok, code: lifecycle.code, status: lifecycle.status },
         mixedPlanRecovery: mixedPlanRecoveryObservation(base),
-        pushApproval: base.pushApproval ?? null,
+        pushApproval: inspectPushApproval(base, () => gitHead(dir)),
         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
         phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
         nextAction: buildInspectNextAction(dir, base, lifecycle, deps),

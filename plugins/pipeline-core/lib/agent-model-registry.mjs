@@ -36,7 +36,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 export const DEFAULT_AGENTS_DIR = join(REPO_ROOT, "plugins", "pipeline-core", "agents");
 
 /**
- * Model-family aliases: agent frontmatter tier name -> the set of concrete identifier prefixes
+ * Approved model-family aliases: agent frontmatter tier name -> the set of concrete identifier prefixes
  * (lowercased) that count as that family. Mirrors the tiers named in `policies/model-policy.md`
  * and the concrete identifiers `pipeline.user.yaml` `models.*` resolves to; NOT parsed from that
  * file (out of this module's scope/budget) — kept here as a small, explicit, documented table so
@@ -89,7 +89,11 @@ export function modelBelongsToFamily(concreteModel, tierAlias) {
   const normalizedModel = String(concreteModel ?? "").trim().toLowerCase();
   const normalizedTier = String(tierAlias ?? "").trim().toLowerCase();
   if (normalizedModel === "" || normalizedTier === "") return false;
-  const prefixes = MODEL_FAMILY_ALIASES[normalizedTier] ?? [normalizedTier];
+  // An unfamiliar frontmatter value is not an approved model family. In
+  // particular, a newly named provider model must be admitted by the
+  // session-role compatibility path, not by prefix similarity here.
+  if (!Object.hasOwn(MODEL_FAMILY_ALIASES, normalizedTier)) return false;
+  const prefixes = MODEL_FAMILY_ALIASES[normalizedTier];
   return prefixes.some((prefix) => {
     const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
     return new RegExp(`^${escapedPrefix}(?:$|[-_.:])`, "u").test(normalizedModel);
@@ -113,6 +117,9 @@ export function modelBelongsToFamily(concreteModel, tierAlias) {
  *                              the agentType is wrong or the file moved).
  *   "agent-type-absent"        the record carries no `agentType` at all — silent by design; see
  *                              the corpus-compatibility note below.
+ *   "runner-model-authority-required" a v4 non-Claude record needs a trusted
+ *                              runner observation and consent binding; Claude
+ *                              agent frontmatter is not its model authority.
  *
  * CORPUS COMPATIBILITY: every dispatch record predating this mechanism has no `agentType` field.
  * Absence therefore resolves to "agent-type-absent" (silent), never a mismatch/fail — the same
@@ -120,6 +127,16 @@ export function modelBelongsToFamily(concreteModel, tierAlias) {
  * ("most existing records predate the convention").
  */
 export function compareRecordedModel(record, { agentsDir = DEFAULT_AGENTS_DIR } = {}) {
+  // Claude agent frontmatter is not an authority for a different runtime.
+  // Until the v4 record carries a verifier-readable host observation and
+  // consent binding, a non-Claude authored return must remain unverified.
+  if (record?.schema === "pipeline.dispatch-record.v4"
+    && record.runner !== undefined && record.runner !== "claude") {
+    return {
+      classification: "runner-model-authority-required",
+      reason: `runner \`${record.runner}\` needs a trusted host-observed model and consent binding; Claude agent frontmatter cannot attest it`,
+    };
+  }
   const agentType = record?.agentType;
   if (typeof agentType !== "string" || agentType.trim() === "") {
     return { classification: "agent-type-absent", reason: "record declares no `agentType`; nothing to derive against — predates the convention" };

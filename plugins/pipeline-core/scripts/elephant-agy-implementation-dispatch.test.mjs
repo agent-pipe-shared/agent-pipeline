@@ -19,7 +19,7 @@ function fixture(role) {
   writeFileSync(request, JSON.stringify(packet(role)));
   const stored = { subjectSha256: sha, mode: "chat", subject: { fallbackPolicy: "none" } };
   const common = {
-    routeAuthority: () => ({ runner: "antigravity", provider: "google", requestedModel: "gemini-3.8-flash-high", effort: "high", routePolicySha256: "e".repeat(64) }),
+    routeAuthority: () => ({ runner: "antigravity", provider: "google", requestedModel: "gemini-3.8-flash-medium", effort: "medium", routePolicySha256: "e".repeat(64) }),
     preflightRoleDispatch: ({ packet: value }) => ({ status: "prepared", packet: value, candidate: value.candidate }),
     loadLiveSession: () => ({ ok: true, session: { id: "session-1", descriptorSha256: sha }, descriptor: { repo: { primaryRoot: root, commonDir: root } } }),
     loadStoredConsent: () => ({ record: stored, descriptor: { repo: { primaryRoot: root, commonDir: root } } }),
@@ -47,10 +47,87 @@ test("sealed route derives every execution choice and binds its closed receipt",
   const value = fixture(); let sealed = null;
   const result = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request, resultPath: "results/out.json", sessionId: "session-1", descriptorSha256: sha }, {
     ...value.common,
-    runLiveHost: async (request) => { sealed = request; return { status: "succeeded", code: "AGY-SESSION-COMPLETED", observed: { provider: null, model: "gemini-3.8-flash-high", effectiveSandbox: "unknown" }, result: { path: "results/out.json", sha256: "f".repeat(64) }, launcherCalls: 1, modelCalls: 1 }; },
+    runLiveHost: async (request) => { sealed = request; return { status: "completed-undelivered", code: "AGY-SESSION-FINAL-UNDELIVERED", observed: { provider: null, model: "gemini-3.8-flash-medium", effectiveSandbox: "unknown" }, result: { path: "results/out.json", sha256: "f".repeat(64) }, record: { target: `evidence/dispatch-record-${request.packet.dispatchId}.json`, sha256: "e".repeat(64), attemptId: "attempt-1", authorship: "not-applicable" }, launcherCalls: 1, modelCalls: 1 }; },
   });
-  assert.equal(sealed.requestedModel, "gemini-3.8-flash-high"); assert.equal(sealed.effort, "high"); assert.equal(sealed.consent, "stored"); assert.equal(sealed.scope.role, "pipeline-core:goldfish-implementor");
-  assert.equal(result.status, "succeeded"); assert.equal(result.route.provider, "google"); assert.equal(result.binding.inputSha256.length, 64); assert.equal(result.authority.fallbackPolicy, "none");
+  assert.equal(sealed.requestedModel, "gemini-3.8-flash-medium"); assert.equal(sealed.effort, "medium"); assert.equal(sealed.consent, "stored"); assert.equal(sealed.scope.role, "pipeline-core:goldfish-implementor");
+  assert.equal(result.status, "completed-undelivered"); assert.equal(result.route.provider, "google"); assert.equal(result.binding.inputSha256.length, 64); assert.equal(result.authority.fallbackPolicy, "none");
+  assert.equal(result.observed.identityEvidence, "host-observed-model");
+  assert.equal(result.record.target, `evidence/dispatch-record-${result.dispatchId}.json`);
+  const pending = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request, resultPath: "results/pending.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common,
+    runLiveHost: async () => ({ status: "final-pending-host-commit", code: "AGY-SESSION-FINAL-VALIDATED", observed: { model: "gemini-3.8-flash-medium" }, result: { path: "results/pending.json", sha256: "e".repeat(64) }, launcherCalls: 1, modelCalls: 1 }),
+  });
+  assert.equal(pending.status, "final-pending-host-commit");
+  assert.equal(pending.observed.identityEvidence, "host-observed-model");
+  const mismatchedModel = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request, resultPath: "results/mismatch.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common,
+    runLiveHost: async () => ({ status: "final-pending-host-commit", code: "AGY-SESSION-FINAL-VALIDATED",
+      observed: { model: "gemini-other" }, modelCalls: 1, launcherCalls: 1 }),
+  });
+  assert.equal(mismatchedModel.status, "recovery-required");
+  assert.equal(mismatchedModel.code, "AGY-ELEPHANT-HOST-MODEL-UNVERIFIED");
+  assert.equal(mismatchedModel.observed.identityEvidence, "unknown");
+  const missingModelCall = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request, resultPath: "results/no-call.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common,
+    runLiveHost: async () => ({ status: "completed-undelivered", code: "AGY-SESSION-FINAL-UNDELIVERED",
+      observed: { model: "gemini-3.8-flash-medium" }, modelCalls: 0, launcherCalls: 0 }),
+  });
+  assert.equal(missingModelCall.status, "recovery-required");
+  assert.equal(missingModelCall.code, "AGY-ELEPHANT-HOST-MODEL-UNVERIFIED");
+  for (const [suffix, modelCalls] of [["absent", undefined], ["fractional", 0.5], ["nan", Number.NaN]]) {
+    const invalidCount = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request,
+      resultPath: `results/${suffix}-calls.json`, sessionId: "session-1", descriptorSha256: sha }, {
+      ...value.common,
+      runLiveHost: async () => ({ status: "final-pending-host-commit", code: "AGY-SESSION-FINAL-VALIDATED",
+        observed: { model: "gemini-3.8-flash-medium" }, modelCalls, launcherCalls: 1 }),
+    });
+    assert.equal(invalidCount.status, "recovery-required");
+    assert.equal(invalidCount.code, "AGY-ELEPHANT-HOST-MODEL-UNVERIFIED");
+  }
+  const invalidHostResult = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request, resultPath: "results/invalid-host.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common, runLiveHost: async () => null,
+  });
+  assert.equal(invalidHostResult.status, "recovery-required");
+  assert.equal(invalidHostResult.code, "AGY-ELEPHANT-HOST-RESULT-INVALID");
+  const thrownHost = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request,
+    resultPath: "results/thrown-host.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common, runLiveHost: async () => { throw new Error("private provider diagnostic"); },
+  });
+  assert.equal(thrownHost.status, "recovery-required");
+  assert.equal(thrownHost.code, "AGY-ELEPHANT-HOST-EXCEPTION");
+  assert.equal(thrownHost.record, null);
+  assert.equal(JSON.stringify(thrownHost).includes("private provider diagnostic"), false);
+  const launchedFailure = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request,
+    resultPath: "results/launched-failure.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common, runLiveHost: async () => ({ status: "unavailable", code: "AGY-TRANSPORT-FAILED",
+      launcherCalls: 1, modelCalls: 1, observed: { model: "gemini-3.8-flash-medium" } }),
+  });
+  assert.equal(launchedFailure.status, "recovery-required");
+  assert.equal(launchedFailure.code, "AGY-ELEPHANT-LAUNCHED-NONFINAL");
+  const interrupted = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request,
+    resultPath: "results/interrupted.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common, runLiveHost: async () => ({ status: "interrupted-recorded", code: "AGY-INTERRUPTION-RECORDED",
+      launcherCalls: 1, modelCalls: 1, observed: { model: "gemini-3.8-flash-medium" },
+      record: { target: "evidence/dispatch-record-agy-implementation-1.json", sha256: "f".repeat(64),
+        attemptId: "1".repeat(32), authorship: "not-applicable" } }),
+  });
+  assert.equal(interrupted.status, "interrupted-recorded");
+  assert.equal(interrupted.record?.authorship, "not-applicable");
+  assert.equal(interrupted.result.sha256, null);
+  const recovery = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request, resultPath: "results/recovery.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common,
+    runLiveHost: async () => ({ status: "recovery-required", code: "AGY-UNDELIVERED-RECORD-UNVERIFIED", record: null, launcherCalls: 1, modelCalls: 1 }),
+  });
+  assert.equal(recovery.status, "recovery-required");
+  assert.equal(recovery.record, null);
+  assert.equal(recovery.modelCalls, 1);
+  const missingRecord = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request, resultPath: "results/missing-record.json", sessionId: "session-1", descriptorSha256: sha }, {
+    ...value.common,
+    runLiveHost: async () => ({ status: "completed-undelivered", code: "AGY-SESSION-FINAL-UNDELIVERED",
+      observed: { model: "gemini-3.8-flash-medium" }, record: null, launcherCalls: 1, modelCalls: 1 }),
+  });
+  assert.equal(missingRecord.status, "recovery-required");
+  assert.equal(missingRecord.code, "AGY-UNDELIVERED-RECORD-UNVERIFIED");
 });
 
 test("route, session, binding and live unavailability stay typed with zero invented fallback", async () => {

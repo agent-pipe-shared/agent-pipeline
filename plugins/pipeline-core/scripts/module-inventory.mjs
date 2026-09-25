@@ -284,11 +284,33 @@ export function getReentryReadingOrder(rootDir = process.cwd(), touchedModuleIds
   ];
 }
 
+/**
+ * Read-only AC-23 entry check for a governed project. This proves the root
+ * pointer exists; it does not claim that a host executed pipeline-start or
+ * that an ADR summary has been semantically resolved.
+ */
+export function inspectArchitectureReentryPointer(rootDir = process.cwd()) {
+  const entryPath = path.join(path.resolve(rootDir), "AGENTS.md");
+  try {
+    if (!fs.lstatSync(entryPath).isFile()) {
+      return { ok: false, code: "ARCHITECTURE-ENTRY-ALIAS-OR-NONFILE", path: entryPath };
+    }
+    const entry = fs.readFileSync(entryPath, "utf8");
+    if (!/\]\(\s*(?:\.\/)?architecture\/map\/index\.md(?:#[^)]*)?\s*\)/u.test(entry)) {
+      return { ok: false, code: "ARCHITECTURE-ENTRY-MAP-POINTER-MISSING", path: entryPath };
+    }
+    return { ok: true, code: null, path: entryPath, mapPath: "architecture/map/index.md" };
+  } catch (error) {
+    return { ok: false, code: error?.code === "ENOENT" ? "ARCHITECTURE-ENTRY-MISSING" : "ARCHITECTURE-ENTRY-UNREADABLE", path: entryPath };
+  }
+}
+
 // CLI handler
 function runCli() {
   const args = process.argv.slice(2);
   let rootDir = process.cwd();
   let check = false;
+  let checkReentryPointer = false;
   let json = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -296,9 +318,27 @@ function runCli() {
       rootDir = path.resolve(args[++i]);
     } else if (args[i] === "--check") {
       check = true;
+    } else if (args[i] === "--check-reentry-pointer") {
+      checkReentryPointer = true;
     } else if (args[i] === "--json") {
       json = true;
     }
+  }
+
+  if (checkReentryPointer) {
+    const pointer = inspectArchitectureReentryPointer(rootDir);
+    const result = {
+      schema: "pipeline.architecture-reentry-pointer-check.v1",
+      ok: pointer.ok,
+      code: pointer.code,
+      path: "AGENTS.md",
+      mapPath: "architecture/map/index.md",
+      bootstrapExecuted: false,
+    };
+    if (json) console.log(JSON.stringify(result, null, 2));
+    else if (result.ok) console.log("Architecture re-entry pointer present; host bootstrap not checked.");
+    else console.error(`Architecture re-entry pointer check FAILED: ${result.code}. Preserve AGENTS.md and add a Markdown link to architecture/map/index.md.`);
+    process.exit(result.ok ? 0 : 1);
   }
 
   const result = loadMapBundle(rootDir);

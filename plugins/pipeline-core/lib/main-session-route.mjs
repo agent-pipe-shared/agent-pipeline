@@ -8,6 +8,7 @@
  * particular, a child/dispatch receipt can never satisfy this boundary.
  */
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+import { validateModelRoleSessionReceipt } from "./model-role-session.mjs";
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
@@ -40,12 +41,15 @@ function observedMainSession(value) {
     || !SAFE_ID.test(value.eventId ?? "")
     || !["claude", "codex", "antigravity"].includes(value.runner)
     || typeof value.modelId !== "string" || value.modelId.length === 0
-    || typeof value.effort !== "string" || value.effort.length === 0) return null;
+    || typeof value.effort !== "string" || value.effort.length === 0
+    || (Object.hasOwn(value, "sessionId")
+      && (typeof value.sessionId !== "string" || !SAFE_ID.test(value.sessionId)))) return null;
   return {
     eventId: value.eventId,
     runner: value.runner,
     modelId: value.modelId,
     effort: value.effort,
+    ...(Object.hasOwn(value, "sessionId") ? { sessionId: value.sessionId } : {}),
   };
 }
 
@@ -75,7 +79,10 @@ function unverified(desired, reasonCode) {
  * Reconcile a profile/phase authority against one host-attested main-session
  * observation. This function is deliberately pure: it cannot change a model,
  * persist an acknowledgement, or infer identity from a child route receipt.
- * Callers persist `observed.eventId` only after displaying a drift request.
+ * A future functional-role route requires a receipt loaded from trusted host
+ * storage; its checksum alone does not prove that provenance. The current V3
+ * registry's exact-ID routes never consult that optional receipt. Callers
+ * persist `observed.eventId` only after displaying a drift request.
  */
 export function reconcileMainSessionRoute({
   profile,
@@ -84,13 +91,24 @@ export function reconcileMainSessionRoute({
   observed,
   reportedEventIds = [],
   poException = null,
+  hostHeldModelRoleReceipt = null,
   registry = loadRunnerProfilesV3Registry(),
 } = {}) {
-  const desired = desiredRoute(profile, phase, runner, registry);
+  let desired = desiredRoute(profile, phase, runner, registry);
   if (desired === null) return unverified(null, "MSR-DESIRED-ROUTE-UNAVAILABLE");
 
   const main = observedMainSession(observed);
   if (main === null) return unverified(desired, "MSR-HOST-OBSERVATION-UNAVAILABLE");
+
+  if (desired.selector.kind === "functional-role") {
+    const receipt = hostHeldModelRoleReceipt;
+    if (!validateModelRoleSessionReceipt(receipt)
+      || receipt.runner !== runner || receipt.role !== desired.selector.value
+      || receipt.effort !== desired.effort || receipt.sessionId !== main.sessionId) {
+      return unverified(desired, "MSR-MODEL-ROLE-RECEIPT-UNAVAILABLE");
+    }
+    desired = { runner, selector: { kind: "model-id", value: receipt.modelId }, effort: receipt.effort };
+  }
 
   const actual = {
     runner: main.runner,

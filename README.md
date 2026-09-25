@@ -70,9 +70,11 @@ Four deliberately separated roles carry the model:
 
 Around those roles:
 
-- **Two-stage result review** — deterministic gates (tests, security scan,
-  lint) run *before* an independent Critic judges the delivered result; only
-  what survives the gates reaches a Critic.
+- **Review before expensive final qualification** — targeted, candidate-bound
+  checks and Security evidence prepare an independent Critic review. Findings
+  are corrected and re-reviewed as needed; the full release Verify then
+  qualifies the reviewed candidate. A later Verify rerun alone does not
+  invalidate a content-bound Critic review.
 - **Specs with checkable acceptance criteria** — every task has a Definition of
   Done something or someone can actually check, not a "done"-on-a-feeling.
 - **Git and write-path guardrails** — configured integrations can refuse unsafe
@@ -123,10 +125,12 @@ review stays the only check point, nothing new is added. Details:
 flowchart LR
     PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(orchestrator)"]
     Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
-    Goldfish -->|"evidence"| Gates["Deterministic gates<br/>(tests, security, lint)"]
+    Goldfish -->|"evidence"| Gates["Targeted checks<br/>(tests, security, lint)"]
     Gates -.->|"fail"| Goldfish
     Gates -->|"pass"| Critic["Critic<br/>(independent reviewer)"]
     Critic -->|"findings"| Elephant
+    Critic -->|"reviewed candidate"| FullVerify["Full Verify<br/>(release qualification)"]
+    FullVerify -->|"candidate evidence"| Elephant
     Elephant -->|"go/no-go recommendation"| PO
 ```
 
@@ -302,9 +306,12 @@ Vier bewusst getrennte Rollen tragen das Modell:
 
 Ergänzend dazu:
 
-- **Zweistufiges Ergebnis-Review** — deterministische Gates (Tests,
-  Security-Scan, Lint) laufen, bevor ein unabhängiger Critic das gelieferte
-  Ergebnis beurteilt; nur was die Gates übersteht, erreicht einen Critic.
+- **Review vor der teuren Abschlussprüfung** — gezielte, an den Kandidaten
+  gebundene Checks und Security-Evidenz bereiten das unabhängige Critic-Review
+  vor. Befunde werden korrigiert und bei Bedarf erneut geprüft; anschließend
+  qualifiziert der vollständige Release-Verify den geprüften Kandidaten.
+  Ein bloßer Verify-Neulauf entwertet ein inhaltlich gebundenes Critic-Review
+  nicht.
 - **Specs mit prüfbaren Akzeptanzkriterien** — keine Aufgabe ist „fertig" nach
   Gefühl; jede Aufgabe hat eine Definition of Done, die sich tatsächlich prüfen
   lässt.
@@ -348,10 +355,12 @@ nichts Neues hinzu. Details: [`docs/operating-model.md`](docs/operating-model.md
 flowchart LR
     PO["Product Owner<br/>(du)"] -->|"Absicht / Auftrag"| Elephant["Elephant<br/>(Orchestrator)"]
     Elephant -->|"Spec + Dispatch"| Goldfish["Goldfish<br/>(frischer Kontext)"]
-    Goldfish -->|"Nachweis"| Gates["Deterministische Gates<br/>(Tests, Security, Lint)"]
+    Goldfish -->|"Nachweis"| Gates["Gezielte Checks<br/>(Tests, Security, Lint)"]
     Gates -.->|"fehlgeschlagen"| Goldfish
     Gates -->|"bestanden"| Critic["Critic<br/>(unabhängiger Prüfer)"]
     Critic -->|"Befunde"| Elephant
+    Critic -->|"geprüfter Kandidat"| FullVerify["Full Verify<br/>(Release-Qualifikation)"]
+    FullVerify -->|"Kandidatennachweis"| Elephant
     Elephant -->|"Go/No-Go-Empfehlung"| PO
 ```
 

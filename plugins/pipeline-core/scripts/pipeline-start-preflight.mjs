@@ -4,13 +4,14 @@
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { observeArchitectureAdoptionOrientation } from "../lib/architecture-adoption-orientation.mjs";
+import { inspectEffectiveArchitectureDecisions } from "../lib/architecture-effective-decisions.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 // NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
 // runnable.md): the same typed readiness check the readiness guard itself uses
@@ -1014,6 +1015,7 @@ export function observePipelineStartPreflight({
   observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
   observeArchitectureAdoptionOrientationFn = observeArchitectureAdoptionOrientation,
+  inspectEffectiveArchitectureDecisionsFn = inspectEffectiveArchitectureDecisions,
   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
   resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
   antigravityPluginRegistries = () => [
@@ -1359,7 +1361,13 @@ export function observePipelineStartPreflight({
       guidance: "Architecture orientation could not be observed. Do not claim an architecture map is present; retry the read-only orientation before implementation.",
     };
   }
+  // A recorded disposition is durable across ordinary commits, but it does
+  // not manufacture a physical navigation map. Offer the same read-only,
+  // map-first proposal when that artifact is absent; do not ask for a new
+  // adoption decision merely because the map still needs materializing.
   const architectureOrientationAction = architectureOrientation.status === "adoption-required"
+    || (architectureOrientation.status === "decision-recorded"
+      && architectureOrientation.physicalMap?.status === "missing")
     ? {
         kind: "command",
         executable: "node",
@@ -1380,6 +1388,49 @@ export function observePipelineStartPreflight({
           expected: { schema: "pipeline.architecture-adoption-orientation.v1", status: "design-pending" },
         }
       : null;
+  // The project-wide decision digest is a compact, runner-neutral re-entry
+  // observation. It does not guess the task's module applicability or turn an
+  // unresolved ADR estate into implementation authority. Every runner sees
+  // the same source projection without making bootstrap a new hard gate.
+  let effectiveDecisions;
+  try {
+    const projection = inspectEffectiveArchitectureDecisionsFn({ rootDir: resolve(cwd), area: "project" });
+    const expectedCodes = {
+      ready: "ARCH-DECISION-EFFECTIVE-READY",
+      advisory: "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
+      blocked: "ARCH-DECISION-EFFECTIVE-UNRESOLVED",
+    };
+    if (projection?.schema !== "pipeline.architecture-effective-decisions.v1"
+      || projection.area !== "project"
+      || !["ready", "advisory", "blocked"].includes(projection.status)
+      || projection.code !== expectedCodes[projection.status]
+      || !Array.isArray(projection.decisions) || !Array.isArray(projection.findings)
+      || (projection.status === "blocked" ? projection.projectionSha256 !== null
+        : !/^[a-f0-9]{64}$/u.test(projection.projectionSha256 ?? ""))) {
+      throw new Error("invalid-decision-projection");
+    }
+    effectiveDecisions = {
+      schema: "pipeline.architecture-decision-bootstrap-observation.v1",
+      area: "project",
+      status: projection.status,
+      code: projection.code,
+      projectionSha256: projection.projectionSha256,
+      decisionCount: Array.isArray(projection.decisions) ? projection.decisions.length : 0,
+      findingCount: projection.findings.length,
+      taskScopeResolved: false,
+    };
+  } catch {
+    effectiveDecisions = {
+      schema: "pipeline.architecture-decision-bootstrap-observation.v1",
+      area: "project",
+      status: "unavailable",
+      code: "ARCH-DECISION-BOOTSTRAP-OBSERVATION-UNAVAILABLE",
+      projectionSha256: null,
+      decisionCount: 0,
+      findingCount: 0,
+      taskScopeResolved: false,
+    };
+  }
   const result = {
     schema: SCHEMA,
     status,
@@ -1397,6 +1448,7 @@ export function observePipelineStartPreflight({
       ...architectureOrientation,
       nextAction: architectureOrientationAction,
     },
+    effectiveDecisions,
     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
     nextAction: status === "plugin-attestation-required"
       ? installedPluginAttestation.setupAction ?? null

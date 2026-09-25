@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,7 +11,7 @@ import { AGY_ERROR_TAXONOMY } from "../lib/antigravity-execution-host.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
-import { CROSS_RUNNER_DISPATCH_RECEIPT_SCHEMA, E3_CODES, dispatchGoldfishToAntigravity, measureAntigravityPipelineStart } from "./goldfish-antigravity-host.mjs";
+import { CROSS_RUNNER_DISPATCH_RECEIPT_SCHEMA, E3_CODES, dispatchGoldfishToAntigravity, measureAntigravityPipelineStart, readE3GateState } from "./goldfish-antigravity-host.mjs";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const prompt = `## Briefing
@@ -61,11 +61,12 @@ if (args[0] === "--pipeline-start-probe") {
   console.log(JSON.stringify({ schema: "pipeline.antigravity-pipeline-start-marker.v1", status: "ready", pluginPath: "plugins/pipeline-core", pluginVersion: version }));
   process.exit(0);
 }
-const prompt = args[args.indexOf("--prompt") + 1];
+const prompt = args.at(-1).slice("--print=".length);
 if (prompt.includes("--malformed")) console.log("not json");
-else if (prompt.includes("--slow")) setTimeout(() => console.log(JSON.stringify({ model: "gemini-3.8-flash-medium", result: "ok" })), 5000);
-else if (prompt.includes("--wrong-model")) console.log(JSON.stringify({ model: "gemini-other", result: "ok" }));
-else console.log(JSON.stringify({ model: "gemini-3.8-flash-medium", result: "ok" }));
+else if (prompt.includes("--legacy-envelope")) console.log(JSON.stringify({ model: "gemini-3.8-flash-medium", result: "ok" }));
+else if (prompt.includes("--slow")) setTimeout(() => console.log(JSON.stringify({ status: "SUCCESS", response: "ok", model: "gemini-3.8-flash-medium" })), 5000);
+else if (prompt.includes("--wrong-model")) console.log(JSON.stringify({ status: "SUCCESS", response: "ok", model: "gemini-other" }));
+else console.log(JSON.stringify({ status: "SUCCESS", response: "ok", model: "gemini-3.8-flash-medium" }));
 `;
 
 function fixture() {
@@ -123,6 +124,11 @@ function packet(value, suffix = "", destination = "results/receipt.json") {
 function request(value, packetValue, extra = {}) {
   return { root: value.root, resultRoot: value.root, executable: value.executable, model: "gemini-3.8-flash-medium", effort: "medium", packet: packetValue, env: { ...process.env, E3_LOG: value.log }, timeoutMs: 500, ...extra };
 }
+function fixtureDispatch(value, packetValue, extra = {}) {
+  return dispatchGoldfishToAntigravity(request(value, packetValue, extra), {
+    readGateState: (input) => readE3GateState(input, { qualifyNativeA1: () => true }),
+  });
+}
 function calls(value) { return existsSync(value.log) ? readFileSync(value.log, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse) : []; }
 
 const cases = [];
@@ -155,7 +161,7 @@ for (const [name, malformedManifest] of [
   check(name, async () => {
   await withFixture(async (value) => {
     writeFileSync(join(value.root, "plugins", "pipeline-core", "hooks.json"), JSON.stringify(malformedManifest));
-    const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
+    const result = await fixtureDispatch(value, packet(value));
     assert.equal(result.status, "unavailable");
     assert.equal(result.code, E3_CODES.PIPELINE_DISCOVERY);
     assert.equal(result.modelCalls, 0);
@@ -166,7 +172,7 @@ for (const [name, malformedManifest] of [
 
 check("dispatches a valid request and persists the schema-valid receipt", async () => {
   await withFixture(async (value) => {
-  const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
+  const result = await fixtureDispatch(value, packet(value));
   assert.equal(result.schema, CROSS_RUNNER_DISPATCH_RECEIPT_SCHEMA, JSON.stringify(result));
   assert.equal(result.status, "succeeded");
   assert.equal(result.code, E3_CODES.COMPLETED);
@@ -182,10 +188,12 @@ check("dispatches a valid request and persists the schema-valid receipt", async 
   });
 });
 
-check("classifies malformed and wrong-model Antigravity results", async () => {
-  for (const [suffix, expected] of [["--malformed", AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED], ["--wrong-model", AGY_ERROR_TAXONOMY.MODEL_MISMATCH]]) {
+check("classifies malformed, legacy and wrong-model Antigravity results", async () => {
+  for (const [suffix, expected] of [["--malformed", AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED],
+    ["--legacy-envelope", AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED],
+    ["--wrong-model", AGY_ERROR_TAXONOMY.MODEL_MISMATCH]]) {
   await withFixture(async (value) => {
-    const result = await dispatchGoldfishToAntigravity(request(value, packet(value, suffix)));
+    const result = await fixtureDispatch(value, packet(value, suffix));
     assert.equal(result.status, "failed");
     assert.equal(result.code, expected);
     assert.equal(result.persisted, true);
@@ -195,7 +203,7 @@ check("classifies malformed and wrong-model Antigravity results", async () => {
 
 check("records a timeout as an unavailable interruption", async () => {
   await withFixture(async (value) => {
-  const result = await dispatchGoldfishToAntigravity(request(value, packet(value, "--slow"), { timeoutMs: 50 }));
+  const result = await fixtureDispatch(value, packet(value, "--slow"), { timeoutMs: 50 });
   assert.equal(result.status, "failed");
   assert.equal(result.code, AGY_ERROR_TAXONOMY.TIMEOUT);
   assert.deepEqual(result.interruption, { status: "unavailable", code: AGY_ERROR_TAXONOMY.TIMEOUT });
@@ -206,7 +214,7 @@ check("records cancellation as an unavailable interruption", async () => {
   await withFixture(async (value) => {
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 25);
-  const result = await dispatchGoldfishToAntigravity(request(value, packet(value, "--slow"), { signal: controller.signal, timeoutMs: 2_000 }));
+  const result = await fixtureDispatch(value, packet(value, "--slow"), { signal: controller.signal, timeoutMs: 2_000 });
   assert.equal(result.status, "failed");
   assert.equal(result.code, AGY_ERROR_TAXONOMY.CANCELLED);
   assert.deepEqual(result.interruption, { status: "unavailable", code: AGY_ERROR_TAXONOMY.CANCELLED });
@@ -219,7 +227,7 @@ for (const [marker, code, name] of [
 ]) {
   check(name, async () => {
   await withFixture(async (value) => {
-    const result = await dispatchGoldfishToAntigravity(request(value, packet(value), { env: { ...process.env, E3_LOG: value.log, E3_MARKER: marker } }));
+    const result = await fixtureDispatch(value, packet(value), { env: { ...process.env, E3_LOG: value.log, E3_MARKER: marker } });
     assert.equal(result.status, "refused");
     assert.equal(result.code, code);
     assert.equal(result.modelCalls, 0);
@@ -231,14 +239,17 @@ for (const [marker, code, name] of [
   });
 }
 
-check("supports the sealed CLI request path and receipt persistence", async () => {
+check("sealed CLI refuses a hand-authored A1 PASS before any fixture launch", async () => {
   await withFixture(async (value) => {
   const requestPath = join(value.root, "sealed-request.json");
   writeFileSync(requestPath, JSON.stringify({ root: value.root, resultRoot: value.root, executable: value.executable, model: "gemini-3.8-flash-medium", effort: "medium", packet: packet(value), timeoutMs: 500 }));
-  const output = execFileSync(process.execPath, [hostScript, "--request", requestPath], { cwd: value.root, env: { ...process.env, E3_LOG: value.log }, encoding: "utf8" });
-  const result = JSON.parse(output);
-  assert.equal(result.status, "succeeded");
-  assert.equal(result.persisted, true);
+  const output = spawnSync(process.execPath, [hostScript, "--request", requestPath], { cwd: value.root, env: { ...process.env, E3_LOG: value.log }, encoding: "utf8" });
+  assert.equal(output.status, 1);
+  const result = JSON.parse(output.stdout);
+  assert.equal(result.status, "rejected");
+  assert.equal(result.code, E3_CODES.PRECONDITION);
+  assert.equal(result.modelCalls, 0);
+  assert.equal(calls(value).length, 0);
   });
 });
 
@@ -254,7 +265,7 @@ check("refuses forged unavailable precondition readback without executing a mode
     for (const artifact of row.artifacts) artifact.sha256 = null;
   }
   writeFileSync(gatePath, JSON.stringify(forged));
-  const result = await dispatchGoldfishToAntigravity(request(value, packet(value), { preconditions: { a1: { status: "measured" }, a2: { status: "current" }, a3: { status: "covered" }, a5: { status: "authorized", casBound: true } } }));
+  const result = await fixtureDispatch(value, packet(value), { preconditions: { a1: { status: "measured" }, a2: { status: "current" }, a3: { status: "covered" }, a5: { status: "authorized", casBound: true } } });
   assert.equal(result.code, E3_CODES.PRECONDITION);
   assert.equal(result.modelCalls, 0);
   assert.equal(calls(value).length, 0);
@@ -264,7 +275,7 @@ check("refuses forged unavailable precondition readback without executing a mode
 check("refuses an occupied result destination before executing a model", async () => {
   await withFixture(async (value) => {
   writeFileSync(join(value.root, "results", "receipt.json"), "occupied\n");
-  const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
+  const result = await fixtureDispatch(value, packet(value));
   assert.equal(result.code, "RDP-RESULT-DESTINATION");
   assert.equal(result.modelCalls, 0);
   assert.equal(calls(value).length, 0);
@@ -273,10 +284,22 @@ check("refuses an occupied result destination before executing a model", async (
 
 check("refuses an escaping result destination before executing a model", async () => {
   await withFixture(async (value) => {
-  const result = await dispatchGoldfishToAntigravity(request(value, packet(value, "", "../receipt.json")));
+  const result = await fixtureDispatch(value, packet(value, "", "../receipt.json"));
   assert.equal(result.code, "RDP-RESULT-PATH");
   assert.equal(result.modelCalls, 0);
   assert.equal(calls(value).length, 0);
+  });
+});
+
+check("a hand-authored current A1 PASS never qualifies the production E3 gate", async () => {
+  await withFixture(async (value) => {
+    const gate = await readE3GateState({ root: value.root,
+      candidate: { commit: value.commit, tree: value.tree } });
+    assert.equal(gate.status, "unavailable");
+    const result = await dispatchGoldfishToAntigravity(request(value, packet(value)));
+    assert.equal(result.code, E3_CODES.PRECONDITION);
+    assert.equal(result.modelCalls, 0);
+    assert.equal(calls(value).length, 0);
   });
 });
 

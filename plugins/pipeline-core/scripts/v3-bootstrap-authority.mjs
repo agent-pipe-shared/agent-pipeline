@@ -222,8 +222,8 @@ function parseArgs(args) {
       index += 1;
     } else if (arg === "--runner") {
       const runner = args[index + 1];
-      if (runner !== "claude" && runner !== "codex") {
-        return { error: '--runner requires "claude" or "codex"' };
+      if (runner !== "claude" && runner !== "codex" && runner !== "antigravity") {
+        return { error: '--runner requires "claude", "codex" or "antigravity"' };
       }
       parsed.runner = runner;
       index += 1;
@@ -259,6 +259,14 @@ function deriveCliRunner(root, deps = {}) {
   }
 }
 
+function declaredRunnerEnabled(root, runner, deps = {}) {
+  try {
+    const raw = (deps.readFileSync ?? readFileSync)(join(root, "pipeline.user.yaml"), "utf8");
+    const declared = parseYaml(raw)?.runners;
+    return Array.isArray(declared?.enabled) && declared.enabled.includes(runner);
+  } catch { return false; }
+}
+
 /**
  * `runner` is the runner the caller already derived from the project's own V3
  * source. It defaults to `"codex"`, so every existing caller keeps today's
@@ -283,7 +291,6 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {
       "run the explicit V3 migration/apply workflow, then rerun bootstrap",
     )], { source: inspection.source, sourceKind: inspection.sourceKind });
   }
-
   const manifest = loadManifest(inspection.root);
   if (manifest.status !== "ok") {
     return rejected(inspection.root, [diagnostic(
@@ -378,7 +385,7 @@ export function main(args = process.argv.slice(2), {
 } = {}) {
   const options = parseArgs(args);
   if (options.help) {
-    write("Usage: node plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs --root <project-dir> [--runner claude|codex]\n");
+    write("Usage: node plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs --root <project-dir> [--runner claude|codex|antigravity]\n");
     return 0;
   }
   if (options.error) {
@@ -386,7 +393,18 @@ export function main(args = process.argv.slice(2), {
     return 2;
   }
   const runner = options.runner ?? deriveCliRunner(options.root, deps);
-  const result = validateV3BootstrapAuthority({ rootDir: options.root, deps, runner });
+  let result = validateV3BootstrapAuthority({ rootDir: options.root, deps, runner });
+  // An explicit CLI runner is a request to bootstrap that installed runner,
+  // unlike the library's pre-enablement intake inspection. Do not advertise
+  // CLI readiness for a runner the project has not enabled yet.
+  if (result.status === "ready" && options.runner && !declaredRunnerEnabled(result.root, runner, deps)) {
+    result = rejected(result.root, [diagnostic(
+      "$.runners.enabled",
+      "v3_runner_not_enabled",
+      "the requested runner is not enabled by the current V3 project source",
+      "enable the runner through the explicit V3 migration workflow before bootstrap",
+    )], { source: result.source, sourceKind: result.sourceKind, runner });
+  }
 
   // AGY-FIX-PUSHGUARD: this function previously also installed a `.git/hooks/pre-push`
   // script here ("to prevent sub-process push evasion"). That workaround is removed --

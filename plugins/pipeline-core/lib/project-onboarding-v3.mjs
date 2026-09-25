@@ -9,7 +9,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consumer-verify.mjs";
-import { initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { inspectArchitectureDesign, parseArchitectureDesign } from "./architecture-design.mjs";
 import {
   accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
@@ -333,7 +333,7 @@ function deps(overrides = {}) {
     linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
     spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer,
     initializePoGateProfileReceipt, publishPoGateProfileReceipt,
-    homedir, readMachinePlane,
+    homedir, readMachinePlane, environment: process.env,
     ...overrides,
   };
 }
@@ -1340,6 +1340,28 @@ function withRunnerPermissionsReadback(result, fs) {
   // their own action and closed non-ready envelope unchanged.
   if (optionalPreauthorization) {
     if (result.status !== "ready") return observed;
+    const plan = planSettingsAllowlistMerge({
+      rootDir: result.root,
+      candidateSet: "runner-permissions",
+      deps: fs,
+    });
+    const carryforwardAction = runnerPermissionCarryforwardAction(plan, result.root);
+    if (carryforwardAction !== null) {
+      const nonReadyObserved = { ...observed };
+      for (const key of PROJECT_ONBOARDING_READY_ONLY_RESULT_KEYS) delete nonReadyObserved[key];
+      return {
+        ...nonReadyObserved,
+        status: "projection-drift",
+        runnerPermissions: { ...runnerPermissions, installedReadback: plan.installedReadback, canonicalizedFamilies: plan.canonicalizedFamilies },
+        nextAction: carryforwardAction,
+        diagnostics: [lifecycleDiagnostic(
+          "$.runnerPermissions",
+          "runner_permissions_version_carryforward",
+          "one complete prior Pipeline permission family can be replaced by this installed version's exact, read-back family",
+          "execute the digest-bound action and re-inspect; incomplete or foreign families are never carried forward",
+        )],
+      };
+    }
     return { ...observed, runnerPermissions: { ...runnerPermissions, optionalPlan: commandAction(
       [SETTINGS_ALLOWLIST_MERGE_SCRIPT, "plan-runner-permissions", "--root", result.root],
       false,
@@ -1389,6 +1411,21 @@ function withRunnerPermissionsReadback(result, fs) {
         : "inspect the typed settings merge disposition and repair invalid project-owned settings",
     )],
   };
+}
+
+export function runnerPermissionCarryforwardAction(plan, root) {
+  if (plan?.status !== "ready" || plan.autoCarryforward !== true
+    || plan.installedReadback?.status !== "verified"
+    || !Array.isArray(plan.canonicalizedFamilies) || plan.canonicalizedFamilies.length === 0
+    || typeof plan.planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(plan.planSha256)
+    || typeof root !== "string" || root.length === 0 || plan.root !== root) return null;
+  return commandAction(
+    [SETTINGS_ALLOWLIST_MERGE_SCRIPT, "apply-runner-permissions", "--root", root, "--plan-sha256", plan.planSha256, "--activate"],
+    true,
+    false,
+    SETTINGS_ALLOWLIST_MERGE_APPLY_SCHEMA,
+    ["ready", "no-op"],
+  );
 }
 function freshBaselines(intent, { hostManaged = false, profile = null, fs = null } = {}) {
   const baselines = {
@@ -5049,8 +5086,10 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   // and it throws on a target that appeared during activation), so a project that
   // already owns a `.gitignore` is never touched -- it simply gets no such target.
   const seedsProjectIgnore = !(inspected.entries ?? []).includes(".gitignore");
+  const agentEntry = initialGreenfieldAgentEntryTarget(inspected.status);
   const internal = [
     ...initialGreenfieldMapTargets(inspected.status),
+    ...(agentEntry ? [agentEntry] : []),
     ...[
       NEUTRAL_CALIBRATION,
       NEUTRAL_MANIFEST,
@@ -5059,17 +5098,21 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     { path: SOURCE, bytes: renderYaml(intent) },
     { path: CONSUMER_VERIFY_ADAPTER_PATH, bytes: CONSUMER_VERIFY_ADAPTER },
     ...(seedsProjectIgnore ? [{ path: ".gitignore", bytes: PROJECT_IGNORE_SEED }] : []),
-  ].sort((left, right) => left.path.localeCompare(right.path));
+  ].sort((left, right) => {
+    // Publish the physical map before its root entry pointer. The remaining
+    // scaffold retains deterministic path order; apply uses this same array.
+    const priority = (item) => item.path.startsWith("architecture/map/") ? 0 : item.path === "AGENTS.md" ? 1 : 2;
+    return priority(left) - priority(right) || left.path.localeCompare(right.path);
+  });
   const targets = internal.map((target) => ({
     path: target.path,
-    // `project-ignore` is its own kind rather than being folded into `runtime`:
-    // the runtime kind is filtered on elsewhere to mean "a compiled V3 runtime
-    // target", and a `.gitignore` is neither compiled nor owned by that projection.
+    // The project entry and ignore file are not compiled V3 runtime targets.
     kind: target.path === SOURCE
       ? "source"
       : (target.path === ".gitignore"
         ? "project-ignore"
-        : (target.path.startsWith("project/") ? "project-authority" : "runtime")),
+        : (target.path === "AGENTS.md" ? "project-entry"
+          : (target.path.startsWith("project/") ? "project-authority" : "runtime"))),
     before: describe(null),
     after: describe(target.bytes),
     changed: true,
@@ -5134,33 +5177,46 @@ function unresolvedAuthorIdentityKeys(root, hostManaged, fs) {
   return ["user.name", "user.email"].filter((key) => !configured(key));
 }
 
-// Read-only provenance for the identity a future commit would inherit.  A
-// Git value is evidence about configuration, never the PO's consent.  Keep
-// the scope explicit so a global/system value can be shown as a proposal
-// without being mistaken for repository-local authority.
+// Read-only provenance for the identity a future commit would inherit. Git's
+// author environment overrides author.* config, which overrides user.* config.
+// A proposed value is never the PO's consent, even when it is repository-local.
 function gitIdentityProvenance(root, fs) {
   const result = {};
   for (const key of ["user.name", "user.email"]) {
     let selected = null;
     let unreadable = false;
-    for (const scope of ["local", "global", "system"]) {
-      try {
-        const probe = fs.spawnSync("git", ["config", `--${scope}`, "--get", key], { cwd: root, encoding: "utf8" });
-        if (probe?.status === 0 && String(probe.stdout ?? "").trim().length > 0) {
-          selected = { value: String(probe.stdout).trim(), source: "git-config", scope };
-          break;
+    const environmentKey = key === "user.name" ? "GIT_AUTHOR_NAME" : "GIT_AUTHOR_EMAIL";
+    const environmentValue = fs.environment?.[environmentKey];
+    if (typeof environmentValue === "string" && environmentValue.length > 0) {
+      const value = environmentValue.trim();
+      selected = value.length > 0 && value.length <= AUTHOR_IDENTITY_FIELD_MAX_BYTES && !/[\r\n\0]/u.test(value)
+        ? { value, source: "environment", scope: environmentKey }
+        : { value: null, source: "unknown", scope: environmentKey };
+    }
+    for (const configKey of [key.replace(/^user\./u, "author."), key]) {
+      if (selected !== null) break;
+      for (const scope of ["local", "global", "system"]) {
+        try {
+          const probe = fs.spawnSync("git", ["config", `--${scope}`, "--get", configKey], { cwd: root, encoding: "utf8" });
+          if (probe?.status === 0 && String(probe.stdout ?? "").trim().length > 0) {
+            selected = { value: String(probe.stdout).trim(), source: "git-config", scope, configKey };
+            break;
+          }
+          if (probe?.error) unreadable = true;
+        } catch {
+          unreadable = true;
         }
-        if (probe?.error) unreadable = true;
-      } catch {
-        unreadable = true;
       }
     }
+    if (selected === null && key === "user.email" && typeof fs.environment?.EMAIL === "string"
+      && fs.environment.EMAIL.length > 0) {
+      const value = fs.environment.EMAIL.trim();
+      selected = value.length > 0 && value.length <= AUTHOR_IDENTITY_FIELD_MAX_BYTES && !/[\r\n\0]/u.test(value)
+        ? { value, source: "environment", scope: "EMAIL" }
+        : { value: null, source: "unknown", scope: "EMAIL" };
+    }
     if (selected === null) {
-      const environmentKey = key === "user.name" ? "GIT_AUTHOR_NAME" : "GIT_AUTHOR_EMAIL";
-      const environmentValue = process.env[environmentKey];
-      selected = typeof environmentValue === "string" && environmentValue.trim().length > 0
-        ? { value: environmentValue.trim(), source: "environment", scope: environmentKey }
-        : { value: null, source: unreadable ? "unknown" : "absent", scope: null };
+      selected = { value: null, source: unreadable ? "unknown" : "absent", scope: null };
     }
     result[key] = selected;
   }

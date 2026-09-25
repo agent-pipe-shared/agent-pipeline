@@ -11,11 +11,11 @@ Rule IDs: `QG-xx`.
 
 ## QG-01 — The gate chain is the norm
 
-- **MUST** pass the deterministic checks selected for the current boundary before any submission counts and before any LLM review starts. Work, Critic, local-candidate and ordinary-push boundaries run the fixed baseline plus every affected registered area. Release, tag, marketplace and publication boundaries run the complete `Format → Lint → Typecheck → Tests → Build` chain. Missing selection metadata or an unclassified change falls back to that complete chain (ADR-0081).
-- **MUST NOT** hand a diff to the Critic while deterministic gates are red, and the Critic **MUST NOT** flag anything CI/verify already enforces (lint, formatting, type errors) — no noise, no double work.
+- **MUST** pass the deterministic checks selected for the current boundary before any submission counts and before the Critic review starts. Work, Critic, local-candidate and ordinary-push boundaries run the fixed baseline plus every affected registered area. The later release, tag, marketplace and publication boundaries run the complete `Format → Lint → Typecheck → Tests → Build` chain after the substantive Critic review. Missing selection metadata or an unclassified change falls back to that complete chain even at an earlier boundary (ADR-0081).
+- **MUST NOT** hand a diff to the Critic while the applicable Critic-boundary deterministic checks are red. A candidate-bound Critic-mode Verify receipt or validated targeted diagnostic may admit review with full release-mode Verify explicitly pending; neither is release qualification. The Critic **MUST NOT** flag anything CI/verify already enforces (lint, formatting, type errors) — no noise, no double work.
 - `verify` + evidence are invariant on ALL rigor levels — there is no path around the deterministic gates, not even for one-line fixes (`docs/operating-model.md`, *Rigor, risk and gates*).
-- **Why:** Machines find mechanical errors guaranteed and cheaply; LLM review is probabilistic and expensive — inverting the order wastes tokens and dilutes findings.
-- **Verification:** The verify script encodes the chain (QG-02); the gate decision (SDLC step 8) records green evidence before the Critic dispatch; Critic reports contain no CI-enforceable findings.
+- **Why:** Machines find mechanical errors guaranteed and cheaply; LLM review is probabilistic and expensive. Skipping the targeted pre-review checks wastes tokens and dilutes findings, while running the full release chain before the first substantive Critic review wastes a candidate-wide pass that corrections may invalidate.
+- **Verification:** The verify script encodes boundary selection (QG-02); the Critic gate records its selected deterministic evidence before dispatch. A fresh substantive Critic review precedes the full release-mode Verify, whose evidence binds the consumed review packet. Critic reports contain no CI-enforceable findings.
 
 ## QG-02 — verify-script contract: ONE engine, boundary-bound modes
 

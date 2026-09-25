@@ -1069,3 +1069,22 @@ yielded binary verdict PASS with 0 findings, sealed with receipt packet
 Candidate freeze v2 and evidence manifest v1 are sealed under
 `specs/sprint-nova-epic/evidence/nova-b/`.
 
+## 2026-09-25 — Correction to the final Nova B Critic claim
+
+Status: `historical-freeze-retained; independent-critic-acceptance-unproven`.
+
+The preceding `critic-passed` statement is a historical report claim, not a
+verified acceptance gate. The sealed
+`specs/sprint-nova-epic/evidence/nova-b/evidence-manifest.json` binds the
+candidate's backlog, Verify and Security sources, but its scope is expressly
+`candidate-freeze-only` and it lists no Critic source. The separate Markdown
+report at `specs/sprint-nova-epic/evidence/critic/986f8f03b7ca737e93d2553be41d7877c5f84137.md`
+was added with this Result in documentation commit
+`10d58d293013eeb47ba192a00cca045b66e0434c`; it is not a file in the
+frozen candidate tree. Its named packet is not independently available as a
+portable, manifest-bound review receipt in this repository. Therefore neither
+that report nor the paragraph above establishes the claimed independent
+Critic PASS or acceptance of all Nova B criteria. The historical Verify and
+Security claims remain separate; they are not upgraded or invalidated by this
+correction. The integrated 0.7 candidate needs its own exact-candidate Critic
+and criterion-level acceptance readback before any close or release claim.

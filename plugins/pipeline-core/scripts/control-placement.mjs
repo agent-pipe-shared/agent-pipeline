@@ -29,6 +29,7 @@ export const ALFRED_SHIPPED_CONTROL_IDS = Object.freeze([
   "alfred:d2-module-inventory",
   "alfred:d3-architecture-fitness",
   "alfred:d4-architecture-adoption",
+  "alfred:e3-cross-runner-agy-host",
 ]);
 
 const TABLE_KEYS = Object.freeze(["schema", "revision", "controls"]);

@@ -6,7 +6,12 @@ import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { normalizeDispatchRecordPath, validateDispatchRecord } from "../lib/dispatch-record.mjs";
+import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
+import { parseStrictJson } from "../lib/governance-event.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
+import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
+import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
 
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const REQUEST_SCHEMA = "pipeline.dispatch-record-write-request.v1";
@@ -138,21 +143,89 @@ export function writeDispatchRecord({ repoRoot, requestPath }, dependencies = {}
   try { request = decodeJson(requestRaw); } catch (error) { if (error?.code === "request-json") throw error; fail("request-json", "dispatch record request is not JSON"); }
   exactKeys(request, ["schema", "target", "record"], "dispatch record write request");
   if (request.schema !== REQUEST_SCHEMA) fail("request-schema", `request schema must be ${REQUEST_SCHEMA}`);
-  const record = validateDispatchRecord(request.record);
+  return publishDispatchRecord(root, request.target, request.record, dependencies);
+}
+
+/** Host-owned in-memory request; publication still uses the same validation and exclusive inode path. */
+export function writeDispatchRecordObject({ repoRoot, target, record }, dependencies = {}) {
+  const root = physicalRoot(repoRoot);
+  return publishDispatchRecord(root, target, record, dependencies);
+}
+
+/**
+ * Host-only authored-Agy route. Its caller cannot supply an authority verdict:
+ * the private receipt, consent, result bytes and Git objects are reopened here.
+ * The public JSON/object writers above retain their model-authority denial.
+ */
+export function writeHostObservedAgyDispatchRecord({ repoRoot, target, record }, dependencies = {}) {
+  const root = physicalRoot(repoRoot);
+  return publishDispatchRecord(root, target, record, dependencies, { hostObservedAgy: true });
+}
+
+function publishDispatchRecord(root, targetPath, inputRecord, dependencies, { hostObservedAgy = false } = {}) {
+  const record = validateDispatchRecord(inputRecord);
   const modelCheck = compareRecordedModel(record);
-  if (modelCheck.classification !== "model-matches") fail("record-model", `record model/effort is not bound to agentType without caller authority: ${modelCheck.reason}`);
-  const targetRelative = normalizeDispatchRecordPath(request.target, "target path");
+  const agyUndelivered = record.schema === "pipeline.dispatch-record.v4"
+    && record.runner === "antigravity"
+    && record.outcomeClassification.kind === "completed-undelivered";
+  const agyInterrupted = record.schema === "pipeline.dispatch-record.v4"
+    && record.runner === "antigravity"
+    && agyAgentTypeForRole(`pipeline-core:${record.agentType}`) !== null
+    && record.outcomeClassification.kind === "stopped-without-commit"
+    && record.commits.length === 0
+    && record.report?.changedFiles.length === 0
+    && record.log.length === 1 && record.log[0].phase === "interrupted"
+    && /^attempt:[a-f0-9]{32};reason:AGY-[A-Z-]+$/u.test(record.log[0].note ?? "")
+    && Object.hasOwn(record, "criticRequired")
+    && !Object.hasOwn(record, "criticSkip") && !Object.hasOwn(record, "criticEvidence");
+  const agyAuthored = record.schema === "pipeline.dispatch-record.v4"
+    && record.runner === "antigravity"
+    && agyAgentTypeForRole(`pipeline-core:${record.agentType}`) !== null
+    && record.outcomeClassification.kind === "authored-commit";
+  if (hostObservedAgy && !agyAuthored) fail("record-host-observation", "host-observed route requires authored Agy v4");
+  if (agyAuthored && hostObservedAgy) {
+    const checked = inspectAgyHostObservedLocalReadback({ root, taskId: record.taskId,
+      record, recordBytes: agyAuthoredRecordBytes(record) });
+    if (!checked.ok) fail("record-host-observation", `Agy host observation is not independently readable: ${checked.code}`);
+  } else if (!agyUndelivered && !agyInterrupted && modelCheck.classification !== "model-matches") {
+    fail("record-model", `record model/effort is not bound to agentType without caller authority: ${modelCheck.reason}`);
+  }
+  const targetRelative = normalizeDispatchRecordPath(targetPath, "target path");
   const expected = `evidence/dispatch-record-${record.taskId}.json`;
   if (targetRelative !== expected) fail("target-path", `target must exactly match ${expected}`);
+  const bytes = Buffer.from(`${JSON.stringify(record, null, 2)}\n`, "utf8");
+  const digest = publishExclusiveBytes(root, targetRelative, record.taskId, bytes, dependencies, "dispatch-record");
+  const receipt = {
+    schema: RECEIPT_SCHEMA_V1,
+    target: targetRelative,
+    sha256: digest,
+    bytes: bytes.length,
+    taskId: record.taskId,
+    candidateCommit: record.candidateCommit,
+    resultSha256: record.resultSha256,
+  };
+  if (record.schema === "pipeline.dispatch-record.v4"
+    && ["read-only", "stopped-without-commit", "completed-undelivered"].includes(record.outcomeClassification.kind)) {
+    return {
+      ...receipt,
+      schema: RECEIPT_SCHEMA_V2,
+      outcomeClassification: structuredClone(record.outcomeClassification),
+      ...(record.outcomeClassification.kind === "completed-undelivered"
+        ? { observationIdentity: structuredClone(record.observationIdentity) } : {}),
+    };
+  }
+  return receipt;
+}
+
+function publishExclusiveBytes(root, targetRelative, taskId, bytes, dependencies, label) {
   const target = resolve(root, targetRelative);
   const parent = physicalParent(root, target);
-  const bytes = Buffer.from(`${JSON.stringify(record, null, 2)}\n`, "utf8");
   const digest = createHash("sha256").update(bytes).digest("hex");
   const nonce = (dependencies.randomBytes ?? randomBytes)(16).toString("hex");
-  const temporaryName = `.${record.taskId}.${nonce}.dispatch-record.tmp`;
+  const temporaryName = `.${taskId}.${nonce}.${label}.tmp`;
   const targetName = basename(target);
   pinnedDirectory(parent, dependencies.afterTargetDirectoryPinned, () => {
-    if (existsSync(targetName)) fail("target-exists", "dispatch record target already exists");
+    if (existsSync(targetName)) fail("target-exists", `${label} target already exists`);
     let fd;
     let targetFd;
     try {
@@ -172,7 +245,7 @@ export function writeDispatchRecord({ repoRoot, requestPath }, dependencies = {}
       const finalIdentity = (dependencies.fstatSync ?? fstatSync)(targetFd);
       const targetInfo = lstatSync(targetName);
       if (!targetInfo.isFile() || targetInfo.isSymbolicLink() || !sameFileContentSnapshot(targetIdentity, finalIdentity) || !sameIdentity(targetInfo, finalIdentity)
-        || !readback.equals(bytes) || createHash("sha256").update(readback).digest("hex") !== digest) fail("readback", "dispatch record publication readback failed");
+        || !readback.equals(bytes) || createHash("sha256").update(readback).digest("hex") !== digest) fail("readback", `${label} publication readback failed`);
       (dependencies.closeSync ?? closeSync)(targetFd); targetFd = undefined;
     } catch (error) {
       if (fd !== undefined) try { (dependencies.closeSync ?? closeSync)(fd); } catch {}
@@ -181,24 +254,26 @@ export function writeDispatchRecord({ repoRoot, requestPath }, dependencies = {}
       throw error;
     }
   });
-  const receipt = {
-    schema: RECEIPT_SCHEMA_V1,
-    target: targetRelative,
-    sha256: digest,
-    bytes: bytes.length,
-    taskId: record.taskId,
-    candidateCommit: record.candidateCommit,
-    resultSha256: record.resultSha256,
-  };
-  if (record.schema === "pipeline.dispatch-record.v4"
-    && ["read-only", "stopped-without-commit"].includes(record.outcomeClassification.kind)) {
-    return {
-      ...receipt,
-      schema: RECEIPT_SCHEMA_V2,
-      outcomeClassification: structuredClone(record.outcomeClassification),
-    };
-  }
-  return receipt;
+  return digest;
+}
+
+/** Host-only publication of byte-bound evidence; coverage separately verifies the consumed Critic receipt. */
+export function writeCriticDispositionAddendumObject({ repoRoot, addendum }, dependencies = {}) {
+  const root = physicalRoot(repoRoot);
+  if (!addendum || typeof addendum !== "object") fail("addendum-shape", "critic addendum is required");
+  const target = criticDispositionAddendumPath(addendum.taskId);
+  const recordBytes = readPhysicalRequest(root, addendum.recordPath, dependencies);
+  let record;
+  try { record = parseStrictJson(recordBytes); }
+  catch (error) { fail("record-json", `dispatch record is not strict JSON: ${error.message}`); }
+  validateDispatchRecord(record);
+  validateCriticDispositionAddendum(addendum, { recordPath: addendum.recordPath, recordBytes, record });
+  const evidenceBytes = readPhysicalRequest(root, addendum.criticEvidence.path, dependencies);
+  if (createHash("sha256").update(evidenceBytes).digest("hex") !== addendum.criticEvidence.sha256) fail("critic-evidence", "critic evidence digest mismatch");
+  const bytes = Buffer.from(`${JSON.stringify(addendum, null, 2)}\n`, "utf8");
+  const digest = publishExclusiveBytes(root, target, addendum.taskId, bytes, dependencies, "critic-addendum");
+  return { schema: "pipeline.critic-disposition-addendum-write-receipt.v1", target, sha256: digest,
+    bytes: bytes.length, taskId: addendum.taskId, candidateCommit: addendum.candidateCommit, recordSha256: addendum.recordSha256 };
 }
 
 function parseArgs(argv) {

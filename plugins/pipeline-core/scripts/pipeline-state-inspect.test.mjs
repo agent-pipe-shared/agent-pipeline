@@ -386,6 +386,42 @@ function implementingFixture(name) {
   return root;
 }
 
+test("inspect classifies prior push approval without disclosing proof or destination", () => {
+  const root = implementingFixture("push-approval-currentness");
+  const stateFile = resolveStatePath(root);
+  const state = JSON.parse(readFileSync(stateFile, "utf8"));
+  state.pushApproval = { lastApproved: {
+    approvedBy: "PO", approvedAt: NOW, forCommit: "a".repeat(40),
+    remote: "private-remote-coordinate", destination: "refs/heads/private-destination",
+    criticalProof: { proof: { publicKey: "private-public-key", signatureBase64: "private-signature" } },
+  } };
+  writeFileSync(stateFile, JSON.stringify(state, null, 2) + "\n");
+  const originalBytes = readFileSync(stateFile, "utf8");
+  const stale = invoke(root, ["inspect"], { gitHead: () => ({ ok: true, commit: "b".repeat(40) }) });
+  assert.equal(stale.status, 0, stale.err);
+  assert.deepEqual(JSON.parse(stale.out).pushApproval, { present: true, relevance: "stale-candidate" });
+  for (const privateValue of ["private-remote-coordinate", "private-destination", "private-public-key", "private-signature"]) {
+    assert.ok(!stale.out.includes(privateValue), `inspect leaked ${privateValue}`);
+  }
+  assert.equal(readFileSync(stateFile, "utf8"), originalBytes, "inspect must preserve the historical record");
+
+  const matching = invoke(root, ["inspect"], { gitHead: () => ({ ok: true, commit: "a".repeat(40) }) });
+  assert.deepEqual(JSON.parse(matching.out).pushApproval, { present: true, relevance: "candidate-match" });
+  const unavailable = invoke(root, ["inspect"], { gitHead: () => ({ ok: false }) });
+  assert.deepEqual(JSON.parse(unavailable.out).pushApproval, { present: true, relevance: "head-unavailable" });
+  state.pushApproval.lastApproved.forCommit = "not-an-oid";
+  writeFileSync(stateFile, JSON.stringify(state, null, 2) + "\n");
+  const malformed = invoke(root, ["inspect"], { gitHead: () => ({ ok: true, commit: "a".repeat(40) }) });
+  assert.deepEqual(JSON.parse(malformed.out).pushApproval, { present: true, relevance: "malformed" });
+});
+
+test("inspect without push history does not probe Git for approval freshness", () => {
+  const root = implementingFixture("no-push-approval");
+  const result = invoke(root, ["inspect"], { gitHead: () => { throw new Error("unnecessary Git read"); } });
+  assert.equal(result.status, 0, result.err);
+  assert.deepEqual(JSON.parse(result.out).pushApproval, { present: false, relevance: "absent" });
+});
+
 test("implementing next-action surfaces push-init.mjs discoverably, with the submitter derived from local Git config", () => {
   const root = implementingFixture("implementing-push-init-derivable");
   setLocalGitUserName(root, "Jordan Example");

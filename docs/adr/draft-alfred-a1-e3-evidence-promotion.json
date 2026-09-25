@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-alfred-a1-e3-evidence-promotion",
+  "title": "Alfred A1 to E3 evidence promotion without candidate self-reference",
+  "status": "proposed",
+  "digest": "ad0abc3a453afdc56ce803903836907381caa8429c253228e03be88839354b06",
+  "scope": "global",
+  "date": "2026-09-25"
+}

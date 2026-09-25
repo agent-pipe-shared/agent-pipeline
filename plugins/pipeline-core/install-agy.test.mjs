@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: SUL-1.0
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { installerUsageLines, postInstallGuidanceLines, selectPluginSource, updatePluginRegistry } from "./install-agy.mjs";
+import { fileURLToPath } from "node:url";
+import { installerUsageLines, postInstallGuidanceLines, selectPluginSource, updateAutonomousSettings, updatePluginRegistry } from "./install-agy.mjs";
 import { resolveAntigravityRegistryInstalledRoot } from "./scripts/installed-plugin-attestation-host.mjs";
 
-test("Agy release-tag checkout creates a named branch without changing the signed tag commit", (t) => {
+test("Agy release-tag checkout creates a named branch without changing the tag commit", (t) => {
   const root = mkdtempSync(join(tmpdir(), "agy-release-tag-checkout-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const source = join(root, "source");
@@ -29,21 +30,67 @@ test("Agy release-tag checkout creates a named branch without changing the signe
   assert.equal(git(["rev-parse", "HEAD"]), tagCommit);
   assert.equal(git(["describe", "--tags", "--exact-match"]), "v0.7.0");
   const setup = readFileSync(new URL("../../SETUP.md", import.meta.url), "utf8");
+  const agyEntry = readFileSync(new URL("../../GEMINI.md", import.meta.url), "utf8");
   const onboarding = readFileSync(new URL("../../docs/v3-consumer-onboarding.md", import.meta.url), "utf8");
+  assert.match(setup, /https:\/\/github\.com\/agent-pipe-shared\/agent-pipeline(?:\.git)?/u);
+  assert.match(setup, /Before `v0\.7\.0` is published, use the installation instructions at the\s+already-approved release tag/u);
+  assert.doesNotMatch(setup, /\[version-independent Agy installation path\]\(GEMINI\.md/u,
+    "the pre-release instruction must not loop back to GEMINI.md");
+  assert.match(agyEntry, /SETUP\.md#antigravity-agy-workspace-local-binding/u);
   assert.match(setup, /git -C "\$pipeline_release_dir" switch -c pipeline-release-v0\.7\.0/u);
+  assert.match(setup, /\$pipelineReleaseDir = Join-Path \$env:LOCALAPPDATA/u);
+  assert.match(setup, /git -C \$pipelineReleaseDir switch -c pipeline-release-v0\.7\.0/u);
+  assert.match(setup, /node \(Join-Path \$pipelineReleaseDir 'plugins\/pipeline-core\/install-agy\.mjs'\)/u);
   assert.match(onboarding, /\.\.\/SETUP\.md#antigravity-agy-workspace-local-binding/u,
     "consumer onboarding links to the single maintained GitHub installation procedure");
 });
 
 test("Agy installer guidance verifies the host PATH without normalizing sudo or yolo", () => {
-  const guidance = postInstallGuidanceLines().join("\n");
+  const guidance = postInstallGuidanceLines("linux").join("\n");
   assert.match(guidance, /command -v node/u);
+  const windowsGuidance = postInstallGuidanceLines("win32").join("\n");
+  assert.match(windowsGuidance, /where\.exe node/u);
+  assert.doesNotMatch(windowsGuidance, /command -v node/u);
   assert.match(guidance, /fully restart Antigravity/u);
   assert.match(guidance, /pipeline-start/u);
   assert.match(guidance, /grants no plan, release, remote, or human authority/u);
   assert.doesNotMatch(guidance, /sudo\s+ln/u);
   assert.doesNotMatch(guidance, /--yolo/u);
   assert.doesNotMatch(guidance, /SILENTLY FAIL OPEN/u);
+});
+
+test("Agy optional autonomous settings preserve unrelated keys and refuse malformed input", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "agy-installer-settings-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const targetFile = join(root, "settings.json");
+  const original = '{"custom":{"keep":true},"terminalSandbox":false}\n';
+  writeFileSync(targetFile, original);
+  updateAutonomousSettings({ targetFile });
+  assert.deepEqual(JSON.parse(readFileSync(targetFile, "utf8")), {
+    custom: { keep: true }, terminalSandbox: true,
+    toolExecutionPolicy: "always-proceed", artifactReviewMode: "always-proceed",
+  });
+  for (const bytes of ["{broken", "[]", "null", Buffer.from([0x7b, 0x22, 0x80, 0x22, 0x3a, 0x31, 0x7d])]) {
+    writeFileSync(targetFile, bytes);
+    assert.throws(() => updateAutonomousSettings({ targetFile }), /Malformed Antigravity settings/u);
+    assert.deepEqual(readFileSync(targetFile), Buffer.from(bytes));
+  }
+  assert.deepEqual(readdirSync(root), ["settings.json"], "failed updates leave no temporary files");
+});
+
+test("Agy optional autonomous settings never follow file or parent aliases", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "agy-installer-settings-alias-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const actual = join(root, "actual");
+  const alias = join(root, "alias");
+  mkdirSync(actual);
+  const outside = join(root, "outside.json");
+  writeFileSync(outside, '{"keep":true}\n');
+  symlinkSync(outside, join(actual, "settings.json"));
+  assert.throws(() => updateAutonomousSettings({ targetFile: join(actual, "settings.json") }), /Unsafe Antigravity settings target/u);
+  symlinkSync(actual, alias);
+  assert.throws(() => updateAutonomousSettings({ targetFile: join(alias, "settings.json") }), /Unsafe Antigravity settings parent/u);
+  assert.equal(readFileSync(outside, "utf8"), '{"keep":true}\n');
 });
 
 test("Agy installer defaults to the approved script directory and makes local development explicit", () => {
@@ -55,8 +102,40 @@ test("Agy installer defaults to the approved script directory and makes local de
     kind: "local-marketplace",
     pluginRoot: "/local/marketplace/plugins/pipeline-core",
   });
+  assert.throws(() => selectPluginSource({ answer: "2", scriptDir: "/approved/plugin", marketplaceRoot: "/missing", marketplaceAvailable: false }),
+    /Local development marketplace is unavailable; no plugin was registered/u);
+  assert.throws(() => selectPluginSource({ answer: "99", scriptDir: "/approved/plugin", marketplaceRoot: "/local/marketplace", marketplaceAvailable: true }),
+    /Invalid plugin source selection; no plugin was registered/u);
   assert.match(installerUsageLines().join("\n"), /approved Agent-Pipeline plugin directory/u);
   assert.match(installerUsageLines().join("\n"), /explicit pre-release development choice/u);
+  assert.match(installerUsageLines().join("\n"), /does not prove GitHub origin or release authenticity/u);
+});
+
+test("Agy installer shows an invalid source choice as a refusal before touching the consumer registry", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "agy-installer-source-choice-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./install-agy.mjs", import.meta.url))],
+    { cwd: root, input: "99\n", encoding: "utf8" });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /Source approval is your decision: this installer does not prove GitHub origin or release authenticity/u);
+  assert.match(result.stderr, /Installation refused: Invalid plugin source selection; no plugin was registered/u);
+  assert.equal(existsSync(join(root, ".agents", "plugins.json")), false);
+});
+
+test("Agy interactive optional-mode failure leaves malformed consumer settings untouched", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "agy-installer-optional-refusal-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, ".agents"));
+  const targetFile = join(root, ".agents", "settings.json");
+  const original = "{broken\n";
+  writeFileSync(targetFile, original);
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("./install-agy.mjs", import.meta.url))],
+    { cwd: root, input: "1\n1\ny\n", encoding: "utf8" });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /Autonomous settings update refused: Malformed Antigravity settings/u);
+  assert.equal(readFileSync(targetFile, "utf8"), original);
+  assert.deepEqual(JSON.parse(readFileSync(join(root, ".agents", "plugins.json"), "utf8")).entries.length, 1,
+    "the already completed plugin registration is reported separately from optional-mode failure");
 });
 
 function fixture(t) {

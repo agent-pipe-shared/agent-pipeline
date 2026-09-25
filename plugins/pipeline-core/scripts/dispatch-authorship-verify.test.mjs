@@ -95,6 +95,21 @@ test("(b) trailer present, no record file -> FAIL record-missing", () => {
   assert.match(verdict.reason, /DOD-B-ABSENT/u);
 });
 
+test("(b2) a marked Agy host commit without its private record stays UNVERIFIABLE in a clone", () => {
+  const message = "feat(agy): deliver\n\nDispatch: DOD-B-AGY (goldfish)\nAgy-Host-Observed: v1\nAI-Assisted: true\n";
+  const verdict = verifyCommit("beef112", commit({ message, paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "agy-portable-export-required");
+  for (const malformed of [
+    message.replace("Agy-Host-Observed: v1", "Agy-Host-Observed: v2"),
+    message.replace("Agy-Host-Observed: v1", "Agy-Host-Observed: v1\nAgy-Host-Observed: v1"),
+    "feat(agy): deliver\n\nAgy-Host-Observed: v1\n\nDispatch: DOD-B-AGY (goldfish)\nAI-Assisted: true\n",
+  ]) {
+    assert.equal(verifyCommit("beef112", commit({ message: malformed, paths: ["src/thing.mjs"] })).classification,
+      "record-missing");
+  }
+});
+
 test("(c) record still in-progress -> FAIL record-not-terminal", () => {
   writeRecord("DOD-C", { taskId: "DOD-C", outcome: "in-progress", log: [], report: { changedFiles: ["src/thing.mjs - x"] } });
   const verdict = verifyCommit("cafe222", commit({ message: "feat(x): a thing\n\nDispatch: DOD-C (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
@@ -340,6 +355,69 @@ test("v4 authored records preserve required-pending and reject non-authoring out
   writeRecord("DOD-V4-READONLY", readOnly);
   const readOnlyDeps = commit({ message: "feat(x): done\n\nDispatch: DOD-V4-READONLY (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
   assert.equal(verifyCommit(sha, readOnlyDeps).classification, "record-outcome-does-not-attest-authorship");
+  const undelivered = {
+    ...authored, taskId: "DOD-V4-UNDELIVERED", outcome: "completed-no-delivery",
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+    observationIdentity: { dispatchId: "dispatch-1", attemptId: "attempt-1" },
+    resultSha256: null, commits: [], report: null,
+  };
+  writeRecord("DOD-V4-UNDELIVERED", undelivered);
+  const undeliveredDeps = commit({ message: "feat(x): done\n\nDispatch: DOD-V4-UNDELIVERED (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] });
+  const undeliveredAuthorship = verifyCommit(sha, undeliveredDeps);
+  assert.equal(undeliveredAuthorship.verdict, VERDICT.fail);
+  assert.equal(undeliveredAuthorship.classification, "record-outcome-does-not-attest-authorship");
+});
+
+test("v4 authored Antigravity record cannot mint PASS from Claude frontmatter or a self-declared model", () => {
+  const sha = "5".repeat(40);
+  const report = { text: "Done.", changedFiles: ["src/thing.mjs"] };
+  const authored = {
+    schema: "pipeline.dispatch-record.v4", taskId: "DOD-V4-AGY", agentType: "goldfish-implementor",
+    runner: "antigravity", model: "gemini-3.8-flash-high", effort: "high", rulesetSha: "0.7.0+local",
+    dispatcher: "Elephant", candidateCommit: sha,
+    resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"),
+    outcome: "completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    commits: [sha], log: [], report, criticSkip: skip(),
+  };
+  writeRecord("DOD-V4-AGY", authored);
+  const deps = commit({
+    message: "feat(agy): done\n\nDispatch: DOD-V4-AGY (goldfish)\nAI-Assisted: true\n",
+    paths: ["src/thing.mjs"],
+  });
+  const verdict = verifyCommit(sha, deps);
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "runner-model-authority-unverified");
+  assert.equal(verdict.modelCheck.classification, "runner-model-authority-required");
+  const local = { ...deps, verifyAgyHostObservation: () => ({ ok: true,
+    authority: "host-observed-local" }) };
+  assert.equal(verifyCommit(sha, local).modelCheck.classification, "host-observed-local");
+  assert.equal(verifyCommit(sha, { ...deps,
+    verifyAgyHostObservation: () => { throw new Error("private reader failed"); } }).classification,
+  "runner-model-authority-unverified");
+  const required = { ...authored, criticRequired: { schema: CRITIC_REQUIRED_SCHEMA,
+    trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" } };
+  delete required.criticSkip;
+  writeRecord("DOD-V4-AGY", required);
+  assert.equal(verifyCommit(sha, local).classification, "critic-evidence-pending");
+  const reviewed = { ...local, verifyCriticAddendum: () => ({ ok: true,
+    code: "critic-addendum-bound" }) };
+  assert.equal(verifyCommit(sha, reviewed).verdict, VERDICT.pass);
+  assert.equal(verifyCommit(sha, { ...reviewed,
+    verifyCriticAddendum: () => ({ ok: false, code: "critic-addendum-invalid" }) }).classification,
+  "critic-addendum-invalid");
+  assert.equal(verifyCommit(sha, { ...reviewed,
+    verifyCriticAddendum: () => { throw new Error("private addendum reader failed"); } }).classification,
+  "critic-addendum-invalid");
+  let portableCalls = 0;
+  const portable = { ...deps,
+    verifyCriticAddendum: () => ({ ok: false, code: "critic-addendum-missing" }),
+    verifyAgyPortableExport: () => { portableCalls += 1; return { ok: true, authority: "host-observed-portable" }; } };
+  assert.equal(verifyCommit(sha, portable).verdict, VERDICT.pass);
+  assert.equal(portableCalls, 1);
+  const invalidAddendum = { ...portable,
+    verifyCriticAddendum: () => ({ ok: false, code: "critic-addendum-invalid" }) };
+  assert.equal(verifyCommit(sha, invalidAddendum).classification, "critic-addendum-invalid");
+  assert.equal(portableCalls, 1, "a present invalid addendum must not be bypassed by the signed export");
 });
 
 test("actual paths reject false T5 and T0 while honest T1 required/evidence is accepted", () => {

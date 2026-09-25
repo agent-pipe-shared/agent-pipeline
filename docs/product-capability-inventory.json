@@ -64,8 +64,8 @@
           "reasonCode": "claude-host-hook-contract"
         },
         "antigravity": {
-          "status": "supported",
-          "reasonCode": null
+          "status": "host-dependent",
+          "reasonCode": "native-hook-measurement-pending"
         }
       },
       "platforms": [
@@ -199,6 +199,9 @@
         "verify-phase:harness/scripts/verify.mjs:agent-model-registry-tests",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-final-return-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-host-commit-admission-tests",
+        "verify-phase:harness/scripts/verify.mjs:agy-host-commit-execution-tests",
         "verify-phase:harness/scripts/verify.mjs:agy-session-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:agy-session-consent-tests",
         "verify-phase:harness/scripts/verify.mjs:agy-session-dispatch-tests",
@@ -212,6 +215,7 @@
         "verify-phase:harness/scripts/verify.mjs:architecture-baseline-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-design-test-fixture-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-design-tests",
+        "verify-phase:harness/scripts/verify.mjs:architecture-effective-decisions-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-entry-readiness-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-fitness-tests",
         "verify-phase:harness/scripts/verify.mjs:architecture-map-scaffold-tests",
@@ -424,6 +428,7 @@
         "verify-phase:harness/scripts/verify.mjs:manual-check-logic-tests",
         "verify-phase:harness/scripts/verify.mjs:measure-tofu-push-e2e-tests",
         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:model-role-session-tests",
         "verify-phase:harness/scripts/verify.mjs:module-cluster-reachability-tests",
         "verify-phase:harness/scripts/verify.mjs:module-inventory-tests",
         "verify-phase:harness/scripts/verify.mjs:native-plugin-readback-tests",
@@ -504,6 +509,10 @@
         "verify-phase:harness/scripts/verify.mjs:po-human-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:portable-agy-authorship-export-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:portable-agy-authorship-export-tests",
+        "verify-phase:harness/scripts/verify.mjs:portable-critic-export-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:portable-critic-export-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
         "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:pre-commit-hook-install-tests",

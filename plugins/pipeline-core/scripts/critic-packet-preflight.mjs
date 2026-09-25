@@ -647,6 +647,18 @@ export function readConsumedCandidateReceipt({ controlRoot, packetId }) {
   const state = currentState(packetDir, packet);
   if (state.phase !== "consumed") fail("CPP-CONSUMED", "Packet is not consumed.");
   const receiptRecord = readJson(join(packetDir, "receipt.json"), "CPP-RECEIPT");
+  // A physical receipt file is not authority on its own. The consume step
+  // copied its exact body and journal position into the durable state; a
+  // later edit of either side must not mint a different positive review.
+  if (receiptRecord?.schema !== RECORD_SCHEMA || receiptRecord.phase !== "consumed"
+    || receiptRecord.packetId !== packetId
+    || receiptRecord.packetDigest !== sha256(canonicalJson(packet))
+    || !Number.isSafeInteger(receiptRecord.revision) || receiptRecord.revision < 1
+    || canonicalJson(recordBody(packet, receiptRecord.revision,
+      receiptRecord.priorStateDigest, receiptRecord.phase,
+      receiptRecord.body, receiptRecord.timestamp)) !== canonicalJson(state)) {
+    fail("CPP-RECEIPT-DRIFT", "Consumed Critic receipt differs from its durable journal state.");
+  }
   const receipt = receiptRecord?.body ?? receiptRecord;
   return Object.freeze({ packet, receipt });
 }

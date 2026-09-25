@@ -33,6 +33,8 @@ test("A3 treats an absent lifecycle state as an empty dynamic protected class", 
   assert.equal(baseline.status, "ready");
   assert.ok(baseline.entries.length >= 6);
   assert.ok(protectedBaselineRuleFor(baseline.entries, "plugins/pipeline-core/lib/protected-baseline.mjs"));
+  assert.equal(protectedBaselineRuleFor(baseline.entries, "plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs")?.id, "PB-ALFRED-E3-HOST");
+  assert.equal(protectedBaselineRuleFor(baseline.entries, "schemas/pipeline.cross-runner-dispatch-receipt.v1.json")?.id, "PB-ALFRED-E3-RECEIPT");
   assert.ok(baseline.identity.baselineDigest);
   assert.equal(baseline.dynamic.status, "absent");
   assert.equal(baseline.diagnostics.some((item) => item.code === PB_DYNAMIC_UNAVAILABLE), false);

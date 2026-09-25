@@ -25,12 +25,12 @@ function parseJsonOutput(result, code) {
   if (result?.status !== 0) fail(code, String(result?.stderr ?? result?.stdout ?? "command failed").trim() || "Command failed.");
   try { return JSON.parse(String(result.stdout)); } catch { fail(code, "Command did not return one JSON object."); }
 }
-function readActiveFeature(root, deps) {
+function readFeatureState(root, deps) {
   const read = deps.readFileSyncFn ?? readFileSync;
   let state;
   try { state = JSON.parse(read(resolve(root, ".claude/pipeline-state.json"), "utf8")); } catch { fail("FINISH-STATE", "Pipeline State is unavailable."); }
-  if (!state?.activeFeature || !FEATURE.test(state.activeFeature.id ?? "")) fail("FINISH-FEATURE", "A valid active feature is required.");
-  return state.activeFeature.id;
+  if (state === null || typeof state !== "object" || Array.isArray(state)) fail("FINISH-STATE", "Pipeline State is invalid.");
+  return state;
 }
 function command(runner, executable, argv, code) { return parseJsonOutput(runner(executable, argv), code); }
 function flagPairs(values) {
@@ -53,8 +53,11 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
   if (typeof auditRequest !== "string" || auditRequest.length === 0 || auditRequest.startsWith("/") || auditRequest.includes("\\") || auditRequest.split("/").some(part => part === "" || part === "." || part === "..")) fail("FINISH-AUDIT-REQUEST", "Feature close requires one safe repository-relative audit request.");
   if (!/^[a-f0-9]{64}$/u.test(criticVerifyLifecycle ?? "")) fail("FINISH-CRITIC-VERIFY", "Feature close requires the exact private Critic/Verify lifecycle receipt ID.");
   if (continuityCloseRequest !== null && (typeof continuityCloseRequest !== "string" || continuityCloseRequest.length === 0 || continuityCloseRequest.startsWith("/") || continuityCloseRequest.includes("\\") || continuityCloseRequest.split("/").some(part => part === "" || part === "." || part === ".."))) fail("FINISH-CONTINUITY", "Continuity close request must be safe and repository-relative.");
-  const featureId = readActiveFeature(root, deps);
   if (lifecycleId !== null && resumeLifecycleId !== null) fail("FINISH-LIFECYCLE", "A new lifecycle ID and a resume ID cannot both be supplied.");
+  const state = readFeatureState(root, deps);
+  const featureId = state.activeFeature?.id;
+  if (featureId !== undefined && !FEATURE.test(featureId)) fail("FINISH-FEATURE", "A valid active feature is required.");
+  if (featureId === undefined && resumeLifecycleId === null) fail("FINISH-FEATURE", "A valid active feature is required.");
   const id = resumeLifecycleId ?? lifecycleId ?? `${featureId}-${(deps.randomBytesFn ?? randomBytes)(12).toString("hex")}`;
   if (!/^[A-Za-z0-9._-]{1,100}$/u.test(id)) fail("FINISH-LIFECYCLE", "Lifecycle ID is invalid.");
   const runner = deps.runCommand ?? ((executable, argv) => spawnSync(executable, argv, {
@@ -62,6 +65,34 @@ export function finishFeature({ rootDir = process.cwd(), by, architectureImpact,
   }));
   const base = { root, lifecycle: id, actor: by.trim() };
   const invokeCoordinator = (subcommand, values, code) => command(runner, process.execPath, [COORDINATOR, subcommand, ...flagPairs(values)], code);
+  if (featureId === undefined) {
+    try {
+      const prior = invokeCoordinator("inspect", { root, lifecycle: id }, "FINISH-RESUME-INSPECT");
+      const matching = Array.isArray(state.closedFeatures)
+        ? state.closedFeatures.filter((entry) => entry?.coordinatorClose?.lifecycleId === id) : [];
+      const closed = matching[0];
+      if (matching.length !== 1 || !FEATURE.test(prior?.identity?.featureId ?? "")
+        || prior.identity.lifecycleId !== id || prior.coordinator?.phase !== "feature-close-prepared"
+        || prior.coordinator.architectureImpact !== architectureImpact
+        || prior.coordinator.featureCloseAudit?.criticVerifyLifecycleId !== criticVerifyLifecycle
+        || !/^[a-f0-9]{64}$/u.test(prior.coordinator.featureCloseAudit?.auditReceiptSha256 ?? "")
+        || !/^[a-f0-9]{64}$/u.test(prior.stateSha256 ?? "")
+        || closed?.id !== prior.identity.featureId || closed?.closedBy !== by.trim()
+        || closed?.architectureImpact !== architectureImpact
+        || closed?.coordinatorClose?.stateSha256 !== prior.stateSha256
+        || closed?.coordinatorClose?.phase !== "feature-close-prepared"
+        || closed?.coordinatorClose?.revision !== prior.coordinator.revision
+        || closed?.auditReference?.auditReceiptSha256 !== prior.coordinator.featureCloseAudit.auditReceiptSha256
+        || closed?.auditReference?.criticVerifyLifecycleId !== criticVerifyLifecycle) {
+        fail("FINISH-RESUME-CLOSED-MISMATCH", "The durable close is not bound to this lifecycle, actor, audit and feature.");
+      }
+      return Object.freeze({ schema: "pipeline.finish-feature.v1", status: "closed", lifecycleId: id,
+        featureId: closed.id, coordinator: prior, closeOutput: "already-closed" });
+    } catch (error) {
+      error.lifecycleId = id;
+      throw error;
+    }
+  }
   const apply = (plan, values, code, subcommand) => {
     if (!/^[a-f0-9]{64}$/u.test(plan?.planSha256 ?? "")) fail("FINISH-PLAN", "Coordinator plan lacks an exact digest.");
     const expectedArgv = [COORDINATOR, subcommand, ...flagPairs({ ...values, "plan-sha256": plan.planSha256, activate: true })];

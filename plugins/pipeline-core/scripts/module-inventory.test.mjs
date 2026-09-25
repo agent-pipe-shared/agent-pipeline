@@ -14,6 +14,7 @@ import {
   loadMapBundle,
   resolveModuleForPath,
   getReentryReadingOrder,
+  inspectArchitectureReentryPointer,
   getModuleInventorySchema
 } from "./module-inventory.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
@@ -269,6 +270,82 @@ adrReferences: []
       assert.equal(readingOrder[4].command, "pipeline-core:pipeline-start");
 
       assert.equal(readingOrder[5].step, 6);
+    });
+
+    it("resolves a disposable governed project's static entry route without claiming a host bootstrap", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "architecture-reentry-user-"));
+      try {
+        fs.mkdirSync(path.join(root, "architecture/map"), { recursive: true });
+        fs.mkdirSync(path.join(root, "project"), { recursive: true });
+        fs.mkdirSync(path.join(root, "src"), { recursive: true });
+        fs.writeFileSync(path.join(root, "AGENTS.md"), "# Project entry\n\n[Architecture map](architecture/map/index.md)\n");
+        fs.writeFileSync(path.join(root, "architecture/map/index.md"), "# Architecture Navigation Map Index\n\nOKF v0.1 concept bundle.\n\n- [application](application.md)\n");
+        fs.writeFileSync(path.join(root, "architecture/map/application.md"), `---
+type: Governed Module
+id: application
+responsibility: Implement the application
+nonResponsibilities: []
+ownedPaths:
+  - src/**
+publicContracts:
+  - src/main.mjs
+allowedDependencies: []
+authorityEffects: []
+verificationEntryPoints:
+  - src/main.test.mjs
+adrReferences: []
+---
+# Application\n`);
+        fs.writeFileSync(path.join(root, "project/architecture-decisions.compiled.json"), '{"schema":"pipeline.architecture-decisions-summary.v1","count":0,"decisions":[],"activeExceptions":[]}\n');
+        fs.writeFileSync(path.join(root, "src/main.mjs"), "export const ready = true;\n");
+        const pointer = inspectArchitectureReentryPointer(root);
+        assert.equal(pointer.ok, true);
+        const bundle = loadMapBundle(root, schema);
+        assert.equal(bundle.ok, true, bundle.errors.join("; "));
+        const order = getReentryReadingOrder(root, ["application"]);
+        assert.deepEqual(order.map(row => row.step), [1, 2, 3, 4, 5, 6]);
+        for (const row of [order[0], order[1], order[3]]) assert.equal(fs.lstatSync(row.path).isFile(), true);
+        assert.equal(fs.lstatSync(order[2].paths[0]).isFile(), true);
+        assert.equal(order[4].command, "pipeline-core:pipeline-start");
+        assert.equal(resolveModuleForPath("src/main.mjs", bundle.modules)?.id, "application");
+        assert.equal(fs.lstatSync(path.join(root, "src/main.mjs")).isFile(), true);
+        // A static fixture cannot attest that an installed host executed step 5.
+      } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    });
+
+    it("types missing, stale and alias entry pointers without rewriting user-owned AGENTS.md", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "architecture-reentry-pointer-"));
+      try {
+        const entryPath = path.join(root, "AGENTS.md");
+        assert.equal(inspectArchitectureReentryPointer(root).code, "ARCHITECTURE-ENTRY-MISSING");
+        fs.writeFileSync(entryPath, "# Project entry\n\nArchitecture is elsewhere.\n");
+        assert.equal(inspectArchitectureReentryPointer(root).code, "ARCHITECTURE-ENTRY-MAP-POINTER-MISSING");
+        assert.equal(fs.readFileSync(entryPath, "utf8"), "# Project entry\n\nArchitecture is elsewhere.\n");
+        fs.rmSync(entryPath);
+        fs.writeFileSync(path.join(root, "other.md"), "[Map](architecture/map/index.md)\n");
+        fs.symlinkSync(path.join(root, "other.md"), entryPath);
+        assert.equal(inspectArchitectureReentryPointer(root).code, "ARCHITECTURE-ENTRY-ALIAS-OR-NONFILE");
+      } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    });
+
+    it("exposes the pointer check as a read-only CLI with honest bootstrap assurance", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "architecture-reentry-cli-"));
+      try {
+        const cli = fileURLToPath(new URL("./module-inventory.mjs", import.meta.url));
+        const invoke = () => spawnSync(process.execPath,
+          [cli, "--root", root, "--check-reentry-pointer", "--json"], { encoding: "utf8" });
+        const missing = invoke();
+        assert.equal(missing.status, 1);
+        assert.deepEqual(JSON.parse(missing.stdout), {
+          schema: "pipeline.architecture-reentry-pointer-check.v1",
+          ok: false, code: "ARCHITECTURE-ENTRY-MISSING", path: "AGENTS.md",
+          mapPath: "architecture/map/index.md", bootstrapExecuted: false,
+        });
+        fs.writeFileSync(path.join(root, "AGENTS.md"), "[Architecture map](architecture/map/index.md)\n");
+        const present = invoke();
+        assert.equal(present.status, 0, present.stderr);
+        assert.equal(JSON.parse(present.stdout).bootstrapExecuted, false);
+      } finally { fs.rmSync(root, { recursive: true, force: true }); }
     });
   });
 });

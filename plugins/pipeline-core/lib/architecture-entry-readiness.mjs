@@ -18,7 +18,7 @@ import {
   resolveAdoptionState,
 } from "../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
-import { loadMapBundle } from "../scripts/module-inventory.mjs";
+import { inspectArchitectureReentryPointer, loadMapBundle } from "../scripts/module-inventory.mjs";
 import { inspectArchitectureDesign } from "./architecture-design.mjs";
 
 export const ARCHITECTURE_ENTRY_SCHEMA = "pipeline.architecture-entry-readiness.v1";
@@ -92,7 +92,7 @@ function proposalAction(root) {
   };
 }
 
-function failure(root, code, message, artifacts, disposition, fitness = null) {
+function failure(root, code, message, artifacts, disposition, fitness = null, nextAction = null) {
   return {
     schema: ARCHITECTURE_ENTRY_SCHEMA,
     status: "blocked",
@@ -102,7 +102,7 @@ function failure(root, code, message, artifacts, disposition, fitness = null) {
     artifacts,
     disposition,
     fitness,
-    nextAction: proposalAction(root),
+    nextAction: nextAction ?? proposalAction(root),
   };
 }
 
@@ -161,6 +161,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     ? { ok: true, disposition: design.disposition, scope: design.scope, authority: design.authority }
     : (deps.checkPlanningAdoptionDisposition ?? checkPlanningAdoptionDisposition)(root, taskScope, now);
   const map = loadMapBundle(root);
+  const reentryPointer = inspectArchitectureReentryPointer(root);
   const fitnessModel = physicalJson(root, "architecture/fitness-model.json", "pipeline.fitness-model.v1", (value) =>
     typeof value.profileId === "string"
     && Number.isInteger(value.revision) && value.revision > 0
@@ -191,6 +192,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       moduleCount: map.modules.length,
       errors: [...map.errors],
     },
+    reentryPointer: { status: reentryPointer.ok ? "current" : "invalid", code: reentryPointer.code, path: "AGENTS.md" },
     fitnessModel,
     baseline,
     adoption: { state: adoption.state, coverageClass: adoption.coverageClass, confidence: adoption.confidence },
@@ -213,6 +215,16 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   }
   if (!disposition.ok) {
     return failure(root, "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED", disposition.error ?? "a valid scoped architecture adoption disposition is required", artifacts, disposition);
+  }
+  if (!reentryPointer.ok) {
+    return failure(root, reentryPointer.code,
+      "the project-owned AGENTS.md must link to architecture/map/index.md before implementation; preserve its other instructions",
+      artifacts, disposition, null, {
+        kind: "repair-required",
+        code: "ARCHITECTURE-ENTRY-POINTER-REPAIR",
+        path: "AGENTS.md",
+        guidance: "Add a Markdown link to architecture/map/index.md in the physical root AGENTS.md; do not replace existing project-owned content or follow an alias. Re-run architecture entry readiness afterward.",
+      });
   }
 
   const surface = planningSurface === undefined

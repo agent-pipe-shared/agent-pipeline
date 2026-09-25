@@ -28,8 +28,13 @@ an “unimplemented” label for all 17 issues. In particular:
 - Nova B has a frozen historical candidate with Verify and Security sources.
   The later Result claims a Critic PASS, but its sealed evidence manifest
   says `candidate-freeze-only`, names Critic/PO close as pending, and lists no
-  Critic source. Until a matching independent receipt is read back, do not
-  promote that prose claim to current issue acceptance.
+  Critic source. A separate Markdown Critic report for that historical
+  candidate exists under `specs/sprint-nova-epic/evidence/critic/`, but is not
+  listed by the manifest; its named packet has not been independently read
+  back as a portable, bound receipt. The 2026-09-25 correction appended to
+  `result.md` retracts the Critic acceptance inference without rewriting the
+  historical claim. Do not promote either prose claim to current issue
+  acceptance; fresh exact-candidate Critic evidence remains required.
 - #49's synthetic macOS scope was historically sealed; native Apple Silicon
   was transferred to #72 and must not be reopened under #49. For #8 A3, the
   PO withdrew the bespoke pilots; this is a scoped supersession, not measured
@@ -82,6 +87,19 @@ current instruction to run those discarded pilots.
 The record above is historical only. Later Nova commits, including the B0
 payload-budget and close-boundary corrections, invalidate it as a current
 candidate binding. No post-rebase final Nova candidate is frozen yet.
+
+Current-source correction, 2026-09-25: the #54 row below preserves its
+historical 2026-08-17 observation, but its claim that the Claude-native
+`critic-dispatch-preflight.mjs` does not use `review-economy.mjs` is no longer
+true. The native preflight now derives the retained, immutable course from the
+feature package, applies the four-review/three-correction gate before
+`packet-ready`, and counts only Git-verified, mixed-free evidence-registration
+commits as budget-neutral. The focused native preflight suite passes 39/39;
+the adjacent course and economics suites pass 14/14 and 103/103. This closes
+that **source-level wiring gap only**. It is not a live multi-round Critic
+exercise, a publication-path correction, or final candidate-bound #54/#98
+acceptance. Do not repeatedly reopen the obsolete code-absence claim; keep
+the remaining observed-evidence and final-gate work explicit.
 
 | Issue / block | Accepted/current scope | Existing implementation or evidence | Remaining gap | Exact next verification / closure gate | Disposition |
 | --- | --- | --- | --- | --- | --- |
@@ -147,3 +165,27 @@ failing acceptance outcomes.
 4. Finish narrowed #15, then #51 and #49; keep #69/#72 and #75 boundaries
    explicit and require fresh Verify/Security/Critic/readback evidence before
    any issue or increment closure.
+
+## 2026-09-25 A4 success-path correction (source checkout, not candidate acceptance)
+
+The dated #12 row above is no longer accurate where it says that a real
+successful worker cannot reach the scheduler without a new design decision.
+The current `execution-plane-launch.mjs` now keeps the real worker's exit-0
+result at `succeeded-unverified`, then performs a distinct host readback of the
+exact workspace bytes and supervisor change manifest. Only the matching
+verification receipt promotes it to `verified`; the scheduler subsequently
+records the package as completed. This preserves Spec §5.4's verified-only
+planner boundary instead of treating process exit as verification.
+
+On 2026-09-25, the real local fixture command
+`node plugins/pipeline-core/scripts/execution-plane-launch.mjs --fixture-exit-code 0`
+returned `ok: true`, `finalState: verified` with eight recorded steps. The
+readback sequence shows `succeeded-unverified` followed by host verification
+and scheduling revision 1. Focused suites passed: real execution contract
+6/6, scheduling lifecycle 9/9 and launcher 15/15. The generated receipt was
+kept under `scratch/0.7-a4-success-preliminary-c4c46c59.json`, not promoted
+to tracked candidate evidence: the checkout was dirty, its short SHA labels
+the existing HEAD, and the fixture itself uses a disposable local repository.
+This corrects the old *source-reachability* finding, not the separate missing
+final 0.7 Verify/Security/Critic/PO binding, provider-backed observation or
+other #12/#14 criteria.

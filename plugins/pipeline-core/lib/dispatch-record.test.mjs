@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { openSync } from "node:fs";
-import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, reportSha256, validateDispatchRecord, validateLegacyDispatchRecord } from "./dispatch-record.mjs";
+import { declaredPaths, dispatchRecordSha256, isTerminalOutcome, missingBriefingFields, normalizeDispatchRecordPath, reportSha256, validateDispatchRecord, validateLegacyDispatchRecord, validatePreviousDispatchRecord } from "./dispatch-record.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "./critic-skip-decision.mjs";
 
@@ -82,6 +82,28 @@ check("v4 distinguishes read-only and stopped non-authoring terminal returns", (
   }
   const forged = { ...terminal(), schema: "pipeline.dispatch-record.v4", resultSha256: reportSha256(report.text), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, report };
   assert.throws(() => validateDispatchRecord(forged), (error) => error?.code === "record-outcome-classification");
+  const undelivered = { ...opening(), schema: "pipeline.dispatch-record.v4", outcome: "completed-no-delivery", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" }, observationIdentity: { dispatchId: "dispatch-1", attemptId: "attempt-1" } };
+  delete undelivered.criticSkip;
+  undelivered.criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" };
+  assert.deepEqual(validateDispatchRecord(undelivered), undelivered);
+  const agyObservation = { ...undelivered, runner: "antigravity", model: "gemini-3.8-flash-high" };
+  assert.deepEqual(validateDispatchRecord(agyObservation), agyObservation);
+  assert.throws(() => validateDispatchRecord({ ...agyObservation, runner: "untrusted-runner" }), (error) => error?.code === "record-runner");
+  assert.throws(() => validatePreviousDispatchRecord({ ...terminal(), runner: "antigravity" }), (error) => error?.code === "record-shape");
+  for (const change of [
+    { resultSha256: "d".repeat(64) }, { commits: [SHA] },
+    { report: { text: "Agent completed.", changedFiles: [] } },
+    { orchestratorAddedFiles: ["src/x.mjs"] },
+    { outcome: "stopped-without-commit" },
+  ]) assert.throws(() => validateDispatchRecord({ ...undelivered, ...change }), (error) => error?.code === "record-no-delivery");
+  for (const invalid of [
+    { ...undelivered, observationIdentity: { dispatchId: "dispatch-1", attemptId: "../attempt" } },
+    { ...undelivered, observationIdentity: { dispatchId: "dispatch/path", attemptId: "attempt-1" } },
+    { ...undelivered, observationIdentity: { dispatchId: "d".repeat(129), attemptId: "attempt-1" } },
+    { ...undelivered, observationIdentity: undefined },
+    { ...undelivered, criticSkip: skip(), criticRequired: undefined },
+  ]) assert.throws(() => validateDispatchRecord(invalid));
+  assert.throws(() => validateDispatchRecord({ ...undelivered, closingAllowance: { schema: "pipeline.dispatch-closing-allowance.v1", taskId: undelivered.taskId, committed: ["false"], verifiedGreen: [], remainsUndone: [], nextBriefingAdjustments: [] } }), (error) => error?.code === "record-no-delivery");
 });
 check("skip cannot falsely claim T5 when A/G/S, high-risk or rigor triggers require review", () => {
   for (const triggerInput of [
@@ -191,7 +213,27 @@ check("every persisted string lane rejects Unix, Windows, WSL and UNC private pa
   }
 });
 
-assert.equal(cases.length, 12, "the complete dispatch-record corpus must be registered before execution begins");
+check("v4 authored reports accept bounded multiline prose while v3 metadata rules stay unchanged", () => {
+  const text = `Implemented the admitted change.\n${"Verified exact paths. ".repeat(80)}`;
+  const value = { ...terminal(), schema: "pipeline.dispatch-record.v4", runner: "antigravity",
+    model: "gemini-observed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    resultSha256: reportSha256(text), report: { text, changedFiles: ["src/x.mjs"] } };
+  assert.deepEqual(validateDispatchRecord(value), value);
+  const previous = { ...value, schema: "pipeline.dispatch-record.v3" };
+  delete previous.runner;
+  delete previous.outcomeClassification;
+  assert.throws(() => validateDispatchRecord(previous),
+    (error) => error?.code === "record-field");
+  for (const invalid of ["x".repeat(16385), "x\r\ny", "x\0y"]) {
+    assert.throws(() => validateDispatchRecord({ ...value, resultSha256: reportSha256(invalid),
+      report: { ...value.report, text: invalid } }));
+  }
+  const atBound = "x".repeat(16384);
+  assert.equal(validateDispatchRecord({ ...value, resultSha256: reportSha256(atBound),
+    report: { ...value.report, text: atBound } }).report.text.length, 16384);
+});
+
+assert.equal(cases.length, 13, "the complete dispatch-record corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

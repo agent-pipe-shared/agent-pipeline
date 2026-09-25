@@ -42,7 +42,7 @@ import {
 import { freshCalibrationBytes, freshManifestBytes, freshSettingsJsonBytes } from "./project-onboarding-v3.mjs";
 import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./runner-profile-migration-v2.mjs";
 import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
-import { CORE_OWNED_V3_SURFACES, loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import { CORE_OWNED_V3_SURFACES, RUNNER_PROFILES_V3_REGISTRY_SHA256, loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import {
   codexCustomAgentSeed,
   loadRuntimeProjectionV3OwnedKeys,
@@ -424,6 +424,7 @@ function v3IntentFromV2(v2) {
   const registry = loadRunnerProfilesV3Registry();
   return {
     schema: "pipeline.user.v3",
+    core_registry_sha256: RUNNER_PROFILES_V3_REGISTRY_SHA256,
     language: clone(v2.language),
     agent_runtime: v2.agent_runtime,
     runners: clone(v2.runners),
@@ -448,6 +449,11 @@ function v3IntentFromV2(v2) {
 // compared here -- a future Core-owned surface needs exactly one new table
 // entry, never a new branch in this function.
 function refreshKnownV3RegistryDelta(parsed) {
+  // A present binding from an unknown Core registry is not an old project
+  // default we may overwrite. In particular, an older installed plugin must
+  // never rewrite a newer project's model routes during bootstrap.
+  if (Object.hasOwn(parsed, "core_registry_sha256")
+    && parsed.core_registry_sha256 !== RUNNER_PROFILES_V3_REGISTRY_SHA256) return null;
   const registry = loadRunnerProfilesV3Registry();
   const candidate = clone(parsed);
   const compatibilityDeltas = [];

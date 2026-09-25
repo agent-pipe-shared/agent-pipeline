@@ -660,6 +660,41 @@ test("V2 revocation atomically returns the feature to design and the exact legac
   }
 });
 
+test("current v5 approval can be revoked and replayed, but a forged submission binding cannot", () => {
+  const accepted = approved();
+  assert.equal(accepted.planApproval.schema, "pipeline.plan-approval.v5");
+  const request = {
+    state: accepted,
+    expectedStateSha256: sha256CanonicalJson(accepted),
+    expectedPlanSha256: PLAN,
+    expectedSpecSha256: SPEC,
+    by: "PO",
+    at: REOPENED,
+  };
+  const revoked = revokePlanV2(request);
+  assert.equal(revoked.ok, true, JSON.stringify(revoked));
+  assert.equal(revoked.state.planApproved, false);
+  assert.equal(revoked.state.activeFeature.phase, "design");
+  const implementation = enterPlanImplementation({ state: accepted, expectedStateSha256: sha256CanonicalJson(accepted), at: IMPLEMENTED });
+  assert.equal(implementation.ok, true, JSON.stringify(implementation));
+  const implementationRevoked = revokePlanV2({
+    ...request, state: implementation.state, expectedStateSha256: sha256CanonicalJson(implementation.state),
+  });
+  assert.equal(implementationRevoked.ok, true, JSON.stringify(implementationRevoked));
+  assert.equal(implementationRevoked.state.activeFeature.phase, "design");
+  const replay = revokePlanV2({ ...request, state: revoked.state, expectedStateSha256: sha256CanonicalJson(revoked.state) });
+  assert.equal(replay.ok, true, JSON.stringify(replay));
+  assert.equal(replay.replay, true);
+  const forged = { ...accepted, planApproval: { ...accepted.planApproval, submissionSha256: "f".repeat(64) } };
+  const denied = revokePlanV2({ ...request, state: forged, expectedStateSha256: sha256CanonicalJson(forged) });
+  assert.equal(denied.ok, false);
+  assert.equal(denied.code, "PS-V2-APPROVAL-INVALID");
+  const forgedReplay = { ...revoked.state, planApproval: { ...revoked.state.planApproval, submissionSha256: "f".repeat(64) } };
+  const replayDenied = revokePlanV2({ ...request, state: forgedReplay, expectedStateSha256: sha256CanonicalJson(forgedReplay) });
+  assert.equal(replayDenied.ok, false);
+  assert.equal(replayDenied.code, "PS-V2-APPROVAL-INVALID");
+});
+
 test("repeated draft edits remain writable while edit-after-submit requires reopen", () => {
   const initial = draft();
   assert.equal(derivePlanLifecycle(initial, { planSha256: "8".repeat(64), specSha256: "9".repeat(64) }).status, "draft");

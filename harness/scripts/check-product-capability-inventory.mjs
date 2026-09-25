@@ -9,12 +9,15 @@
  * and (until the documentation reduction lands) a pending public anchor.
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseYaml } from "../../plugins/pipeline-core/lib/yaml-lite.mjs";
 import { canonicalJson, readConsumedCandidateReceipt } from "../../plugins/pipeline-core/scripts/critic-packet-preflight.mjs";
 import { readBoundConsumedCriticReceipt } from "../../plugins/pipeline-core/lib/critic-verify-lifecycle.mjs";
+import { PORTABLE_CRITIC_EXPORT_PATH, verifyPortableCriticExport } from "../../plugins/pipeline-core/lib/portable-critic-export.mjs";
+import { canonical } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
 
 // v3 (NVA-INVDERIVE-1, 2026-08-28): the `surfaces` array was removed from the
 // inventory and is now DERIVED from `discoverSurfaces()` on every run.
@@ -57,12 +60,14 @@ const CRITIC_REVIEW_STATUS = new Set(["required-before-publication", "attested"]
 const CRITIC_PACKET_ID = /^[a-f0-9]{32}$/;
 
 /** Only the final attestation and target activation may follow the reviewed candidate. */
-export function validateFinalCriticTransition({ reviewed, final, changedPaths, inventoryPath = INVENTORY_PATH }) {
+export function validateFinalCriticTransition({ reviewed, final, changedPaths, inventoryPath = INVENTORY_PATH,
+  portableExportPath = null }) {
   if (!isObject(reviewed) || !isObject(final) || !Array.isArray(changedPaths)) return false;
   if (reviewed.criticReview?.status !== "required-before-publication"
     || reviewed.criticReview?.receiptSha256 !== null
     || final.criticReview?.status !== "attested") return false;
   if (changedPaths.some((path) => path !== inventoryPath
+    && path !== portableExportPath
     && !/^specs\/sprint-alfred-epic\/evidence\/reader-review\/[a-zA-Z0-9._/-]+$/.test(path))) return false;
   const normalized = structuredClone(reviewed);
   normalized.criticReview = final.criticReview;
@@ -84,15 +89,46 @@ function gitRead(root, args, encoding = "utf8") {
   return execFileSync("git", args, { cwd: root, encoding, stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
 }
 
+const PORTABLE_PLAN_PATH = "specs/sprint-alfred-epic/plans/sprint-alfred-execution-roadmap.md";
+const PORTABLE_SPEC_PATH = "specs/sprint-alfred-epic/spec.md";
+const PORTABLE_TRUST_PATH = "project/critical-human-proof.json";
+function portableCriticExportReadback(root, receiptSha256) {
+  const target = repoPath(root, PORTABLE_CRITIC_EXPORT_PATH);
+  if (!target) return { ok: false, code: "path-invalid" };
+  let entry = root;
+  for (const segment of PORTABLE_CRITIC_EXPORT_PATH.split("/")) {
+    entry = join(entry, segment);
+    const stat = lstatSync(entry);
+    if (stat.isSymbolicLink()) return { ok: false, code: "path-alias" };
+  }
+  const stat = lstatSync(target);
+  if (!stat.isFile() || stat.size < 1 || stat.size > 1024 * 1024) return { ok: false, code: "file-invalid" };
+  const bytes = readFileSync(target);
+  const committed = gitRead(root, ["show", `HEAD:${PORTABLE_CRITIC_EXPORT_PATH}`], null);
+  if (!bytes.equals(committed)) return { ok: false, code: "committed-bytes-differ" };
+  const record = JSON.parse(bytes.toString("utf8"));
+  if (!bytes.equals(Buffer.from(`${canonical(record)}\n`, "utf8"))) return { ok: false, code: "canonical-bytes-differ" };
+  const candidate = record?.subject?.candidate;
+  if (!candidate || typeof candidate.commit !== "string" || typeof candidate.tree !== "string") return { ok: false, code: "candidate-invalid" };
+  const policy = JSON.parse(gitRead(root, ["show", `${candidate.commit}:${PORTABLE_TRUST_PATH}`]));
+  const anchors = policy?.schema === "pipeline.critical-human-proof-policy.v3" ? policy.trustAnchors : null;
+  const planSha256 = createHash("sha256").update(gitRead(root, ["show", `${candidate.commit}:${PORTABLE_PLAN_PATH}`], null)).digest("hex");
+  const specSha256 = createHash("sha256").update(gitRead(root, ["show", `${candidate.commit}:${PORTABLE_SPEC_PATH}`], null)).digest("hex");
+  const checked = verifyPortableCriticExport({ exportRecord: record, candidate, receiptSha256,
+    planSha256, specSha256, trustAnchors: anchors });
+  return checked.ok ? { ok: true, reviewedCommit: candidate.commit, reviewedTree: candidate.tree }
+    : { ok: false, code: checked.code };
+}
+
 export function validateFinalCriticReadback(root, inventoryPath, inventory) {
   try {
     const checkoutInventory = JSON.parse(readFileSync(repoPath(root, inventoryPath), "utf8"));
     if (canonicalJson(checkoutInventory) !== canonicalJson(inventory)) return "final Critic receipt readback requires the exact checkout inventory";
     const common = realpathSync(resolve(root, gitRead(root, ["rev-parse", "--git-common-dir"]).trim()));
     const packetRoot = join(common, "agent-pipeline", "critic-packets");
-    if (!existsSync(packetRoot) || !lstatSync(packetRoot).isDirectory()) return "final Critic receipt readback is unavailable";
     const matches = [];
-    const entries = readdirSync(packetRoot, { withFileTypes: true });
+    const entries = existsSync(packetRoot) && lstatSync(packetRoot).isDirectory()
+      ? readdirSync(packetRoot, { withFileTypes: true }) : [];
     if (entries.length > 4096) return "final Critic receipt readback exceeds its bounded packet inventory";
     for (const entry of entries) {
       if (!entry.isDirectory() || !CRITIC_PACKET_ID.test(entry.name)) continue;
@@ -109,20 +145,25 @@ export function validateFinalCriticReadback(root, inventoryPath, inventory) {
       } catch { continue; }
       if (bound.criticReceiptSha256 === inventory.criticReview.receiptSha256) matches.push(bound);
     }
-    if (matches.length !== 1) return "final Critic receipt readback is unavailable or ambiguous";
-    const reviewedCommit = matches[0].critic.candidate.commit;
+    if (matches.length > 1) return "final Critic receipt readback is unavailable or ambiguous";
+    const portable = matches.length === 0
+      ? portableCriticExportReadback(root, inventory.criticReview.receiptSha256) : null;
+    if (matches.length === 0 && !portable?.ok) return `final Critic portable export ${portable?.code ?? "unavailable"}`;
+    const reviewedCommit = portable?.reviewedCommit ?? matches[0].critic.candidate.commit;
+    const reviewedTree = portable?.reviewedTree ?? matches[0].critic.candidate.tree;
     const head = gitRead(root, ["rev-parse", "HEAD"]).trim();
     if (canonicalJson(JSON.parse(gitRead(root, ["show", `HEAD:${inventoryPath}`]))) !== canonicalJson(inventory)) {
       return "final Critic receipt requires the committed inventory, not a working-tree claim";
     }
-    if (gitRead(root, ["rev-parse", `${reviewedCommit}^{tree}`]).trim() !== matches[0].critic.candidate.tree) {
+    if (gitRead(root, ["rev-parse", `${reviewedCommit}^{tree}`]).trim() !== reviewedTree) {
       return "final Critic receipt candidate tree does not match Git";
     }
     if (reviewedCommit === head) return "final Critic receipt requires a later inventory activation commit";
     gitRead(root, ["merge-base", "--is-ancestor", reviewedCommit, "HEAD"]);
     const reviewed = JSON.parse(gitRead(root, ["show", `${reviewedCommit}:${inventoryPath}`]));
     const changedPaths = gitRead(root, ["diff", "--name-only", "-z", reviewedCommit, "HEAD"]).split("\0").filter(Boolean);
-    if (!validateFinalCriticTransition({ reviewed, final: inventory, changedPaths, inventoryPath })) {
+    if (!validateFinalCriticTransition({ reviewed, final: inventory, changedPaths, inventoryPath,
+      portableExportPath: portable === null ? null : PORTABLE_CRITIC_EXPORT_PATH })) {
       return "final Critic receipt candidate is stale or inventory activation changed unreviewed content";
     }
     return null;
@@ -684,7 +725,8 @@ export function validateInventory({
     }
     if (!Array.isArray(capability.surfaceIds) || capability.surfaceIds.length === 0) fail(findings, `${label}.surfaceIds must be nonempty`);
     for (const id of capability.surfaceIds ?? []) {
-      if (!surfaceById.has(id)) fail(findings, `${label} references missing surface ${id}`);
+      if (!surfaceById.has(id)) fail(findings, `${label} references missing surface ${id}${baselineSource === null
+        ? "" : ` in committed sourceBaseline ${inventory.sourceBaseline.commit} (uncommitted worktree files are not discovery evidence)`}`);
       else if (surfaceAssignments.has(id)) fail(findings, `surface ${id} belongs to both ${surfaceAssignments.get(id)} and ${capability.id}`);
       else surfaceAssignments.set(id, capability.id);
     }

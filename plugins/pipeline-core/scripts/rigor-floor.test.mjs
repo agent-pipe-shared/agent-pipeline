@@ -12,6 +12,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import {
   deriveMinimumRigor,
+  inferInputsFromRepo,
   normalizeInputs,
   computeInputDigest,
   loadPolicy,
@@ -28,6 +29,39 @@ const policy = JSON.parse(fs.readFileSync(POLICY_PATH, "utf8"));
 const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, "utf8"));
 
 describe("WP-B1 / Issue #105: Minimum Rigor Floor Derivation", () => {
+  test("Git observation failures and untracked paths cannot masquerade as an empty mini surface", () => {
+    const broken = inferInputsFromRepo(REPO_ROOT, { execFileSyncFn() { throw new Error("git unavailable"); } });
+    assert.equal(broken.actualPaths.status, "unknown");
+    assert.equal(broken.actualPaths.value, null);
+    assert.equal(broken.protectedTouches.status, "unknown");
+    assert.equal(broken.contractDeltas.status, "unknown");
+    assert.equal(broken.diffStats.status, "unknown");
+    assert.notEqual(deriveMinimumRigor(broken, policy).minProfile, "mini");
+
+    const calls = [];
+    const observed = inferInputsFromRepo(REPO_ROOT, { execFileSyncFn(command, argv, options) {
+      assert.equal(command, "git");
+      assert.equal(options.encoding, null);
+      calls.push(argv.slice(3).join(" "));
+      if (argv[3] === "diff" && argv[4] === "--name-only") return Buffer.from("src/with space.mjs\0");
+      if (argv[3] === "ls-files") return Buffer.from("src/new file.mjs\0");
+      throw new Error("unexpected Git command");
+    } });
+    assert.deepEqual(calls, ["diff --name-only -z HEAD", "ls-files --others --exclude-standard -z"]);
+    assert.deepEqual(observed.actualPaths.value, ["src/new file.mjs", "src/with space.mjs"]);
+    assert.equal(observed.actualPaths.status, "available");
+    assert.equal(observed.plannedPaths.status, "unknown", "actual files are not a PO-approved plan");
+    assert.equal(observed.selectedProfile.status, "unknown", "the CLI cannot invent a PO selection");
+    assert.equal(observed.diffStats.status, "unknown", "untracked file lines were not counted");
+
+    const deletionOnly = inferInputsFromRepo(REPO_ROOT, { execFileSyncFn(_command, argv) {
+      if (argv[3] === "diff" && argv[4] === "--name-only") return Buffer.from("src/deleted.mjs\0");
+      if (argv[3] === "ls-files") return Buffer.alloc(0);
+      if (argv[3] === "diff" && argv[4] === "--shortstat") return Buffer.from(" 1 file changed, 4 deletions(-)\n");
+      throw new Error("unexpected Git command");
+    } });
+    assert.deepEqual(deletionOnly.diffStats, { value: { files: 1, lines: 4 }, status: "available", sourceContract: "git.diff-stat" });
+  });
   // Fixture 1: Identical normalized inputs produce identical floor & inputDigest (pinned test)
   test("1. Identical normalized inputs produce identical floor & inputDigest (pinned test)", () => {
     const inputA = {

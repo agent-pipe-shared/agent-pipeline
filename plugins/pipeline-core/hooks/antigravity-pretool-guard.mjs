@@ -448,7 +448,9 @@ export async function runAntigravityPreToolGuard(rawInput) {
 
   const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
 
-  const hookSessionId = nativeHookSessionId(input);
+  // Agy's hook payload, not an inherited Codex environment variable, owns
+  // the identity of the bootstrap lock written at PreInvocation.
+  const hookSessionId = nativeHookSessionId(input, {});
 
   // Methodological Enforcement (Hard Block):
   const sessionBootstrapMarker = join(projectRoot, ".git", "agent-pipeline", "run", `session-${hookSessionId}`, "requires-bootstrap.lock");

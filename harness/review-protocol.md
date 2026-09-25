@@ -11,6 +11,7 @@ Governing principle: **deterministic before probabilistic.** Stage 1 is machine 
 ## 1. Stage 1 — deterministic gate chain (blocking)
 
 **Rule:** The fixed chain **format → lint → typecheck → tests → build** runs through ONE verify engine and project command (`{{VERIFY_COMMAND}}` from the project calibration). Its bound run type selects the fixed baseline plus every registered area affected since the bound base; release, tag, marketplace and publication run the full registry (ADR-0081). Stop hook, goldfish delivery, Critic/local-candidate work, CI, and release all invoke that same engine and emit its selection evidence; an unknown path, missing base, or incomplete registration falls back to full execution.
+Before Stage 2, this is the applicable Critic-boundary selection (or a validated targeted diagnostic with Full Verify explicitly pending), not an automatic claim that release-mode Full Verify has run. After the first substantive fresh Critic review and any correction/delta review, release-mode Full Verify runs on the reviewed candidate and binds the consumed Critic packet.
 **Why:** Three diverging check engines are three truths (anti-pattern AP1); one engine makes "green" and its boundary-aware scope unambiguous (ADR-0005, ADR-0081).
 **Check:** The evidence artifact names engine/command + commit state + selected scope + exit code; CI demonstrably invokes the same engine.
 

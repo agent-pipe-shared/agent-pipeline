@@ -28,6 +28,11 @@ const candidateTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: p
 const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit, candidateTree };
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const NON_WSL_HOST = Object.freeze({ platform: "linux", release: "6.8.0-generic", wslDistroName: null });
+const ADVISORY_MODEL = "gpt-6-sol";
+const testRoute = ({ candidateCommit: commit }) => ({
+  dutyId: "advisory", runner: "codex", model: ADVISORY_MODEL, effort: "max",
+  state: "default", sourceSha256: "a".repeat(64), candidateCommit: commit,
+});
 const evidenceBundle = () => buildAdvisoryEvidenceBundle(process.cwd(), [
   "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
 ]);
@@ -52,7 +57,7 @@ function selectedAdvisory() {
   const referenceSetSha256 = base().sandboxContext.referenceSetSha256;
   const requestSha256 = buildSandboxRequest({
     repoFingerprint: "c".repeat(64), duty: "advisory", queueRevision: 1, candidateCommit, candidateTree,
-    referenceSetSha256, runner: "codex", model: "gpt-6-astra",
+    referenceSetSha256, runner: "codex", model: ADVISORY_MODEL,
   }).requestSha256;
   return {
     schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "c".repeat(64), duty: "advisory",
@@ -70,6 +75,7 @@ function selectedTransport() {
   return {
     hostObservation: NON_WSL_HOST,
     repoRoot: process.cwd(),
+    resolveAdvisoryRoute: testRoute,
     dependencies: {
       async executeSandboxedReadonlyDuty(request, dependencies) {
         const selection = selectedAdvisory();
@@ -86,13 +92,13 @@ function selectedTransport() {
     },
     async invokeCodexAdvisoryAppServer({ sandboxTransport, evidenceBundle: evidence, advisoryRoute }) {
       assert.equal(advisoryEvidenceBundleSha256(evidence), sandboxTransport.dispatch.referenceSetSha256);
-      assert.deepEqual(sandboxTransport.requested, { runner: "codex", model: "gpt-6-astra" });
+      assert.deepEqual(sandboxTransport.requested, { runner: "codex", model: ADVISORY_MODEL });
       assert.deepEqual(advisoryRoute, {
-        dutyId: "advisory", runner: "codex", model: "gpt-6-astra", effort: "max", state: "default",
+        dutyId: "advisory", runner: "codex", model: ADVISORY_MODEL, effort: "max", state: "default",
         sourceSha256: advisoryRoute.sourceSha256, candidateCommit,
       });
       return {
-        status: "answered", answer: "Use the selected transport.", identity: { provider: "openai", modelId: "gpt-6-astra", effort: "max" },
+        status: "answered", answer: "Use the selected transport.", identity: { provider: "openai", modelId: ADVISORY_MODEL, effort: "max" },
         sandboxExecution: {
           schema: "pipeline.codex-sandbox-host-execution.v1", selectionId: sandboxTransport.selectionId, selectionSha256: sandboxTransport.selectionSha256,
           repoFingerprint: sandboxTransport.repoFingerprint, duty: "advisory", dispatch: sandboxTransport.dispatch,
@@ -106,7 +112,7 @@ function selectedTransport() {
 
 test("an unbound direct host adapter never starts a Codex advisory or claims an answer", async () => {
   let calls = 0; let payload;
-  const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async (value) => { calls += 1; payload = value; return { status: "answered", answer: "Keep it closed." }; }, { hostObservation: NON_WSL_HOST, repoRoot: process.cwd(), observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }) });
+  const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async (value) => { calls += 1; payload = value; return { status: "answered", answer: "Keep it closed." }; }, { hostObservation: NON_WSL_HOST, repoRoot: process.cwd(), resolveAdvisoryRoute: testRoute, observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }) });
   assert.equal(calls, 0); assert.equal(payload, undefined);
   assert.equal(result.advisoryResult.ok, false); assert.equal(result.advisoryResult.code, "selected-sandbox-required"); assert.equal(result.execution, null);
   assert.equal(result.advisoryResult.receipt.schema, "pipeline.advisory-receipt.v1");
@@ -117,6 +123,7 @@ test("workspace observation failure remains typed no-child evidence", async () =
   const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async () => ({ status: "answered", answer: "must be discarded" }), {
     hostObservation: NON_WSL_HOST,
     repoRoot: process.cwd(),
+    resolveAdvisoryRoute: testRoute,
     observeWorkspace: () => { n += 1; return { workspaceSha256: n === 1 ? "1".repeat(64) : "2".repeat(64) }; },
   });
   assert.equal(result.advisoryResult.ok, false); assert.equal(result.advisoryResult.answer, null); assert.equal(result.execution, null);
@@ -126,7 +133,7 @@ test("workspace observation failure remains typed no-child evidence", async () =
 test("an adapter response cannot alter the typed no-child result", async () => {
   for (const response of [{ status: "unavailable" }, { status: "answered" }, null]) {
     let calls = 0;
-    const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async () => { calls += 1; return response; }, { hostObservation: NON_WSL_HOST, repoRoot: process.cwd(), observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }) });
+    const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async () => { calls += 1; return response; }, { hostObservation: NON_WSL_HOST, repoRoot: process.cwd(), resolveAdvisoryRoute: testRoute, observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }) });
     assert.equal(calls, 0); assert.equal(result.advisoryResult.ok, false); assert.equal(result.advisoryResult.code, "selected-sandbox-required");
     assert.equal(result.execution, null);
   }
@@ -229,7 +236,7 @@ test("production bridge persists typed no-child receipt without accepting a raw 
   const root = await mkdtemp(join(tmpdir(), "host-advisor-")); const inputPath = join(root, "input.json"); const receiptPath = join(root, "status.json");
   try {
     await writeFile(inputPath, JSON.stringify({ ...base(), sandboxRuntime: { repoRoot: process.cwd(), sessionCleanup: { sessionId: "session-test" } } }));
-    const code = await runAdvisoryHostBridge(["--input", inputPath, "--receipt", receiptPath], { hostObservation: NON_WSL_HOST, makeHostAdapter: () => async () => ({ status: "answered", answer: "private answer" }) });
+    const code = await runAdvisoryHostBridge(["--input", inputPath, "--receipt", receiptPath], { hostObservation: NON_WSL_HOST, makeHostAdapter: () => async () => ({ status: "answered", answer: "private answer" }), runCodexAdvisoryWithHostFallback: (input, adapter, transport) => runCodexAdvisoryThroughSelectedSandbox(input, adapter, { ...transport, resolveAdvisoryRoute: testRoute }) });
     assert.equal(code, 2); await assert.rejects(readFile(inputPath));
     const status = JSON.parse(await readFile(receiptPath, "utf8")); assert.equal(status.schema, "pipeline.advisory-receipt.v1"); assert.equal(status.observed.status, "unavailable"); assert.equal(JSON.stringify(status).includes("private answer"), false);
     const recordPath = `${receiptPath}.consultation-v2.json`;
@@ -255,7 +262,7 @@ test("only a selected child with matching selection, identity, and durable recei
   assert.equal(adapterCalls, 0);
   assert.equal(result.advisoryResult.ok, true, JSON.stringify(result));
   assert.equal(result.advisoryResult.answer, "Use the selected transport.");
-  assert.equal(result.advisoryResult.receipt.observed.identity.modelId, "gpt-6-astra");
+  assert.equal(result.advisoryResult.receipt.observed.identity.modelId, ADVISORY_MODEL);
   assert.equal(result.execution.dutyReceipt.status, "answered");
   assert.equal(result.sandboxBinding.selectionId, result.execution.selectionId);
   assert.equal(result.sandboxBinding.dutyReceiptSha256, result.execution.dutyReceipt.sha256);

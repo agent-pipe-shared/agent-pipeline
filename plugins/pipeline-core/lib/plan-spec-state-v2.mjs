@@ -1378,7 +1378,8 @@ export function bindPlanSpecApprovalWithHumanDecision({
 
 /**
  * Pure current-approval revocation. Legacy approvals/revocations are history;
- * an exact v2 or ledger-first v3 approval supplies the bound authority.
+ * an exact v2, ledger-first v3, or current submission-bound approval supplies
+ * the bound authority. The latter must also be current in the lifecycle.
  */
 export function revokePlanV2({
   state,
@@ -1391,7 +1392,26 @@ export function revokePlanV2({
   if (!currentStateMatches(state, expectedStateSha256)) return fail("PS-V2-STATE-STALE");
   if (!isNonBlankString(by) || !isCanonicalIso(at)) return fail("PS-V2-REVOCATION-REQUEST-INVALID");
   const approval = state?.planApproval;
-  if (!validV2Approval(approval) && !validV3Approval(approval)) return fail("PS-V2-APPROVAL-INVALID");
+  const submissionBound = validCurrentPlanApproval(approval) || validPreviousCurrentPlanApproval(approval);
+  if (!validV2Approval(approval) && !validV3Approval(approval) && !submissionBound) return fail("PS-V2-APPROVAL-INVALID");
+  if (submissionBound) {
+    const submission = state.planSubmission;
+    if (!validPlanSubmission(submission)
+      || submission.featureId !== state.activeFeature?.id
+      || approval.submissionSha256 !== sha256CanonicalJson(submission)
+      || approval.profileSha256 !== submission.profileSha256
+      || approval.poGateAuthority.planPath !== submission.planPath
+      || approval.poGateAuthority.planSha256 !== submission.planSha256
+      || approval.poGateAuthority.specPath !== submission.specPath
+      || approval.poGateAuthority.specSha256 !== submission.specSha256) {
+      return fail("PS-V2-APPROVAL-INVALID");
+    }
+  }
+  if (submissionBound && !Object.prototype.hasOwnProperty.call(state, "planRevocation")) {
+    const lifecycle = derivePlanLifecycle(state);
+    if (!lifecycle.ok || !["approved", "implementing"].includes(lifecycle.status)
+      || lifecycle.approvalCurrent !== true) return fail("PS-V2-APPROVAL-INVALID");
+  }
   const authority = approval.poGateAuthority;
   if (
     !matchingAuthority(authority, expectedPlanSha256, expectedSpecSha256)

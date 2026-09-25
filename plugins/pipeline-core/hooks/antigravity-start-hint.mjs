@@ -5,6 +5,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sessionStartDecision } from './codex-session-start-hint.mjs';
 import { resolvePluginManifestVersion } from '../scripts/pipeline-start-preflight.mjs';
+import { nativeHookSessionId } from '../lib/native-hook-failure-memory.mjs';
 
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
@@ -61,14 +62,31 @@ function main() {
       reportFailure('AGY-REPOSITORY-CONTEXT-UNAVAILABLE');
       return;
     }
-    decision = sessionStartDecision(rootDir, undefined, input.conversationId || input.session_id || null, 'antigravity');
+    const sessionId = nativeHookSessionId(input, {});
+    decision = sessionStartDecision(rootDir, undefined, sessionId, 'antigravity');
+
+    // Workspace-local installation does not itself activate governance in an
+    // arbitrary Git repository. An optional onboarding hint must not arm a
+    // mandatory implementation block before the repository opts in.
+    if (!decision.governed) {
+      process.stdout.write(JSON.stringify({
+        injectSteps: [{ ephemeralMessage: decision.context }],
+      }) + '\n');
+      return;
+    }
 
     // A first-run directory is not yet a Git repository.  Never manufacture
     // `.git/agent-pipeline/...` there: creating `.git` before `git init`
     // turns Git's future control directory into a malformed repository and
     // strands onboarding in repository-control-path-invalid.  A real local
     // checkout has `.git/HEAD`; only then does this hook own its private lock.
-    const sessionId = input.conversationId || input.session_id || 'default';
+    // Use the exact validated identity the pretool guard uses to locate this
+    // lock. An unchecked conversationId can contain separators and escape the
+    // private run directory; a missing/invalid identity cannot be armed.
+    if (!sessionId) {
+      reportFailure('AGY-SESSION-IDENTITY-UNAVAILABLE');
+      return;
+    }
     const gitHead = join(rootDir, '.git', 'HEAD');
     if (!existsSync(gitHead)) {
       process.stdout.write(JSON.stringify({

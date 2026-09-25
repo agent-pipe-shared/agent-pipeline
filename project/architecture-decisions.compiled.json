@@ -1,7 +1,372 @@
 {
   "schema": "pipeline.architecture-decisions-summary.v1",
-  "compiledAt": "2026-09-14T09:58:48.343Z",
-  "count": 89,
+  "compiledAt": "2026-09-25T19:35:02.641Z",
+  "authorityStatus": "inventory-only",
+  "effectiveProjection": {
+    "status": "blocked",
+    "code": "ARCH-DECISION-EFFECTIVE-UNRESOLVED",
+    "projectionSha256": null,
+    "decisionIds": [],
+    "findings": [
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0001-distribution-plugin-marketplace.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0002-versioning-sha-then-semver.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0003-role-implementation-subagents.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0004-spec-rigor-tiers-ears.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0005-quality-gates-dod.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0006-model-effort-policy.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0007-workflows-ultracode-opt-in.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0008-permissions-worktree-policy.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0009-session-hygiene-lifecycle.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0010-session-bootstrap.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0011-language-policy.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0012-handover-canonicalization.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0013-git-guard-union.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0014-critic-contract.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0015-self-application.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0016-git-hosting-github.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0017-push-policy-standing-approval.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0018-retro-process-elephant-authored.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0019-project-scoping-one-repo-one-elephant.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0020-el01-enforcement-goldfish-duty.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0021-prd-po-gate.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0022-light-profile-xhigh-default.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0023-elephant-context-diet.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0024-critic-staffing-data-based.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0025-haiku-research-fetcher.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0026-role-split-elephant-goldfish-critic.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0027-gate-philosophy.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0028-manifest-approach.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0029-file-handoffs-status.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0030-governance-layer.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0031-model-routing-manifest.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0032-project-doc-structure.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0033-release-promotion-phase.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0034-deploy-precedence-central-vs-project.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0035-codex-native-normal-critic.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0036-runner-honest-profiles-v2.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0037-batman-bounded-assurance.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0038-runner-neutral-advisory-v3.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0039-hawkeye-lifecycle-boundaries.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0040-advisor-consent-and-readonly-bash.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0041-po-authorized-codex-functional-equivalent.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0042-global-observation-and-document-governance.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0043-post-go-live-sprint-model.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0044-control-execution-boundary.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0045-canonical-artifact-topology.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0046-project-authority-layering.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0047-model-free-advisor-preflight-v2.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0048-local-goldfish-supervisor.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0049-gitlab-ci-constrained-remote-executor-pilot.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0050-candidate-bound-verify-run-journal.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0051-dual-runner-tri-platform-development-contract.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0052-marketplace-identity-restoration-and-local-dev-separation.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0053-setup-generator-authority-resolved-targets.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0054-arbitheon-authority-directory-and-precedence-chain.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0055-critical-human-proof-waiver.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0056-push-approval-mode.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0058-guard-maintenance-window.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0059-signed-human-guard-override.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0060-handover-placement-and-rotation.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0061-uniform-human-approval-ceremony.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0062-production-execution-and-selected-sandbox-launch.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0063-repository-directory-contract.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0065-a-voided-gate-is-re-earned-from-declared-inputs.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0066-handover-rotation-extraction-archive-hard-size-gate.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0067-tri-runner-antigravity-integration.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0068-backlog-ledger-merge-semantics.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0069-adr-numbers-are-allocated-at-acceptance.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0070-local-supervisor-state-authority.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0071-governance-event-kernel.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0072-fork-disposition-approval-proof.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0073-handover-rotation-extraction-archive-hard-size-gate.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0074-port-authorize-critical-ceremony.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0075-publication-approval-time-signature-accepted-tradeoff.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0076-global-chat-attributed-unattested-approval-mode.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0077-push-approvals-per-destination.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0078-distribution-channels-on-main.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0079-hook-bypass-is-never-agent-overridable.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0080-parallel-dispatch-slicing-enforcement.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0081-boundary-aware-impacted-verify.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0082-bounded-continuity-self-repair.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0083-governance-action-events.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0084-ci-failure-reporter-public-log-boundary.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/draft-critic-report-durable-write-location.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/draft-read-scope-containment-boundary.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/draft-session-cut-recommended-by-readiness.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/README.md"
+      }
+    ]
+  },
+  "count": 95,
   "decisions": [
     {
       "id": "0001-distribution-plugin-marketplace",
@@ -188,7 +553,7 @@
       "title": "ADR-0021: PRD-PO Gate Before the First Implementation Dispatch",
       "status": "provisional",
       "scope": "project",
-      "digest": "8c078fc8bb1b8e794c6aa5dfa272cf9c3113f9419ada9cbe22ddb9cebc1f989c",
+      "digest": "922cdf304f5ccbfb5fb8584fd675c3a915035bb6a1aeaabedde011ce969051a2",
       "supersedes": null,
       "exception": null
     },
@@ -332,7 +697,7 @@
       "title": "ADR-0037: Batman bounded assurance, static Verify extension and typed delivery",
       "status": "accepted",
       "scope": "project",
-      "digest": "e3103d508edfc4c614f4c834179defdf0ef6f46e7383c36e8eb8a1828fed97fd",
+      "digest": "0c620daaa22737809f4b9c39cf9a84212651c23fb0d93441078fa085ef2d51a9",
       "supersedes": null,
       "exception": null
     },
@@ -769,6 +1134,24 @@
       "exception": null
     },
     {
+      "id": "draft-agy-host-observed-authorship",
+      "title": "Agy host-observed authorship and portable evidence",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "85638eb28c67469c3526e60431ae24878c6fec34ffe1682981be68403a1c543d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-alfred-a1-e3-evidence-promotion",
+      "title": "Alfred A1 to E3 evidence promotion without candidate self-reference",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "ad0abc3a453afdc56ce803903836907381caa8429c253228e03be88839354b06",
+      "supersedes": null,
+      "exception": null
+    },
+    {
       "id": "draft-b1-worker-pool-superseded-by-workflow-tool",
       "title": "ADR-{{NNNN}}: Nova B's own parallel worker-pool capability is superseded by the runner's Workflow tool",
       "status": "proposed",
@@ -778,11 +1161,47 @@
       "exception": null
     },
     {
+      "id": "draft-content-bound-review-before-full-verify",
+      "title": "Content-bound review before final verification",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "c18811df68e6f0f50ed634e008d313d4237982f28a392eeec0b62d30a8b5519d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
       "id": "draft-critic-report-durable-write-location",
       "title": "ADR-{{NNNN}}: Where a Critic's report can durably live",
       "status": "proposed",
       "scope": "project",
       "digest": "635a996aeda6b2ccdf61476e9461ef93da88d8451d32956ea773d8863693e8aa",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-design-advisory-admission-storage",
+      "title": "Durable storage for mandatory design-advisory admission",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "5c905f1389c63e5e2cb09ddf2ea9146223097a46fa414c496f09592b5054dc15",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-design-stage-architecture-materialization",
+      "title": "Explicit design-stage architecture materialization",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "c89fb37261dca2e7383da27592badc03e2374ea158f95b68262671b8e1ccedd4",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-functional-model-roles-at-session-bootstrap",
+      "title": "Functional model roles resolved at session bootstrap",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "93af75a9e0df81e67ef4f3af9ed3dc80a469b8b8ba6220a5d04160ac620cf76f",
       "supersedes": null,
       "exception": null
     },

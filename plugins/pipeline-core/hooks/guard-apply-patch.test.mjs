@@ -231,7 +231,9 @@ check("multi-file patches use bounded parallel guard fan-out", () => {
   assert.match(source, /const results = new Array\(jobs\.length\);/u);
   assert.match(source, /const index = next\+\+;\s*const job = jobs\[index\];\s*results\[index\] = \{ job, result: await runGuard\(job\) \};/su);
   assert.match(source, /guard-lifecycle-ready\.mjs.*lane:\s*"repository-serial"/su);
-  assert.match(source, /for \(const job of serialJobs\) results\.push\(\{ job, result: await runGuard\(job\) \}\)/u);
+  assert.match(source, /const indexedJobs = jobs\.map\(\(job, inputIndex\) => \(\{ \.\.\.job, inputIndex \}\)\)/u);
+  assert.match(source, /results\[entry\.job\.inputIndex\] = entry/u);
+  assert.match(source, /for \(const job of serialJobs\) results\[job\.inputIndex\] = \{ job, result: await runGuard\(job\) \}/u);
   assert.match(source, /const results = await runGuardJobs\(jobs\)/u);
   const patch = [
     "*** Begin Patch",
@@ -245,6 +247,23 @@ check("multi-file patches use bounded parallel guard fan-out", () => {
   ].join("\n");
   const result = run(patch);
   assert.equal(result.status, 0, result.stderr);
+});
+
+check("mixed parallel and repository-serial denials retain patch-input order", () => {
+  const root = fixture();
+  writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({ protectedTestPaths: [
+    { id: "PATCH-FIRST", pattern: "first\\.test\\.mjs$", reason: "first path" },
+    { id: "PATCH-SECOND", pattern: "second\\.test\\.mjs$", reason: "second path" },
+  ] }));
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const patch = "*** Begin Patch\n*** Update File: first.test.mjs\n@@\n-a\n+b\n*** Update File: second.test.mjs\n@@\n-a\n+b\n*** End Patch";
+  const result = run(patch, { root });
+  assert.equal(result.status, 2, result.stderr);
+  const first = result.stderr.indexOf("PATCH-FIRST");
+  const second = result.stderr.indexOf("PATCH-SECOND");
+  const lifecycle = result.stderr.indexOf("BLOCKED (guard-lifecycle-ready");
+  assert.ok(first >= 0 && second >= 0 && lifecycle >= 0, result.stderr);
+  assert.ok(first < lifecycle && lifecycle < second, result.stderr);
 });
 
 check("every governed patch target requires dispatch-ready lifecycle without path exemptions", () => {

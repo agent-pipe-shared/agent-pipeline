@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import {
   evaluateSignificanceAxes,
   checkBaselineAdrs,
@@ -279,14 +281,47 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
         const parsed = JSON.parse(stdout);
         assert.equal(parsed.count, 1);
         assert.equal(parsed.decisions[0].id, "0001-test");
+        assert.equal(parsed.authorityStatus, "inventory-only");
+        assert.equal(parsed.effectiveProjection.status, "blocked");
+        assert.ok(parsed.effectiveProjection.findings.some(({ code }) => code === "legacy-decision-without-sidecar"));
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
+
+    it("compiles only byte-validated decisions into the effective identity list and never self-activates a waiver", () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "arch-summary-valid-"));
+      try {
+        const dir = path.join(root, "docs", "adr");
+        fs.mkdirSync(dir, { recursive: true });
+        const body = "# Valid decision\n";
+        const record = { schema: SCHEMA_DECISION, id: "ADR-1", title: "Valid decision", status: "accepted",
+          digest: createHash("sha256").update(body).digest("hex"), scope: "project", date: "2026-09-25" };
+        fs.writeFileSync(path.join(dir, "ADR-1.md"), body);
+        fs.writeFileSync(path.join(dir, "ADR-1.json"), `${JSON.stringify(record)}\n`);
+        const valid = compileDecisionSummary(root, { write: false });
+        assert.equal(valid.authorityStatus, "source-validated");
+        assert.deepEqual(valid.effectiveProjection.decisionIds, ["ADR-1"]);
+        assert.deepEqual(valid.activeExceptions, []);
+
+        const waivedBody = "# Claimed waiver\n";
+        fs.writeFileSync(path.join(dir, "ADR-waiver.md"), waivedBody);
+        fs.writeFileSync(path.join(dir, "ADR-waiver.json"), `${JSON.stringify({ ...record, id: "ADR-waiver",
+          status: "waived", digest: createHash("sha256").update(waivedBody).digest("hex"),
+          exception: { authority: "human-po", rationale: "Test", scope: "project", expiry: "2026-12-31" } })}\n`);
+        const unverified = compileDecisionSummary(root, { write: false, now: "2026-09-25T12:00:00.000Z" });
+        assert.equal(unverified.authorityStatus, "inventory-only");
+        assert.deepEqual(unverified.activeExceptions, []);
+        assert.deepEqual(unverified.effectiveProjection.decisionIds, []);
+        assert.ok(unverified.effectiveProjection.findings.some(({ code }) => code === "waiver-human-authority-unverified"));
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 
-  describe("5. AC-19: Decision parity across runners fixture", () => {
-    it("produces identical deterministic assessment for same repo state regardless of invocation context", () => {
+  describe("5. Determinism precondition for AC-19 (not a two-runner parity fixture)", () => {
+    it("repeats significance-axis assessment in one process without changing the result", () => {
       const testFiles = ["contracts/parity-test.mjs", "package.json"];
       const resA = evaluateSignificanceAxes(testFiles);
       const resB = evaluateSignificanceAxes(testFiles);
@@ -296,8 +331,8 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
     });
   });
 
-  describe("6. AC-20: Semantic conformance / token-ADR fixture (#99 §7)", () => {
-    it("catches a token ADR that does not match schema or has invalid digest", () => {
+  describe("6. Schema precondition for AC-20 (not a semantic Critic fixture)", () => {
+    it("rejects an ADR with an invalid digest before semantic review", () => {
       const tokenAdr = {
         schema: "pipeline.architecture-decision.v1",
         id: "TOKEN-ADR-FAKE",
@@ -311,6 +346,17 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
       const res = validateArchitectureDecision(tokenAdr, decisionSchema);
       assert.equal(res.valid, false, "Token ADR with invalid digest must be rejected");
       assert.ok(res.errors.length > 0);
+    });
+    it("keeps a schema-valid, digest-matching but semantically false ADR/implementation pair for independent Critic review", async () => {
+      const fixture = path.join(path.dirname(DECISION_SCHEMA_PATH), "..", "specs", "sprint-alfred-epic", "fixtures", "ac20-token-adr");
+      const decisionBytes = fs.readFileSync(path.join(fixture, "decision.md"));
+      const decision = JSON.parse(fs.readFileSync(path.join(fixture, "decision.json"), "utf8"));
+      assert.equal(validateArchitectureDecision(decision, decisionSchema).valid, true);
+      assert.equal(decision.digest, createHash("sha256").update(decisionBytes).digest("hex"));
+      assert.match(decisionBytes.toString("utf8"), /returns `false`\s+whenever `approved` is `false`/u);
+      const { mayPublish } = await import(pathToFileURL(path.join(fixture, "implementation.mjs")).href);
+      assert.equal(mayPublish({ approved: false, urgent: true }), true,
+        "the fixture contradicts the valid ADR; only a semantic review may call this nonconformant");
     });
   });
 });

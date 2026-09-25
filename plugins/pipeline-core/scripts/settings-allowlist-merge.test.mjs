@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { runnerPermissionCarryforwardAction } from "../lib/project-onboarding-v3.mjs";
 
 import {
   applySettingsAllowlistMerge,
@@ -42,7 +43,10 @@ function installedCacheFixture(version) {
   mkdirSync(join(plugin, "scripts"), { recursive: true });
   mkdirSync(join(plugin, "lib"), { recursive: true });
   copyFileSync(join(SOURCE_SCRIPTS_DIR, "settings-allowlist-merge.mjs"), join(plugin, "scripts", "settings-allowlist-merge.mjs"));
+  copyFileSync(join(SOURCE_SCRIPTS_DIR, "push-init.mjs"), join(plugin, "scripts", "push-init.mjs"));
   copyFileSync(join(SOURCE_SCRIPTS_DIR, "..", "lib", "entrypoint.mjs"), join(plugin, "lib", "entrypoint.mjs"));
+  mkdirSync(join(plugin, ".claude-plugin"), { recursive: true });
+  writeFileSync(join(plugin, ".claude-plugin", "plugin.json"), `${JSON.stringify({ name: "pipeline-core", version })}\n`);
   return { base, plugin, script: join(plugin, "scripts", "settings-allowlist-merge.mjs") };
 }
 
@@ -238,6 +242,12 @@ test("installed-cache fixture replaces an old permission family through the clos
     const plan = JSON.parse(output);
     assert.equal(plan.status, "ready");
     assert.deepEqual(plan.canonicalizedFamilies, ["0.6.0-test"]);
+    assert.equal(plan.autoCarryforward, true);
+    assert.equal(plan.installedReadback.status, "verified");
+    const action = runnerPermissionCarryforwardAction(plan, project);
+    assert.equal(action?.requiresConfirmation, false);
+    assert.equal(action?.mutation, true);
+    assert.deepEqual(action?.argv.slice(-3), ["--plan-sha256", plan.planSha256, "--activate"]);
     assert.deepEqual(plan.removed, oldEntries);
     output = "";
     const applyStatus = installed.main(["apply-runner-permissions", "--root", project, "--plan-sha256", plan.planSha256, "--activate"], { write: (chunk) => { output += chunk; } });
@@ -247,6 +257,31 @@ test("installed-cache fixture replaces an old permission family through the clos
     output = "";
     assert.equal(installed.main(["plan-runner-permissions", "--root", project], { write: (chunk) => { output += chunk; } }), 0);
     assert.equal(JSON.parse(output).status, "no-op");
+  } finally {
+    rmSync(project, { recursive: true, force: true });
+    rmSync(fixture.base, { recursive: true, force: true });
+  }
+});
+
+test("runner permission carryforward requires the exact installed manifest readback", async () => {
+  const fixture = installedCacheFixture("0.7.0-test");
+  const project = freshDir("installed-cache-readback");
+  try {
+    const oldScripts = join(dirname(fixture.plugin), "0.6.0-test", "scripts");
+    writeFileSync(localSettingsPath(project), `${JSON.stringify({ permissions: { allow: pipelineScriptsRunnerAllowlistEntries(oldScripts) } }, null, 2)}\n`);
+    const installed = await import(pathToFileURL(fixture.script).href);
+    const plan = () => installed.planSettingsAllowlistMerge({ rootDir: project, candidateSet: "runner-permissions" });
+    const verified = plan();
+    assert.equal(verified.autoCarryforward, true);
+    assert.match(verified.installedReadback.manifestSha256, /^[a-f0-9]{64}$/u);
+    writeFileSync(join(fixture.plugin, ".claude-plugin", "plugin.json"), `${JSON.stringify({ name: "pipeline-core", version: "0.6.0-test" })}\n`);
+    const mismatched = plan();
+    assert.equal(mismatched.status, "ready");
+    assert.equal(mismatched.autoCarryforward, false);
+    assert.equal(mismatched.installedReadback.status, "unavailable");
+    assert.equal(runnerPermissionCarryforwardAction(mismatched, project), null);
+    assert.notEqual(mismatched.planSha256, verified.planSha256);
+    assert.equal(installed.applySettingsAllowlistMerge({ rootDir: project, candidateSet: "runner-permissions", planSha256: verified.planSha256, activate: true }).status, "invalid-plan");
   } finally {
     rmSync(project, { recursive: true, force: true });
     rmSync(fixture.base, { recursive: true, force: true });

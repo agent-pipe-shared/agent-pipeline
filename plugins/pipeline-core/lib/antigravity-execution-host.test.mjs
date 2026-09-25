@@ -7,7 +7,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { AGY_ERROR_TAXONOMY, AGY_MAX_OUTPUT_BYTES, discoverAgyPath, invokeAgy, parseAgyOutput } from "./antigravity-execution-host.mjs";
+import { AGY_ERROR_TAXONOMY, AGY_MAX_OUTPUT_BYTES, createAgyStreamCollector, discoverAgyPath, invokeAgy, parseAgyOutput } from "./antigravity-execution-host.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
@@ -45,17 +45,18 @@ const mockProgram = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 const args = process.argv.slice(2);
 appendFileSync(process.env.AGY_SPAWN_LOG, JSON.stringify(args) + "\\n");
-const prompt = args[args.indexOf("--prompt") + 1];
+const prompt = args.at(-1).slice("--print=".length);
 if (prompt.includes("--timeout-test")) setTimeout(() => {}, 5000);
-else if (prompt.includes("--slow-test")) setTimeout(() => console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }})), 1200);
+else if (prompt.includes("--slow-test")) setTimeout(() => console.log(JSON.stringify({ status: "SUCCESS", response: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }})), 1200);
 else if (prompt.includes("--auth-test")) { console.error("Please login to Vertex"); process.exit(1); }
 else if (prompt.includes("--fail-test")) process.exit(2);
 else if (prompt.includes("--malformed-test")) console.log("no json for you");
+else if (prompt.includes("--reported-error-test")) console.log(JSON.stringify({ status: "ERROR", response: "", error: "private child diagnostic" }));
 else if (prompt.includes("--permission-test")) { console.error('jetski: a tool required the "command" permission and was auto-denied'); process.exit(2); }
 else if (prompt.includes("--permission-noise-test")) { console.error("permission may be needed later: /home/alice/private.txt"); process.exit(2); }
 else if (prompt.includes("--oversized-stdout-test")) console.log("x".repeat(65537));
 else if (prompt.includes("--oversized-stderr-test")) { console.error("y".repeat(65537)); process.exit(2); }
-else console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}));
+else console.log(JSON.stringify({ status: "SUCCESS", response: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}));
 `;
 
 function createFixture() {
@@ -115,6 +116,25 @@ check("EPH02 parses the last valid JSON line", () => {
 });
 check("EPH03 rejects malformed output", () => {
   assert.throws(() => parseAgyOutput("no json"), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED);
+  for (const output of ["null", "true", "1", '"ok"', "[]", '[{"result":"ok"}]']) {
+    assert.throws(() => parseAgyOutput(output), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED, output);
+    assert.throws(() => parseAgyOutput(`{"status":"running"}\n${output}`), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED, output);
+  }
+  const init = '{"event":"init","conversation_id":"session-one","init":{"model":"gemini-observed"}}\n';
+  const step = '{"event":"step_update","step_update":{"text_delta":"private tool data"}}\n';
+  const terminal = '{"event":"result","result":{"conversation_id":"session-one","status":"SUCCESS","response":"done"}}\n';
+  const stream = createAgyStreamCollector("gemini-observed");
+  for (const byte of Buffer.from(init + step + terminal)) stream.write(Buffer.from([byte]));
+  assert.deepEqual(stream.finish(), { payload: { conversation_id: "session-one", status: "SUCCESS", response: "done" }, observedModel: "gemini-observed" });
+  assert.doesNotMatch(JSON.stringify(stream.finish()), /private tool data/u);
+  const mismatched = createAgyStreamCollector("gemini-other");
+  assert.throws(() => mismatched.write(init), (error) => error.code === AGY_ERROR_TAXONOMY.MODEL_MISMATCH);
+  const missing = createAgyStreamCollector("gemini-observed");
+  missing.write(init);
+  assert.throws(() => missing.finish(), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED);
+  const wrongConversation = createAgyStreamCollector("gemini-observed");
+  wrongConversation.write(init);
+  assert.throws(() => wrongConversation.write(terminal.replace("session-one", "session-two")), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED);
 });
 check("EPH04 rejects oversized parser input before attempting JSON", () => {
   assert.throws(() => parseAgyOutput("x".repeat(AGY_MAX_OUTPUT_BYTES + 1)), (error) => error.code === AGY_ERROR_TAXONOMY.OUTPUT_TOO_LARGE);
@@ -128,7 +148,11 @@ check("EPH05 valid packet launches exactly once with its prompt byte-for-byte", 
   assert.equal(result.modelCalls, 1);
   const rows = spawnRows(fixture);
   assert.equal(rows.length, 1);
-  assert.equal(rows[0][rows[0].indexOf("--prompt") + 1], packet.prompt);
+  assert.equal(rows[0].includes("--prompt"), false);
+  assert.equal(rows[0].includes("--print"), false, "a bare --print would consume the following option");
+  assert.equal(rows[0].at(-1), `--print=${packet.prompt}`);
+  assert.ok(rows[0].indexOf("--output-format") < rows[0].length - 1);
+  assert.ok(rows[0].indexOf("--sandbox") < rows[0].length - 1);
 }));
 
 const zeroSpawnCases = [
@@ -191,6 +215,12 @@ for (const [name, suffix, model, code] of executionCases) {
     assert.equal(result.ok, false);
     assert.equal(result.code, code);
     assert.equal(result.launcherCalls, 1);
+    if (name.startsWith("EPH14")) {
+      const reported = await invokeAgy(launchArgs(fixture, packetFor(fixture, "consult-advisor", "--reported-error-test")));
+      assert.equal(reported.ok, false);
+      assert.equal(reported.code, AGY_ERROR_TAXONOMY.REPORTED_FAILURE);
+      assert.doesNotMatch(JSON.stringify(reported), /private child diagnostic/u);
+    }
   }));
 }
 check("EPH16 detects timeout", () => withFixture(async (fixture) => {

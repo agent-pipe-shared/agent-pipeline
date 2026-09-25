@@ -72,5 +72,11 @@ test("ships a syntactically complete but deliberately unqualified table until A1
   const shipped = JSON.parse(readFileSync(join(repoRoot, "policies/control-placement.v1.json"), "utf8"));
   assert.equal(validateControlPlacement(shipped), true);
   assert.deepEqual(shipped.controls.map((row) => row.controlId).sort(), expectedControlIds(hooks));
+  const e3 = shipped.controls.find((row) => row.controlId === "alfred:e3-cross-runner-agy-host");
+  assert.deepEqual(e3.protects, [
+    "plugins/pipeline-core/scripts/goldfish-antigravity-host.mjs",
+    "schemas/pipeline.cross-runner-dispatch-receipt.v1.json",
+  ]);
+  assert.ok(e3.perRunnerStatus.every((status) => status.status === "unavailable"));
   assert.equal(checkControlPlacement({ table: shipped, hooksDocument: hooks, a1Record: null, activeRunner: "codex" }).findings.includes("A2-A1-RECORD-REQUIRED"), true);
 });

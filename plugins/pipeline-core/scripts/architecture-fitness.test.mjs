@@ -454,6 +454,32 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
     });
   });
 
+  it("AC-22 planning finding carries compared conformant remedies, but candidate findings do not", () => {
+    const options = {
+      rootDir: REPO_ROOT,
+      plannedModules: ["harness"],
+      candidatePaths: ["plugins/pipeline-core/scripts/architecture-fitness.mjs"],
+      fitnessModel: { allowedBoundaryCrossings: [] },
+      baseline: { acceptedViolations: [] },
+      telemetryUnavailable: true,
+    };
+    const planning = evaluateArchitectureFitness({ ...options, mode: "planning" });
+    const boundary = planning.outcomes.find((row) => row.propertyId === "boundary-crossing");
+    assert.equal(boundary.outcome, OUTCOME_FINDING);
+    const comparison = boundary.evidence.remedyComparisons[0];
+    assert.equal(comparison.findingType, "boundary-crossing");
+    assert.equal(comparison.currentModule, "pipeline-core");
+    assert.equal(comparison.target, options.candidatePaths[0]);
+    assert.ok(comparison.remedies.length >= 2);
+    assert.equal(comparison.bestRemedy.conformant, true);
+    assert.ok(comparison.remedies.some((remedy) => remedy.conformant === false));
+    assert.equal(validateAgainstSchema(planning, fitnessEvidenceSchema).valid, true);
+
+    const candidate = evaluateArchitectureFitness({ ...options, mode: "candidate" });
+    assert.equal(candidate.outcomes.find((row) => row.propertyId === "boundary-crossing")
+      .evidence.remedyComparisons, undefined);
+  });
+
   describe("5. Baseline and Ratchet Store mechanics", () => {
     it("net-new violation fails, accepted baseline passes as excepted, ratchet reduces", () => {
       const initialBaseline = {

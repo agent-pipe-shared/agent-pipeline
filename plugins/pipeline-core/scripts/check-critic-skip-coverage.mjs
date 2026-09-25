@@ -8,12 +8,17 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CRITIC_SKIP_SCHEMA, criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
+import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
+import { readBoundConsumedCriticReceipt } from "../lib/critic-verify-lifecycle.mjs";
 import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord, validateLegacyDispatchRecord } from "../lib/dispatch-record.mjs";
+import { parseStrictJson } from "../lib/governance-event.mjs";
+import { readPortableAgyAuthorshipExport } from "../lib/portable-agy-authorship-export.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
 const EVIDENCE_DIR = "evidence";
 const DISPATCH_RECORD_PATTERN = /^dispatch-record-.+\.json$/u;
+const CRITIC_ADDENDUM_PATTERN = /^dispatch-critic-addendum-.+\.json$/u;
 export const LEGACY_RECONCILE_SCHEMA = "pipeline.legacy-dispatch-reconcile-index.v1";
 export const DEFAULT_LEGACY_RECONCILE_INDEX_PATH = "evidence/legacy-dispatch-reconcile-index.json";
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -128,6 +133,89 @@ export function walkDispatchRecords(root) {
   return { records, findings, filesScanned: names.length };
 }
 
+function readCriticDispositionAddenda(root) {
+  const findings = [];
+  const entriesByPath = new Map();
+  let names;
+  try { names = readdirSync(resolve(root, EVIDENCE_DIR)).filter((name) => CRITIC_ADDENDUM_PATTERN.test(name)).sort(); }
+  catch (error) { return { entriesByPath, findings: [`${EVIDENCE_DIR} is missing or unreadable: ${error.message}`] }; }
+  for (const name of names) {
+    const path = `${EVIDENCE_DIR}/${name}`;
+    const file = physicalRegularFile(root, path, path);
+    if (file.finding) { findings.push(file.finding); continue; }
+    try {
+      const addendum = parseStrictJson(file.bytes);
+      if (path !== criticDispositionAddendumPath(addendum.taskId)) throw new TypeError("critic addendum filename does not match taskId");
+      if (entriesByPath.has(addendum.recordPath)) throw new TypeError("duplicate critic addendum for dispatch record");
+      entriesByPath.set(addendum.recordPath, { path, addendum });
+    } catch (error) { findings.push(`${path}: invalid critic addendum (${error.message})`); }
+  }
+  return { entriesByPath, findings };
+}
+
+function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+  try {
+    const readBound = options.readBoundCriticReceipt ?? ((input) => readBoundConsumedCriticReceipt(input));
+    const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
+    const gitRead = options.gitRead ?? ((args) => execFileSync("git", args, {
+      cwd: root, encoding: "utf8", maxBuffer: 1024 * 1024,
+      env: gitEnv,
+    }).trim());
+    const readGitBlob = options.readGitBlob ?? ((oid) => execFileSync("git", ["cat-file", "blob", oid], {
+      cwd: root, maxBuffer: 1024 * 1024, env: gitEnv,
+    }));
+    const gitCommonDir = resolve(root, gitRead(["rev-parse", "--git-common-dir"]));
+    gitRead(["merge-base", "--is-ancestor", addendum.candidateCommit, addendum.reviewCandidateCommit]);
+    const tree = gitRead(["rev-parse", "--verify", `${addendum.reviewCandidateCommit}^{tree}`]);
+    const bound = readBound({ gitCommonDir, criticPacketId: addendum.criticPacketId,
+      candidate: { commit: addendum.reviewCandidateCommit, tree } });
+    if (bound?.packet?.request?.taskId !== addendum.taskId
+      || bound?.critic?.reviewPass !== true
+      || bound?.critic?.candidate?.commit !== addendum.reviewCandidateCommit
+      || bound.criticReceiptSha256 !== addendum.criticReceiptSha256) {
+      return "Critic addendum does not match a passed, consumed, task-bound Critic receipt";
+    }
+    const blobOid = gitRead(["rev-parse", "--verify", `${addendum.reviewCandidateCommit}:${addendum.recordPath}`]);
+    if (!bound.packet.references?.some((reference) => reference.kind === "evidence"
+      && reference.path === addendum.recordPath && reference.candidateBlobOid === blobOid)
+      || !Buffer.from(readGitBlob(blobOid)).equals(recordBytes)) {
+      return "Critic packet does not bind the exact immutable dispatch record as reviewed evidence";
+    }
+    return null;
+  } catch (error) { return `consumed Critic receipt is unavailable or invalid (${error.code ?? "readback"})`; }
+}
+
+function resolvedCriticAddendumFinding(root, entry, addendumEntry, options) {
+  try { validateCriticDispositionAddendum(addendumEntry.addendum, { recordPath: entry.path, recordBytes: entry.bytes, record: entry.record }); }
+  catch (error) { return `${addendumEntry.path}: ${error.message}`; }
+  const evidenceFinding = verifyCriticEvidence(root, addendumEntry.path, addendumEntry.addendum.criticEvidence);
+  if (evidenceFinding) return evidenceFinding;
+  const reviewFinding = boundCriticReviewFinding(root, addendumEntry.addendum, entry.bytes, options);
+  return reviewFinding ? `${addendumEntry.path}: ${reviewFinding}` : null;
+}
+
+/** Single-record readback for authorship consumers; does not waive corpus coverage. */
+export function verifyCriticDispositionAddendumForRecord({ root, taskId, record, recordBytes, options = {} } = {}) {
+  if (typeof root !== "string" || !Buffer.isBuffer(recordBytes)) {
+    return { ok: false, code: "critic-addendum-input" };
+  }
+  let addendumPath;
+  try { addendumPath = criticDispositionAddendumPath(taskId); }
+  catch { return { ok: false, code: "critic-addendum-task-invalid" }; }
+  if (!existsSync(resolve(root, addendumPath))) return { ok: false, code: "critic-addendum-missing" };
+  const file = physicalRegularFile(root, addendumPath, "critic addendum");
+  if (!file.bytes) return { ok: false, code: "critic-addendum-unreadable" };
+  let addendum;
+  try { addendum = parseStrictJson(file.bytes); }
+  catch { return { ok: false, code: "critic-addendum-malformed" }; }
+  const recordPath = `evidence/dispatch-record-${taskId}.json`;
+  const finding = resolvedCriticAddendumFinding(root,
+    { path: recordPath, bytes: recordBytes, record },
+    { path: addendumPath, addendum }, options);
+  return finding ? { ok: false, code: "critic-addendum-invalid" }
+    : { ok: true, code: "critic-addendum-bound" };
+}
+
 
 function legacySchema(record) {
   return record?.schema === undefined || record?.schema === "pipeline.dispatch-record.v1" || record?.schema === "pipeline.dispatch-evidence.v1" || record?.schema === LEGACY_DISPATCH_RECORD_SCHEMA;
@@ -169,7 +257,9 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
   const readChangedPaths = options.readChangedPaths ?? ((record) => readCommitChangedPaths(root, record.commits));
   const scan = walkDispatchRecords(root);
   const reconciliations = readLegacyDispatchReconcileIndex(root, options);
-  const findings = [...scan.findings, ...reconciliations.findings];
+  const addenda = readCriticDispositionAddenda(root);
+  const findings = [...scan.findings, ...reconciliations.findings, ...addenda.findings];
+  const usedAddenda = new Set();
   let applicableRecordCount = 0;
   let legacyRecordCount = 0;
   let skipRecordCount = 0;
@@ -180,6 +270,10 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     const { path, record } = entry;
     const reconciliation = reconciliations.entriesByPath.get(path);
     if (reconciliation) {
+      if (record?.schema === DISPATCH_RECORD_SCHEMA) {
+        findings.push(`${path}: a v4 record cannot be removed from coverage by the historical no-commit reconciliation index`);
+        continue;
+      }
       const reconciliationFinding = reconciledNoCommitFinding(record, reconciliation);
       if (reconciliationFinding) findings.push(`${path}: ${reconciliationFinding}`);
       else { legacyRecordCount += 1; reconciledLegacyRecordCount += 1; }
@@ -202,6 +296,11 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     try { isV4 ? validateDispatchRecord(record) : validatePreviousDispatchRecord(record); }
     catch (error) { findings.push(`${path}: invalid ${isV4 ? "v4" : "v3"} dispatch record (${error.message})`); continue; }
     const disposition = criticDisposition(record);
+    const addendum = addenda.entriesByPath.get(path);
+    if (addendum && disposition !== "required") {
+      findings.push(`${addendum.path}: critic addendum is only valid for a required v4 record`);
+      usedAddenda.add(path);
+    }
     if (disposition === "skipped") {
       try {
         const pathFinding = criticDecisionPathFinding(record.criticSkip, readChangedPaths(record));
@@ -213,8 +312,26 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
       continue;
     }
     if (disposition === "required") {
-      requiredRecordCount += 1;
-      findings.push(`${path}: Critic is required by ${record.criticRequired.appliedRow}; task/candidate/digest-bound criticEvidence is missing`);
+      if (addendum) {
+        usedAddenda.add(path);
+        const addendumFinding = resolvedCriticAddendumFinding(root, entry, addendum, options);
+        if (addendumFinding) { requiredRecordCount += 1; findings.push(addendumFinding); }
+        else criticEvidenceRecordCount += 1;
+      } else {
+        const portable = isV4 && record.runner === "antigravity"
+          && record.outcomeClassification?.kind === "authored-commit"
+          && record.commits.length === 1
+          ? readPortableAgyAuthorshipExport({ root, taskId: record.taskId,
+            commit: record.commits[0], record }) : null;
+        if (portable?.ok && portable.authority === "host-observed-portable") {
+          criticEvidenceRecordCount += 1;
+        } else {
+          requiredRecordCount += 1;
+          findings.push(portable && portable.code !== "agy-export-missing"
+            ? `${path}: signed portable Agy export is invalid (${portable.code})`
+            : `${path}: Critic is required by ${record.criticRequired.appliedRow}; task/candidate/digest-bound criticEvidence is missing`);
+        }
+      }
       continue;
     }
     if (disposition === "evidenced") {
@@ -225,6 +342,7 @@ export function evaluateRepositoryCriticSkipCoverage(options = {}) {
     }
     findings.push(`${path}: requires exactly one Critic disposition`);
   }
+  for (const [path, addendum] of addenda.entriesByPath) if (!usedAddenda.has(path)) findings.push(`${addendum.path}: orphan critic addendum has no applicable pending record`);
   const uncoveredRecordCount = applicableRecordCount - skipRecordCount - criticEvidenceRecordCount;
   const ok = findings.length === 0 && uncoveredRecordCount === 0;
   return {
@@ -260,16 +378,23 @@ export function evaluateReviewAdmission(options = {}) {
   const readChangedPaths = options.readChangedPaths ?? ((record) => readCommitChangedPaths(root, record.commits));
   const scan = walkDispatchRecords(root);
   const reconciliations = readLegacyDispatchReconcileIndex(root, options);
-  const findings = [...scan.findings, ...reconciliations.findings];
+  const addenda = readCriticDispositionAddenda(root);
+  const findings = [...scan.findings, ...reconciliations.findings, ...addenda.findings];
+  const usedAddenda = new Set();
   let admittedCount = 0;
   let applicableRecordCount = 0;
   let coveredRecordCount = 0;
   if (typeof taskId !== "string" || taskId.trim() === "") findings.push("review admission taskId is required");
   if (typeof candidateCommit !== "string" || !/^[a-f0-9]{40}$/u.test(candidateCommit)) findings.push("review admission candidateCommit must be a full lowercase Git SHA");
 
-  for (const { path, record } of scan.records) {
+  for (const entry of scan.records) {
+    const { path, record } = entry;
     const reconciliation = reconciliations.entriesByPath.get(path);
     if (reconciliation) {
+      if (record?.schema === DISPATCH_RECORD_SCHEMA) {
+        findings.push(`${path}: a v4 record cannot be removed from review admission by the historical no-commit reconciliation index`);
+        continue;
+      }
       const reconciliationFinding = reconciledNoCommitFinding(record, reconciliation);
       if (reconciliationFinding) findings.push(`${path}: ${reconciliationFinding}`);
       continue;
@@ -290,8 +415,18 @@ export function evaluateReviewAdmission(options = {}) {
     try { isV4 ? validateDispatchRecord(record) : validatePreviousDispatchRecord(record); }
     catch (error) { findings.push(`${path}: invalid ${isV4 ? "v4" : "v3"} dispatch record (${error.message})`); continue; }
     const disposition = criticDisposition(record);
+    const addendum = addenda.entriesByPath.get(path);
+    if (addendum && disposition !== "required") {
+      findings.push(`${addendum.path}: critic addendum is only valid for a required v4 record`);
+      usedAddenda.add(path);
+    }
     if (disposition === "required") {
-      if (record.taskId === taskId && record.candidateCommit === candidateCommit) {
+      if (addendum) {
+        usedAddenda.add(path);
+        const addendumFinding = resolvedCriticAddendumFinding(root, entry, addendum, options);
+        if (addendumFinding) findings.push(addendumFinding);
+        else coveredRecordCount += 1;
+      } else if (record.taskId === taskId && record.candidateCommit === candidateCommit) {
         admittedCount += 1;
       } else {
         findings.push(`${path}: Critic is required by ${record.criticRequired.appliedRow}; only the exact review target may remain pending`);
@@ -314,6 +449,7 @@ export function evaluateReviewAdmission(options = {}) {
     }
     findings.push(`${path}: requires exactly one Critic disposition`);
   }
+  for (const [path, addendum] of addenda.entriesByPath) if (!usedAddenda.has(path)) findings.push(`${addendum.path}: orphan critic addendum has no applicable pending record`);
   if (admittedCount !== 1) findings.push(`review admission requires exactly one pending record for ${taskId}@${candidateCommit}; found ${admittedCount}`);
   const ok = findings.length === 0 && admittedCount === 1 && coveredRecordCount + admittedCount === applicableRecordCount;
   return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount, readFindings: findings };

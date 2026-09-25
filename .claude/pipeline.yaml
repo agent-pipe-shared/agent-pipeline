@@ -59,13 +59,13 @@ security:
 modelRouting:
   # Generated V3 Claude compatibility projection; pipeline.user.v3 is the only routing authority.
   # Requested selectors are not advisor-receipt, route-receipt, or effective-model evidence.
-  # Adapter selector catalog — Claude aliases: haiku, opus, sonnet; Codex/OpenAI model IDs: gpt-5.6-luna, gpt-5.6-terra, gpt-6-astra.
+  # Adapter selector catalog — Claude aliases: haiku, opus, sonnet; Codex/OpenAI model IDs: gpt-6-luna, gpt-6-sol.
   elephant_epic_design:
     model: opus
     effort: xhigh
   elephant_epic_execution:
-    model: sonnet-5
-    effort: high
+    model: opus
+    effort: medium
   advisor_epic:
     model: opus
     effort: not-applicable
@@ -73,29 +73,29 @@ modelRouting:
     model: opus
     effort: high
   elephant_feature_execution:
-    model: sonnet-5
+    model: opus
     effort: medium
   advisor_feature:
     model: opus
     effort: not-applicable
   elephant_mini_design:
-    model: sonnet-5
-    effort: high
+    model: opus
+    effort: medium
   elephant_mini_execution:
-    model: sonnet-5
+    model: opus
     effort: medium
   goldfish:
     model: sonnet-5
     effort: medium
   goldfish_mechanic:
     model: haiku
-    effort: medium
+    effort: high
   goldfish_deep:
     model: sonnet-5
     effort: medium
   critic:
-    model: sonnet-5
-    effort: high
+    model: opus
+    effort: medium
 
 criticExport:
   policy: pipeline.critic-export-policy.v1

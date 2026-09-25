@@ -246,22 +246,30 @@ normative shape is:
    scope/prohibition breach, conflicting mutation, or explicit stop request;
    impatience alone is not evidence. This is orchestration discipline, not a
    claim that a worker has passed its DoD.
-6. **Verify.** Run the project's single configured verify command. The result
-   is machine evidence containing the command and result, not “looks good”.
-7. **Critic.** Review the delta only after the applicable deterministic chain
-   is green. High-risk, architecture, guardrail and security changes receive
-   the required stronger review path. Findings need evidence and a disposition.
+6. **Check the Critic boundary.** Run the applicable targeted deterministic
+   checks and packet preflight. A candidate-bound Critic-mode Verify receipt
+   or a validated diagnostic may admit review while full release-mode Verify
+   remains explicitly pending; neither is a full qualification.
+7. **Critic, then Full Verify.** Have a fresh Critic review the substantive
+   delta after those boundary checks. High-risk, architecture, guardrail and
+   security changes receive the required stronger review path. Findings need
+   evidence and a disposition. Then run the project's configured Full Verify
+   against the reviewed candidate, binding its consumed Critic packet. An
+   unchanged deterministic rerun may reuse only the exact content-bound
+   Critic/Verify lifecycle receipt. The machine result is evidence of the
+   command and outcome, not “looks good”.
 
    **Collection-block batching (2026-08-25, backlog item
-   `pipeline.critic-and-verify-cadence-may-be-too-fine-grained`).** Verify
-   and Critic gate a deliverable unit, not necessarily one individual
+   `pipeline.critic-and-verify-cadence-may-be-too-fine-grained`).** Critic
+   and Full Verify gate a deliverable unit, not necessarily one individual
    Goldfish dispatch. Where several independently-scoped Goldfish dispatches
    run within the same session — none of them individually
    guardrail/security/architecture-classified (MP-07) and each already Rigor
    0/1 — the Elephant MAY collect their green, committed results into one
-   stated collection block and run ONE Verify pass plus ONE Critic review
-   against the combined diff, instead of a separate Verify+Critic pass per
-   dispatch. The block size is a bound the Elephant states before
+   stated collection block. Each dispatch still needs its applicable targeted
+   checks; the block then receives ONE Critic review of the combined diff
+   followed by ONE Full Verify, instead of a separate review and Full Verify
+   per dispatch. The block size is a bound the Elephant states before
    dispatching (e.g. "this sweep's N items"), so a regression cannot ride
    along unreviewed indefinitely. This does not change a single package's
    correction-review rule: QG-13 defaults to one initial round plus one fresh
@@ -825,6 +833,15 @@ optionales Security-Tool erscheint als `SKIPPED`, nie als `PASS`. Eine typisiert
 nicht verfügbare Runner-Fähigkeit stoppt diese Fähigkeit ehrlich; sie ist keine
 Einladung, Berechtigungen zu lockern, Evidenz zu erfinden oder Runner/Modell zu
 wechseln.
+
+Die reguläre Reihenfolge ist: gezielte deterministische Checks und
+Critic-Preflight, frischer unabhängiger Critic für den inhaltlichen Diff,
+danach Full Verify auf dem geprüften Kandidaten mit Bindung des verbrauchten
+Critic-Pakets. Ein Critic-Mode-Verify-Receipt oder eine validierte Diagnose
+ersetzt den abschließenden Full Verify nicht. Bei zulässigen, vorab begrenzten
+Collection-Blöcken dürfen mehrere risikoarme Dispatches gemeinsam geprüft
+werden; ihre gezielten Checks bleiben erhalten, und auf eine gemeinsame
+Critic-Runde folgt ein gemeinsamer Full Verify.
 
 ### Gate-Disziplin und autonomer Happy Path
 

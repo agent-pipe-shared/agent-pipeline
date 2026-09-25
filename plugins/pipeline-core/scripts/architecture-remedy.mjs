@@ -141,6 +141,23 @@ export function compareRemedies({ findingType, currentModule, proposedChanges })
         recommendation: "Rejected per AC-21: misleading tiny-module optimization fragments topology without architectural justification."
       }
     );
+  } else if (findingType === "navigation-currency") {
+    remedies.push(
+      {
+        id: "restore-navigation-bundle",
+        description: `Restore the governed navigation bundle for ${moduleId} from its accepted source and re-evaluate freshness.`,
+        churnScore: 10,
+        conformant: true,
+        recommendation: "Restore the missing or stale map without changing the approved architecture decision."
+      },
+      {
+        id: "regenerate-and-review-map",
+        description: `Regenerate the map for ${moduleId} from the current inventory, review its ownership and contract edges, then re-evaluate.`,
+        churnScore: 25,
+        conformant: true,
+        recommendation: "Use when the implementation intentionally changed and the map needs a reviewed update."
+      }
+    );
   } else if (candidates.length === 0) {
     // Generic finding without candidate remedies
     remedies.push(

@@ -106,11 +106,21 @@ guidance, not as a reason to widen concurrency or autonomy.
 1. Split independent, non-overlapping packages so they may run in parallel.
 2. Give each implementor a bounded goal, exact context paths, acceptance checks,
    prohibitions, and stop conditions.
-3. Run the [Verify evidence producer](#verify-a-consumer-project) with the
-   appropriate mode and reviewed base, plus any applicable security checks.
+3. Run the applicable targeted deterministic checks and Critic preflight.
+   A candidate-bound Critic-mode [Verify evidence producer](#verify-a-consumer-project)
+   receipt or validated diagnostic may admit review; Full Verify is still pending.
 4. Run the independent Critic review; profile and risk determine its depth and route.
-5. Record the outcome and close the feature only when its tracked work is
-   actually complete.
+5. After corrections and any required delta review, run Full Verify on the
+   reviewed candidate with its consumed Critic evidence, plus applicable
+   security checks. Record the outcome and close the feature only when its
+   tracked work is actually complete.
+
+Several independent, low-risk dispatches may share one predeclared, bounded
+collection block: retain each task's targeted checks, review the combined
+diff once, then run one Full Verify. Architecture, guardrail or security work
+does not gain this batching exception. Keep a coherent feature scope separate
+from the smaller, independently owned dispatch scopes; a shared checkout is
+not isolation for parallel writers.
 
 The human remains the decision owner for material scope changes, configured
 approvals, and remote or otherwise irreversible actions. Routine task ordering,
@@ -183,11 +193,56 @@ adopt a bounded scope, defer it with a review/expiry date, or record a partial
 scope through the normal human-decision route. Do not hand-write
 `architecture/adoption-state.json`.
 
+If a valid decision already exists but the physical map index is missing, the
+bootstrap still offers this read-only, map-first proposal. Its
+`decisionOptions` are empty: materializing the map does not ask the owner to
+repeat a still-valid adoption decision. A later ordinary commit does not by
+itself expire a deferral; its recorded review/expiry date or explicit
+supersession controls that status. The map and fitness checks at the
+implementation boundary remain separate from the bootstrap readback.
+
+For a decision, the installed CLI's `prepare` command builds the exact request
+from the selected decision, scope, rationale, decision reference and dates.
+Review that request before using `apply` with the same arguments and its
+matching `--request` plus authority evidence. In signature mode that evidence
+is a separately produced `--proof`; in an explicitly configured, low-consequence
+chat mode it is an intent-bound `--chat-approval` record, not a signature or
+human-identity attestation. `apply` rejects missing, stale or mismatched
+authority. Check the resulting `status` and the intended task scope with the
+CLI's `check --scope` before treating the disposition as planning authority.
+
 A deferred decision is not tied to an ordinary Git commit. It remains valid
 until its declared review or expiry date, explicit supersession, or a changed
 decision. Before work that depends on the architecture controls, the planning
 boundary checks the current decision and scope; it fails closed if the
 decision is absent, expired, malformed, or out of scope.
+
+For a new repository, complete the guided initial design before implementation:
+the onboarding flow materializes its first map index and module concepts from
+that design. The generated entry pointer is navigation, not adoption approval
+or proof that code conforms. For an existing repository, review the staged
+proposal against its real modules and decisions, obtain the required adoption
+disposition, and update the map without replacing existing architecture files
+wholesale. A deferral may remain the correct disposition; do not manufacture a
+map merely to make `status` look adopted.
+
+Once a map exists, check the machine-readable module inventory and its derived
+human overview from the consuming project root. `--check` is read-only; after
+changing the map sources, `--write` regenerates only the overview HTML. Do not
+edit the generated HTML as an independent architecture authority.
+
+```bash
+node <plugin-root>/scripts/module-inventory.mjs --root <project-root> --check
+node <plugin-root>/scripts/generate-architecture-overview.mjs --root <project-root> --check
+node <plugin-root>/scripts/generate-architecture-overview.mjs --root <project-root> --write
+```
+
+For an auditor, hand over the map index and module concepts, the applicable
+ADRs or compiled decision summary, the current adoption decision and its
+separately verified authority evidence, and the candidate-bound fitness
+result. An [Audit Bundle](audit-bundles.md) can collect registered feature
+artifacts for offline byte-integrity checks; it does not by itself establish
+source provenance, deployment, approval or regulatory compliance.
 
 ## Private review export
 
@@ -204,8 +259,9 @@ The three-runner Greenfield Driver contract is covered for Claude, Codex, and
 Antigravity, but coverage is not a claim of identical native enforcement across
 hosts.
 Publication still needs its own Verify, security, independent review,
-approval, and remote readback. Nova B remains open for further runner and
-workflow refinements.
+approval, and remote readback. Nova A/B implementation in this source tree
+does not by itself establish acceptance of every issue criterion on the final
+0.7 candidate or installed-host support for every runner route.
 
 Use [SETUP](../SETUP.md) for installation, [PIPELINE_FLOW](../PIPELINE_FLOW.md)
 for the maintained lifecycle, and the [documentation map](README.md) for the

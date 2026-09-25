@@ -26,7 +26,7 @@
           "state": "default",
           "selector": {
             "kind": "model-id",
-            "value": "gpt-6-astra"
+            "value": "gpt-6-sol"
           },
           "effort": "xhigh",
           "unavailable": "defer",
@@ -48,9 +48,9 @@
           "state": "default",
           "selector": {
             "kind": "alias",
-            "value": "sonnet"
+            "value": "opus"
           },
-          "effort": "high",
+          "effort": "medium",
           "unavailable": "defer",
           "evidence": "dispatch-receipt"
         },
@@ -58,9 +58,9 @@
           "state": "default",
           "selector": {
             "kind": "model-id",
-            "value": "gpt-5.6-terra"
+            "value": "gpt-6-sol"
           },
-          "effort": "high",
+          "effort": "medium",
           "unavailable": "defer",
           "evidence": "dispatch-receipt"
         },
@@ -92,7 +92,7 @@
           "state": "default",
           "selector": {
             "kind": "model-id",
-            "value": "gpt-6-astra"
+            "value": "gpt-6-sol"
           },
           "effort": "high",
           "unavailable": "defer",
@@ -114,7 +114,7 @@
           "state": "default",
           "selector": {
             "kind": "alias",
-            "value": "sonnet"
+            "value": "opus"
           },
           "effort": "medium",
           "unavailable": "defer",
@@ -124,7 +124,7 @@
           "state": "default",
           "selector": {
             "kind": "model-id",
-            "value": "gpt-5.6-terra"
+            "value": "gpt-6-sol"
           },
           "effort": "medium",
           "unavailable": "defer",
@@ -148,9 +148,9 @@
           "state": "default",
           "selector": {
             "kind": "alias",
-            "value": "sonnet"
+            "value": "opus"
           },
-          "effort": "high",
+          "effort": "medium",
           "unavailable": "defer",
           "evidence": "dispatch-receipt"
         },
@@ -158,9 +158,9 @@
           "state": "default",
           "selector": {
             "kind": "model-id",
-            "value": "gpt-5.6-terra"
+            "value": "gpt-6-sol"
           },
-          "effort": "high",
+          "effort": "medium",
           "unavailable": "defer",
           "evidence": "dispatch-receipt"
         },
@@ -180,7 +180,7 @@
           "state": "default",
           "selector": {
             "kind": "alias",
-            "value": "sonnet"
+            "value": "opus"
           },
           "effort": "medium",
           "unavailable": "defer",
@@ -190,7 +190,7 @@
           "state": "default",
           "selector": {
             "kind": "model-id",
-            "value": "gpt-5.6-terra"
+            "value": "gpt-6-sol"
           },
           "effort": "medium",
           "unavailable": "defer",
@@ -225,9 +225,9 @@
         "state": "default",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-5.6-luna"
+          "value": "gpt-6-luna"
         },
-        "effort": "medium",
+        "effort": "high",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       },
@@ -235,9 +235,9 @@
         "state": "opt-in",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.8-flash-high"
+          "value": "gemini-3.8-flash-medium"
         },
-        "effort": "high",
+        "effort": "medium",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       }
@@ -249,7 +249,7 @@
           "kind": "alias",
           "value": "haiku"
         },
-        "effort": "medium",
+        "effort": "high",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       },
@@ -257,9 +257,9 @@
         "state": "opt-in",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-5.6-luna"
+          "value": "gpt-6-luna"
         },
-        "effort": "medium",
+        "effort": "high",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       },
@@ -267,9 +267,9 @@
         "state": "unavailable",
         "selector": {
           "kind": "model-id",
-          "value": "gemini-3.8-flash-low"
+          "value": "gemini-3.8-flash-medium"
         },
-        "effort": "low",
+        "effort": "medium",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       }
@@ -289,7 +289,7 @@
         "state": "opt-in",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-5.6-terra"
+          "value": "gpt-6-sol"
         },
         "effort": "medium",
         "unavailable": "defer",
@@ -311,9 +311,9 @@
         "state": "opt-in",
         "selector": {
           "kind": "alias",
-          "value": "sonnet"
+          "value": "opus"
         },
-        "effort": "high",
+        "effort": "medium",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       },
@@ -321,9 +321,9 @@
         "state": "opt-in",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-5.6-terra"
+          "value": "gpt-6-sol"
         },
-        "effort": "high",
+        "effort": "medium",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       },
@@ -343,9 +343,9 @@
         "state": "default",
         "selector": {
           "kind": "alias",
-          "value": "sonnet"
+          "value": "opus"
         },
-        "effort": "high",
+        "effort": "medium",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       },
@@ -353,9 +353,9 @@
         "state": "default",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-5.6-terra"
+          "value": "gpt-6-sol"
         },
-        "effort": "high",
+        "effort": "medium",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       },
@@ -385,7 +385,7 @@
         "state": "default",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-6-astra"
+          "value": "gpt-6-sol"
         },
         "effort": "max",
         "unavailable": "defer",
@@ -397,7 +397,7 @@
           "kind": "model-id",
           "value": "gemini-3.1-pro-high"
         },
-        "effort": "max",
+        "effort": "high",
         "unavailable": "defer",
         "evidence": "dispatch-receipt"
       }
@@ -417,7 +417,7 @@
         "state": "default",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-5.6-terra"
+          "value": "gpt-6-luna"
         },
         "effort": "high",
         "unavailable": "defer",
@@ -470,7 +470,7 @@
         "runner": "codex",
         "selector": {
           "kind": "model-id",
-          "value": "gpt-6-astra"
+          "value": "gpt-6-sol"
         },
         "effort": "max",
         "isolation": "selected-sandbox-network-open-read-only",

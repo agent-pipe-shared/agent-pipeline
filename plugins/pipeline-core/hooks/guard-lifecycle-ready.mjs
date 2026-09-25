@@ -325,7 +325,7 @@ const CONTROLLING_NON_READY_STATUSES = new Set(
 );
 const ARCHITECTURE_ADOPTION_DENIAL_CODE = "GUARD-ARCHITECTURE-ADOPTION-UNRESOLVED";
 const ARCHITECTURE_FITNESS_DENIAL_CODE = "GUARD-ARCHITECTURE-FITNESS-NON-GREEN";
-const MINIMUM_RIGOR_DENIAL_CODE = "GUARD-MINIMUM-RIGOR-FLOOR";
+const MINIMUM_RIGOR_ADVISORY_CODE = "GUARD-MINIMUM-RIGOR-ADVISORY";
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
@@ -501,42 +501,59 @@ function architectureFitnessAuthorityVerdict(root, command, dependencies = {}) {
   }
   if (fitness?.overallStatus === "pass" || fitness?.overallStatus === "excepted") return null;
   const status = typeof fitness?.overallStatus === "string" ? fitness.overallStatus : "unavailable";
+  const remedyIds = (Array.isArray(fitness?.outcomes) ? fitness.outcomes : [])
+    .filter((outcome) => outcome?.outcome === "finding")
+    .flatMap((outcome) => Array.isArray(outcome?.evidence?.remedyComparisons)
+      ? outcome.evidence.remedyComparisons.map((comparison) => ({
+        propertyId: outcome.propertyId,
+        remedyId: comparison?.bestRemedy?.id,
+      })) : [])
+    .filter(({ propertyId, remedyId }) => [propertyId, remedyId].every((id) =>
+      typeof id === "string" && /^[a-z][a-z0-9-]{0,63}$/u.test(id)))
+    .map(({ propertyId, remedyId }) => `${propertyId}:${remedyId}`);
+  const remedyGuidance = remedyIds.length > 0
+    ? `Proposed conformant architecture remedies: ${[...new Set(remedyIds)].slice(0, 5).join(", ")}. Compare them in the planning fitness evidence before changing the plan.\n`
+    : "";
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${ARCHITECTURE_FITNESS_DENIAL_CODE}: planning architecture fitness is ${status}.\n`
+      + remedyGuidance
       + "Resolve new or worsened findings, record a valid exception, or repair the evaluator/profile evidence before requesting implementation authority.\n",
   );
 }
 
 /**
- * The PO may select more rigor, never less. Feed the plan-bound selected
- * profile into the deterministic B1 derivation over the observable working
- * surface, then refuse only a demonstrated under-selection.
+ * B1 is report-only until measured C1 calibration and an explicit PO
+ * promotion decision (Alfred Spec §5.1). The PO may decide the immediate
+ * approach and model at the transition; an absent or disagreeing B1 input
+ * cannot become a second, implicit lifecycle authority gate. Other readiness,
+ * architecture and safety checks still run before this observation.
  */
-function minimumRigorAuthorityVerdict(root, command, dependencies = {}) {
+function minimumRigorObservation(root, command, dependencies = {}) {
   if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
   const selectedProfile = (dependencies.activeFeatureSelectedProfileFn ?? activeFeatureSelectedProfile)(root, dependencies);
   if (selectedProfile === null) {
     return verdict(
-      2,
-      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
-        + `${MINIMUM_RIGOR_DENIAL_CODE}: the active feature has no valid PO-bound lifecycle profile.\n`
-        + "Submit and approve a plan with mini, feature, or epic profile before requesting implementation authority.\n",
+      0,
+      `WARNING (guard-lifecycle-ready): ${MINIMUM_RIGOR_ADVISORY_CODE}: no valid PO-bound lifecycle profile was observed; B1 cannot compare selected and derived rigor. Ask the PO to choose the approach and model. This B1 observation does not block the transition.\n`,
     );
   }
   const surface = (dependencies.activeFeaturePlanningSurfaceFn ?? activeFeaturePlanningSurface)(root, dependencies);
   if (surface === null) {
     return verdict(
-      2,
-      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
-        + `${MINIMUM_RIGOR_DENIAL_CODE}: the active plan has no valid declared implementation surface.\n`
-        + "Repair the PO-bound plan path or declare repository-relative implementation paths before requesting implementation authority.\n",
+      0,
+      `WARNING (guard-lifecycle-ready): ${MINIMUM_RIGOR_ADVISORY_CODE}: no valid declared implementation surface was observed; B1 cannot compare planned and actual paths. Ask the PO to choose the approach and model. This B1 observation does not block the transition.\n`,
     );
   }
   let derived;
+  let actualSurfaceUnavailable = false;
   try {
     const inputs = (dependencies.inferRigorInputsFn ?? inferInputsFromRepo)(root);
+    if (inputs?.actualPaths?.status !== "available" || !Array.isArray(inputs.actualPaths.value)) {
+      actualSurfaceUnavailable = true;
+      throw new Error("actual Git surface unavailable");
+    }
     const actualPaths = Array.isArray(inputs.actualPaths?.value) ? inputs.actualPaths.value : [];
     const observedPaths = [...new Set([...surface.paths, ...actualPaths])];
     inputs.plannedPaths = {
@@ -566,21 +583,25 @@ function minimumRigorAuthorityVerdict(root, command, dependencies = {}) {
   } catch {
     derived = null;
   }
+  if (actualSurfaceUnavailable) {
+    return verdict(
+      0,
+      `WARNING (guard-lifecycle-ready): ${MINIMUM_RIGOR_ADVISORY_CODE}: the actual Git change surface is unavailable; it is unknown, not clean. Ask the PO to choose the approach and model; restore the Git observation for B1 evidence. This B1 observation does not block the transition.\n`,
+    );
+  }
   const validDerivation = derived?.schema === "pipeline.rigor-derivation.v1"
     && new Set(["mini", "feature", "epic"]).has(derived.minProfile)
     && derived.disagreementLog === undefined;
   if (validDerivation) return null;
-  // An incomplete or otherwise malformed derivation is a fail-closed condition.
-  // Its reported profile is not authority evidence and must not be rendered as one.
+  // An incomplete derivation is not a floor or authority claim. It remains a
+  // visible B1 evidence gap, not an implementation-transition refusal.
   const minimum = derived?.schema === "pipeline.rigor-derivation.v1"
     && new Set(["mini", "feature", "epic"]).has(derived.minProfile)
     ? derived.minProfile
     : "unavailable";
   return verdict(
-    2,
-    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
-      + `${MINIMUM_RIGOR_DENIAL_CODE}: the PO-bound ${selectedProfile} profile is below the derived ${minimum} floor.\n`
-      + "Raise the plan profile or resolve the observed material-input uncertainty before requesting implementation authority.\n",
+    0,
+    `WARNING (guard-lifecycle-ready): ${MINIMUM_RIGOR_ADVISORY_CODE}: selected ${selectedProfile}; derived minimum ${minimum}. Record the B1 disagreement and ask the PO to choose the approach and model. This B1 observation does not block the transition.\n`,
   );
 }
 
@@ -5844,7 +5865,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       dependencies,
     );
     if (fitnessVerdict !== null) return fitnessVerdict;
-    const rigorVerdict = minimumRigorAuthorityVerdict(
+    const rigorVerdict = minimumRigorObservation(
       root,
       input.tool_input.command ?? input.tool_input.CommandLine,
       dependencies,

@@ -75,10 +75,12 @@ async function runGuardsInParallel(jobs) {
 }
 
 async function runGuardJobs(jobs) {
-  const parallelJobs = jobs.filter((job) => job.lane === "parallel");
-  const serialJobs = jobs.filter((job) => job.lane === "repository-serial");
-  const results = await runGuardsInParallel(parallelJobs);
-  for (const job of serialJobs) results.push({ job, result: await runGuard(job) });
+  const indexedJobs = jobs.map((job, inputIndex) => ({ ...job, inputIndex }));
+  const parallelJobs = indexedJobs.filter((job) => job.lane === "parallel");
+  const serialJobs = indexedJobs.filter((job) => job.lane === "repository-serial");
+  const results = new Array(jobs.length);
+  for (const entry of await runGuardsInParallel(parallelJobs)) results[entry.job.inputIndex] = entry;
+  for (const job of serialJobs) results[job.inputIndex] = { job, result: await runGuard(job) };
   return results;
 }
 

@@ -57,7 +57,10 @@ import test from "node:test";
 
 import { authorizeCriticalPushCommand, outside, parseHumanArgs, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
-import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { PORTABLE_AGY_AUTHORSHIP_SUBJECT_SCHEMA, portableAgyAuthorshipExportPath,
+  portableAgyAuthorshipIntent, portableAgyAuthorshipRequest } from "../lib/portable-agy-authorship-export.mjs";
+import { PORTABLE_CRITIC_EXPORT_SUBJECT_SCHEMA, portableCriticExportRequest } from "../lib/portable-critic-export.mjs";
 import { CRITICAL_ACTION_KINDS, criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import {
   HGO_SIGNATURE_REASON,
@@ -617,6 +620,135 @@ test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scra
   } finally {
     cleanup(dirs);
   }
+});
+
+function portableAgySigningFixture() {
+  const subject = { schema: PORTABLE_AGY_AUTHORSHIP_SUBJECT_SCHEMA,
+    purpose: "portable-agy-authorship", taskId: "AGY-SIGN-1", runner: "antigravity",
+    model: "gemini-flash", effort: "high", candidateCommit: "a".repeat(40),
+    authoredCommit: "b".repeat(40), authoredTree: "c".repeat(40), parentCommit: "a".repeat(40),
+    changedPaths: ["src/feature.mjs"], routePolicySha256: "d".repeat(64),
+    consentSubjectSha256: "e".repeat(64), consentRecordSha256: "f".repeat(64),
+    resultSha256: "1".repeat(64), reportSha256: "2".repeat(64),
+    recordSha256: "3".repeat(64), hostReceiptSha256: "4".repeat(64), localVerdict: "bound" };
+  return portableAgyAuthorshipRequest({ ok: true,
+    path: portableAgyAuthorshipExportPath(subject.taskId), subject,
+    approvalIntent: portableAgyAuthorshipIntent(subject) });
+}
+
+test("sign-intent discloses the exact redacted Agy authorship export and its non-attestation boundary", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const request = portableAgySigningFixture();
+    const path = "scratch/agy-authorship-export-request-fixture.json";
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(request)}\n`);
+    const prompts = [];
+    const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+      "--directory", dirs.directory, "--request", path],
+    { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+      checkPortableAgyAuthorshipRequest: () => true });
+    assert.equal(result.ok, true);
+    assert.equal(result.intentSha256, request.intentSha256);
+    assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /AGY-SIGN-1/u);
+    assert.ok(prompts[0].includes(request.subject.authoredCommit));
+    assert.ok(prompts[0].includes(request.subject.model));
+    assert.ok(prompts[0].includes(request.exportPath));
+    assert.match(prompts[0], /NOT cryptographic provider model attestation/u);
+  } finally { cleanup(dirs); }
+});
+
+test("sign-intent rejects a tampered portable Agy request before signing", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const request = portableAgySigningFixture();
+    request.subject.model = "forged-model";
+    const path = "scratch/agy-authorship-export-request-tampered.json";
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(request)}\n`);
+    assert.throws(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+      "--directory", dirs.directory, "--request", path],
+    { readConfirmation: () => "approve" }), /does not bind its exact subject and intent digest/u);
+  } finally { cleanup(dirs); }
+});
+
+test("sign-intent refuses a well-shaped portable Agy request without local host and Critic PASS", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const request = portableAgySigningFixture();
+    const path = "scratch/agy-authorship-export-request-unbacked.json";
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(request)}\n`);
+    assert.throws(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+      "--directory", dirs.directory, "--request", path],
+    { readConfirmation: () => { throw new Error("confirmation must not run"); } }),
+    /not bound to a current local host and Critic PASS/u);
+    assert.equal(existsSync(join(dirs.repoRoot, "scratch", "agy-authorship-export-proof-unbacked.json")), false);
+  } finally { cleanup(dirs); }
+});
+
+function portableCriticSigningFixture() {
+  const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
+  const subject = { schema: PORTABLE_CRITIC_EXPORT_SUBJECT_SCHEMA,
+    purpose: "product-capability-final", inventoryPath: "docs/product-capability-inventory.json",
+    candidate, producer: { kind: "consumed-session-critic", packetId: "c".repeat(32),
+      packetDigest: "d".repeat(64), receiptSha256: "e".repeat(64), verdictSha256: "f".repeat(64),
+      reviewRange: { base: "0".repeat(40), commit: candidate.commit, diffSha256: "1".repeat(64) },
+      reviewPass: true } };
+  const approvalIntent = createPoApprovalIntent({ kind: "critic-export", featureId: "sprint-alfred-epic",
+    planSha256: "2".repeat(64), specSha256: "3".repeat(64), candidate,
+    policyRevision: "v1", subjectSha256: createHash("sha256").update(canonical(subject)).digest("hex"),
+    decision: "approve" });
+  return portableCriticExportRequest({ subject, approvalIntent });
+}
+
+test("sign-intent discloses a bound portable Critic export and no release authority", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const request = portableCriticSigningFixture();
+    const path = "scratch/portable-critic-export-request-fixture.json";
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(request)}\n`);
+    const prompts = [];
+    const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+      "--directory", dirs.directory, "--request", path],
+    { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+      checkPortableCriticExportRequest: () => true });
+    assert.equal(result.ok, true);
+    assert.equal(result.intentSha256, request.intentSha256);
+    assert.equal(prompts.length, 1);
+    assert.ok(prompts[0].includes(request.subject.candidate.commit));
+    assert.ok(prompts[0].includes(request.subject.producer.packetId));
+    assert.ok(prompts[0].includes(request.exportPath));
+    assert.match(prompts[0], /does not approve source changes, a release, a push/u);
+  } finally { cleanup(dirs); }
+});
+
+test("sign-intent rejects a changed or unbacked portable Critic request before signing", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const request = portableCriticSigningFixture();
+    const path = "scratch/portable-critic-export-request-fixture.json";
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    request.subject.producer.verdictSha256 = "4".repeat(64);
+    writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(request)}\n`);
+    assert.throws(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+      "--directory", dirs.directory, "--request", path],
+    { readConfirmation: () => { throw new Error("must not ask for approval"); } }),
+    /portable Critic export request does not bind its exact subject/u);
+    const valid = portableCriticSigningFixture();
+    writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify(valid)}\n`);
+    assert.throws(() => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+      "--directory", dirs.directory, "--request", path],
+    { readConfirmation: () => { throw new Error("must not ask for approval"); } }),
+    /not bound to a current consumed private Critic review/u);
+  } finally { cleanup(dirs); }
 });
 
 test("sign-intent discloses the exact reviewed PRD, specification, and checkpoint for a bootstrap acknowledgement request", { skip: REQUIRES_OPENSSL }, () => {

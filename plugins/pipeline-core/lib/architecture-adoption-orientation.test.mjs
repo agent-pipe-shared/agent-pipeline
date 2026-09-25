@@ -43,6 +43,7 @@ test("brownfield without a physical map has an actionable adoption-required read
   assert.equal(result.status, "adoption-required");
   assert.equal(result.adoption.state, "adoption-required");
   assert.equal(result.physicalMap.greenfieldScaffold, false);
+  assert.equal(result.physicalMap.status, "missing");
   assert.match(result.guidance, /staged read-only adoption proposal/u);
 });
 
@@ -54,7 +55,9 @@ test("near-matching inventory cannot turn an existing repository into greenfield
   parsed.modules.push({ id: "invented" });
   writeFileSync(inventory, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
   assert.equal(hasExactGreenfieldDesignPendingScaffold({ rootDir: root }), false);
-  assert.equal(observeArchitectureAdoptionOrientation({ rootDir: root }).status, "adoption-required");
+  const orientation = observeArchitectureAdoptionOrientation({ rootDir: root });
+  assert.equal(orientation.status, "adoption-required");
+  assert.equal(orientation.physicalMap.status, "present-unvalidated");
 });
 
 test("a valid durable adoption decision is shown as a readback, never as physical-map readiness", () => {
@@ -73,6 +76,6 @@ test("a valid durable adoption decision is shown as a readback, never as physica
   });
   assert.equal(result.status, "decision-recorded");
   assert.equal(result.adoption.decisionRef, "po-architecture-17");
-  assert.equal(result.physicalMap.status, "not-classified");
-  assert.match(result.guidance, /implementation boundary/u);
+  assert.equal(result.physicalMap.status, "missing");
+  assert.match(result.guidance, /physical map index is missing/u);
 });

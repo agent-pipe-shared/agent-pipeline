@@ -8,6 +8,7 @@
  * advisory request into a different runner/profile route by editing one cell.
  */
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,10 +38,12 @@ function freeze(value) {
 }
 
 const FROZEN_REGISTRY = freeze(readJson(REGISTRY_PATH));
+const REGISTRY_SHA256 = createHash("sha256").update(readFileSync(REGISTRY_PATH)).digest("hex");
 const USER_SCHEMA = freeze(readJson(USER_SCHEMA_PATH));
 
 export const RUNNER_PROFILES_V3_REGISTRY_PATH = REGISTRY_PATH;
 export const PIPELINE_USER_V3_SCHEMA_PATH = USER_SCHEMA_PATH;
+export const RUNNER_PROFILES_V3_REGISTRY_SHA256 = REGISTRY_SHA256;
 /**
  * How a human clears the push gate (ADR-0056).
  *
@@ -255,8 +258,9 @@ function validateRoot(value, errors) {
   }
   const required = ["schema", "language", "agent_runtime", "runners", "routing", "usage", "autonomy", "gates", "critic_export"];
   for (const key of required) if (!Object.hasOwn(value, key)) add(errors, `$.${key}`, "required", "required property is missing", "add the required property");
-  for (const key of Object.keys(value)) if (![...required, "roles", "session", "advisor_export"].includes(key)) add(errors, `$.${key}`, "additional_property", "property is not part of pipeline.user.v3", "remove the unregistered property");
+  for (const key of Object.keys(value)) if (![...required, "roles", "session", "advisor_export", "core_registry_sha256"].includes(key)) add(errors, `$.${key}`, "additional_property", "property is not part of pipeline.user.v3", "remove the unregistered property");
   if (value.schema !== "pipeline.user.v3") add(errors, "$.schema", "const", "schema must be pipeline.user.v3", "use pipeline.user.v3");
+  if (Object.hasOwn(value, "core_registry_sha256") && value.core_registry_sha256 !== REGISTRY_SHA256) add(errors, "$.core_registry_sha256", "frozen_mapping", "source was produced by a different Core registry", "use a compatible installed Core; never downgrade this source with an older plugin");
   if (validateClosedObject(value.language, "$.language", ["human_facing", "agent_facing"], errors, "supply exactly both approved language values")
     && (!["de", "en"].includes(value.language.human_facing) || !["de", "en"].includes(value.language.agent_facing))) add(errors, "$.language", "contract", "language must declare approved human and agent languages", "supply both approved language values");
   if (!["claude-code", "other"].includes(value.agent_runtime)) add(errors, "$.agent_runtime", "enum", "agent runtime is not registered", "use claude-code or other");

@@ -103,6 +103,34 @@ test("finish-feature resumes a prepared real close without duplicating the audit
   assert.deepEqual(readFileSync(join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md")), original);
   assert.equal(JSON.parse(readFileSync(f.statePath)).closedFeatures.length, 1);
 });
+test("finish-feature recovers a lost final response from real closed State without duplicating effects", t => {
+  const f = fixture(t);
+  const input = { rootDir: f.root, by: "PO", architectureImpact: "no-architecture-impact",
+    auditRequest: "evidence/audit-request.json", criticVerifyLifecycle: f.lifecycle.receipt.id,
+    continuityCloseRequest: "evidence/close-request.json" };
+  const first = finishFeature({ ...input, lifecycleId: "close-audit" });
+  assert.equal(first.status, "closed");
+  const stateBefore = readFileSync(f.statePath);
+  const bundlePath = join(f.root, "audit-bundles", "audit-feature", f.candidate.commit, "README.md");
+  const bundleBefore = readFileSync(bundlePath);
+  const replay = spawnSync(process.execPath, [FINISH, "--root", f.root, "--by", "PO",
+    "--architecture-impact", "no-architecture-impact", "--audit-request", input.auditRequest,
+    "--critic-verify-lifecycle", input.criticVerifyLifecycle,
+    "--continuity-close-request", input.continuityCloseRequest,
+    "--resume-lifecycle-id", "close-audit"], {
+    cwd: f.root, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: f.root },
+  });
+  assert.equal(replay.status, 0, replay.stderr || replay.stdout);
+  const recovered = JSON.parse(replay.stdout);
+  assert.equal(recovered.status, "closed");
+  assert.equal(recovered.closeOutput, "already-closed");
+  assert.deepEqual(readFileSync(f.statePath), stateBefore);
+  assert.deepEqual(readFileSync(bundlePath), bundleBefore);
+  assert.equal(JSON.parse(stateBefore).closedFeatures.length, 1);
+  assert.throws(() => finishFeature({ ...input, by: "Different actor", resumeLifecycleId: "close-audit" }),
+    error => error.code === "FINISH-RESUME-CLOSED-MISMATCH");
+  assert.deepEqual(readFileSync(f.statePath), stateBefore);
+});
 test("altered public Verify bytes after preparation refuse the final State close without mutation", t => {
   const f = prepare(t); const before = readFileSync(f.statePath);
   put(f.root, "specs/audit-feature/verify.json", JSON.stringify({ schema: "pipeline.verify-evidence.v0", exitCode: 0, candidate: f.candidate, forged: true }));

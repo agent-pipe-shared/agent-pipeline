@@ -7,6 +7,7 @@
   "additionalProperties": false,
   "properties": {
     "schema": { "const": "pipeline.user.v3" },
+    "core_registry_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "language": { "$ref": "#/$defs/language" },
     "agent_runtime": { "enum": ["claude-code", "other"] },
     "runners": { "$ref": "#/$defs/runners" },

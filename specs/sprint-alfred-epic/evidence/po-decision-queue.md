@@ -1,6 +1,6 @@
 # Alfred autonomous continuation — PO decision queue
 
-Updated 2026-09-18. This is the collection point for decisions that genuinely
+Updated 2026-09-25. This is the collection point for decisions that genuinely
 need the PO during the approved Alfred continuation. It is not a new approval
 mechanism, a substitute for signed gates, or a record of feature acceptance.
 
@@ -21,6 +21,43 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
   or a typed hard block without a safe recovery route.
 
 ## PO decisions
+
+### 2026-09-25 — 0.7 candidate boundaries clarified in chat
+
+- The PO performs the clean candidate installation. Agents prepare and
+  qualify the clean source, then stamp its three runner manifests; a stamp
+  does not imply an installed-host or release PASS.
+- For Claude cache-versioned command permissions, an already expressly
+  confirmed, complete Pipeline permission family may be moved to a new
+  version without asking again **only after** visible digest and installed-
+  identity readback. Foreign, broadened or incomplete families remain
+  blocked. This is not a general wildcard grant or approval of an unknown
+  installation. The existing canonicalization planner alone does not prove
+  host wiring of this decision.
+- The earlier read-only interpretation of `efficient` was superseded by the
+  PO's explicit clarification: Luna may also write repository files. The
+  MP-02/MP-03 Mechanic writing floor remains, but a functional role or
+  provider product name does not itself establish a model's position relative
+  to that floor. Bounded writing needs an approved, checked exact model/duty
+  route; bootstrap acknowledgement alone cannot provide that authority.
+- Historical ADRs lacking a safe machine-readable applicability mapping are
+  visibly `advisory`, not guessed into scope and not an implementation stop
+  solely for that reason. Malformed governed records, invalid supersession
+  and unverified waivers still block the affected decision projection.
+- For Agy A1/E3, design a separately approvable lower-assurance proof model
+  if isolated testing cannot establish that the transcript channel is
+  independent of the Agent tool. No JSON marker becomes native attestation
+  merely by being present; the weaker model needs its own explicit approval.
+- The old HA Verify/BOM diagnosis files are absent. Do not request the same
+  missing files again. The PO will re-test in the HA consumer repo with the
+  then-current plugin path; record this as deferred operational evidence, not
+  as a verified repair or a technical PASS.
+- AC-7/B1 remains report-only at the design-to-implementation transition.
+  A derived rigor disagreement, unavailable Git observation or missing B1
+  input is a visible advisory, never a standalone transition deadlock. The
+  PO may choose the immediate approach and model. Independent readiness,
+  architecture-fitness, signature and safety gates are not waived. Enforcing
+  B1 later needs measured C1 calibration and a separate PO promotion.
 
 ### 2026-09-19 — Dispatched design, Advisor and independent readiness
 

@@ -57,6 +57,13 @@ test("modelBelongsToFamily: supported aliases and concrete forms require a token
   }
 });
 
+test("modelBelongsToFamily: unknown frontmatter aliases cannot authorize a new model by prefix", () => {
+  assert.equal(modelBelongsToFamily("gpt-6-sol", "gpt"), false);
+  assert.equal(modelBelongsToFamily("renamed-worker-2", "renamed-worker"), false);
+  assert.equal(modelBelongsToFamily("toString", "toString"), false);
+  assert.equal(modelBelongsToFamily("__proto__", "__proto__"), false);
+});
+
 test("modelBelongsToFamily is the discriminating check the incident needed: opus vs. sonnet, xhigh unchanged", () => {
   // The exact incident shape: briefed "claude-opus-5 at xhigh" against a sonnet/xhigh agent.
   // Effort (xhigh) matches on both sides; model family is what silently diverged.
@@ -78,6 +85,14 @@ test("compareRecordedModel: recorded model reproduces the exact 2026-08-08 incid
   const outcome = compareRecordedModel({ agentType: "goldfish-deep", model: "claude-opus-5", effort: "xhigh" });
   assert.equal(outcome.classification, "model-mismatch");
   assert.match(outcome.reason, /goldfish-deep/u);
+});
+
+test("compareRecordedModel: v4 Antigravity model cannot be judged by Claude agent frontmatter", () => {
+  const record = { schema: "pipeline.dispatch-record.v4", runner: "antigravity", agentType: "goldfish-implementor", model: "gemini-3.8-flash-high", effort: "high" };
+  const outcome = compareRecordedModel(record);
+  assert.equal(outcome.classification, "runner-model-authority-required");
+  assert.match(outcome.reason, /host-observed model and consent/u);
+  assert.equal(compareRecordedModel({ ...record, runner: "claude", model: "claude-sonnet-5", effort: "medium" }).classification, "model-matches");
 });
 
 test("compareRecordedModel: a well-formed modelOverride is honoured and reported as an override, not a mismatch", () => {

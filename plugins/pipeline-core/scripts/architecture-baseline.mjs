@@ -12,6 +12,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { inspectEffectiveArchitectureDecisions } from "../lib/architecture-effective-decisions.mjs";
 
 export const SCHEMA_BASELINE_RESULT = "pipeline.architecture-baseline-result.v1";
 export const SCHEMA_DECISION = "pipeline.architecture-decision.v1";
@@ -386,7 +387,6 @@ export function compileDecisionSummary(root, options = {}) {
   const summaryFile = options.outputPath || path.join(root, "project", "architecture-decisions.compiled.json");
 
   const decisions = [];
-  const activeExceptions = [];
 
   if (fs.existsSync(adrDir)) {
     const entries = fs.readdirSync(adrDir).sort();
@@ -404,12 +404,8 @@ export function compileDecisionSummary(root, options = {}) {
               supersedes: raw.supersedes || null,
               exception: raw.exception || null
             });
-            if (raw.status === "waived" && raw.exception) {
-              activeExceptions.push({
-                decisionId: raw.id,
-                ...raw.exception
-              });
-            }
+            // A self-declared `waived` sidecar is not a human-authorized active
+            // exception. Effective status is resolved separately below.
           }
         } catch {
           // ignore malformed
@@ -438,12 +434,25 @@ export function compileDecisionSummary(root, options = {}) {
     }
   }
 
+  const effective = inspectEffectiveArchitectureDecisions({
+    rootDir: root,
+    area: "project",
+    now: options.now ?? new Date().toISOString(),
+  });
   const payload = {
     schema: SCHEMA_DECISION_SUMMARY,
     compiledAt: new Date().toISOString(),
+    authorityStatus: effective.status === "ready" ? "source-validated" : "inventory-only",
+    effectiveProjection: {
+      status: effective.status,
+      code: effective.code,
+      projectionSha256: effective.projectionSha256,
+      decisionIds: effective.decisions.map(({ id }) => id),
+      findings: effective.findings,
+    },
     count: decisions.length,
     decisions,
-    activeExceptions
+    activeExceptions: effective.activeExceptions,
   };
 
   if (options.write !== false) {

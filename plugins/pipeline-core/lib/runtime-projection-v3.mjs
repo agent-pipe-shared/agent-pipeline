@@ -174,14 +174,15 @@ function v2CompatibilityIntent(intent) {
   // Repository export consent gates advisory dispatch only. It has no runtime
   // projection and must not leak into the closed V2 byte-rendering kernel.
   delete compatibilityIntent.advisor_export;
-  // `gates.human_approval` records the common Human-Gate approval mode, while
-  // `gates.push_approval` keeps the existing push gate aligned with it. Both are
-  // V3-only settings with no V2 byte rendering and would otherwise be rejected by
-  // V2's own closed gates key set.
+  delete compatibilityIntent.core_registry_sha256;
+  // V3-only approval and external-ledger settings have no V2 byte rendering.
+  // Keep them in the source intent, but never feed them to V2's closed kernel.
   if (compatibilityIntent.gates !== null && typeof compatibilityIntent.gates === "object") {
     compatibilityIntent.gates = { ...compatibilityIntent.gates };
     delete compatibilityIntent.gates.human_approval;
     delete compatibilityIntent.gates.push_approval;
+    delete compatibilityIntent.gates.reconcile_approval;
+    delete compatibilityIntent.gates.push_external_ledger;
   }
   if (compatibilityIntent.runners !== null && typeof compatibilityIntent.runners === "object") {
     const v2Enabled = (compatibilityIntent.runners.enabled ?? []).filter((r) => ["claude", "codex"].includes(r));

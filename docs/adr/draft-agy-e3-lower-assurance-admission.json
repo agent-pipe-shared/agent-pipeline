@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-agy-e3-lower-assurance-admission",
+  "title": "Explicit lower-assurance Agy E3 admission",
+  "status": "proposed",
+  "digest": "ba4f94b031dbc5ccd41aff807f07c323d969fbc43f5bc6dcc8697ef75ffb1b21",
+  "scope": "project",
+  "date": "2026-09-25"
+}

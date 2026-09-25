@@ -45,6 +45,7 @@ const RETURN_COMPLETION_KEYS = new Set(["identity", "taskId", "resultSha256", "c
 const RETURN_ADAPTER_KEYS = new Set(["writeDispatchRecord", "verifyCommit"]);
 const RETURN_RECEIPT_KEYS = new Set(["schema", "target", "sha256", "bytes", "taskId", "candidateCommit", "resultSha256"]);
 const RETURN_NONAUTHORING_RECEIPT_KEYS = new Set([...RETURN_RECEIPT_KEYS, "outcomeClassification"]);
+const RETURN_UNDELIVERED_RECEIPT_KEYS = new Set([...RETURN_NONAUTHORING_RECEIPT_KEYS, "observationIdentity"]);
 const RETURN_AUTHORSHIP_KEYS = new Set([
   "sha", "verdict", "classification", "reason", "taskId", "modelCheck", "orchestratorAddedFiles",
 ]);
@@ -92,18 +93,24 @@ function validReturnAuthorship(value) {
 }
 
 function validReturnReceipt(value) {
-  const base = (allowed) => exactKeyCount(value, allowed)
+  const base = (allowed, undelivered = false) => exactKeyCount(value, allowed)
     && typeof value.target === "string"
     && normalizedRepositoryPath(value.target)
     && SHA256.test(value.sha256)
     && Number.isSafeInteger(value.bytes) && value.bytes > 0
     && typeof value.taskId === "string" && SAFE_ID.test(value.taskId)
     && FULL_COMMIT.test(value.candidateCommit)
-    && SHA256.test(value.resultSha256);
+    && (undelivered ? value.resultSha256 === null : SHA256.test(value.resultSha256));
   if (value?.schema === "pipeline.dispatch-record-write-receipt.v1") return base(RETURN_RECEIPT_KEYS);
-  if (value?.schema !== NONAUTHORING_RECEIPT_SCHEMA || !base(RETURN_NONAUTHORING_RECEIPT_KEYS)
-    || !exactKeyCount(value.outcomeClassification, new Set(["schema", "kind"]))) return false;
-  return value.outcomeClassification.schema === OUTCOME_CLASSIFICATION_SCHEMA
+  if (value?.schema !== NONAUTHORING_RECEIPT_SCHEMA
+    || !exactKeyCount(value.outcomeClassification, new Set(["schema", "kind"]))
+    || value.outcomeClassification.schema !== OUTCOME_CLASSIFICATION_SCHEMA) return false;
+  if (value.outcomeClassification.kind === "completed-undelivered") {
+    return base(RETURN_UNDELIVERED_RECEIPT_KEYS, true)
+      && exactKeyCount(value.observationIdentity, new Set(["dispatchId", "attemptId"]))
+      && Object.values(value.observationIdentity).every((id) => typeof id === "string" && SAFE_ID.test(id));
+  }
+  return base(RETURN_NONAUTHORING_RECEIPT_KEYS)
     && new Set(["read-only", "stopped-without-commit"]).has(value.outcomeClassification.kind);
 }
 
@@ -356,8 +363,9 @@ export function coordinateWorkflowRunnerReturn(expected, observation, completion
     state: normalized.state,
     resultSha256: normalized.resultSha256,
   };
-  const acceptedTerminalCodes = new Set(["WR-OUTCOME-FINAL", "WR-OUTCOME-PRODUCT-BLOCKED"]);
-  if (!normalized.ok || !acceptedTerminalCodes.has(normalized.code) || normalized.resultSha256 === null) {
+  const acceptedTerminalCodes = new Set(["WR-OUTCOME-FINAL", "WR-OUTCOME-PRODUCT-BLOCKED", "WR-OUTCOME-COMPLETED-UNDELIVERED"]);
+  if (!normalized.ok || !acceptedTerminalCodes.has(normalized.code)
+    || (normalized.resultSha256 === null && normalized.code !== "WR-OUTCOME-COMPLETED-UNDELIVERED")) {
     return { ok: false, code: normalized.code, ...base, record: null, adapterInvocations: 0 };
   }
   if (typeof expected?.taskId !== "string" || !SAFE_ID.test(expected.taskId)
@@ -398,13 +406,17 @@ export function coordinateWorkflowRunnerReturn(expected, observation, completion
   }
   if (receipt.schema === NONAUTHORING_RECEIPT_SCHEMA) {
     const kind = receipt.outcomeClassification.kind;
-    const expectedCode = kind === "read-only" ? "WR-OUTCOME-FINAL" : "WR-OUTCOME-PRODUCT-BLOCKED";
-    if (normalized.code !== expectedCode) {
+    const expectedCode = kind === "read-only" ? "WR-OUTCOME-FINAL"
+      : kind === "completed-undelivered" ? "WR-OUTCOME-COMPLETED-UNDELIVERED" : "WR-OUTCOME-PRODUCT-BLOCKED";
+    if (normalized.code !== expectedCode
+      || (kind === "completed-undelivered"
+        && (receipt.observationIdentity.dispatchId !== normalized.identity.dispatchId
+          || receipt.observationIdentity.attemptId !== normalized.identity.attemptId))) {
       return { ok: false, code: "WR-RECORD-UNVERIFIED", ...base, record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "not-applicable" }, adapterInvocations: 1 };
     }
     return {
       ok: true,
-      code: "WR-OUTCOME-NONAUTHORING-RECORDED",
+      code: kind === "completed-undelivered" ? "WR-OUTCOME-UNDELIVERED-RECORDED" : "WR-OUTCOME-NONAUTHORING-RECORDED",
       ...base,
       record: { sha256: receipt.sha256, bytes: receipt.bytes, authorship: "not-applicable", outcomeClassification: kind },
       adapterInvocations: 1,
@@ -444,5 +456,6 @@ export const WORKFLOW_RUNNER_CODES = Object.freeze([
   "WR-OUTCOME-PRODUCT-FAILED", "WR-OUTCOME-PRODUCT-BLOCKED", "WR-OUTCOME-ENVIRONMENT-FAILED", "WR-OUTCOME-UNKNOWN-FAILED",
   "WR-RECORD-BINDING", "WR-RECORD-ADAPTER", "WR-RECORD-WRITE-FAILED", "WR-RECORD-UNVERIFIED",
   "WR-OUTCOME-FINAL-RECORDED", "WR-OUTCOME-NONAUTHORING-RECORDED",
+  "WR-OUTCOME-UNDELIVERED-RECORDED",
   ...Object.values(PREFLIGHT_CODE_MAP),
 ]);

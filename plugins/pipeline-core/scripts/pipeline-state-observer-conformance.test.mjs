@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
- * Exhaustive writer/observer conformance verification suite per PRD §7 AC-3 / WP-A5(ii).
+ * Core lifecycle writer/observer conformance suite per PRD §7 AC-3 / WP-A5(ii).
  *
- * Asserts that all sanctioned pipeline-state.mjs transition verbs:
- *   init, set-feature, submit-plan, approve-plan, set-phase, close-feature, discard-feature
+ * Asserts that the following primary pipeline-state.mjs transition verbs:
+ *   init, continuity-init, set-feature, submit-plan, present-plan,
+ *   cancel-submitted-plan, approve-plan, reopen-design, revoke-plan, set-phase,
+ *   close-feature, discard-feature
  * produce machine states that are accepted without error by BOTH:
  *   1. classifyOnboardingContinuity (plugins/pipeline-core/lib/onboarding-continuity.mjs)
  *   2. observeSessionCleanupState (plugins/pipeline-core/lib/onboarding-continuity.mjs)
@@ -11,6 +13,9 @@
  * Specifically verifies that after discard-feature (from an active feature with null Result),
  * observeSessionCleanupState does NOT throw SESSION-CLEANUP-STATE-MALFORMED and
  * classifyOnboardingContinuity classifies the state as valid.
+ * This is not an exhaustive inventory of the CLI's sanctioned commands;
+ * authority/recovery, deployment/publication and newer continuity verbs need
+ * separate positive writer-to-observer evidence before AC-3 can be claimed.
  */
 
 import assert from "node:assert/strict";
@@ -21,6 +26,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { run, statePath as resolveStatePath } from "./pipeline-state.mjs";
+import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import {
   classifyOnboardingContinuity,
   observeSessionCleanupState,
@@ -227,6 +233,28 @@ test("conformance: submit-plan verb produces state accepted by both observers", 
   }
 });
 
+test("conformance: cancel-submitted-plan returns the active feature to a state accepted by both observers", () => {
+  const root = tempRoot("cancel-submitted-plan");
+  try {
+    const featureId = "feature-cancel-submission";
+    const planPath = `specs/${featureId}/prd.md`;
+    const specPath = `specs/${featureId}/spec.md`;
+    mkdirSync(join(root, "specs", featureId), { recursive: true });
+    writeFileSync(join(root, planPath), `# PRD for ${featureId}\n\nRequirements.\n`);
+    writeFileSync(join(root, specPath), `# Spec for ${featureId}\n\nDetails.\n`);
+    const deps = createDeps(root, featureId, planPath, specPath);
+    assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
+    initContinuity(root, featureId, planPath, specPath, deps);
+    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
+    const submitted = JSON.parse(readFileSync(resolveStatePath(root), "utf8"));
+    assert.equal(run(["cancel-submitted-plan", "--by", "PO", "--submission-sha256", sha256CanonicalJson(submitted.planSubmission)], deps), 0);
+    const { classification, cleanupState } = assertObserverConformance(root, "cancel-submitted-plan");
+    assert.equal(classification.status, "valid");
+    assert.equal(cleanupState.mode, "active");
+    assert.equal(cleanupState.activeFeatureId, featureId);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("conformance: approve-plan verb produces state accepted by both observers", () => {
   const root = tempRoot("approve-plan");
   try {
@@ -242,6 +270,7 @@ test("conformance: approve-plan verb produces state accepted by both observers",
     initContinuity(root, featureId, planPath, specPath, deps);
     assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
     assert.equal(run(["present-plan", "--by", "Elephant"], deps), 0);
+    assertObserverConformance(root, "present-plan");
 
     const exit = run(["approve-plan", "--by", "PO"], deps);
     assert.equal(exit, 0);
@@ -253,6 +282,52 @@ test("conformance: approve-plan verb produces state accepted by both observers",
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("conformance: reopen-design after approved plan produces state accepted by both observers", () => {
+  const root = tempRoot("reopen-design");
+  try {
+    const featureId = "feature-reopen";
+    const planPath = `specs/${featureId}/prd.md`;
+    const specPath = `specs/${featureId}/spec.md`;
+    mkdirSync(join(root, "specs", featureId), { recursive: true });
+    writeFileSync(join(root, planPath), `# PRD for ${featureId}\n\nRequirements.\n`);
+    writeFileSync(join(root, specPath), `# Spec for ${featureId}\n\nDetails.\n`);
+    const deps = createDeps(root, featureId, planPath, specPath);
+    assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
+    initContinuity(root, featureId, planPath, specPath, deps);
+    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
+    assert.equal(run(["present-plan", "--by", "Elephant"], deps), 0);
+    assert.equal(run(["approve-plan", "--by", "PO"], deps), 0);
+    assert.equal(run(["reopen-design", "--by", "PO"], deps), 0);
+    const { classification, cleanupState } = assertObserverConformance(root, "reopen-design");
+    assert.equal(classification.status, "valid");
+    assert.equal(cleanupState.mode, "active");
+    assert.equal(cleanupState.activeFeatureId, featureId);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("conformance: revoke-plan after approved plan produces state accepted by both observers", () => {
+  const root = tempRoot("revoke-plan");
+  try {
+    const featureId = "feature-revoke";
+    const planPath = `specs/${featureId}/prd.md`;
+    const specPath = `specs/${featureId}/spec.md`;
+    mkdirSync(join(root, "specs", featureId), { recursive: true });
+    writeFileSync(join(root, planPath), `# PRD for ${featureId}\n\nRequirements.\n`);
+    writeFileSync(join(root, specPath), `# Spec for ${featureId}\n\nDetails.\n`);
+    const deps = createDeps(root, featureId, planPath, specPath);
+    assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
+    initContinuity(root, featureId, planPath, specPath, deps);
+    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
+    assert.equal(run(["present-plan", "--by", "Elephant"], deps), 0);
+    assert.equal(run(["approve-plan", "--by", "PO"], deps), 0);
+    assert.equal(run(["revoke-plan", "--by", "PO"], deps), 0);
+    const { classification, cleanupState } = assertObserverConformance(root, "revoke-plan");
+    assert.equal(classification.status, "valid");
+    assert.equal(cleanupState.mode, "active");
+    assert.equal(cleanupState.activeFeatureId, featureId);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("conformance: set-phase verb produces state accepted by both observers", () => {

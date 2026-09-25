@@ -14,6 +14,18 @@ its findings and recording its committed binding do not require a PO decision.
 A later push, publication or release still uses its separately configured
 gates.
 
+For any review mode, limit one documentation course to four complete
+two-stage rounds and three public-document correction cycles. Count a
+correction batch once even if it spans several commits. Preserve the count and
+remaining findings across sessions; an evidence-only commit or new round ID
+does not reset it. Count actual earlier rounds of an active course; do not
+retroactively invalidate a completed binding. At exhaustion, stop automatic
+edits and reader dispatches,
+then present an explicit documentation-owner course decision with the remaining
+findings and options. Involve the PO only when existing authority rules require
+it. A new course decision cannot itself close a finding or replace a fresh
+final review.
+
 ## Choose the binding mode
 
 Confirm Agent-Pipeline source-checkout identity before selecting the
@@ -44,8 +56,8 @@ basenames never select source-bound mode.
    moving candidate. Run the checker's `--snapshot` mode and retain the exact
    committed paths and digests it returns.
 2. Dispatch phase one as a fresh read-only subagent with no conversation
-   history. Pass only the fixed candidate and the eleven document paths from
-   the snapshot. Do not disclose source, diffs, history, capability inventory,
+   history. Pass only the fixed candidate and every document path returned by
+   the checker's snapshot. Do not disclose source, diffs, history, capability inventory,
    governance, this protocol, earlier reports or desired conclusions. Request
    only cuts, reorderings and file/line findings, with no replacement prose.
 3. Save the returned report unchanged at
@@ -61,7 +73,8 @@ basenames never select source-bound mode.
    finding in `disposition/<round>.json` with the protocol's closed schema.
    Resolve applicable findings in the public documents. If any covered document
    changes, commit that state and restart both phases with a new round; reports
-   from the previous document state cannot close the review.
+   from the previous document state cannot close the review. Apply the course
+   limit above; never claim a passing binding from an unfinished course.
 6. On the first round needing no further public-document edits, commit the two
    reports and disposition. Derive `record.json` from a fresh checker snapshot,
    commit it last, and run the checker without `--snapshot` against that exact

@@ -14,6 +14,12 @@
       "nonOverlapNote": "Unique test suite for architecture-baseline.mjs"
     },
     {
+      "name": "architecture-effective-decisions-tests",
+      "file": "plugins/pipeline-core/lib/architecture-effective-decisions.test.mjs",
+      "invariantPinned": "Validated effective ADR identity, unresolved legacy authority, and typed parity divergence",
+      "nonOverlapNote": "Unique fail-closed decision-estate projection tests; baseline significance tests do not resolve effective decisions"
+    },
+    {
       "name": "architecture-fitness-tests",
       "file": "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
       "invariantPinned": "Architecture fitness functions evaluation and threshold adherence",
@@ -168,6 +174,30 @@
       "file": "plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs"
+    },
+    {
+      "name": "portable-critic-export-tests",
+      "file": "plugins/pipeline-core/lib/portable-critic-export.test.mjs",
+      "invariantPinned": "Anchored detached-signature and exact candidate binding for a redacted Critic export",
+      "nonOverlapNote": "Unique portable export contract; private Critic lifecycle checks remain in critic-verify-lifecycle-tests"
+    },
+    {
+      "name": "portable-critic-export-cli-tests",
+      "file": "plugins/pipeline-core/scripts/portable-critic-export.test.mjs",
+      "invariantPinned": "A consumed Critic receipt prepares one exact signer-visible request; an anchored proof exclusively publishes the clone-portable export and dirty candidate or drift fail closed",
+      "nonOverlapNote": "Unique host preparation and publication coverage; the redacted signature contract and private Critic lifecycle have separate suites"
+    },
+    {
+      "name": "portable-agy-authorship-export-tests",
+      "file": "plugins/pipeline-core/lib/portable-agy-authorship-export.test.mjs",
+      "invariantPinned": "A locally checked Agy host receipt may be exported only through a signed redacted subject; fresh-clone Git, trust-anchor and tamper readbacks fail closed",
+      "nonOverlapNote": "Unique portable Agy authorship export contract; private host receipt and commit admission have separate suites"
+    },
+    {
+      "name": "portable-agy-authorship-export-cli-tests",
+      "file": "plugins/pipeline-core/scripts/portable-agy-authorship-export.test.mjs",
+      "invariantPinned": "Agy signature-request and export publication use exclusive inode-checked writes, refuse aliases or absent local authorship evidence, and validate a detached proof before committed clone readback",
+      "nonOverlapNote": "Unique host CLI publication coverage; the portable export contract and clone readback are tested separately"
     },
     {
       "name": "critical-action-authorization-chat-tests",

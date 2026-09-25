@@ -46,6 +46,24 @@ test("malformed physical map blocks even with an authorized adoption disposition
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("a materialized map without a project-owned AGENTS pointer has an actionable typed refusal", () => {
+  const root = fixture();
+  try {
+    cpSync(join(repoRoot, "architecture"), join(root, "architecture"), { recursive: true });
+    const options = { rootDir: root, deps: { checkPlanningAdoptionDisposition: readyDisposition } };
+    const missing = inspectArchitectureEntryReadiness(options);
+    assert.equal(missing.status, "blocked");
+    assert.equal(missing.code, "ARCHITECTURE-ENTRY-MISSING");
+    assert.equal(missing.nextAction.kind, "repair-required");
+    assert.equal(missing.nextAction.path, "AGENTS.md");
+    writeFileSync(join(root, "AGENTS.md"), "# Existing project instructions\n");
+    const stale = inspectArchitectureEntryReadiness(options);
+    assert.equal(stale.code, "ARCHITECTURE-ENTRY-MAP-POINTER-MISSING");
+    assert.equal(stale.nextAction.kind, "repair-required");
+    assert.equal(existsSync(join(root, "AGENTS.md")), true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("a PO-deferred adoption reports complete fitness observations without enforcing them", () => {
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,
@@ -99,6 +117,7 @@ test("real signed approved-scoped adoption reaches the physical readiness gate",
   const root = fixture();
   try {
     cpSync(join(repoRoot, "architecture"), join(root, "architecture"), { recursive: true });
+    cpSync(join(repoRoot, "AGENTS.md"), join(root, "AGENTS.md"));
     cpSync(join(repoRoot, "backlog"), join(root, "backlog"), { recursive: true });
     cpSync(join(repoRoot, "harness"), join(root, "harness"), { recursive: true });
     cpSync(join(repoRoot, "plugins/pipeline-core"), join(root, "plugins/pipeline-core"), { recursive: true });

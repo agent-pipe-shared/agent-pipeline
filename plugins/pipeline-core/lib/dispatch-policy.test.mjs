@@ -303,6 +303,81 @@ const fixtureCheck = (label, run) => check(label, async () => {
     assert.equal(preflightRoleDispatch({ root: dispatchFixture, packet }).code, "RDP-RESULT-DESTINATION");
   });
 
+  fixtureCheck("DP18g one malformed packet reports independent static faults before launch", async () => {
+    const packet = packetFor("consult-advisor", 187);
+    packet.dispatchId = "INVALID ID";
+    packet.candidate.tree = "not-an-oid";
+    packet.requiredPathSha256["input.txt"] = "bad-digest";
+    packet.resultPath = "../unsafe.json";
+    let launches = 0;
+    const result = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: [packet],
+      launch: async () => { launches += 1; },
+    });
+    assert.equal(result.status, "rejected");
+    assert.equal(result.preparations[0].code, "RDP-DISPATCH-ID");
+    assert.deepEqual(result.preparations[0].findings, [
+      { code: "RDP-DISPATCH-ID", field: "dispatchId" },
+      { code: "RDP-CANDIDATE-SHAPE", field: "candidate" },
+      { code: "RDP-REQUIRED-DIGESTS", field: "requiredPathSha256" },
+      { code: "RDP-RESULT-PATH", field: "resultPath" },
+    ]);
+    assert.equal(result.modelCalls, 0);
+    assert.equal(result.launcherCalls, 0);
+    assert.equal(launches, 0);
+  });
+
+  fixtureCheck("DP18h independent role-policy faults are all log-safe and prelaunch", () => {
+    const packet = packetFor("critic", 188);
+    packet.prompt = "WHAT THE CHANGE CLAIMS\nADVERSARIAL FOCUS";
+    const result = preflightRoleDispatch({ root: dispatchFixture, packet });
+    assert.equal(result.status, "rejected");
+    assert.equal(result.code, "DBB-BASE-CAP-MISSING");
+    assert.deepEqual(result.findings.map(({ code }) => code), [
+      "DBB-BASE-CAP-MISSING",
+      "DISPATCH-CONTAMINATION-CLAIMS-LIST",
+      "DISPATCH-CONTAMINATION-HUNT-LIST",
+      "DISPATCH-NO-RULESET-SHA",
+      "DISPATCH-NO-MODEL",
+    ]);
+    assert.ok(!JSON.stringify(result).includes(packet.prompt));
+    assert.equal(result.modelCalls, 0);
+    assert.equal(result.launcherCalls, 0);
+  });
+
+  fixtureCheck("DP18i independent missing candidate inputs and result destination are reported together", async () => {
+    const packet = packetFor("consult-advisor", 189, ["absent-a.txt", "absent-b.txt"]);
+    packet.resultPath = "missing-parent/result.json";
+    let launches = 0;
+    const result = await runRoleDispatchBatch({
+      root: dispatchFixture,
+      packets: [packet],
+      launch: async () => { launches += 1; },
+    });
+    assert.equal(result.status, "rejected");
+    assert.deepEqual(result.preparations[0].findings, [
+      { code: "RDP-REQUIRED-PATH", field: "requiredPaths[0]" },
+      { code: "RDP-REQUIRED-PATH", field: "requiredPaths[1]" },
+      { code: "RDP-RESULT-DESTINATION", field: "resultPath" },
+    ]);
+    assert.equal(launches, 0);
+    assert.equal(result.modelCalls, 0);
+    assert.equal(result.launcherCalls, 0);
+  });
+
+  fixtureCheck("DP18j rejected candidate paths identify only a bounded index, never private names", () => {
+    const privatePath = "private/customer-secret.md";
+    const packet = packetFor("consult-advisor", 190, [privatePath]);
+    const result = preflightRoleDispatch({ root: dispatchFixture, packet });
+    assert.equal(result.status, "rejected");
+    assert.equal(result.code, "RDP-REQUIRED-PATH");
+    assert.equal(result.field, "requiredPaths[0]");
+    assert.ok(!JSON.stringify(result).includes(privatePath));
+    assert.equal(result.modelCalls, 0);
+    assert.equal(result.launcherCalls, 0);
+  });
+
   fixtureCheck("DP18b a coordinator-owned result root is validated separately from candidate inputs", () => {
     const resultRoot = mkdtempSync(join(tmpdir(), "pipeline-role-result-"));
     try {
@@ -610,7 +685,7 @@ const fixtureCheck = (label, run) => check(label, async () => {
     }
   });
 
-assert.equal(cases.length, 34, "the complete dispatch-policy corpus must be registered before execution begins");
+assert.equal(cases.length, 38, "the complete dispatch-policy corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

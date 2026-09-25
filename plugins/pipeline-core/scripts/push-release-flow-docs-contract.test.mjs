@@ -48,10 +48,12 @@ test("source release documentation names the shipped reader-review workflow and 
   for (const contract of [
     /Resolve `\$ARGUMENTS` as a safe feature ID and optional full candidate commit/u,
     /Dispatch phase one as a fresh read-only subagent with no conversation\s+history/u,
+    /every document path returned by\s+the checker's snapshot/u,
     /Dispatch phase two as a different fresh read-only subagent/u,
     /If any covered document\s+changes,[\s\S]*restart both phases with a new round/u,
     /Derive `record\.json` from a fresh checker snapshot,[\s\S]*Accept only `status: passed` with no findings/u,
   ]) assert.match(skill, contract, `reader-review lost required source-bound procedure: ${contract}`);
+  assert.doesNotMatch(skill, /\b(?:eleven|sixteen) document paths\b/u, "reader-review must follow the checker's current snapshot instead of a stale count");
 
   const inventory = JSON.parse(readFileSync(CAPABILITY_INVENTORY, "utf8"));
   const capability = inventory.capabilities.find(({ id }) => id === "session-and-delivery-skills");

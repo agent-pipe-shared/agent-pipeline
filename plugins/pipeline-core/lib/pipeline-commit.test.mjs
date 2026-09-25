@@ -26,3 +26,43 @@ test("a refusing commit-msg hook blocks execution without moving HEAD or droppin
   assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), before);
   assert.match(execFileSync("git", ["diff", "--cached", "--name-only"], { cwd: root, encoding: "utf8" }), /file with spaces\.txt/u);
 });
+test("a successful pre-commit hook cannot silently change the committed staged tree", t => {
+  const root = repo(t);
+  const dispatchRecord = record(root);
+  const hook = join(root, ".git", "hooks", "pre-commit");
+  writeFileSync(hook, "#!/bin/sh\nprintf 'changed by hook\\n' > 'file with spaces.txt'\ngit add -- 'file with spaces.txt'\n");
+  chmodSync(hook, 0o755);
+  const result = commitPipeline({ root, type: "fix", scope: "core", message: "retain exact staged content", dispatchRecord, execute: true });
+  assert.equal(result.status, "recovery-required");
+  assert.equal(result.code, "PC-COMMIT-READBACK-MISMATCH");
+  assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), result.commit);
+});
+test("a successful commit-msg hook cannot silently replace the Dispatch trailer", t => {
+  const root = repo(t);
+  const dispatchRecord = record(root);
+  const hook = join(root, ".git", "hooks", "commit-msg");
+  writeFileSync(hook, "#!/bin/sh\nprintf 'fix(core): replaced by hook\\n' > \"$1\"\n");
+  chmodSync(hook, 0o755);
+  const result = commitPipeline({ root, type: "fix", scope: "core", message: "retain exact dispatch attribution", dispatchRecord, execute: true });
+  assert.equal(result.status, "recovery-required");
+  assert.equal(result.code, "PC-COMMIT-READBACK-MISMATCH");
+  assert.equal(execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), result.commit);
+});
+test("ambient Git index and directory overrides cannot redirect the staged commit preview", t => {
+  const root = repo(t);
+  const dispatchRecord = record(root);
+  const previousIndex = process.env.GIT_INDEX_FILE;
+  const previousDir = process.env.GIT_DIR;
+  try {
+    process.env.GIT_INDEX_FILE = join(root, "foreign.index");
+    process.env.GIT_DIR = join(root, "missing-git-dir");
+    const result = commitPipeline({ root, type: "fix", scope: "core", message: "preserve pinned repository stage", dispatchRecord });
+    assert.deepEqual(result.paths, ["file with spaces.txt"]);
+    assert.equal(result.status, "preview");
+  } finally {
+    if (previousIndex === undefined) delete process.env.GIT_INDEX_FILE;
+    else process.env.GIT_INDEX_FILE = previousIndex;
+    if (previousDir === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = previousDir;
+  }
+});

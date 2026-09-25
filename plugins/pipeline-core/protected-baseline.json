@@ -43,6 +43,18 @@
       "pathPattern": "plugins/pipeline-core/scripts/pipeline-state\\.mjs$",
       "class": "sanctioned-writer",
       "rationale": "The sanctioned lifecycle state writer can alter protected policy bindings."
+    },
+    {
+      "id": "PB-ALFRED-E3-HOST",
+      "pathPattern": "plugins/pipeline-core/scripts/goldfish-antigravity-host\\.mjs$",
+      "class": "loader",
+      "rationale": "The provider-free Goldfish to Antigravity caller owns the AC-24 packet and gate boundary."
+    },
+    {
+      "id": "PB-ALFRED-E3-RECEIPT",
+      "pathPattern": "schemas/pipeline\\.cross-runner-dispatch-receipt\\.v1\\.json$",
+      "class": "loader",
+      "rationale": "The AC-24 receipt contract must not be weakened by an unbriefed mutation route."
     }
   ]
 }

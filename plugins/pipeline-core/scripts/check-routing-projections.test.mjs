@@ -204,10 +204,13 @@ try {
 }
 
 check("RP37 Antigravity runner provider is google", expectedProviderForRunner("antigravity") === "google");
-check("RP38 Antigravity design and implement capabilities match Gemini models",
-  projectRunnerAssignment("antigravity", { capability: "design", effort: "high" }).model === v3Registry.profiles.epic.design_phase.antigravity.selector.value
-  && projectRunnerAssignment("antigravity", { capability: "implement", effort: "high" }).model === v3Registry.duties.implement.antigravity.selector.value
-  && projectRunnerAssignment("antigravity", { capability: "mechanic", effort: "low" }).model === v3Registry.duties.mechanic.antigravity.selector.value
+check("RP38 current V3 Antigravity duties keep Pro design and distinct Flash-high/medium routes",
+  v3Registry.profiles.epic.design_phase.antigravity.selector.value === "gemini-3.1-pro-high"
+  && v3Registry.duties.implement.antigravity.selector.value === "gemini-3.8-flash-medium"
+  && v3Registry.duties.implement.antigravity.effort === "medium"
+  && v3Registry.duties.mechanic.antigravity.selector.value === "gemini-3.8-flash-medium"
+  && v3Registry.duties.mechanic.antigravity.effort === "medium"
+  && v3Registry.duties.critic_normal.antigravity.selector.value === "gemini-3.8-flash-high"
 );
 check("RP39 Antigravity aliases resolve accurately",
   projectRunnerAssignment("antigravity", { model: "flash-high", effort: "high" }).model === projectRunnerAssignment("antigravity", { capability: "implement", effort: "high" }).model

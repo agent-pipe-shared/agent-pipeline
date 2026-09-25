@@ -427,55 +427,69 @@ export function deriveMinimumRigor(inputs, policy = null) {
 /**
  * Infer inputs from working tree if no inputs file is supplied.
  */
-export function inferInputsFromRepo(root) {
-  let actualPaths = [];
-  let filesCount = 0;
-  let linesCount = 0;
-
-  try {
-    const diffNames = execFileSync("git", ["diff", "--name-only", "HEAD"], { cwd: root, encoding: "utf8" });
-    const untracked = execFileSync("git", ["status", "--short"], { cwd: root, encoding: "utf8" });
-    const paths = diffNames.split("\n").map(normalizePath).filter(Boolean);
-    for (const line of untracked.split("\n")) {
-      if (line.startsWith("?? ")) {
-        paths.push(normalizePath(line.slice(3)));
+export function inferInputsFromRepo(root, { execFileSyncFn = execFileSync } = {}) {
+  // A failed Git read is unknown evidence, never an empty working tree. Keep
+  // ambient GIT_* overrides from redirecting the observation to another repo.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const git = (args) => execFileSyncFn("git", ["--no-optional-locks", "-C", root, ...args], {
+    encoding: null, maxBuffer: 4 * 1024 * 1024, timeout: 10_000, env,
+  });
+  const pathsFromNul = (bytes) => {
+    if (!Buffer.isBuffer(bytes) || (bytes.length > 0 && bytes.at(-1) !== 0)) throw new Error("invalid Git path output");
+    if (bytes.length === 0) return [];
+    const decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return decoded.slice(0, -1).split("\0").map((name) => {
+      // Do not silently canonicalize an unusual Git filename into a different
+      // policy path. The caller must review it as unknown instead.
+      if (!name || normalizePath(name) !== name || name.includes("\n") || name.includes("\r")) {
+        throw new Error("unsupported Git path");
       }
-    }
-    actualPaths = Array.from(new Set(paths)).sort();
-    filesCount = actualPaths.length;
-  } catch {
-    actualPaths = [];
+      return name;
+    });
+  };
+  let actualPaths = null;
+  let untrackedPaths = null;
+  try {
+    const changed = pathsFromNul(git(["diff", "--name-only", "-z", "HEAD"]));
+    untrackedPaths = pathsFromNul(git(["ls-files", "--others", "--exclude-standard", "-z"]));
+    actualPaths = [...new Set([...changed, ...untrackedPaths])].sort();
+  } catch { /* unknown, not empty */ }
+
+  let diffStats = null;
+  if (actualPaths !== null && untrackedPaths.length === 0) {
+    try {
+      const output = git(["diff", "--shortstat", "HEAD"]);
+      if (!Buffer.isBuffer(output)) throw new Error("invalid Git stat output");
+      const stat = new TextDecoder("utf-8", { fatal: true }).decode(output).trim();
+      const insertions = /(?:^|,\s*)(\d+) insertions?\(\+\)/u.exec(stat);
+      const deletions = /(?:^|,\s*)(\d+) deletions?\(-\)/u.exec(stat);
+      if (stat && !insertions && !deletions) throw new Error("unrecognized Git stat output");
+      diffStats = { files: actualPaths.length, lines: Number(insertions?.[1] ?? 0) + Number(deletions?.[1] ?? 0) };
+    } catch { /* unknown line count */ }
   }
 
-  try {
-    const diffStat = execFileSync("git", ["diff", "--shortstat", "HEAD"], { cwd: root, encoding: "utf8" });
-    const match = diffStat.match(/(\d+)\s+insertions?\(\+\)(?:,\s+(\d+)\s+deletions?\(-\))?/);
-    if (match) {
-      linesCount = (parseInt(match[1], 10) || 0) + (parseInt(match[2], 10) || 0);
-    }
-  } catch {
-    linesCount = 0;
-  }
+  const actualStatus = actualPaths === null ? "unknown" : "available";
+  const observedStatus = actualPaths === null ? "unknown" : "available";
 
   return {
     plannedPaths: {
-      value: actualPaths,
-      status: "available",
-      sourceContract: "git.working-tree"
+      value: null,
+      status: "unknown",
+      sourceContract: "requires-plan-authority"
     },
     actualPaths: {
       value: actualPaths,
-      status: "available",
+      status: actualStatus,
       sourceContract: "git.working-tree"
     },
     protectedTouches: {
-      value: actualPaths.some(isProtectedPath),
-      status: "available",
+      value: actualPaths === null ? null : actualPaths.some(isProtectedPath),
+      status: observedStatus,
       sourceContract: "pipeline.protected-baseline.v1"
     },
     contractDeltas: {
-      value: actualPaths.some(isContractPath),
-      status: "available",
+      value: actualPaths === null ? null : actualPaths.some(isContractPath),
+      status: observedStatus,
       sourceContract: "pipeline.contract-freeze.v1"
     },
     reversibility: {
@@ -484,14 +498,14 @@ export function inferInputsFromRepo(root) {
       sourceContract: "pipeline.reversibility-assessment.v1"
     },
     diffStats: {
-      value: { files: filesCount, lines: linesCount },
-      status: "available",
+      value: diffStats,
+      status: diffStats === null ? "unknown" : "available",
       sourceContract: "git.diff-stat"
     },
     selectedProfile: {
-      value: "mini",
-      status: "available",
-      sourceContract: "human.plan-selection"
+      value: null,
+      status: "unknown",
+      sourceContract: "requires-po-bound-plan"
     }
   };
 }

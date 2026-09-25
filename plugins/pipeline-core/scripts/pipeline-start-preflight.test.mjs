@@ -3,11 +3,11 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { validateRulesetSource } from "../lib/ruleset-source.mjs";
 import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
@@ -142,8 +142,47 @@ function readyObservation() {
   };
 }
 function preflight(options) {
-  return observePipelineStartPreflight({ observe: readyObservation, ...options });
+  return observePipelineStartPreflight({
+    observe: readyObservation,
+    inspectEffectiveArchitectureDecisionsFn: () => ({
+      schema: "pipeline.architecture-effective-decisions.v1", area: "project",
+      status: "advisory", code: "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
+      projectionSha256: "a".repeat(64), decisions: [], activeExceptions: [],
+      findings: [{ code: "legacy-decision-without-sidecar", path: "docs/adr/legacy.md" }],
+    }),
+    ...options,
+  });
 }
+
+test("all three runner bootstraps expose the same nonblocking decision digest", () => {
+  const expected = "b".repeat(64);
+  const inspect = ({ rootDir, area }) => {
+    assert.equal(rootDir, "/projects/current");
+    assert.equal(area, "project");
+    return {
+      schema: "pipeline.architecture-effective-decisions.v1", area,
+      status: "advisory", code: "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
+      projectionSha256: expected,
+      decisions: [{ id: "ADR-1", digest: "c".repeat(64), scope: "project", path: "docs/adr/0001.md" }],
+      activeExceptions: [],
+      findings: [{ code: "legacy-decision-without-sidecar", path: "docs/adr/old.md" }],
+    };
+  };
+  for (const env of [{ CLAUDECODE: "1" }, { CODEX_SESSION_ID: "codex-session" }, { ANTIGRAVITY_AGENT: "1" }]) {
+    const result = preflight({ env, pluginList: pluginList(), read: () => manifest,
+      cwd: "/projects/current", inspectEffectiveArchitectureDecisionsFn: inspect });
+    assert.equal(result.effectiveDecisions.projectionSha256, expected);
+    assert.equal(result.effectiveDecisions.decisionCount, 1);
+    assert.equal(result.effectiveDecisions.taskScopeResolved, false);
+    assert.notEqual(result.status, "architecture-decision-blocked",
+      "a legacy warning cannot turn bootstrap into an implementation gate");
+  }
+  const malformed = preflight({ env: { CODEX_SESSION_ID: "codex-session" },
+    pluginList: pluginList(), read: () => manifest, cwd: "/projects/current",
+    inspectEffectiveArchitectureDecisionsFn: () => ({ status: "ready", projectionSha256: expected }) });
+  assert.equal(malformed.effectiveDecisions.status, "unavailable");
+  assert.equal(malformed.effectiveDecisions.projectionSha256, null);
+});
 
 test("preflight reports exact identity and no-handoff without secret fields", () => {
   const cwd = "/projects/current";
@@ -154,7 +193,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "architectureOrientation", "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "executionBoundary", "handoff", "installedPluginAttestation",
+    "architectureOrientation", "bootstrapPayload", "cloneProvisioning", "concurrentSessionWarning", "effectiveDecisions", "executionBoundary", "handoff", "installedPluginAttestation",
     "installedSource", "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
     "version",
   ]);
@@ -168,6 +207,12 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   assert.equal(result.installedPluginAttestation.status, "not-required");
   assert.equal(result.executionBoundary, "default");
   assert.equal(result.handoff, "none");
+  assert.deepEqual(result.effectiveDecisions, {
+    schema: "pipeline.architecture-decision-bootstrap-observation.v1",
+    area: "project", status: "advisory", code: "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
+    projectionSha256: "a".repeat(64), decisionCount: 0, findingCount: 1,
+    taskScopeResolved: false,
+  });
   assert.ok(result.cloneProvisioning);
   assert.equal(result.cloneProvisioning.schema, "pipeline.clone-provisioning-report.v1");
   assert.equal(result.bootstrapPayload.schema, "pipeline.bootstrap-payload-receipt.v1");
@@ -226,6 +271,50 @@ test("normal bootstrap surfaces brownfield architecture adoption as a read-only 
     executionBoundary: "default",
     expected: { schema: "pipeline.adoption-proposal.v1" },
   });
+});
+
+test("a durable deferral with a missing physical map retains its decision and offers a read-only map-first proposal", () => {
+  const cwd = "/projects/current";
+  const result = preflight({
+    env: {}, pluginList: pluginList(), read: () => manifest, cwd,
+    requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
+    observeArchitectureAdoptionOrientationFn: () => ({
+      schema: "pipeline.architecture-adoption-orientation.v1",
+      status: "decision-recorded",
+      root: cwd,
+      adoption: { state: "deferred-valid-until-review", scope: ["src/"], decisionRef: "po-architecture-17", coverageClass: "excepted", confidence: "measured" },
+      physicalMap: { greenfieldScaffold: false, status: "missing" },
+      guidance: "preserve the decision and materialize the map",
+    }),
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.architectureOrientation.adoption.decisionRef, "po-architecture-17");
+  assert.deepEqual(result.architectureOrientation.nextAction, {
+    kind: "command",
+    executable: "node",
+    argv: [`${result.pluginRoot}/scripts/architecture-adoption.mjs`, "propose", "--root", cwd, "--json"],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "default",
+    expected: { schema: "pipeline.adoption-proposal.v1" },
+  });
+});
+
+test("a durable decision with a present physical map does not repeatedly propose adoption", () => {
+  const result = preflight({
+    env: {}, pluginList: pluginList(), read: () => manifest, cwd: "/projects/current",
+    requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
+    observeArchitectureAdoptionOrientationFn: () => ({
+      schema: "pipeline.architecture-adoption-orientation.v1",
+      status: "decision-recorded",
+      root: "/projects/current",
+      adoption: { state: "deferred-valid-until-review", scope: ["src/"], decisionRef: "po-architecture-17", coverageClass: "excepted", confidence: "measured" },
+      physicalMap: { greenfieldScaffold: false, status: "present-unvalidated" },
+      guidance: "verify at implementation boundary",
+    }),
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.architectureOrientation.nextAction, null);
 });
 
 test("normal bootstrap reports a real greenfield scaffold as design-pending rather than falsely adopted", () => {
@@ -302,6 +391,51 @@ test("Brownfield architecture orientation is identical and actionable on fresh e
       // orientation plus a later implementation-boundary concern.
       assert.ok(["ready", "plugin-refresh-required"].includes(result.status), `${runner.name}/${entry}: ${result.status}`);
       assert.equal(result.architectureOrientation.status, "adoption-required");
+      assert.equal(result.architectureOrientation.nextAction.mutation, false);
+      assert.equal(result.architectureOrientation.nextAction.requiresConfirmation, false);
+      assert.deepEqual(result.architectureOrientation.nextAction.expected, { schema: "pipeline.adoption-proposal.v1" });
+      proposals.push(result.architectureOrientation.nextAction);
+    }
+  }
+  for (const proposal of proposals.slice(1)) assert.deepEqual(proposal, proposals[0]);
+});
+
+test("all three runner entry routes retain a valid deferral while proposing a missing map on fresh entry and resume", () => {
+  const cwd = "/projects/current";
+  const orientation = {
+    schema: "pipeline.architecture-adoption-orientation.v1",
+    status: "decision-recorded",
+    root: cwd,
+    adoption: { state: "deferred-valid-until-review", scope: ["src/"], decisionRef: "po-architecture-17", coverageClass: "excepted", confidence: "measured" },
+    physicalMap: { greenfieldScaffold: false, status: "missing" },
+    guidance: "Preserve the decision and materialize the map before implementation.",
+  };
+  const runners = [
+    { name: "codex", env: { CODEX_SESSION_ID: "codex-entry" }, list: pluginList() },
+    { name: "claude", env: { CLAUDECODE: "1" }, list: claudePluginList("0.4.5+test") },
+    { name: "antigravity", env: { ANTIGRAVITY_AGENT: "1" }, list: pluginList(), antigravity: () => ({
+      schema: "pipeline.antigravity-hard-enforcement-observation.v1", observed: true, freshWindowMs: 1, warning: null,
+    }) },
+  ];
+  const proposals = [];
+  for (const entry of ["fresh", "resume"]) {
+    for (const runner of runners) {
+      let observedCalls = 0;
+      assert.equal(resolveActiveRunner({ env: runner.env }), runner.name);
+      const result = preflight({
+        env: { ...runner.env, PIPELINE_TEST_ENTRY: entry }, pluginList: runner.list,
+        read: () => manifest, cwd, observeAntigravityHardEnforcementFn: runner.antigravity,
+        requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }),
+        observeArchitectureAdoptionOrientationFn: ({ rootDir }) => {
+          observedCalls += 1;
+          assert.equal(rootDir, cwd);
+          return orientation;
+        },
+      });
+      assert.equal(observedCalls, 1, `${runner.name}/${entry}: decision readback must happen once`);
+      assert.ok(["ready", "plugin-refresh-required"].includes(result.status), `${runner.name}/${entry}: ${result.status}`);
+      assert.equal(result.architectureOrientation.adoption.decisionRef, "po-architecture-17");
+      assert.equal(result.architectureOrientation.nextAction.kind, "command");
       assert.equal(result.architectureOrientation.nextAction.mutation, false);
       assert.equal(result.architectureOrientation.nextAction.requiresConfirmation, false);
       assert.deepEqual(result.architectureOrientation.nextAction.expected, { schema: "pipeline.adoption-proposal.v1" });
@@ -1640,6 +1774,24 @@ test("observeDutyNotRuntimeLive reports in-force when roots are identical or mat
   }
 });
 
+test("observeDutyNotRuntimeLive recognizes two paths to one physical plugin root", () => {
+  const base = mkdtempSync(join(tmpdir(), "duty-live-alias-"));
+  try {
+    const physicalRoot = join(base, "physical");
+    const aliasRoot = join(base, "alias");
+    mkdirSync(physicalRoot);
+    symlinkSync(physicalRoot, aliasRoot, "dir");
+    const result = observeDutyNotRuntimeLive({
+      checkoutPluginRoot: physicalRoot,
+      installedPluginRoot: aliasRoot,
+      read: () => { throw new Error("one physical root must not be read as two copies"); },
+    });
+    assert.deepEqual(result, { status: "in-force" });
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("observeDutyNotRuntimeLive reports differing and lists differing files when modified", () => {
   const base = mkdtempSync(join(tmpdir(), "duty-live-diff-"));
   try {
@@ -1662,4 +1814,30 @@ test("observeDutyNotRuntimeLive reports differing and lists differing files when
 test("observeDutyNotRuntimeLive reports not-applicable when roots are missing or null", () => {
   assert.equal(observeDutyNotRuntimeLive({ checkoutPluginRoot: null, installedPluginRoot: null }).status, "not-applicable");
   assert.equal(observeDutyNotRuntimeLive({ checkoutPluginRoot: "/non/existent/a", installedPluginRoot: "/non/existent/b" }).status, "not-applicable");
+});
+
+test("NVA-B8-11: gitless Claude recovery references survive a skill-only installation", () => {
+  const sourceSkill = fileURLToPath(new URL("../skills/pipeline-start/", import.meta.url));
+  const base = mkdtempSync(join(tmpdir(), "pipeline-start-skill-only-"));
+  const installedSkill = join(base, "skills", "pipeline-start");
+  try {
+    cpSync(sourceSkill, installedSkill, { recursive: true });
+    const skill = readFileSync(join(installedSkill, "SKILL.md"), "utf8");
+    const references = new Set(Array.from(
+      skill.matchAll(/references\/[A-Za-z0-9._/-]+\.md/gu),
+      (match) => match[0],
+    ));
+    assert.ok(references.size >= 15, "the installed skill's reference inventory must be checked, not one hardcoded link");
+    for (const reference of references) {
+      assert.equal(existsSync(join(installedSkill, reference)), true, reference);
+    }
+    const recovery = readFileSync(join(installedSkill, "references/local-plugin-attestation.md"), "utf8");
+    assert.match(skill, /gitless Claude cache[\s\S]*references\/local-plugin-attestation\.md/u);
+    assert.match(recovery, /known clean source checkout/u);
+    assert.match(recovery, /nextAction` is deliberate/u);
+    assert.doesNotMatch(recovery, /(?:^|\s)(?:docs|specs|architecture)\//mu,
+      "the isolated installed skill must not depend on an unavailable repository-root document");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });

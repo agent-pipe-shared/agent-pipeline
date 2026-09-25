@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadMapBundle, resolveModuleForPath } from "./module-inventory.mjs";
-import { isMisleadingTinyModuleOptimization } from "./architecture-remedy.mjs";
+import { compareRemedies, isMisleadingTinyModuleOptimization } from "./architecture-remedy.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { adoptionSnapshot } from "../lib/architecture-adoption-authority.mjs";
 import { resolveAdoptionState } from "./architecture-adoption.mjs";
@@ -1006,7 +1006,27 @@ export function evaluateArchitectureFitness(options = {}) {
   });
 
   // 5. Enforce Deterministic-Pass Rule (AC-10)
-  const evaluatedOutcomes = enforceDeterministicPassRule(finalOutcomes, options);
+  const evaluatedOutcomes = enforceDeterministicPassRule(finalOutcomes, options).map((outcome) => {
+    if (mode !== "planning" || outcome.outcome !== OUTCOME_FINDING) return outcome;
+    const violations = outcome.violations?.length ? outcome.violations : [{ module: "unknown" }];
+    const findingType = outcome.propertyId === "contract-presence-freshness"
+      ? "contract-violation"
+      : outcome.propertyId === "boundary-crossing" || outcome.propertyId === "dependency-direction-cycles"
+        ? "boundary-crossing"
+        : outcome.propertyId;
+    return {
+      ...outcome,
+      evidence: {
+        ...(outcome.evidence && !Array.isArray(outcome.evidence) && typeof outcome.evidence === "object"
+          ? outcome.evidence : outcome.evidence === undefined ? {} : { sourceEvidence: outcome.evidence }),
+        remedyComparisons: violations.map((violation) => ({
+          ruleId: violation.ruleId ?? outcome.propertyId,
+          target: violation.target ?? null,
+          ...compareRemedies({ findingType, currentModule: violation.module ?? "unknown" }),
+        })),
+      },
+    };
+  });
 
   // 6. Calculate summary & overallStatus
   const passCount = evaluatedOutcomes.filter((o) => o.outcome === OUTCOME_PASS).length;

@@ -39,7 +39,7 @@ test("same-session consent permits a bounded positive fixture dispatch and exclu
   const agy = join(root, "agy-mock");
   writeFileSync(join(root, "input.txt"), "input\n");
   mkdirSync(join(root, "results"));
-  writeFileSync(agy, "#!/usr/bin/env node\nconst mode = process.env.AGY_MODE; if (mode === 'auth') { console.error('Please login'); process.exit(1); } if (mode === 'quota') { console.error('quota exhausted'); process.exit(2); } if (mode === 'timeout') { setTimeout(() => {}, 5000); } else if (mode === 'malformed') console.log('not-json'); else if (mode === 'mismatch') console.log(JSON.stringify({model:'gemini-other', result:'ok'})); else if (mode === 'unknown') console.log(JSON.stringify({result:'ok'})); else console.log(JSON.stringify({model:'gemini-3.8-flash-high', result:'ok'}));\n");
+  writeFileSync(agy, "#!/usr/bin/env node\nconst mode = process.env.AGY_MODE; if (mode === 'auth') { console.error('Please login'); process.exit(1); } if (mode === 'quota') { console.error('quota exhausted'); process.exit(2); } if (mode === 'timeout') { setTimeout(() => {}, 5000); } else if (mode === 'malformed') console.log('not-json'); else if (mode === 'mismatch') console.log(JSON.stringify({status:'SUCCESS',response:'ok',model:'gemini-other'})); else if (mode === 'unknown') console.log(JSON.stringify({status:'SUCCESS',response:'ok'})); else if (mode === 'structured') { const args=process.argv; const json_schema=JSON.parse(args[args.indexOf('--json-schema')+1]); const structured_output={schema:'pipeline.agy-final-return.v1',dispatchId:process.env.AGY_DISPATCH_ID,candidateCommit:process.env.AGY_CANDIDATE_COMMIT,outcome:'succeeded',report:'done',changedPaths:['input.txt']}; console.log(JSON.stringify({conversation_id:'structured-one',status:'SUCCESS',response:JSON.stringify(structured_output),structured_output,json_schema,model:'gemini-3.8-flash-high'})); } else console.log(JSON.stringify({status:'SUCCESS',response:'ok',model:'gemini-3.8-flash-high'}));\n");
   chmodSync(agy, 0o755);
   try {
     execFileSync("git", ["init", "-q"], { cwd: root });
@@ -49,14 +49,20 @@ test("same-session consent permits a bounded positive fixture dispatch and exclu
     execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: root });
     const candidate = { commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), tree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim() };
     const result = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/result.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate }), nowEpochMs: 2 });
-    assert.equal(result.status, "succeeded", JSON.stringify(result));
+    assert.equal(result.status, "completed-undelivered", JSON.stringify(result));
+    assert.equal(result.code, "AGY-SESSION-FINAL-UNDELIVERED");
     assert.equal(result.observed.model, "gemini-3.8-flash-high");
     assert.equal(existsSync(join(root, "results/result.json")), true);
+    assert.equal(result.result.sha256, hash(readFileSync(join(root, "results/result.json"))));
     const replay = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/result.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-dispatch-2" }), nowEpochMs: 2 });
     assert.equal(replay.code, "AGY-SESSION-RESULT-COLLISION");
     assert.match(readFileSync(join(root, "results/result.json"), "utf8"), /gemini-3\.8-flash-high/u);
     const secondTask = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/second.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("different-task-input"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-dispatch-3" }), nowEpochMs: 2 });
-    assert.equal(secondTask.status, "succeeded");
+    assert.equal(secondTask.status, "completed-undelivered");
+    const structured = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/structured.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, packet: packet({ candidate, dispatchId: "agy-structured" }), env: { ...process.env, AGY_MODE: "structured", AGY_DISPATCH_ID: "agy-structured", AGY_CANDIDATE_COMMIT: candidate.commit }, requireStructuredFinal: true, nowEpochMs: 2 });
+    assert.equal(structured.status, "final-pending-host-commit", JSON.stringify(structured));
+    assert.equal(structured.final.reportSha256, hash("done"));
+    assert.deepEqual(structured.final.changedPaths, ["input.txt"]);
     const unknown = await dispatchAgySession({ ...authority, root, resultRoot: root, resultPath: "results/unknown.json", session, consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "scope-1", inputSha256: hash("scope-1"), agyPath: agy, env: { ...process.env, AGY_MODE: "unknown" }, packet: packet({ candidate, dispatchId: "agy-unknown" }), requireObservedModel: true, nowEpochMs: 2 });
     assert.equal(unknown.code, "AGY-SESSION-MODEL-UNOBSERVED");
     assert.equal(unknown.result, null);

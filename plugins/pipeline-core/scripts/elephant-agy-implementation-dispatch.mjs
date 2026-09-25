@@ -15,12 +15,15 @@ import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { digest, loadLiveSession, loadStoredConsent, validateConsentRecord, validateDispatchBinding } from "../lib/agy-session-authority.mjs";
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { LIVE_REQUEST_SCHEMA, LIVE_REQUEST_SEAL, runGoldfishAntigravityLiveHost } from "./goldfish-antigravity-live-host.mjs";
+import { finalizeAgyHostObservedReturn } from "./agy-host-observed-finalize.mjs";
 
 export const ELEPHANT_AGY_IMPLEMENTATION_DISPATCH_SCHEMA = "pipeline.elephant-agy-implementation-dispatch-receipt.v1";
 export const ELEPHANT_AGY_IMPLEMENTATION_REQUEST_SCHEMA = "pipeline.role-dispatch-request.v1";
 const SHA = /^[a-f0-9]{64}$/u;
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const IMPLEMENTATION_ROLES = new Set(["pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"]);
+const APPROVED_IMPLEMENT_MODEL = "gemini-3.8-flash-medium";
+const APPROVED_IMPLEMENT_EFFORT = "medium";
 const canonical = (value) => JSON.stringify(value, Object.keys(value ?? {}).sort());
 const sha256 = (value) => createHash("sha256").update(Buffer.isBuffer(value) ? value : String(value), "utf8").digest("hex");
 
@@ -45,7 +48,7 @@ function safeNewRelativePath(value) {
 function routeAuthority(dependencies = {}) {
   const registry = dependencies.registry ?? loadRunnerProfilesV3Registry();
   const route = registry?.duties?.implement?.antigravity;
-  if (!route || route.state !== "opt-in" || route.selector?.kind !== "model-id" || route.selector.value !== "gemini-3.8-flash-high" || route.effort !== "high" || route.unavailable !== "defer" || route.evidence !== "dispatch-receipt") return null;
+  if (!route || route.state !== "opt-in" || route.selector?.kind !== "model-id" || route.selector.value !== APPROVED_IMPLEMENT_MODEL || route.effort !== APPROVED_IMPLEMENT_EFFORT || route.unavailable !== "defer" || route.evidence !== "dispatch-receipt") return null;
   return { runner: "antigravity", provider: "google", requestedModel: route.selector.value, effort: route.effort, routePolicySha256: digest(route) };
 }
 
@@ -59,8 +62,8 @@ function validRouteAuthority(route) {
   return route !== null && typeof route === "object"
     && route.runner === "antigravity"
     && route.provider === "google"
-    && route.requestedModel === "gemini-3.8-flash-high"
-    && route.effort === "high"
+    && route.requestedModel === APPROVED_IMPLEMENT_MODEL
+    && route.effort === APPROVED_IMPLEMENT_EFFORT
     && SHA.test(route.routePolicySha256 ?? "")
     && Object.keys(route).length === 5;
 }
@@ -78,10 +81,32 @@ function empty(code, status = "rejected", extra = {}) {
     binding: null,
     observed: { provider: "unknown", model: "unknown", identityEvidence: "unknown", effectiveSandbox: "unknown" },
     result: { path: null, sha256: null },
+    record: null,
+    recoveryCommit: null,
     launcherCalls: 0,
     modelCalls: 0,
     ...extra,
   };
+}
+
+function closedUndeliveredRecord(value, taskId) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join(",") === "attemptId,authorship,sha256,target"
+    && value.target === `evidence/dispatch-record-${taskId}.json`
+    && SHA.test(value.sha256 ?? "")
+    && SESSION_ID.test(value.attemptId ?? "")
+    && value.authorship === "not-applicable"
+    ? { target: value.target, sha256: value.sha256, attemptId: value.attemptId, authorship: value.authorship }
+    : null;
+}
+
+function closedAuthoredRecord(value, taskId) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join(",") === "authorship,commit,sha256,target"
+    && value.target === `evidence/dispatch-record-${taskId}.json`
+    && SHA.test(value.sha256 ?? "")
+    && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value.commit ?? "")
+    && value.authorship === "host-observed-local" ? { ...value } : null;
 }
 
 function receipt({ packet, sessionId, descriptorSha256, route, record, scope, inputSha256, result, status, code }) {
@@ -98,10 +123,14 @@ function receipt({ packet, sessionId, descriptorSha256, route, record, scope, in
     observed: {
       provider: result?.observed?.provider ?? "unknown",
       model: result?.observed?.model ?? "unknown",
-      identityEvidence: result?.observed?.model && result.observed.model !== "unknown" ? "provider-readback" : "unknown",
+      identityEvidence: result?.modelCalls > 0 && result?.observed?.model === route.requestedModel
+        ? "host-observed-model" : "unknown",
       effectiveSandbox: result?.observed?.effectiveSandbox ?? "unknown",
     },
     result: { path: result?.result?.path ?? null, sha256: result?.result?.sha256 ?? null },
+    record: ["completed-undelivered", "interrupted-recorded"].includes(status) ? closedUndeliveredRecord(result?.record, packet.dispatchId)
+      : status === "authored-commit-recorded" ? closedAuthoredRecord(result?.record, packet.dispatchId) : null,
+    recoveryCommit: result?.recoveryCommit ?? null,
     launcherCalls: result?.launcherCalls ?? 0,
     modelCalls: result?.modelCalls ?? 0,
   };
@@ -146,8 +175,44 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
   const binding = (dependencies.validateDispatchBinding ?? validateDispatchBinding)(stored.record, { requestedModel: route.requestedModel, role: packet.role, scope, requiredPaths: packet.requiredPaths, nowEpochMs: dependencies.nowEpochMs ?? Date.now() });
   if (!binding.ok) return empty(binding.code);
   const sealed = { schema: LIVE_REQUEST_SCHEMA, seal: LIVE_REQUEST_SEAL, root: input.root, resultRoot: input.root, resultPath, packet: preflight.packet, sessionId, descriptorSha256, consent: "stored", requestedModel: route.requestedModel, effort: route.effort, scope, inputSha256, routePolicySha256: route.routePolicySha256, timeoutMs: 300_000 };
-  const launched = await (dependencies.runLiveHost ?? runGoldfishAntigravityLiveHost)(sealed, dependencies);
-  return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record, scope, inputSha256, result: launched, status: launched.status === "succeeded" ? "succeeded" : launched.status === "unavailable" ? "unavailable" : "rejected", code: launched.code });
+  let launched;
+  try { launched = await (dependencies.runLiveHost ?? runGoldfishAntigravityLiveHost)(sealed, dependencies); }
+  catch {
+    // The child may already have run or changed the checkout. Never turn an
+    // unexpected host exception into a safe retry or expose its private text.
+    return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record,
+      scope, inputSha256, result: null, status: "recovery-required", code: "AGY-ELEPHANT-HOST-EXCEPTION" });
+  }
+  if (!launched || typeof launched !== "object" || Array.isArray(launched)) {
+    return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record,
+      scope, inputSha256, result: null, status: "recovery-required", code: "AGY-ELEPHANT-HOST-RESULT-INVALID" });
+  }
+  if (launched.modelCalls > 0 && ["unavailable", "rejected"].includes(launched.status)) {
+    return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record,
+      scope, inputSha256, result: launched, status: "recovery-required", code: "AGY-ELEPHANT-LAUNCHED-NONFINAL" });
+  }
+  const terminalModelClaim = ["final-pending-host-commit", "completed-undelivered"].includes(launched?.status);
+  if (terminalModelClaim && (launched?.observed?.model !== route.requestedModel
+    || !Number.isSafeInteger(launched.modelCalls) || launched.modelCalls < 1)) {
+    return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record,
+      scope, inputSha256, result: launched, status: "recovery-required", code: "AGY-ELEPHANT-HOST-MODEL-UNVERIFIED" });
+  }
+  // The real sealed host carries its internal admission only inside this
+  // process. Test-injected hosts remain pending; they cannot mint an authored
+  // publication through a supplied "success" object.
+  let completed = launched;
+  if (launched.status === "final-pending-host-commit" && !dependencies.runLiveHost) {
+    const finalized = finalizeAgyHostObservedReturn({ sealed, launched });
+    completed = { ...launched, ...finalized };
+  }
+  const status = completed.status === "authored-commit-recorded" ? "authored-commit-recorded" : completed.status === "final-pending-host-commit" ? "final-pending-host-commit" : completed.status === "completed-undelivered" ? "completed-undelivered" : completed.status === "interrupted-recorded" ? "interrupted-recorded" : completed.status === "recovery-required" ? "recovery-required" : completed.status === "unavailable" ? "unavailable" : "rejected";
+  const recordMissing = ["completed-undelivered", "interrupted-recorded"].includes(status) && !closedUndeliveredRecord(completed.record, preflight.packet.dispatchId);
+  const authoredMissing = status === "authored-commit-recorded" && !closedAuthoredRecord(completed.record, preflight.packet.dispatchId);
+  return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record, scope, inputSha256, result: completed,
+    status: recordMissing || authoredMissing ? "recovery-required" : status,
+    code: recordMissing ? status === "completed-undelivered"
+      ? "AGY-UNDELIVERED-RECORD-UNVERIFIED" : "AGY-INTERRUPTION-RECORD-UNVERIFIED"
+      : authoredMissing ? "AGY-AUTHORED-RECORD-UNVERIFIED" : completed.code });
 }
 
 export const elephantAgyImplementationDispatchInternals = Object.freeze({

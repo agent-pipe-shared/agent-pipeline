@@ -18,22 +18,26 @@ export function installerUsageLines() {
     "",
     "Run this from an approved Agent-Pipeline plugin directory while your shell is in the project Antigravity will govern.",
     "The interactive installer defaults to that approved directory. A local marketplace copy is an explicit pre-release development choice.",
+    "The installer checks the physical plugin manifest and registry binding; it does not prove GitHub origin or release authenticity.",
   ];
 }
 
 export function selectPluginSource({ answer = "", scriptDir = SCRIPT_DIR, marketplaceRoot = LOCAL_MARKETPLACE, marketplaceAvailable = hasMarketplace } = {}) {
-  if (answer.trim() === "2" && marketplaceAvailable) {
+  const selected = answer.trim();
+  if (selected === "" || selected === "1") return { kind: "approved-directory", pluginRoot: scriptDir };
+  if (selected === "2" && marketplaceAvailable) {
     return { kind: "local-marketplace", pluginRoot: join(marketplaceRoot, "plugins", "pipeline-core") };
   }
-  return { kind: "approved-directory", pluginRoot: scriptDir };
+  if (selected === "2") throw new Error("Local development marketplace is unavailable; no plugin was registered");
+  throw new Error("Invalid plugin source selection; no plugin was registered");
 }
 
-export function postInstallGuidanceLines() {
+export function postInstallGuidanceLines(platform = process.platform) {
   return [
     "=== Environment verification ===",
     "The pipeline's hooks require `node` in the PATH of the Antigravity host.",
     "If Antigravity starts from an IDE, desktop launcher, or service, verify that host PATH directly.",
-    "Run: command -v node",
+    platform === "win32" ? "Run in PowerShell or Command Prompt: where.exe node" : "Run: command -v node",
     "If node is absent, correct the launcher or host PATH, then fully restart Antigravity.",
     "Do not create a global sudo symlink merely for this plugin.",
     "",
@@ -145,13 +149,66 @@ export function updatePluginRegistry({ targetFile, corePluginPath }) {
   }
 }
 
+/** Apply the separately confirmed runner-local option without losing existing settings. */
+export function updateAutonomousSettings({ targetFile }) {
+  if (typeof targetFile !== "string" || !isAbsolute(targetFile) || resolve(targetFile) !== targetFile) {
+    throw new Error("Unsafe Antigravity settings path");
+  }
+  const parent = dirname(targetFile);
+  const parentInfo = lstatSync(parent);
+  if (!parentInfo.isDirectory() || parentInfo.isSymbolicLink() || realpathSync(parent) !== parent) {
+    throw new Error("Unsafe Antigravity settings parent");
+  }
+  let settings = {};
+  if (existsSync(targetFile)) {
+    const info = lstatSync(targetFile);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) {
+      throw new Error("Unsafe Antigravity settings target");
+    }
+    try {
+      settings = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(targetFile)));
+    } catch {
+      throw new Error("Malformed Antigravity settings; existing bytes were preserved");
+    }
+    if (settings === null || typeof settings !== "object" || Array.isArray(settings)) {
+      throw new Error("Malformed Antigravity settings; existing bytes were preserved");
+    }
+  } else {
+    try { lstatSync(targetFile); throw new Error("Unsafe Antigravity settings target"); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
+  const next = { ...settings, terminalSandbox: true, toolExecutionPolicy: "always-proceed", artifactReviewMode: "always-proceed" };
+  const temporary = join(parent, `.${basename(targetFile)}.${randomUUID()}.tmp`);
+  let descriptor;
+  try {
+    descriptor = openSync(temporary, "wx", 0o600);
+    writeFileSync(descriptor, JSON.stringify(next, null, 2) + "\n");
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = undefined;
+    if (realpathSync(parent) !== parent) throw new Error("Unsafe Antigravity settings parent");
+    renameSync(temporary, targetFile);
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+    rmSync(temporary, { force: true });
+  }
+}
+
 export function runInteractiveInstaller() {
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 console.log("\n=== Antigravity Pipeline Installer ===\n");
 if (hasMarketplace) console.log(`Detected local development marketplace: ${LOCAL_MARKETPLACE}`);
+console.log("Source approval is your decision: this installer does not prove GitHub origin or release authenticity.");
 
 rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCAL_MARKETPLACE})? [Default: 1]: `, (sourceAnswer) => {
-  const selectedSource = selectPluginSource({ answer: sourceAnswer });
+  let selectedSource;
+  try { selectedSource = selectPluginSource({ answer: sourceAnswer }); }
+  catch (error) {
+    console.error(`Installation refused: ${error.message}`);
+    rl.close();
+    process.exitCode = 1;
+    return;
+  }
   const useMarketplace = selectedSource.kind === "local-marketplace";
   const corePluginPath = selectedSource.pluginRoot;
   
@@ -204,17 +261,14 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
         const settingsFile = answer.trim() === "1"
           ? join(process.cwd(), ".agents", "settings.json")
           : join(process.env.HOME || process.env.USERPROFILE, ".gemini", "antigravity-cli", "settings.json");
-        
-        let settings = {};
-        if (existsSync(settingsFile)) {
-          try { settings = JSON.parse(readFileSync(settingsFile, "utf-8")); } catch (e) {}
+        try {
+          mkdirSync(dirname(settingsFile), { recursive: true });
+          updateAutonomousSettings({ targetFile: settingsFile });
+          console.log(`Autonomous sandboxed mode configured in: ${settingsFile}`);
+        } catch (error) {
+          console.error(`Autonomous settings update refused: ${error.message}`);
+          process.exitCode = 1;
         }
-        settings.terminalSandbox = true;
-        settings.toolExecutionPolicy = "always-proceed";
-        settings.artifactReviewMode = "always-proceed";
-        mkdirSync(dirname(settingsFile), { recursive: true });
-        writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n");
-        console.log(`Autonomous sandboxed mode configured in: ${settingsFile}`);
       }
 
       for (const line of postInstallGuidanceLines()) console.log(line);

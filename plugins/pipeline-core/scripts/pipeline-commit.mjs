@@ -39,5 +39,18 @@ function parse(argv) {
   if (!out.type || !out.scope || !out.message || !out.dispatchRecord) throw new Error("usage: type, scope, message and dispatch record are required");
   return out;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { try { process.stdout.write(`${JSON.stringify(commitPipeline(parse(process.argv.slice(2))))}\n`); } catch (error) { process.stderr.write(`pipeline-commit: ${error.code ?? "PC-FAILED"}: ${error.message}\n`); process.exitCode = 2; } }
+export function runPipelineCommitCli(argv, { commit = commitPipeline, stdout = process.stdout, stderr = process.stderr } = {}) {
+  try {
+    const result = commit(parse(argv));
+    if (!["preview", "committed", "recovery-required"].includes(result?.status)) throw Object.assign(new Error("invalid commit result"), { code: "PC-RESULT" });
+    stdout.write(`${JSON.stringify(result)}\n`);
+    return result.status === "recovery-required" ? 3 : 0;
+  } catch (error) {
+    stderr.write(`pipeline-commit: ${error?.code ?? "PC-FAILED"}\n`);
+    return 2;
+  }
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = runPipelineCommitCli(process.argv.slice(2));
+}
 export { parse };

@@ -58,6 +58,13 @@ describe("architecture-remedy & active optimization (WP-D2, AC-21, AC-22)", () =
     });
   });
 
+  it("AC-22 offers map-specific repairs rather than a generic contract suggestion", () => {
+    const result = compareRemedies({ findingType: "navigation-currency", currentModule: "pipeline-core" });
+    assert.equal(result.bestRemedy.id, "restore-navigation-bundle");
+    assert.ok(result.remedies.some((remedy) => remedy.id === "regenerate-and-review-map"));
+    assert.ok(result.remedies.every((remedy) => remedy.conformant));
+  });
+
   describe("3. Anti-fragmentation fixture (AC-21: misleading tiny-module optimization)", () => {
     it("identifies misleading tiny-module optimization keywords and flags", () => {
       assert.equal(isMisleadingTinyModuleOptimization({ id: "tiny-module-optimization" }), true);

@@ -706,7 +706,7 @@ const prepared = preparedRecord.value;
 
 check("T1 prepare and host execution bind the candidate-high-risk V3 route", () => {
   assert.deepEqual(criticGateCalls, [{ rootDir: repo, intent: "dispatch", runner: "codex" }]);
-  assert.equal(preparedResult.model, "gpt-6-astra");
+  assert.equal(preparedResult.model, "gpt-6-sol");
   assert.equal(preparedResult.effort, "max");
   assert.equal(prepared.route.duty, "critic_high_risk");
   assert.equal(prepared.route.alias, prepared.route.model);
@@ -983,8 +983,8 @@ check("non-T1 preparation retains the normal assurance", () => {
   const normalPrepared = normalPreparedRecord.value;
   assert.equal(normalPrepared.assurance, ASSURANCE);
   assert.equal(normalPrepared.route.duty, "critic_normal");
-  assert.equal(normalPrepared.route.model, "gpt-5.6-terra");
-  assert.equal(normalPrepared.route.effort, "high");
+  assert.equal(normalPrepared.route.model, "gpt-6-sol");
+  assert.equal(normalPrepared.route.effort, "medium");
   assert.doesNotThrow(() => validateHostReturn(
     normalPrepared,
     normalPreparedRecord.sha256,
@@ -1441,7 +1441,7 @@ function validCriticVerdict() {
   };
 }
 
-const SELECTED_CRITIC_ROUTE = Object.freeze({ dutyId: "critic_high_risk", runner: "codex", model: "gpt-6-astra", effort: "max", sourceSha256: "a".repeat(64), candidateCommit: null });
+const SELECTED_CRITIC_ROUTE = Object.freeze({ dutyId: "critic_high_risk", runner: "codex", model: "gpt-6-sol", effort: "max", sourceSha256: "a".repeat(64), candidateCommit: null });
 function selectedRouteFor(input) { return { ...SELECTED_CRITIC_ROUTE, candidateCommit: input.dispatch.candidateCommit }; }
 
 function realSelectedInput(paths = ["roles/critic.md"]) {

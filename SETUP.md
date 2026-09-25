@@ -113,10 +113,10 @@ claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
 `--scope project` keeps the binding with the repository rather than with one
-developer's user profile. `claude plugin marketplace add --help` documents
-only `--scope` and `--sparse` for this command — there is no flag or URL
-syntax verified to pin it to a specific branch, so it tracks the source
-repository's default branch. Confirm the installation with `claude plugin list
+developer's user profile. The installed CLI's `claude plugin marketplace add
+--help` does not document a `--ref` option for pinning a Git branch; this
+marketplace binding therefore follows the source repository's default branch.
+Confirm the installation with `claude plugin list
 --json`. To update a Claude Code binding later, update the marketplace, update
 the same project-scoped plugin, then reload the running host session:
 
@@ -165,11 +165,12 @@ marketplace or cache files.
 
 #### Antigravity (Agy): workspace-local binding
 
-For a currently approved release before `v0.7.0` is published, use the
-[version-independent Agy installation path](GEMINI.md#antigravity-installation-workspace-local)
-with its approved GitHub-distributed plugin directory. The pinned example
-below applies only after the `v0.7.0` tag actually exists; it is not a
-pre-release installation command.
+Before `v0.7.0` is published, use the installation instructions at the
+already-approved release tag in the
+[official GitHub repository](https://github.com/agent-pipe-shared/agent-pipeline).
+Do not use an unpublished `v0.7.0` tag or treat a local developer checkout as
+a released plugin. The pinned example below applies only after that tag
+actually exists; it is not a pre-release installation command.
 
 After the `v0.7.0` release tag is published on the official GitHub repository,
 run these commands with your shell in the **consumer project root**. The tag
@@ -180,31 +181,64 @@ location if `$HOME/.local/share` is unsuitable:
 
 ```sh
 mkdir -p "$HOME/.local/share"
-pipeline_release_dir="$HOME/.local/share/agent-pipeline-v0.7.0"
-git clone --branch v0.7.0 --depth 1 https://github.com/agent-pipe-shared/agent-pipeline.git "$pipeline_release_dir"
+pipeline_release_tag="v0.7.0"
+pipeline_source_url="https://github.com/agent-pipe-shared/agent-pipeline.git"
+pipeline_release_dir="$HOME/.local/share/agent-pipeline-$pipeline_release_tag"
+git clone --branch "$pipeline_release_tag" --depth 1 \
+  "$pipeline_source_url" "$pipeline_release_dir"
 git -C "$pipeline_release_dir" switch -c pipeline-release-v0.7.0
 git -C "$pipeline_release_dir" remote get-url origin
 git -C "$pipeline_release_dir" describe --tags --exact-match
+```
+
+On Windows, use PowerShell from the consumer project root. The following
+directory is durable and outside the project; choose another durable path if
+`$env:LOCALAPPDATA` is unsuitable:
+
+```powershell
+$pipelineReleaseTag = 'v0.7.0'
+$pipelineSourceUrl = 'https://github.com/agent-pipe-shared/agent-pipeline.git'
+$pipelineReleaseDir = Join-Path $env:LOCALAPPDATA "AgentPipeline\agent-pipeline-$pipelineReleaseTag"
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pipelineReleaseDir) | Out-Null
+git clone --branch $pipelineReleaseTag --depth 1 $pipelineSourceUrl $pipelineReleaseDir
+git -C $pipelineReleaseDir switch -c pipeline-release-v0.7.0
+git -C $pipelineReleaseDir remote get-url origin
+git -C $pipelineReleaseDir describe --tags --exact-match
 ```
 
 Confirm the two Git readbacks show the official URL above and `v0.7.0` before
 running the installer from the same consumer project root. The local branch is
 required because cloning a tag otherwise leaves a detached HEAD, which the
 plugin's clean-source observer refuses; creating the branch does not move the
-checked-out release commit.
+checked-out release commit. The installer validates physical plugin files and
+the registry binding; it does not independently authenticate the GitHub source
+or a release signature. Treat those readbacks and your approved release channel
+as operator checks, not as proof supplied by the installer.
 
 ```sh
 node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs"
 ```
 
+On Windows, run the same installer from the consumer project root with:
+
+```powershell
+node (Join-Path $pipelineReleaseDir 'plugins/pipeline-core/install-agy.mjs')
+```
+
 At the first prompt choose **Approved Plugin Directory** (the default). Choose
 **Local Marketplace** only for an explicitly validated pre-release developer
-copy. Then choose **Workspace-Local** when the installer asks where to bind
+copy; if that development copy is unavailable, the installer refuses the
+selection instead of silently switching sources. Then choose
+**Workspace-Local** when the installer asks where to bind
 the plugin. The installer registers that exact physical plugin directory in
 the consumer project's `.agents/plugins.json`; keep the clone at the same path
 while it is registered. Do not hand-edit Agy registry or plugin files. The
 installer may offer a runner-local autonomous tool policy, but that option
 grants no plan, release, remote, or human authority.
+If its existing runner settings are malformed or linked through an alias, the
+optional policy update fails without replacing those bytes. Plugin registration
+may already have succeeded; inspect `.agents/plugins.json` and repair the
+settings deliberately before retrying that optional step.
 
 To upgrade after a newer final release tag is published, clone that tag into
 a **different** durable directory and run its `install-agy.mjs` from each
@@ -222,13 +256,19 @@ deleting an entry it cannot prove it owns; do not work around this by editing
 the registry by hand.
 
 If launching Agy from this same terminal, check Node.js immediately before
-launching it:
+launching it. On macOS/Linux use:
 
 ```sh
 command -v node
 ```
 
-For a desktop or service launch, this shell result does **not** prove the Agy
+On Windows, use PowerShell or Command Prompt:
+
+```powershell
+where.exe node
+```
+
+For a desktop or service launch, either shell result does **not** prove the Agy
 host's PATH. Inspect that launcher/service environment and confirm that Agy's
 own command tool can resolve and run `node --version` in a new session. If
 that readback is unavailable or denied, treat hook readiness as unknown;

@@ -8,6 +8,21 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "agy-final-return-tests",
+      "path": "plugins/pipeline-core/lib/agy-final-return.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "agy-host-commit-admission-tests",
+      "path": "plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "agy-host-commit-execution-tests",
+      "path": "plugins/pipeline-core/lib/agy-host-commit-execution.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "antigravity-execution-host-tests",
       "path": "plugins/pipeline-core/lib/antigravity-execution-host.test.mjs",
       "disposition": "required"
@@ -497,6 +512,11 @@
       "path": "plugins/pipeline-core/lib/main-session-route.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "model-role-session-tests",
+      "path": "plugins/pipeline-core/lib/model-role-session.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "native-plugin-readback-tests",

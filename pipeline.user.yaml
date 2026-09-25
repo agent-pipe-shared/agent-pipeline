@@ -85,7 +85,7 @@ routing:
         runner: "codex"
         selector:
           kind: "model-id"
-          value: "gpt-6-astra"
+          value: "gpt-6-sol"
         state: "default"
         status: "pipeline.codex-sandbox-execution-receipt.v1"
       eligibility:
@@ -95,7 +95,7 @@ routing:
       receipt: "pipeline.advisory-receipt.v1"
     critic_high_risk:
       antigravity:
-        effort: "max"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
@@ -115,7 +115,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-6-astra"
+          value: "gpt-6-sol"
         state: "default"
         unavailable: "defer"
     critic_normal:
@@ -128,19 +128,19 @@ routing:
         state: "unavailable"
         unavailable: "defer"
       claude:
-        effort: "high"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
-          value: "sonnet"
+          value: "opus"
         state: "default"
         unavailable: "defer"
       codex:
-        effort: "high"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-terra"
+          value: "gpt-6-sol"
         state: "default"
         unavailable: "defer"
     deep:
@@ -165,16 +165,16 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-terra"
+          value: "gpt-6-sol"
         state: "opt-in"
         unavailable: "defer"
     implement:
       antigravity:
-        effort: "high"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.8-flash-high"
+          value: "gemini-3.8-flash-medium"
         state: "opt-in"
         unavailable: "defer"
       claude:
@@ -186,24 +186,24 @@ routing:
         state: "default"
         unavailable: "defer"
       codex:
-        effort: "medium"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-luna"
+          value: "gpt-6-luna"
         state: "default"
         unavailable: "defer"
     mechanic:
       antigravity:
-        effort: "low"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gemini-3.8-flash-low"
+          value: "gemini-3.8-flash-medium"
         state: "unavailable"
         unavailable: "defer"
       claude:
-        effort: "medium"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
@@ -211,11 +211,11 @@ routing:
         state: "opt-in"
         unavailable: "defer"
       codex:
-        effort: "medium"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-luna"
+          value: "gpt-6-luna"
         state: "opt-in"
         unavailable: "defer"
     readiness:
@@ -240,7 +240,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-terra"
+          value: "gpt-6-luna"
         state: "default"
         unavailable: "defer"
     test_author:
@@ -253,19 +253,19 @@ routing:
         state: "unavailable"
         unavailable: "defer"
       claude:
-        effort: "high"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
-          value: "sonnet"
+          value: "opus"
         state: "opt-in"
         unavailable: "defer"
       codex:
-        effort: "high"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-terra"
+          value: "gpt-6-sol"
         state: "opt-in"
         unavailable: "defer"
   profiles:
@@ -292,7 +292,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gpt-6-astra"
+            value: "gpt-6-sol"
           state: "default"
           unavailable: "defer"
       execution_phase:
@@ -305,19 +305,19 @@ routing:
           state: "unavailable"
           unavailable: "defer"
         claude:
-          effort: "high"
+          effort: "medium"
           evidence: "dispatch-receipt"
           selector:
             kind: "alias"
-            value: "sonnet"
+            value: "opus"
           state: "default"
           unavailable: "defer"
         codex:
-          effort: "high"
+          effort: "medium"
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gpt-5.6-terra"
+            value: "gpt-6-sol"
           state: "default"
           unavailable: "defer"
     feature:
@@ -343,7 +343,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gpt-6-astra"
+            value: "gpt-6-sol"
           state: "default"
           unavailable: "defer"
       execution_phase:
@@ -360,7 +360,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "alias"
-            value: "sonnet"
+            value: "opus"
           state: "default"
           unavailable: "defer"
         codex:
@@ -368,7 +368,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gpt-5.6-terra"
+            value: "gpt-6-sol"
           state: "default"
           unavailable: "defer"
     mini:
@@ -382,19 +382,19 @@ routing:
           state: "unavailable"
           unavailable: "defer"
         claude:
-          effort: "high"
+          effort: "medium"
           evidence: "dispatch-receipt"
           selector:
             kind: "alias"
-            value: "sonnet"
+            value: "opus"
           state: "default"
           unavailable: "defer"
         codex:
-          effort: "high"
+          effort: "medium"
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gpt-5.6-terra"
+            value: "gpt-6-sol"
           state: "default"
           unavailable: "defer"
       execution_phase:
@@ -411,7 +411,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "alias"
-            value: "sonnet"
+            value: "opus"
           state: "default"
           unavailable: "defer"
         codex:
@@ -419,7 +419,7 @@ routing:
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
-            value: "gpt-5.6-terra"
+            value: "gpt-6-sol"
           state: "default"
           unavailable: "defer"
 runners:
@@ -429,6 +429,7 @@ runners:
     - "codex"
     - "antigravity"
 schema: "pipeline.user.v3"
+core_registry_sha256: "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5"
 session:
   keep_awake: true
 usage:

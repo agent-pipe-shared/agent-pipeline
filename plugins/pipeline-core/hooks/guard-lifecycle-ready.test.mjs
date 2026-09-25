@@ -90,6 +90,7 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
 // TPSHELL-*: the shell lane of the test-path authority gate. Imported from the library the
 // guard defers to, for the same reason AC-10 states above -- and because the write lane
 // (guard-testpath.mjs) reads the identical exports, which is the property TPSHELL-5 pins.
@@ -454,6 +455,81 @@ function withContinuityAuthority(path, {
 function readyStub() {
   return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
 }
+
+test("a valid architecture deferral does not let a missing physical map mint implementation authority", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const surface = { planPath: "specs/feature/plan.md", paths: ["src/new-feature.mjs"] };
+    const fitness = evaluateArchitectureFitness({ rootDir: path, mode: "planning", candidatePaths: surface.paths, files: surface.paths });
+    assert.equal(fitness.overallStatus, "blocked");
+    assert.ok(fitness.outcomes.some((item) => item.propertyId === "navigation-currency"
+      && item.violations?.some((finding) => finding.ruleId === "missing-navigation-index")));
+    const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      activeFeaturePlanningScopeFn: () => surface.planPath,
+      checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "deferred" }),
+      activeFeaturePlanningSurfaceFn: () => surface,
+      evaluateArchitectureFitnessFn: evaluateArchitectureFitness,
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
+    assert.match(result.stderr, /navigation-currency:restore-navigation-bundle/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("AC-7 reports expanded or unknown B1 rigor without deadlocking implementation authority", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const policy = JSON.parse(readFileSync(new URL("../../../policies/rigor-derivation.v1.json", import.meta.url), "utf8"));
+    const surface = { planPath: "specs/feature/plan.md", paths: ["src/planned.mjs"] };
+    const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+    let selectedProfile = "mini";
+    let actualPaths = ["src/planned.mjs"];
+    let actualSurfaceKnown = true;
+    const dependencies = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      activeFeaturePlanningScopeFn: () => surface.planPath,
+      checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "deferred" }),
+      activeFeaturePlanningSurfaceFn: () => surface,
+      evaluateArchitectureFitnessFn: () => ({ overallStatus: "pass" }),
+      activeFeatureSelectedProfileFn: () => selectedProfile,
+      inferRigorInputsFn: () => ({
+        actualPaths: { value: actualSurfaceKnown ? actualPaths : null, status: actualSurfaceKnown ? "available" : "unknown", sourceContract: "git.diff" },
+        reversibility: { value: "high", status: "available", sourceContract: "pipeline.reversibility.v1" },
+        diffStats: { value: { files: actualPaths.length, lines: 10 }, status: "available", sourceContract: "git.diff-stat" },
+      }),
+      loadRigorPolicyFn: () => policy,
+    };
+    assert.equal(evaluateLifecycleReadyGuard(bash(command), dependencies).exitCode, 0);
+    actualPaths = ["src/planned.mjs", "src/expanded.mjs"];
+    const advisory = evaluateLifecycleReadyGuard(bash(command), dependencies);
+    assert.equal(advisory.exitCode, 0);
+    assert.match(advisory.stderr, /GUARD-MINIMUM-RIGOR-ADVISORY/u);
+    assert.match(advisory.stderr, /selected mini; derived minimum feature/u);
+    assert.match(advisory.stderr, /ask the PO to choose the approach and model/iu);
+    selectedProfile = "feature";
+    assert.equal(evaluateLifecycleReadyGuard(bash(command), dependencies).exitCode, 0);
+    actualSurfaceKnown = false;
+    const unreadable = evaluateLifecycleReadyGuard(bash(command), dependencies);
+    assert.equal(unreadable.exitCode, 0);
+    assert.match(unreadable.stderr, /actual Git change surface is unavailable; it is unknown, not clean/u);
+    dependencies.activeFeatureSelectedProfileFn = () => null;
+    const missingProfile = evaluateLifecycleReadyGuard(bash(command), dependencies);
+    assert.equal(missingProfile.exitCode, 0);
+    assert.match(missingProfile.stderr, /no valid PO-bound lifecycle profile/u);
+    dependencies.activeFeatureSelectedProfileFn = () => "mini";
+    dependencies.activeFeaturePlanningSurfaceFn = () => null;
+    const missingSurface = evaluateLifecycleReadyGuard(bash(command), dependencies);
+    assert.equal(missingSurface.exitCode, 2);
+    assert.match(missingSurface.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u,
+      "an independent architecture-fitness denial is not weakened by B1 report-only rollout");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
 
 test("writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route", () => {
   const path = root();
@@ -7058,6 +7134,21 @@ test("TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected sui
     const plain = tpShellRun(path, `rm ${TPSHELL_TARGET}`);
     assert.equal(plain.exitCode, 2);
     assert.doesNotMatch(plain.stderr, /cannot parse arbitrary interpreter code/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("IR-4 incident replay: a read-only inventory index probe mentioning a protected suite needs no signature", () => {
+  const path = tpShellFixture();
+  try {
+    const command = `node -e "const inventory=JSON.parse(require('fs').readFileSync('docs/product-capability-inventory.json','utf8')); console.log(inventory.suites.indexOf('${TPSHELL_TARGET}'))"`;
+    const result = tpShellRun(path, command);
+    assert.equal(result.exitCode, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /GUARD-TESTPATH-SHELL|human-guard-override|signature/iu);
+
+    const hiddenWrite = tpShellRun(path,
+      `node -e "const p='${TPSHELL_TARGET}'; require('fs').writeFileSync(p,'x')"`);
+    assert.equal(hiddenWrite.exitCode, 2, "variable-indirected protected write must remain denied");
+    assert.match(hiddenWrite.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"));
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

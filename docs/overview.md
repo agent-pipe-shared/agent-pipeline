@@ -21,7 +21,7 @@ in the repository you intend to govern.
 | Product strand | What it contributes to this release scope | Status |
 | --- | --- | --- |
 | Phoenix | Durable delivery governance: explicit human decisions, candidate-bound evidence, deterministic gates before review, safe external-action boundaries, and recoverable public records. | Integrated foundation |
-| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Existing foundation; Nova B remains roadmap work |
+| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Nova A/B implementation is present in the repository; final 0.7 candidate-bound issue-criteria acceptance remains pending. |
 
 The documented Greenfield route is covered for Claude, Codex, and Antigravity:
 from an empty directory through public onboarding actions, plan approval and a
@@ -35,14 +35,17 @@ methodology does not mean that every host has identical native hooks, sandbox
 isolation, model identity, or platform coverage. Missing, stale, malformed, or
 candidate-mismatched evidence stays a typed non-success.
 
-## What is still a roadmap item
+## What is not yet qualified for 0.7
 
-Nova B remains active. It contains the next usability and operations work, such
-as easier plan amendments and formal close, clearer runner-specific approval
-and verify guidance, delivery-loop observability, and additional
-platform-specific evidence. Those items do not reduce the controls that are
-already integrated through Phoenix, and this overview does not present them as
-completed.
+Closing a Nova backlog item records that its delivery work was handled; it is
+not a substitute for checking every issue acceptance criterion against the
+final integrated 0.7 tree. Nova A/B source includes runner and workflow
+capabilities, but the current candidate still needs criterion-level evidence,
+full Verify, security checks, independent review, and any applicable human
+acceptance. Host-dependent behavior also needs readback from the runner that
+actually executes it. This overview therefore does not claim a released or
+fully accepted Nova B package, nor does it demote the integrated implementation
+back to a future roadmap promise.
 
 For the product entry point, use the top-level [README](../README.md). For
 the normal next documents, use the [documentation map](README.md):

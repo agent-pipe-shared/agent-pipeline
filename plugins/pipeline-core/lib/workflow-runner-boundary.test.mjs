@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { coordinateWorkflowRunnerReturn, normalizeWorkflowRunnerOutcome, runSyntheticWorkflowDispatch, runSyntheticWorkflowDispatchBatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
+import { CRITIC_REQUIRED_SCHEMA } from "./critic-skip-decision.mjs";
 import { gitDeps, verifyCommit } from "../scripts/dispatch-authorship-verify.mjs";
 import { writeDispatchRecord } from "../scripts/dispatch-record-write.mjs";
 
@@ -283,6 +284,96 @@ check("v4 read-only return writes once and never invokes commit verification", (
   assert.equal(result.record.authorship, "not-applicable");
   assert.equal(result.adapterInvocations, 1);
   assert.equal(verifyCalls, 0);
+});
+check("v4 stopped and undelivered returns record only truthful non-authorship", () => {
+  const completion = { identity, taskId: "P5B-RETURN-1", resultSha256: A, candidateCommit: "c".repeat(40), requestPath: "requests/write.json" };
+  const receipt = { schema: "pipeline.dispatch-record-write-receipt.v2", target: "evidence/dispatch-record-P5B-RETURN-1.json", sha256: B, bytes: 300, taskId: completion.taskId, candidateCommit: completion.candidateCommit, resultSha256: A, outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "stopped-without-commit" } };
+  let writes = 0;
+  let verifications = 0;
+  let receiptToWrite = receipt;
+  const adapter = {
+    writeDispatchRecord: () => { writes += 1; return receiptToWrite; },
+    verifyCommit: () => { verifications += 1; throw new Error("non-authoring return must not verify a commit"); },
+  };
+  const stopped = coordinateWorkflowRunnerReturn(recordExpected,
+    observation("failed", { schemaValid: true, outcome: "blocked", resultSha256: A }), completion, adapter);
+  assert.equal(stopped.ok, true);
+  assert.equal(stopped.code, "WR-OUTCOME-NONAUTHORING-RECORDED");
+  assert.equal(stopped.record.outcomeClassification, "stopped-without-commit");
+  assert.equal(stopped.record.authorship, "not-applicable");
+  assert.equal(writes, 1);
+  assert.equal(verifications, 0);
+
+  const undeliveredCompletion = { ...completion, resultSha256: null };
+  receiptToWrite = { ...receipt, resultSha256: null,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+    observationIdentity: identity };
+  const undelivered = coordinateWorkflowRunnerReturn(recordExpected,
+    observation("completed-but-undelivered", null), undeliveredCompletion, adapter);
+  assert.equal(undelivered.ok, true);
+  assert.equal(undelivered.code, "WR-OUTCOME-UNDELIVERED-RECORDED");
+  assert.equal(undelivered.resultSha256, null);
+  assert.equal(undelivered.record.authorship, "not-applicable");
+  assert.equal(undelivered.record.outcomeClassification, "completed-undelivered");
+  assert.equal(undelivered.adapterInvocations, 1);
+  assert.equal(writes, 2);
+  assert.equal(verifications, 0);
+  receiptToWrite = { ...receiptToWrite, observationIdentity: { ...identity, attemptId: "other-attempt" } };
+  const conflicting = coordinateWorkflowRunnerReturn(recordExpected,
+    observation("completed-but-undelivered", null), undeliveredCompletion, adapter);
+  assert.equal(conflicting.code, "WR-RECORD-UNVERIFIED");
+  assert.equal(conflicting.ok, false);
+  assert.equal(writes, 3);
+  assert.equal(verifications, 0);
+  const forgedDigest = coordinateWorkflowRunnerReturn(recordExpected,
+    observation("completed-but-undelivered", null), completion, adapter);
+  assert.equal(forgedDigest.code, "WR-RECORD-BINDING");
+  assert.equal(forgedDigest.adapterInvocations, 0);
+  assert.equal(writes, 3);
+});
+check("v4 undelivered coordinator publishes through the real exclusive writer", () => {
+  const root = mkdtempSync(join(tmpdir(), "workflow-undelivered-record-"));
+  try {
+    mkdirSync(join(root, "evidence"));
+    mkdirSync(join(root, "requests"));
+    const candidateCommit = "c".repeat(40);
+    const requestPath = "requests/undelivered.json";
+    const record = {
+      schema: "pipeline.dispatch-record.v4", taskId: recordExpected.taskId,
+      agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
+      rulesetSha: "0.7.0+local", dispatcher: "Elephant", candidateCommit,
+      resultSha256: null, outcome: "completed-no-delivery",
+      outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+      observationIdentity: identity, commits: [], log: [{ phase: "undelivered", toolUseCount: 1 }], report: null,
+      criticRequired: {
+        schema: CRITIC_REQUIRED_SCHEMA,
+        trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "low", riskFlag: false,
+          diff: { mechanical: false, architecture: false, guardrails: false, security: false } },
+        appliedRow: "T3",
+      },
+    };
+    writeFileSync(join(root, requestPath), `${JSON.stringify({
+      schema: "pipeline.dispatch-record-write-request.v1",
+      target: `evidence/dispatch-record-${recordExpected.taskId}.json`, record,
+    })}\n`);
+    let verificationCalls = 0;
+    const adapter = {
+      writeDispatchRecord: ({ requestPath: path }) => writeDispatchRecord({ repoRoot: root, requestPath: path }),
+      verifyCommit: () => { verificationCalls += 1; throw new Error("undelivered must not verify a commit"); },
+    };
+    const completion = { identity, taskId: recordExpected.taskId, candidateCommit, resultSha256: null, requestPath };
+    const observed = observation("completed-but-undelivered", null);
+    const result = coordinateWorkflowRunnerReturn(recordExpected, observed, completion, adapter);
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "WR-OUTCOME-UNDELIVERED-RECORDED");
+    assert.equal(result.record.authorship, "not-applicable");
+    assert.equal(verificationCalls, 0);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, "evidence", `dispatch-record-${recordExpected.taskId}.json`), "utf8")), record);
+    const replay = coordinateWorkflowRunnerReturn(recordExpected, observed, completion, adapter);
+    assert.equal(replay.ok, false);
+    assert.equal(replay.code, "WR-RECORD-WRITE-FAILED");
+    assert.equal(verificationCalls, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 check("return coordinator rejects stale bindings before record I/O", () => {
   let calls = 0;

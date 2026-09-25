@@ -27,7 +27,12 @@
 // `plan-runner-permissions`/`apply-runner-permissions` set contains only the exact entries
 // emitted for every fresh consumer. Lifecycle inspection may return its digest-bound
 // apply command as the typed repair for an already-ready consumer whose project-owned
-// settings contain only part of that fixed set. In either mode this CLI never writes
+// settings contain only part of that fixed set. A later PO-approved exception
+// permits automatic replacement of one complete historical four-entry family
+// only after this installed Claude plugin's version, manifest and executable
+// files have been read back and bound into the plan digest. It never applies
+// to the original operator-reviewed candidate set, a checkout, an incomplete
+// family, or a foreign permission entry. In either mode this CLI never writes
 // without `--activate`, and apply recomputes the plan against the current preimage before
 // accepting its digest. That split also addresses this item's history: an earlier dispatch
 // against this same item edited
@@ -45,10 +50,11 @@
 // fixture directories only. It never invokes `apply --activate` against this repository's
 // own real `.claude/settings.json`; see the backlog item's own dated implementation note
 // for the read-only `plan` output this mechanism proposes for this repo, left for explicit
-// PO review rather than committed.
+// PO review rather than committed. The version-carryforward exception does not
+// retroactively authorize that historical project-settings edit.
 
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -200,6 +206,39 @@ export const PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES = Object.freeze([
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 
+function installedRunnerPermissionReadback(fs) {
+  const lineage = runnerPermissionCacheLineage(SCRIPTS_DIR);
+  if (!lineage) return { status: "unavailable" };
+  const pluginRoot = dirname(SCRIPTS_DIR);
+  const manifestPath = join(pluginRoot, ".claude-plugin", "plugin.json");
+  const driverPath = join(SCRIPTS_DIR, "push-init.mjs");
+  const mergePath = join(SCRIPTS_DIR, "settings-allowlist-merge.mjs");
+  try {
+    for (const path of [pluginRoot, SCRIPTS_DIR, manifestPath, driverPath, mergePath]) {
+      const actual = normalizeRunnerPermissionPath(fs.realpathSync(path));
+      const expected = normalizeRunnerPermissionPath(path);
+      if ((process.platform === "win32" ? actual.toLowerCase() : actual)
+        !== (process.platform === "win32" ? expected.toLowerCase() : expected)) return { status: "unavailable" };
+    }
+    for (const path of [manifestPath, driverPath, mergePath]) {
+      const info = fs.lstatSync(path);
+      if (!info.isFile() || info.isSymbolicLink()) return { status: "unavailable" };
+    }
+    const manifestBytes = fs.readFileSync(manifestPath);
+    const manifest = JSON.parse(manifestBytes.toString("utf8"));
+    if (manifest?.name !== "pipeline-core" || manifest.version !== lineage.version) return { status: "unavailable" };
+    return {
+      status: "verified",
+      version: lineage.version,
+      manifestSha256: sha256(manifestBytes),
+      driverSha256: sha256(fs.readFileSync(driverPath)),
+      mergeSha256: sha256(fs.readFileSync(mergePath)),
+    };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object") {
@@ -211,7 +250,7 @@ function stable(value) {
 function diagnostic(path, code, message, repair) { return { path, code, message, repair }; }
 
 function defaultDeps() {
-  return { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync };
+  return { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync, renameSync, unlinkSync };
 }
 
 function selectedCandidates(candidateSet) {
@@ -321,11 +360,16 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateS
   }
   const removed = runnerCanonicalization?.removed ?? [];
   const canonicalizedFamilies = runnerCanonicalization?.canonicalizedFamilies ?? [];
+  const installedReadback = candidateSet === "runner-permissions" ? installedRunnerPermissionReadback(fs) : null;
+  const autoCarryforward = candidateSet === "runner-permissions"
+    && before.present
+    && canonicalizedFamilies.length > 0
+    && installedReadback?.status === "verified";
 
   if (added.length === 0 && removed.length === 0) {
     return {
       schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "no-op", root, target,
-      before: beforeSummary, candidates, added, removed, skipped, canonicalizedFamilies, after: null, planSha256: null, diagnostics: [],
+      before: beforeSummary, candidates, added, removed, skipped, canonicalizedFamilies, installedReadback, autoCarryforward, after: null, planSha256: null, diagnostics: [],
     };
   }
 
@@ -338,11 +382,11 @@ export function planSettingsAllowlistMerge({ rootDir = process.cwd(), candidateS
   const afterBytes = `${JSON.stringify(afterParsed, null, 2)}\n`;
   const after = { bytes: afterBytes, sha256: sha256(afterBytes), byteLength: Buffer.byteLength(afterBytes, "utf8") };
 
-  const planSha256 = sha256(JSON.stringify(stable({ root, target, before: beforeSummary, added, removed, skipped, canonicalizedFamilies, after: { sha256: after.sha256, byteLength: after.byteLength } })));
+  const planSha256 = sha256(JSON.stringify(stable({ root, target, before: beforeSummary, added, removed, skipped, canonicalizedFamilies, installedReadback, autoCarryforward, after: { sha256: after.sha256, byteLength: after.byteLength } })));
 
   return {
     schema: SETTINGS_ALLOWLIST_MERGE_PLAN_SCHEMA, status: "ready", root, target,
-    before: beforeSummary, candidates, added, removed, skipped, canonicalizedFamilies, after, planSha256, diagnostics: [],
+    before: beforeSummary, candidates, added, removed, skipped, canonicalizedFamilies, installedReadback, autoCarryforward, after, planSha256, diagnostics: [],
   };
 }
 

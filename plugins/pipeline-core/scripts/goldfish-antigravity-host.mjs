@@ -19,6 +19,7 @@ import { AGY_ERROR_TAXONOMY, invokeAgy, parseAgyOutput } from "../lib/antigravit
 import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { validateControlPlacement } from "./control-placement.mjs";
 import { validateRecord } from "./enforcement-conformance.mjs";
+import { runEvidenceCli } from "./enforcement-conformance-cli.mjs";
 
 export const CROSS_RUNNER_DISPATCH_RECEIPT_SCHEMA = "pipeline.cross-runner-dispatch-receipt.v1";
 export const E3_CODES = Object.freeze({
@@ -104,7 +105,15 @@ function canonicalGateRow(gates, id, status, nullDigests = false) {
  * Resolve the four E3 prerequisites from fixed, repository-owned readbacks.
  * Callers cannot supply, substitute, or upgrade this evidence in arguments.
  */
-export function readE3GateState({ root, candidate } = {}) {
+async function qualifyNativeA1({ root, recordPath, runnerVersion }) {
+  const checked = await runEvidenceCli(["check", "--root", root, "--runner", "antigravity",
+    "--runner-version", runnerVersion, "--record", recordPath]);
+  return checked.exitCode === 0 && checked.output?.binding?.matches === true
+    && checked.output?.qualification?.qualifies === true
+    && checked.output?.nativeMeasurementVerified === true;
+}
+
+export async function readE3GateState({ root, candidate } = {}, dependencies = {}) {
   try {
     const raw = readFileSync(join(root, E3_GATE_READBACK_PATH));
     const readback = JSON.parse(raw.toString("utf8"));
@@ -123,6 +132,15 @@ export function readE3GateState({ root, candidate } = {}) {
     const a1 = JSON.parse(a1Bytes.toString("utf8"));
     validateRecord(a1);
     if (a1.runner.name !== "antigravity" || a1.layer !== "runner-hook" || a1.measurement.status !== "measured" || a1.evaluator.outcome !== "pass" || a1.staleness.status !== "current" || a1.candidate.commit !== candidate.commit || a1.candidate.tree !== candidate.tree) throw new Error("A1 record is not a current Antigravity measurement");
+    // Record fields and matching hashes alone can be hand-authored. The
+    // native A1 checker must independently qualify the same physical record.
+    // Its current implementation deliberately returns unverified until a
+    // native producer/readback exists. Tests may inject this one verifier to
+    // exercise E3's provider-free downstream fixture, never the public CLI.
+    if (await (dependencies.qualifyNativeA1 ?? qualifyNativeA1)({ root,
+      recordPath: resolve(root, A1_RECORD_PATH), runnerVersion: a1.runner.version }) !== true) {
+      throw new Error("A1 native measurement is not independently verified");
+    }
 
     const a2Bytes = candidateFile(root, candidate, A2_TABLE_PATH, a2Gate.artifacts[0].sha256);
     if (!a2Bytes) throw new Error("A2 table is not candidate-bound");
@@ -284,14 +302,14 @@ export async function dispatchGoldfishToAntigravity({
   timeoutMs = 300_000,
   env = process.env,
   signal,
-} = {}) {
+} = {}, dependencies = {}) {
   if (typeof root !== "string" || typeof resultRoot !== "string" || typeof model !== "string" || model.trim() === "") return refused(E3_CODES.PACKET, "request");
   if (!packet || packet.schema !== ROLE_DISPATCH_REQUEST_SCHEMA || packet.transport !== "antigravity" || !/^pipeline-core:goldfish-[a-z0-9-]+$/u.test(packet.role)) return refused(E3_CODES.PACKET, "packet");
   const destination = resultPath(packet);
   if (typeof destination !== "string") return refused(E3_CODES.RESULT_DESTINATION, "resultDestination");
   const prepared = preflightRoleDispatch({ root, resultRoot, packet });
   if (prepared.status !== "prepared") return prepared;
-  const gate = readE3GateState({ root, candidate: prepared.candidate });
+  const gate = await (dependencies.readGateState ?? readE3GateState)({ root, candidate: prepared.candidate });
   if (gate.status !== "current") return refused(E3_CODES.PRECONDITION, "canonical-gate-readback");
   const fixture = fixtureExecutable(root, executable);
   if (!fixture) return refused(E3_CODES.FIXTURE_EXECUTABLE, "executable");

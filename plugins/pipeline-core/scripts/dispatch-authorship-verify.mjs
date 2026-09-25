@@ -106,13 +106,17 @@
  *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --strict <sha>
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, mkdtempSync, openSync, readFileSync, readSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
+import { AGY_HOST_OBSERVED_TRAILER, agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
+import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
+import { readPortableAgyAuthorshipExport } from "../lib/portable-agy-authorship-export.mjs";
+import { verifyCriticDispositionAddendumForRecord } from "./check-critic-skip-coverage.mjs";
 import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
 import {
   DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, LEGACY_DISPATCH_RECORD_SCHEMA, NON_TERMINAL_OUTCOMES, SAFE_TASK_ID, coveringPath, declaredCommits, declaredOrchestratorPaths,
@@ -460,6 +464,27 @@ export function verifyCommit(sha, deps) {
     return result(sha, VERDICT.fail, "record-unreadable", `record for \`${taskId}\` could not be read: ${error.message}`, { taskId });
   }
   if (record === null) {
+    const agyMarkers = parseTrailerBlock(message).filter((entry) => entry.key.toLowerCase() === "agy-host-observed");
+    if (agyMarkers.length === 1 && `${agyMarkers[0].key}: ${agyMarkers[0].value}` === AGY_HOST_OBSERVED_TRAILER) {
+      let portable = null;
+      if (typeof deps.verifyAgyPortableExport === "function") {
+        try { portable = deps.verifyAgyPortableExport(taskId, sha); }
+        catch { portable = { ok: false, code: "agy-export-readback-error" }; }
+      }
+      if (portable?.ok && portable.authority === "host-observed-portable") {
+        return result(sha, VERDICT.pass, "agy-portable-export-verified",
+          `signed redacted export binds Agy host observation, Critic-checked local verdict and Git commit for \`${taskId}\``,
+          { taskId, modelCheck: { classification: "host-observed-portable", reason: "signed redacted export and Git readback" } });
+      }
+      if (portable && portable.code !== "agy-export-missing") {
+        return result(sha, VERDICT.fail, "agy-portable-export-invalid",
+          `Agy portable export for \`${taskId}\` is present or attempted but fails exact signed readback`,
+          { taskId, exportCode: portable.code ?? "agy-export-unverified" });
+      }
+      return result(sha, VERDICT.unverifiable, "agy-portable-export-required",
+        `Agy host commit for \`${taskId}\` has no verifier-readable private record in this checkout; a separately signed redacted export is required for portable authorship`,
+        { taskId });
+    }
     return result(sha, VERDICT.fail, "record-missing", `trailer names \`${taskId}\` but no dispatch-record-${taskId}.json exists`, { taskId });
   }
   if (typeof record.taskId === "string" && record.taskId.trim() !== "" && record.taskId.trim() !== taskId) {
@@ -489,6 +514,16 @@ export function verifyCommit(sha, deps) {
       { taskId },
     );
   }
+  let portableForRecord;
+  const readPortableForRecord = () => {
+    if (portableForRecord !== undefined) return portableForRecord;
+    if (!isV4 || record.runner !== "antigravity"
+      || record.outcomeClassification?.kind !== "authored-commit"
+      || typeof deps.verifyAgyPortableExport !== "function") return (portableForRecord = null);
+    try { portableForRecord = deps.verifyAgyPortableExport(taskId, sha, record); }
+    catch { portableForRecord = { ok: false, code: "agy-export-readback-error" }; }
+    return portableForRecord;
+  };
   if (isV4 && !isCommitAuthorshipOutcome(record)) {
     return result(
       sha,
@@ -509,13 +544,43 @@ export function verifyCommit(sha, deps) {
     );
   }
   if ((isV3 || isV4) && criticDisposition(record) === "required") {
-    return result(
-      sha,
-      VERDICT.unverifiable,
-      "critic-evidence-pending",
-      `record for \`${taskId}\` requires a Critic under ${record.criticRequired.appliedRow}; task/candidate/digest-bound criticEvidence has not replaced the pending disposition`,
-      { taskId },
-    );
+    let addendum = null;
+    if (isV4 && record.runner === "antigravity"
+      && record.outcomeClassification?.kind === "authored-commit"
+      && typeof deps.verifyCriticAddendum === "function") {
+      try { addendum = deps.verifyCriticAddendum(taskId, record); }
+      catch { addendum = { ok: false, code: "critic-addendum-readback-error" }; }
+    }
+    if (!addendum?.ok) {
+      // A signed portable export substitutes for an absent private addendum,
+      // never for an addendum that is present but invalid.
+      if (!addendum || addendum.code === "critic-addendum-missing") {
+        const portable = readPortableForRecord();
+        if (portable?.ok && portable.authority === "host-observed-portable") {
+          // The signed subject was prepared only after a local Critic-bound PASS.
+          // The clone reader additionally binds the exact committed record bytes.
+          addendum = { ok: true, code: "critic-covered-by-signed-export" };
+        } else if (portable && portable.code !== "agy-export-missing") {
+          return result(sha, VERDICT.fail, "agy-portable-export-invalid",
+            `Agy portable export for \`${taskId}\` fails exact signed record readback`,
+            { taskId, exportCode: portable.code ?? "agy-export-unverified" });
+        }
+      }
+    }
+    if (!addendum?.ok) {
+      if (addendum && addendum.code !== "critic-addendum-missing") {
+        return result(sha, VERDICT.fail, "critic-addendum-invalid",
+          `record for \`${taskId}\` has a Critic addendum that is not independently bound`,
+          { taskId, addendumCode: addendum.code });
+      }
+      return result(
+        sha,
+        VERDICT.unverifiable,
+        "critic-evidence-pending",
+        `record for \`${taskId}\` requires a Critic under ${record.criticRequired.appliedRow}; task/candidate/digest-bound criticEvidence has not replaced the pending disposition`,
+        { taskId },
+      );
+    }
   }
   if (Object.hasOwn(record, "modelOverride")) {
     return result(
@@ -572,6 +637,32 @@ export function verifyCommit(sha, deps) {
   // Dimension 4: the recorded model, checked against the dispatched agent's own definition
   // (NVA-BL-78). Silent (no effect on verdict) when the record predates `agentType`.
   const modelCheck = compareRecordedModel(record);
+  let acceptedModelCheck = modelCheck;
+  if (modelCheck.classification === "runner-model-authority-required") {
+    let observation = null;
+    if (record.runner === "antigravity"
+      && record.outcomeClassification?.kind === "authored-commit"
+      && typeof deps.verifyAgyHostObservation === "function") {
+      try { observation = deps.verifyAgyHostObservation(taskId, record); }
+      catch { observation = { ok: false, code: "agy-host-observation-readback-error" }; }
+    }
+    if (!observation?.ok || observation.authority !== "host-observed-local") {
+      const portable = readPortableForRecord();
+      if (portable?.ok && portable.authority === "host-observed-portable") {
+        acceptedModelCheck = { classification: "host-observed-portable", reason: "signed redacted export and committed record readback" };
+      } else if (portable && portable.code !== "agy-export-missing") {
+        return result(sha, VERDICT.fail, "agy-portable-export-invalid",
+          `Agy portable export for \`${taskId}\` fails exact signed record readback`,
+          { taskId, exportCode: portable.code ?? "agy-export-unverified" });
+      } else {
+        return result(sha, VERDICT.unverifiable, "runner-model-authority-unverified",
+          `path coverage is fine, but the non-Claude runner's model and consent have no verifier-readable host binding: ${modelCheck.reason}`,
+          { taskId, modelCheck, ...(observation?.code ? { observationCode: observation.code } : {}) });
+      }
+    } else {
+      acceptedModelCheck = { classification: "host-observed-local", reason: "private receipt, consent, result and Git readback bound" };
+    }
+  }
   if (modelCheck.classification === "model-mismatch" || modelCheck.classification === "model-override-malformed") {
     return result(
       sha,
@@ -612,13 +703,44 @@ export function verifyCommit(sha, deps) {
   const orchestratorPaths = declaredOrchestratorPaths(record);
   return result(sha, VERDICT.pass, "bound", `bound to \`${taskId}\` (outcome \`${record.outcome}\`, ${changed.length} path(s) covered${orchestratorPaths.length > 0 ? `, ${orchestratorPaths.length} orchestrator-added` : ""})`, {
     taskId,
-    modelCheck,
+    modelCheck: acceptedModelCheck,
     ...(orchestratorPaths.length > 0 ? { orchestratorAddedFiles: orchestratorPaths } : {}),
   });
 }
 
-export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = DEFAULT_EVIDENCE_DIR } = {}) {
+function readExactAgyRecordBytes(evidenceDir, taskId, record) {
+  if (!isSafeTaskId(taskId)) return null;
+  const target = join(evidenceDir, `dispatch-record-${taskId}.json`);
+  let fd;
+  try {
+    if (realpathSync(evidenceDir) !== evidenceDir) return null;
+    const entry = lstatSync(target);
+    if (!entry.isFile() || entry.isSymbolicLink() || entry.size < 1 || entry.size > 2 * 1024 * 1024) return null;
+    fd = openSync(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    const before = fstatSync(fd);
+    if (before.dev !== entry.dev || before.ino !== entry.ino || before.size !== entry.size) return null;
+    const bytes = Buffer.allocUnsafe(entry.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = readSync(fd, bytes, offset, bytes.length - offset, null);
+      if (count === 0) return null;
+      offset += count;
+    }
+    const after = fstatSync(fd);
+    const current = lstatSync(target);
+    if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size
+      || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs
+      || current.dev !== before.dev || current.ino !== before.ino
+      || !bytes.equals(agyAuthoredRecordBytes(record))) return null;
+    return bytes;
+  } catch { return null; }
+  finally { if (fd !== undefined) closeSync(fd); }
+}
+
+export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = join(repoRoot, "evidence") } = {}) {
   const git = (args) => execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+  const agyRecordBytes = (taskId, record) => evidenceDir === join(repoRoot, "evidence")
+    ? readExactAgyRecordBytes(evidenceDir, taskId, record) : null;
   return {
     readCommitMessage: (sha) => git(["show", "-s", "--format=%B", `${sha}^{commit}`]),
     readChangedPaths: (sha) =>
@@ -627,6 +749,17 @@ export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = DEFAULT_EVIDENCE_D
         .map((line) => line.trim())
         .filter((line) => line !== ""),
     readRecord: (taskId) => readRecordFile(evidenceDir, taskId),
+    verifyAgyHostObservation: (taskId, record) => {
+      const recordBytes = agyRecordBytes(taskId, record);
+      return recordBytes === null ? { ok: false, code: "agy-record-bytes-unverifiable" }
+        : inspectAgyHostObservedLocalReadback({ root: repoRoot, taskId, record, recordBytes });
+    },
+    verifyAgyPortableExport: (taskId, sha, record) => readPortableAgyAuthorshipExport({ root: repoRoot, taskId, commit: sha, record }),
+    verifyCriticAddendum: (taskId, record) => {
+      const recordBytes = agyRecordBytes(taskId, record);
+      return recordBytes === null ? { ok: false, code: "critic-addendum-record-unverifiable" }
+        : verifyCriticDispositionAddendumForRecord({ root: repoRoot, taskId, record, recordBytes });
+    },
     readBlobAtCommit: (sha, path) => git(["show", `${sha}:${path}`]),
     runAllowlistedGenerator: (entry, sha) =>
       runGeneratorInIsolatedParentTree({ repoRoot, parentRef: `${sha}^`, scriptRelPath: entry.scriptPath, args: entry.args }),

@@ -17,6 +17,7 @@ import {
   inspectClaimedSessionAdmission,
   prepareCandidatePacket,
   publishClaimedSessionAdmission,
+  readConsumedCandidateReceipt,
   recordCandidateResult,
 } from "./critic-packet-preflight.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
@@ -207,6 +208,16 @@ check("claims once, records once, consumes once and capability-cleans only its c
     assert.equal(recordCandidateResult({ controlRoot: f.control, packetId: prepared.packet.packetId, result: { verdict: "pass" } }, { now: new Date("2026-07-18T12:03:00.000Z") }).replay, true);
     const consumed = consumeCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, receipt: { verdictStatus: "pass" } }, { now: new Date("2026-07-18T12:04:00.000Z") });
     assert.equal(consumed.code, "CPP-CONSUMED");
+    assert.deepEqual(readConsumedCandidateReceipt({ controlRoot: f.control,
+      packetId: prepared.packet.packetId }).receipt, { verdictStatus: "pass" });
+    const receiptPath = join(prepared.packetDir, "receipt.json");
+    const originalReceipt = readFileSync(receiptPath, "utf8");
+    const alteredReceipt = JSON.parse(originalReceipt);
+    alteredReceipt.body = { verdictStatus: "fail" };
+    writeFileSync(receiptPath, JSON.stringify(alteredReceipt));
+    assert.throws(() => readConsumedCandidateReceipt({ controlRoot: f.control,
+      packetId: prepared.packet.packetId }), expectCode("CPP-RECEIPT-DRIFT"));
+    writeFileSync(receiptPath, originalReceipt);
     assert.throws(() => consumeCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, receipt: { verdictStatus: "fail" } }), expectCode("CPP-CONSUME-REPLAY"));
     assert.equal(consumeCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, receipt: { verdictStatus: "pass" } }).replay, true);
     assert.throws(() => cleanupCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, cleanupCapability: "0".repeat(64) }), expectCode("CPP-CLEANUP"));

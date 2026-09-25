@@ -35,49 +35,77 @@ const cases = [
     assert.deepEqual({
       "epic.design.codex": route(registry.profiles.epic.design_phase.codex),
       "epic.design.claude": route(registry.profiles.epic.design_phase.claude),
+      "epic.design.antigravity": route(registry.profiles.epic.design_phase.antigravity),
       "epic.execution.codex": route(registry.profiles.epic.execution_phase.codex),
       "epic.execution.claude": route(registry.profiles.epic.execution_phase.claude),
+      "epic.execution.antigravity": route(registry.profiles.epic.execution_phase.antigravity),
       "feature.design.codex": route(registry.profiles.feature.design_phase.codex),
       "feature.design.claude": route(registry.profiles.feature.design_phase.claude),
+      "feature.design.antigravity": route(registry.profiles.feature.design_phase.antigravity),
       "feature.execution.codex": route(registry.profiles.feature.execution_phase.codex),
       "feature.execution.claude": route(registry.profiles.feature.execution_phase.claude),
+      "feature.execution.antigravity": route(registry.profiles.feature.execution_phase.antigravity),
       "mini.design.codex": route(registry.profiles.mini.design_phase.codex),
       "mini.design.claude": route(registry.profiles.mini.design_phase.claude),
+      "mini.design.antigravity": route(registry.profiles.mini.design_phase.antigravity),
       "mini.execution.codex": route(registry.profiles.mini.execution_phase.codex),
       "mini.execution.claude": route(registry.profiles.mini.execution_phase.claude),
+      "mini.execution.antigravity": route(registry.profiles.mini.execution_phase.antigravity),
       "advisory.codex": route(registry.duties.advisory.codex),
       "advisory.claude": route(registry.duties.advisory.claude),
+      "advisory.antigravity": route(registry.duties.advisory.antigravity),
       "advisory.claude.consult": route(registry.duties.advisory.claude.fallbacks[0]),
       "critic-high-risk.codex": route(registry.duties.critic_high_risk.codex),
       "critic-high-risk.claude": route(registry.duties.critic_high_risk.claude),
+      "critic-high-risk.antigravity": route(registry.duties.critic_high_risk.antigravity),
       "critic-normal.codex": route(registry.duties.critic_normal.codex),
       "critic-normal.claude": route(registry.duties.critic_normal.claude),
+      "critic-normal.antigravity": route(registry.duties.critic_normal.antigravity),
       "deep.codex": route(registry.duties.deep.codex),
       "deep.claude": route(registry.duties.deep.claude),
+      "deep.antigravity": route(registry.duties.deep.antigravity),
       "implement.codex": route(registry.duties.implement.codex),
       "implement.claude": route(registry.duties.implement.claude),
+      "implement.antigravity": route(registry.duties.implement.antigravity),
       "mechanic.codex": route(registry.duties.mechanic.codex),
       "mechanic.claude": route(registry.duties.mechanic.claude),
+      "mechanic.antigravity": route(registry.duties.mechanic.antigravity),
       "readiness.codex": route(registry.duties.readiness.codex),
       "readiness.claude": route(registry.duties.readiness.claude),
+      "readiness.antigravity": route(registry.duties.readiness.antigravity),
       "test-author.codex": route(registry.duties.test_author.codex),
       "test-author.claude": route(registry.duties.test_author.claude),
+      "test-author.antigravity": route(registry.duties.test_author.antigravity),
     }, {
-      "epic.design.codex": "gpt-6-astra / xhigh", "epic.design.claude": "opus / xhigh",
-      "epic.execution.codex": "gpt-5.6-terra / high", "epic.execution.claude": "sonnet / high",
-      "feature.design.codex": "gpt-6-astra / high", "feature.design.claude": "opus / high",
-      "feature.execution.codex": "gpt-5.6-terra / medium", "feature.execution.claude": "sonnet / medium",
-      "mini.design.codex": "gpt-5.6-terra / high", "mini.design.claude": "sonnet / high",
-      "mini.execution.codex": "gpt-5.6-terra / medium", "mini.execution.claude": "sonnet / medium",
-      "advisory.codex": "gpt-6-astra / max", "advisory.claude": "opus / not-applicable",
+      "epic.design.codex": "gpt-6-sol / xhigh", "epic.design.claude": "opus / xhigh",
+      "epic.design.antigravity": "gemini-3.1-pro-high / high",
+      "epic.execution.codex": "gpt-6-sol / medium", "epic.execution.claude": "opus / medium",
+      "epic.execution.antigravity": "gemini-3.8-flash-high / high",
+      "feature.design.codex": "gpt-6-sol / high", "feature.design.claude": "opus / high",
+      "feature.design.antigravity": "gemini-3.1-pro-high / high",
+      "feature.execution.codex": "gpt-6-sol / medium", "feature.execution.claude": "opus / medium",
+      "feature.execution.antigravity": "gemini-3.8-flash-high / high",
+      "mini.design.codex": "gpt-6-sol / medium", "mini.design.claude": "opus / medium",
+      "mini.design.antigravity": "gemini-3.8-flash-high / high",
+      "mini.execution.codex": "gpt-6-sol / medium", "mini.execution.claude": "opus / medium",
+      "mini.execution.antigravity": "gemini-3.8-flash-high / high",
+      "advisory.codex": "gpt-6-sol / max", "advisory.claude": "opus / not-applicable",
+      "advisory.antigravity": "gemini-3.1-pro-high / high",
       "advisory.claude.consult": "opus / max",
-      "critic-high-risk.codex": "gpt-6-astra / max", "critic-high-risk.claude": "opus / max",
-      "critic-normal.codex": "gpt-5.6-terra / high", "critic-normal.claude": "sonnet / high",
-      "deep.codex": "gpt-5.6-terra / medium", "deep.claude": "sonnet / medium",
-      "implement.codex": "gpt-5.6-luna / medium", "implement.claude": "sonnet / medium",
-      "mechanic.codex": "gpt-5.6-luna / medium", "mechanic.claude": "haiku / medium",
-      "readiness.codex": "gpt-5.6-terra / high", "readiness.claude": "sonnet / high",
-      "test-author.codex": "gpt-5.6-terra / high", "test-author.claude": "sonnet / high",
+      "critic-high-risk.codex": "gpt-6-sol / max", "critic-high-risk.claude": "opus / max",
+      "critic-high-risk.antigravity": "gemini-3.1-pro-high / high",
+      "critic-normal.codex": "gpt-6-sol / medium", "critic-normal.claude": "opus / medium",
+      "critic-normal.antigravity": "gemini-3.8-flash-high / high",
+      "deep.codex": "gpt-6-sol / medium", "deep.claude": "sonnet / medium",
+      "deep.antigravity": "gemini-3.8-flash-high / high",
+      "implement.codex": "gpt-6-luna / high", "implement.claude": "sonnet / medium",
+      "implement.antigravity": "gemini-3.8-flash-medium / medium",
+      "mechanic.codex": "gpt-6-luna / high", "mechanic.claude": "haiku / high",
+      "mechanic.antigravity": "gemini-3.8-flash-medium / medium",
+      "readiness.codex": "gpt-6-luna / high", "readiness.claude": "sonnet / high",
+      "readiness.antigravity": "gemini-3.8-flash-high / high",
+      "test-author.codex": "gpt-6-sol / medium", "test-author.claude": "opus / medium",
+      "test-author.antigravity": "gemini-3.8-flash-high / high",
     });
   }],
   ["complete V3 intent is accepted", () => assert.equal(validatePipelineUserV3(completeIntent()).ok, true)],
@@ -99,7 +127,7 @@ const cases = [
   }],
   ["Codex advisory selected-sandbox host-consult cell is frozen", () => {
     const cell = completeIntent().routing.duties.advisory.codex;
-    assert.deepEqual(cell, { adapter: "host-consult", effort: "max", evidence: "advisory-receipt", isolation: "selected-sandbox-network-open-read-only", runner: "codex", selector: { kind: "model-id", value: "gpt-6-astra" }, state: "default", status: "pipeline.codex-sandbox-execution-receipt.v1" });
+    assert.deepEqual(cell, { adapter: "host-consult", effort: "max", evidence: "advisory-receipt", isolation: "selected-sandbox-network-open-read-only", runner: "codex", selector: { kind: "model-id", value: "gpt-6-sol" }, state: "default", status: "pipeline.codex-sandbox-execution-receipt.v1" });
     const value = completeIntent(); value.routing.duties.advisory.codex.selector.value = "gpt-5.6-terra";
     const checked = validatePipelineUserV3(value); assert.equal(checked.ok, false); assert.ok(has(checked, "$.routing.duties.advisory.codex.selector.value", "frozen_mapping"));
   }],
@@ -135,8 +163,8 @@ const cases = [
   }],
   ["normal Antigravity and Codex Critic use registered routes", () => {
     const codexRoute = registry.duties.critic_normal.codex;
-    assert.equal(codexRoute.selector.value, "gpt-5.6-terra");
-    assert.equal(codexRoute.effort, "high");
+    assert.equal(codexRoute.selector.value, "gpt-6-sol");
+    assert.equal(codexRoute.effort, "medium");
 
     const agyRoute = registry.duties.critic_normal.antigravity;
     assert.equal(agyRoute.selector.value, "gemini-3.8-flash-high");
@@ -144,7 +172,7 @@ const cases = [
 
     const agyHighRisk = registry.duties.critic_high_risk.antigravity;
     assert.equal(agyHighRisk.selector.value, "gemini-3.1-pro-high");
-    assert.equal(agyHighRisk.effort, "max");
+    assert.equal(agyHighRisk.effort, "high");
   }],
   ["keep-awake accepts only its explicit boolean and legacy V3 absence remains compatible", () => {
     const enabled = completeIntent();

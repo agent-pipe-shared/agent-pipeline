@@ -26,6 +26,33 @@ weighting as a reader would, and it does not assess implementation correctness.
    be an ancestor of `C`. Do not change covered documentation, the capability
    inventory, governance data, or this protocol between `Y` and `C`.
 
+## Review-course limit
+
+One documentation course permits at most four complete two-stage rounds,
+including the initial round, and at most three public-document correction
+cycles between them. A correction cycle is one batch of edits to the covered
+documents followed by a fresh two-stage round; it counts once even when the
+batch needs multiple commits. Rewriting or re-numbering round IDs, restarting
+a session, or committing review evidence alone does not reset the course.
+Track rounds, correction cycles, reviewed commits, and remaining findings in
+the course handover. This is a procedural limit; the binding checker does not
+currently attest the course history or enforce these counts.
+Apply the count to an already-active course using its actual earlier rounds;
+do not invalidate a previously completed binding retroactively.
+
+If the fourth round still requires covered-document edits, or a fourth
+correction cycle would be needed, stop automatic corrections and further
+reader dispatches. Present the unresolved findings, completed rounds and
+corrections, and concrete options for a course decision. Do not label the
+binding passed, silently start a new course for the same documents/findings,
+or waive a finding by editing its disposition. An explicit course decision by
+the documentation owner may authorize a newly bounded course or defer the
+documentation/release; involve the PO only when existing authority rules
+require it. The decision does not substitute for a fresh final review or a
+passing binding.
+Additional documents or a genuinely new scope may need a separate course,
+but cannot erase unresolved findings from the existing one.
+
 The checker only proves committed-state equality and the presence of bounded,
 well-formed evidence. It does not prove reader identity, actual freshness,
 sandbox isolation, truthful provenance, or judgment quality. A JSON boolean

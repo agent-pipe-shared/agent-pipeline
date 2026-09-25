@@ -197,6 +197,7 @@ adrReferences: []
     it("enforces backfill safety and deterministic-pass rule", () => {
       const proposal = generateAdoptionProposal(tempDir);
       assert.equal(proposal.deterministicPassSafe, true);
+      assert.deepEqual(proposal.decisionOptions, [STATE_APPROVED_SCOPED, STATE_DEFERRED, STATE_PARTIAL]);
       assert.ok(proposal.coverageClass);
       assert.ok(proposal.confidence);
 
@@ -205,6 +206,32 @@ adrReferences: []
         assert.ok(stage.confidence);
         assert.ok(stage.effort.units);
         assert.ok(["measured", "estimated", "unavailable"].includes(stage.effort.status));
+      }
+    });
+
+    it("retains a durable deferral when proposing a missing physical map", () => {
+      const proposalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-proposal-deferral-"));
+      try {
+        applyAdoptionDecision({
+          rootDir: proposalRoot,
+          decision: STATE_DEFERRED,
+          scope: "src/",
+          rationale: "Existing repository may defer migration while its map is prepared",
+          reviewDate: "2027-10-20",
+          by: "PO"
+        });
+        // The signed fixture provisions a map before recording authority.
+        // Simulate a later physical-map loss without changing that decision.
+        fs.rmSync(path.join(proposalRoot, "architecture/map/index.md"));
+        assert.equal(fs.existsSync(path.join(proposalRoot, "architecture/map/index.md")), false);
+        const proposal = generateAdoptionProposal(proposalRoot);
+        assert.equal(resolveAdoptionState(proposalRoot).state, STATE_DEFERRED);
+        assert.equal(proposal.stages[0].stage, 1);
+        assert.ok(proposal.stages[0].primaryDeliverables.includes("architecture/map/index.md"));
+        assert.deepEqual(proposal.decisionOptions, [], "the existing decision must not be presented for repeat approval");
+        assert.ok(proposal.whatIsNotProposed.some((line) => line.includes("No repeat adoption decision")));
+      } finally {
+        fs.rmSync(proposalRoot, { recursive: true, force: true });
       }
     });
   });
@@ -392,6 +419,24 @@ describe("Adoption authority anti-forgery and durable readback", () => {
     assert.equal(JSON.parse(observed.stdout).state, "approved-scoped");
     const proposed = spawnSync(process.execPath, [script, "propose", "--root", root, "--json"], { encoding: "utf8" });
     assert.equal(proposed.status, 0, proposed.stderr);
+    assert.deepEqual(JSON.parse(proposed.stdout).decisionOptions, [], "installed CLI must not re-offer a durable approved decision");
+    const usage = fs.readFileSync(path.resolve("docs/usage.md"), "utf8");
+    for (const command of [
+      "architecture-adoption.mjs status --root <project-root> --json",
+      "architecture-adoption.mjs propose --root <project-root> --json",
+      "module-inventory.mjs --root <project-root> --check",
+      "generate-architecture-overview.mjs --root <project-root> --check",
+      "generate-architecture-overview.mjs --root <project-root> --write",
+    ]) assert.ok(usage.includes(command), `consumer guide must name the tested installed-plugin command: ${command}`);
+    const concept = path.join(root, "architecture/map/core.md");
+    fs.writeFileSync(concept, fs.readFileSync(concept, "utf8").replace("---\nid:", "---\ntype: Governed Module\nid:"));
+    const inventory = spawnSync(process.execPath, [path.join(plugin, "scripts/module-inventory.mjs"), "--root", root, "--check"], { encoding: "utf8" });
+    assert.equal(inventory.status, 0, inventory.stderr);
+    const overviewScript = path.join(plugin, "scripts/generate-architecture-overview.mjs");
+    const overviewWrite = spawnSync(process.execPath, [overviewScript, "--root", root, "--write"], { encoding: "utf8" });
+    assert.equal(overviewWrite.status, 0, overviewWrite.stderr);
+    const overviewCheck = spawnSync(process.execPath, [overviewScript, "--root", root, "--check"], { encoding: "utf8" });
+    assert.equal(overviewCheck.status, 0, overviewCheck.stderr);
     fs.unlinkSync(path.join(plugin, "schemas/pipeline.adoption-state.v1.json"));
     const missingSchema = spawnSync(process.execPath, [script, "status", "--root", root, "--json"], { encoding: "utf8" });
     assert.notEqual(missingSchema.status, 0);

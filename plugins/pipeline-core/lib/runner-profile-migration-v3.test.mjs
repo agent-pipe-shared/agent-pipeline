@@ -25,7 +25,7 @@ import {
 } from "./runner-profile-migration-v3.mjs";
 import * as migrationV3Module from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV2Registry } from "./runner-profiles-v2.mjs";
-import { CORE_OWNED_V3_SURFACES, loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import { CORE_OWNED_V3_SURFACES, RUNNER_PROFILES_V3_REGISTRY_SHA256, loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "./runtime-projection-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { main as migrationCli } from "../scripts/runner-profile-migration-v3.mjs";
@@ -241,6 +241,30 @@ record("v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable
     assert.equal(noopPlan.activation?.required, false);
     assert.equal(noopPlan.nextAction, null);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("V3 registry refresh preserves each explicit human-approval mode without silently switching chat and signature", () => {
+  for (const mode of ["chat", "signature"]) {
+    const source = v3Intent();
+    source.gates.human_approval = mode;
+    source.gates.push_approval = mode;
+    source.gates.reconcile_approval = mode;
+    source.gates.push_external_ledger = "required";
+    source.routing.duties.advisory.claude.fallbacks.pop();
+    const root = fixture(yaml(source));
+    try {
+      const plan = planRunnerProfileMigrationV3({ rootDir: root });
+      assert.equal(plan.status, "ready", `${mode} must plan: ${JSON.stringify(plan.diagnostics)}`);
+      assert.equal(plan.sourceKind, "v3-refresh");
+      assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+      const migrated = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+      assert.equal(validatePipelineUserV3(migrated).ok, true);
+      for (const key of ["human_approval", "push_approval", "reconcile_approval"]) {
+        assert.equal(migrated.gates[key], mode, `${key} must retain its explicit ${mode} decision`);
+      }
+      assert.equal(migrated.gates.push_external_ledger, "required");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
 });
 
 record("apply requires explicit activation and an unchanged in-process digest-only plan", () => {
@@ -565,6 +589,22 @@ record("already-current v3 inspects ready and plans noop", () => {
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
     assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), source);
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /session:\n  keep_awake: true\n/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("a newer registry-bound project cannot be downgraded by an older Core refresh", () => {
+  const intent = v3Intent();
+  intent.core_registry_sha256 = "f".repeat(64);
+  const source = yaml(intent);
+  const root = fixture(source);
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "invalid-source");
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "invalid-source");
+    assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), source);
+    intent.core_registry_sha256 = RUNNER_PROFILES_V3_REGISTRY_SHA256;
+    writeFileSync(join(root, "pipeline.user.yaml"), yaml(intent));
+    assert.equal(inspectRunnerProfileMigrationV3({ rootDir: root }).sourceKind, "v3");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -1229,10 +1269,10 @@ record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-ap
     assert.equal(plan.sourceKind, "v3-refresh");
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
-    assert.equal(refreshed.routing.duties.critic_normal.codex.selector.value, "gpt-5.6-terra");
-    assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "high");
+    assert.equal(refreshed.routing.duties.critic_normal.codex.selector.value, "gpt-6-sol");
+    assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "medium");
     assert.equal(refreshed.critic_export.schema, "pipeline.critic-export-policy.v1");
-    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-5\.6-terra"/u);
+    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-6-sol"/u);
     assert.doesNotMatch(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /runnerRoutes|worktype_mini_advisor/u);
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /criticExport:\n  policy: pipeline\.critic-export-policy\.v1/u);
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
@@ -1703,7 +1743,7 @@ record("a customised existing manifest is never replaced by the fresh seed", () 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 51, "the complete runner profile migration corpus must be registered before execution begins");
+assert.equal(cases.length, 53, "the complete runner profile migration corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

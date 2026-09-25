@@ -27,7 +27,7 @@ import {
   RequirementTraceabilityError,
   evaluateRequirementTraceability,
 } from "../lib/requirement-traceability.mjs";
-import { deriveRegisteredCriticCourseSource, CriticCourseAdmissionError } from "../lib/critic-course-admission.mjs";
+import { classifyRegisteredEvidenceOnlyCommits, CriticCourseAdmissionError } from "../lib/critic-course-admission.mjs";
 import { admitReviewAttempt, sha256Canonical } from "../lib/review-economy.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
@@ -360,7 +360,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     if (scope !== null) fail("CDP-COURSE-SCOPE", "A versioned feature Critic review requires an exact base-to-candidate range.");
     let source;
     try {
-      source = deriveRegisteredCriticCourseSource({ repoRoot: realRoot, featureId,
+      source = classifyRegisteredEvidenceOnlyCommits({ repoRoot: realRoot, featureId,
         baseCommit: baseCommit ?? baseTree, candidateCommit });
     } catch (error) {
       if (error instanceof CriticCourseAdmissionError) fail("CDP-COURSE-SOURCE", "Retained Critic course or candidate range is invalid.");
@@ -371,7 +371,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     }
     const round = source.history.length + 1;
     const correctionCommits = source.history.length === 0 ? 0
-      : source.history.at(-1).course.correctionCommitCount + source.rangeCommits.length;
+      : source.history.at(-1).course.correctionCommitCount + source.correctionCommits.length;
     const course = admitReviewAttempt({ round, correctionCommits, requestedMode: "full" });
     if (!course.ok) fail(course.courseGateRequired === true ? "CDP-COURSE-GATE" : "CDP-COURSE-INVALID",
       "Critic course does not admit another dispatch.");
@@ -379,7 +379,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
       featureId,
       sourceSha256: sha256Canonical({ manifestSha256: source.manifestSha256,
         historySha256: source.historySha256, baseCommit: source.baseCommit,
-        candidateCommit: source.candidateCommit, rangeCommits: source.rangeCommits }),
+        candidateCommit: source.candidateCommit, rangeCommits: source.rangeCommits,
+        correctionCommits: source.correctionCommits, evidenceOnlyCommits: source.evidenceOnlyCommits }),
       decisionSha256: sha256Canonical({ round, correctionCommits, code: course.code, mode: course.mode }),
       round,
       correctionCommits,

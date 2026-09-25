@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { reportSha256, validateDispatchRecord } from "../lib/dispatch-record.mjs";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { VERDICT, verifyCommit } from "./dispatch-authorship-verify.mjs";
-import { writeDispatchRecord } from "./dispatch-record-write.mjs";
+import { writeCriticDispositionAddendumObject, writeDispatchRecord, writeDispatchRecordObject } from "./dispatch-record-write.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
 
 const SHA = "a".repeat(40);
 const RESULT_SHA = "d".repeat(64);
@@ -69,6 +72,23 @@ check("writer publishes a closed v4 read-only receipt without commit authorship"
     assert.deepEqual(receipt.outcomeClassification, value.outcomeClassification);
     assert.deepEqual(validateDispatchRecord(JSON.parse(readFileSync(join(root, receipt.target)))), value);
   } finally { rmSync(root, { recursive: true, force: true }); }
+  const undelivered = record({
+    schema: "pipeline.dispatch-record.v4", taskId: "NVA-V4-UNDELIVERED",
+    outcome: "completed-no-delivery", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+    observationIdentity: { dispatchId: "dispatch-1", attemptId: "attempt-1" },
+    resultSha256: null, commits: [], report: null,
+  });
+  delete undelivered.criticSkip;
+  undelivered.criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" };
+  const undeliveredRoot = fixture(undelivered);
+  try {
+    const receipt = writeDispatchRecord({ repoRoot: undeliveredRoot, requestPath: "requests/write.json" });
+    assert.equal(receipt.schema, "pipeline.dispatch-record-write-receipt.v2");
+    assert.equal(receipt.resultSha256, null);
+    assert.deepEqual(receipt.observationIdentity, undelivered.observationIdentity);
+    assert.deepEqual(validateDispatchRecord(JSON.parse(readFileSync(join(undeliveredRoot, receipt.target)))), undelivered);
+    assert.throws(() => writeDispatchRecord({ repoRoot: undeliveredRoot, requestPath: "requests/write.json" }), /already exists/u);
+  } finally { rmSync(undeliveredRoot, { recursive: true, force: true }); }
 });
 check("malformed, missing, computed and mismatched records fail before publication", () => {
   const cases = [
@@ -227,7 +247,120 @@ check("target replacement after hard-link admission is detected without reading 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 13, "the complete dispatch-record writer corpus must be registered before execution begins");
+check("in-memory writer publishes Agy non-authoring observation but cannot bypass authored model binding", () => {
+  const value = record({
+    schema: "pipeline.dispatch-record.v4", taskId: "AGY-UNDELIVERED-1", runner: "antigravity",
+    model: "gemini-3.8-flash-high", effort: "high", resultSha256: null,
+    outcome: "completed-no-delivery", commits: [], report: null,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+    observationIdentity: { dispatchId: "agy-dispatch-1", attemptId: "attempt-1" },
+  });
+  delete value.criticSkip;
+  value.criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T4", reason: "An undelivered implementation attempt requires review." };
+  const root = fixture(value);
+  try {
+    const target = `evidence/dispatch-record-${value.taskId}.json`;
+    const receipt = writeDispatchRecordObject({ repoRoot: root, target, record: value });
+    assert.equal(receipt.schema, "pipeline.dispatch-record-write-receipt.v2");
+    assert.equal(receipt.outcomeClassification.kind, "completed-undelivered");
+    assert.equal(receipt.resultSha256, null);
+    assert.deepEqual(validateDispatchRecord(JSON.parse(readFileSync(join(root, target), "utf8"))), value);
+    assert.throws(() => writeDispatchRecordObject({ repoRoot: root, target, record: value }), /already exists/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+  const authored = { ...value, outcome: "completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" }, candidateCommit: "b".repeat(40), commits: ["b".repeat(40)], resultSha256: reportSha256("Done."), report: { text: "Done.", changedFiles: ["src/x.mjs"] } };
+  delete authored.observationIdentity;
+  const authoredRoot = fixture(authored);
+  try {
+    assert.throws(() => writeDispatchRecordObject({ repoRoot: authoredRoot, target: `evidence/dispatch-record-${authored.taskId}.json`, record: authored }),
+      error => error.code === "record-model" && /trusted host-observed model and consent binding/u.test(error.message));
+  } finally { rmSync(authoredRoot, { recursive: true, force: true }); }
+  const reportText = "Host observation: interrupted before Final Return.";
+  const stopped = { ...value, taskId: "AGY-INTERRUPTED-1", model: "unknown",
+    outcome: "stopped-without-commit", resultSha256: reportSha256(reportText),
+    report: { text: reportText, changedFiles: [] },
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "stopped-without-commit" },
+    log: [{ phase: "interrupted", toolUseCount: 1,
+      note: `attempt:${"1".repeat(32)};reason:AGY-NONZERO-EXIT` }] };
+  delete stopped.observationIdentity;
+  const stoppedRoot = fixture(stopped);
+  try {
+    const target = `evidence/dispatch-record-${stopped.taskId}.json`;
+    const receipt = writeDispatchRecordObject({ repoRoot: stoppedRoot, target, record: stopped });
+    assert.equal(receipt.outcomeClassification.kind, "stopped-without-commit");
+    assert.deepEqual(validateDispatchRecord(JSON.parse(readFileSync(join(stoppedRoot, target), "utf8"))), stopped);
+    assert.throws(() => writeDispatchRecordObject({ repoRoot: stoppedRoot,
+      target: "evidence/dispatch-record-UNSAFE-STOP.json", record: { ...stopped, taskId: "UNSAFE-STOP",
+        criticRequired: undefined, criticSkip: skip } }));
+  } finally { rmSync(stoppedRoot, { recursive: true, force: true }); }
+});
+
+function undeliveredFixture() {
+  const value = record({
+    schema: "pipeline.dispatch-record.v4", taskId: "AGY-ADDENDUM-1", runner: "antigravity",
+    model: "gemini-3.8-flash-high", effort: "high", resultSha256: null,
+    outcome: "completed-no-delivery", commits: [], report: null,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+    observationIdentity: { dispatchId: "agy-dispatch-1", attemptId: "attempt-1" },
+  });
+  delete value.criticSkip;
+  value.criticRequired = { schema: CRITIC_REQUIRED_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T4" };
+  const root = fixture(value);
+  const recordPath = `evidence/dispatch-record-${value.taskId}.json`;
+  const recordReceipt = writeDispatchRecordObject({ repoRoot: root, target: recordPath, record: value });
+  const criticPath = `evidence/critic-${value.taskId}.md`;
+  const criticBytes = Buffer.from("Independent Critic reviewed the undelivered attempt.\n");
+  writeFileSync(join(root, criticPath), criticBytes);
+  const addendum = {
+    schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath, recordSha256: recordReceipt.sha256,
+    taskId: value.taskId, candidateCommit: value.candidateCommit,
+    reviewCandidateCommit: "e".repeat(40),
+    criticPacketId: "d".repeat(32), criticReceiptSha256: "c".repeat(64),
+    criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId: value.taskId,
+      candidateCommit: value.candidateCommit, path: criticPath, sha256: createHash("sha256").update(criticBytes).digest("hex") },
+  };
+  return { root, value, addendum, criticPath };
+}
+
+check("Critic addendum writer publishes exclusively and coverage reads the exact record bytes", () => {
+  const { root, value, addendum } = undeliveredFixture();
+  try {
+    const receipt = writeCriticDispositionAddendumObject({ repoRoot: root, addendum });
+    assert.equal(receipt.target, criticDispositionAddendumPath(value.taskId));
+    assert.equal(receipt.recordSha256, addendum.recordSha256);
+    const bytes = readFileSync(join(root, receipt.target));
+    assert.equal(receipt.sha256, createHash("sha256").update(bytes).digest("hex"));
+    assert.deepEqual(JSON.parse(bytes), addendum);
+    const coverage = evaluateRepositoryCriticSkipCoverage({ root, readChangedPaths: () => [],
+      gitRead: (args) => args[1] === "--git-common-dir" ? ".git" : "e".repeat(40) });
+    assert.equal(coverage.ok, false, "a byte-bound file is not an independent Critic receipt");
+    assert.match(coverage.readFindings.join("\n"), /consumed Critic receipt is unavailable/u);
+    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: root, addendum }), /already exists/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Critic addendum writer rejects drift and cannot overwrite an occupied target", () => {
+  const { root, value, addendum, criticPath } = undeliveredFixture();
+  try {
+    const target = join(root, criticDispositionAddendumPath(value.taskId));
+    for (const invalid of [
+      { ...addendum, recordSha256: "f".repeat(64) },
+      { ...addendum, candidateCommit: "f".repeat(40) },
+      { ...addendum, criticEvidence: { ...addendum.criticEvidence, taskId: "OTHER" } },
+    ]) {
+      assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: root, addendum: invalid }));
+      assert.equal(existsSync(target), false);
+    }
+    writeFileSync(join(root, criticPath), "changed review bytes\n");
+    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: root, addendum }), /digest mismatch/u);
+    assert.equal(existsSync(target), false);
+    writeFileSync(join(root, criticPath), "Independent Critic reviewed the undelivered attempt.\n");
+    writeFileSync(target, "foreign\n");
+    assert.throws(() => writeCriticDispositionAddendumObject({ repoRoot: root, addendum }), /already exists/u);
+    assert.equal(readFileSync(target, "utf8"), "foreign\n");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 16, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

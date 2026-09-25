@@ -129,7 +129,7 @@ test("V3 plan projects epic/feature advisory and excludes mini advisory", () => 
     assert.match(claude.after.bytes, /hostGate: visible-not-bypassed/u);
     assert.match(claude.after.bytes, /providerGate: visible-not-bypassed/u);
     assert.match(claude.after.bytes, /elephant_epic_design/u);
-    assert.match(claude.after.bytes, /Adapter selector catalog — Claude aliases: haiku, opus, sonnet; Codex\/OpenAI model IDs: gpt-5\.6-luna, gpt-5\.6-terra, gpt-6-astra\./u);
+    assert.match(claude.after.bytes, /Adapter selector catalog — Claude aliases: haiku, opus, sonnet; Codex\/OpenAI model IDs: gpt-6-luna, gpt-6-sol\./u);
     assert.match(claude.after.bytes, /language:\n  human_facing: de\n  unowned_language_sentinel: exact/u);
     assert.match(claude.after.bytes, /language:\n  human_facing: de\n  unowned_language_sentinel: exact\nsession:\n  keep_awake: true\ncustomBefore: exact\n/u);
     assert.ok(claude.after.bytes.endsWith(SUFFIX));
@@ -192,9 +192,9 @@ test("V3 planning is deterministic, read-only, and byte-preserving", () => {
     assert.deepEqual(second, first);
     assert.ok(first.targets.filter((entry) => entry.unowned).every((entry) => entry.unowned.preserved));
     assert.deepEqual(Object.fromEntries(targetPaths.map((path) => [path, readFileSync(join(root, path), "utf8")])), before);
-    assert.match(target(first, ".codex/agents/implementor.toml").after.bytes, /model = "gpt-5\.6-luna"/u);
-    assert.match(target(first, ".codex/agents/critic.toml").after.bytes, /model = "gpt-5\.6-terra"/u);
-    assert.equal(target(first, ".codex/agents/critic.toml").route.requested.effort, "high");
+    assert.match(target(first, ".codex/agents/implementor.toml").after.bytes, /model = "gpt-6-luna"/u);
+    assert.match(target(first, ".codex/agents/critic.toml").after.bytes, /model = "gpt-6-sol"/u);
+    assert.equal(target(first, ".codex/agents/critic.toml").route.requested.effort, "medium");
     assert.match(target(first, ".codex/agents/consult-advisor.toml").after.bytes, /sandbox_mode = "read-only"/u);
   } finally {
     rmSync(root, { recursive: true, force: true });

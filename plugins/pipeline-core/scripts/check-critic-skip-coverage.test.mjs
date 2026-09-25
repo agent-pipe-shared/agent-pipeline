@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { DEFAULT_LEGACY_RECONCILE_INDEX_PATH, LEGACY_RECONCILE_SCHEMA, evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
+import { DEFAULT_LEGACY_RECONCILE_INDEX_PATH, LEGACY_RECONCILE_SCHEMA, evaluateRepositoryCriticSkipCoverage, evaluateReviewAdmission, readCommitChangedPaths, verifyCriticDispositionAddendumForRecord, walkDispatchRecords } from "./check-critic-skip-coverage.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
 
 const SHA = "a".repeat(40);
 const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
@@ -39,12 +41,188 @@ function v4(taskId, disposition) {
   };
 }
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
-const evaluate = (root, paths = ["generated/output.json"]) => evaluateRepositoryCriticSkipCoverage({ root, readChangedPaths: () => paths });
+const evaluate = (root, paths = ["generated/output.json"], options = {}) => evaluateRepositoryCriticSkipCoverage({ root, readChangedPaths: () => paths, ...options });
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const criticReceiptSha256 = "c".repeat(64);
+const criticPacketId = "d".repeat(32);
+const reviewCandidateCommit = "e".repeat(40);
+const recordBlobOid = "b".repeat(40);
+const boundReview = (recordBytes) => ({
+  gitRead: (args) => args[1] === "--git-common-dir" ? ".git" : recordBlobOid,
+  readGitBlob: () => Buffer.from(recordBytes),
+  readBoundCriticReceipt: () => ({ packet: { request: { taskId: "UNDELIVERED" },
+    references: [{ kind: "evidence", path: "evidence/dispatch-record-UNDELIVERED.json", candidateBlobOid: recordBlobOid }] },
+  critic: { reviewPass: true, candidate: { commit: reviewCandidateCommit } }, criticReceiptSha256 }),
+});
 function reconcileIndex(entry) { return json({ schema: LEGACY_RECONCILE_SCHEMA, entries: [entry] }); }
 function reconciledNoCommitRecord(taskId = "HISTORICAL") {
   return v3(taskId, { outcome: "partial-analysis-only", commits: [], criticRequired: required() });
 }
+function undelivered(taskId = "UNDELIVERED") {
+  return v4(taskId, {
+    runner: "antigravity", model: "gemini-3.8-flash-high", effort: "high",
+    outcome: "completed-no-delivery", commits: [], report: null,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+    observationIdentity: { dispatchId: taskId, attemptId: "attempt-1" },
+    criticRequired: required(),
+  });
+}
+function addendum(taskId, recordBytes, criticBytes) {
+  return {
+    schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA,
+    recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: sha256(recordBytes),
+    taskId, candidateCommit: SHA,
+    reviewCandidateCommit,
+    criticPacketId, criticReceiptSha256,
+    criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit: SHA,
+      path: `evidence/critic-${taskId}.md`, sha256: sha256(criticBytes) },
+  };
+}
+
+test("immutable v4 undelivered record is covered by an exact byte-bound Critic addendum", () => {
+  const taskId = "UNDELIVERED";
+  const recordBytes = json(undelivered(taskId));
+  const criticBytes = "Independent Critic review for UNDELIVERED.\n";
+  const root = fixture({
+    [`evidence/dispatch-record-${taskId}.json`]: recordBytes,
+    [`evidence/critic-${taskId}.md`]: criticBytes,
+    [criticDispositionAddendumPath(taskId)]: json(addendum(taskId, recordBytes, criticBytes)),
+  });
+  const bound = boundReview(recordBytes);
+  const unbound = evaluate(root, [], { gitRead: bound.gitRead });
+  assert.equal(unbound.ok, false);
+  assert.match(unbound.readFindings.join("\n"), /consumed Critic receipt is unavailable/u);
+  const result = evaluate(root, [], bound);
+  assert.equal(result.ok, true);
+  assert.equal(result.requiredRecordCount, 0);
+  assert.equal(result.criticEvidenceRecordCount, 1);
+  const review = evaluateReviewAdmission({ root, taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [], ...bound });
+  assert.equal(review.ok, false);
+  assert.equal(review.coveredRecordCount, 1);
+  assert.match(review.readFindings.join("\n"), /found 0/u);
+});
+
+test("immutable authored Agy v4 record can be resolved by the same independently bound Critic addendum", () => {
+  const taskId = "UNDELIVERED";
+  const authored = v4(taskId, { runner: "antigravity", model: "gemini-3.8-flash-high",
+    effort: "high", outcome: "completed", candidateCommit: SHA,
+    resultSha256: sha256("Implemented approved change."), commits: [SHA],
+    report: { text: "Implemented approved change.", changedFiles: ["src.txt"] },
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    criticRequired: required() });
+  const recordBytes = json(authored);
+  const criticBytes = "Independent review of authored Agy delivery.\n";
+  const root = fixture({ [`evidence/dispatch-record-${taskId}.json`]: recordBytes,
+    [`evidence/critic-${taskId}.md`]: criticBytes,
+    [criticDispositionAddendumPath(taskId)]: json(addendum(taskId, recordBytes, criticBytes)) });
+  const reviewed = evaluate(root, ["src.txt"], boundReview(recordBytes));
+  assert.equal(reviewed.ok, true, reviewed.readFindings.join("\n"));
+  assert.equal(reviewed.criticEvidenceRecordCount, 1);
+  assert.equal(verifyCriticDispositionAddendumForRecord({ root, taskId, record: authored,
+    recordBytes: Buffer.from(recordBytes), options: boundReview(recordBytes) }).code,
+  "critic-addendum-bound");
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`),
+    json({ ...authored, commits: [] }));
+  assert.match(evaluate(root, ["src.txt"], boundReview(recordBytes)).readFindings.join("\n"),
+    /authored-commit terminal record requires candidateCommit/u);
+});
+
+test("interrupted Agy v4 remains pending until exact independent Critic review", () => {
+  const taskId = "UNDELIVERED";
+  const report = "Host observation: Agy invocation interrupted before a validated Final Return.";
+  const stopped = v4(taskId, {
+    runner: "antigravity", model: "unknown", effort: "high", outcome: "stopped-without-commit",
+    resultSha256: sha256(report), commits: [],
+    log: [{ phase: "interrupted", toolUseCount: 1,
+      note: `attempt:${"1".repeat(32)};reason:AGY-NONZERO-EXIT` }],
+    report: { text: report, changedFiles: [] },
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "stopped-without-commit" },
+    criticRequired: { schema: CRITIC_REQUIRED_SCHEMA,
+      trigger: trigger({ riskFlag: true }), appliedRow: "T4", reason: "Independent review required." },
+  });
+  const recordBytes = json(stopped);
+  const criticBytes = "Independent Critic review for interrupted invocation.\n";
+  const root = fixture({ [`evidence/dispatch-record-${taskId}.json`]: recordBytes,
+    [`evidence/critic-${taskId}.md`]: criticBytes });
+  const pending = evaluate(root, []);
+  assert.equal(pending.ok, false);
+  assert.match(pending.readFindings.join("\n"), /Critic is required/u);
+  writeFileSync(join(root, criticDispositionAddendumPath(taskId)),
+    json(addendum(taskId, recordBytes, criticBytes)));
+  const reviewed = evaluate(root, [], boundReview(recordBytes));
+  assert.equal(reviewed.ok, true, reviewed.readFindings.join("\n"));
+  assert.equal(reviewed.criticEvidenceRecordCount, 1);
+});
+
+test("Critic addendum checks the reviewed candidate's real Git blob and explicit packet reference", () => {
+  const taskId = "UNDELIVERED";
+  const recordPath = `evidence/dispatch-record-${taskId}.json`;
+  const criticBytes = "Independent Critic review for UNDELIVERED.\n";
+  const root = fixture({ "seed.txt": "base\n", [`evidence/critic-${taskId}.md`]: criticBytes });
+  const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
+  const git = (...args) => execFileSync("git", args, { cwd: root, env: cleanEnv, encoding: "utf8" }).trim();
+  git("init", "-q");
+  git("add", "seed.txt");
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "base");
+  const candidateCommit = git("rev-parse", "HEAD");
+  const recordBytes = json({ ...undelivered(taskId), candidateCommit });
+  writeFileSync(join(root, recordPath), recordBytes);
+  git("add", recordPath);
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "review candidate");
+  const reviewCommit = git("rev-parse", "HEAD");
+  const recordBlob = git("rev-parse", `${reviewCommit}:${recordPath}`);
+  const entry = { ...addendum(taskId, recordBytes, criticBytes), candidateCommit, reviewCandidateCommit: reviewCommit,
+    criticEvidence: { ...addendum(taskId, recordBytes, criticBytes).criticEvidence, candidateCommit } };
+  writeFileSync(join(root, criticDispositionAddendumPath(taskId)), json(entry));
+  const review = { packet: { request: { taskId }, references: [{ kind: "evidence", path: recordPath, candidateBlobOid: recordBlob }] },
+    critic: { reviewPass: true, candidate: { commit: reviewCommit } }, criticReceiptSha256 };
+  const passing = evaluate(root, [], { readBoundCriticReceipt: () => review });
+  assert.equal(passing.ok, true, passing.readFindings.join("\n"));
+  const unreferenced = evaluate(root, [], { readBoundCriticReceipt: () => ({ ...review, packet: { ...review.packet, references: [] } }) });
+  assert.match(unreferenced.readFindings.join("\n"), /does not bind the exact immutable dispatch record/u);
+});
+
+test("Critic addendum rejects record drift, evidence drift, forged binding and orphan files", () => {
+  const taskId = "UNDELIVERED";
+  const recordBytes = json(undelivered(taskId));
+  const criticBytes = "Independent Critic review for UNDELIVERED.\n";
+  const entry = addendum(taskId, recordBytes, criticBytes);
+  const path = criticDispositionAddendumPath(taskId);
+  const root = fixture({
+    [`evidence/dispatch-record-${taskId}.json`]: recordBytes,
+    [`evidence/critic-${taskId}.md`]: criticBytes,
+    [path]: json(entry),
+  });
+  const bound = boundReview(recordBytes);
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), `${recordBytes}\n`);
+  assert.match(evaluate(root, []).readFindings.join("\n"), /does not bind an immutable Critic-required/u);
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), recordBytes);
+  writeFileSync(join(root, `evidence/critic-${taskId}.md`), "changed\n");
+  assert.match(evaluate(root, []).readFindings.join("\n"), /digest mismatch/u);
+  writeFileSync(join(root, `evidence/critic-${taskId}.md`), criticBytes);
+  writeFileSync(join(root, path), json({ ...entry, candidateCommit: "b".repeat(40) }));
+  assert.match(evaluate(root, []).readFindings.join("\n"), /evidence binding|does not bind/u);
+  writeFileSync(join(root, path), json(entry));
+  const wrongReceipt = evaluate(root, [], { ...bound, readBoundCriticReceipt: () => ({ packet: { request: { taskId } },
+    critic: { reviewPass: true, candidate: { commit: reviewCandidateCommit } }, criticReceiptSha256: "f".repeat(64) }) });
+  assert.match(wrongReceipt.readFindings.join("\n"), /does not match a passed, consumed/u);
+  const wrongTask = evaluate(root, [], { ...bound, readBoundCriticReceipt: () => ({ packet: { request: { taskId: "OTHER" } },
+    critic: { reviewPass: true, candidate: { commit: reviewCandidateCommit } }, criticReceiptSha256 }) });
+  assert.match(wrongTask.readFindings.join("\n"), /does not match a passed, consumed/u);
+  const failedReview = evaluate(root, [], { ...bound, readBoundCriticReceipt: () => ({ packet: { request: { taskId } },
+    critic: { reviewPass: false, candidate: { commit: reviewCandidateCommit } }, criticReceiptSha256 }) });
+  assert.match(failedReview.readFindings.join("\n"), /does not match a passed, consumed/u);
+  const noRecordReference = evaluate(root, [], { ...bound, readBoundCriticReceipt: () => ({ packet: { request: { taskId }, references: [] },
+    critic: { reviewPass: true, candidate: { commit: reviewCandidateCommit } }, criticReceiptSha256 }) });
+  assert.match(noRecordReference.readFindings.join("\n"), /does not bind the exact immutable dispatch record/u);
+  const changedReviewBlob = evaluate(root, [], { ...bound, readGitBlob: () => Buffer.from("different") });
+  assert.match(changedReviewBlob.readFindings.join("\n"), /does not bind the exact immutable dispatch record/u);
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), json(v4(taskId, { criticRequired: required() })));
+  assert.match(evaluate(root, []).readFindings.join("\n"), /does not bind an immutable Critic-required/u);
+  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), recordBytes);
+  writeFileSync(join(root, "evidence/dispatch-critic-addendum-ORPHAN.json"), json({ ...entry, taskId: "ORPHAN", recordPath: "evidence/dispatch-record-ORPHAN.json" }));
+  assert.match(evaluate(root, []).readFindings.join("\n"), /orphan critic addendum/u);
+});
 
 test("walkDispatchRecords retains source paths and reports malformed JSON", () => {
   const root = fixture({ "evidence/dispatch-record-A.json": json({ taskId: "A" }), "evidence/dispatch-record-B.json": "{" });
@@ -80,6 +258,34 @@ test("a byte-bound reconciliation preserves a truthful terminal no-commit record
   assert.equal(result.ok, true);
   assert.equal(result.reconciledLegacyRecordCount, 1);
   assert.equal(result.applicableRecordCount, 0);
+});
+
+test("historical no-commit reconciliation cannot hide a new v4 undelivered record", () => {
+  const recordPath = "evidence/dispatch-record-AGY-UNDELIVERED.json";
+  const record = v4("AGY-UNDELIVERED", {
+    runner: "antigravity", model: "gemini-3.8-flash-high", effort: "high",
+    outcome: "completed-no-delivery", commits: [], report: null,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+    observationIdentity: { dispatchId: "AGY-UNDELIVERED", attemptId: "attempt-1" },
+    criticRequired: required(),
+  });
+  const recordBytes = json(record);
+  const evidencePath = "evidence/undelivered-note.md";
+  const evidenceBytes = "This attempt did not deliver a commit.\n";
+  const root = fixture({
+    [recordPath]: recordBytes,
+    [evidencePath]: evidenceBytes,
+    [DEFAULT_LEGACY_RECONCILE_INDEX_PATH]: reconcileIndex({
+      recordPath, recordSha256: sha256(recordBytes), terminalKind: "stopped-without-commit",
+      disposition: { kind: "evidence", path: evidencePath, sha256: sha256(evidenceBytes) },
+    }),
+  });
+  const result = evaluate(root);
+  assert.equal(result.ok, false);
+  assert.match(result.readFindings.join("\n"), /v4 record cannot be removed from coverage/u);
+  const review = evaluateReviewAdmission({ root, taskId: "AGY-UNDELIVERED", candidateCommit: SHA, readChangedPaths: () => [] });
+  assert.equal(review.ok, false);
+  assert.match(review.readFindings.join("\n"), /v4 record cannot be removed from review admission/u);
 });
 
 test("legacy reconciliation fails closed on source drift, duplicate record paths, and disposition digest drift", () => {
@@ -188,12 +394,17 @@ test("v4 pending, skipped and evidenced records remain actual coverage consumers
   const digest = createHash("sha256").update(bytes).digest("hex");
   const pendingRoot = fixture({
     "evidence/dispatch-record-PENDING.json": json(v4("PENDING", { criticRequired: required() })),
+    "evidence/dispatch-record-UNDELIVERED.json": json(v4("UNDELIVERED", {
+      criticRequired: required(), outcome: "completed-no-delivery",
+      outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "completed-undelivered" },
+      observationIdentity: { dispatchId: "dispatch-1", attemptId: "attempt-1" },
+    })),
     "evidence/dispatch-record-SKIPPED.json": json(v4("SKIPPED", { criticSkip: skip() })),
   });
   const pending = evaluate(pendingRoot);
   assert.equal(pending.ok, false);
-  assert.equal(pending.applicableRecordCount, 2);
-  assert.equal(pending.requiredRecordCount, 1);
+  assert.equal(pending.applicableRecordCount, 3);
+  assert.equal(pending.requiredRecordCount, 2);
   assert.equal(pending.skipRecordCount, 1);
 
   const coveredRoot = fixture({

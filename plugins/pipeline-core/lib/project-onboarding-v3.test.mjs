@@ -230,6 +230,7 @@ function fakeAppServer({ intent }) {
 }
 export const fakeDeps = {
   spawnSync: fakeGit,
+  environment: {},
   codexExecutable: process.execPath,
   observeCodexOnboardingCapabilities: fakeCapabilities,
   observeOnboardingAppServer: fakeAppServer,
@@ -2284,7 +2285,7 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      ".gitignore", "architecture/map/index.md", "architecture/map/inventory.json", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
     ]);
   } finally { dispose(path); }
@@ -2476,6 +2477,59 @@ test("apply-portable-seed --activate surfaces the missing-author-identity ask-st
 // already-answered plane gets a short pre-filled confirm/override instead --
 // and never in either case does the ask change the lifecycle's own resting
 // status or primary chained nextAction.
+test("initial author proposal follows Git author environment and author.* precedence without granting consent", () => {
+  const configuredGit = (command, args, options) => {
+    if (command === "git" && args[0] === "config" && args[2] === "--get") {
+      const values = {
+        "--global:author.name": "Configured Author",
+        "--local:user.name": "Local User",
+        "--global:user.email": "configured@example.invalid",
+      };
+      const value = values[`${args[1]}:${args[3]}`];
+      return value === undefined ? { status: 1, stdout: "" } : { status: 0, stdout: `${value}\n` };
+    }
+    return fakeGit(command, args, options);
+  };
+  const inspectFirstAsk = (environment, git = configuredGit) => {
+    const path = root();
+    try {
+      const deps = { ...fakeDeps, spawnSync: git, environment };
+      let output = "";
+      const planCode = onboardingCli(["plan", "--root", path, "--runner", "codex"], {
+        deps, write: (chunk) => { output += chunk; },
+      });
+      assert.equal(planCode, 0);
+      const planned = JSON.parse(output);
+      const digest = planned.nextAction.argv[planned.nextAction.argv.indexOf("--plan-sha256") + 1];
+      output = "";
+      const applyCode = onboardingCli(["apply-portable-seed", "--root", path, "--plan-sha256", digest,
+        "--activate", "--runner", "codex"], { deps, write: (chunk) => { output += chunk; } });
+      assert.equal(applyCode, 0);
+      const result = JSON.parse(output);
+      assert.equal(result.nextAction.pendingAsks[0].requiresConfirmation, false);
+      return result.nextAction.pendingAsks[0].reviewedDefaults.gitIdentity;
+    } finally { dispose(path); }
+  };
+  const configured = inspectFirstAsk({});
+  assert.deepEqual(configured["user.name"], {
+    value: "Configured Author", source: "git-config", scope: "global", configKey: "author.name",
+  });
+  assert.deepEqual(configured["user.email"], {
+    value: "configured@example.invalid", source: "git-config", scope: "global", configKey: "user.email",
+  });
+  const environment = inspectFirstAsk({ GIT_AUTHOR_NAME: "Environment Author", GIT_AUTHOR_EMAIL: "env@example.invalid" });
+  assert.deepEqual(environment["user.name"], {
+    value: "Environment Author", source: "environment", scope: "GIT_AUTHOR_NAME",
+  });
+  assert.deepEqual(environment["user.email"], {
+    value: "env@example.invalid", source: "environment", scope: "GIT_AUTHOR_EMAIL",
+  });
+  const emailFallback = inspectFirstAsk({ EMAIL: "fallback@example.invalid" }, fakeGit);
+  assert.deepEqual(emailFallback["user.email"], {
+    value: "fallback@example.invalid", source: "environment", scope: "EMAIL",
+  });
+});
+
 test("apply-portable-seed --activate surfaces the push-approval-setup ask-step for every repository, pre-filled from the machine default", () => {
   const unasked = root();
   const asked = root();
@@ -6735,7 +6789,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.deepEqual(
       plan.targets.map((target) => target.path),
       [
-        ".gitignore", "architecture/map/index.md", "architecture/map/inventory.json", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
         "project/pipeline.json", "project/pipeline.yaml",
       ],
       "fresh onboarding seeds the canonical project authority and the ignore rules for the paths it writes into; runtime targets are initialized later",
@@ -6744,6 +6798,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
     assert.match(readFileSync(join(path, "architecture/map/index.md"), "utf8"), /design-pending/u);
+    assert.match(readFileSync(join(path, "AGENTS.md"), "utf8"), /architecture\/map\/index\.md/u);
     assert.deepEqual(JSON.parse(readFileSync(join(path, "architecture/map/inventory.json"), "utf8")).modules, []);
     // The ignore rules are ANCHORED. An unanchored `evidence/` also matches
     assert.match(readFileSync(join(path, "project/consumer-verify.mjs"), "utf8"), /runConsumerVerifyCheck/u);
@@ -6896,7 +6951,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      ".gitignore", "architecture/map/index.md", "architecture/map/inventory.json", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });

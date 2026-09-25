@@ -67,9 +67,21 @@ export async function dispatchElephantImplementation(input = {}, dependencies = 
     return receipt({ status: "unavailable", code: "ELEPHANT-IMPLEMENTATION-ROUTE-NOT-SELECTED" });
   }
   const runAgy = dependencies.dispatchElephantAgyImplementation ?? dispatchElephantAgyImplementation;
-  const inner = await runAgy(input, dependencies);
+  let inner;
+  try { inner = await runAgy(input, dependencies); }
+  catch {
+    // The selected route may already have launched a child. Preserve a typed
+    // recovery state, not an unstructured CLI error or a retry suggestion.
+    return receipt({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-SELECTED-ROUTE-EXCEPTION", selected: true });
+  }
+  if (!inner || typeof inner !== "object" || Array.isArray(inner)) {
+    return receipt({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-SELECTED-ROUTE-INVALID", selected: true });
+  }
+  if (inner.modelCalls > 0 && !["authored-commit-recorded", "final-pending-host-commit", "completed-undelivered", "interrupted-recorded", "recovery-required"].includes(inner.status)) {
+    return receipt({ status: "recovery-required", code: "ELEPHANT-IMPLEMENTATION-LAUNCHED-NONFINAL", selected: true });
+  }
   return receipt({
-    status: inner?.status === "succeeded" ? "succeeded" : inner?.status === "unavailable" ? "unavailable" : "rejected",
+    status: inner?.status === "authored-commit-recorded" ? "authored-commit-recorded" : inner?.status === "final-pending-host-commit" ? "final-pending-host-commit" : inner?.status === "completed-undelivered" ? "completed-undelivered" : inner?.status === "interrupted-recorded" ? "interrupted-recorded" : inner?.status === "recovery-required" ? "recovery-required" : inner?.status === "unavailable" ? "unavailable" : "rejected",
     code: inner?.code ?? "AGY-ELEPHANT-ROUTE-UNAVAILABLE",
     selected: true,
     inner,
@@ -84,7 +96,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const result = await dispatchElephantImplementation(parseArgs(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify(result)}\n`);
-    process.exitCode = result.status === "succeeded" ? 0 : 2;
+    process.exitCode = ["succeeded", "authored-commit-recorded"].includes(result.status) ? 0 : 2;
   } catch {
     process.stderr.write("elephant-implementation-dispatch: request refused\n");
     process.exitCode = 64;

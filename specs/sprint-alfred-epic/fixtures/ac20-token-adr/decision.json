@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "ADR-TOKEN-AC20",
+  "title": "Deny unapproved publication",
+  "status": "accepted",
+  "digest": "c65dd86284ae05b0185ce0a4b54ef508b948f7826c9e132f29fa970f534c86e6",
+  "scope": "project",
+  "date": "2026-09-25"
+}

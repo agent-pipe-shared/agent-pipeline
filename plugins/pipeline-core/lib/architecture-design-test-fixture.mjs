@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import { prepareAdoptionAuthority } from "./architecture-adoption-authority.mjs";
 import { applyAdoptionDecision } from "../scripts/architecture-adoption.mjs";
 import { readHumanApprovalMode } from "./critical-human-proof-policy.mjs";
+import { initialGreenfieldAgentEntryTarget } from "./architecture-map-scaffold.mjs";
 
 function write(root, relativePath, bytes) {
   const output = resolve(root, relativePath);
@@ -87,6 +88,11 @@ export function materializeArchitectureDesignFixture({
   const currentPlan = readFileSync(plan, "utf8");
   if (!currentPlan.includes(sourcePath)) writeFileSync(plan, `${currentPlan.trimEnd()}\n\nImplementation surface: \`${sourcePath}\`.\n`, "utf8");
   if (!existsSync(resolve(root, sourcePath))) write(root, sourcePath, "export const ready = true;\n");
+  const createdAgentEntry = !existsSync(resolve(root, "AGENTS.md"));
+  if (createdAgentEntry) {
+    const entry = initialGreenfieldAgentEntryTarget("fresh");
+    write(root, entry.path, entry.bytes);
+  }
   write(root, "architecture/map/index.md", "# Architecture Navigation Map Index\n\n## Governed Modules\n\n- [application](application.md)\n");
   write(root, "architecture/map/application.md", [
     "---",
@@ -126,7 +132,7 @@ export function materializeArchitectureDesignFixture({
   // commits a protected proof-policy mutation.  The physical design artifacts
   // still get a real candidate commit, while the actual signature is verified
   // against the temporary policy bytes for this isolated fixture.
-  git(root, ["add", "--", "architecture", sourcePath, planPath]);
+  git(root, ["add", "--", "architecture", ...(createdAgentEntry ? ["AGENTS.md"] : []), sourcePath, planPath]);
   commitIfStaged(root, "test fixture architecture design");
 
   const scope = decisionScope ?? [

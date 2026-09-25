@@ -33,6 +33,8 @@ import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verif
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { describeHumanGuardOverrideSelection } from "../lib/human-guard-override.mjs";
 import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
+import { PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA, validatePortableAgyAuthorshipRequest } from "../lib/portable-agy-authorship-export.mjs";
+import { PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA, validatePortableCriticExportRequest } from "../lib/portable-critic-export.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
@@ -89,6 +91,72 @@ function describeBootstrapAcknowledgementRequest(record, intentSha256) {
       "decision: the PRD is content-sound and consistent with the specification",
     ],
   };
+}
+
+function describePortableAgyAuthorshipRequest(record, intentSha256) {
+  if (record?.schema !== PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA
+    || record.intentSha256 !== intentSha256
+    || !validatePortableAgyAuthorshipRequest(record)) return null;
+  return { resolved: true, lines: [
+    "action: approve a redacted, portable Agy host-observed authorship export",
+    `dispatch id: ${record.subject.taskId}`,
+    `authored commit: ${record.subject.authoredCommit}`,
+    `authored tree: ${record.subject.authoredTree}`,
+    `parent commit: ${record.subject.parentCommit}`,
+    `host-observed model: ${record.subject.model} (${record.subject.effort})`,
+    `local host receipt sha256: ${record.subject.hostReceiptSha256}`,
+    `consent subject sha256: ${record.subject.consentSubjectSha256}`,
+    `result sha256: ${record.subject.resultSha256}`,
+    `export destination: ${record.exportPath}`,
+    "this approves a host observation, NOT cryptographic provider model attestation, a push, or a release",
+  ] };
+}
+
+function checkPortableAgyAuthorshipRequestOnHost({ repository, requestPath, taskId, intentSha256 }) {
+  const checked = spawnSync(process.execPath, [join(dirname(SCRIPT), "portable-agy-authorship-export.mjs"),
+    "check", "--root", repository, "--task-id", taskId], {
+    cwd: repository, encoding: "utf8", shell: false, timeout: 20_000, maxBuffer: 8192,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (checked.error || checked.status !== 0) return false;
+  try {
+    const value = JSON.parse(checked.stdout);
+    return value?.ok === true && value.code === "AGY-EXPORT-LOCAL-PASS-BOUND"
+      && value.requestPath === requestPath && value.intentSha256 === intentSha256;
+  } catch { return false; }
+}
+
+function describePortableCriticExportRequest(record, intentSha256) {
+  if (record?.schema !== PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA
+    || record.intentSha256 !== intentSha256
+    || !validatePortableCriticExportRequest(record, {
+      planSha256: record.approvalIntent?.value?.planSha256,
+      specSha256: record.approvalIntent?.value?.specSha256,
+    })) return null;
+  return { resolved: true, lines: [
+    "action: approve a redacted, portable export of one consumed independent Critic review",
+    `reviewed commit: ${record.subject.candidate.commit}`,
+    `reviewed tree: ${record.subject.candidate.tree}`,
+    `private Critic packet: ${record.subject.producer.packetId}`,
+    `private receipt sha256: ${record.subject.producer.receiptSha256}`,
+    `verdict sha256: ${record.subject.producer.verdictSha256}`,
+    `export destination: ${record.exportPath}`,
+    "this does not approve source changes, a release, a push, or provider identity",
+  ] };
+}
+
+function checkPortableCriticExportRequestOnHost({ repository, requestPath, packetId, intentSha256 }) {
+  const checked = spawnSync(process.execPath, [join(dirname(SCRIPT), "portable-critic-export.mjs"),
+    "check", "--root", repository, "--packet-id", packetId], {
+    cwd: repository, encoding: "utf8", shell: false, timeout: 20_000, maxBuffer: 8192,
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (checked.error || checked.status !== 0) return false;
+  try {
+    const value = JSON.parse(checked.stdout);
+    return value?.ok === true && value.code === "CRITIC-EXPORT-CONSUMED-REVIEW-BOUND"
+      && value.requestPath === requestPath && value.intentSha256 === intentSha256;
+  } catch { return false; }
 }
 // SETUP-2b/AC-13: a third source, ordered between --directory and the environment
 // fallback (SETUP-2b/AC-11) -- the machine-scoped configuration plane's own
@@ -1394,6 +1462,7 @@ function executeHumanApproval(args, dependencies = {}) {
     // the SAME `intentSha256` local either way -- `--request` only changes where that
     // value comes from and, further below, adds a second write target for the result.
     let scratchProofPath = null; let scratchSignerPath = null; let scratchRequestRecord = null;
+    let portableRequestPath = null;
     if (text(args.request)) {
       const requestPath = resolve(repository, args.request);
       // NVA-SWEEP-F2f-REWORK (Critic finding 1): canonicalize both the repository root
@@ -1409,6 +1478,7 @@ function executeHumanApproval(args, dependencies = {}) {
       try { canonicalRequestPath = realpathSync(requestPath); } catch { fail("--request could not be read"); }
       const scratchRel = repoScratchRelativePath(canonicalRepository, canonicalRequestPath);
       if (scratchRel === null) fail("--request must be a path inside this repository's own scratch/ directory");
+      portableRequestPath = canonicalRequestPath;
       let raw;
       try { raw = read(canonicalRequestPath, "utf8"); } catch { fail("--request could not be read"); }
       let record;
@@ -1444,6 +1514,8 @@ function executeHumanApproval(args, dependencies = {}) {
     const describeGmw = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
     const describeHgo = dependencies.describeHgoIntentRecord ?? describeHumanGuardOverrideSelection;
     const bootstrapAcknowledgement = describeBootstrapAcknowledgementRequest(scratchRequestRecord, intentSha256);
+    const portableAgyAuthorship = describePortableAgyAuthorshipRequest(scratchRequestRecord, intentSha256);
+    const portableCriticExport = describePortableCriticExportRequest(scratchRequestRecord, intentSha256);
     // A scratch request which claims the bootstrap-acknowledgement schema is
     // never a generic, opaque `sign-intent` request. In particular, do not
     // fall through to the generic GMW/HGO disclosure route when its action
@@ -1452,7 +1524,30 @@ function executeHumanApproval(args, dependencies = {}) {
     if (scratchRequestRecord?.schema === BOOTSTRAP_ACKNOWLEDGEMENT_REQUEST_SCHEMA && bootstrapAcknowledgement === null) {
       fail("the bootstrap acknowledgement request does not bind its exact action and intent digest");
     }
-    let record = bootstrapAcknowledgement
+    if (scratchRequestRecord?.schema === PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA && portableAgyAuthorship === null) {
+      fail("the portable Agy authorship request does not bind its exact subject and intent digest");
+    }
+    if (scratchRequestRecord?.schema === PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA && portableCriticExport === null) {
+      fail("the portable Critic export request does not bind its exact subject and intent digest");
+    }
+    if (portableAgyAuthorship !== null) {
+      const checkPortable = dependencies.checkPortableAgyAuthorshipRequest
+        ?? checkPortableAgyAuthorshipRequestOnHost;
+      if (checkPortable({ repository, requestPath: portableRequestPath,
+        taskId: scratchRequestRecord.subject.taskId, intentSha256 }) !== true) {
+        fail("the portable Agy authorship request is not bound to a current local host and Critic PASS");
+      }
+    }
+    if (portableCriticExport !== null) {
+      const checkPortable = dependencies.checkPortableCriticExportRequest
+        ?? checkPortableCriticExportRequestOnHost;
+      if (checkPortable({ repository, requestPath: portableRequestPath,
+        packetId: scratchRequestRecord.subject.producer.packetId,
+        intentSha256 }) !== true) {
+        fail("the portable Critic export request is not bound to a current consumed private Critic review");
+      }
+    }
+    let record = bootstrapAcknowledgement ?? portableAgyAuthorship ?? portableCriticExport
       ?? describeGmw({ rootDir: repository, intentSha256 });
     if (!record.resolved) {
       record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });

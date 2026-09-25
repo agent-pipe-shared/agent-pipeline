@@ -9,10 +9,12 @@
  * the existing runner-neutral role preflight and AGY process boundary.
  */
 import { createHash } from "node:crypto";
-import { lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, mkdirSync, openSync, readSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 
 import { invokeAgy } from "./antigravity-execution-host.mjs";
+import { AGY_FINAL_RETURN_JSON_SCHEMA, validateAgyFinalReturn } from "./agy-final-return.mjs";
+import { parseStrictJson } from "./governance-event.mjs";
 import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, preflightRoleDispatch } from "./role-dispatch-preflight.mjs";
 
 export const AGY_SESSION_DISPATCH_SCHEMA = "pipeline.agy-session-dispatch-receipt.v1";
@@ -95,10 +97,85 @@ function writeExclusiveResult(resultRoot, resultPath, value) {
   try {
     const bytes = Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
     writeFileSync(location.target, bytes, { flag: "wx", mode: 0o600 });
-    return { ok: true, path: location.relative, bytes: bytes.length, sha256: digest(bytes) };
+    return { ok: true, path: location.relative, bytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex") };
   } catch {
     return { ok: false, code: AGY_SESSION_DISPATCH_CODES.RESULT_COLLISION };
   }
+}
+
+/** Re-read the host's exclusive Final Return file before commit or non-authoring recovery. */
+export function verifyAgySessionResultReadback({ resultRoot, resultPath, receipt, dispatchId,
+  candidate, sessionId, requestedModel, expectedFinal } = {}) {
+  if (!exact(receipt, ["ok", "path", "bytes", "sha256"]) || receipt.ok !== true || receipt.path !== resultPath
+    || !Number.isSafeInteger(receipt.bytes) || receipt.bytes < 1 || receipt.bytes > 2 * 1024 * 1024
+    || !SHA256.test(receipt.sha256 ?? "") || !OID.test(candidate?.commit ?? "")
+    || !OID.test(candidate?.tree ?? "") || !SESSION_ID.test(sessionId ?? "")
+    || typeof dispatchId !== "string" || dispatchId.length === 0
+    || typeof requestedModel !== "string" || requestedModel.length === 0
+    || !["succeeded", "failed", "blocked"].includes(expectedFinal?.outcome)
+    || !SHA256.test(expectedFinal.reportSha256 ?? "")
+    || !Array.isArray(expectedFinal.changedPaths)) {
+    return { ok: false, code: "AGY-RESULT-READBACK-INPUT" };
+  }
+  let raw;
+  try {
+    const root = resolve(resultRoot);
+    const rootStat = lstatSync(root);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink() || realpathSync(root) !== root
+      || typeof resultPath !== "string" || resultPath.startsWith("/") || resultPath.includes("\\")
+      || resultPath.split("/").some((part) => !part || part === "." || part === "..")) throw new Error("path");
+    const target = resolve(root, resultPath);
+    const rel = relative(root, target);
+    if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`)
+      || realpathSync(dirname(target)) !== dirname(target)) throw new Error("parent");
+    const expected = lstatSync(target);
+    if (!expected.isFile() || expected.isSymbolicLink() || realpathSync(target) !== target
+      || expected.size !== receipt.bytes) throw new Error("file");
+    const fd = openSync(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    try {
+      const before = fstatSync(fd);
+      if (!before.isFile() || before.dev !== expected.dev || before.ino !== expected.ino
+        || before.size !== receipt.bytes) throw new Error("inode");
+      const buffer = Buffer.alloc(receipt.bytes + 1);
+      let length = 0;
+      while (length < buffer.length) {
+        const count = readSync(fd, buffer, length, buffer.length - length, null);
+        if (count === 0) break;
+        length += count;
+      }
+      raw = buffer.subarray(0, length);
+      const after = fstatSync(fd);
+      const pathAfter = lstatSync(target);
+      if (length !== receipt.bytes || after.dev !== before.dev || after.ino !== before.ino
+        || after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs
+        || pathAfter.dev !== before.dev || pathAfter.ino !== before.ino
+        || realpathSync(target) !== target
+        || createHash("sha256").update(raw).digest("hex") !== receipt.sha256) throw new Error("bytes");
+    } finally { closeSync(fd); }
+  } catch { return { ok: false, code: "AGY-RESULT-READBACK-DRIFT" }; }
+  let result;
+  try { result = parseStrictJson(raw); }
+  catch { return { ok: false, code: "AGY-RESULT-READBACK-MALFORMED" }; }
+  if (!exact(result, ["schema", "dispatchId", "candidate", "sessionId", "requestedModel", "observedModel", "payload"])
+    || result.schema !== "pipeline.agy-session-dispatch-result.v1"
+    || result.dispatchId !== dispatchId || result.sessionId !== sessionId
+    || result.candidate?.commit !== candidate.commit || result.candidate?.tree !== candidate.tree
+    || result.requestedModel !== requestedModel || result.observedModel !== requestedModel) {
+    return { ok: false, code: "AGY-RESULT-READBACK-BINDING" };
+  }
+  const final = validateAgyFinalReturn(result.payload, { dispatchId, candidateCommit: candidate.commit });
+  if (!final.ok || final.outcome !== expectedFinal.outcome
+    || final.reportSha256 !== expectedFinal.reportSha256
+    || JSON.stringify(final.changedPaths) !== JSON.stringify(expectedFinal.changedPaths)) {
+    return { ok: false, code: "AGY-RESULT-READBACK-FINAL" };
+  }
+  return { ok: true, code: "AGY-RESULT-READBACK-VERIFIED", model: result.observedModel,
+    resultSha256: receipt.sha256, reportSha256: final.reportSha256, changedPaths: final.changedPaths,
+    // The host-owned authored record needs the actual durable report bytes,
+    // not a digest or a second model-supplied copy. Keep this on the internal
+    // readback result; the outer Elephant receipt never includes report text.
+    final };
 }
 
 /**
@@ -125,6 +202,8 @@ export async function dispatchAgySession({
   nowEpochMs = Date.now(),
   verifyAuthority,
   requireObservedModel = false,
+  streamJson = false,
+  requireStructuredFinal = false,
 } = {}) {
   if (!validSessionIdentity(session)) return rejected(AGY_SESSION_DISPATCH_CODES.SESSION_MISMATCH, "session");
   if (!IMPLEMENTATION_ROLES.has(packet?.role)) return rejected(AGY_SESSION_DISPATCH_CODES.ROLE_FORBIDDEN, "packet.role");
@@ -146,11 +225,19 @@ export async function dispatchAgySession({
   const resultLocation = safeResultPath(resultRoot, resultPath);
   if (resultLocation === null) return rejected(AGY_SESSION_DISPATCH_CODES.RESULT_COLLISION, "resultPath");
 
-  const invoked = await invokeAgy({ root, resultRoot, packet: prepared.packet, agyPath, model: requestedModel, effort, timeoutMs, env, signal });
+  const executionPacket = requireStructuredFinal ? {
+    ...prepared.packet,
+    prompt: `${prepared.packet.prompt}\n- **Host-bound Final Return:** Emit the --json-schema object with schema pipeline.agy-final-return.v1, dispatchId ${packet.dispatchId}, candidateCommit ${prepared.candidate.commit}, outcome, report and changedPaths. This is a claim for host validation, not permission to commit.\n`,
+  } : prepared.packet;
+  const invoked = await invokeAgy({ root, resultRoot, packet: executionPacket, agyPath, model: requestedModel, effort, timeoutMs, env, signal, streamJson, jsonSchema: requireStructuredFinal ? AGY_FINAL_RETURN_JSON_SCHEMA : null });
+  const validatedFinal = invoked.ok === true && requireStructuredFinal
+    ? validateAgyFinalReturn(invoked.payload, { dispatchId: packet.dispatchId, candidateCommit: prepared.candidate.commit }) : null;
   const receipt = {
     schema: AGY_SESSION_DISPATCH_SCHEMA,
-    status: invoked.ok === true ? "succeeded" : "unavailable",
-    code: invoked.ok === true ? "AGY-SESSION-COMPLETED" : invoked.code,
+    // A valid child Final Return still needs a host commit and a v4 record.
+    // Neither a CLI exit nor a schema-constrained answer alone is delivery.
+    status: invoked.ok === true ? validatedFinal?.ok === true ? "final-pending-host-commit" : "completed-undelivered" : "unavailable",
+    code: invoked.ok === true ? validatedFinal?.ok === true ? "AGY-SESSION-FINAL-VALIDATED" : "AGY-SESSION-FINAL-UNDELIVERED" : invoked.code,
     dispatchId: packet.dispatchId,
     candidate: prepared.candidate,
     session: { id: session.id, source: session.source },
@@ -159,7 +246,11 @@ export async function dispatchAgySession({
     consent: { decisionId: consent.decisionId, subjectSha256: consent.subjectSha256 },
     launcherCalls: invoked.launcherCalls ?? 0,
     modelCalls: invoked.modelCalls ?? 0,
+    processStarted: invoked.processStarted === true,
+    processClosed: invoked.processClosed === true,
+    transportResultObserved: invoked.transportResultObserved === true,
     result: null,
+    final: validatedFinal?.ok === true ? { outcome: validatedFinal.outcome, reportSha256: validatedFinal.reportSha256, changedPaths: validatedFinal.changedPaths } : null,
   };
   if (invoked.ok !== true) return receipt;
   if (requireObservedModel === true && (typeof invoked.observedModel !== "string" || invoked.observedModel === "unknown")) {

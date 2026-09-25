@@ -178,3 +178,62 @@ test("a missing or substituted Critic/Verify lifecycle ID never reaches the coor
   }), error => error.code === "FINISH-CRITIC-VERIFY");
   assert.equal(f.calls.length, 0);
 });
+
+test("a lost close response resumes from the durable closed State without a second mutation", () => {
+  const f = fixture();
+  const auditReceiptSha256 = "c".repeat(64);
+  const prior = { identity: { lifecycleId: "feature-abc", featureId: "feature-abc" },
+    stateSha256: "a".repeat(64), coordinator: { phase: "feature-close-prepared", revision: 3,
+      architectureImpact: "no-architecture-impact", featureCloseAudit: {
+        auditReceiptSha256, criticVerifyLifecycleId: f.criticVerifyLifecycle,
+      } } };
+  const state = { closedFeatures: [{ id: "feature-abc", closedBy: "PO",
+    architectureImpact: "no-architecture-impact", coordinatorClose: {
+      lifecycleId: "feature-abc", stateSha256: prior.stateSha256,
+      revision: 3, phase: "feature-close-prepared",
+    }, auditReference: { auditReceiptSha256, criticVerifyLifecycleId: f.criticVerifyLifecycle } }] };
+  const calls = [];
+  const runner = (_executable, argv) => { calls.push(argv); return response(prior); };
+  const input = { rootDir: "/repo", by: "PO", architectureImpact: "no-architecture-impact",
+    auditRequest: "specs/feature/audit-request.json", criticVerifyLifecycle: f.criticVerifyLifecycle,
+    resumeLifecycleId: "feature-abc" };
+  const deps = { realpathSyncFn: value => value, readFileSyncFn: () => JSON.stringify(state), runCommand: runner };
+  const result = finishFeature(input, deps);
+  assert.equal(result.status, "closed");
+  assert.equal(result.closeOutput, "already-closed");
+  assert.deepEqual(calls.map(argv => argv[1]), ["inspect"]);
+  assert.equal(finishFeature(input, deps).closeOutput, "already-closed");
+  assert.deepEqual(calls.map(argv => argv[1]), ["inspect", "inspect"]);
+  assert.throws(() => finishFeature({ ...input, resumeLifecycleId: null }, deps),
+    error => error.code === "FINISH-FEATURE");
+  assert.deepEqual(calls.map(argv => argv[1]), ["inspect", "inspect"]);
+});
+
+test("closed-State recovery rejects a mismatched actor, audit, or coordinator without State writes", () => {
+  const criticVerifyLifecycle = "b".repeat(64);
+  const auditReceiptSha256 = "c".repeat(64);
+  const prior = { identity: { lifecycleId: "feature-abc", featureId: "feature-abc" },
+    stateSha256: "a".repeat(64), coordinator: { phase: "feature-close-prepared", revision: 3,
+      architectureImpact: "no-architecture-impact", featureCloseAudit: {
+        auditReceiptSha256, criticVerifyLifecycleId: criticVerifyLifecycle,
+      } } };
+  const closed = { id: "feature-abc", closedBy: "PO", architectureImpact: "no-architecture-impact",
+    coordinatorClose: { lifecycleId: "feature-abc", stateSha256: prior.stateSha256,
+      revision: 3, phase: "feature-close-prepared" },
+    auditReference: { auditReceiptSha256, criticVerifyLifecycleId: criticVerifyLifecycle } };
+  const calls = [];
+  const runner = (_executable, argv) => { calls.push(argv); return response(prior); };
+  const input = { rootDir: "/repo", by: "PO", architectureImpact: "no-architecture-impact",
+    auditRequest: "specs/feature/audit-request.json", criticVerifyLifecycle,
+    resumeLifecycleId: "feature-abc" };
+  for (const changed of [
+    { input: { ...input, by: "Another" }, closed },
+    { input, closed: { ...closed, auditReference: { ...closed.auditReference, auditReceiptSha256: "d".repeat(64) } } },
+    { input, closed: { ...closed, coordinatorClose: { ...closed.coordinatorClose, revision: 2 } } },
+  ]) {
+    assert.throws(() => finishFeature(changed.input, { realpathSyncFn: value => value,
+      readFileSyncFn: () => JSON.stringify({ closedFeatures: [changed.closed] }), runCommand: runner }),
+    error => error.code === "FINISH-RESUME-CLOSED-MISMATCH" && error.lifecycleId === "feature-abc");
+  }
+  assert.deepEqual(calls.map(argv => argv[1]), ["inspect", "inspect", "inspect"]);
+});

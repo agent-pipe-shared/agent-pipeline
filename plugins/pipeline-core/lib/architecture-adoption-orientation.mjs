@@ -61,6 +61,9 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
     read: deps.read ?? readFileSync,
     exists: deps.exists ?? existsSync,
   });
+  const indexPresent = (deps.exists ?? existsSync)(resolve(root, "architecture/map/index.md"));
+  const physicalMapStatus = greenfieldScaffold ? "design-pending"
+    : indexPresent ? "present-unvalidated" : "missing";
   const adoptionRequired = adoption?.state === "adoption-required";
   const status = adoptionRequired
     ? (greenfieldScaffold ? "design-pending" : "adoption-required")
@@ -69,7 +72,9 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
     ? "The greenfield navigation scaffold exists but is not an adopted architecture baseline. Complete initial design, then record a scoped architecture disposition before implementation."
     : status === "adoption-required"
       ? "No usable architecture adoption decision exists. Review the staged read-only adoption proposal with the PO before implementation."
-      : "A durable architecture adoption decision was read back. Respect its scope; physical map and fitness evidence are verified only at the implementation boundary.";
+      : physicalMapStatus === "missing"
+        ? "A durable architecture adoption decision exists, but the physical map index is missing. Preserve that decision; materialize the map before implementation, where map and fitness evidence are verified."
+        : "A durable architecture adoption decision was read back. Respect its scope; the present map and fitness evidence are verified only at the implementation boundary.";
   return {
     schema: ARCHITECTURE_ADOPTION_ORIENTATION_SCHEMA,
     status,
@@ -84,7 +89,7 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
     },
     physicalMap: {
       greenfieldScaffold,
-      status: greenfieldScaffold ? "design-pending" : "not-classified",
+      status: physicalMapStatus,
     },
     guidance,
   };

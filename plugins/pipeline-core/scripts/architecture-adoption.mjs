@@ -142,6 +142,7 @@ export function resolveAdoptionState(rootDir = DEFAULT_ROOT, now = new Date()) {
  * Invariant: Generated artifacts carry { coverageClass, confidence } and cannot pass (deterministic-pass rule).
  */
 export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
+  const currentDecision = resolveAdoptionState(rootDir);
   const mapBundle = loadAdoptionMap(rootDir);
   const baseline = loadBaseline(rootDir);
 
@@ -243,17 +244,16 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
       "No architectural restructuring",
       "No all-at-once migration",
       "No retroactive ADR mass backfill",
-      "No prompt-based pass claims"
+      "No prompt-based pass claims",
+      ...(currentDecision.state === STATE_ADOPTION_REQUIRED ? [] : ["No repeat adoption decision: retain the existing durable disposition"])
     ],
     estimatedTotalEffort: {
       units: 24,
       status: "estimated"
     },
-    decisionOptions: [
-      STATE_APPROVED_SCOPED,
-      STATE_DEFERRED,
-      STATE_PARTIAL
-    ],
+    decisionOptions: currentDecision.state === STATE_ADOPTION_REQUIRED
+      ? [STATE_APPROVED_SCOPED, STATE_DEFERRED, STATE_PARTIAL]
+      : [],
     deterministicPassSafe: true
   };
 

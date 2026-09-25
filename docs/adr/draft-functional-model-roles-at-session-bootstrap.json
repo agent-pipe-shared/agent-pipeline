@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-functional-model-roles-at-session-bootstrap",
+  "title": "Functional model roles resolved at session bootstrap",
+  "status": "proposed",
+  "digest": "b8286fca64db897c95f40a70758e3af9d9cc34e95dcc6be886feaf02905791ea",
+  "scope": "global",
+  "date": "2026-09-25"
+}

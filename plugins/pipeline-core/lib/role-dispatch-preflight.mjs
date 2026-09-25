@@ -27,15 +27,58 @@ function exactKeys(value, keys) {
     && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
 }
 
-function rejected(code, field) {
+function rejected(code, field, findings = [{ code, field }]) {
   return {
     schema: ROLE_DISPATCH_PREFLIGHT_SCHEMA,
     status: "rejected",
     code,
     field,
+    findings,
     modelCalls: 0,
     launcherCalls: 0,
   };
+}
+
+function staticPacketFindings(packet, legacyPacket, explicitPacket) {
+  const findings = [];
+  const add = (code, field) => findings.push({ code, field });
+  if (!ID.test(packet.dispatchId)) add("RDP-DISPATCH-ID", "dispatchId");
+  if (!TRANSPORTS.has(packet.transport)) add("RDP-TRANSPORT", "transport");
+  const validRole = typeof packet.role === "string" && packet.role.trim() !== "";
+  const validPrompt = typeof packet.prompt === "string" && packet.prompt.trim() !== "";
+  if (!validRole) add("RDP-ROLE", "role");
+  if (!validPrompt) add("RDP-PROMPT", "prompt");
+  if (!exactKeys(packet.candidate, ["commit", "tree"]) || !OID.test(packet.candidate.commit) || !OID.test(packet.candidate.tree)) {
+    add("RDP-CANDIDATE-SHAPE", "candidate");
+  }
+  const validPaths = Array.isArray(packet.requiredPaths) && packet.requiredPaths.length > 0 && packet.requiredPaths.length <= 128
+    && packet.requiredPaths.every((path) => normalizedPath(path))
+    && new Set(packet.requiredPaths).size === packet.requiredPaths.length
+    && JSON.stringify([...packet.requiredPaths].sort()) === JSON.stringify(packet.requiredPaths);
+  if (!validPaths) add("RDP-REQUIRED-PATHS", "requiredPaths");
+  if (validPaths && (!exactKeys(packet.requiredPathSha256, packet.requiredPaths)
+    || packet.requiredPaths.some((path) => !SHA256.test(packet.requiredPathSha256[path])))) {
+    add("RDP-REQUIRED-DIGESTS", "requiredPathSha256");
+  }
+  let destination = null;
+  if (legacyPacket) {
+    if (!normalizedPath(packet.resultPath)) add("RDP-RESULT-PATH", "resultPath");
+    else destination = { kind: "file", path: packet.resultPath };
+  } else if (exactKeys(packet.resultDestination, ["kind", "path"])
+    && packet.resultDestination.kind === "file") {
+    if (!normalizedPath(packet.resultDestination.path)) add("RDP-RESULT-PATH", "resultDestination.path");
+    else destination = packet.resultDestination;
+  } else if (exactKeys(packet.resultDestination, ["kind"])
+    && (packet.resultDestination.kind === "return" || packet.resultDestination.kind === "stream")) {
+    destination = packet.resultDestination;
+  } else if (explicitPacket) {
+    add("RDP-RESULT-DESTINATION", "resultDestination");
+  }
+  if (validRole && validPrompt && TRANSPORTS.has(packet.transport)) {
+    const policy = dispatchFindings({ subagentType: packet.role, prompt: packet.prompt, transport: packet.transport });
+    for (const finding of policy.findings) add(finding.code, "role");
+  }
+  return { findings, destination };
 }
 
 function normalizedPath(value) {
@@ -118,40 +161,8 @@ export function preflightRoleDispatch({
   if ((!legacyPacket && !explicitPacket) || packet.schema !== ROLE_DISPATCH_REQUEST_SCHEMA) {
     return rejected("RDP-PACKET-SHAPE", "packet");
   }
-  if (!ID.test(packet.dispatchId)) return rejected("RDP-DISPATCH-ID", "dispatchId");
-  if (!TRANSPORTS.has(packet.transport)) return rejected("RDP-TRANSPORT", "transport");
-  if (typeof packet.role !== "string" || packet.role.trim() === "") return rejected("RDP-ROLE", "role");
-  if (typeof packet.prompt !== "string" || packet.prompt.trim() === "") return rejected("RDP-PROMPT", "prompt");
-  if (!exactKeys(packet.candidate, ["commit", "tree"]) || !OID.test(packet.candidate.commit) || !OID.test(packet.candidate.tree)) {
-    return rejected("RDP-CANDIDATE-SHAPE", "candidate");
-  }
-  if (!Array.isArray(packet.requiredPaths) || packet.requiredPaths.length === 0 || packet.requiredPaths.length > 128
-    || packet.requiredPaths.some((path) => !normalizedPath(path))
-    || new Set(packet.requiredPaths).size !== packet.requiredPaths.length
-    || JSON.stringify([...packet.requiredPaths].sort()) !== JSON.stringify(packet.requiredPaths)) {
-    return rejected("RDP-REQUIRED-PATHS", "requiredPaths");
-  }
-  if (!exactKeys(packet.requiredPathSha256, packet.requiredPaths)
-    || packet.requiredPaths.some((path) => !SHA256.test(packet.requiredPathSha256[path]))) {
-    return rejected("RDP-REQUIRED-DIGESTS", "requiredPathSha256");
-  }
-  let destination;
-  if (legacyPacket) {
-    if (!normalizedPath(packet.resultPath)) return rejected("RDP-RESULT-PATH", "resultPath");
-    destination = { kind: "file", path: packet.resultPath };
-  } else if (exactKeys(packet.resultDestination, ["kind", "path"])
-    && packet.resultDestination.kind === "file") {
-    if (!normalizedPath(packet.resultDestination.path)) return rejected("RDP-RESULT-PATH", "resultDestination.path");
-    destination = packet.resultDestination;
-  } else if (exactKeys(packet.resultDestination, ["kind"])
-    && (packet.resultDestination.kind === "return" || packet.resultDestination.kind === "stream")) {
-    destination = packet.resultDestination;
-  } else {
-    return rejected("RDP-RESULT-DESTINATION", "resultDestination");
-  }
-
-  const policy = dispatchFindings({ subagentType: packet.role, prompt: packet.prompt, transport: packet.transport });
-  if (policy.findings.length > 0) return rejected(policy.findings[0].code, "role");
+  const { findings, destination } = staticPacketFindings(packet, legacyPacket, explicitPacket);
+  if (findings.length > 0) return rejected(findings[0].code, findings[0].field, findings);
 
   const deadlineRejected = () => rejected("RDP-DEADLINE", "deadlineEpochMs");
   const commit = git(realRoot, ["rev-parse", "--verify", `${packet.candidate.commit}^{commit}`], deadline);
@@ -160,28 +171,37 @@ export function preflightRoleDispatch({
   const tree = git(realRoot, ["rev-parse", `${commit}^{tree}`], deadline);
   if (tree === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
   if (tree !== packet.candidate.tree) return rejected("RDP-CANDIDATE-TREE", "candidate.tree");
-  for (const path of packet.requiredPaths) {
+  const runtimeFindings = [];
+  const addRuntimeFinding = (code, field) => runtimeFindings.push({ code, field });
+  for (const [index, path] of packet.requiredPaths.entries()) {
+    const field = `requiredPaths[${index}]`;
     const row = git(realRoot, ["--literal-pathspecs", "ls-tree", "-z", commit, "--", path], deadline);
     if (row === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
     const match = /^(?:100644|100755) blob ((?:[a-f0-9]{40}|[a-f0-9]{64}))\t/u.exec(row ?? "");
     if (match === null) {
-      return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
+      addRuntimeFinding("RDP-REQUIRED-PATH", field);
+      continue;
     }
     const candidateDigest = candidateBlobSha256(realRoot, match[1], deadline);
     if (candidateDigest === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
     if (candidateDigest !== packet.requiredPathSha256[path]) {
-      return rejected("RDP-REQUIRED-BLOB", `requiredPaths:${path}`);
+      addRuntimeFinding("RDP-REQUIRED-BLOB", field);
+      continue;
     }
     const physicalPath = resolve(realRoot, path);
     try {
       const physical = lstatSync(physicalPath);
       if (!physical.isFile() || physical.isSymbolicLink() || realpathSync(physicalPath) !== physicalPath) {
-        return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`);
+        addRuntimeFinding("RDP-REQUIRED-PATH", field);
+        continue;
       }
-    } catch { return rejected("RDP-REQUIRED-PATH", `requiredPaths:${path}`); }
+    } catch {
+      addRuntimeFinding("RDP-REQUIRED-PATH", field);
+      continue;
+    }
     const physicalBlob = git(realRoot, ["--literal-pathspecs", "hash-object", "--no-filters", "--", path], deadline);
     if (physicalBlob === null && remainingDeadlineMs(deadline) < 1) return deadlineRejected();
-    if (physicalBlob !== match[1]) return rejected("RDP-REQUIRED-PATH-DRIFT", `requiredPaths:${path}`);
+    if (physicalBlob !== match[1]) addRuntimeFinding("RDP-REQUIRED-PATH-DRIFT", field);
   }
   if (destination.kind === "file") {
     let realResultRoot;
@@ -193,16 +213,19 @@ export function preflightRoleDispatch({
       // catches a symlinked destination without rejecting platform-standard
       // ancestors such as macOS /var -> /private/var.
       if (!lexicalResultStat.isDirectory() || lexicalResultStat.isSymbolicLink()) {
-        return rejected("RDP-RESULT-ROOT", "resultRoot");
+        addRuntimeFinding("RDP-RESULT-ROOT", "resultRoot");
       }
-    } catch { return rejected("RDP-RESULT-ROOT", "resultRoot"); }
-    if (!resultParentIsSafe(realResultRoot, destination.path)) {
-      return rejected("RDP-RESULT-DESTINATION", explicitPacket ? "resultDestination.path" : "resultPath");
-    }
-    if (realRoot === realResultRoot && packet.requiredPaths.includes(destination.path)) {
-      return rejected("RDP-RESULT-ALIASES-INPUT", explicitPacket ? "resultDestination.path" : "resultPath");
+    } catch { addRuntimeFinding("RDP-RESULT-ROOT", "resultRoot"); }
+    if (realResultRoot !== undefined && !runtimeFindings.some(({ field }) => field === "resultRoot")) {
+      if (!resultParentIsSafe(realResultRoot, destination.path)) {
+        addRuntimeFinding("RDP-RESULT-DESTINATION", explicitPacket ? "resultDestination.path" : "resultPath");
+      } else if (realRoot === realResultRoot && packet.requiredPaths.includes(destination.path)) {
+        addRuntimeFinding("RDP-RESULT-ALIASES-INPUT", explicitPacket ? "resultDestination.path" : "resultPath");
+      }
     }
   }
+
+  if (runtimeFindings.length > 0) return rejected(runtimeFindings[0].code, runtimeFindings[0].field, runtimeFindings);
 
   return {
     schema: ROLE_DISPATCH_PREFLIGHT_SCHEMA,

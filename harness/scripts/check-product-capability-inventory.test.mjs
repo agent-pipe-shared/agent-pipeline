@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -11,6 +12,9 @@ import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test
 import { produceCriticDiagnostic } from "../../plugins/pipeline-core/lib/critic-diagnostic-producer.mjs";
 import { canonicalJson, sha256 } from "../../plugins/pipeline-core/scripts/critic-packet-preflight.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "../../plugins/pipeline-core/scripts/session-critic-finalizer.mjs";
+import { PORTABLE_CRITIC_EXPORT_PATH, PORTABLE_CRITIC_EXPORT_SCHEMA,
+  preparePortableCriticExport, verifyPortableCriticExport } from "../../plugins/pipeline-core/lib/portable-critic-export.mjs";
+import { canonical, PO_APPROVAL_PROOF_SCHEMA } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const inventoryPath = join(repoRoot, "docs", "product-capability-inventory.json");
@@ -37,8 +41,15 @@ const PENDING_REVIEW = {
   reason: "Fixture-only pending review; no Critic receipt is attested.",
 };
 
-function inventory({ review = "attested", targets = "pending" } = {}) {
-  const document = JSON.parse(readFileSync(inventoryPath, "utf8"));
+function inventory({ review = "attested", targets = "pending", source = "worktree" } = {}) {
+  // Positive validator fixtures use committed inventory bytes while an
+  // implementation candidate is still being assembled. The production CLI
+  // below continues to require the exact committed sourceBaseline; this
+  // fixture choice cannot make an uncommitted inventory pass that gate.
+  const bytes = source === "committed"
+    ? gitText(["show", "HEAD:docs/product-capability-inventory.json"])
+    : readFileSync(inventoryPath, "utf8");
+  const document = JSON.parse(bytes);
   if (review === "attested") {
     // Fixture-only digest: it is never written to the production inventory.
     document.criticReview = { status: "attested", receiptSha256: FIXTURE_RECEIPT_SHA256, reason: null };
@@ -191,8 +202,8 @@ check("HAW-A01 discovers the complete current direct product surface", () => {
 });
 
 check("HAW-A02 accepts an attested receipt and an honest inventory-phase pending gate", () => {
-  assert.equal(validated(inventory()).ok, true);
-  const pendingReview = inventory({ review: "pending" });
+  assert.equal(validated(inventory({ source: "committed" })).ok, true);
+  const pendingReview = inventory({ review: "pending", source: "committed" });
   assert.equal(validated(pendingReview).ok, true);
   const finalResult = validated(pendingReview, "final");
   assert.equal(finalResult.ok, false);
@@ -262,6 +273,9 @@ check("HAW-A04b permits only a reviewed pending-to-active inventory transition",
 
 check("HAW-A04c reads a genuinely consumed private Critic receipt across a committed activation successor", () => {
   const root = mkdtempSync(join(tmpdir(), "haw-critic-readback-"));
+  const cloneParent = mkdtempSync(join(tmpdir(), "haw-critic-clone-"));
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyText = publicKey.export({ type: "spki", format: "pem" }).toString();
   const git = (args) => {
     const result = run(root, "git", args);
     assert.equal(result.status, 0, result.stderr);
@@ -274,9 +288,18 @@ check("HAW-A04c reads a genuinely consumed private Critic receipt across a commi
   };
   try {
     git(["init", "-q"]);
-    for (const path of [".claude", "specs", "evidence", "docs"]) mkdirSync(join(root, path));
+    for (const path of [".claude", "specs", "evidence", "docs", "project",
+      "specs/sprint-alfred-epic/plans"]) mkdirSync(join(root, path), { recursive: true });
     writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
     writeFileSync(join(root, "specs", "spec.md"), "# Spec\n");
+    const portablePlan = "specs/sprint-alfred-epic/plans/sprint-alfred-execution-roadmap.md";
+    const portableSpec = "specs/sprint-alfred-epic/spec.md";
+    writeFileSync(join(root, portablePlan), "# Reviewed plan\n");
+    writeFileSync(join(root, portableSpec), "# Reviewed spec\n");
+    writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: [], waivedKinds: [],
+      trustAnchors: [{ keyReference: "fixture-po", publicKeySha256: sha256(publicKeyText) }],
+    }));
     const inventoryPath = "docs/product-capability-inventory.json";
     const pending = {
       schema: "fixture.inventory.v1",
@@ -316,6 +339,14 @@ check("HAW-A04c reads a genuinely consumed private Critic receipt across a commi
     assert.equal(admitSessionCriticReview(criticRequest).status, "admitted");
     const result = finalizeSessionCriticReview(criticRequest);
     assert.equal(result.status, "completed");
+    const prepared = preparePortableCriticExport({ gitCommonDir: join(root, ".git"),
+      criticPacketId: criticRequest.packetId, candidate: { commit: candidate, tree },
+      planSha256: sha256(readFileSync(join(root, portablePlan))),
+      specSha256: sha256(readFileSync(join(root, portableSpec))) });
+    assert.equal(prepared.subject.producer.receiptSha256, sha256(canonicalJson(result.receipt)));
+    assert.equal(prepared.subject.producer.reviewPass, true);
+    assert.equal(JSON.stringify(prepared).includes(root), false,
+      "portable preparation must not export the private checkout path");
     const final = structuredClone(pending);
     final.criticReview = { status: "attested", receiptSha256: sha256(canonicalJson(result.receipt)), reason: null };
     final.capabilities[0].targets[0].status = "active";
@@ -323,15 +354,42 @@ check("HAW-A04c reads a genuinely consumed private Critic receipt across a commi
     git(["add", inventoryPath]);
     git(["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "activate reviewed inventory"]);
     assert.equal(validateFinalCriticReadback(root, inventoryPath, final), null);
+    const exportRecord = { schema: PORTABLE_CRITIC_EXPORT_SCHEMA, ...prepared,
+      proof: { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: prepared.approvalIntent.sha256,
+        keyReference: "fixture-po", publicKey: publicKeyText,
+        signatureBase64: sign(null, Buffer.from(prepared.approvalIntent.sha256, "utf8"), privateKey).toString("base64") } };
+    const exportCheck = verifyPortableCriticExport({ exportRecord,
+      candidate: { commit: candidate, tree },
+      receiptSha256: sha256(canonicalJson(result.receipt)),
+      planSha256: sha256(readFileSync(join(root, portablePlan))),
+      specSha256: sha256(readFileSync(join(root, portableSpec))),
+      trustAnchors: [{ keyReference: "fixture-po", publicKeySha256: sha256(publicKeyText) }] });
+    assert.equal(exportCheck.ok, true, JSON.stringify(exportCheck));
+    const exportPath = join(root, PORTABLE_CRITIC_EXPORT_PATH);
+    mkdirSync(dirname(exportPath), { recursive: true });
+    writeFileSync(exportPath, `${canonical(exportRecord)}\n`);
+    git(["add", PORTABLE_CRITIC_EXPORT_PATH]);
+    git(["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "publish signed redacted review export"]);
+    const clone = join(cloneParent, "checkout");
+    const cloned = run(cloneParent, "git", ["clone", "-q", root, clone]);
+    assert.equal(cloned.status, 0, cloned.stderr);
+    assert.equal(validateFinalCriticReadback(clone, inventoryPath, final), null,
+      "fresh clone must verify the signed public export without private packet state");
+    writeFileSync(join(clone, PORTABLE_CRITIC_EXPORT_PATH), `${canonical({ ...exportRecord,
+      subject: { ...exportRecord.subject, purpose: "unrelated" } })}\n`);
+    assert.match(validateFinalCriticReadback(clone, inventoryPath, final), /committed-bytes-differ/u);
     const tampered = structuredClone(final);
     tampered.capabilities[0].id = "unreviewed";
     writeFileSync(join(root, inventoryPath), `${JSON.stringify(tampered)}\n`);
     assert.match(validateFinalCriticReadback(root, inventoryPath, tampered), /committed inventory/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(cloneParent, { recursive: true, force: true });
+  }
 });
 
 check("HAW-A05 accepts an ancestor baseline and still requires every discovered surface to be categorized", () => {
-  const document = inventory();
+  const document = inventory({ source: "committed" });
   document.sourceBaseline = revision("HEAD^");
   assert.equal(validated(document).ok, true);
 
@@ -366,6 +424,7 @@ check("HAW-A05a CLI discovery is bound to the committed baseline and rejects a l
     const assigned = cliInventory(root);
     assert.notEqual(assigned.status, 0);
     assert.match(assigned.stderr, /capabilities\[0\] references missing surface skill:plugins\/baseline-regression\/skills\/later-surface\/SKILL\.md:later-surface/);
+    assert.match(assigned.stderr, /in committed sourceBaseline [a-f0-9]{40} \(uncommitted worktree files are not discovery evidence\)/);
   });
 });
 

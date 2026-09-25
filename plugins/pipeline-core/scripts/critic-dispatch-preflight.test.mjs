@@ -70,7 +70,7 @@ function input(fx, overrides = {}) {
   };
 }
 
-function registeredFourRoundFixture() {
+function registeredFourRoundFixture(roundCount = 4) {
   const fx = fixture();
   const featureId = "course-feature";
   const specPath = `specs/${featureId}/spec.md`;
@@ -80,7 +80,7 @@ function registeredFourRoundFixture() {
   writeFileSync(join(fx.root, specPath), "# Course feature\nround one\n");
   writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest([]))}\n`);
   const commits = [commit(fx.root, "course round one candidate")];
-  for (let round = 2; round <= 4; round += 1) {
+  for (let round = 2; round <= roundCount; round += 1) {
     writeFileSync(join(fx.root, specPath), `# Course feature\nround ${round}\n`);
     commits.push(commit(fx.root, `course round ${round} candidate`));
   }
@@ -125,7 +125,7 @@ function registeredFourRoundFixture() {
     return { class: "candidate-evidence", path, sha256: sha256(bytes), authority: false, mutability: "immutable", retention: "retain" };
   });
   writeFileSync(join(fx.root, manifestPath), `${JSON.stringify(manifest(artifacts))}\n`);
-  commit(fx.root, "register four immutable course rounds");
+  commit(fx.root, `register ${roundCount} immutable course rounds`);
   writeFileSync(join(fx.root, specPath), "# Course feature\nround five candidate\n");
   const fifth = commit(fx.root, "fifth candidate");
   const tree = git(fx.root, ["rev-parse", `${fifth}^{tree}`]);
@@ -149,6 +149,22 @@ test("a fifth feature-package review is refused before packet-ready from retaine
     assert.throws(() => preflightCriticDispatch({ ...proposed, base: null,
       reviewScope: { kind: "current-artifacts", paths: [fx.specPath] } }),
     (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-COURSE-SCOPE");
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("an exact evidence-only registration does not consume the fourth review's correction budget", () => {
+  const fx = registeredFourRoundFixture(3);
+  try {
+    const result = preflightCriticDispatch(input(fx, {
+      base: fx.reviewedCommit,
+      candidate: fx.fifth,
+      specPath: fx.specPath,
+      evidencePaths: ["evidence/verify-course.json"],
+      priorCriticEvidencePath: fx.priorPath,
+    }));
+    assert.equal(result.status, "packet-ready");
+    assert.equal(result.coordinatorOnly.courseAdmission.round, 4);
+    assert.equal(result.coordinatorOnly.courseAdmission.correctionCommits, 3);
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 

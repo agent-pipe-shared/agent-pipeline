@@ -62,7 +62,7 @@ function snapshot(root) {
 }
 
 /** One real local root; `migrate: false` keeps its legacy (non-V3) source. */
-function fixture({ migrate = true } = {}) {
+function fixture({ migrate = true, enableAgy = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), "v3-bootstrap-authority-test-"));
   for (const path of runtimePaths) {
     if (!path.startsWith(".codex/")) write(root, path, BASELINES[path] ?? "");
@@ -74,6 +74,15 @@ function fixture({ migrate = true } = {}) {
     const plan = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true });
     assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics ?? []));
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    if (enableAgy) {
+      const sourcePath = join(root, "pipeline.user.yaml");
+      const source = readFileSync(sourcePath, "utf8");
+      const enabled = '  enabled:\n    - "claude"\n    - "codex"';
+      assert.ok(source.includes(enabled), "the fixture must retain its V3 enabled-runner block");
+      writeFileSync(sourcePath, source.replace(enabled, `${enabled}\n    - "antigravity"`));
+      const agyPlan = planRunnerProfileMigrationV3({ rootDir: root });
+      assert.equal(agyPlan.status, "noop", JSON.stringify(agyPlan.diagnostics ?? []));
+    }
   }
   return root;
 }
@@ -261,7 +270,7 @@ check("the CLI keeps its exact usage/argument contract and validates --runner", 
     const write_ = (chunk) => { output += String(chunk); };
     assert.equal(authorityCli(["--help"], { write: write_, deps }), 0);
     assert.match(output, /Usage: node plugins\/pipeline-core\/scripts\/v3-bootstrap-authority\.mjs --root/u);
-    assert.match(output, /--runner claude\|codex/u);
+    assert.match(output, /--runner claude\|codex\|antigravity/u);
 
     output = "";
     assert.equal(authorityCli([], { write: write_, deps }), 2);
@@ -273,11 +282,41 @@ check("the CLI keeps its exact usage/argument contract and validates --runner", 
 
     output = "";
     assert.equal(authorityCli(["--root", root, "--runner", "bogus"], { write: write_, deps }), 2);
-    assert.match(output, /--runner requires "claude" or "codex"/u);
+    assert.match(output, /--runner requires "claude", "codex" or "antigravity"/u);
 
     output = "";
     assert.equal(authorityCli(["--root", root, "--runner"], { write: write_, deps }), 2);
-    assert.match(output, /--runner requires "claude" or "codex"/u);
+    assert.match(output, /--runner requires "claude", "codex" or "antigravity"/u);
+  });
+});
+
+check("an explicit Antigravity CLI runner is refused until the project enables it", () => {
+  withFixture({}, (root) => {
+    const { deps, probes } = gitDeps(root);
+    let output = "";
+    const exit = authorityCli(["--root", root, "--runner", "antigravity"], {
+      write: (chunk) => { output += String(chunk); }, deps,
+    });
+    const authority = JSON.parse(output);
+    assert.equal(exit, 1);
+    assert.equal(authority.status, "rejected");
+    assert.equal(authority.diagnostics[0].code, "v3_runner_not_enabled");
+    assert.deepEqual(probes, []);
+  });
+});
+
+check("an enabled Antigravity CLI runner uses the non-Codex readback boundary", () => {
+  withFixture({ enableAgy: true }, (root) => {
+    const { deps, probes } = gitDeps(root);
+    let output = "";
+    const exit = authorityCli(["--root", root, "--runner", "antigravity"], {
+      write: (chunk) => { output += String(chunk); }, deps,
+    });
+    const authority = JSON.parse(output);
+    assert.equal(exit, 0);
+    assert.equal(authority.status, "ready");
+    assert.equal(authority.runtimeReadback, "not-applicable");
+    assert.deepEqual(probes, [], "Antigravity must not consult private Codex runtime readback");
   });
 });
 

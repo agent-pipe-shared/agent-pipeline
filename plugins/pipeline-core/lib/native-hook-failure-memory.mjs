@@ -20,7 +20,7 @@ const CODES = new Set(["ETIMEDOUT", "EPERM", "EACCES", "EROFS"]);
 const sha = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 export function nativeHookSessionId(input, environment = process.env) {
-  const value = input?.session_id ?? input?.sessionId
+  const value = input?.session_id ?? input?.sessionId ?? input?.conversationId
     ?? environment.CODEX_SESSION_ID ?? environment.CODEX_THREAD_ID ?? null;
   return typeof value === "string" && /^[A-Za-z0-9_.-]{1,160}$/u.test(value) ? value : null;
 }

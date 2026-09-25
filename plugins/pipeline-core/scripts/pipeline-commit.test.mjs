@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parse } from "./pipeline-commit.mjs";
+import { parse, runPipelineCommitCli } from "./pipeline-commit.mjs";
 test("CLI parser requires a canonical dispatch record and refuses caller-supplied attribution", () => {
   assert.equal(parse(["--type", "fix", "--scope", "x", "--message", "m", "--dispatch-record", "evidence/dispatch-record-T.json"]).dispatchRecord, "evidence/dispatch-record-T.json");
   assert.throws(() => parse(["--type", "fix", "--scope", "x", "--message", "m", "--dispatch-task", "T", "--dispatch-role", "goldfish"]), /usage/u);
@@ -25,4 +25,23 @@ test("CLI rejects duplicate, mixed, multiline, unknown and unsafe timeout inputs
   assert.throws(() => parse([...base, "--no-verify"]), /usage/u);
   assert.throws(() => parse([...base, "--timeout-ms", "NaN"]), /usage/u);
   assert.throws(() => parse([...base, "--timeout-ms", "300001"]), /usage/u);
+});
+test("CLI returns a nonzero exit for post-commit recovery without exposing private Git diagnostics", () => {
+  const output = [], errors = [];
+  const argv = ["--type", "fix", "--scope", "core", "--summary", "safe", "--body", "why",
+    "--dispatch-record", "evidence/dispatch-record-T.json", "--execute"];
+  const exitCode = runPipelineCommitCli(argv, {
+    commit: () => ({ status: "recovery-required", code: "PC-COMMIT-READBACK-MISMATCH", commit: "a".repeat(40) }),
+    stdout: { write: (value) => output.push(value) }, stderr: { write: (value) => errors.push(value) },
+  });
+  assert.equal(exitCode, 3);
+  assert.equal(JSON.parse(output[0]).status, "recovery-required");
+  assert.deepEqual(errors, []);
+  const privateError = runPipelineCommitCli(argv, {
+    commit: () => { throw Object.assign(new Error("private host path"), { code: "PC-COMMIT" }); },
+    stdout: { write: (value) => output.push(value) }, stderr: { write: (value) => errors.push(value) },
+  });
+  assert.equal(privateError, 2);
+  assert.equal(errors[0], "pipeline-commit: PC-COMMIT\n");
+  assert.equal(errors[0].includes("private host path"), false);
 });
