@@ -668,3 +668,5 @@ executed in the backlog, on GitHub, in `acceptance.md`, and — for decision 6
 
 The 2026-09-27 amendment awaits renewed content review and the sanctioned
 PO plan acknowledgement before submission.
+
+<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->
