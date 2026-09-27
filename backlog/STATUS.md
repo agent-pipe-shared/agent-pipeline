@@ -259,6 +259,7 @@
 | pipeline.gg22-pathspec-fix-lacks-permanent-test | closed | defect | pipeline | nova-b | 2026-09-06 | 2026-10-06 | Nova B — NVA-B-GG22FIX-1 (commit fe2d7afe) fixed the GG-22 shared-index deadlock, but plugins/pipeline-core/hooks/guard-git.test.mjs is TP-1 protected with no in-session override route, so the dispatch could not add a permanent regression test there. The fix was proven RED-then-GREEN via an ephemeral scratch/ reproduction script instead, which is not committed and does not guard against a future regression of this exact scoping logic. |
 | pipeline.git-09-still-calls-the-append-only-source-ledger-a-projection-file | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
+| pipeline.git-apply-bypasses-draft-source-guard | open | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.git-commit-multiple-message-trailers-are-misparsed | closed | defect | pipeline | nova-b | 2026-09-14 | 2026-09-30 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | — | 2026-08-10 | 2026-08-17 | — |
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -714,7 +715,7 @@
 
 ## Counts
 
-- open: 50
+- open: 51
 - in_progress: 0
 - closed: 642
 - rejected: 3

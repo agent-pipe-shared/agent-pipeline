@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8c4ca9319d33b3d7ed7ab2b800dea2729f37d0d6b6a98d1ac7bc0d23c8fbc3db"
+    "transitionHead": "6c811397c68d0e92ea6f1fa0e34e1966f375930ee84d7787d960b639999685fa"
   },
   "counts": {
-    "open": 50,
+    "open": 51,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -3444,6 +3444,16 @@
       "closureRepository": "self",
       "closureCommit": "f12c335034c524c325e960d3c508df1d0530fed5",
       "closureEvidence": "backlog/items/2026-08-08-a-git-repository-appears-although-the-plan-said-it-would-not.md"
+    },
+    {
+      "id": "pipeline.git-apply-bypasses-draft-source-guard",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Live Alfred Design/Draft readback, 2026-09-27: git apply wrote two protected plugin source files without HGO; an equivalent apply_patch action was denied by guard-testpath and guard-devplan.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.git-commit-multiple-message-trailers-are-misparsed",
