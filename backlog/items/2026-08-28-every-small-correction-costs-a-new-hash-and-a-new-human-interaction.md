@@ -55,3 +55,15 @@ question.
 - Does a partially-consumed manifest degrade safely?
 - How does this interact with the existing narrower-branch and replay refusals,
   which are working correctly today and must not regress?
+
+## Additional 2026-09-27 Greenfield observation
+
+The Codex/WSL Feature run signed the exact initial PRD/Spec bytes and then
+reached a design-workflow package that requires a separate final PO decision
+over those sources plus Advisor and readiness evidence. The Advisor route was
+unavailable, so the second decision was never reached; the observed cost is
+one completed signature ceremony before a deterministic later stop. Evaluate
+whether the first signature can be deferred until all review inputs are
+ready, producing one final bounded approval without weakening its exact
+source and evidence binding. This is an input to the existing design question,
+not proof that one broad reusable signature would be safe.

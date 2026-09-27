@@ -133,3 +133,15 @@ against, which is the cheapest remaining step toward closing this item.
   source triage's own `LATER (measurement item)` classification; execute after
   the 0.7 local-candidate work.
 - **Date:** 2026-09-27
+
+## Additional Codex/WSL input, 2026-09-27
+
+A fresh Feature run reached `awaiting-approval` without implementation after
+roughly 31 minutes of wall time across intake, human answers, signing and
+Advisor diagnosis. Its self-review could not split active Agent time from
+human wait or recover an exact token breakdown for the current session. The
+earlier session's token record was dominated by cached context and is not a
+valid administration-share estimate. Use this as another reason to meter
+per-gate wall time, retries, human wait, input/output/cached tokens and actual
+product work in the planned cross-runner study, not as a fourth comparable
+percentage.
