@@ -126,14 +126,15 @@ guidance, not as a reason to widen concurrency or autonomy.
 1. Split independent, non-overlapping packages so they may run in parallel.
 2. Give each implementor a bounded goal, exact context paths, acceptance checks,
    prohibitions, and stop conditions.
-3. Run the applicable targeted deterministic checks and Critic preflight.
+3. Run the applicable targeted deterministic and security checks, then the
+   Critic preflight.
    A candidate-bound Critic-mode [Verify evidence producer](#verify-a-consumer-project)
    receipt or validated diagnostic may admit review; Full Verify is still pending.
 4. Run the independent Critic review; profile and risk determine its depth and route.
 5. After corrections and any required delta review, run Full Verify on the
-   reviewed candidate with its consumed Critic evidence, plus applicable
-   security checks. Record the outcome and close the feature only when its
-   tracked work is actually complete.
+   reviewed candidate with its consumed Critic evidence. The final receipt
+   includes the configured security outcome for that exact candidate. Record
+   the outcome and close the feature only when its tracked work is complete.
 
 Several independent, low-risk dispatches may share one predeclared, bounded
 collection block: retain each task's targeted checks, review the combined
@@ -275,13 +276,11 @@ boundary requires an amended decision.
 
 ## Know the boundary
 
-The three-runner Greenfield Driver contract is covered for Claude, Codex, and
-Antigravity, but coverage is not a claim of identical native enforcement across
-hosts.
-Publication still needs its own Verify, security, independent review,
-approval, and remote readback. Nova A/B implementation in this source tree
-does not by itself establish acceptance of every issue criterion on the final
-0.7 candidate or installed-host support for every runner route.
+The three-runner Greenfield Driver contract covers Claude, Codex, and
+Antigravity without asserting identical native enforcement across hosts.
+Publication still needs Verify, security, independent review, approval, and
+remote readback. The [current release status](overview.md) distinguishes
+source implementation from candidate acceptance and installed availability.
 
 Use [SETUP](../SETUP.md) for installation, [PIPELINE_FLOW](../PIPELINE_FLOW.md)
 for the maintained lifecycle, and the [documentation map](README.md) for the

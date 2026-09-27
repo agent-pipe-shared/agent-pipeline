@@ -115,6 +115,15 @@ node <plugin-root>/scripts/project-onboarding-v3.mjs inspect --root /absolute/co
 
 The normal progress sequence is ordered and fail-closed:
 
+`F0: onboarding-required` and `F0A: adoption-required` in [SETUP](../SETUP.md)
+classify the **repository root** before this progress sequence starts; they
+are not statuses in the table. An F0 fresh root begins with
+`portable-seed-required`. After the approved seed, run `pipeline-start` again
+and follow the next returned runtime/restart/intake status. An F0A existing
+root follows its additive adoption plan first and enters this sequence only
+at the status its new authority actually returns; do not apply a fresh seed
+over existing project files.
+
 | Status | Reviewed next action | What completion proves |
 | --- | --- | --- |
 | `portable-seed-required` | Read-only `plan`, then the returned digest-bound `apply-portable-seed --activate` command. | The portable V3 source/calibration seed validates. It does not prove Codex runtime or operational readiness. |

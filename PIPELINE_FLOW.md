@@ -323,24 +323,10 @@ rule is not host-wide enforcement; a governance path is not IAM; a requested
 route is not observed model identity; and a machine gate does not prove every
 semantic property.
 
-`0.7.0` names the next documented source and plugin release line, not a tag,
-installation source, or availability claim:
-
-- The completed Phoenix product line provides the delivery-governance
-  foundation: candidate-bound evidence and approvals, deterministic checks
-  before independent review, recoverable operational records, and typed
-  boundaries for external actions.
-- Nova's candidate-ready increment includes the guided greenfield driver, a
-  usable first project, and runner-aware delivery.
-- Nova A/B implementation is present in the repository; its issue criteria
-  still need final candidate-bound acceptance. Lighter plan-change and close
-  flows, clearer cross-runner guidance, and stronger delivery-loop
-  observability remain follow-up work only where the current candidate does
-  not yet meet their acceptance criteria.
-- The three-runner greenfield contract covers Claude, Codex, and Antigravity;
-  coverage does not imply identical native enforcement on each host.
-- This release line does not claim publication, a Git tag, marketplace
-  availability, or production support.
+`0.7.0` describes a pending source and plugin release, not an available
+tag or installation source. Use the approved published plugin and check the
+loaded host version before following a route. The [overview](docs/overview.md)
+maintains the detailed implementation and candidate-acceptance status.
 
 For the normative details, read the [Operating Model](docs/operating-model.md).
 For adoption and migration, use [SETUP](SETUP.md) and

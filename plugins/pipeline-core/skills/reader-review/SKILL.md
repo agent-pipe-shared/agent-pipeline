@@ -14,17 +14,28 @@ its findings and recording its committed binding do not require a PO decision.
 A later push, publication or release still uses its separately configured
 gates.
 
-For any review mode, limit one documentation course to four complete
-two-stage rounds and three public-document correction cycles. Count a
-correction batch once even if it spans several commits. Preserve the count and
-remaining findings across sessions; an evidence-only commit or new round ID
-does not reset it. Count actual earlier rounds of an active course; do not
-retroactively invalidate a completed binding. At exhaustion, stop automatic
-edits and reader dispatches,
-then present an explicit documentation-owner course decision with the remaining
-findings and options. Involve the PO only when existing authority rules require
-it. A new course decision cannot itself close a finding or replace a fresh
-final review.
+For any review mode, use a bounded **2+2 course**: an initial complete
+two-stage review, a correction batch, a fresh two-stage re-review focused on
+those corrections, a second correction batch, a second complete two-stage
+review, a third correction batch, a fresh two-stage re-review focused on those
+corrections, and one final correction batch for findings from that last review.
+The fourth correction batch is terminal: after it, the course is complete
+without a fifth reader dispatch. Count each batch once even if it spans several
+commits. A re-review may focus its findings on changed passages, but must
+receive the complete frozen document set and flag regressions or inconsistent
+surrounding guidance it notices. Preserve rounds, batches, reviewed commits,
+and remaining findings across sessions; a new round ID or evidence-only commit
+does not reset the count. An earlier round with no findings completes the
+course immediately. Do not retroactively invalidate a completed binding.
+
+At the terminal batch, record the exact findings, their resolutions, and the
+final committed document state. Do not launch another two-stage round or
+silently start a new course for the same findings. Completion requires every
+finding to be resolved or explicitly accepted by the documentation owner;
+otherwise it remains open. Procedural completion does not by itself create a
+passing source binding: never write `record.json` against a document state the
+source checker cannot attest. Involve the PO only when existing authority
+rules require it.
 
 ## Choose the binding mode
 
@@ -73,8 +84,10 @@ basenames never select source-bound mode.
    finding in `disposition/<round>.json` with the protocol's closed schema.
    Resolve applicable findings in the public documents. If any covered document
    changes, commit that state and restart both phases with a new round; reports
-   from the previous document state cannot close the review. Apply the course
-   limit above; never claim a passing binding from an unfinished course.
+   from the previous document state cannot close the review. Apply the bounded
+   course above; after its fourth review, resolve findings in one terminal
+   correction batch and do not dispatch a fifth review. Never claim a passing
+   source binding from a document state the checker cannot attest.
 6. On the first round needing no further public-document edits, commit the two
    reports and disposition. Derive `record.json` from a fresh checker snapshot,
    commit it last, and run the checker without `--snapshot` against that exact

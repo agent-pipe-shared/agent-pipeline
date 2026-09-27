@@ -102,6 +102,14 @@ Die Pfeile versprechen nicht, dass jede Änderung jede Box besucht. Die Tabellen
 sagen, wann ein Zweig existiert, wer ihn besitzt, welcher Nachweis ihn real macht
 und wo er wieder einmündet.
 
+Skills machen Bootstrap, Beratung, Observation Intake, Review und Close
+auffindbar; ein Skill genehmigt weder Plan noch Commit oder Release. Eine
+V3-Route benennt Runner, Pflichtnachweis und Verhalten bei Nichtverfügbarkeit.
+Prüfe ihre tatsächliche Verfügbarkeit auf dem aktuellen Host: eine deklarierte
+Route ist noch kein erfolgreicher Dispatch, und ein angefragtes Modell belegt
+nicht das effektiv gelaufene Modell. Die englische Fassung enthält die
+[ausführliche Routen- und Evidenzgrenze](PIPELINE_FLOW.md#1-confirm-the-v3-profile-before-bootstrap).
+
 ## 1. Zuerst das V3-Profil wählen
 
 | Profil | Einstieg, wenn | Owner | Nachweis / Schutz | Wiedereinstieg oder Stopp |
@@ -249,26 +257,11 @@ Durchsetzung, aus einem Governance-Pfad kein IAM, aus einer angefragten Route
 keine beobachtete Modellidentität und aus einem Maschinen-Gate keinen Beweis
 jeder semantischen Eigenschaft.
 
-`0.7.0` bezeichnet den dokumentierten Umfang des nächsten Source- und Plugin-
-Releases. Das ist weder ein Tag noch eine Installations- oder
-Verfügbarkeitsaussage:
-
-- Der abgeschlossene Phoenix-Produktstrang ist als Delivery-Governance-
-  Fundament integriert: kandidatengebundene Evidenz und Freigaben,
-  deterministische Prüfungen vor unabhängigem Review, wiederherstellbare
-  Betriebsaufzeichnungen und typisierte Grenzen für externe Aktionen.
-- Novas kandidatreifes Increment ist enthalten: der geführte Greenfield-
-  Driver, ein praktikables erstes Projekt und runner-bewusstes Delivery.
-- Nova A/B ist im Repository implementiert; die Issue-Kriterien benötigen noch
-  eine finale kandidatengebundene Abnahme. Leichtere Planänderungs- und
-  Abschlussflüsse, klarere runnerübergreifende Hinweise und stärkere
-  Delivery-Loop-Beobachtbarkeit bleiben nur dort Folgearbeit, wo der aktuelle
-  Kandidat ihre Akzeptanzkriterien noch nicht erfüllt.
-- Der Drei-Runner-Greenfield-Vertrag ist für Claude, Codex und Antigravity
-  abgedeckt, aber diese Abdeckung ist kein Anspruch auf identische native
-  Durchsetzung je Host.
-- Dieses Release behauptet weder Veröffentlichung, einen Git-Tag,
-  Marketplace-Verfügbarkeit noch Produktivsupport.
+`0.7.0` beschreibt ein noch nicht veröffentlichtes Source- und Plugin-
+Release, keinen verfügbaren Tag oder Installationspfad. Nutze die freigegebene
+veröffentlichte Version und prüfe die geladene Host-Version, bevor du eine
+Route wählst. Den detaillierten Implementierungs- und Abnahmestand hält der
+[Überblick](docs/overview.md) fest.
 
 Normative Details stehen im [Operating Model](docs/operating-model.md). Für
 Adoption und Migration nutze [SETUP.md](SETUP.md) und

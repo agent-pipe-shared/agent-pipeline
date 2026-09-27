@@ -69,3 +69,18 @@ immutable source-bound report. No `disposition/20260927b.json` or
 findings remain open. Four rounds and three correction batches are exhausted.
 Do not edit the sixteen public documents or dispatch another reader for this
 course until the documentation owner makes an explicit new course decision.
+
+The documentation owner authorized one terminal correction batch for exactly
+these five findings and explicitly ruled out another two-stage reader round.
+The decision is recorded in `course-decision-request-2026-09-27.md`. The
+public-document patch addresses the five findings in `SETUP.md`, both flow
+guides, `docs/usage.md`, and `docs/v3-consumer-onboarding.md`; the 0.7 release
+status detail remains in `docs/overview.md`. The general Reader skill now
+defines a bounded 2+2 course with a fourth terminal correction batch.
+
+This is an editorial resolution by the coordinator, not a fresh Reader
+verdict. The fourth-round reports and their source snapshot remain unchanged.
+No passing `record.json` is claimed: the present source binding checker
+requires an unchanged final reviewed document set and has no terminal-batch
+contract. Release qualification remains pending that technical contract and
+other candidate-bound evidence.
