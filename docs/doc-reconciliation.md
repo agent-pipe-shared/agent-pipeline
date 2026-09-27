@@ -47,6 +47,13 @@ something to do here without review.
 
 ## Entries
 
+## Candidate ae6e23352a30030e4ea80e1379162f65b09f9e9a — 2026-09-27, Alfred reader course and Agy intake
+
+- ADR-0011: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0076: checked, no change needed.
+
 ## Candidate f4b1fb1110974e58f5a2f010158e7620cc5c7497 — 2026-09-13, policy-selected bootstrap acknowledgement recovery
 
 - ADR-0003: checked, no change needed.
