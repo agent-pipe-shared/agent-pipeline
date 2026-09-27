@@ -829,6 +829,26 @@ test("resubmission clears a native continuation bound to the preceding authority
   });
   assert.equal(resubmitted.ok, true, JSON.stringify(resubmitted));
   assert.equal(resubmitted.state.continuity.nativeContinuation, null);
+  assert.equal(resubmitted.state.planApproval, undefined);
+  assert.equal(resubmitted.state.planPresentation, undefined);
+  assert.equal(resubmitted.state.planApprovalBriefing, undefined);
+  assert.deepEqual(resubmitted.state.planInvalidation, reopened.state.planInvalidation);
+  assert.equal(derivePlanLifecycle(resubmitted.state).status, "awaiting-approval");
+
+  const mismatched = { ...reopened.state, planInvalidation: {
+    ...reopened.state.planInvalidation, invalidatedApprovalSha256: "0".repeat(64),
+  } };
+  const refused = submitPlan({
+    state: mismatched,
+    expectedStateSha256: sha256CanonicalJson(mismatched),
+    poGateAuthority: { ...AUTHORITY, planSha256: "a".repeat(64), specSha256: "b".repeat(64) },
+    profile: "feature",
+    profileSha256: PROFILE,
+    by: "Coordinator",
+    at: RESUBMITTED,
+  });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "PLAN-SUBMIT-RETAINED-APPROVAL-UNBOUND");
 });
 
 test("restart/resume is deterministic and hostile or contradictory states fail closed", () => {

@@ -699,6 +699,16 @@ export function submitPlan({
     submittedBy: by,
     submittedAt: at,
   };
+  const retainedApproval = state.planApproval;
+  if (retainedApproval !== undefined
+    && (!(validCurrentPlanApproval(retainedApproval) || validPreviousCurrentPlanApproval(retainedApproval))
+      || !validPlanSubmission(state.planSubmission)
+      || retainedApproval.submissionSha256 !== sha256CanonicalJson(state.planSubmission)
+      || !validPlanInvalidation(state.planInvalidation)
+      || state.planInvalidation.invalidatedSubmissionSha256 !== sha256CanonicalJson(state.planSubmission)
+      || state.planInvalidation.invalidatedApprovalSha256 !== sha256CanonicalJson(retainedApproval))) {
+    return fail("PLAN-SUBMIT-RETAINED-APPROVAL-UNBOUND");
+  }
   const next = {
     ...state,
     planApproved: false,
@@ -719,6 +729,11 @@ export function submitPlan({
       },
     },
   };
+  if (retainedApproval !== undefined) {
+    delete next.planApproval;
+    delete next.planPresentation;
+    delete next.planApprovalBriefing;
+  }
   if (!validateContinuityState(next.continuity, state.activeFeature.id).ok) {
     return fail("PLAN-SUBMIT-CONTINUITY-POSTIMAGE");
   }

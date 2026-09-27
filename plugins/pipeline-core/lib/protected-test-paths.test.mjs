@@ -66,6 +66,24 @@ test("extractShellWriteTargets: git write verbs yield their operand on the 'git-
   assert.ok(targets.some((t) => t.candidate === TARGET && t.lane === "git-working-tree-write"));
 });
 
+test("mutating git apply cannot masquerade as a scratch-only write", () => {
+  for (const command of [
+    "git apply scratch/change.patch",
+    "git apply -R scratch/change.patch",
+    "git apply --reverse scratch/change.patch",
+    "git apply --cached scratch/change.patch",
+    "git apply -",
+    "git -C other apply scratch/change.patch",
+    "git apply --check --apply scratch/change.patch",
+    "git apply scratch/change.patch; true",
+  ]) {
+    assert.throws(() => extractShellWriteTargets({ command, root: "/repo" }),
+      /mutating git apply has unbound patch targets/u, command);
+  }
+  assert.deepEqual(extractShellWriteTargets({ command: "git apply --check scratch/change.patch", root: "/repo" }), []);
+  assert.deepEqual(extractShellWriteTargets({ command: "git apply --check -- scratch/change.diff", root: "/repo" }), []);
+});
+
 test("NVA-B8: Git revision-only working-tree verbs never invent a path from a commit or ref", () => {
   for (const command of [
     "git revert --no-edit d2b1dbfc",

@@ -804,6 +804,18 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
       const verb = isGit ? (argv[verbIndex] ?? null) : null;
       const gitWrite = isGit && GIT_WRITE_VERBS.has(verb ?? "");
       if (!WRITE_EXECUTABLES.has(executable) && !inPlace && !gitWrite) continue;
+      if (gitWrite && verb === "apply") {
+        const postVerbArgv = argv.slice(verbIndex + 1);
+        const checked = postVerbArgv[0] === "--check"
+          ? (postVerbArgv[1] === "--" ? postVerbArgv.slice(2) : postVerbArgv.slice(1))
+          : null;
+        if (verbIndex === 0 && checked?.length > 0
+          && checked.every((arg) => !arg.startsWith("-") && /\.(?:diff|patch)$/iu.test(arg))) continue;
+        // The patch file is an input, not the destination. A PreToolUse inspection of its
+        // contents would race the subsequent command, so no path-only classification can
+        // authorize this opaque mutation. Use the per-target Edit/Write/apply_patch tools.
+        throw new Error("mutating git apply has unbound patch targets");
+      }
 
       // Subcommand-aware for git (never the subcommand itself, never a global option's value --
       // both excluded by starting AFTER verbIndex; per-verb pathspec rules beyond that live in
@@ -846,6 +858,9 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
   // narrower than the gate-strength lane's unconditional name match, for the reason in this
   // module's header — a protected suite is meant to be run.
   const lowered = command.replace(/\\/gu, "/").toLowerCase();
+  if (/\bgit(?:\.exe)?\b/u.test(lowered) && /\bapply\b/u.test(lowered)) {
+    throw new Error("mutating git apply has unbound patch targets");
+  }
   const inPlaceNamed = [...IN_PLACE_EXECUTABLES].some((name) =>
     containsWholeToken(lowered, name) && (/(?:^|\s)-(?:[a-z]*i[a-z]*|-[a-z]*in-place)(?:[\s=]|$)/u.test(lowered))
   );
