@@ -916,3 +916,22 @@ pathway; §5 → §7.2 active optimization and §7.4 artifact orientation; §6 �
    which is false for context locality (signal-only until calibration) and
    for module identity (a foundation whose parents are all nine, not one).
    They stay separate, joined by the explicit mapping table in §7.3.
+
+## 16. 0.7 greenfield remediation increment
+
+The 2026-09-27 three-runner acceptance findings are integrated through
+[`design/greenfield-0.7-remediation-2026-09-27.md`](design/greenfield-0.7-remediation-2026-09-27.md).
+Its five slices fix or explicitly resolve significant delivery blockers,
+security gaps, evidence defects, and measured usability costs before a new
+local 0.7 candidate is offered for installation. Each backlog item's own
+acceptance remains authoritative; the addendum owns implementation ordering,
+non-overlapping file responsibilities, and the candidate evidence matrix.
+
+The security and Advisor deadlock slices precede candidate qualification.
+Source fixtures and a clean checkout cannot substitute for the stated live
+Codex/WSL, Claude/Windows, and version-correct Antigravity readbacks. The
+Reader terminal course closes after its fourth correction without a fifth
+review; a source release pass requires a distinct truthful terminal binding
+contract. Any item not satisfied on the exact candidate remains visible as an
+open release impact or needs an explicit PO-visible disposition. No backlog
+status or sprint assignment is silently changed by this section.

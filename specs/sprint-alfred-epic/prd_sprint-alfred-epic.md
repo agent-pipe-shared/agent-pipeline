@@ -1,7 +1,7 @@
 # Sprint Alfred Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 28c4d00aee6259dba1344104dd432277701183faa906f1be65f3513f50122e4d -->
+<!-- technical-spec-sha256: 167b99e5a565e204a13cc4f1cd4312b70dfe631b78236dc75bb0e061d09a73b9 -->
 
 **Feature ID:** `sprint-alfred-epic`
 **Profile / rigor / risk:** Epic / 2 / high (guard, canon, and authority
@@ -9,6 +9,9 @@ surfaces throughout)
 **Gate:** PRD/Spec accepted by the PO; implementation begins only after the
 sanctioned State submission/approval, the phase transition, and the Nova
 rebase precondition below.
+**Current amendment:** The 2026-09-27 greenfield remediation increment is
+prepared for PO review. The current State is design/draft with stale prior
+approval; this amendment grants no implementation authority by itself.
 **Current design base:** `feat/sprint-alfred` at `a50c8093` (clone of the Nova
 line); epic opened by PO-released `discard-feature` + `set-feature`
 (2026-08-27, commit `0d0031ea`).
@@ -35,6 +38,9 @@ rework directive), [`design/issue-intake.md`](design/issue-intake.md),
 [`design/external-research.md`](design/external-research.md),
 [`design/gap-analysis-2026-08-28.md`](design/gap-analysis-2026-08-28.md)
 (per-issue audit behind the rework).
+The next local 0.7 candidate also follows
+[`design/greenfield-0.7-remediation-2026-09-27.md`](design/greenfield-0.7-remediation-2026-09-27.md),
+which binds the later three-runner findings into five reviewable slices.
 
 ---
 
@@ -533,6 +539,9 @@ named in `spec.md` §12 and `acceptance.md`:
    from 24 by this design phase's own filed defects — and the live set, read
    via `check-backlog-sprint-assignment.mjs`, is authoritative over any count
    written here.
+   The later significant 0.7 greenfield items are tracked in the remediation
+   addendum even when their present sprint assignment is Nightwing or none;
+   inclusion in this candidate does not rewrite backlog ownership.
 5. Report-only phases collect real #103 interruption evidence from the first
    implementation wave. Before any threshold-dependent blocking promotion,
    establish sufficient measured coverage and calibration evidence, record the
@@ -655,5 +664,7 @@ executed in the backlog, on GitHub, in `acceptance.md`, and — for decision 6
 | 24 backlog items | `design/backlog-intake.md` → cluster tables, ⚖ PO-decided directions |
 | External research | `design/external-research.md` → D2 representation pin, D3 deterministic-pass rule, A1 rationale, positioning |
 | 2026-08-27 incidents | `docs/state.md` current section; the two filed items → A4/A5, C1 seed codes |
+| 2026-09-27 three-runner greenfield findings | `design/greenfield-0.7-remediation-2026-09-27.md` → five non-overlapping implementation slices, exact backlog acceptance, host readbacks and candidate evidence |
 
-<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->
+The 2026-09-27 amendment awaits renewed content review and the sanctioned
+PO plan acknowledgement before submission.
