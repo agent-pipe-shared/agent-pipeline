@@ -76,6 +76,11 @@ bridge's exact `take` callback to the runtime transport on the default path.
   read a credential reference, including after SIGKILL. Registered scratch
   remains recoverable and the exact bound report reaches the runtime `take`
   path.
+- The host disables inherited plugins, MCP servers, hooks, command tools,
+  external tools and environment access before accepting untrusted evidence.
+  Tool inventory queries are thread-bound; a global MCP inventory query must
+  not accidentally start a configured server. Process ownership, finite
+  shutdown and restart recovery are registered before a productive spawn.
 
 ## Triage
 
@@ -86,6 +91,17 @@ link and corrected `take` callback published a candidate-bound probe receipt
 under `scratch/` (`design-readiness-selected-probe-20260928i.json`). An
 independent patch critique found the link's credential exposure and crash
 cleanup flaw plus loss of explicit mutation detection. This probe is a
-diagnostic only, and `scratch/codex-readiness-fix.patch` must not be applied as
-written. The production source path remains unverified until a safe fix is
-integrated and replayed without dependency substitution.
+diagnostic only. The regenerated `scratch/codex-readiness-fix.patch` has no
+auth link and restores explicit mutation detection, but remains incomplete
+because its fresh scratch home is unauthenticated.
+
+A later Codex-only host prototype completed an authenticated synthetic turn
+with the registered readiness model/effort, a named restricted-read profile,
+all model tools disabled, and no secret copying or linking. Its adversarial
+input caused no tool/server request or fixture mutation. A model-free control
+also verified readable input, denied outside input and denied writes. A
+configured synthetic MCP server remained disabled without starting when the
+inventory was queried with the exact thread ID. These are scratch diagnostics,
+not a production transport, design gate or candidate stamp. The production
+source path remains unverified until a safe fix is integrated and replayed
+without dependency substitution.
