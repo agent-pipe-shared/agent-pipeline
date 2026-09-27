@@ -331,7 +331,7 @@
 | pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit. |
 | pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
 | pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check | closed | requirement | pipeline | — | 2026-08-19 | — | — |
-| pipeline.hgo-patch-preflight-before-signature | open | improvement | pipeline | alfred | 2026-09-27 | — | — |
+| pipeline.hgo-patch-preflight-before-signature | open | workflow-improvement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | — | 2026-08-17 | — | — |

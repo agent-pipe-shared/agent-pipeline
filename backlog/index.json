@@ -4422,7 +4422,7 @@
     {
       "id": "pipeline.hgo-patch-preflight-before-signature",
       "status": "open",
-      "type": "improvement",
+      "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-27",
       "source": "Alfred 0.7 Reader terminal correction, 2026-09-27: two exact signed apply_patch actions failed on missing blank-line context before a third root-guide signature applied.",

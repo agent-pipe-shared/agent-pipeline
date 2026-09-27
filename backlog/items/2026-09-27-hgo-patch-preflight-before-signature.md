@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.hgo-patch-preflight-before-signature
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-09-27
