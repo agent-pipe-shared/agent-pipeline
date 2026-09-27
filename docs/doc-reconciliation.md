@@ -320,6 +320,24 @@ against the project trust anchors and remains fail-closed for every race.
 - ADR-0082: checked, no change needed.
 - ADR-0083: checked, no change needed.
 
+## Candidate 641b6d17dc00ee0d657febef435a072595c888e8 — 2026-09-27, bounded Reader correction course
+
+The candidate applies the documentation owner's one terminal correction batch
+to the five fourth-round Reader findings and updates the source Reader skill
+to a bounded 2+2 course. It relocates Antigravity installation detail,
+connects F0/F0A with onboarding statuses, aligns the security/Verify order,
+consolidates release status, and adds German route context. The final changed
+document state has no passing reader binding under the current source checker;
+the open backlog item records the required terminal evidence contract. This
+reconciliation does not claim release qualification or change any approval or
+distribution authority.
+
+- ADR-0011: checked, no change needed. Public evidence uses sanitized paths.
+- ADR-0045: checked, no change needed. Reader course evidence stays under its canonical feature evidence directory.
+- ADR-0076: checked, no change needed. The guide aligns security ordering without changing approval mode.
+- ADR-0078: checked, no change needed. The setup remains explicit that 0.7.0 is not yet a published tag.
+- ADR-0081: checked, no change needed. The guide keeps candidate-bound Critic-mode evidence and final Full Verify distinct.
+
 ## Candidate 8b747c185c0d002dba685a791d14d23f5ccd6449 — 2026-09-18, Alfred integration candidate reconciliation
 
 - ADR-0001: checked, no change needed.
