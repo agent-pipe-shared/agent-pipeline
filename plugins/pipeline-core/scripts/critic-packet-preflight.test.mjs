@@ -190,6 +190,13 @@ check("binds an ordinary session preflight explicitly without changing legacy pa
     const invalid = options(f, "a".repeat(32));
     invalid.sessionBinding = { ...boundOptions.sessionBinding, assurance: "runner-native" };
     assert.throws(() => prepareCandidatePacket(invalid), expectCode("CPP-SESSION-BINDING"));
+    const mismatched = options(f, "b".repeat(32));
+    mismatched.sessionBinding = { ...boundOptions.sessionBinding, modelRole: {
+      schema: "pipeline.session-critic-model-role.v1", runner: mismatched.route.runner,
+      taskRoute: "duty.critic_normal", modelId: "different-model",
+      effort: mismatched.route.effortTier, readbackSha256: "a".repeat(64), receiptSha256: "b".repeat(64),
+    } };
+    assert.throws(() => prepareCandidatePacket(mismatched), expectCode("CPP-SESSION-BINDING"));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

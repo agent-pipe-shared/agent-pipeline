@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { advisoryEvidenceBundleSha256, buildAdvisoryEvidenceBundle, createAdvisoryDemand } from "./advisory-lifecycle-v2.mjs";
+import { validateAdvisoryAttemptTrail } from "./advisory-attempt-trail.mjs";
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
 import { DESIGN_ADVISORY_RECEIPT_DIRECTORY, readDesignAdvisoryTransaction, writeDesignAdvisoryTransaction } from "./design-advisory-transaction.mjs";
 
@@ -196,16 +197,14 @@ export async function coordinateDesignAdvisory({
     const bridgeCode = await invokeBridge({ inputPath, receiptPath: target, repoRoot: root, input, timeoutMs: 180_000 });
     if (!existsSync(target)) fail("DAC-RECEIPT-MISSING", "Advisor host bridge returned without the required private receipt");
     physicalFile(target, "DAC-RECEIPT-PATH");
-    const receipt = JSON.parse(readFileSync(target, "utf8"));
+    const receiptBytes = readFileSync(target);
+    const receipt = JSON.parse(receiptBytes.toString("utf8"));
     const validated = validateAdvisoryReceipt(receipt);
     if (!validated.ok || receipt.receiptId !== binding.receiptId
       || receipt.dispatch.dispatchId !== binding.receiptId
       || receipt.dispatch.candidateCommit !== candidateCommit || receipt.dispatch.candidateTree !== candidateTree
       || receipt.questionSha256 !== sha(Buffer.from(question, "utf8")) || receipt.configuredRoute.runner !== trustedRuntime.runner) {
       fail("DAC-RECEIPT-BINDING", "Advisor receipt is forged, stale, or bound to a different package");
-    }
-    if (bridgeCode !== 0 || receipt.observed.status !== "answered") {
-      fail("DAC-ADVISOR-UNAVAILABLE", "Advisor did not produce a fresh usable result; only the later final-approval exception may admit this receipt");
     }
     const currentPlan = bytesAt(root, plan, "DAC-PLAN");
     const currentSpec = bytesAt(root, spec, "DAC-SPEC");
@@ -214,6 +213,33 @@ export async function coordinateDesignAdvisory({
     if (sha(currentPlan) !== sha(planBytes) || sha(currentSpec) !== sha(specBytes)
       || currentCommit !== candidateCommit || currentTree !== candidateTree) {
       fail("DAC-PACKAGE-DRIFT", "governed package or candidate changed while the Advisor was running");
+    }
+    if (bridgeCode !== 0 || receipt.observed.status !== "answered") {
+      if (bridgeCode === 0 || receipt.observed.status === "answered") {
+        fail("DAC-BRIDGE-RESULT", "Advisor host exit and receipt disagree");
+      }
+      const trailTarget = `${target}.attempts-v1.json`;
+      physicalFile(trailTarget, "DAC-ATTEMPT-TRAIL-MISSING");
+      const trailBytes = readFileSync(trailTarget);
+      if (trailBytes.length > 16 * 1024) fail("DAC-ATTEMPT-TRAIL-INVALID", "Advisor attempt trail exceeds its byte bound");
+      let trail;
+      try { trail = JSON.parse(trailBytes.toString("utf8")); }
+      catch { fail("DAC-ATTEMPT-TRAIL-INVALID", "Advisor attempt trail is malformed"); }
+      const checked = validateAdvisoryAttemptTrail({ trail, receipt, receiptBytes,
+        requireNativeThenConsult: trustedRuntime.runner === "claude" });
+      if (!checked.ok) fail("DAC-ATTEMPT-TRAIL-INVALID", `Advisor routes were not exhausted (${checked.code})`);
+      // This is only an immutable pre-approval input. In particular it does
+      // not publish the public admission record or manufacture an approved
+      // exception before the one final human package decision exists.
+      return Object.freeze({
+        schema: "pipeline.design-advisory-coordinator-result.v1",
+        status: "unavailable-pending-final-approval",
+        binding: { packageSha256: binding.packageSha256, receiptId: binding.receiptId, candidateCommit, candidateTree },
+        bridge: { code: bridgeCode, target, observedAtMs: now() },
+        attemptTrail: { sha256: sha(trailBytes), attempts: checked.attempts },
+        write: null,
+        readback: null,
+      });
     }
     if (!exact(disposition, ["decision", "rationale"]) || !["accept", "decline"].includes(disposition.decision)
       || typeof disposition.rationale !== "string" || disposition.rationale.trim().length === 0) {
@@ -228,7 +254,11 @@ export async function coordinateDesignAdvisory({
       planPath: plan,
       specPath: spec,
       receiptId: binding.receiptId,
-      nativeAvailable: receipt.adapter === "native",
+      // The selected adapter is not the preflight capability: a successful
+      // consult may follow a native attempt that failed. Keep that attempt
+      // visible in the admission instead of rewriting history as if native
+      // had never been available.
+      nativeAvailable: receipt.adapter === "native" || receipt.fallback.reason.startsWith("native-"),
       disposition: { decision: disposition.decision, rationale: disposition.rationale },
       finalApprovalValid: false,
       expectedPublicSha256: expected,

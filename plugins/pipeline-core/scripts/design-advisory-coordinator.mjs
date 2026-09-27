@@ -61,7 +61,7 @@ export async function runDesignAdvisoryCoordinator(argv = process.argv.slice(2),
 
 if (isDirectInvocation(import.meta.url)) {
   runDesignAdvisoryCoordinator().then(
-    (result) => { process.stdout.write(`${JSON.stringify(result)}\n`); },
+    (result) => { process.stdout.write(`${JSON.stringify(result)}\n`); if (result.status !== "admitted") process.exitCode = 2; },
     (error) => { process.stderr.write(`DESIGN-ADVISORY-COORDINATOR-FAILED: ${error.code ?? "error"}: ${error.message}\n`); process.exitCode = 2; },
   );
 }

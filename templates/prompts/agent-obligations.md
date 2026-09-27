@@ -74,7 +74,7 @@ a route it never offered is wasted budget.
 
 ## 2. Protected test paths — and there is no in-session override
 
-Derived from `project/guard-config.json` (12 entries). `guard-testpath`
+Derived from `project/guard-config.json` (13 entries). `guard-testpath`
 refuses every Edit/Write against these. For Pipeline plugin source in a source
 checkout the override does not help either, and the reason is specific rather
 than general: `recordHumanGuardDenial()` takes the `eligible.authorCandidate`
@@ -98,6 +98,7 @@ a route.**
 | `TP-10` | `plugins/pipeline-core/hooks/notebook-write-coverage\.test\.mjs$` |
 | `TP-11` | `plugins/pipeline-core/lib/public-core-origin-allowlist\.test\.mjs$` |
 | `TP-12` | `plugins/pipeline-core/lib/self-application-attestation-gate\.test\.mjs$` |
+| `TP-13` | `harness/verify-suites\.json$` |
 
 This is not a blanket rule about `plugins/pipeline-core/**`: files under that
 tree that match no pattern above are ordinarily editable.
@@ -149,8 +150,12 @@ deliberately carries no static copy of that; a second copy is the drift.
 <!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index
      race), not values any guard exports, so no generator can derive them. -->
 
-- `git add -- <exact paths>` then `git commit -m "<subject>" --trailer "AI-Assisted: true" --trailer "Dispatch: <binding>" -- <same paths>`, as
-  two consecutive calls. Never `git add -A`, never `git add .`, never a bare
+- For an ordinary Goldfish write outside native host-commit mode, generate
+  the exact stage and commit commands with the read-only
+  `goldfish-commit-command-flow.mjs` producer named in the briefing. Run its
+  two returned commands separately after checking the exact paths; never
+  hand-compose a chained `git add && git commit`. Never `git add -A`,
+  never `git add .`, never a bare
   `git commit` — in a shared working tree a wildcard add lets another agent's
   files ride along on your commit.
 - Commit messages carry **no** provider or model co-author trailers, **no**

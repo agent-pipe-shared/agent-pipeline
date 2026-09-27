@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+  advisorySessionRoleSelectionSha256,
   advisoryEvidenceBundleSha256,
   buildAdvisoryEvidenceBundle,
   createAdvisoryConsultationRecord,
@@ -34,7 +35,7 @@ const testRoute = ({ candidateCommit: commit }) => ({
   state: "default", sourceSha256: "a".repeat(64), candidateCommit: commit,
 });
 const evidenceBundle = () => buildAdvisoryEvidenceBundle(process.cwd(), [
-  "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+  "LICENSE",
 ]);
 const base = () => {
   const question = "Which boundary is safest?";
@@ -53,11 +54,11 @@ const base = () => {
   };
 };
 
-function selectedAdvisory() {
+function selectedAdvisory(model = ADVISORY_MODEL) {
   const referenceSetSha256 = base().sandboxContext.referenceSetSha256;
   const requestSha256 = buildSandboxRequest({
     repoFingerprint: "c".repeat(64), duty: "advisory", queueRevision: 1, candidateCommit, candidateTree,
-    referenceSetSha256, runner: "codex", model: ADVISORY_MODEL,
+    referenceSetSha256, runner: "codex", model,
   }).requestSha256;
   return {
     schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "c".repeat(64), duty: "advisory",
@@ -71,14 +72,14 @@ function selectedAdvisory() {
   };
 }
 
-function selectedTransport() {
+function selectedTransport(model = ADVISORY_MODEL) {
   return {
     hostObservation: NON_WSL_HOST,
     repoRoot: process.cwd(),
     resolveAdvisoryRoute: testRoute,
     dependencies: {
       async executeSandboxedReadonlyDuty(request, dependencies) {
-        const selection = selectedAdvisory();
+        const selection = selectedAdvisory(model);
         const launched = await dependencies.bridge.launch({
           selectionId: selection.selectionId, duty: "advisory", selection, requested: request.requested, references: request.references, profile: selection.profile,
           scratch: { path: "/tmp/advisory-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: process.cwd(), codexPath: "/codex" },
@@ -92,13 +93,13 @@ function selectedTransport() {
     },
     async invokeCodexAdvisoryAppServer({ sandboxTransport, evidenceBundle: evidence, advisoryRoute }) {
       assert.equal(advisoryEvidenceBundleSha256(evidence), sandboxTransport.dispatch.referenceSetSha256);
-      assert.deepEqual(sandboxTransport.requested, { runner: "codex", model: ADVISORY_MODEL });
+      assert.deepEqual(sandboxTransport.requested, { runner: "codex", model });
       assert.deepEqual(advisoryRoute, {
-        dutyId: "advisory", runner: "codex", model: ADVISORY_MODEL, effort: "max", state: "default",
+        dutyId: "advisory", runner: "codex", model, effort: "max", state: "default",
         sourceSha256: advisoryRoute.sourceSha256, candidateCommit,
       });
       return {
-        status: "answered", answer: "Use the selected transport.", identity: { provider: "openai", modelId: ADVISORY_MODEL, effort: "max" },
+        status: "answered", answer: "Use the selected transport.", identity: { provider: "openai", modelId: model, effort: "max" },
         sandboxExecution: {
           schema: "pipeline.codex-sandbox-host-execution.v1", selectionId: sandboxTransport.selectionId, selectionSha256: sandboxTransport.selectionSha256,
           repoFingerprint: sandboxTransport.repoFingerprint, duty: "advisory", dispatch: sandboxTransport.dispatch,
@@ -109,6 +110,25 @@ function selectedTransport() {
     },
   };
 }
+
+test("host Advisor uses a qualified session model, while defective optional selection retains V3", async () => {
+  const selectedModel = "gpt-6-reviewed";
+  const ready = selectedTransport(selectedModel);
+  ready.selectModelRoleForTaskFn = ({ runner, taskRoute }) => {
+    assert.equal(runner, "codex");
+    assert.equal(taskRoute, "duty.advisory");
+    return { ok: true, status: "ready", runner, taskRoute, modelId: selectedModel,
+      effort: "max", readbackSha256: "1".repeat(64), receiptSha256: "2".repeat(64) };
+  };
+  const admitted = await runSelectedAdvisoryHost(base(), ready);
+  assert.equal(admitted.advisoryResult.code, "answered");
+  assert.equal(admitted.advisoryResult.receipt.configuredRoute.selector.value, selectedModel);
+  const legacy = selectedTransport();
+  legacy.selectModelRoleForTaskFn = () => { throw new Error("optional store unavailable"); };
+  const fallback = await runSelectedAdvisoryHost(base(), legacy);
+  assert.equal(fallback.advisoryResult.code, "answered");
+  assert.equal(fallback.advisoryResult.receipt.configuredRoute.selector.value, ADVISORY_MODEL);
+});
 
 test("an unbound direct host adapter never starts a Codex advisory or claims an answer", async () => {
   let calls = 0; let payload;
@@ -387,6 +407,123 @@ function advisoryInput(dispatch, question, evidence, runner = "claude") {
 function nativeClaudeAdvisoryInput(dispatch, question, evidence) {
   return advisoryInput(dispatch, question, evidence, "claude");
 }
+
+test("host bridge resolves Claude's admitted Frontier for fallback and preserves the V3 native route", async () => {
+  const { root, dispatchCandidate, evidence } = await governanceRepoRoot();
+  const inputRoot = await mkdtemp(join(tmpdir(), "advisory-claude-role-route-"));
+  try {
+    const dispatch = { dispatchId: "claude-role-fallback-01", queueRevision: 1, ...dispatchCandidate };
+    const inputPath = join(inputRoot, "input.json");
+    const receiptPath = join(inputRoot, "receipt.json");
+    const input = nativeClaudeAdvisoryInput(dispatch, "Which admitted fallback should be used?", evidence);
+    await writeFile(inputPath, JSON.stringify(input));
+    const selectedModel = "claude-frontier-session-model";
+    const selectedRoute = {
+      runner: "claude", taskRoute: "duty.advisory.fallback", role: "frontier",
+      effort: "max", modelId: selectedModel, sessionId: "claude-session-bridge-01",
+      readbackSha256: "1".repeat(64), receiptSha256: "2".repeat(64),
+    };
+    const selectedRole = {
+      ...selectedRoute,
+      selectionSha256: advisorySessionRoleSelectionSha256(selectedRoute),
+    };
+    const expectedDemand = createAdvisoryDemand({
+      runner: "claude", profile: input.profile, reason: input.demand.reason,
+      question: input.question, evidenceSha256: input.demand.evidenceSha256,
+      dispatch, sessionRoleSelection: selectedRole,
+    }).demand;
+    const nativeCalls = [];
+    const consultCalls = [];
+    let selectionReads = 0;
+    const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
+      ["--input", inputPath, "--receipt", receiptPath],
+      {
+        repoRoot: root,
+        modelRoleEnvironment: { CLAUDE_CODE_SESSION_ID: "claude-session-bridge-01" },
+        selectModelRoleForTaskFn: (selectionRequest) => {
+          selectionReads += 1;
+          assert.equal(selectionRequest.rootDir, root);
+          assert.equal(selectionRequest.runner, "claude");
+          assert.equal(selectionRequest.taskRoute, "duty.advisory.fallback");
+          return {
+            ok: true, status: "ready", runner: "claude", taskRoute: "duty.advisory.fallback",
+            role: "frontier", effort: "max", modelId: selectedModel,
+            sessionId: "claude-session-bridge-01", readbackSha256: "1".repeat(64),
+            receiptSha256: "2".repeat(64),
+          };
+        },
+        makeHostAdapter: () => async (payload) => {
+          if (payload.role === "native-advisor") {
+            nativeCalls.push(payload);
+            return { status: "unavailable" };
+          }
+          consultCalls.push(payload);
+          return { status: "answered", answer: "Use the exact admitted route.",
+            identity: { provider: "anthropic", modelId: selectedModel, effort: "max" } };
+        },
+      },
+    ));
+    assert.equal(code, 0);
+    assert.equal(selectionReads, 1);
+    assert.equal(nativeCalls.length, 2);
+    assert.ok(nativeCalls.every((call) => call.selector.value === "opus"
+      && call.effort === "not-applicable"));
+    assert.equal(consultCalls.length, 1);
+    assert.equal(consultCalls[0].model, selectedModel);
+    assert.equal(consultCalls[0].effort, "max");
+    const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    assert.equal(receipt.configuredRoute.selector.kind, "model-id");
+    assert.equal(receipt.configuredRoute.selector.value, selectedModel);
+    assert.match(receipt.configuredRoute.sessionRoleBindingSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(JSON.stringify(receipt).includes("claude-session-bridge-01"), false,
+      "the receipt binds the private session selection by digest without persisting its session id");
+    const completed = events.find((event) => event.type === "advisory.completed");
+    assert.equal(completed?.ok, true);
+    assert.equal(completed.consultationRecord.demandSha256,
+      sha256(canonicalizeJson(expectedDemand)), "consultation record must bind the reconstructed v3 demand");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(inputRoot, { recursive: true, force: true });
+  }
+});
+
+test("a missing optional Claude session route uses the V3 fallback without blocking", async () => {
+  const { root, dispatchCandidate, evidence } = await governanceRepoRoot();
+  const inputRoot = await mkdtemp(join(tmpdir(), "advisory-claude-v3-route-"));
+  try {
+    const dispatch = { dispatchId: "claude-v3-fallback-01", queueRevision: 1, ...dispatchCandidate };
+    const inputPath = join(inputRoot, "input.json");
+    const receiptPath = join(inputRoot, "receipt.json");
+    const input = nativeClaudeAdvisoryInput(dispatch, "Can the registered fallback still run?", evidence);
+    await writeFile(inputPath, JSON.stringify(input));
+    let consultCall;
+    const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
+      ["--input", inputPath, "--receipt", receiptPath],
+      {
+        repoRoot: root,
+        selectModelRoleForTaskFn: () => { throw new Error("optional model-role store is unavailable"); },
+        makeHostAdapter: () => async (payload) => {
+          if (payload.role === "native-advisor") return { status: "unavailable" };
+          consultCall = payload;
+          return { status: "answered", answer: "Keep the valid route.",
+            identity: { provider: "anthropic", modelId: "claude-opus", effort: "max" } };
+        },
+      },
+    ));
+    assert.equal(code, 0);
+    assert.equal(consultCall.model, "opus");
+    assert.equal(consultCall.effort, "max");
+    const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    assert.deepEqual(receipt.configuredRoute.selector, { kind: "alias", value: "opus" });
+    assert.equal(Object.hasOwn(receipt.configuredRoute, "sessionRoleBindingSha256"), false);
+    const completed = events.find((event) => event.type === "advisory.completed");
+    assert.equal(completed.consultationRecord.demandSha256,
+      sha256(canonicalizeJson(input.demand)), "missing optional selection must retain the exact V2 demand");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(inputRoot, { recursive: true, force: true });
+  }
+});
 
 test("A-AC-05: an answered coordinateAdvisory receipt is durably recorded on the agent governance stream", async () => {
   const { root, fingerprint, dispatchCandidate, evidence } = await governanceRepoRoot();

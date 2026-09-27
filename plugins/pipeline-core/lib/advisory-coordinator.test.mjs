@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createAdvisoryDemand } from "./advisory-lifecycle-v2.mjs";
+import { advisorySessionRoleSelectionSha256, createAdvisoryDemand } from "./advisory-lifecycle-v2.mjs";
 import { ADVISORY_NATIVE_ATTEMPTS, coordinateAdvisory } from "./advisory-coordinator.mjs";
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
 
@@ -14,6 +14,15 @@ const DISPATCH = Object.freeze({
   candidateCommit: "a".repeat(40),
   candidateTree: "b".repeat(40),
 });
+function claudeFallbackSelection(overrides = {}) {
+  const selection = {
+    runner: "claude", taskRoute: "duty.advisory.fallback", role: "frontier",
+    effort: "max", modelId: "claude-frontier-reviewed", sessionId: "claude-session-01",
+    readbackSha256: "1".repeat(64), receiptSha256: "2".repeat(64),
+    ...overrides,
+  };
+  return { ...selection, selectionSha256: advisorySessionRoleSelectionSha256(selection) };
+}
 
 function identity(provider, modelId, effort = "not-applicable") {
   return { provider, modelId, effort };
@@ -129,6 +138,75 @@ test("Claude falls through failed native adapters only to a fresh read-only Clau
   assert.equal(result.receipt.adapter, "consult");
   assert.equal(result.receipt.configuredRoute.runner, "claude");
   assert.equal(result.receipt.fallback.reason, "native-timeout");
+});
+
+test("Claude uses the digest-bound session Frontier only for consult fallback", async () => {
+  const nativeCalls = [];
+  const consultCalls = [];
+  const selection = claudeFallbackSelection();
+  const selectedRequest = request({ runner: "claude", question: "Use the admitted fallback?" });
+  selectedRequest.demand = createAdvisoryDemand({
+    runner: "claude", profile: selectedRequest.profile, reason: "risk-review",
+    question: selectedRequest.question, evidenceSha256: "e".repeat(64),
+    dispatch: selectedRequest.dispatch, sessionRoleSelection: selection,
+  }).demand;
+  const result = await coordinateAdvisory(selectedRequest, options({
+    claudeFallbackSelection: selection,
+    invokeNative: async (call) => { nativeCalls.push(call); return { status: "unavailable" }; },
+    invokeConsult: async (call) => {
+      consultCalls.push(call);
+      return { status: "answered", answer: "Use the admitted Frontier.",
+        identity: identity("anthropic", selection.modelId, "max") };
+    },
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(nativeCalls.length, ADVISORY_NATIVE_ATTEMPTS);
+  assert.equal(nativeCalls.every((call) => call.selector.value === "opus"
+    && call.effort === "not-applicable"), true, "the selected fallback must never remap the native route");
+  assert.equal(consultCalls.length, 1);
+  assert.equal(consultCalls[0].model, selection.modelId);
+  assert.equal(consultCalls[0].effort, "max");
+  assert.equal(result.receipt.configuredRoute.selector.kind, "model-id");
+  assert.equal(result.receipt.configuredRoute.selector.value, selection.modelId);
+  assert.equal(result.receipt.configuredRoute.sessionRoleBindingSha256, selection.selectionSha256);
+  assert.equal(Object.hasOwn(result.receipt.configuredRoute, "sessionId"), false);
+  assert.deepEqual(validateAdvisoryReceipt(result.receipt), { ok: true });
+});
+
+test("invalid optional Claude session selection falls back to the registered V3 consult cell", async () => {
+  const invalid = claudeFallbackSelection({ role: "worker" });
+  let consultCall;
+  const result = await coordinateAdvisory(request({ runner: "claude", question: "Keep V3 available?" }), options({
+    claudeFallbackSelection: invalid,
+    invokeNative: async () => ({ status: "failed" }),
+    invokeConsult: async (call) => {
+      consultCall = call;
+      return { status: "answered", answer: "Yes.", identity: identity("anthropic", "claude-opus", "max") };
+    },
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(consultCall.model, "opus");
+  assert.deepEqual(result.receipt.configuredRoute.selector, { kind: "alias", value: "opus" });
+  assert.equal(Object.hasOwn(result.receipt.configuredRoute, "sessionRoleBindingSha256"), false);
+});
+
+test("a session-bound Claude demand rejects a different host readback before any adapter", async () => {
+  const selection = claudeFallbackSelection();
+  const selectedRequest = request({ runner: "claude", question: "Bind this fallback exactly?" });
+  selectedRequest.demand = createAdvisoryDemand({
+    runner: "claude", profile: selectedRequest.profile, reason: "risk-review",
+    question: selectedRequest.question, evidenceSha256: "e".repeat(64),
+    dispatch: selectedRequest.dispatch, sessionRoleSelection: selection,
+  }).demand;
+  let calls = 0;
+  const result = await coordinateAdvisory(selectedRequest, options({
+    claudeFallbackSelection: claudeFallbackSelection({ modelId: "another-admitted-model" }),
+    invokeNative: async () => { calls += 1; return { status: "unavailable" }; },
+    invokeConsult: async () => { calls += 1; return { status: "answered" }; },
+  }));
+  assert.equal(result.code, "advisory_demand_binding_mismatch");
+  assert.equal(result.receipt, null);
+  assert.equal(calls, 0);
 });
 
 test("mini and malformed batched questions fail before an adapter is called", async () => {

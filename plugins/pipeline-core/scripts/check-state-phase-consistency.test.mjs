@@ -198,7 +198,10 @@ test("the marker stays atomic with a real design -> implementation transition", 
 
     const continuityInit = initializeLifecycleContinuity(dir, "atomic-feature", planPath);
     assert.equal(continuityInit, 0);
-    const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], lifecycleDeps(dir, planPath));
+    // This suite verifies atomic phase-marker projection. Use the mini plan
+    // route; the epic/feature design-package and signature ceremony has its
+    // own end-to-end coverage in pipeline-state.test.mjs.
+    const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "mini"], lifecycleDeps(dir, planPath));
     assert.equal(submitted, 0);
     const presented = run(["present-plan", "--by", "coordinator"], lifecycleDeps(dir, planPath));
     assert.equal(presented, 0);

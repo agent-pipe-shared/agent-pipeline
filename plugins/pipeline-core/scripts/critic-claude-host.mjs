@@ -10,8 +10,9 @@ import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { checkCriticExport, deriveCriticExportView } from "../lib/critic-export-policy.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
-import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { diagnosticReviewerReferences } from "../lib/critic-diagnostic-packet.mjs";
+import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
 import {
   canonicalJson,
   claimCandidatePacket,
@@ -173,6 +174,73 @@ function authorizeExport(packet, assuranceClass, options, deps) {
   if (!decision.ok) fail("CLH-EXPORT", `Critic export denied: ${decision.code}`);
   return { registry, policy, exportView, receipt: decision.receipt };
 }
+
+function validateClaudeCriticModelRoute(packet, deps) {
+  const trigger = packet.request?.trigger;
+  if (typeof trigger !== "string" || !/^T[1-6]$/u.test(trigger)) {
+    fail("CLH-MODEL-ROLE-TRIGGER", "Packet does not contain a classified Critic trigger.");
+  }
+  const taskRoute = trigger === "T1" || trigger === "T2"
+    ? "duty.critic_high_risk" : "duty.critic_normal";
+  const registry = (deps.readRunnerProfilesV3RegistryFn ?? loadRunnerProfilesV3Registry)();
+  if (!validateRunnerProfilesV3Registry(registry).ok) fail("CLH-MODEL-ROLE-V3", "Claude V3 Critic routing source is invalid.");
+  const dutyId = taskRoute === "duty.critic_high_risk" ? "critic_high_risk" : "critic_normal";
+  const v3 = registry.duties?.[dutyId]?.claude;
+  if (!v3 || v3.state !== "default" || !v3.selector
+    || !["alias", "model-id"].includes(v3.selector.kind)
+    || typeof v3.selector.value !== "string" || v3.selector.value.length === 0
+    || typeof v3.effort !== "string" || v3.effort.length === 0) {
+    fail("CLH-MODEL-ROLE-V3", "Claude V3 Critic route is unavailable.");
+  }
+
+  const binding = packet.request.sessionBinding;
+  const boundRole = binding?.modelRole;
+  const env = deps.modelRoleEnvironment ?? process.env;
+  let selected;
+  try {
+    selected = (deps.selectModelRoleForTaskFn ?? selectModelRoleForTask)({
+      rootDir: packet.checkout.realPath,
+      runner: "claude",
+      taskRoute,
+      env,
+    });
+  } catch {
+    // Optional role-selection failures fall back only to the independently
+    // validated V3 route. A packet already sealed for another model is stale.
+    selected = null;
+  }
+
+  if (selected?.ok === true && selected.status === "ready") {
+    const envSessionId = env?.CLAUDE_CODE_SESSION_ID;
+    const roleKeys = ["schema", "runner", "taskRoute", "modelId", "effort", "readbackSha256", "receiptSha256"];
+    if (typeof envSessionId !== "string" || selected.sessionId !== envSessionId
+      || selected.runner !== "claude" || selected.taskRoute !== taskRoute
+      || typeof selected.modelId !== "string" || selected.modelId.length === 0
+      || selected.modelId.trim() !== selected.modelId || selected.effort !== v3.effort
+      || !/^[a-f0-9]{64}$/u.test(selected.readbackSha256 ?? "")
+      || !/^[a-f0-9]{64}$/u.test(selected.receiptSha256 ?? "")
+      || !binding || binding.sessionId !== envSessionId
+      || binding.preflightSha256 !== packet.route.projectionDigest
+      || !boundRole || Object.keys(boundRole).length !== roleKeys.length
+      || roleKeys.some((key) => !Object.hasOwn(boundRole, key))
+      || boundRole.schema !== "pipeline.session-critic-model-role.v1"
+      || boundRole.runner !== "claude" || boundRole.taskRoute !== taskRoute
+      || boundRole.modelId !== selected.modelId || boundRole.effort !== selected.effort
+      || boundRole.readbackSha256 !== selected.readbackSha256
+      || boundRole.receiptSha256 !== selected.receiptSha256
+      || packet.route.modelTier !== selected.modelId || packet.route.effortTier !== selected.effort) {
+      fail("CLH-MODEL-ROLE-PACKET", "Packet is not bound to the admitted current Claude session model.");
+    }
+    return { mode: "selected", taskRoute, model: selected.modelId, effort: selected.effort };
+  }
+
+  if (boundRole !== undefined || packet.route.modelTier !== v3.selector.value
+    || packet.route.effortTier !== v3.effort) {
+    fail("CLH-MODEL-ROLE-PACKET", "Packet does not match the valid Claude V3 fallback route.");
+  }
+  return { mode: "legacy-v3", taskRoute, model: v3.selector.value, effort: v3.effort };
+}
+
 function persistExport(controlRoot, packet, authorization) {
   recordCandidateExport({
     controlRoot,
@@ -189,6 +257,7 @@ export function prepareClaudePacketReview(options, deps = {}) {
   const packet = inspected.packet;
   if (packet.route.runner !== "claude" || packet.route.provider !== "anthropic"
     || packet.route.adapter !== options.adapter) fail("CLH-ROUTE", "Packet does not select this Claude adapter.");
+  validateClaudeCriticModelRoute(packet, deps);
   const prompt = promptFor(packet);
   const dispatch = dispatchPreparation(packet, options, deps, prompt);
   const nativeAuthorization = authorizeExport(packet, CLAUDE_NATIVE_ASSURANCE, options, deps);

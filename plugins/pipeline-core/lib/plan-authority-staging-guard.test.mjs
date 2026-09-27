@@ -260,7 +260,7 @@ test("refusePlanAuthorityStagingPath fails closed for unreadable authority files
   }
 });
 
-test("submit-plan refuses legacy staging drafts and admits canonical legacy-banner compatibility with valid authority", () => {
+test("submit-plan refuses staging drafts and pre-authority banners outside staging", () => {
   // Scenario 1: in staging directory
   {
     const featureId = "staging-sub";
@@ -294,7 +294,7 @@ test("submit-plan refuses legacy staging drafts and admits canonical legacy-bann
   }
 });
 
-test("approve-plan independently refuses legacy staging drafts and does not misclassify canonical legacy-banner compatibility", () => {
+test("approve-plan independently refuses staging drafts and pre-authority banners outside staging", () => {
   // Scenario 1: in staging directory
   {
     const featureId = "staging-appr";
@@ -330,7 +330,10 @@ test("approve-plan independently refuses legacy staging drafts and does not misc
       state.planSubmission = {
         schema: "pipeline.plan-submission.v1",
         featureId, planPath, planSha256, specPath, specSha256,
-        profile: "feature", profileSha256: sha256Hex("profile"),
+        // Keep this fixture on the legacy mini-profile path so this test
+        // isolates the pre-authority banner guard from the separate complete
+        // design-workflow-package requirement for epic/feature approval.
+        profile: "mini", profileSha256: sha256Hex("profile"),
         submittedBy: "coordinator", submittedAt: "2026-08-27T10:01:00.000Z",
       };
       writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");

@@ -31,6 +31,8 @@ const POLICY_PATH = join(HERE, "..", "config", "advisory-lifecycle-v2.json");
 const SHA256 = /^[a-f0-9]{64}$/;
 const GIT_OBJECT = /^[a-f0-9]{40,64}$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+const CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE = "duty.advisory.fallback";
 const STATES = Object.freeze(["available", "degraded", "unavailable", "disabled", "unknown"]);
 const OBSERVED_ROUTE_STATES = Object.freeze(["available", "unavailable", "unknown"]);
 const PROFILES = Object.freeze(["epic", "feature", "mini"]);
@@ -71,6 +73,7 @@ function failure(code) {
 export const ADVISORY_LIFECYCLE_POLICY_SCHEMA = "pipeline.advisory-lifecycle-policy.v2";
 export const ADVISORY_CAPABILITY_SCHEMA = "pipeline.advisory-capability-preflight.v2";
 export const ADVISORY_DEMAND_SCHEMA = "pipeline.advisory-demand.v2";
+export const ADVISORY_DEMAND_SESSION_SCHEMA = "pipeline.advisory-demand.v3";
 export const ADVISORY_CONSULTATION_RECORD_SCHEMA = "pipeline.advisory-consultation-record.v2";
 export const ADVISORY_EVIDENCE_BUNDLE_SCHEMA = "pipeline.advisory-evidence-bundle.v1";
 export const ADVISORY_CAPABILITY_STATES = STATES;
@@ -344,6 +347,7 @@ export function createAdvisoryDemand({
   question,
   evidenceSha256,
   dispatch,
+  sessionRoleSelection = null,
   policy = loadAdvisoryLifecycleV2Policy(),
   registry = loadRunnerProfilesV3Registry(),
 } = {}) {
@@ -371,10 +375,24 @@ export function createAdvisoryDemand({
     routeRegistrySha256: digest(registry),
     routePolicySha256: routePolicyDigest(registry, runner),
   };
+  let schema = ADVISORY_DEMAND_SCHEMA;
+  if (sessionRoleSelection !== null) {
+    if (runner !== "claude" || !validClaudeAdvisorySessionSelection(sessionRoleSelection)) return failure("invalid_advisory_demand_input");
+    bindings.sessionRoleBinding = {
+      taskRoute: sessionRoleSelection.taskRoute,
+      role: sessionRoleSelection.role,
+      effort: sessionRoleSelection.effort,
+      modelId: sessionRoleSelection.modelId,
+      readbackSha256: sessionRoleSelection.readbackSha256,
+      receiptSha256: sessionRoleSelection.receiptSha256,
+      selectionSha256: sessionRoleSelection.selectionSha256,
+    };
+    schema = ADVISORY_DEMAND_SESSION_SCHEMA;
+  }
   return {
     ok: true,
     demand: {
-      schema: ADVISORY_DEMAND_SCHEMA,
+      schema,
       ...bindings,
       reuseKeySha256: digest(bindings),
     },
@@ -389,10 +407,15 @@ export function validateAdvisoryDemand(demand, {
   policy = loadAdvisoryLifecycleV2Policy(),
   registry = loadRunnerProfilesV3Registry(),
 } = {}) {
-  if (!exact(demand, [
+  const isSessionBound = demand?.schema === ADVISORY_DEMAND_SESSION_SCHEMA;
+  if (!exact(demand, isSessionBound ? [
+    "schema", "runner", "profile", "reason", "questionSha256", "evidenceSha256",
+    "dispatch", "policySha256", "routeRegistrySha256", "routePolicySha256",
+    "sessionRoleBinding", "reuseKeySha256",
+  ] : [
     "schema", "runner", "profile", "reason", "questionSha256", "evidenceSha256",
     "dispatch", "policySha256", "routeRegistrySha256", "routePolicySha256", "reuseKeySha256",
-  ]) || demand.schema !== ADVISORY_DEMAND_SCHEMA) return failure("advisory_demand_required");
+  ]) || (!isSessionBound && demand.schema !== ADVISORY_DEMAND_SCHEMA)) return failure("advisory_demand_required");
   const created = createAdvisoryDemand({
     runner,
     profile,
@@ -403,15 +426,29 @@ export function validateAdvisoryDemand(demand, {
     policy,
     registry,
   });
-  if (!created.ok || canonical(created.demand) !== canonical(demand)) return failure("advisory_demand_binding_mismatch");
+  if (!created.ok) return failure("advisory_demand_binding_mismatch");
+  let expected = created.demand;
+  if (isSessionBound) {
+    if (!validClaudeAdvisorySessionBinding(demand.sessionRoleBinding)) return failure("advisory_demand_binding_mismatch");
+    const { schema: _v2, reuseKeySha256: _v2Reuse, ...baseBindings } = created.demand;
+    const bindings = { ...baseBindings, sessionRoleBinding: structuredClone(demand.sessionRoleBinding) };
+    expected = { schema: ADVISORY_DEMAND_SESSION_SCHEMA, ...bindings,
+      reuseKeySha256: digest(bindings) };
+  }
+  if (canonical(expected) !== canonical(demand)) return failure("advisory_demand_binding_mismatch");
   return { ok: true, demandSha256: digest(demand), reuseKeySha256: demand.reuseKeySha256 };
 }
 
 function structurallyValidDemand(demand) {
-  if (!exact(demand, [
+  const isSessionBound = demand?.schema === ADVISORY_DEMAND_SESSION_SCHEMA;
+  if (!exact(demand, isSessionBound ? [
+    "schema", "runner", "profile", "reason", "questionSha256", "evidenceSha256",
+    "dispatch", "policySha256", "routeRegistrySha256", "routePolicySha256",
+    "sessionRoleBinding", "reuseKeySha256",
+  ] : [
     "schema", "runner", "profile", "reason", "questionSha256", "evidenceSha256",
     "dispatch", "policySha256", "routeRegistrySha256", "routePolicySha256", "reuseKeySha256",
-  ]) || demand.schema !== ADVISORY_DEMAND_SCHEMA
+  ]) || (!isSessionBound && demand.schema !== ADVISORY_DEMAND_SCHEMA)
     || !RUNNERS.includes(demand.runner) || !["epic", "feature"].includes(demand.profile)
     || !ID.test(demand.reason ?? "")
     || !SHA256.test(demand.questionSha256 ?? "") || !SHA256.test(demand.evidenceSha256 ?? "")
@@ -421,9 +458,52 @@ function structurallyValidDemand(demand) {
     || !ID.test(demand.dispatch.dispatchId ?? "")
     || !Number.isSafeInteger(demand.dispatch.queueRevision) || demand.dispatch.queueRevision < 0
     || !GIT_OBJECT.test(demand.dispatch.candidateCommit ?? "")
-    || !GIT_OBJECT.test(demand.dispatch.candidateTree ?? "")) return false;
+    || !GIT_OBJECT.test(demand.dispatch.candidateTree ?? "")
+    || (isSessionBound && (demand.runner !== "claude"
+      || !validClaudeAdvisorySessionBinding(demand.sessionRoleBinding)))) return false;
   const { schema: _schema, reuseKeySha256, ...bindings } = demand;
   return reuseKeySha256 === digest(bindings);
+}
+
+export function advisorySessionRoleSelectionSha256(selection) {
+  return digest(JSON.stringify([
+    "pipeline.model-role-session-selection.v1",
+    selection.runner,
+    selection.taskRoute,
+    selection.role,
+    selection.effort,
+    selection.modelId,
+    selection.sessionId,
+    selection.readbackSha256,
+    selection.receiptSha256,
+  ]));
+}
+
+function validClaudeAdvisorySessionSelection(selection) {
+  return exact(selection, ["runner", "taskRoute", "role", "effort", "modelId", "sessionId",
+    "readbackSha256", "receiptSha256", "selectionSha256"])
+    && selection.runner === "claude"
+    && selection.taskRoute === CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE
+    && selection.role === "frontier"
+    && selection.effort === "max"
+    && MODEL_ID.test(selection.modelId ?? "")
+    && ID.test(selection.sessionId ?? "")
+    && SHA256.test(selection.readbackSha256 ?? "")
+    && SHA256.test(selection.receiptSha256 ?? "")
+    && SHA256.test(selection.selectionSha256 ?? "")
+    && selection.selectionSha256 === advisorySessionRoleSelectionSha256(selection);
+}
+
+function validClaudeAdvisorySessionBinding(binding) {
+  return exact(binding, ["taskRoute", "role", "effort", "modelId", "readbackSha256",
+    "receiptSha256", "selectionSha256"])
+    && binding.taskRoute === CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE
+    && binding.role === "frontier"
+    && binding.effort === "max"
+    && MODEL_ID.test(binding.modelId ?? "")
+    && SHA256.test(binding.readbackSha256 ?? "")
+    && SHA256.test(binding.receiptSha256 ?? "")
+    && SHA256.test(binding.selectionSha256 ?? "");
 }
 
 export function createAdvisoryConsultationRecord({ demand, receipt = null, outcome, completedAtMs }) {

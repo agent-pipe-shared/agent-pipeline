@@ -360,7 +360,25 @@ check("Critic addendum writer rejects drift and cannot overwrite an occupied tar
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 16, "the complete dispatch-record writer corpus must be registered before execution begins");
+check("public writer cannot publish authored Claude/Codex v4 without the private native host path", () => {
+  const report = { text: "Native return was delivered.", changedFiles: ["src/native.mjs"] };
+  const value = record({
+    schema: "pipeline.dispatch-record.v4", taskId: "NATIVE-PUBLIC-1", runner: "codex",
+    model: "gpt-6-luna", effort: "medium", candidateCommit: "b".repeat(40),
+    resultSha256: reportSha256(report.text), outcome: "completed", commits: ["b".repeat(40)],
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+    report,
+  });
+  const root = fixture(value);
+  try {
+    assert.throws(() => writeDispatchRecordObject({ repoRoot: root,
+      target: `evidence/dispatch-record-${value.taskId}.json`, record: value }),
+    (error) => error.code === "record-host-observation");
+    assert.equal(existsSync(join(root, `evidence/dispatch-record-${value.taskId}.json`)), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 17, "the complete dispatch-record writer corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

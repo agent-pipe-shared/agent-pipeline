@@ -11,7 +11,7 @@
  * substitute for this command.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -67,8 +67,8 @@ function parsed(argv) {
   if (command === "apply" && ["--receipt-id", "--native-available", "--expected-public-sha256"].some((key) => !Object.hasOwn(values, key))) fail("DAA-CLI-USAGE", USAGE);
   return { command, values };
 }
-function finalApproval(root, common, values) {
-  const receipt = receiptForException(common, values["--receipt-id"]);
+function finalApproval(root, common, values, receiptOverride = null) {
+  const receipt = receiptOverride ?? receiptForException(common, values["--receipt-id"]);
   if (receipt?.observed?.status === "answered") return false;
   const plan = rootPath(root, values["--plan"], "plan");
   const spec = rootPath(root, values["--spec"], "spec");
@@ -80,6 +80,18 @@ function finalApproval(root, common, values) {
       candidateCommit: receipt?.dispatch?.candidateCommit, candidateTree: receipt?.dispatch?.candidateTree,
     });
   } catch { return false; }
+}
+function publicInspectSource(root) {
+  const target = join(root, DESIGN_ADVISORY_RECORD_PATH);
+  const stat = lstatSync(target);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 2 * 1024 * 1024) {
+    fail("DAA-CLI-PUBLIC", "public Advisor admission is not a bounded regular file");
+  }
+  const bytes = readFileSync(target);
+  let record;
+  try { record = JSON.parse(bytes.toString("utf8")); }
+  catch { fail("DAA-CLI-PUBLIC", "public Advisor admission is malformed"); }
+  return { sha256: sha(bytes), receipt: record?.admission?.advisorReceipt ?? null };
 }
 function disposition(root, values) {
   const decision = values["--decision"];
@@ -101,8 +113,14 @@ export function runDesignAdvisoryAdmission(argv = process.argv.slice(2)) {
     return { schema: "pipeline.design-advisory-admission-plan.v1", target: DESIGN_ADVISORY_RECORD_PATH, currentPublicSha256: currentPublicSha(root), receiptDirectory: join(common, DESIGN_ADVISORY_RECEIPT_DIRECTORY), apply: "supply an observed private receipt id, native capability, and exact public preimage" };
   }
   if (command === "inspect") {
-    const finalApprovalValid = false;
+    // An unavailable Advisor remains subject to the *current* exact final
+    // human-decision readback. Reading a candidate from the public projection
+    // alone never grants admission: the transaction reader must independently
+    // bind that projection to its immutable private receipt and package bytes.
+    const source = publicInspectSource(root);
+    const finalApprovalValid = finalApproval(root, common, values, source.receipt);
     const result = readDesignAdvisoryTransaction({ repoRoot: root, gitCommonDir: common, featureId: values["--feature"], planPath: values["--plan"], specPath: values["--spec"], finalApprovalValid });
+    if (result.id !== source.sha256) fail("DAA-CLI-PUBLIC-DRIFT", "public Advisor admission changed during inspection");
     return { schema: "pipeline.design-advisory-admission-inspect.v1", status: "valid", id: result.id, mode: result.mode, target: DESIGN_ADVISORY_RECORD_PATH };
   }
   if (!ID.test(values["--receipt-id"] ?? "")) fail("DAA-CLI-RECEIPT", "receipt id is invalid");

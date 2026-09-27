@@ -49,6 +49,9 @@ import {
 } from "../lib/project-onboarding-ready-gate.mjs";
 import { routingProvenance } from "../lib/routing-projection.mjs";
 import { resolveCriticHighRiskRoute, resolveV3DutyRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+import { applyCriticSessionModelRoute } from "../lib/critic-session-model-route.mjs";
+export { applyCriticSessionModelRoute } from "../lib/critic-session-model-route.mjs";
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { prepareSelectedCriticRoleDispatch } from "./codex-critic-selected-host.mjs";
 import { PROGRESS_COMPONENTS, admitReviewAttempt, evaluateProgress } from "../lib/review-economy.mjs";
@@ -1088,15 +1091,27 @@ function routeForCriticRequest(repoRoot, request) {
     candidateCommit: request.candidate_commit,
   });
   if (route.state !== "default") fail("Critic V3 duty is unavailable for request trigger");
+  const sessionIdentityPresent = process.env.CODEX_SESSION_ID !== undefined
+    || process.env.CODEX_THREAD_ID !== undefined;
+  let sessionSelection = null;
+  if (sessionIdentityPresent) {
+    try {
+      sessionSelection = selectModelRoleForTask({ rootDir: repoRoot, runner: "codex",
+        taskRoute: `duty.${dutyId}` });
+    } catch {
+      // Optional model-role storage cannot strand the governed V3 duty.
+    }
+  }
+  const bound = applyCriticSessionModelRoute(route, sessionSelection);
   return {
     duty: route.dutyId,
     runner: route.runner,
     // This is the native-host protocol label. It is the canonical resolved
     // Codex model, never a Claude alias or a caller-selected model.
-    alias: route.model,
-    model: route.model,
-    effort: route.effort,
-    sourceSha256: route.sourceSha256,
+    alias: bound.model,
+    model: bound.model,
+    effort: bound.effort,
+    sourceSha256: bound.sourceSha256,
     candidateCommit: route.candidateCommit,
   };
 }

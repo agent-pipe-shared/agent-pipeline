@@ -8720,7 +8720,8 @@ function rbImplementingState() {
     state: initial,
     expectedStateSha256: sha256CanonicalJson(initial),
     poGateAuthority: REBWIRE_AUTHORITY,
-    profile: "epic",
+    // The fixture exercises rebase admission, not the epic design-workflow package contract.
+    profile: "mini",
     profileSha256: "3".repeat(64),
     by: "Coordinator",
     at: "2026-09-01T20:00:00.000Z",
@@ -9218,7 +9219,9 @@ function rbdMarkedState(marker) {
   };
   const submitted = submitPlan({
     state: draft, expectedStateSha256: sha256CanonicalJson(draft), poGateAuthority: REBWIRE_AUTHORITY,
-    profile: "epic", profileSha256: "3".repeat(64), by: "Coordinator", at: "2026-09-01T20:00:00.000Z",
+    // This fixture tests rebase recovery, not the epic design-workflow admission contract.
+    // `mini` is the only profile whose plan approval intentionally has no workflow package.
+    profile: "mini", profileSha256: "3".repeat(64), by: "Coordinator", at: "2026-09-01T20:00:00.000Z",
   });
   assert.equal(submitted.ok, true, JSON.stringify(submitted));
   const approved = approveSubmittedPlan({

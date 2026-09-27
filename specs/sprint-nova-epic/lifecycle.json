@@ -48,7 +48,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "142091c3eaeeea29e10e1f734664b605334dafe6a9e7138b953e59aa96ce78ad",
+      "sha256": "e86509f29221bcd1e79e5610ab64d150f115137343ce63e068edf0741632d3b4",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"

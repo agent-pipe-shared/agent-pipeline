@@ -16,6 +16,9 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { AGY_ERROR_TAXONOMY, invokeAgy, parseAgyOutput } from "../lib/antigravity-execution-host.mjs";
+import { bindStoredModelRoleDispatch } from "../lib/model-role-host-session.mjs";
+import { createModelRoleHostStore } from "../lib/model-role-host-store.mjs";
+import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { validateControlPlacement } from "./control-placement.mjs";
 import { validateRecord } from "./enforcement-conformance.mjs";
@@ -28,6 +31,7 @@ export const E3_CODES = Object.freeze({
   PRECONDITION: "E3-PRECONDITION-UNAVAILABLE",
   RESULT_DESTINATION: "E3-RESULT-DESTINATION",
   RESULT_OCCUPIED: "E3-RESULT-OCCUPIED",
+  MODEL_ROLE_NOT_BOUND: "E3-MODEL-ROLE-NOT-BOUND",
   PIPELINE_DISCOVERY: "E3-PIPELINE-DISCOVERY-UNAVAILABLE",
   PIPELINE_MARKER_MISSING: "E3-PIPELINE-MARKER-MISSING",
   PIPELINE_MARKER_MISMATCH: "E3-PIPELINE-MARKER-MISMATCH",
@@ -288,6 +292,21 @@ function refused(code, field) {
   return Object.freeze({ schema: ROLE_DISPATCH_PREFLIGHT_SCHEMA, status: "rejected", code, field, launcherCalls: 0, modelCalls: 0, probeCalls: 0 });
 }
 
+function modelRoleStoreForRoot(root) {
+  try {
+    const result = spawnSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      { encoding: "utf8", shell: false, timeout: 5_000, maxBuffer: 4096 });
+    const commonDir = result.status === 0 ? String(result.stdout).trim() : "";
+    return isAbsolute(commonDir) ? createModelRoleHostStore(realpathSync(commonDir), { rootDir: root }) : null;
+  } catch { return null; }
+}
+
+function taskRouteForGoldfish(role) {
+  const bare = role.slice("pipeline-core:".length);
+  return ({ "goldfish-implementor": "duty.implement", "goldfish-mechanic": "duty.mechanic",
+    "goldfish-deep": "duty.deep" })[bare] ?? null;
+}
+
 /**
  * One production caller.  `executable` is purposefully mandatory and must be
  * a regular fixture file underneath `root`; no AGY path discovery is exposed.
@@ -298,6 +317,7 @@ export async function dispatchGoldfishToAntigravity({
   packet,
   executable,
   model,
+  sessionId,
   effort,
   timeoutMs = 300_000,
   env = process.env,
@@ -309,6 +329,33 @@ export async function dispatchGoldfishToAntigravity({
   if (typeof destination !== "string") return refused(E3_CODES.RESULT_DESTINATION, "resultDestination");
   const prepared = preflightRoleDispatch({ root, resultRoot, packet });
   if (prepared.status !== "prepared") return prepared;
+  if (sessionId !== undefined) {
+    // An optional role receipt may replace, but must never become a
+    // prerequisite for, an independently admitted V3 route. This legacy E3
+    // fixture wrapper still accepts a caller model, so compare it to the
+    // registered V3 cell before allowing any fallback.
+    const taskRoute = taskRouteForGoldfish(packet.role);
+    const baseRoute = packet.role === "pipeline-core:goldfish-mechanic"
+      ? "duty.implement" : taskRoute;
+    let registry;
+    try { registry = dependencies.readRegistry?.() ?? loadRunnerProfilesV3Registry(); }
+    catch { return refused(E3_CODES.MODEL_ROLE_NOT_BOUND, "sessionId"); }
+    if (!validateRunnerProfilesV3Registry(registry).ok)
+      return refused(E3_CODES.MODEL_ROLE_NOT_BOUND, "sessionId");
+    const cell = baseRoute?.startsWith("duty.")
+      ? registry.duties?.[baseRoute.slice(5)]?.antigravity : null;
+    if (!cell || cell.state === "unavailable")
+      return refused(E3_CODES.MODEL_ROLE_NOT_BOUND, "sessionId");
+    const v3Match = cell.selector?.kind === "model-id" && cell.selector.value === model
+      && cell.effort === effort;
+    const store = dependencies.modelRoleStore ?? modelRoleStoreForRoot(root);
+    let bound;
+    try { bound = bindStoredModelRoleDispatch({ taskRoute,
+      runner: "antigravity", sessionId, requestedModel: model, store }); }
+    catch { bound = null; }
+    if ((!bound?.ok || bound.effort !== effort) && !v3Match)
+      return refused(E3_CODES.MODEL_ROLE_NOT_BOUND, "sessionId");
+  }
   const gate = await (dependencies.readGateState ?? readE3GateState)({ root, candidate: prepared.candidate });
   if (gate.status !== "current") return refused(E3_CODES.PRECONDITION, "canonical-gate-readback");
   const fixture = fixtureExecutable(root, executable);
@@ -336,7 +383,8 @@ export async function runGoldfishAntigravityHostCli(argv, { stdout = process.std
     const stat = lstatSync(requestPath);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 1024 * 1024) throw new Error("request is not a regular bounded file");
     const request = JSON.parse(readFileSync(requestPath, "utf8"));
-    if (!exactKeys(request, ["effort", "executable", "model", "packet", "resultRoot", "root", "timeoutMs"])) throw new Error("request shape is invalid");
+    if (!exactKeys(request, ["effort", "executable", "model", "packet", "resultRoot", "root", "timeoutMs"])
+      && !exactKeys(request, ["effort", "executable", "model", "packet", "resultRoot", "root", "sessionId", "timeoutMs"])) throw new Error("request shape is invalid");
     const result = await dispatchGoldfishToAntigravity(request);
     stdout.write(`${JSON.stringify(result)}\n`);
     return result.status === "succeeded" ? 0 : 1;

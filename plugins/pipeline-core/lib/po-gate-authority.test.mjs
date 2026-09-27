@@ -44,6 +44,7 @@ import {
 import { main as poGateProfileRepair } from "../scripts/po-gate-profile-repair.mjs";
 import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
+import { materializeTestDesignWorkflowPackage } from "./test-design-workflow-fixture.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..", "..");
@@ -686,6 +687,11 @@ check("a bound Spec digest alone accepts the current PRD's neighboring spec.md",
 });
 
 function submitFixturePlan(primary, authority, profile) {
+  const state = JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
+  const designFixture = materializeTestDesignWorkflowPackage({
+    root: primary, featureId: state.activeFeature.id,
+    planPath: authority.value.planPath, specPath: authority.value.specPath,
+  });
   const status = runPipelineState(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
     dir: primary,
     now: () => NOW,
@@ -695,11 +701,13 @@ function submitFixturePlan(primary, authority, profile) {
   assert.equal(status, 0);
   // NVA-R22-PLANSHOWN: approve-plan now refuses an approval of unseen content
   // -- a prior present-plan record bound to this exact submission is required.
-  const presented = runPipelineState(["present-plan", "--by", "coordinator"], {
+  const presented = runPipelineState(["present-plan", "--by", "coordinator", "--design-workflow-package", designFixture.packagePath], {
     dir: primary,
     now: () => NOW,
+    ...designFixture.deps,
   });
   assert.equal(presented, 0);
+  return designFixture;
 }
 
 check("approve-plan rejects bare attribution when the shared human-approval receipt is required", () => {

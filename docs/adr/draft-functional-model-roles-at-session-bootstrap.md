@@ -89,8 +89,10 @@ session acknowledgement, determines whether a concrete model may write.
    returned route before claiming conformance.
 5. Registry, project source, runner projections, schemas and migration logic
    change together. Historical exact-ID decisions and evidence are preserved
-   as history; the new selector takes effect only after full projection and
-   installed-host checks for all three runners. User repositories receive
+   as history; the new selector takes effect for an installed runner only
+   after its own complete route projection and host check. Product source
+   covers all three runners, but a user repository needs only its chosen one;
+   it need not install or authenticate the others. User repositories receive
    their own projected approved mapping, not an implicit selection from this
    repository's local installation.
 
@@ -150,6 +152,70 @@ observation alone. Sources:
 <https://developers.openai.com/api/docs/models/gpt-6-sol>,
 <https://developers.openai.com/api/docs/models/gpt-6-luna>, and
 <https://codelabs.developers.google.com/antigravity-cli-hands-on>.
+
+OpenAI family check (2026-09-26): its current model guidance lists GPT-6
+`Astra`, `Sol`, and `Luna`; it does not list a GPT-6 `Terra`. The current
+Codex model availability page continues to identify Terra as part of GPT-5.6
+and describes it as the balance-of-cost-and-capability option. Therefore the
+current exact GPT-6 route choices remain Sol and Luna; `Terra` is not a
+GPT-6 successor candidate unless OpenAI publishes one and the normal
+compatibility and PO-mapping process admits it. This records current upstream
+nomenclature, not a promise that a provider will retain these product names.
+Sources:
+<https://developers.openai.com/api/docs/guides/latest-model> and
+<https://help.openai.com/en/articles/20001354-gpt-56-and-gpt-6-pro-in-chatgpt>.
+
+PO direction (2026-09-26): the task-quality gain of the GPT-6 family over
+GPT-5.6 is valuable enough that a GPT-5.6 Terra route should not displace a
+qualified GPT-6 Luna route merely to save cost. Keep Luna for suitable worker
+and efficient duties; reserve Sol for duties whose additional capability
+justifies its higher observed consumption. Further cost reduction is a
+post-0.7 objective: measure task-level quality and consumption, then improve
+routing, batching and avoidable review/verification work without silently
+reverting the selected GPT-6 roles to GPT-5.6. This is routing direction, not
+a claim that Sol's per-token cost or the measured plan-budget impact is
+acceptable for every workload.
+
+Post-0.7 measurement plan: use a small, repeatable set of representative tasks
+with fixed inputs and acceptance criteria, and record the exact admitted role,
+model and effort for every dispatch. Compare task completion and acceptance,
+Critic finding severity and correction rounds, executed/reused verification
+work, elapsed time, and observed provider-plan consumption where the runner
+exposes it. Label unavailable or estimated usage as such; do not infer plan
+quota or money from token counts alone. A routing or batching change is an
+improvement only when it reduces observed consumption or avoidable elapsed
+work without reducing accepted quality, required independent review, or
+verification coverage. Keep the exact approved route snapshot stable during
+each comparison, change one cost factor at a time, and retain a rollback to
+the prior approved mapping. This work measures whether Sol's higher capability
+is worth its observed consumption on each route; it does not assume that Sol
+must be used for every task or that Luna is unsuitable for writing.
+
+PO clarification (2026-09-26): an unchanged, concrete V3 `model-id`
+selector is an approved *initial assignment* after its own role/effort
+compatibility check passes; it does not need a second approval solely to
+enter the functional-role scheme. A floating V3 alias is not an approval of
+whichever exact model it resolves to later. Changed or newly observed exact
+IDs still require the explicit model-policy decision. This clarification is
+not itself evidence that the installed account can launch the selector.
+
+Host-interface check (2026-09-26, preparatory evidence only): the installed
+Codex app-server answered `model/list` with concrete Sol and Luna IDs plus
+supported reasoning efforts; `agy models` returned concrete Flash and Pro CLI
+variants. The official Claude Code model configuration documents the
+`opus`/`sonnet`/`haiku` aliases and states that JSON results expose actual
+models in `modelUsage`; Anthropic's `GET /v1/models` lists models available
+to its **API credential**, which need not be the installed Claude Code OAuth
+account. No Anthropic API key was configured for this check, and a minimal
+tool-free Claude Code probe returned an expired-OAuth error with empty
+`modelUsage`. Thus Claude host availability was not observed. Pure catalogue
+parsers and a bounded, paginated API host fetcher fail closed on partial or
+malformed input. An isolated tool-free Claude Code alias probe reports only
+the exact model in a successful single-model `modelUsage` result. Neither
+helper is yet a
+trusted bootstrap producer or an approved route policy. Sources:
+<https://code.claude.com/docs/en/model-config> and
+<https://platform.claude.com/docs/en/api/models/list>.
 
 ## Consequences
 

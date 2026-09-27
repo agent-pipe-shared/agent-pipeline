@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -103,6 +103,40 @@ test("the production bridge accepts only the coordinator-derived receipt target"
   } finally { rmSync(value, { recursive: true, force: true }); }
 });
 
+test("a native-capable Claude session retains its failed-native then answered-consult route", async () => {
+  const value = root();
+  try {
+    let nativeCalls = 0;
+    let consultCalls = 0;
+    const result = await coordinateDesignAdvisory(args(value, {
+      runtime: { runner: "claude", profile: "feature" },
+      invokeBridge: ({ inputPath, receiptPath }) => runAdvisoryHostBridge(
+        ["--input", inputPath, "--receipt", receiptPath],
+        {
+          repoRoot: value,
+          preflightRoleDispatch: () => ({ status: "prepared" }),
+          makeHostAdapter: () => async (payload) => {
+            if (payload.role === "native-advisor") {
+              nativeCalls += 1;
+              return { status: "unavailable" };
+            }
+            consultCalls += 1;
+            return { status: "answered", answer: "Use the bounded consult fallback.",
+              identity: { provider: "anthropic", modelId: payload.selector.value, effort: payload.effort } };
+          },
+        },
+      ),
+    }));
+    assert.equal(result.status, "admitted");
+    assert.equal(nativeCalls, 2);
+    assert.equal(consultCalls, 1);
+    const record = JSON.parse(readFileSync(join(value, DESIGN_ADVISORY_RECORD_PATH), "utf8"));
+    assert.equal(record.admission.nativeAvailable, true);
+    assert.equal(record.admission.advisor.route, "generic-consult");
+    assert.equal(record.admission.advisorReceipt.fallback.reason, "native-unavailable");
+  } finally { rmSync(value, { recursive: true, force: true }); }
+});
+
 test("the production bridge rejects a substituted receipt identity before adapter launch", async () => {
   const value = root();
   try {
@@ -153,12 +187,40 @@ test("does not admit an answered receipt without an Elephant disposition", async
   } finally { rmSync(value, { recursive: true, force: true }); }
 });
 
-test("records no unavailable shortcut before the later final-approval exception authority", async () => {
+test("a failing bridge without a physical route trail cannot propose an unavailable exception", async () => {
   const value = root();
   try {
     await assert.rejects(
       coordinateDesignAdvisory(args(value, { invokeBridge: bridge({ status: "unavailable" }) })),
-      (error) => error.code === "DAC-ADVISOR-UNAVAILABLE",
+      (error) => error.code === "DAC-ATTEMPT-TRAIL-MISSING",
     );
+  } finally { rmSync(value, { recursive: true, force: true }); }
+});
+
+test("exhausted Claude routes produce a pending exception input, never a public admission", async () => {
+  const value = root();
+  try {
+    let nativeCalls = 0;
+    let consultCalls = 0;
+    const result = await coordinateDesignAdvisory(args(value, {
+      runtime: { runner: "claude", profile: "feature" },
+      invokeBridge: ({ inputPath, receiptPath }) => runAdvisoryHostBridge(
+        ["--input", inputPath, "--receipt", receiptPath],
+        { repoRoot: value, preflightRoleDispatch: () => ({ status: "prepared" }),
+          makeHostAdapter: () => async (payload) => {
+            if (payload.role === "native-advisor") nativeCalls += 1;
+            else consultCalls += 1;
+            return { status: "unavailable" };
+          } },
+      ),
+    }));
+    assert.equal(result.status, "unavailable-pending-final-approval");
+    assert.equal(nativeCalls, 2);
+    assert.equal(consultCalls, 1);
+    assert.equal(result.attemptTrail.attempts, 3);
+    assert.match(result.attemptTrail.sha256, /^[a-f0-9]{64}$/u);
+    assert.equal(result.write, null);
+    assert.equal(result.readback, null);
+    assert.equal(existsSync(join(value, DESIGN_ADVISORY_RECORD_PATH)), false);
   } finally { rmSync(value, { recursive: true, force: true }); }
 });

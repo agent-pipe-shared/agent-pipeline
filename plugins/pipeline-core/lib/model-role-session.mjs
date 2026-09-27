@@ -15,6 +15,109 @@ const SHA = /^[a-f0-9]{64}$/u;
 const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 const ROLES = new Set(["frontier", "worker", "efficient"]);
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "not-applicable"]);
+const CATALOGUE_EFFORT = /^[a-z][a-z0-9-]{0,31}$/u;
+
+/**
+ * Normalize the account-specific Codex app-server `model/list` response.
+ * This is only availability evidence: descriptions, default status and model
+ * names never assign a functional role or approve an exact model. The host
+ * must still authenticate the app-server process and approved role policy.
+ */
+export function codexAvailableModelIds(catalogue, effort) {
+  if (!EFFORTS.has(effort) || effort === "not-applicable"
+    || catalogue === null || typeof catalogue !== "object" || Array.isArray(catalogue)
+    || !Array.isArray(catalogue.data) || catalogue.nextCursor !== null) {
+    return { ok: false, code: "MODEL-ROLE-CODEX-CATALOGUE-INVALID" };
+  }
+  const ids = [];
+  const seen = new Set();
+  for (const entry of catalogue.data) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)
+      || !id(entry.id) || entry.model !== entry.id || typeof entry.hidden !== "boolean"
+      || !Array.isArray(entry.supportedReasoningEfforts)
+      || entry.supportedReasoningEfforts.some((item) => item === null
+        || typeof item !== "object" || !CATALOGUE_EFFORT.test(item.reasoningEffort ?? ""))) {
+      return { ok: false, code: "MODEL-ROLE-CODEX-CATALOGUE-INVALID" };
+    }
+    if (seen.has(entry.id)) return { ok: false, code: "MODEL-ROLE-CODEX-CATALOGUE-DUPLICATE" };
+    seen.add(entry.id);
+    if (!entry.hidden && entry.supportedReasoningEfforts.some((item) => item.reasoningEffort === effort)) ids.push(entry.id);
+  }
+  return { ok: true, code: "MODEL-ROLE-CODEX-CATALOGUE-OBSERVED", availableModelIds: ids.sort() };
+}
+
+/** Parse bounded `agy models` stdout without trusting display names or rank. */
+export function antigravityAvailableModelIds(stdout) {
+  if (typeof stdout !== "string" || stdout.length > 65_536 || stdout.length === 0) {
+    return { ok: false, code: "MODEL-ROLE-AGY-CATALOGUE-INVALID" };
+  }
+  const lines = stdout.trimEnd().split(/\r?\n/u);
+  if (lines.length === 0 || lines.length > 256) return { ok: false, code: "MODEL-ROLE-AGY-CATALOGUE-INVALID" };
+  const ids = [];
+  for (const line of lines) {
+    const match = /^([^\t\r\n]+)\t([^\t\r\n]+)$/u.exec(line);
+    if (!match || !id(match[1]) || match[2].trim() === "") {
+      return { ok: false, code: "MODEL-ROLE-AGY-CATALOGUE-INVALID" };
+    }
+    ids.push(match[1]);
+  }
+  if (new Set(ids).size !== ids.length) return { ok: false, code: "MODEL-ROLE-AGY-CATALOGUE-DUPLICATE" };
+  return { ok: true, code: "MODEL-ROLE-AGY-CATALOGUE-OBSERVED", availableModelIds: ids.sort() };
+}
+
+/**
+ * Normalize an authenticated Anthropic Models API cursor chain. Each item is
+ * `{ requestAfterId, response }`; a caller must record the actual request
+ * cursor rather than assembling arbitrary response pages. API availability
+ * belongs to the API credential, not automatically to a Claude Code OAuth
+ * session. The host must label that boundary and never treat documentation or
+ * an empty/partial response as proof of installed Claude Code availability.
+ */
+export function claudeApiAvailableModelIds(pages) {
+  if (!Array.isArray(pages) || pages.length === 0 || pages.length > 32) {
+    return { ok: false, code: "MODEL-ROLE-CLAUDE-API-CATALOGUE-INVALID" };
+  }
+  const ids = [];
+  let expectedAfterId = null;
+  for (let index = 0; index < pages.length; index += 1) {
+    const item = pages[index];
+    const page = item?.response;
+    if (item === null || typeof item !== "object" || Array.isArray(item)
+      || item.requestAfterId !== expectedAfterId
+      || page === null || typeof page !== "object" || Array.isArray(page)
+      || !Array.isArray(page.data) || page.data.length > 1000
+      || typeof page.has_more !== "boolean" || page.has_more !== (index < pages.length - 1)
+      || (page.data.length === 0 && page.has_more)
+      || page.first_id !== (page.data[0]?.id ?? null)
+      || page.last_id !== (page.data.at(-1)?.id ?? null)
+      || page.data.some((entry) => entry === null || typeof entry !== "object"
+        || Array.isArray(entry) || entry.type !== "model" || !id(entry.id))) {
+      return { ok: false, code: "MODEL-ROLE-CLAUDE-API-CATALOGUE-INVALID" };
+    }
+    ids.push(...page.data.map((entry) => entry.id));
+    expectedAfterId = page.last_id;
+  }
+  if (new Set(ids).size !== ids.length) return { ok: false, code: "MODEL-ROLE-CLAUDE-API-CATALOGUE-DUPLICATE" };
+  return { ok: true, code: "MODEL-ROLE-CLAUDE-API-CATALOGUE-OBSERVED",
+    assurance: "api-credential-only", availableModelIds: ids.sort() };
+}
+
+/** Actual Claude Code model usage from one completed, successful JSON result. */
+export function claudeCodeObservedModelIds(result) {
+  if (result === null || typeof result !== "object" || Array.isArray(result)
+    || result.type !== "result" || result.is_error !== false
+    || result.terminal_reason === "api_error"
+    || result.modelUsage === null || typeof result.modelUsage !== "object"
+    || Array.isArray(result.modelUsage)) {
+    return { ok: false, code: "MODEL-ROLE-CLAUDE-HOST-RESULT-INVALID" };
+  }
+  const ids = Object.keys(result.modelUsage);
+  if (ids.length === 0 || ids.some((modelId) => !id(modelId))) {
+    return { ok: false, code: "MODEL-ROLE-CLAUDE-HOST-MODEL-UNOBSERVED" };
+  }
+  return { ok: true, code: "MODEL-ROLE-CLAUDE-HOST-MODEL-OBSERVED",
+    availableModelIds: ids.sort() };
+}
 
 function digest(value) {
   return createHash("sha256").update(canonicalizeJson(value)).digest("hex");

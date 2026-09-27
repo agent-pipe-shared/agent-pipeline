@@ -7,6 +7,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
+import { createAdvisoryAttemptTrail } from "./advisory-attempt-trail.mjs";
 import { DESIGN_ADVISORY_RECEIPT_DIRECTORY, readDesignAdvisoryTransaction, writeDesignAdvisoryTransaction } from "./design-advisory-transaction.mjs";
 
 const COMMIT = "c".repeat(40);
@@ -101,5 +102,41 @@ test("unavailable Advisor path cannot be recorded without a verified final PO ap
     const written = writeDesignAdvisoryTransaction(input(value, { disposition: null, finalApprovalValid: true }));
     assert.equal(written.mode, "unavailable");
     assert.equal(readDesignAdvisoryTransaction(readInput(value, { finalApprovalValid: true })).mode, "advisor-unavailable-exception");
+  } finally { rmSync(value, { recursive: true, force: true }); }
+});
+
+test("native-capable Claude may publish a consulted fallback only with native failure in its receipt", () => {
+  const value = root();
+  try {
+    const fallback = receipt();
+    fallback.configuredRoute = { runner: "claude", selector: { kind: "alias", value: "opus" }, effort: "high" };
+    fallback.observed.identity = { provider: "anthropic", modelId: "opus", effort: "high" };
+    fallback.adapter = "consult";
+    writeReceipt(value, fallback);
+    assert.throws(() => writeDesignAdvisoryTransaction(input(value, { nativeAvailable: true })),
+      (error) => error.code === "DAA-ROUTE", "native-capable direct consult must not appear as fallback");
+    fallback.fallback = { reason: "native-failed", redactedErrorClass: "failure" };
+    writeReceipt(value, fallback);
+    assert.throws(() => writeDesignAdvisoryTransaction(input(value, { nativeAvailable: true })),
+      (error) => error.code === "DAA-ATTEMPT-TRAIL-UNAVAILABLE");
+    const receiptBytes = readFileSync(join(value, ".git", DESIGN_ADVISORY_RECEIPT_DIRECTORY, "advisor-1.json"));
+    const trail = createAdvisoryAttemptTrail({ receipt: fallback, receiptBytes,
+      attempts: [
+        { adapter: "native-opus", kind: "native", runner: "claude", status: "failed" },
+        { adapter: "consult", kind: "consult", runner: "claude", status: "answered" },
+      ] });
+    const trailPath = join(value, ".git", DESIGN_ADVISORY_RECEIPT_DIRECTORY, "advisor-1.json.attempts-v1.json");
+    const directOnly = { ...trail, attempts: [trail.attempts[1]] };
+    writeFileSync(trailPath, `${JSON.stringify(directOnly, null, 2)}\n`, { mode: 0o600 });
+    assert.throws(() => writeDesignAdvisoryTransaction(input(value, { nativeAvailable: true })),
+      (error) => error.code === "DAA-ATTEMPT-TRAIL-INVALID", "one consult call is not proof of native fallback");
+    writeFileSync(trailPath, `${JSON.stringify(trail, null, 2)}\n`, { mode: 0o600 });
+    const written = writeDesignAdvisoryTransaction(input(value, { nativeAvailable: true }));
+    assert.equal(readDesignAdvisoryTransaction(readInput(value)).id, written.id);
+    assert.equal(readDesignAdvisoryTransaction(readInput(value)).record.admission.advisor.route, "generic-consult");
+    trail.attempts[0].status = "unavailable";
+    writeFileSync(trailPath, `${JSON.stringify(trail, null, 2)}\n`, { mode: 0o600 });
+    assert.throws(() => readDesignAdvisoryTransaction(readInput(value)),
+      (error) => ["DAA-ATTEMPT-TRAIL-INVALID", "DAA-ATTEMPT-TRAIL-DRIFT"].includes(error.code));
   } finally { rmSync(value, { recursive: true, force: true }); }
 });

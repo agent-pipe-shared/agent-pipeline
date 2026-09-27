@@ -64,6 +64,7 @@ import {
 import { sha256CanonicalJson } from "../../plugins/pipeline-core/lib/plan-spec-state-v2.mjs";
 import { materializeArchitectureDesignFixture } from "../../plugins/pipeline-core/lib/architecture-design-test-fixture.mjs";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../../plugins/pipeline-core/lib/critical-action-approval-request.mjs";
+import { materializeTestDesignWorkflowPackage } from "../../plugins/pipeline-core/lib/test-design-workflow-fixture.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
@@ -848,7 +849,9 @@ function submitAndApprove(dir, planPath) {
   const activeFeature = readState(dir).state.activeFeature;
   const initialized = initializeLifecycleContinuity(dir, activeFeature.id, planPath);
   const deps = lifecycleDeps(dir, planPath);
-  const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps);
+  // Generic state-transition fixture: the separate design-workflow package
+  // suite owns the stronger epic/feature approval ceremony.
+  const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "mini"], deps);
   run(["present-plan", "--by", "coordinator"], deps);
   const approved = run(["approve-plan", "--by", "po-test"], deps);
   return { initialized, submitted, approved };
@@ -1144,7 +1147,7 @@ function canonicalFixtureJson(value) {
     ".claude/plans/x.md",
   );
   const submitted = run(
-    ["submit-plan", "--by", "coordinator", "--profile", "feature"],
+    ["submit-plan", "--by", "coordinator", "--profile", "mini"],
     lifecycleDeps(dir, ".claude/plans/x.md"),
   );
   const presented = run(["present-plan", "--by", "coordinator"], lifecycleDeps(dir, ".claude/plans/x.md"));
@@ -1157,9 +1160,9 @@ function canonicalFixtureJson(value) {
   ok("PS06b schema field correct", state.schema === SCHEMA_ID);
   ok("PS06c planApproved true", state.planApproved === true);
   ok(
-    "PS06d planApproval is exact v4 and binds the submitted Plan, Spec, profile authority, and an empty audit seal",
+    "PS06d planApproval is exact v7 and binds the submitted Plan, Spec, profile authority, and an empty audit seal",
     state.planSubmission?.schema === "pipeline.plan-submission.v1"
-      && state.planApproval?.schema === "pipeline.plan-approval.v5"
+      && state.planApproval?.schema === "pipeline.plan-approval.v7"
       && state.planApproval?.approvedBy === "po-test"
       && state.planApproval?.approvedAt === FIXED_NOW()
       && state.planApproval?.submissionSha256
@@ -1210,11 +1213,18 @@ function canonicalFixtureJson(value) {
   const deps = lifecycleDeps(dir, planPath);
   const reopened = run(["reopen-design", "--by", "po-test"], deps);
   const successorDeps = lifecycleDeps(dir, planPath, { now: () => "2026-07-08T21:00:00.000Z" });
-  const successorSubmitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], successorDeps);
+  const successorSubmitted = run(["submit-plan", "--by", "coordinator", "--profile", "mini"], successorDeps);
   const successorPresented = run(["present-plan", "--by", "coordinator"], successorDeps);
   const successorApproved = run(["approve-plan", "--by", "po-test"], successorDeps);
   const legacy = readState(dir).state;
-  const { priorInvalidationSha256: _ignored, designAdvisorAdmissionSha256: _d, ...v4Approval } = legacy.planApproval;
+  const {
+    priorInvalidationSha256: _ignored,
+    designAdvisorAdmissionSha256: _d,
+    designWorkflowPackagePath: _packagePath,
+    designWorkflowPackageSha256: _packageSha,
+    designWorkflowApproval: _packageApproval,
+    ...v4Approval
+  } = legacy.planApproval;
   const historicalV4 = {
     ...legacy,
     planApproved: true,
@@ -3825,7 +3835,7 @@ function runAuthorityRevisionTests() {
   mkdirSync(join(fx.dir, "project"), { recursive: true });
   writeFileSync(join(fx.dir, "project", "pipeline.json"), JSON.stringify({ schema: "pipeline.project.v1", verify: "echo ok" }) + "\n");
   const lifecycleDepsForFx = lifecycleDeps(fx.dir, fx.prdRel);
-  const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], lifecycleDepsForFx);
+  const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "mini"], lifecycleDepsForFx);
   const presented = run(["present-plan", "--by", "coordinator"], lifecycleDepsForFx);
   const approved = run(["approve-plan", "--by", "po-test"], lifecycleDepsForFx);
   const phased = run(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`], lifecycleDepsForFx);
@@ -5018,20 +5028,47 @@ runFeaturePackageReconcileTests();
 {
   const dir = freshDir("humanlegible-briefing");
   const planPath = "specs/humanlegible/prd_hl.md";
+  const specPath = "specs/humanlegible/spec.md";
+  mkdirSync(dirname(join(dir, planPath)), { recursive: true });
+  writeFileSync(join(dir, specPath), "# Human-legible fixture Spec\n");
+  writeFileSync(join(dir, planPath), "# Human-legible fixture PRD\n");
+  const authorityFromFiles = ({ expectedPlanSha256, expectedSpecSha256 } = {}) => {
+    const planSha256 = createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex");
+    const specSha256 = createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex");
+    const value = { ...injectedPoGateAuthority(planPath)().value, planSha256, specSha256 };
+    return (expectedPlanSha256 === undefined || expectedPlanSha256 === planSha256)
+      && (expectedSpecSha256 === undefined || expectedSpecSha256 === specSha256)
+      ? { ok: true, code: "PO-GATE-AUTHORITY-VALID", value }
+      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
+  };
   run(["set-feature", "--id", "hl-feature", "--plan-path", planPath], { dir, now: FIXED_NOW });
-  const initialized = initializeLifecycleContinuity(dir, "hl-feature", planPath);
-  const deps = lifecycleDeps(dir, planPath);
+  const continuityRequest = writeRequest(dir, "hl-continuity", lifecycleContinuity("hl-feature", authorityFromFiles().value));
+  const initialized = run(continuityArgs("continuity-init", "absent", continuityRequest), continuityDeps(dir));
+  const fixture = materializeTestDesignWorkflowPackage({ root: dir, featureId: "hl-feature", planPath, specPath });
+  const deps = { ...lifecycleDeps(dir, planPath), ...fixture.deps, poGateAuthority: authorityFromFiles };
+  const presentSignedPackage = (currentDeps, currentFixture) => {
+    const presented = run(["present-plan", "--by", "coordinator", "--design-workflow-package", currentFixture.packagePath], currentDeps);
+    if (presented !== 0) return { presented, approved: 2, approvalText: "" };
+    const presentation = readState(dir).state.planPresentation;
+    currentFixture.signRequest(presentation.designWorkflowApprovalRequestPath);
+    const attended = {
+      ...currentDeps, isattyFn: () => true,
+      readLineFn: () => `approve-${presentation.designWorkflowPackageSha256.slice(0, 12)}`,
+    };
+    const approved = captureConsole(() => run([
+      "approve-plan", "--by", "po-test", "--design-workflow-approval-request", presentation.designWorkflowApprovalRequestPath,
+    ], attended));
+    return { presented, approved: approved.value, approvalText: approved.text };
+  };
   const submitted = captureConsole(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
   ok("HL-1 continuity-init exit 0", initialized === 0, `got ${initialized}`);
   ok("HL-2 submit-plan exit 0", submitted.value === 0, `got ${submitted.value}`);
   ok("HL-3 submit-plan prints the human-legible briefing (not just digests)", submitted.text.includes("Briefing:") && submitted.text.includes("scope=") && submitted.text.includes("authorizes=") && submitted.text.includes("excludes="), submitted.text);
 
-  const presented = run(["present-plan", "--by", "coordinator"], deps);
-  ok("HL-3a present-plan exit 0", presented === 0, `got ${presented}`);
-
-  const approved = captureConsole(() => run(["approve-plan", "--by", "po-test"], deps));
-  ok("HL-4 approve-plan exit 0", approved.value === 0, `got ${approved.value}`);
-  ok("HL-5 approve-plan's gate presentation shows the briefing too", approved.text.includes("Briefing:") && approved.text.includes("authorizes=") && approved.text.includes("excludes="), approved.text);
+  const firstApproval = presentSignedPackage(deps, fixture);
+  ok("HL-3a present-plan exit 0", firstApproval.presented === 0, `got ${firstApproval.presented}`);
+  ok("HL-4 approve-plan exit 0", firstApproval.approved === 0, `got ${firstApproval.approved}`);
+  ok("HL-5 approve-plan's gate presentation shows the briefing too", firstApproval.approvalText.includes("Briefing:") && firstApproval.approvalText.includes("authorizes=") && firstApproval.approvalText.includes("excludes="), firstApproval.approvalText);
 
   const state = readState(dir).state;
   const briefing = state.planApprovalBriefing;
@@ -5074,19 +5111,10 @@ runFeaturePackageReconcileTests();
 
   // A resubmission with a materially different binding (same path, changed content) is
   // classified as a change against the prior approved binding, not silently as identical.
-  const originalAuthorityValue = deps.poGateAuthority().value;
-  function changedAuthority({ expectedPlanSha256, expectedSpecSha256 } = {}) {
-    const value = {
-      ...originalAuthorityValue,
-      planSha256: createHash("sha256").update(`fixture:${planPath}:v2`).digest("hex"),
-    };
-    return (expectedPlanSha256 === undefined || expectedPlanSha256 === value.planSha256)
-      && (expectedSpecSha256 === undefined || expectedSpecSha256 === value.specSha256)
-      ? { ok: true, code: "PO-GATE-AUTHORITY-VALID", value }
-      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
-  }
   const reopened = run(["reopen-design", "--by", "po-test"], deps);
-  const changedDeps = { ...deps, poGateAuthority: changedAuthority };
+  writeFileSync(join(dir, planPath), "# Human-legible fixture PRD\n\nRevised requirements.\n");
+  const revisedFixture = materializeTestDesignWorkflowPackage({ root: dir, featureId: "hl-feature", planPath, specPath });
+  const changedDeps = { ...deps, ...revisedFixture.deps };
   const resubmitted = captureConsole(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], changedDeps));
   ok("HL-12 reopen-design + resubmit with changed content exit 0", reopened === 0 && resubmitted.value === 0, `reopened=${reopened} resubmitted=${resubmitted.value}`);
   const resubmittedState = readState(dir).state;
@@ -5097,13 +5125,11 @@ runFeaturePackageReconcileTests();
     JSON.stringify(resubmittedState.planApprovalBriefing.change),
   );
 
-  const presented2 = run(["present-plan", "--by", "coordinator"], changedDeps);
-  ok("HL-13a present-plan exit 0 (resubmitted content)", presented2 === 0, `got ${presented2}`);
-
   // Reviewer reconstruction on a TAMPERED persisted briefing (excludes narrowed after the
   // fact, still within the closed vocabulary shape) must fail, not silently trust the bytes.
-  const reapproved = run(["approve-plan", "--by", "po-test"], changedDeps);
-  ok("HL-14 fixture re-approves the changed submission", reapproved === 0, `got ${reapproved}`);
+  const renewedApproval = presentSignedPackage(changedDeps, revisedFixture);
+  ok("HL-13a present-plan exit 0 (resubmitted content)", renewedApproval.presented === 0, `got ${renewedApproval.presented}`);
+  ok("HL-14 fixture re-approves the changed submission", renewedApproval.approved === 0, `got ${renewedApproval.approved}`);
   const genuine = readState(dir).state;
   const tampered = {
     ...genuine,

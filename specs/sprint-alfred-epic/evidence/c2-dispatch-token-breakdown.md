@@ -1,5 +1,14 @@
 # C2 Dispatch Economics & Token Cost Breakdown
 
+> **0.7 provenance correction (2026-09-26):** The phase-by-phase token
+> numbers and percentages below are retained as a historical report, not as
+> verified measurements. This artifact names six dispatches but contains no
+> links to their raw usage records, phase-boundary timestamps, or a
+> reproducible derivation. In particular, the 17.2% average and the conclusion
+> that bootstrap is below 40% must not be used as a measured 0.7 result or a
+> user-facing cost estimate. A new measurement must bind raw per-dispatch
+> usage, its phase classification, and the calculation to an exact candidate.
+
 **Checkpoint:** 2026-09-14  
 **Task:** `ALF-C2-ECONOMICS-OPERATIONS`  
 **Governing Item:** `backlog/items/2026-08-17-goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate.md`  

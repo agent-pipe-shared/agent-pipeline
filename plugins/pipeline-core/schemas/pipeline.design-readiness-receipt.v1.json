@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.design-readiness-receipt.v1",
+  "title": "Independent design readiness receipt",
+  "description": "A fresh comparison of the immutable user input, PRD, Spec, revised design, and traceability map. Read-only execution is established by hostExecution evidence, not by a caller assertion. It records readiness for PO review, never human approval or implementation authority.",
+  "type": "object",
+  "additionalProperties": false,
+    "required": ["schema", "dispatchId", "runner", "hostExecution", "candidate", "sources", "outcome", "findings", "unresolvedChoices", "summary"],
+  "properties": {
+    "schema": { "const": "pipeline.design-readiness-receipt.v1" },
+    "dispatchId": { "$ref": "#/$defs/id" },
+    "runner": { "enum": ["claude", "codex", "antigravity"] },
+    "hostExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "runner", "repoFingerprint", "selectionId", "selectionSha256", "executionReceiptSha256", "dutyReceiptSha256", "route"],
+      "properties": {
+        "schema": { "const": "pipeline.design-readiness-host-execution.v1" },
+        "runner": { "enum": ["claude", "codex", "antigravity"] },
+        "repoFingerprint": { "$ref": "#/$defs/sha256" },
+        "selectionId": { "type": "string", "pattern": "^(?:css_[a-z2-7]{25}[aeimquy4]|drh_[a-f0-9]{32})$" },
+        "selectionSha256": { "$ref": "#/$defs/sha256" },
+        "executionReceiptSha256": { "$ref": "#/$defs/sha256" },
+        "dutyReceiptSha256": { "$ref": "#/$defs/sha256" },
+        "route": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "effort", "sourceSha256", "candidateCommit"],
+          "properties": {
+            "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "effort": { "type": "string", "minLength": 1, "maxLength": 32 },
+            "sourceSha256": { "$ref": "#/$defs/sha256" },
+            "candidateCommit": { "$ref": "#/$defs/gitObject" }
+          }
+        }
+      }
+    },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "sources": { "$ref": "#/$defs/sources" },
+    "outcome": { "enum": ["ready-for-po-review", "not-ready"] },
+    "findings": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "summary"],
+        "properties": {
+          "code": { "$ref": "#/$defs/id" },
+          "severity": { "enum": ["blocking", "non-blocking"] },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        }
+      }
+    },
+    "unresolvedChoices": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "question", "impact"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "question": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "impact": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        }
+      }
+    },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 2000 }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "gitObject": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": { "commit": { "$ref": "#/$defs/gitObject" }, "tree": { "$ref": "#/$defs/gitObject" } }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._/@:-]+$" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "prd", "spec", "design", "traceability"],
+      "properties": {
+        "input": { "$ref": "#/$defs/source" },
+        "prd": { "$ref": "#/$defs/source" },
+        "spec": { "$ref": "#/$defs/source" },
+        "design": { "$ref": "#/$defs/source" },
+        "traceability": { "$ref": "#/$defs/source" }
+      }
+    }
+  }
+}

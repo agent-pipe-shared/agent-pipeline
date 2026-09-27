@@ -19,7 +19,7 @@ import {
   applyProjectOnboardingLifecycleV4,
   applyProjectOnboardingManifestRepair,
   applyProjectOnboardingV3,
-  inspectProjectOnboardingV3,
+  inspectProjectOnboardingV3 as inspectProjectOnboardingV3Core,
   planProjectOnboardingManifestRepair,
   planProjectOnboardingSourceRecovery,
   planProjectOnboardingKickoffV4,
@@ -43,6 +43,8 @@ import {
   pipelineScriptsRunnerAllowlistEntries,
   PROJECT_ONBOARDING_VERIFY_COMMAND_PLACEHOLDER,
 } from "./project-onboarding-v3.mjs";
+import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
+import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { main as runnerProfileMigrationCli } from "../scripts/runner-profile-migration-v3.mjs";
@@ -88,6 +90,34 @@ import { isDirectInvocation } from "./entrypoint.mjs";
 import { requireProjectOnboardingReady } from "./project-onboarding-ready-gate.mjs";
 import { materializeArchitectureDesignFixture } from "./architecture-design-test-fixture.mjs";
 import { inspectArchitectureEntryReadiness } from "./architecture-entry-readiness.mjs";
+import { designWorkflowAdvisorQuestionSha256 } from "./design-workflow-package.mjs";
+import { designReadinessReportSha256 } from "./design-readiness-host-evidence.mjs";
+
+// B8 producer-to-guard property: exercise the real guard against every direct
+// session command action reached by this onboarding fixture corpus. The guard
+// receives the producer's exact observation, not a reconstructed permission.
+const b8ObservedCommandClasses = new Set();
+function inspectProjectOnboardingV3(input) {
+  const observed = inspectProjectOnboardingV3Core(input);
+  const action = observed?.nextAction;
+  if (input?.intent === "session" && observed?.schema === "pipeline.project-onboarding.v4"
+    && observed.status !== "ready" && action?.kind === "command") {
+    const command = [action.executable, ...action.argv].map(JSON.stringify).join(" ");
+    const guarded = evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, {
+      projectDir: observed.root,
+      requireProjectOnboardingReadyFn() {
+        throw new ProjectOnboardingReadyError("PORG-NOT-READY", "fixture", {
+          intent: "session", lifecycleStatus: observed.status,
+        });
+      },
+      inspectProjectOnboardingV3Fn() { return observed; },
+    });
+    assert.deepEqual(guarded, { exitCode: 0, stderr: "" },
+      `B8 producer/guard command drift: ${observed.status} ${action.argv?.[1] ?? "unknown"}`);
+    b8ObservedCommandClasses.add(`${observed.status}:${action.argv?.[1] ?? "unknown"}`);
+  }
+  return observed;
+}
 
 // CLI-shaped cases use the same production PATH discovery as onboarding.
 // Publish an explicit physical test runtime so the hermetic five-tool CI PATH
@@ -266,6 +296,112 @@ export const fakeDeps = {
     };
   },
 };
+
+// The plan-handoff regressions below exercise lifecycle semantics, not live
+// Advisor/Readiness providers. They still use a real, physically validated
+// feature package so the production presentation and single-approval contract
+// remains in force. Candidate/model observations are deterministic test
+// evidence and are never written into the product source tree.
+const DESIGN_WORKFLOW_FIXTURE_CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
+function materializeDesignWorkflowPackageFixture({ rootDir, featureId, planPath, specPath, runner = "codex" }) {
+  const parent = dirname(planPath);
+  const sourceFiles = {
+    input: { path: `${parent}/input.md`, bytes: Buffer.from(`Original request for ${featureId}.\n`) },
+    prd: { path: planPath, bytes: readFileSync(join(rootDir, planPath)) },
+    spec: { path: specPath, bytes: readFileSync(join(rootDir, specPath)) },
+    design: { path: `${parent}/design.md`, bytes: Buffer.from(`Revised design for ${featureId}.\n`) },
+    traceability: { path: `${parent}/traceability.md`, bytes: Buffer.from(`Every requirement for ${featureId} is mapped.\n`) },
+  };
+  const sources = Object.fromEntries(Object.entries(sourceFiles).map(([name, entry]) => [name, {
+    path: entry.path, sha256: sha256(entry.bytes),
+  }]));
+  for (const entry of Object.values(sourceFiles)) {
+    const target = join(rootDir, entry.path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, entry.bytes);
+  }
+  const providerAndModel = {
+    claude: { provider: "anthropic", modelId: "claude-opus", selector: { kind: "alias", value: "opus" } },
+    codex: { provider: "openai", modelId: "gpt-6-sol", selector: { kind: "model-id", value: "gpt-6-sol" } },
+    antigravity: { provider: "google", modelId: "gemini-pro", selector: { kind: "model-id", value: "gemini-pro" } },
+  }[runner];
+  const advisorDispatchId = `advisor-${featureId}`;
+  const advisorReceipt = {
+    schema: "pipeline.advisory-receipt.v1", receiptId: `receipt-${advisorDispatchId}`,
+    dispatch: { dispatchId: advisorDispatchId, queueRevision: 0,
+      candidateCommit: DESIGN_WORKFLOW_FIXTURE_CANDIDATE.commit,
+      candidateTree: DESIGN_WORKFLOW_FIXTURE_CANDIDATE.tree },
+    duty: "advisory", profile: "feature",
+    configuredRoute: { runner, selector: providerAndModel.selector, effort: "high" },
+    adapter: "consult",
+    observed: { status: "answered", identity: { provider: providerAndModel.provider,
+      modelId: providerAndModel.modelId, effort: "high" } },
+    questionSha256: designWorkflowAdvisorQuestionSha256(sources), answerSha256: "c".repeat(64),
+    fallback: { reason: "none", redactedErrorClass: null }, emittedAtMs: 1,
+  };
+  const evidenceDir = `${parent}/evidence`;
+  const advisorPath = `${evidenceDir}/advisor.json`;
+  const readinessPath = `${evidenceDir}/readiness.json`;
+  const advisorBytes = Buffer.from(`${JSON.stringify(advisorReceipt)}\n`);
+  const readinessReport = {
+    schema: "pipeline.design-readiness-receipt.v1", dispatchId: `readiness-${featureId}`,
+    runner, candidate: DESIGN_WORKFLOW_FIXTURE_CANDIDATE, sources,
+    outcome: "ready-for-po-review",
+    findings: [{ code: "TRACE-OK", severity: "non-blocking", summary: "All requirements are mapped." }],
+    unresolvedChoices: [], summary: `The complete design package for ${featureId} is ready for PO review.`,
+  };
+  const readinessReceipt = {
+    ...readinessReport,
+    hostExecution: {
+      schema: "pipeline.design-readiness-host-execution.v1", runner,
+      repoFingerprint: "f".repeat(64), selectionId: `css_${"a".repeat(25)}e`,
+      selectionSha256: "b".repeat(64), executionReceiptSha256: "c".repeat(64),
+      dutyReceiptSha256: designReadinessReportSha256(readinessReport),
+      route: { model: providerAndModel.modelId, effort: "high", sourceSha256: "8".repeat(64),
+        candidateCommit: DESIGN_WORKFLOW_FIXTURE_CANDIDATE.commit },
+    },
+  };
+  const readinessBytes = Buffer.from(`${JSON.stringify(readinessReceipt)}\n`);
+  const workflowPackage = {
+    schema: "pipeline.design-workflow-package.v1", featureId,
+    authoringDispatchId: `authoring-${featureId}`, candidate: DESIGN_WORKFLOW_FIXTURE_CANDIDATE,
+    sources,
+    advisor: { status: "answered", runner, nativeAvailable: false,
+      receipt: { path: advisorPath, sha256: sha256(advisorBytes) }, attemptTrail: null,
+      disposition: { decision: "accept", rationale: "The advice is reflected in the design." }, exception: null },
+    readiness: { path: readinessPath, sha256: sha256(readinessBytes), dispatchId: readinessReceipt.dispatchId },
+    createdAt: "2026-09-27T12:00:00.000Z",
+  };
+  const packagePath = `${evidenceDir}/design-workflow-package.json`;
+  for (const [relativePath, bytes] of [[advisorPath, advisorBytes], [readinessPath, readinessBytes],
+    [packagePath, Buffer.from(`${JSON.stringify(workflowPackage)}\n`)]]) {
+    const target = join(rootDir, relativePath);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, bytes);
+  }
+  return packagePath;
+}
+
+function designWorkflowApprovalArgv(rootDir, by = "po") {
+  const current = JSON.parse(readFileSync(join(rootDir, "project", "pipeline-state.json"), "utf8"));
+  return ["approve-plan", "--by", by, "--design-workflow-approval-request",
+    current.planPresentation.designWorkflowApprovalRequestPath];
+}
+
+function designWorkflowLifecycleDeps(rootDir) {
+  return {
+    gitCandidate: () => ({ ok: true, ...DESIGN_WORKFLOW_FIXTURE_CANDIDATE }),
+    verifyDesignReadinessHostExecution: ({ hostExecution, readinessReceipt }) =>
+      hostExecution?.dutyReceiptSha256 === designReadinessReportSha256(readinessReceipt)
+        ? { ok: true } : { ok: false, code: "DWP-TEST-HOST-BINDING" },
+    isattyFn: () => true,
+    readLineFn: () => {
+      const current = JSON.parse(readFileSync(join(rootDir, "project", "pipeline-state.json"), "utf8"));
+      const packageSha256 = current.planPresentation?.designWorkflowPackageSha256;
+      return typeof packageSha256 === "string" ? `approve-${packageSha256.slice(0, 12)}` : "";
+    },
+  };
+}
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
@@ -4470,8 +4606,9 @@ test("a kickoff with the seed-default (unchanged) language still repairs genuine
 // are the contract: a promoted `feature` whose plan nobody approved is REFUSED
 // an implementation write (exit 2 -- exit 1 would let the write proceed, which
 // is the reported defect: implementation beginning without the human ever being
-// asked). The final path now also requires the separately bound private Advisor
-// admission; its positive matrix is exercised in guard-devplan.test.mjs.
+// asked). A successful implementation write requires one complete, digest-bound
+// package with Advisor disposition and independent readiness, then the single
+// final PO approval. The guard's refusal matrix remains covered separately.
 test("the seeded dev-plan gate refuses implementation before approval and admits it after", () => {
   const path = root();
   try {
@@ -4504,6 +4641,9 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
     };
     materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-GATED-DESIGN" });
+    const workflowPackagePath = materializeDesignWorkflowPackageFixture({
+      rootDir: path, featureId: "gated-work", planPath: prdPath, specPath,
+    });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");
@@ -4533,10 +4673,11 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
         now: () => "2026-08-01T12:00:00.000Z",
         writeError: (value) => stderr.push(String(value)),
         // This dev-plan regression exercises the phase gate, not the shared
-        // acknowledgement ceremony.  Its historical authority fixture is
+        // acknowledgement ceremony. Its historical authority fixture is
         // deliberately legacy-scoped; global signature/chat receipt behavior
         // is covered by the dedicated acknowledgement tests below.
-        readHumanApprovalMode: () => ({ mode: "signature", source: "test", key: "human_approval", scope: "legacy" }),
+        ...designWorkflowLifecycleDeps(path),
+        readHumanApprovalMode: () => ({ mode: "chat", source: "test", key: "human_approval", scope: "legacy" }),
         designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
       });
       return { code, stderr: stderr.join("") };
@@ -4544,17 +4685,16 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
     const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
     assert.equal(submitted.code, 0, submitted.stderr);
     assert.equal(attemptWrite("src/index.html").status, 2, "a submitted but unapproved plan still refuses implementation");
-    const presented = state(["present-plan", "--by", "po"]);
+    const presented = state(["present-plan", "--by", "po", "--design-workflow-package", workflowPackagePath]);
     assert.equal(presented.code, 0, presented.stderr);
-    const approved = state(["approve-plan", "--by", "po"]);
+    const approved = state(designWorkflowApprovalArgv(path));
     assert.equal(approved.code, 0, approved.stderr);
     const phased = state(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`]);
     assert.equal(phased.code, 0, phased.stderr);
 
-    const awaitingAdvisor = attemptWrite("src/index.html");
-    assert.equal(awaitingAdvisor.status, 2, `the approved plan without Advisor admission must remain closed: ${awaitingAdvisor.stderr}`);
-    assert.match(String(awaitingAdvisor.stderr), /DAA-PUBLIC-UNAVAILABLE/u);
-    assert.match(String(awaitingAdvisor.stderr), /design-advisory-admission\.mjs inspect/u);
+    const admittedWrite = attemptWrite("src/index.html");
+    assert.equal(admittedWrite.status, 0,
+      `the complete, PO-approved package contains the Advisor result and independent readiness required for implementation: ${admittedWrite.stderr}`);
   } finally { dispose(path); }
 });
 
@@ -4614,6 +4754,9 @@ test("the public onboarding handover is executable for every runner with baselin
       assert.equal(promoted.status, "ready");
       const architectureReadiness = inspectArchitectureEntryReadiness({ rootDir: path });
       assert.equal(architectureReadiness.status, "ready", `${runner}: design materialization must satisfy the real entry gate: ${JSON.stringify(architectureReadiness)}`);
+      const workflowPackagePath = materializeDesignWorkflowPackageFixture({
+        rootDir: path, featureId: `handover-${runner}`, planPath: prdPath, specPath, runner,
+      });
 
       let tick = 0;
       const state = (argv) => {
@@ -4625,20 +4768,21 @@ test("the public onboarding handover is executable for every runner with baselin
           writeError: (value) => stderr.push(String(value)),
           // Keep this handover test's concern to public lifecycle handoff.
           // The signature/global receipt contract has its own all-runner test.
-          readHumanApprovalMode: () => ({ mode: "signature", source: "test", key: "human_approval", scope: "legacy" }),
+          ...designWorkflowLifecycleDeps(path),
+          readHumanApprovalMode: () => ({ mode: "chat", source: "test", key: "human_approval", scope: "legacy" }),
           designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
         });
         return { code, stderr: stderr.join("") };
       };
       const approve = () => {
-        for (const argv of [
-          ["submit-plan", "--by", "po", "--profile", "feature"],
-          ["present-plan", "--by", "po"],
-          ["approve-plan", "--by", "po"],
-        ]) {
+        for (const argv of [["submit-plan", "--by", "po", "--profile", "feature"]]) {
           const result = state(argv);
           assert.equal(result.code, 0, `${runner}: ${argv[0]}: ${result.stderr}`);
         }
+        const presented = state(["present-plan", "--by", "po", "--design-workflow-package", workflowPackagePath]);
+        assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
+        const approved = state(designWorkflowApprovalArgv(path));
+        assert.equal(approved.code, 0, `${runner}: approve-plan: ${approved.stderr}`);
       };
       const publicInspect = () => {
         let stdout = "";
@@ -4691,9 +4835,9 @@ test("the public onboarding handover is executable for every runner with baselin
       const awaitingEntry = publicInspect();
       assert.deepEqual(awaitingEntry.nextAction, draftEntry.nextAction,
         `${runner}: awaiting approval remains owned by the same public inspect driver`);
-      const presented = state(["present-plan", "--by", "po"]);
+      const presented = state(["present-plan", "--by", "po", "--design-workflow-package", workflowPackagePath]);
       assert.equal(presented.code, 0, `${runner}: present-plan: ${presented.stderr}`);
-      const approved = state(["approve-plan", "--by", "po"]);
+      const approved = state(designWorkflowApprovalArgv(path));
       assert.equal(approved.code, 0, `${runner}: approve-plan: ${approved.stderr}`);
 
       // Fresh calibration uses the shipped baseline and needs no PO input.
@@ -4802,6 +4946,9 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
       prdPath, specPath, designInputPath, runner, deps: localDeps,
     };
     materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROJDRIFT-DESIGN" });
+    const workflowPackagePath = materializeDesignWorkflowPackageFixture({
+      rootDir: path, featureId: "projdrift-work", planPath: prdPath, specPath, runner,
+    });
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner, ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");
@@ -4815,14 +4962,15 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause 
         // Projection drift is independent from the global acknowledgement
         // policy; retain the legacy fixture instead of reviving --by in the
         // production global policy.
-        readHumanApprovalMode: () => ({ mode: "signature", source: "test", key: "human_approval", scope: "legacy" }),
+        ...designWorkflowLifecycleDeps(path),
+        readHumanApprovalMode: () => ({ mode: "chat", source: "test", key: "human_approval", scope: "legacy" }),
         designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
       });
       return { code, stderr: stderr.join("") };
     };
     assert.equal(state(["submit-plan", "--by", "po", "--profile", "feature"]).code, 0);
-    assert.equal(state(["present-plan", "--by", "po"]).code, 0);
-    assert.equal(state(["approve-plan", "--by", "po"]).code, 0);
+    assert.equal(state(["present-plan", "--by", "po", "--design-workflow-package", workflowPackagePath]).code, 0);
+    assert.equal(state(designWorkflowApprovalArgv(path)).code, 0);
 
     const inspect = () => inspectProjectOnboardingV3({ runner, rootDir: path, intent: "bootstrap", deps: localDeps });
 
@@ -9555,6 +9703,9 @@ if (ORCHESTRATING_SHARDS) {
     process.exitCode = 1;
   }
 } else if (shard !== null) {
+  assert.ok(b8ObservedCommandClasses.size > 0,
+    "B8 producer/guard test must reach at least one session command per shard");
+  console.log(`B8 producer/guard command classes in shard: ${b8ObservedCommandClasses.size}`);
   console.log(`\nproject-onboarding-v3 shard ${shard + 1}/${SHARD_COUNT}: ${passed} passed, ${failures.length} failed`);
   if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
 }

@@ -92,6 +92,11 @@ function createDeps(root, featureId, planPath, specPath, now = "2026-09-13T12:00
   };
 }
 
+// Observer conformance tests the state projection, not the separate
+// epic/feature package-signature ceremony. Keep feature submission/cancellation
+// coverage above, and exercise approved transitions through the mini route.
+const OBSERVER_APPROVAL_PROFILE = "mini";
+
 function initContinuity(root, featureId, planPath, specPath, deps) {
   const continuityPayload = {
     schema: "pipeline.continuity.v0",
@@ -268,7 +273,7 @@ test("conformance: approve-plan verb produces state accepted by both observers",
     const deps = createDeps(root, featureId, planPath, specPath);
     assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
     initContinuity(root, featureId, planPath, specPath, deps);
-    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
+    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", OBSERVER_APPROVAL_PROFILE], deps), 0);
     assert.equal(run(["present-plan", "--by", "Elephant"], deps), 0);
     assertObserverConformance(root, "present-plan");
 
@@ -296,7 +301,7 @@ test("conformance: reopen-design after approved plan produces state accepted by 
     const deps = createDeps(root, featureId, planPath, specPath);
     assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
     initContinuity(root, featureId, planPath, specPath, deps);
-    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
+    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", OBSERVER_APPROVAL_PROFILE], deps), 0);
     assert.equal(run(["present-plan", "--by", "Elephant"], deps), 0);
     assert.equal(run(["approve-plan", "--by", "PO"], deps), 0);
     assert.equal(run(["reopen-design", "--by", "PO"], deps), 0);
@@ -319,7 +324,7 @@ test("conformance: revoke-plan after approved plan produces state accepted by bo
     const deps = createDeps(root, featureId, planPath, specPath);
     assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
     initContinuity(root, featureId, planPath, specPath, deps);
-    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
+    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", OBSERVER_APPROVAL_PROFILE], deps), 0);
     assert.equal(run(["present-plan", "--by", "Elephant"], deps), 0);
     assert.equal(run(["approve-plan", "--by", "PO"], deps), 0);
     assert.equal(run(["revoke-plan", "--by", "PO"], deps), 0);
@@ -343,7 +348,7 @@ test("conformance: set-phase verb produces state accepted by both observers", ()
     const deps = createDeps(root, featureId, planPath, specPath);
     assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
     initContinuity(root, featureId, planPath, specPath, deps);
-    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
+    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", OBSERVER_APPROVAL_PROFILE], deps), 0);
     assert.equal(run(["present-plan", "--by", "Elephant"], deps), 0);
     assert.equal(run(["approve-plan", "--by", "PO"], deps), 0);
 
@@ -606,7 +611,7 @@ test("conformance: complete end-to-end lifecycle progression through all transit
     assertObserverConformance(root, "e2e: continuity-init");
 
     // Verb 3: submit-plan
-    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", "feature"], deps), 0);
+    assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", OBSERVER_APPROVAL_PROFILE], deps), 0);
     assertObserverConformance(root, "e2e: submit-plan");
 
     // Verb 4: approve-plan (requires present-plan)

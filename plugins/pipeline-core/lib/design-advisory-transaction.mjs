@@ -15,9 +15,11 @@ import { existsSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, u
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
+import { validateAdvisoryAttemptTrail } from "./advisory-attempt-trail.mjs";
 import { DESIGN_ADVISORY_RECORD_PATH, DESIGN_ADVISORY_RECORD_SCHEMA, evaluateDesignAdvisoryRecord } from "./design-advisory-enforcement.mjs";
 
 export const DESIGN_ADVISORY_TRANSACTION_SCHEMA = "pipeline.design-advisory-transaction.v1";
+export const DESIGN_ADVISORY_TRANSACTION_SCHEMA_V2 = "pipeline.design-advisory-transaction.v2";
 export const DESIGN_ADVISORY_RECEIPT_DIRECTORY = "agent-pipeline/design-advisory-receipts";
 export const DESIGN_ADVISORY_TRANSACTION_DIRECTORY = "agent-pipeline/design-advisory-transactions";
 
@@ -91,16 +93,34 @@ function readExactReceipt(common, receiptId) {
   if (!checked.ok) fail("DAA-RECEIPT-INVALID", "private Advisor receipt does not validate");
   return { path: target, bytes, sha256: sha(bytes), receipt };
 }
-function expectedRoute(runner, nativeAvailable) {
-  if (runner === "claude" && nativeAvailable === true) return "native";
-  if (["claude", "codex", "antigravity"].includes(runner)) return "generic-consult";
-  fail("DAA-RUNNER", "Advisor runner is unsupported");
+function readExactAttemptTrail(common, receiptId, receiptObserved) {
+  const target = `${receiptPath(common, receiptId)}.attempts-v1.json`;
+  const info = physicalFile(target, "DAA-ATTEMPT-TRAIL-UNAVAILABLE");
+  if (info.size > 16 * 1024) fail("DAA-ATTEMPT-TRAIL-INVALID", "Advisor attempt trail exceeds its byte bound");
+  const bytes = readFileSync(target);
+  const trail = parseStrict(bytes, "DAA-ATTEMPT-TRAIL-INVALID");
+  const checked = validateAdvisoryAttemptTrail({ trail, receipt: receiptObserved.receipt,
+    receiptBytes: receiptObserved.bytes, requireNativeThenConsult: true });
+  if (!checked.ok) fail("DAA-ATTEMPT-TRAIL-INVALID", `Advisor fallback sequence is invalid (${checked.code})`);
+  return { bytes, sha256: sha(bytes) };
+}
+function observedRoute(runner, nativeAvailable, receipt) {
+  if (!["claude", "codex", "antigravity"].includes(runner)) fail("DAA-RUNNER", "Advisor runner is unsupported");
+  if (receipt.adapter === "native") {
+    if (runner === "claude" && nativeAvailable === true) return "native";
+    fail("DAA-ROUTE", "native Advisor route does not match observed capability");
+  }
+  if (receipt.adapter !== "consult" || (runner === "claude" && nativeAvailable === true
+    && !["native-unavailable", "native-failed", "native-timeout", "native-permission-denied"].includes(receipt.fallback?.reason))) {
+    fail("DAA-ROUTE", "consult Advisor route lacks its required native fallback observation");
+  }
+  return "generic-consult";
 }
 function makeAdmission({ featureId, planPath, specPath, planSha256, specSha256, receipt, nativeAvailable, disposition, rationale, finalApprovalValid }) {
   if (!ID.test(featureId ?? "") || !OID.test(receipt.dispatch?.candidateCommit ?? "") || !OID.test(receipt.dispatch?.candidateTree ?? "")) fail("DAA-BINDING", "feature or Advisor candidate binding is invalid");
   if (typeof nativeAvailable !== "boolean") fail("DAA-NATIVE-CAPABILITY", "native Advisor capability must be observed");
   const runner = receipt.configuredRoute.runner;
-  const route = expectedRoute(runner, nativeAvailable);
+  const route = observedRoute(runner, nativeAvailable, receipt);
   // The staged admission evaluator owns this digest contract.  It hashes the
   // in-memory receipt's JSON representation, not its private file bytes; keep
   // the two identities distinct so formatting changes cannot forge a receipt.
@@ -208,16 +228,20 @@ export function writeDesignAdvisoryTransaction({ repoRoot, gitCommonDir, feature
   const spec = bytesAt(root, specPath, "DAA-SPEC");
   const receiptObserved = readExactReceipt(common, receiptId);
   const record = makeAdmission({ featureId, planPath, specPath, planSha256: sha(plan), specSha256: sha(spec), receipt: receiptObserved.receipt, nativeAvailable, disposition, finalApprovalValid });
+  const needsAttemptTrail = record.admission.runner === "claude" && record.admission.nativeAvailable === true
+    && record.admission.advisor.route === "generic-consult";
+  const attemptTrail = needsAttemptTrail ? readExactAttemptTrail(common, receiptId, receiptObserved) : null;
   const publicBytes = Buffer.from(canonical(record));
   const publicSha256 = sha(publicBytes);
   const transaction = {
-    schema: DESIGN_ADVISORY_TRANSACTION_SCHEMA,
+    schema: attemptTrail === null ? DESIGN_ADVISORY_TRANSACTION_SCHEMA : DESIGN_ADVISORY_TRANSACTION_SCHEMA_V2,
     id: publicSha256,
     publicRecordSha256: publicSha256,
     featureId,
     candidate: { commit: receiptObserved.receipt.dispatch.candidateCommit, tree: receiptObserved.receipt.dispatch.candidateTree },
     package: { planPath, planSha256: sha(plan), specPath, specSha256: sha(spec) },
     sourceReceipt: { id: receiptId, sha256: receiptObserved.sha256 },
+    ...(attemptTrail === null ? {} : { attemptTrailSha256: attemptTrail.sha256 }),
   };
   const privateBytes = Buffer.from(canonical(transaction));
   const privateDir = join(common, DESIGN_ADVISORY_TRANSACTION_DIRECTORY);
@@ -244,8 +268,12 @@ export function readDesignAdvisoryTransaction({ repoRoot, gitCommonDir, featureI
   const privatePath = transactionPath(common, publicSha256);
   physicalFile(privatePath, "DAA-PRIVATE-UNAVAILABLE");
   const transaction = parseStrict(readFileSync(privatePath), "DAA-PRIVATE-INVALID");
-  if (!exact(transaction, ["schema", "id", "publicRecordSha256", "featureId", "candidate", "package", "sourceReceipt"])
-    || transaction.schema !== DESIGN_ADVISORY_TRANSACTION_SCHEMA || transaction.id !== publicSha256 || transaction.publicRecordSha256 !== publicSha256
+  const fallbackTrailRequired = record.admission.runner === "claude" && record.admission.nativeAvailable === true
+    && record.admission.advisor.route === "generic-consult";
+  const transactionKeys = ["schema", "id", "publicRecordSha256", "featureId", "candidate", "package", "sourceReceipt"];
+  if (!exact(transaction, fallbackTrailRequired ? [...transactionKeys, "attemptTrailSha256"] : transactionKeys)
+    || transaction.schema !== (fallbackTrailRequired ? DESIGN_ADVISORY_TRANSACTION_SCHEMA_V2 : DESIGN_ADVISORY_TRANSACTION_SCHEMA)
+    || transaction.id !== publicSha256 || transaction.publicRecordSha256 !== publicSha256
     || transaction.featureId !== featureId || !exact(transaction.candidate, ["commit", "tree"])
     || transaction.candidate.commit !== record.admission.workflow.candidateCommit || transaction.candidate.tree !== record.admission.workflow.candidateTree
     || !exact(transaction.package, ["planPath", "planSha256", "specPath", "specSha256"])
@@ -255,5 +283,11 @@ export function readDesignAdvisoryTransaction({ repoRoot, gitCommonDir, featureI
   }
   const receiptObserved = readExactReceipt(common, transaction.sourceReceipt.id);
   if (receiptObserved.sha256 !== transaction.sourceReceipt.sha256 || JSON.stringify(receiptObserved.receipt) !== JSON.stringify(record.admission.advisorReceipt)) fail("DAA-RECEIPT-DRIFT", "private Advisor receipt differs from the public admission binding");
+  if (fallbackTrailRequired) {
+    const trail = readExactAttemptTrail(common, transaction.sourceReceipt.id, receiptObserved);
+    if (!SHA256.test(transaction.attemptTrailSha256 ?? "") || trail.sha256 !== transaction.attemptTrailSha256) {
+      fail("DAA-ATTEMPT-TRAIL-DRIFT", "private Advisor attempt trail differs from the immutable transaction");
+    }
+  }
   return Object.freeze({ record, transaction, id: publicSha256, mode: evaluated.mode });
 }

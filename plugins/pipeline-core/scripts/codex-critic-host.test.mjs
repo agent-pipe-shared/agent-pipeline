@@ -35,6 +35,7 @@ import {
   ASSURANCE,
   DEFAULT_PIPELINE_ROOT,
   T1_ASSURANCE,
+  applyCriticSessionModelRoute,
   assertNoDuplicateJsonKeys,
   admitCriticReview,
   canonicalJson,
@@ -61,7 +62,7 @@ import { expectedPipelineScriptsRunnerAllowlistEntries } from "../lib/project-on
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
-const EXPECTED_CASE_COUNT = 133;
+const EXPECTED_CASE_COUNT = 135;
 const caseResults = Array.from({ length: EXPECTED_CASE_COUNT }, () => {
   let resolveCase;
   let rejectCase;
@@ -2976,6 +2977,36 @@ await checkAsync("codex-critic-app-server binds a source ruleset to a completely
     assert.equal(drifted.childStarted, false);
     assert.equal(spawned, false);
   } finally { rmSync(fixtureRoot, { recursive: true, force: true }); }
+});
+
+check("admitted session model changes the pre-packet route and its authority digest", () => {
+  const route = { dutyId: "critic_normal", model: "gpt-6-sol", effort: "medium",
+    sourceSha256: "a".repeat(64) };
+  const selected = { ok: true, status: "ready", runner: "codex",
+    taskRoute: "duty.critic_normal", modelId: "approved-next-model", effort: "medium",
+    readbackSha256: "b".repeat(64), receiptSha256: "c".repeat(64) };
+  const bound = applyCriticSessionModelRoute(route, selected);
+  assert.equal(bound.model, selected.modelId);
+  assert.equal(bound.effort, route.effort);
+  assert.match(bound.sourceSha256, /^[a-f0-9]{64}$/u);
+  assert.notEqual(bound.sourceSha256, route.sourceSha256);
+});
+
+check("a foreign or mismatched session cannot substitute a Critic model", () => {
+  const route = { dutyId: "critic_high_risk", model: "gpt-6-sol", effort: "max",
+    sourceSha256: "a".repeat(64) };
+  assert.deepEqual(applyCriticSessionModelRoute(route, null), {
+    model: route.model, effort: route.effort, sourceSha256: route.sourceSha256 });
+  const selected = { ok: true, status: "ready", runner: "codex",
+    taskRoute: "duty.critic_high_risk", modelId: "approved-next-model", effort: "max",
+    readbackSha256: "b".repeat(64), receiptSha256: "c".repeat(64) };
+  for (const invalid of [{ ...selected, effort: "medium" },
+    { ...selected, taskRoute: "duty.critic_normal" },
+    { ...selected, receiptSha256: "bad" },
+    { ok: false, status: "unavailable" }]) {
+    assert.deepEqual(applyCriticSessionModelRoute(route, invalid), {
+      model: route.model, effort: route.effort, sourceSha256: route.sourceSha256 });
+  }
 });
 
 assert.equal(declaredCases, EXPECTED_CASE_COUNT, "Codex Critic host Completion case count drifted");

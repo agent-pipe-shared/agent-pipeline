@@ -1,5 +1,13 @@
 # Dispatch Economics, Closing Allowance, Range Mode Check, Clone Provisioning Readback, and Critic Notes Persistence (WP-C2 & Operations) — Verification Evidence
 
+> **0.7 provenance correction (2026-09-26):** The implementation and test
+> claims below remain historical. The linked token-breakdown table does not
+> include raw usage records or a reproducible phase calculation. Its 17.2%
+> bootstrap figure is therefore an unverified historical estimate, not a
+> measured 0.7 economy result or a consumer cost claim. This correction does
+> not alter the recorded backlog transitions or assert that WP-C2's current
+> measurement requirement is satisfied.
+
 **Checkpoint:** 2026-09-14  
 **Task:** `ALF-C2-ECONOMICS-OPERATIONS`  
 **Governing Spec:** `specs/sprint-alfred-epic/spec.md` §7.3 (WP-C2) & Operations  

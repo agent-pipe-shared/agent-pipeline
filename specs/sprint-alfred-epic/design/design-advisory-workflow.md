@@ -3,6 +3,25 @@
 Status: initial design draft, not implementation, not Advisor output, and not
 PO-approved. Owner: Elephant. Dispatch: ALF-DESIGN-ADVISORY. Date: 2026-09-19.
 
+## Subsequent PO direction (2026-09-26; not a package signature)
+
+The PO chose one final approval for a digest-bound package containing the
+independent readiness comparison. The Driver must present the complete,
+mutually consistent package before that approval; submitting or presenting an
+intermediate draft must not lock it as approved. Material changes require a
+fresh complete package/readiness check, not a second routine approval for a
+separate readiness stage.
+
+For an Advisor failure, the normal route and its governed fallback must both
+actually be attempted before an unavailable exception is eligible. The final
+package must show the exact attempted routes, typed failures and receipt
+bindings. The same one final approval may include that narrow exception;
+independent readiness remains mandatory. A skipped, malformed or unobserved
+fallback is not proof of unavailability. Current source has an approval cycle
+on this path (`approve-plan` asks for admission before writing v5 approval;
+unavailable admission asks for final approval before publication), so this
+direction is an implementation requirement, not a claim of a working route.
+
 ## 1. Contract and traceability
 
 This design covers the requested sequence: immutable user input -> this fresh
@@ -108,7 +127,7 @@ pipeline-core/schema ownership; no new top-level directory is warranted.
 
 | Runner | Advisor route | Required enforcement and honest assurance |
 |---|---|---|
-| Claude | Native Advisor when available; then the existing fresh ordinary read-only consult fallback. | Native availability and observed identity are receipt facts. Fallback is a fresh subagent with Read/Grep/Glob only. No claim that the shared helper enforces every Claude host tool. |
+| Claude | Native Advisor when available; on a typed native failure, use the separately bootstrap-confirmed functional Advisor route. If that optional selection is absent or malformed, retain the valid V3 consult fallback. | Native availability and observed identity are receipt facts. Each fallback is a fresh read-only consult and binds its own model/effort through demand, invocation and receipt. Native uses `not-applicable` effort; consult fallback uses the selected functional route's normal effort. No claim that the shared helper enforces every Claude host tool. |
 | Codex | Ordinary fresh `consult-advisor` route directly for this workflow. | `codex-host-advisor-route.mjs` may report legacy host status, but selected-sandbox/App-Server is not required. WSL/native deferred is typed unavailable, not proof of isolation or a reason to invoke the old route. |
 | Antigravity | Ordinary fresh `consult-advisor` route directly. | Runner identity and route are recorded in the receipt; no OS isolation, provider, effective-model, or host enforcement is claimed without observed evidence. |
 
@@ -122,7 +141,14 @@ unrelated host tools.
 
 The Elephant creates exactly one demand for one concrete design question, with
 `pipeline.advisory-demand.v2`, the current candidate commit/tree, question,
-reason, and physical evidence references. Allowed trigger reasons are the
+reason, and physical evidence references. When Claude has an admitted current-
+session model-role selection for its consult fallback, the host reconstructs
+the demand as `pipeline.advisory-demand.v3`, adding the exact fallback model,
+effort and private-store readback digests; it does not persist the session ID.
+The coordinator rejects a v3 demand unless the current host readback and
+child/receipt route match it. If that optional selection is missing or
+defective, the host retains the valid V2 demand and registered V3 fallback.
+Allowed trigger reasons are the
 existing `architecture-tradeoff`, `decision-ambiguity`, `evidence-conflict`,
 `recovery-choice`, or `risk-review`; lifecycle events never trigger it.
 
@@ -170,6 +196,14 @@ second implementation approval exist in the ordinary path. Host/export consent
 and permission boundaries remain those of the existing authority; this design
 does not invent a Pipeline approval or bypass a host denial.
 
+The earlier onboarding/bootstrap PRD-and-Spec acknowledgement is a distinct
+intake fact: its existing receipt binds those two sources, not the later Advisor
+disposition or independent readiness report. It must not be relabelled as the
+final complete-package decision. The final package ceremony therefore needs
+its own exact digest-bound human readback while retaining the earlier intake
+continuity; the user should see one complete final package, not a sequence of
+partial final approvals.
+
 If the Advisor genuinely cannot produce a usable result, the package may carry
 one explicit, scoped `advisor-unavailable` exception naming the typed failure,
 attempts, receipt, and why proceeding without advice is safe for this design.
@@ -213,34 +247,46 @@ skill paragraph, prompt instruction, or a shared helper without runner-entry
 point coverage is insufficient. Claude, Codex, and Antigravity each need actual
 invocation-path and negative tests; those tests prove only the covered paths.
 
-## 8. Open product and security choices
+## 8. Decisions and remaining implementation details
 
-These are intentionally unresolved and must be decided before implementation;
-this draft does not infer them:
+The PO's 2026-09-26 direction above settles the product decision: one complete,
+digest-bound package is presented for one final approval. An Advisor-unavailable
+exception is eligible only after the normal route and governed fallback were
+actually attempted and their typed failures were retained. Independent readiness
+is never waived. A pre-approval exception is a proposed package member, not an
+approved admission or permission to enter implementation.
 
-1. Which exact existing state record should hold the package and exception, and
-   whether the package is append-only or replaces the active feature record.
-2. Whether the final PO ceremony displays the full readiness/receipt metadata or
-   only a bounded digest summary, subject to the selected chat/signature mode.
-3. What minimum evidence makes an Advisor-unavailable exception safe for this
-   particular design question, and whether some trigger reasons prohibit the
-   exception entirely.
-4. Whether Claude native failure should spend both configured native attempts
-   before ordinary consult, or use a shorter design-specific cap; the existing
-   coordinator default is two native attempts.
-5. Which independently observed host facts, if any, are sufficient for a
-   runner-specific assurance claim; absent an explicit proof, the implementation
-   must retain the conservative unknown/unavailable result.
-6. Exact schema names/versioning and the final list of implementation files,
-   after architecture-decision review confirms ownership and compatibility.
+The remaining choices are implementation details to be specified and tested
+before activation, not additional PO approvals for partial drafts:
+
+1. Select the existing state/transaction records for the immutable package,
+   pending exception and final readback. Presentation and approval must re-read
+   the same complete package digest without an approval/admission cycle.
+2. Present the full human-readable package and bounded receipt metadata while
+   the ceremony signs or records the exact digest required by its selected mode.
+   A digest alone is not a substitute for showing the PO the content.
+3. Define the closed failure sequence and exact evidence binding for both
+   Advisor routes. A route skipped or lacking a valid receipt cannot establish
+   unavailability. The existing two-native-attempt cap is the starting bound;
+   any design-specific reduction must preserve an actual fallback attempt.
+   For Claude consult fallback, the bootstrap-admitted functional selection is
+   optional: if it is absent or fails validation, route through the valid V3
+   selector and bind that exact result instead of blocking the consultation.
+4. Keep runner-specific host assurance at `unknown` or `unavailable` unless a
+   separate independently observed fact supports a narrower claim. A local
+   result or model string is not provider attestation.
+5. Fix schema names, versioning, ownership and implementation files after the
+   architecture-decision review. The accepted direction itself does not approve
+   a concrete implementation diff.
 
 ## 9. Implementation and review gates
 
 This document is design-only. It does not install, push, invoke an Advisor,
-change production/configuration/skills, or claim implementation. Before any
-implementation dispatch: resolve the choices above, update the Spec and PRD
-references as needed, run independent readiness over original input + PRD +
-Spec, obtain the single final PO package approval, and preserve the separate
-Critic-before-Full-Verify repair and plugin-update drift work. A Critic/readiness
-reviewer must compare this design to all three digested sources; the author
-cannot self-approve that comparison.
+change production/configuration/skills, or claim implementation. Source work
+may implement and test the decided workflow without treating a pending package
+as approved. The governed transition to feature implementation requires the
+complete package, independent readiness over original input + PRD + Spec +
+revised design, and the one final PO package approval with exact readback.
+Critic-before-Full-Verify repair and plugin-update drift work remain separate.
+An independent readiness reviewer must compare this design to all three
+digested sources; the author cannot self-approve that comparison.

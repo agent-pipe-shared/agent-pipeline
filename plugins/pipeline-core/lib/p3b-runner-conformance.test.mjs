@@ -328,7 +328,7 @@ check("C03 native Antigravity usage binds correctly using v3 definitions", () =>
 
     const agyUsage = boundUsage(root, {
       runner: "antigravity", nativeEvent: ANTIGRAVITY_EVENT, requested: intent.routing.duties.critic_high_risk.antigravity,
-      duty: "critic_high_risk", effectiveModelId: "gemini-3.1-pro-high", effectiveEffort: "max", evidenceSource: "host",
+      duty: "critic_high_risk", effectiveModelId: "gemini-3.1-pro-high", effectiveEffort: "high", evidenceSource: "host",
     });
 
     const agyTurnUsage = ingestAntigravityUsage({ version: "antigravity-exec-json.v1", nativeEventBytes: ANTIGRAVITY_EVENT, sourceContext: agyUsage.sourceContext, routeContext: agyUsage.routeContext, repoRoot: root });

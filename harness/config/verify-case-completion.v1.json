@@ -303,6 +303,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "design-workflow-package-tests",
+      "path": "plugins/pipeline-core/lib/design-workflow-package.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "dispatch-budget-binding-tests",
       "path": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
       "disposition": "required"
@@ -514,8 +519,53 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "model-role-approved-policy-tests",
+      "path": "plugins/pipeline-core/lib/model-role-approved-policy.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-role-bootstrap-tests",
+      "path": "plugins/pipeline-core/scripts/model-role-bootstrap.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-role-dispatch-select-tests",
+      "path": "plugins/pipeline-core/scripts/model-role-dispatch-select.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-role-dispatch-tests",
+      "path": "plugins/pipeline-core/lib/model-role-dispatch.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-role-host-identity-tests",
+      "path": "plugins/pipeline-core/lib/model-role-host-identity.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-role-host-observations-tests",
+      "path": "plugins/pipeline-core/lib/model-role-host-observations.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-role-host-session-tests",
+      "path": "plugins/pipeline-core/lib/model-role-host-session.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-role-host-store-tests",
+      "path": "plugins/pipeline-core/lib/model-role-host-store.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "model-role-session-tests",
       "path": "plugins/pipeline-core/lib/model-role-session.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "model-role-v3-baseline-tests",
+      "path": "plugins/pipeline-core/lib/model-role-v3-baseline.test.mjs",
       "disposition": "required"
     },
     {

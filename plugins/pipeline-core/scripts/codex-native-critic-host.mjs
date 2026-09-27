@@ -25,7 +25,7 @@ import {
   validateNativeCriticTuple,
 } from "../lib/codex-native-critic-policy.mjs";
 import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest } from "../lib/codex-native-critic-tools.mjs";
-import { resolveCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+import { resolveSessionCodexCriticHighRiskRoute } from "./codex-critic-session-route.mjs";
 import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
 import { admitNativeCriticExport } from "../lib/native-critic-export-admission.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
@@ -441,7 +441,13 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
   try { input = structuredClone(validateInput(rawInput)); selection = input.selection; }
   catch { return boundedFailure("input-invalid"); }
   const nowMs = dependencies.nowMs ?? Date.now();
-  const resolveRoute = dependencies.resolveRoute ?? resolveCriticHighRiskRoute;
+  const resolveRoute = dependencies.resolveRoute ?? (({ rootDir, candidateCommit }) =>
+    resolveSessionCodexCriticHighRiskRoute({
+      rootDir, candidateCommit,
+      authorityDependencies: dependencies.authorityDependencies ?? {},
+      env: dependencies.modelRoleEnvironment ?? process.env,
+      select: dependencies.selectModelRoleForTaskFn,
+    }));
   try {
     const validateRoute = (route) => resolveRoute({ rootDir: realpathSync(input.repository.root), candidateCommit: input.selection.dispatch.candidateCommit, ...(dependencies.authorityDependencies ?? {}) });
     validateNativeCriticSelection(selection, { validateRoute, expectedTuple: input.expectedTuple, nowMs, maxSmokeAgeMs: dependencies.maxSmokeAgeMs ?? 300_000 });

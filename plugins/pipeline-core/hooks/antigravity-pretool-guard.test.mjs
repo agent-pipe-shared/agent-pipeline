@@ -1065,7 +1065,7 @@ check("Antigravity start hint never creates .git before Git initialization", () 
     const result = spawnSync(process.execPath, [startHint], { cwd: root, input, encoding: "utf8", timeout: 8_000 });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(existsSync(join(root, ".git")), false, "the pre-init hint must not manufacture a Git control directory");
-    assert.match(result.stdout, /no session bootstrap lock was created/u);
+    assert.match(result.stdout, /Agent Pipeline is available as an optional project workflow/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

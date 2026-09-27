@@ -37,10 +37,18 @@ function validWorkflow(value) {
     && SHA256.test(value.designSha256 ?? "") && SHA256.test(value.evidenceSha256 ?? "");
 }
 
-function expectedRoute(runner, nativeAvailable) {
-  if (runner === "claude" && nativeAvailable === true) return "native";
-  if (RUNNERS.includes(runner)) return "generic-consult";
-  return null;
+function observedRoute(runner, nativeAvailable, receipt) {
+  if (!RUNNERS.includes(runner)) return null;
+  if (receipt?.adapter === "native") {
+    return runner === "claude" && nativeAvailable === true ? "native" : null;
+  }
+  if (receipt?.adapter !== "consult") return null;
+  // Availability is a preflight fact, not the route that ultimately answered.
+  // A native-capable Claude session may reach consult only after a recorded
+  // native failure. A forged direct consult must not satisfy that fallback.
+  if (runner === "claude" && nativeAvailable === true
+    && !["native-unavailable", "native-failed", "native-timeout", "native-permission-denied"].includes(receipt.fallback?.reason)) return null;
+  return "generic-consult";
 }
 
 function validReceipt(receipt, workflow, runner, route, status) {
@@ -79,8 +87,8 @@ export function evaluateDesignAdvisoryAdmission(input) {
   if (!validWorkflow(workflow)) return fail("workflow-binding");
   if (!RUNNERS.includes(runner)) return fail("runner-invalid");
   if (typeof nativeAvailable !== "boolean") return fail("capability-unobserved");
-  const route = expectedRoute(runner, nativeAvailable);
-  if (route === null) return fail("runner-invalid");
+  const route = observedRoute(runner, nativeAvailable, advisorReceipt);
+  if (route === null) return fail("advisor-route-invalid");
   if (!keys(advisor, ["status", "route", "mode", "readOnly", "dispatchId", "candidateCommit", "candidateTree", "designSha256", "evidenceSha256", "receiptSha256", "failureCode"])) return fail("advisor-shape");
   if (advisor.dispatchId !== workflow.dispatchId || advisor.candidateCommit !== workflow.candidateCommit || advisor.candidateTree !== workflow.candidateTree
     || advisor.designSha256 !== workflow.designSha256 || advisor.evidenceSha256 !== workflow.evidenceSha256) return fail("advisor-binding");

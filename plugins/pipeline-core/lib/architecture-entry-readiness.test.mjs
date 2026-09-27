@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { fixtureAdoption } from "../scripts/architecture-adoption-test-fixture.mjs";
@@ -11,6 +11,8 @@ import { fixtureAdoption } from "../scripts/architecture-adoption-test-fixture.m
 import {
   ARCHITECTURE_ENTRY_SCOPE,
   inspectArchitectureEntryReadiness,
+  inspectPlanningDecisionApplicability,
+  summarizePlanningDecisionApplicability,
 } from "./architecture-entry-readiness.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
@@ -119,6 +121,12 @@ test("real signed approved-scoped adoption reaches the physical readiness gate",
     cpSync(join(repoRoot, "architecture"), join(root, "architecture"), { recursive: true });
     cpSync(join(repoRoot, "AGENTS.md"), join(root, "AGENTS.md"));
     cpSync(join(repoRoot, "backlog"), join(root, "backlog"), { recursive: true });
+    cpSync(join(repoRoot, "docs/adr"), join(root, "docs/adr"), { recursive: true });
+    for (const relative of ["docs/operating-model.md", "policies/model-policy.md",
+      "roles/elephant.md", "roles/goldfish.md", "guardrails/token-budget.md"]) {
+      mkdirSync(dirname(join(root, relative)), { recursive: true });
+      cpSync(join(repoRoot, relative), join(root, relative));
+    }
     cpSync(join(repoRoot, "harness"), join(root, "harness"), { recursive: true });
     cpSync(join(repoRoot, "plugins/pipeline-core"), join(root, "plugins/pipeline-core"), { recursive: true });
     cpSync(join(repoRoot, "schemas"), join(root, "schemas"), { recursive: true });
@@ -155,4 +163,55 @@ test("unresolved adoption authority remains blocked even when the physical bundl
   assert.equal(result.status, "blocked");
   assert.equal(result.code, "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED");
   assert.equal(result.nextAction.kind, "collect-input");
+});
+
+test("planning decisions are projected only for owned task modules", () => {
+  const calls = [];
+  const result = inspectPlanningDecisionApplicability(repoRoot,
+    { paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs",
+      "harness/scripts/verify.mjs", "docs/unowned-note.md"] },
+    new Date("2026-09-26T00:00:00.000Z"), {
+      inspectDecisions: (input) => {
+        calls.push(input);
+        return { area: input.area, status: "advisory", decisions: [],
+          findings: [{ code: "legacy-decision-without-sidecar" }] };
+      },
+    });
+  assert.deepEqual(calls.map((item) => item.area), ["harness", "pipeline-core"]);
+  assert.deepEqual(result.unresolvedPaths, ["docs/unowned-note.md"]);
+  assert.equal(result.status, "advisory");
+  assert.deepEqual(summarizePlanningDecisionApplicability(result), {
+    schema: "pipeline.architecture-planning-decisions.v1",
+    status: "advisory",
+    areas: [
+      { area: "harness", status: "advisory", decisions: [], findingCount: 1 },
+      { area: "pipeline-core", status: "advisory", decisions: [], findingCount: 1 },
+    ],
+    unresolvedPaths: ["docs/unowned-note.md"],
+  });
+});
+
+test("a deferred architecture decision remains visible without changing lifecycle readiness", () => {
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    planningSurface: { planPath: "specs/architecture-entry.md",
+      paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
+    deps: {
+      checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred",
+        scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }),
+      inspectDecisions: ({ area }) => ({ area, status: "blocked",
+        code: "ARCH-DECISION-EFFECTIVE-UNRESOLVED", decisions: [], findings: [] }),
+    },
+  });
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  assert.equal(result.artifacts.decisionApplicability.status, "blocked");
+  assert.equal(result.artifacts.decisionApplicability.areas[0].area, "pipeline-core");
+});
+
+test("an unavailable optional decision clock remains diagnostic", () => {
+  const result = inspectPlanningDecisionApplicability(repoRoot,
+    { paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
+    new Date(Number.NaN));
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.code, "ARCH-DECISION-CLOCK-UNAVAILABLE");
 });

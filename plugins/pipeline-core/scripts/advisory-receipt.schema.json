@@ -37,7 +37,8 @@
             "value": { "$ref": "#/$defs/modelId" }
           }
         },
-        "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] }
+        "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
+        "sessionRoleBindingSha256": { "$ref": "#/$defs/sha256" }
       }
     },
     "adapter": { "enum": ["native", "consult"] },

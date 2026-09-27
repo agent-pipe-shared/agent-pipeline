@@ -53,6 +53,31 @@ test("Claude selects native only when capability is explicitly available", () =>
   assert.equal(evaluateDesignAdvisoryAdmission(packet({ runner: "antigravity", nativeAvailable: true })).route, "generic-consult");
 });
 
+test("Claude accepts a real consult fallback after native failure, not direct consult or foreign native", () => {
+  const fallback = packet({ runner: "claude", nativeAvailable: true });
+  fallback.advisor.route = "generic-consult";
+  fallback.advisorReceipt.adapter = "consult";
+  fallback.advisorReceipt.fallback = { reason: "native-failed", redactedErrorClass: "failure" };
+  fallback.advisor.receiptSha256 = designAdvisoryDigest(fallback.advisorReceipt);
+  fallback.elephant.advisorReceiptSha256 = fallback.advisor.receiptSha256;
+  assert.deepEqual(evaluateDesignAdvisoryAdmission(fallback), {
+    ok: true, mode: "consulted", route: "generic-consult", consumesFinalException: false,
+  });
+
+  const direct = structuredClone(fallback);
+  direct.advisorReceipt.fallback = { reason: "none", redactedErrorClass: null };
+  direct.advisor.receiptSha256 = designAdvisoryDigest(direct.advisorReceipt);
+  direct.elephant.advisorReceiptSha256 = direct.advisor.receiptSha256;
+  assert.equal(evaluateDesignAdvisoryAdmission(direct).code, "advisor-route-invalid");
+
+  const unavailableNative = packet({ runner: "claude", nativeAvailable: false });
+  unavailableNative.advisor.route = "native";
+  unavailableNative.advisorReceipt.adapter = "native";
+  unavailableNative.advisor.receiptSha256 = designAdvisoryDigest(unavailableNative.advisorReceipt);
+  unavailableNative.elephant.advisorReceiptSha256 = unavailableNative.advisor.receiptSha256;
+  assert.equal(evaluateDesignAdvisoryAdmission(unavailableNative).code, "advisor-route-invalid");
+});
+
 test("Codex and Antigravity both use the generic fresh route", () => {
   for (const runner of ["codex", "antigravity"]) {
     const result = evaluateDesignAdvisoryAdmission(packet({ runner, nativeAvailable: true }));

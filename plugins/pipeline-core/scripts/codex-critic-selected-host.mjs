@@ -32,7 +32,8 @@ import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs"
 import { executeSandboxedReadonlyDuty } from "./sandboxed-readonly-host-bridge.mjs";
 import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { invokeCodexCriticAppServer } from "./codex-critic-app-server.mjs";
-import { resolveCriticHighRiskRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+import { validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+import { resolveSessionCodexCriticHighRiskRoute } from "./codex-critic-session-route.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { dispatchBudgetLineForRole } from "../lib/dispatch-policy.mjs";
 
@@ -398,13 +399,22 @@ export async function runSelectedCriticHost(rawInput, transport = {}) {
   let input;
   try { input = validateSelectedCriticInput(rawInput); }
   catch { return unavailableResult("selected-critic-role-dispatch-rejected", null, null, "RDP-INPUT"); }
-  const resolveRoute = transport.resolveCriticRoute ?? resolveCriticHighRiskRoute;
   const routeInput = {
     rootDir: input.sandboxRuntime.repoRoot,
     candidateCommit: input.dispatch.candidateCommit,
     ...(transport.authorityDependencies ?? {}),
   };
-  const resolveBoundRoute = () => validateCriticHighRiskRoute(resolveRoute(routeInput));
+  const resolveBoundRoute = () => validateCriticHighRiskRoute(
+    transport.resolveCriticRoute
+      ? transport.resolveCriticRoute(routeInput)
+      : resolveSessionCodexCriticHighRiskRoute({
+        rootDir: routeInput.rootDir,
+        candidateCommit: routeInput.candidateCommit,
+        authorityDependencies: transport.authorityDependencies ?? {},
+        env: transport.modelRoleEnvironment ?? process.env,
+        select: transport.selectModelRoleForTaskFn,
+      }),
+  );
   let route;
   try {
     route = resolveBoundRoute();

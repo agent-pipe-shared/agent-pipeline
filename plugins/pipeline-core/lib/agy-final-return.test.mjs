@@ -345,6 +345,14 @@ test("AFR15 local reader independently checks signed consent, result bytes and G
       result: { ok: true, path: resultPath, bytes: resultBytes.length, sha256: sha(resultBytes) },
       commitAdmission: { ...admitted, baseline: baseline.baseline,
         recordPreflight: preflight, modelWitness, final: validatedFinal, criticRequired } };
+    let wrongDispatchCommitCalls = 0;
+    const wrongDispatch = finalizeAgyHostObservedReturn({
+      sealed: { ...sealed, packet: { ...sealed.packet, dispatchId: "OTHER-VALID-DISPATCH" } },
+      launched,
+    }, { commitAdmittedAgyReturn: () => { wrongDispatchCommitCalls += 1; return null; } });
+    assert.equal(wrongDispatch.code, "AGY-FINALIZE-WITNESS-DRIFT");
+    assert.equal(wrongDispatchCommitCalls, 0);
+    assert.equal(git("rev-parse", "HEAD"), candidate.commit);
     const failedBeforeCommit = finalizeAgyHostObservedReturn({ sealed, launched }, {
       commitAdmittedAgyReturn: () => { throw new Error("private Git diagnostic"); },
     });

@@ -23,7 +23,8 @@
         "plugins/pipeline-core/scripts/module-inventory.test.mjs",
         "plugins/pipeline-core/scripts/architecture-remedy.test.mjs",
         "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
-        "plugins/pipeline-core/scripts/architecture-adoption.test.mjs"
+        "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
+        "plugins/pipeline-core/lib/design-workflow-package.test.mjs"
       ]
     },
     {
@@ -53,7 +54,8 @@
         "schema-validation-contract"
       ],
       "verificationEntryPoints": [
-        "plugins/pipeline-core/scripts/module-inventory.test.mjs"
+        "plugins/pipeline-core/scripts/module-inventory.test.mjs",
+        "plugins/pipeline-core/lib/design-workflow-package.test.mjs"
       ]
     },
     {

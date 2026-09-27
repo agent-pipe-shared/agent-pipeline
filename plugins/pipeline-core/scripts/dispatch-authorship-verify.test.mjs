@@ -420,6 +420,45 @@ test("v4 authored Antigravity record cannot mint PASS from Claude frontmatter or
   assert.equal(portableCalls, 1, "a present invalid addendum must not be bypassed by the signed export");
 });
 
+test("native Claude/Codex authored records require exact host-observation markers and local evidence", () => {
+  for (const runner of ["claude", "codex"]) {
+    const sha = runner === "claude" ? "6".repeat(40) : "7".repeat(40);
+    const taskId = `DOD-V4-${runner.toUpperCase()}`;
+    const report = { text: "Host-validated native return.", changedFiles: ["src/native.mjs"] };
+    const authored = {
+      schema: "pipeline.dispatch-record.v4", taskId, agentType: "goldfish-implementor",
+      runner, model: runner === "claude" ? "claude-sonnet-5" : "gpt-6-luna", effort: "medium",
+      rulesetSha: "0.7.0+local", dispatcher: "Elephant", candidateCommit: sha,
+      resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"),
+      outcome: "completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" },
+      commits: [sha], log: [], report, criticSkip: skip(),
+    };
+    writeRecord(taskId, authored);
+    const marker = `Native-Host-Observed: v1 (${runner})`;
+    const deps = commit({ message: `feat(${runner}): done\n\nDispatch: ${taskId} (goldfish)\n${marker}\nAI-Assisted: true\n`, paths: ["src/native.mjs"] });
+    const unmarked = verifyCommit(sha, { ...deps,
+      readCommitMessage: () => `feat(${runner}): done\n\nDispatch: ${taskId} (goldfish)\nAI-Assisted: true\n` });
+    assert.equal(unmarked.verdict, VERDICT.unverifiable);
+    assert.equal(unmarked.classification, "native-host-marker-required");
+    const clone = verifyCommit(sha, { ...deps,
+      verifyNativeHostObservation: () => ({ ok: false, code: "NGHO-OBSERVATION-MISSING" }) });
+    assert.equal(clone.verdict, VERDICT.unverifiable, JSON.stringify(clone));
+    assert.equal(clone.classification, "native-host-observation-required");
+    const local = verifyCommit(sha, { ...deps,
+      verifyNativeHostObservation: (_id, record) => record.runner === runner
+        ? { ok: true, authority: "host-observed-local" } : { ok: false, code: "mismatch" } });
+    assert.equal(local.verdict, VERDICT.pass);
+    assert.equal(local.modelCheck.classification, "host-observed-local");
+    const corrupt = verifyCommit(sha, { ...deps,
+      verifyNativeHostObservation: () => ({ ok: false, code: "NGHO-GIT-READBACK" }) });
+    assert.equal(corrupt.verdict, VERDICT.fail);
+    assert.equal(corrupt.classification, "native-host-observation-invalid");
+    assert.equal(verifyCommit(sha, { ...deps,
+      readCommitMessage: () => deps.readCommitMessage().replace(marker, "Native-Host-Observed: v2 (" + runner + ")") }).classification,
+    "native-host-marker-invalid");
+  }
+});
+
 test("actual paths reject false T5 and T0 while honest T1 required/evidence is accepted", () => {
   const sha = "7".repeat(40);
   const base = {

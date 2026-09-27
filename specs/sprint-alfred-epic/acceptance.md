@@ -26,7 +26,7 @@ deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
 | AC-9 | This repository completes the D4 adoption flow end to end: typed state, priced staged proposal, one durable PO decision, evidence recorded | dogfood evidence set under `specs/sprint-alfred-epic/evidence/` |
 | AC-10 | Model-judged evaluator output can never be `pass` (deterministic-pass rule) — attempted prompt-only compliance yields `finding`/`unknown` in fixtures | D3 fixture "prompt-only claimed compliance" |
 | AC-11 | The eight B2 routes exist; each refusal message names its route; the B2-i authorization satisfies its four ⚖ constraints | B2 per-route fixtures |
-| AC-12 | Rules-as-code sweep landed: GG-22 defined where cited; SendMessage relay rule homed; push-flow doc corrected; strip tool bounded to the Triage section | B3 doc-consistency suites + strip fixture |
+| AC-12 | Rules-as-code sweep landed: GG-22 defined where cited; SendMessage relay rule homed; push-flow doc corrected; strip tool removes Triage and separately identified stale verdict/closure prose while preserving genuine later requirements | B3 doc-consistency suites + positive/negative strip fixtures |
 | AC-13 | Every open `sprint: alfred` backlog item is closed with closure evidence or PO-visibly re-triaged; ledger reconciled; member issues closed with candidate-bound comments; sprint close comment written. The set is **28 as of 2026-08-28**: the 24 read in full by the design intake, minus the two moved to Nightwing at the design gate (PRD §9 decision 1), plus the six this design phase itself filed. The live set, not this number, is authoritative at close — re-count with `check-backlog-sprint-assignment.mjs` | backlog ledger + GitHub issue trail |
 | AC-14 | Every wave's deliverables passed ≥1 independent Critic round (fresh context, paths-only dispatch); fail-then-fix cycles documented — and the same bar held for every design document of this epic before PO review (spec §12 design-phase review duty) | Critic evidence under `evidence/critic/` |
 | AC-15 | Documentation acceptance per member issue against the exact accepted candidate | per-issue doc evidence links |
@@ -39,6 +39,7 @@ deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
 | AC-22 | **Active optimization exists at planning:** a finding at the planning boundary carries proposed conformant remedy options with their comparison, not only the violation | D2 remedy-comparison generator fixture |
 | AC-23 | **AGENTS.md linkage:** a governed repository's AGENTS.md references the map bundle entry point, and the declared re-entry reading order resolves end to end from it | D2 estate fixture; re-entry walkthrough evidence |
 | AC-24 | **Provider-free AGY dispatch seam:** a complete runner-neutral Goldfish packet reaches `invokeAgy` through one production caller with candidate/input/result isolation and a typed receipt. Fake executable cases prove success, malformed output, model mismatch, timeout and cancellation; a missing/mismatched repo-local plugin/pipeline-start marker refuses or remains unavailable. `agy plugins list`, a sandbox flag, and fixture success do not count as native guard or three-runner proof. | E3 Verify suite; `pipeline.cross-runner-dispatch-receipt.v1` fixture receipt; A1/A2/A3/A5 precondition readback |
+| AC-25 | **Native Claude/Codex Host-Commit:** each direct runner route binds the exact prelaunch candidate and child/session/model identity to one validated structured final return; only its exact allowed diff is committed by the host with ordinary Git hooks, then commit readback, private local observation, and authored v4 publication occur in that order. Ambiguous or invalid returns do not gain authorship; a fresh clone without a separately approved signed export remains `UNVERIFIABLE`; no provider attestation is claimed. | Native Goldfish host state/return/finalizer/commit-execution Verify suites; authorship writer/verifier regressions; runner-hook contract readback |
 
 ## B. Incident-derived regression criteria (live-measured classes)
 
@@ -47,7 +48,7 @@ deliberately disjoint from the WP ids (`A1`–`A5`, `B1`–`B3`, `C1`–`C3`,
 | IR-1 | A post-close write to a bound Result is refused (agent routes) and detected (any route) at next state read — not at the next lifecycle transition weeks later | A3 dynamic-class + A5(i) fixtures |
 | IR-2 | A `discard-feature` on a repo with active continuity and null Result completes into a `ready` session with no human shell step | A5(ii) end-to-end fixture |
 | IR-3 | The four seed interruption classes (per-class dates and provenance: `design/issue-intake.md` #103) emit correct receipts when reproduced | C1 seed fixtures |
-| IR-4 | A guard-refused read-only interpreter command receives a typed read-only retry action, not a signature demand | B2-iii fixture |
+| IR-4 | A bounded read-only interpreter probe that merely mentions a protected path is admitted without a signature demand; an opaque write with an unresolved protected target remains a typed denial | B2-iii direct-admission and fail-closed negative fixtures |
 
 ## C. Fixture inventory floor
 

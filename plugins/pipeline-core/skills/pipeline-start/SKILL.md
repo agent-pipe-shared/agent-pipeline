@@ -180,6 +180,18 @@ recommendation.
    prohibitions, freshness/update availability, handover/state and Verify
    availability. Machine-read full sources and emit digest-bound compact
    facts; never claim a skipped or cached check passed.
+   For a new session, also run the installed
+   `scripts/model-role-bootstrap.mjs --repo-root <absolute-repo> --runner <current-runner>`
+   for Codex or Claude. Antigravity uses the same command with
+   `--runner antigravity --host-session-id <id-from-this-session's-native-hook>`;
+   its CLI first checks the exact fresh hook lock and plugin version. This
+   probes only the installed runner, never demands the other two. A first or
+   changed mapping needs the displayed digest confirmed by the human in an
+   attended terminal; an already confirmed unchanged mapping is reused.
+   A missing or defective optional model-role source, approval, host
+   observation, identity, or receipt is reported as such: retain the existing
+   independently governed V3 route for that session, never silently promote a
+   new model or turn the entire ready bootstrap into a partial lifecycle.
 3. **Boundary:** one simple shell command per tool call; never compose
    `&&`, `;`, redirects or pipelines except bounded, expansions-free
    `rg … | rg …`, `rg … | head -n 1..500`, or `rg … | tail -n 1..500`
@@ -461,6 +473,23 @@ guard-enforced rule — no guard blocks or detects a non-dispatched write, so
 skipping the dispatch right here produces no refusal to catch it: get this
 right by reading this paragraph now, not by expecting a later guard to stop
 a miss.
+Before sealing a model-bearing native dispatch packet, run the installed
+`scripts/model-role-dispatch-select.mjs --repo-root <absolute-repo> --runner <current-runner> --task-route <registered-route>`.
+For Antigravity, append `--host-session-id <id-from-this-session's-native-hook>`.
+Use the declared `profile.<profile>.<phase>` or `duty.<duty>` route from the
+registered source; the role is task-derived, never guessed from model names.
+`ready` selects the exact returned `modelId`/effort; `legacy-v3` explicitly
+keeps the returned `v3Route.selector` and `v3Route.effort` from the validated
+V3 cell. Copy that selector and effort into the native packet before sealing;
+do not leave the model blank or silently inherit the Elephant's model. A
+missing identity, policy, observation or defective optional model-role
+receipt or derived role source yields a visible diagnostic and this exact V3
+fallback, never a partial lifecycle or an unapproved new model.
+`unavailable` is reserved for an invalid V3 source or a task with no admitted
+V3 route; it stops only that
+dispatch, never the whole otherwise-ready session. Do not derive a new model from its name or
+probe an uninstalled runner. The selected model must enter the packet before
+its digest is sealed; changing it in a host after sealing is not a recovery.
 Before constructing a native Antigravity `invoke_subagent` request that
 includes any Pipeline role, load
 `references/antigravity-native-dispatch.md`. Its preparation route is required

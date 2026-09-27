@@ -16,6 +16,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -33,6 +35,9 @@ import { ONBOARDING_SUBCOMMANDS } from "./project-onboarding-v3.mjs";
 import { isSanctionedLifecycleCommand } from "../hooks/guard-lifecycle-ready.mjs";
 import { checkVerifyContractConfigured } from "./push-gate-satisfiability.mjs";
 import { fixtureAdoption } from "./architecture-adoption-test-fixture.mjs";
+import { designWorkflowAdvisorQuestionSha256 } from "../lib/design-workflow-package.mjs";
+import { designReadinessReportSha256 } from "../lib/design-readiness-host-evidence.mjs";
+import { createAdvisoryAttemptTrail } from "../lib/advisory-attempt-trail.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -974,7 +979,7 @@ for (const [name, prepare] of [
 // Fixture shape mirrors acknowledgeFixture() above: a state/continuity pair
 // already bound to a plan/spec pair, deps mocking poGateAuthority/poGateProfile
 // so no real onboarded project tree is needed.
-function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27T10:00:00.000Z" }) {
+function planAuthorityFixture({ featureId, planPath, specPath, advisorUnavailable = false, now = "2026-08-27T10:00:00.000Z" }) {
   const root = mktempProjectDir();
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, planPath, ".."), { recursive: true });
@@ -985,6 +990,96 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   const planSha256 = sha256Hex(planBytes);
   writeFileSync(join(root, specPath), specBytes);
   writeFileSync(join(root, planPath), planBytes);
+  const sourceFiles = {
+    input: [`${planPath.slice(0, planPath.lastIndexOf("/"))}/design-input.md`, Buffer.from(`Original request for ${featureId}.\n`, "utf8")],
+    prd: [planPath, planBytes],
+    spec: [specPath, specBytes],
+    design: [`${planPath.slice(0, planPath.lastIndexOf("/"))}/design.md`, Buffer.from(`Revised design for ${featureId}.\n`, "utf8")],
+    traceability: [`${planPath.slice(0, planPath.lastIndexOf("/"))}/traceability.md`, Buffer.from(`Every requirement for ${featureId} is mapped.\n`, "utf8")],
+  };
+  const sources = Object.fromEntries(Object.entries(sourceFiles).map(([name, [path, bytes]]) => [name, {
+    path, sha256: sha256Hex(bytes),
+  }]));
+  for (const [name, [path, bytes]] of Object.entries(sourceFiles)) {
+    if (name === "prd" || name === "spec") continue;
+    mkdirSync(join(root, path, ".."), { recursive: true });
+    writeFileSync(join(root, path), bytes);
+  }
+  const advisorReceipt = {
+    schema: "pipeline.advisory-receipt.v1",
+    receiptId: `advisor-${featureId}`,
+    dispatch: { dispatchId: `advisor-${featureId}`, queueRevision: 0, candidateCommit: candidate.commit, candidateTree: candidate.tree },
+    duty: "advisory", profile: "feature",
+    configuredRoute: { runner: "codex", selector: { kind: "model-id", value: "gpt-6-sol" }, effort: "high" },
+    adapter: "consult",
+    observed: advisorUnavailable
+      ? { status: "unavailable", identity: null }
+      : { status: "answered", identity: { provider: "openai", modelId: "gpt-6-sol", effort: "high" } },
+    questionSha256: designWorkflowAdvisorQuestionSha256(sources),
+    answerSha256: advisorUnavailable ? null : "c".repeat(64),
+    fallback: advisorUnavailable
+      ? { reason: "consult-unavailable", redactedErrorClass: "unavailable" }
+      : { reason: "none", redactedErrorClass: null }, emittedAtMs: 1,
+  };
+  const advisorPath = `${planPath.slice(0, planPath.lastIndexOf("/"))}/evidence/advisor.json`;
+  const readinessPath = `${planPath.slice(0, planPath.lastIndexOf("/"))}/evidence/readiness.json`;
+  const attemptTrailPath = `${planPath.slice(0, planPath.lastIndexOf("/"))}/evidence/advisor-attempts.json`;
+  mkdirSync(join(root, advisorPath, ".."), { recursive: true });
+  const advisorBytes = Buffer.from(`${JSON.stringify(advisorReceipt)}\n`, "utf8");
+  writeFileSync(join(root, advisorPath), advisorBytes);
+  const attemptTrail = advisorUnavailable ? createAdvisoryAttemptTrail({
+    receipt: advisorReceipt,
+    receiptBytes: advisorBytes,
+    attempts: [{ adapter: "consult", kind: "consult", runner: "codex", status: "unavailable" }],
+  }) : null;
+  const attemptTrailBytes = attemptTrail === null ? null : Buffer.from(`${JSON.stringify(attemptTrail)}\n`, "utf8");
+  if (attemptTrailBytes !== null) writeFileSync(join(root, attemptTrailPath), attemptTrailBytes);
+  const readinessReport = {
+    schema: "pipeline.design-readiness-receipt.v1",
+    dispatchId: `readiness-${featureId}`, runner: "codex",
+    candidate, sources, outcome: "ready-for-po-review",
+    findings: [{ code: "TRACE-OK", severity: "non-blocking", summary: "Traceability is complete." }],
+    unresolvedChoices: [], summary: "The exact input, PRD and Spec are covered by the revised design.",
+  };
+  const readinessReceipt = {
+    ...readinessReport,
+    hostExecution: {
+      schema: "pipeline.design-readiness-host-execution.v1", runner: "codex",
+      repoFingerprint: "4".repeat(64), selectionId: `css_${"a".repeat(25)}e`,
+      selectionSha256: "5".repeat(64), executionReceiptSha256: "6".repeat(64),
+      dutyReceiptSha256: designReadinessReportSha256(readinessReport),
+      route: { model: "gpt-6-luna", effort: "high", sourceSha256: "8".repeat(64), candidateCommit: candidate.commit },
+    },
+  };
+  const readinessBytes = Buffer.from(`${JSON.stringify(readinessReceipt)}\n`, "utf8");
+  writeFileSync(join(root, readinessPath), readinessBytes);
+  const packagePath = `${planPath.slice(0, planPath.lastIndexOf("/"))}/evidence/design-workflow-package.json`;
+  const workflowPackage = {
+    schema: "pipeline.design-workflow-package.v1", featureId,
+    authoringDispatchId: `authoring-${featureId}`, candidate, sources,
+    advisor: advisorUnavailable ? {
+      status: "unavailable", runner: "codex", nativeAvailable: false,
+      receipt: { path: advisorPath, sha256: sha256Hex(advisorBytes) },
+      attemptTrail: { path: attemptTrailPath, sha256: sha256Hex(attemptTrailBytes) },
+      disposition: null,
+      exception: { status: "proposed", failureCode: "capacity-unavailable", rationale: "The Advisor route was attempted and recorded as unavailable; independent design readiness is complete for the PO's one final review." },
+    } : {
+      status: "answered", runner: "codex", nativeAvailable: false,
+      receipt: { path: advisorPath, sha256: sha256Hex(advisorBytes) },
+      attemptTrail: null,
+      disposition: { decision: "accept", rationale: "The advice is reflected in the revised design." },
+      exception: null,
+    },
+    readiness: { path: readinessPath, sha256: sha256Hex(readinessBytes), dispatchId: readinessReceipt.dispatchId },
+    createdAt: "2026-08-27T10:00:00.000Z",
+  };
+  writeFileSync(join(root, packagePath), `${JSON.stringify(workflowPackage)}\n`);
+  const poTestKey = generateKeyPairSync("ed25519");
+  const poTestPublicKey = poTestKey.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const poTestAnchor = {
+    keyReference: "plan-authority-fixture-key",
+    publicKeySha256: sha256Hex(Buffer.from(poTestPublicKey)),
+  };
   const profile = {
     schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
     sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64),
@@ -1005,6 +1100,13 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
   const deps = {
     dir: root, now: () => now,
+    gitCandidate: () => ({ ok: true, ...candidate }),
+    designWorkflowPackagePath: packagePath,
+    designWorkflowTestKey: { privateKey: poTestKey.privateKey, publicKey: poTestPublicKey },
+    verifyDesignReadinessHostExecution: ({ hostExecution, readinessReceipt: report }) =>
+      hostExecution?.runner === "codex" && hostExecution.dutyReceiptSha256 === designReadinessReportSha256(report)
+        ? { ok: true } : { ok: false, code: "DWP-TEST-HOST-BINDING" },
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchors: [poTestAnchor] }),
     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: () => ({
@@ -1013,6 +1115,36 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
     }),
   };
   return { root, deps, planPath, specPath, planSha256, specSha256 };
+}
+
+function presentFeaturePlanArgs(deps, by = "coordinator") {
+  return ["present-plan", "--by", by, "--design-workflow-package", deps.designWorkflowPackagePath];
+}
+
+function approveFeaturePlanArgs(root, by = "po-test") {
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  return ["approve-plan", "--by", by, "--design-workflow-approval-request", state.planPresentation.designWorkflowApprovalRequestPath];
+}
+
+function signPresentedFeaturePlan(root, deps) {
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  const requestPath = state.planPresentation.designWorkflowApprovalRequestPath;
+  const request = JSON.parse(readFileSync(join(root, requestPath), "utf8"));
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: request.approvalIntent.sha256,
+    keyReference: "plan-authority-fixture-key",
+    publicKey: deps.designWorkflowTestKey.publicKey,
+    signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), deps.designWorkflowTestKey.privateKey).toString("base64"),
+  };
+  const proofPath = requestPath.replace("request-", "proof-");
+  writeFileSync(join(root, proofPath), `${JSON.stringify(proof)}\n`);
+}
+
+function attendedFeaturePlanDeps(root, deps) {
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  const confirmation = `approve-${state.planPresentation.designWorkflowPackageSha256.slice(0, 12)}`;
+  return { ...deps, isattyFn: () => true, readLineFn: () => confirmation };
 }
 
 // Scenario 1: submit-plan is refused when the plan path resolves inside the
@@ -1084,9 +1216,10 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
   const submitted = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
   assert.equal(submitted.result, 0, `an ordinary path must not be refused by the staging bolt: ${submitted.lines.join(" ")}`);
-  const presented = capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps));
+  const presented = capturedStderr(() => run(presentFeaturePlanArgs(deps), deps));
   assert.equal(presented.result, 0, `present-plan must succeed for a normal submitted plan: ${presented.lines.join(" ")}`);
-  const approved = capturedStderr(() => run(["approve-plan", "--by", "po-test"], deps));
+  signPresentedFeaturePlan(root, deps);
+  const approved = capturedStderr(() => run(approveFeaturePlanArgs(root), deps));
   assert.equal(approved.result, 0, `an ordinary path must not be refused by the staging bolt: ${approved.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(state.planApproved, true, "an ordinary specs/ path must approve normally");
@@ -1104,20 +1237,22 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
   commitGlobalHumanApproval(root, "chat");
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
-  assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps)).result, 0);
+  assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(deps), deps)).result, 0);
   const inspected = capturedStdout(() => run(["inspect"], deps));
   assert.equal(inspected.result, 0, inspected.lines.join(" "));
   const action = JSON.parse(inspected.lines.join("\n")).nextAction;
   assert.equal(action.kind, "collect-input");
   assert.equal(action.input?.name, "by");
-  assert.deepEqual(action.applyAction?.argv.slice(1), [
-    "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>",
-  ]);
+  const inspectArgv = action.applyAction?.argv.slice(1) ?? [];
+  assert.deepEqual(inspectArgv.slice(0, 3), ["approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>"]);
+  assert.ok(inspectArgv.includes("--design-workflow-approval-request"),
+    "the one final approval must include the exact complete-package request");
+  assert.ok(inspectArgv.includes(JSON.parse(readFileSync(statePath(root), "utf8")).planPresentation.designWorkflowApprovalRequestPath));
   assert.equal(action.applyAction?.requiresConfirmation, true);
   const approvalArgv = action.applyAction.argv.slice(1).map((value) => (
     value === "<PO_PLAN_APPROVER_NAME>" ? "PO" : value
   ));
-  assert.equal(capturedStderr(() => run(approvalArgv, deps)).result, 0);
+  assert.equal(capturedStderr(() => run(approvalArgv, attendedFeaturePlanDeps(root, deps))).result, 0);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(state.planApproved, true);
   assert.deepEqual(state.planApprovalAttribution, {
@@ -1171,19 +1306,20 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   const specPath = `specs/${featureId}/spec.md`;
   const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
-  assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps)).result, 0);
+  assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(deps), deps)).result, 0);
   // Reopen and resubmit with a DIFFERENT timestamp -> a new submissionSha256,
   // simulating a revised plan re-entering the same gate.
   assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
   const laterDeps = { ...deps, now: () => "2026-08-27T11:00:00.000Z" };
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], laterDeps)).result, 0);
-  const staleAttempt = capturedStderr(() => run(["approve-plan", "--by", "po-test"], laterDeps));
+  const staleAttempt = capturedStderr(() => run(approveFeaturePlanArgs(root), laterDeps));
   assert.equal(staleAttempt.result, 2, "an approval bound to a stale presentation must be refused");
   assert.ok(staleAttempt.lines.some((line) => line.includes("present-plan")),
     `refusal must name present-plan as the fix: ${staleAttempt.lines.join(" ")}`);
   // The correct remedy -- re-present, then approve -- succeeds.
-  assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], laterDeps)).result, 0);
-  const reapproved = capturedStderr(() => run(["approve-plan", "--by", "po-test"], laterDeps));
+  assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(laterDeps), laterDeps)).result, 0);
+  signPresentedFeaturePlan(root, laterDeps);
+  const reapproved = capturedStderr(() => run(approveFeaturePlanArgs(root), laterDeps));
   assert.equal(reapproved.result, 0, `re-presenting the resubmitted plan must unblock approval: ${reapproved.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(state.planApproved, true);
@@ -1348,7 +1484,7 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   const specPath = `specs/${featureId}/spec.md`;
   const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-08-27T10:00:00.000Z" });
   assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps)).result, 0);
-  assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], deps)).result, 0);
+  assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(deps), deps)).result, 0);
   // Reopen and resubmit with a DIFFERENT timestamp -> a new submissionSha256,
   // simulating a revised plan re-entering the same gate.
   assert.equal(capturedStderr(() => run(["reopen-design", "--by", "po-test"], deps)).result, 0);
@@ -1359,8 +1495,9 @@ function planAuthorityFixture({ featureId, planPath, specPath, now = "2026-08-27
   assert.ok(staleAttempt.lines.some((line) => line.includes("present-plan")),
     `refusal must name present-plan as the fix: ${staleAttempt.lines.join(" ")}`);
   // The correct remedy -- re-present, then approve -- succeeds.
-  assert.equal(capturedStderr(() => run(["present-plan", "--by", "coordinator"], laterDeps)).result, 0);
-  const reapproved = capturedStderr(() => run(["approve-plan", "--by", "po-test"], laterDeps));
+  assert.equal(capturedStderr(() => run(presentFeaturePlanArgs(laterDeps), laterDeps)).result, 0);
+  signPresentedFeaturePlan(root, laterDeps);
+  const reapproved = capturedStderr(() => run(approveFeaturePlanArgs(root), laterDeps));
   assert.equal(reapproved.result, 0, `re-presenting the resubmitted plan must unblock approval: ${reapproved.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
   assert.equal(state.planApproved, true);
@@ -1416,7 +1553,7 @@ function awaitingApprovalFixture() {
     planSha256: sha256Hex(`plan:${planPath}`),
     specPath,
     specSha256: sha256Hex(`spec:${specPath}`),
-    profile: "feature",
+    profile: "mini",
     profileSha256: sha256Hex("profile"),
     submittedBy: "coordinator", submittedAt: localNow,
   };
@@ -1445,30 +1582,36 @@ function awaitingApprovalFixture() {
   };
 }
 
-// Epic/feature Advisor status is a pre-approval decision with a direct remedy;
-// it must not survive as a vague failure in a later implementation gate.
+// The DWP carries the exact Advisor failure trail/exception and independent
+// readiness into the same package review. That package receives one final PO
+// approval; a second, pre-approval Advisor admission must not deadlock it.
 {
-  const { root, deps } = awaitingApprovalFixture();
-  const missingAdvisor = { ...deps, designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }) };
-  const inspected = capturedStdout(() => run(["inspect"], missingAdvisor));
-  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
-  assert.equal(action.kind, "collect-input");
-  assert.equal(action.inputs?.[0]?.name, "runner");
-  assert.ok(action.guidance.includes("DAA-PUBLIC-UNAVAILABLE"));
   const authorityFixture = planAuthorityFixture({
     featureId: "advisor-early-refusal",
     planPath: "specs/advisor-early-refusal/prd.md",
     specPath: "specs/advisor-early-refusal/spec.md",
+    advisorUnavailable: true,
   });
-  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], authorityFixture.deps), 0);
-  assert.equal(run(["present-plan", "--by", "coordinator"], authorityFixture.deps), 0);
-  const refused = capturedStderr(() => run(["approve-plan", "--by", "PO"], {
+  const deps = {
     ...authorityFixture.deps,
     designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }),
+  };
+  assert.equal(run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps), 0);
+  assert.equal(run(presentFeaturePlanArgs(deps), deps), 0);
+  const inspected = capturedStdout(() => run(["inspect"], deps));
+  const action = JSON.parse(inspected.lines.join("\n")).nextAction;
+  assert.equal(action.kind, "collect-input");
+  assert.equal(action.input?.name, "by");
+  assert.equal(action.inputs, undefined, "a second Advisor choice must not precede the package's one final PO approval");
+  assert.ok(action.applyAction.argv.includes("--design-workflow-approval-request"));
+  signPresentedFeaturePlan(authorityFixture.root, deps);
+  const approved = capturedStderr(() => run(approveFeaturePlanArgs(authorityFixture.root, "PO"), {
+    ...attendedFeaturePlanDeps(authorityFixture.root, deps),
+    designAdvisoryAdmission: () => ({ ok: false, code: "DAA-PUBLIC-UNAVAILABLE" }),
   }));
-  assert.equal(refused.result, 2);
-  assert.ok(refused.lines.join(" ").includes("DAA-PUBLIC-UNAVAILABLE"));
-  void root;
+  assert.equal(approved.result, 0, approved.lines.join(" "));
+  const state = JSON.parse(readFileSync(statePath(authorityFixture.root), "utf8"));
+  assert.equal(state.planApproved, true, "the PO's single package approval must bind the visible Advisor exception and independent readiness");
 }
 
 // Mini is deliberately Advisor-free even where an Advisor dependency itself
@@ -1548,7 +1691,10 @@ function awaitingApprovalFixture() {
   };
   const inspected = capturedStdout(() => run(["inspect"], chatDeps));
   const action = JSON.parse(inspected.lines.join("\n")).nextAction;
-  assert.deepEqual(action.argv.slice(1), ["approve-plan", "--bootstrap-acknowledgement-receipt", receiptPath]);
+  assert.deepEqual(action.argv.slice(1, 4), ["approve-plan", "--bootstrap-acknowledgement-receipt", receiptPath]);
+  assert.equal(action.argv[4], "--by");
+  assert.deepEqual(action.argv[5], { text: "<PO_PLAN_APPROVER_NAME>" },
+    "chat keeps its explicit human attribution alongside the signed bootstrap receipt");
   const downgraded = capturedStderr(() => run(["approve-plan", "--by", "po-test"], chatDeps));
   assert.equal(downgraded.result, 2, "chat must not bypass its acknowledgement receipt with --by");
 }
@@ -1719,7 +1865,22 @@ function awaitingApprovalFixture() {
     ["matching-dual", {}, ["project/pipeline.json", ".claude/pipeline.json"]],
   ]) {
     const root = fixture(options);
-    assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir: root, now: () => now, architectureEntryReadiness: () => ({ status: "ready" }) }), 0, `${label} layout must remain supported`);
+    const lines = [];
+    const originalLog = console.log;
+    console.log = (...parts) => { lines.push(parts.join(" ")); };
+    try {
+      assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], {
+        dir: root, now: () => now,
+        architectureEntryReadiness: () => ({ status: "ready", artifacts: { decisionApplicability: {
+          status: "advisory", areas: [{ area: "pipeline-core", status: "advisory",
+            decisions: [{ id: "ADR-0076", digest: "a".repeat(64), path: "docs/adr/0076.md" }], findings: [] }],
+          unresolvedPaths: [],
+        } } }),
+      }), 0, `${label} layout must remain supported`);
+    } finally { console.log = originalLog; }
+    const decisionLine = lines.find((line) => line.startsWith("Architecture decisions: "));
+    assert.ok(decisionLine, `${label} must display task-scoped architecture decisions`);
+    assert.equal(JSON.parse(decisionLine.slice("Architecture decisions: ".length)).areas[0].decisions[0].id, "ADR-0076");
     for (const path of expectedPaths) assert.equal(JSON.parse(readFileSync(join(root, path), "utf8")).verify, verifyCommand, `${label} must configure ${path}`);
   }
 
@@ -1736,6 +1897,7 @@ function awaitingApprovalFixture() {
   for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
     cpSync(join(repositoryRoot, directory), join(root, directory), { recursive: true });
   }
+  writeFileSync(join(root, "AGENTS.md"), "Architecture: [map](architecture/map/index.md).\n", "utf8");
   mkdirSync(join(root, "specs/partial-calibration-io"), { recursive: true });
   writeFileSync(join(root, "specs/partial-calibration-io/prd.md"), "Implement plugins/pipeline-core/scripts/pipeline-state.mjs\n", "utf8");
 
@@ -1761,32 +1923,36 @@ function awaitingApprovalFixture() {
     rationale: "partial calibration test fixture",
   });
   const before = [readFileSync(calibrationPath, "utf8"), readFileSync(legacyPath, "utf8"), readFileSync(stateFile, "utf8")];
-  const preload = join(root, "inject-partial-calibration-write.mjs");
-  writeFileSync(preload, `import fs from "node:fs";
-import { syncBuiltinESMExports } from "node:module";
-const original = fs.writeFileSync;
-fs.writeFileSync = function(path, data, ...options) {
-  if (String(path) === process.env.NVA_PARTIAL_CALIBRATION_PATH) {
-    original.call(this, path, String(data).slice(0, 12), ...options);
-    const error = new Error("fixture partial calibration write failure"); error.code = "ENOSPC"; throw error;
+  const originalWriteFileSync = fs.writeFileSync;
+  let injected = false;
+  fs.writeFileSync = function(path, data, ...options) {
+    if (String(path) === calibrationPath) {
+      injected = true;
+      originalWriteFileSync.call(this, path, String(data).slice(0, 12), ...options);
+      const error = new Error("fixture partial calibration write failure"); error.code = "ENOSPC"; throw error;
+    }
+    return originalWriteFileSync.call(this, path, data, ...options);
+  };
+  syncBuiltinESMExports();
+  let captured;
+  try {
+    captured = capturedStderr(() => run(["set-phase", "--phase", "implementation", "--verify-command", "node --test"], {
+      dir: root,
+      now: () => now,
+      architectureEntryReadiness: () => ({ status: "ready" }),
+    }));
+  } finally {
+    fs.writeFileSync = originalWriteFileSync;
+    syncBuiltinESMExports();
   }
-  return original.call(this, path, data, ...options);
-};
-syncBuiltinESMExports();
-`);
-  const script = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
-  const result = spawnSync(process.execPath, ["--import", preload, script, "set-phase", "--phase", "implementation", "--verify-command", "node --test"], {
-    cwd: root,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: root, NVA_PARTIAL_CALIBRATION_PATH: calibrationPath },
-    encoding: "utf8",
-  });
   const after = [readFileSync(calibrationPath, "utf8"), readFileSync(legacyPath, "utf8"), readFileSync(stateFile, "utf8")];
-  assert.equal(result.status, 2, "the ordinary CLI must refuse after the injected ENOSPC");
+  assert.equal(captured.result, 2, "the ordinary CLI must refuse after the injected ENOSPC");
+  assert.equal(injected, true, "the fixture must reach the calibration writer after architecture preflight");
   assert.notEqual(after[0], before[0], "the throwing first calibration write may have partially changed its file");
   assert.equal(after[1], before[1], "the later calibration twin must remain unchanged");
   assert.equal(after[2], before[2], "State must remain unchanged when the companion write fails");
-  assert.doesNotMatch(result.stderr, /zero mutation/u, "a partial attempted calibration write must never be reported as zero mutation");
-  assert.match(result.stderr, /companion mutation|calibration mutation/u, "the failure must disclose possible calibration mutation");
+  assert.doesNotMatch(captured.lines.join(" "), /zero mutation/u, "a partial attempted calibration write must never be reported as zero mutation");
+  assert.match(captured.lines.join(" "), /companion mutation|calibration mutation/u, "the failure must disclose possible calibration mutation");
 }
 
 // NVA-CF-VERIFYDEADLOCK (backlog: pipeline.verify-contract-fails-until-configured-

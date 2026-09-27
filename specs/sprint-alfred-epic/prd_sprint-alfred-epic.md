@@ -280,12 +280,15 @@ Mapping to issues/backlog: intake docs. Summary:
 - **B2 Typed routes where guards meet legitimate work.** Eight designed
   fixes, each with a prior PO decision or measured incident behind it:
   briefed test-change authorization; batchable TP-3 registration ceremony;
-  read-only retry lane; per-key trust-on-first-use anchors; CLI-derived
+  direct admission for bounded read-only protected-path probes with
+  fail-closed handling of opaque interpreter writes; per-key trust-on-first-use anchors; CLI-derived
   signing-command list; derived capability-inventory surfaces; repo-live vs
   runtime-live duty disclosure; gitleaks fingerprint diagnostics.
 - **B3 Rules-as-code sweep.** GG-22 and ledger discipline into guardrails;
   SendMessage scope-relay rule into dispatch canon; push-flow doc corrected;
-  backlog strip fixed to strip only the Triage section.
+  backlog dispatch references strip Triage and separately identified stale
+  verdict/closure prose, while preserving genuine later requirements and
+  decisions.
 
 ### Track C — Measurable rigor
 - **C1 Interruption receipts (#103).** Five-way classification (planned-gate /
@@ -390,6 +393,16 @@ dogfood case, end to end.
   keeps the seam closed rather than standing in for runner evidence.
   A separately PO-authorized live pilot, with readback, is the only route that
   can establish live AGY hook/start behavior.
+- **E4 Native-runner Goldfish Host-Commit (PO-directed scope extension,
+  2026-09-27).** Claude and Codex direct native Goldfish dispatches may opt in
+  to the host-owned commit boundary through separate runner-native start and
+  return bindings. Only a validated exact final return and its admitted paths
+  can be host-committed; ordinary Git hooks stay enabled, and the v4 record is
+  published only after exact commit readback and a private host-observation
+  receipt. This is local host-observed evidence, not provider attestation. A
+  fresh clone without a separately approved signed export remains
+  `UNVERIFIABLE`. Unsupported or ambiguous dispatch shapes have no host-commit
+  authority and cannot be represented as authored success.
 
 ### The control loop the tracks form
 
@@ -507,9 +520,11 @@ named in `spec.md` §12 and `acceptance.md`:
 2. Every member issue's own acceptance-criteria list is satisfied or its
    deviations are explicitly PO-accepted at closure (the intake's argued
    deviations in `design/issue-intake.md` are the starting set).
-3. The eight B2 routes exist with their refusal messages naming the route;
-   the four live-measured incident receipt classes (guard-refused read-only
-   command and readiness deadlock, 2026-08-27; TP ceremony, 2026-08-18;
+3. The eight B2 routes exist with refusal messages naming the route wherever
+   a route denies work; B2-iii directly admits a recognized bounded read-only
+   probe without a signature demand and keeps unresolved interpreter writes
+   fail-closed. The four live-measured incident receipt classes
+   (guard-refused read-only command and readiness deadlock, 2026-08-27; TP ceremony, 2026-08-18;
    dispatch truncation, 2026-08-08 — provenance in `design/issue-intake.md`
    #103) are reproducible as C1 fixtures.
 4. Every in-scope backlog item is closed with closure evidence, or explicitly
@@ -543,6 +558,15 @@ named in `spec.md` §12 and `acceptance.md`:
    the declared↔evaluated mapping table is complete in both directions — no
    declared property without an evaluation route, no evaluated class without
    a declared parent.
+10. **Native Claude/Codex authorship is host-bound (E4).** Each runner-native
+    return correlates to one exact prelaunch dispatch, candidate, configured
+    model, role, and allowed write scope. The host commits only the validated
+    returned diff with ordinary Git hooks, reads back the exact resulting
+    commit, persists a private local observation, and publishes the authored
+    v4 record last. Malformed, ambiguous, interrupted, or missing-evidence
+    cases never become authored PASS; local observation is not provider
+    attestation, and a fresh clone without an independently signed export
+    remains unverifiable.
 
 ## 8. Assumptions and risks
 

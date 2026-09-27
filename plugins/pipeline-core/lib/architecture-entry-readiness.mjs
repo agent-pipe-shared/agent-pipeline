@@ -18,8 +18,10 @@ import {
   resolveAdoptionState,
 } from "../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
-import { inspectArchitectureReentryPointer, loadMapBundle } from "../scripts/module-inventory.mjs";
+import { inspectArchitectureReentryPointer, loadMapBundle, resolveModuleForPath } from "../scripts/module-inventory.mjs";
 import { inspectArchitectureDesign } from "./architecture-design.mjs";
+import { loadPhysicalArchitectureMap } from "./architecture-effective-decisions.mjs";
+import { inspectArchitectureDecisionContinuity } from "./architecture-decision-continuity.mjs";
 
 export const ARCHITECTURE_ENTRY_SCHEMA = "pipeline.architecture-entry-readiness.v1";
 export const ARCHITECTURE_ENTRY_SCOPE = "architecture/map/";
@@ -147,6 +149,55 @@ function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
   return { blockingOverallStatus, reportOnly, malformed: false };
 }
 
+/** Expose task-scoped decisions without assigning unknown paths or promoting legacy ADRs. */
+export function inspectPlanningDecisionApplicability(root, surface, now,
+  { loadPhysicalMap = loadPhysicalArchitectureMap,
+    inspectDecisions = inspectArchitectureDecisionContinuity } = {}) {
+  const paths = Array.isArray(surface?.paths) ? surface.paths : [];
+  const observedAt = now instanceof Date && Number.isFinite(now.getTime())
+    ? now.toISOString() : null;
+  if (observedAt === null) return { status: "unavailable", areas: [],
+    unresolvedPaths: [...paths], code: "ARCH-DECISION-CLOCK-UNAVAILABLE" };
+  let inventory;
+  try { inventory = loadPhysicalMap(root); } catch { inventory = null; }
+  if (!inventory) return { status: "unavailable", areas: [], unresolvedPaths: [...paths],
+    code: "ARCH-DECISION-MODULE-INVENTORY-UNAVAILABLE" };
+  const areas = new Set();
+  const unresolvedPaths = [];
+  for (const path of paths) {
+    let owner = null;
+    try { owner = typeof path === "string" ? resolveModuleForPath(path, inventory) : null; }
+    catch { /* an invalid optional path is a diagnostic, not module authority */ }
+    if (owner) areas.add(owner.id);
+    else unresolvedPaths.push(path);
+  }
+  const projections = [...areas].sort().map((area) => {
+    try { return inspectDecisions({ rootDir: root, area, now: observedAt }); }
+    catch { return { area, status: "blocked", code: "ARCH-DECISION-SOURCE-UNAVAILABLE",
+      decisions: [], findings: [], projectionSha256: null }; }
+  });
+  return {
+    status: projections.some((item) => item.status === "blocked") ? "blocked"
+      : projections.some((item) => item.status === "advisory") || unresolvedPaths.length > 0
+        ? "advisory" : "ready",
+    areas: projections,
+    unresolvedPaths,
+  };
+}
+
+export function summarizePlanningDecisionApplicability(value) {
+  if (!value || !Array.isArray(value.areas) || !Array.isArray(value.unresolvedPaths)) return null;
+  return {
+    schema: "pipeline.architecture-planning-decisions.v1",
+    status: value.status,
+    areas: value.areas.map((item) => ({ area: item.area, status: item.status,
+      decisions: Array.isArray(item.decisions)
+        ? item.decisions.map(({ id, digest: decisionSha256, path }) => ({ id, decisionSha256, path })) : [],
+      findingCount: Array.isArray(item.findings) ? item.findings.length : 0 })),
+    unresolvedPaths: value.unresolvedPaths,
+  };
+}
+
 /**
  * Inspect the evidence required before a project enters implementation.
  * `taskScope` is intentionally optional; callers entering the shared project
@@ -233,6 +284,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
   if (surface === null) {
     return failure(root, "ARCHITECTURE-PLAN-SURFACE-MISSING", "the active PO-bound plan has no valid declared implementation surface", artifacts, disposition);
   }
+  artifacts.decisionApplicability = inspectPlanningDecisionApplicability(root, surface, now, deps);
 
   // A greenfield package already carries its PO-bound fitness model and zero-debt
   // baseline. Do not send it through retrospective adoption calibration, which

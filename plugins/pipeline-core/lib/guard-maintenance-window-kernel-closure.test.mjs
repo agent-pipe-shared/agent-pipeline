@@ -175,6 +175,15 @@ function stripCodeComments(source) {
 // below), so an edge added or removed in the source without updating this table fails
 // rather than silently stops being covered.
 const DYNAMIC_IMPORT_EDGES = {
+  // The Critic's model-role selector loads the host bootstrap only for the
+  // Antigravity hook-session observation path. Both sides are protected so a
+  // maintenance window cannot change which runner/model is admitted.
+  "plugins/pipeline-core/scripts/model-role-dispatch-select.mjs": [
+    "./model-role-bootstrap.mjs",
+  ],
+  "plugins/pipeline-core/lib/portable-agy-authorship-export.mjs": [
+    "../scripts/dispatch-authorship-verify.mjs",
+  ],
   // The generated consumer adapter imports the dispatcher supplied by the
   // evidence producer. Its URL is bound to the executing plugin, not the
   // consumer's tree; generated executable text is deliberately scanned too.

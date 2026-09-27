@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { openSync } from "node:fs";
-import { admitModelRoleBootstrap, modelRoleBootstrapReadback, resolveModelRoleBootstrap, resolveModelRoleSession, validateModelRoleSessionReceipt, validateModelRoleDispatchBinding } from "./model-role-session.mjs";
+import { EventEmitter } from "node:events";
+import { admitModelRoleBootstrap, antigravityAvailableModelIds, claudeApiAvailableModelIds, claudeCodeObservedModelIds, codexAvailableModelIds, modelRoleBootstrapReadback, resolveModelRoleBootstrap, resolveModelRoleSession, validateModelRoleSessionReceipt, validateModelRoleDispatchBinding } from "./model-role-session.mjs";
+import { observeClaudeModelAlias } from "./claude-model-host-observation.mjs";
+import { observeAntigravityModels } from "./antigravity-model-host-observation.mjs";
+import { observeCodexModels } from "./codex-model-host-observation.mjs";
+import { observeAnthropicApiModels } from "./anthropic-model-catalogue-host.mjs";
+import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const cases = [];
@@ -403,7 +410,320 @@ test("changed mappings require one exact new-session acknowledgement; unchanged 
     "MODEL-ROLE-BOOTSTRAP-ADMISSION-ROUTE-SET-MISMATCH");
 });
 
-assert.equal(cases.length, 20, "the complete model-role session corpus must be registered before execution begins");
+test("Codex catalogue admits only visible exact IDs supporting the requested effort", () => {
+  const data = [
+    { id: "gpt-6-sol", model: "gpt-6-sol", hidden: false,
+      supportedReasoningEfforts: [{ reasoningEffort: "high" }, { reasoningEffort: "max" }] },
+    { id: "gpt-6-luna", model: "gpt-6-luna", hidden: false,
+      supportedReasoningEfforts: [{ reasoningEffort: "medium" }, { reasoningEffort: "high" }] },
+    { id: "hidden-test", model: "hidden-test", hidden: true,
+      supportedReasoningEfforts: [{ reasoningEffort: "high" }] },
+  ];
+  assert.deepEqual(codexAvailableModelIds({ data, nextCursor: null }, "high"), {
+    ok: true, code: "MODEL-ROLE-CODEX-CATALOGUE-OBSERVED",
+    availableModelIds: ["gpt-6-luna", "gpt-6-sol"],
+  });
+  assert.deepEqual(codexAvailableModelIds({ data, nextCursor: null }, "xhigh").availableModelIds, []);
+  assert.equal(codexAvailableModelIds({ data, nextCursor: "more" }, "high").ok, false,
+    "a partial page cannot pretend to be the complete available catalogue");
+  assert.equal(codexAvailableModelIds({ data: [...data, { ...data[0] }], nextCursor: null }, "high").code,
+    "MODEL-ROLE-CODEX-CATALOGUE-DUPLICATE");
+  assert.equal(codexAvailableModelIds({ data: [...data, { ...data[2] }], nextCursor: null }, "high").code,
+    "MODEL-ROLE-CODEX-CATALOGUE-DUPLICATE",
+    "a hidden duplicate still makes the account catalogue malformed");
+  assert.equal(codexAvailableModelIds({ data: [{ ...data[0], model: "different" }], nextCursor: null }, "high").ok, false);
+});
+
+test("Antigravity catalogue parses exact IDs without inferring roles from display names", () => {
+  assert.deepEqual(antigravityAvailableModelIds("gemini-3.8-flash-high\tGemini 3.8 Flash (High)\n"
+    + "gemini-3.1-pro-high\tGemini 3.1 Pro (High)\n"), {
+    ok: true, code: "MODEL-ROLE-AGY-CATALOGUE-OBSERVED",
+    availableModelIds: ["gemini-3.1-pro-high", "gemini-3.8-flash-high"],
+  });
+  assert.equal(antigravityAvailableModelIds("gemini-3.8-flash-high\tFlash\n"
+    + "gemini-3.8-flash-high\tRenamed Flash\n").code, "MODEL-ROLE-AGY-CATALOGUE-DUPLICATE");
+  assert.equal(antigravityAvailableModelIds("unstructured model name").ok, false);
+  assert.equal(antigravityAvailableModelIds("../../bad\tBad\n").ok, false);
+});
+
+test("Claude API catalogue requires all pages and retains its narrower credential assurance", () => {
+  const first = { data: [{ type: "model", id: "claude-opus-5" }],
+    first_id: "claude-opus-5", last_id: "claude-opus-5", has_more: true };
+  const last = { data: [{ type: "model", id: "claude-sonnet-5" }],
+    first_id: "claude-sonnet-5", last_id: "claude-sonnet-5", has_more: false };
+  const firstItem = { requestAfterId: null, response: first };
+  const lastItem = { requestAfterId: "claude-opus-5", response: last };
+  assert.deepEqual(claudeApiAvailableModelIds([firstItem, lastItem]), {
+    ok: true, code: "MODEL-ROLE-CLAUDE-API-CATALOGUE-OBSERVED",
+    assurance: "api-credential-only", availableModelIds: ["claude-opus-5", "claude-sonnet-5"],
+  });
+  assert.equal(claudeApiAvailableModelIds([firstItem]).ok, false);
+  assert.equal(claudeApiAvailableModelIds([firstItem, { ...lastItem, requestAfterId: "wrong" }]).ok, false);
+  assert.equal(claudeApiAvailableModelIds([{ requestAfterId: null, response: {
+    ...last, data: [last.data[0], last.data[0]] } }]).code,
+    "MODEL-ROLE-CLAUDE-API-CATALOGUE-DUPLICATE");
+  assert.equal(claudeApiAvailableModelIds([firstItem, {
+    requestAfterId: "claude-opus-5", response: { ...last, data: [first.data[0]],
+      first_id: "claude-opus-5", last_id: "claude-opus-5" } }]).code,
+    "MODEL-ROLE-CLAUDE-API-CATALOGUE-DUPLICATE");
+});
+
+test("Claude Code successful modelUsage is host observation; OAuth failure cannot mint availability", () => {
+  assert.deepEqual(claudeCodeObservedModelIds({ type: "result", is_error: false,
+    terminal_reason: "success", modelUsage: { "claude-opus-5": { inputTokens: 1 } } }), {
+    ok: true, code: "MODEL-ROLE-CLAUDE-HOST-MODEL-OBSERVED",
+    availableModelIds: ["claude-opus-5"],
+  });
+  assert.equal(claudeCodeObservedModelIds({ type: "result", is_error: true,
+    terminal_reason: "api_error", modelUsage: {} }).ok, false);
+  assert.equal(claudeCodeObservedModelIds({ type: "result", is_error: false,
+    terminal_reason: "success", modelUsage: {} }).code, "MODEL-ROLE-CLAUDE-HOST-MODEL-UNOBSERVED");
+});
+
+const claudeProbeResult = (modelUsage) => ({ status: 0, stdout: JSON.stringify({
+  type: "result", is_error: false, terminal_reason: "success", modelUsage,
+}) });
+const claudeProbeDeps = (overrides = {}) => ({
+  alias: "opus", executableResult: { ok: true, path: "/usr/bin/claude" },
+  makeTemp: () => "/tmp/isolated-claude-model-probe", removeTemp: () => {},
+  now: () => observedAt, run: () => claudeProbeResult({ "claude-opus-5": { inputTokens: 1 } }),
+  ...overrides,
+});
+
+test("Claude host probe observes only the model actually used by an isolated, tool-free call", () => {
+  let call;
+  let removed = false;
+  const result = observeClaudeModelAlias(claudeProbeDeps({
+    run: (...args) => { call = args; return claudeProbeResult({ "claude-opus-5": { inputTokens: 1 } }); },
+    removeTemp: () => { removed = true; },
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(result.modelCalls, 1);
+  assert.equal(result.observation.modelId, "claude-opus-5");
+  assert.equal(result.observation.assurance, "host-observed-single-call-not-provider-attested");
+  assert.match(result.observationSha256, /^[a-f0-9]{64}$/u);
+  assert.equal(call[0], "/usr/bin/claude");
+  assert.deepEqual(call[1], ["--print", "--output-format", "json", "--no-session-persistence",
+    "--tools", "", "--setting-sources", "", "--model", "opus", "Reply exactly OK."]);
+  assert.equal(call[2].cwd, "/tmp/isolated-claude-model-probe");
+  assert.equal(call[2].shell, false);
+  assert.equal(removed, true);
+});
+
+test("Claude host probe rejects unsupported alias and missing trusted executable before launch", () => {
+  let launched = false;
+  const run = () => { launched = true; throw new Error("unexpected launch"); };
+  assert.equal(observeClaudeModelAlias(claudeProbeDeps({ alias: "other", run })).code,
+    "MODEL-ROLE-CLAUDE-ALIAS-INVALID");
+  assert.equal(observeClaudeModelAlias(claudeProbeDeps({ executableResult: { ok: false }, run })).code,
+    "MODEL-ROLE-CLAUDE-EXECUTABLE-UNAVAILABLE");
+  assert.equal(launched, false);
+});
+
+test("Claude host probe fails closed on OAuth failure, absent or ambiguous model usage", () => {
+  const oauth = observeClaudeModelAlias(claudeProbeDeps({ run: () => ({ status: 1,
+    stdout: JSON.stringify({ type: "result", is_error: true, terminal_reason: "api_error", modelUsage: {} }) }) }));
+  assert.equal(oauth.code, "MODEL-ROLE-CLAUDE-PROBE-UNAVAILABLE");
+  assert.equal(oauth.modelCalls, 1);
+  for (const modelUsage of [{}, { "claude-opus-5": {}, "claude-sonnet-5": {} }]) {
+    const result = observeClaudeModelAlias(claudeProbeDeps({ run: () => claudeProbeResult(modelUsage) }));
+    assert.equal(result.code, "MODEL-ROLE-CLAUDE-MODEL-UNOBSERVED");
+  }
+});
+
+test("Claude host probe preserves attempt count and requires canonical host time", () => {
+  const threw = observeClaudeModelAlias(claudeProbeDeps({ run: () => { throw new Error("private"); } }));
+  assert.equal(threw.code, "MODEL-ROLE-CLAUDE-PROBE-UNAVAILABLE");
+  assert.equal(threw.modelCalls, 1);
+  assert.equal(JSON.stringify(threw).includes("private"), false);
+  const invalidTime = observeClaudeModelAlias(claudeProbeDeps({ now: () => "2026-09-24" }));
+  assert.equal(invalidTime.code, "MODEL-ROLE-CLAUDE-CLOCK-UNAVAILABLE");
+});
+
+test("Anthropic API host follows authenticated pagination without exporting the credential", async () => {
+  const requests = [];
+  const pages = [
+    { data: [{ type: "model", id: "claude-opus-5" }], first_id: "claude-opus-5",
+      last_id: "claude-opus-5", has_more: true },
+    { data: [{ type: "model", id: "claude-sonnet-5" }], first_id: "claude-sonnet-5",
+      last_id: "claude-sonnet-5", has_more: false },
+  ];
+  const fetchImpl = async (url, options) => {
+    requests.push({ url: String(url), options });
+    return new Response(JSON.stringify(pages[requests.length - 1]), { status: 200 });
+  };
+  const result = await observeAnthropicApiModels({ apiKey: "private-test-key", fetchImpl });
+  assert.deepEqual(result, { ok: true, code: "MODEL-ROLE-CLAUDE-API-CATALOGUE-OBSERVED",
+    assurance: "api-credential-only", availableModelIds: ["claude-opus-5", "claude-sonnet-5"] });
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].options.headers["x-api-key"], "private-test-key");
+  assert.equal(new URL(requests[1].url).searchParams.get("after_id"), "claude-opus-5");
+  assert.equal(requests[0].options.redirect, "error");
+  assert.equal(JSON.stringify(result).includes("private-test-key"), false);
+});
+
+test("Anthropic API host rejects absent credentials and malformed or incomplete responses", async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return new Response("{}", { status: 200 }); };
+  assert.equal((await observeAnthropicApiModels({ fetchImpl })).code,
+    "MODEL-ROLE-CLAUDE-API-CREDENTIAL-UNAVAILABLE");
+  assert.equal(calls, 0);
+  assert.equal((await observeAnthropicApiModels({ apiKey: "key", fetchImpl })).ok, false);
+  const badStatus = await observeAnthropicApiModels({ apiKey: "key", fetchImpl: async () =>
+    new Response("private backend error", { status: 401 }) });
+  assert.equal(badStatus.code, "MODEL-ROLE-CLAUDE-API-UNAVAILABLE");
+  assert.equal(JSON.stringify(badStatus).includes("private backend error"), false);
+  const tooLarge = await observeAnthropicApiModels({ apiKey: "key", fetchImpl: async () =>
+    new Response("x".repeat(262_145), { status: 200 }) });
+  assert.equal(tooLarge.code, "MODEL-ROLE-CLAUDE-API-RESPONSE-INVALID");
+});
+
+test("Anthropic API host does not turn transport exceptions into model availability", async () => {
+  const failed = await observeAnthropicApiModels({ apiKey: "private-key", fetchImpl: async () => {
+    throw new Error("private response details");
+  } });
+  assert.equal(failed.code, "MODEL-ROLE-CLAUDE-API-UNAVAILABLE");
+  assert.equal(failed.ok, false);
+  assert.equal(JSON.stringify(failed).includes("private"), false);
+});
+
+function completeRoleRegistry() {
+  return loadRunnerProfilesV3Registry();
+}
+
+test("functional task projection includes the registered V3 pure-read duty", () => {
+  const result = registeredFunctionalTaskRoutes();
+  assert.equal(result.ok, true);
+  assert.equal(result.taskRoutes.filter((route) => route.taskRoute === "duty.read").length, 3);
+  const absent = completeRoleRegistry();
+  delete absent.duties.read;
+  assert.deepEqual(registeredFunctionalTaskRoutes(absent), {
+    ok: false, code: "MODEL-ROLE-ROUTE-SOURCE-INCOMPLETE",
+    missingTaskRoutes: ["duty.read"],
+  });
+});
+
+test("functional roles cover every registered task route without inferring them from model names", () => {
+  const result = registeredFunctionalTaskRoutes(completeRoleRegistry());
+  assert.equal(result.ok, true);
+  assert.equal(result.taskRoutes.length, (6 + 9) * 3 + 1,
+    "V3 records three design and three coordination profiles, nine duties and the separate Claude Advisor fallback");
+  const role = (taskRoute, runner) => result.taskRoutes.find((route) =>
+    route.taskRoute === taskRoute && route.runner === runner);
+  assert.equal(role("profile.epic.design_phase", "codex").role, "frontier");
+  assert.equal(role("duty.implement", "codex").role, "worker");
+  assert.equal(role("duty.mechanic", "codex").role, "efficient");
+  assert.equal(role("duty.read", "codex").role, "efficient");
+  assert.equal(role("duty.critic_high_risk", "antigravity").role, "frontier");
+  assert.equal(result.configuredRoutes.filter((route) => route.runner === "antigravity").length, 1,
+    "unavailable Agy routes stay visible but cannot demand a bootstrap model selection");
+  assert.equal(result.unavailableTaskRoutes.some((route) => route.taskRoute === "duty.critic_high_risk"
+    && route.runner === "antigravity"), true);
+  assert.equal(result.configuredRoutes.filter((route) =>
+    route.runner === "codex" && route.role === "efficient").length, 2);
+});
+
+test("functional route source fails closed on a conflicting or extra route cell", () => {
+  const conflict = completeRoleRegistry();
+  conflict.duties.test_author.codex.selector.value = "gpt-6-astra";
+  assert.equal(registeredFunctionalTaskRoutes(conflict).code, "MODEL-ROLE-ROUTE-SOURCE-CONFLICT");
+  const extra = completeRoleRegistry();
+  extra.duties.read.codex.inventedRole = "frontier";
+  assert.equal(registeredFunctionalTaskRoutes(extra).code, "MODEL-ROLE-ROUTE-SOURCE-INVALID");
+  delete extra.duties.read.codex.inventedRole;
+  extra.duties.unregistered = extra.duties.read;
+  assert.equal(registeredFunctionalTaskRoutes(extra).code, "MODEL-ROLE-ROUTE-SOURCE-INCOMPLETE");
+});
+
+test("Agy host catalogue executes only the installed models command", () => {
+  let invocation;
+  const result = observeAntigravityModels({ executableResult: { ok: true, path: "/usr/bin/agy" },
+    run: (path, argv, options) => {
+      invocation = { path, argv, options };
+      return { status: 0, stdout: "gemini-3.8-flash-medium\tFlash Medium\n" };
+    } });
+  assert.equal(result.ok, true);
+  assert.equal(result.assurance, "installed-host-observed");
+  assert.deepEqual(result.availableModelIds, ["gemini-3.8-flash-medium"]);
+  assert.deepEqual(invocation.argv, ["models"]);
+  assert.equal(invocation.options.shell, false);
+});
+
+test("Agy host catalogue rejects missing executable, errors and malformed output", () => {
+  assert.equal(observeAntigravityModels({ executableResult: { ok: false } }).ok, false);
+  assert.equal(observeAntigravityModels({ executableResult: { ok: true, path: "/usr/bin/agy" },
+    run: () => ({ status: 1, stderr: "private diagnostic" }) }).code,
+    "MODEL-ROLE-AGY-CATALOGUE-UNAVAILABLE");
+  const malformed = observeAntigravityModels({ executableResult: { ok: true, path: "/usr/bin/agy" },
+    run: () => ({ status: 0, stdout: "not a tabbed model row" }) });
+  assert.equal(malformed.ok, false);
+  assert.equal(JSON.stringify(malformed).includes("private"), false);
+});
+
+function codexCatalogChild(respond) {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+  child.stdin = { write(bytes) {
+    const request = JSON.parse(bytes);
+    queueMicrotask(() => {
+      const response = respond(request);
+      if (response) child.stdout.emit("data", Buffer.from(`${JSON.stringify(response)}\n`));
+    });
+  }, end() {} };
+  child.kill = () => {};
+  return child;
+}
+
+test("Codex host catalogue uses initialized model/list pagination and supported effort", async () => {
+  const calls = [];
+  const item = (id, effort) => ({ id, model: id, hidden: false,
+    supportedReasoningEfforts: [{ reasoningEffort: effort }] });
+  const observed = await observeCodexModels({ effort: "high",
+    executableResult: { ok: true, path: "/usr/bin/codex" },
+    spawnProcess: (path, args, options) => {
+      assert.deepEqual(args, ["app-server", "--stdio", "--strict-config"]);
+      assert.equal(options.shell, false);
+      return codexCatalogChild((request) => {
+        calls.push(request);
+        if (request.id === 1) return { id: 1, result: { userAgent: "test" } };
+        if (request.id === 2) return { id: 2, result: { data: [item("gpt-6-sol", "high")], nextCursor: "next" } };
+        if (request.id === 3) return { id: 3, result: { data: [item("gpt-6-luna", "medium")], nextCursor: null } };
+        return null;
+      });
+    } });
+  assert.equal(observed.ok, true);
+  assert.deepEqual(observed.availableModelIds, ["gpt-6-sol"]);
+  assert.equal(observed.assurance, "installed-host-observed");
+  assert.deepEqual(calls.filter((call) => call.method === "model/list").map((call) => call.params.cursor ?? null), [null, "next"]);
+  assert.equal(calls.some((call) => call.method === "thread/start" || call.method === "turn/start"), false);
+});
+
+test("Codex host catalogue fails closed on missing executable and protocol errors", async () => {
+  assert.equal((await observeCodexModels({ effort: "high", executableResult: { ok: false } })).ok, false);
+  const invalid = await observeCodexModels({ effort: "high", executableResult: { ok: true, path: "/usr/bin/codex" },
+    spawnProcess: () => codexCatalogChild((request) => request.id === 1
+      ? { id: 1, result: {} } : request.id === 2
+        ? { id: 2, result: { data: [], nextCursor: "partial" } } : null), timeoutMs: 100 });
+  assert.equal(invalid.ok, false);
+  assert.equal(JSON.stringify(invalid).includes("partial"), false);
+});
+
+test("Codex catalogue tolerates a future effort without promoting it to a governed route", () => {
+  const data = [
+    { id: "future-model", model: "future-model", hidden: false,
+      supportedReasoningEfforts: [{ reasoningEffort: "ultra" }] },
+    { id: "approved-model", model: "approved-model", hidden: false,
+      supportedReasoningEfforts: [{ reasoningEffort: "high" }, { reasoningEffort: "ultra" }] },
+  ];
+  assert.deepEqual(codexAvailableModelIds({ data, nextCursor: null }, "high").availableModelIds,
+    ["approved-model"]);
+  assert.equal(codexAvailableModelIds({ data, nextCursor: null }, "ultra").ok, false,
+    "a catalogue-only effort must not become an approved routing effort");
+  assert.equal(codexAvailableModelIds({ data: [{ ...data[0],
+    supportedReasoningEfforts: [{ reasoningEffort: "unsafe effort" }] }], nextCursor: null }, "high").ok, false);
+});
+
+assert.equal(cases.length, 39, "the complete model-role session corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

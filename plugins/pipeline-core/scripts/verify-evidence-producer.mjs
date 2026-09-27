@@ -65,7 +65,8 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
-import { readBoundConsumedCriticReceipt, readCriticVerifyLifecycle, recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
+import { inspectConsumedCriticEvidenceCarryForward, readBoundConsumedCriticReceipt,
+  readCriticVerifyLifecycle, recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 import { startSessionDescriptor, registerTemporaryIntent, finalizeTemporaryResource, releaseCompletedVerifyRunSession, retireSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
@@ -82,7 +83,7 @@ import {
 
 export const VERIFY_EVIDENCE_SCHEMA = "pipeline.verify-evidence.v0";
 const CLI_HELP = [
-  "Usage: verify-evidence-producer.mjs [--root <repo>] [--out <repo-relative path>] [--event-out <repo-relative path>] [--mode <work|critic|push|candidate|release>] [--base <ref>] [--no-reuse]",
+  "Usage: verify-evidence-producer.mjs [--root <repo>] [--out <repo-relative path>] [--event-out <repo-relative path>] [--mode <work|critic|push|candidate|release>] [--base <ref>] [--no-reuse] [--critic-packet-id <id> [--critic-evidence-feature-id <id>] | --critic-reverify-receipt-id <id>]",
   "       verify-evidence-producer.mjs --prepare [--root <repo>]",
   "       verify-evidence-producer.mjs --help",
   "",
@@ -187,48 +188,63 @@ function writeEvidence(root, target, evidence) {
 }
 
 /**
- * Full release Verify is the production consumer for the content-bound Critic
- * contract. First qualification supplies its packet. A deterministic rerun
+ * Critic-bound full candidate/release Verify consumes the reviewed packet.
+ * First qualification supplies its packet. A deterministic rerun
  * supplies a previous lifecycle receipt, which must still chain to the exact
- * old release evidence and the same consumed private Critic receipt.
+ * old evidence and the same consumed private Critic receipt.
  */
-function preflightReleaseCriticAdmission({ root, candidate: sourceCandidate, criticPacketId, criticReverifyReceiptId }) {
+function preflightGovernedCriticAdmission({ root, mode, candidate: sourceCandidate,
+  criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId }) {
   if ((criticPacketId === null) === (criticReverifyReceiptId === null)) {
-    fail("VEP-CRITIC-REQUIRED", "Release Verify requires exactly one of --critic-packet-id or --critic-reverify-receipt-id.");
+    fail("VEP-CRITIC-REQUIRED", "Governed Verify requires exactly one of --critic-packet-id or --critic-reverify-receipt-id.");
+  }
+  if (criticEvidenceFeatureId !== null && criticPacketId === null) {
+    fail("VEP-CRITIC-CARRY-INPUT", "Evidence-only carry-forward requires a consumed Critic packet ID.");
   }
   const gitCommonDir = resolve(root, git(root, ["rev-parse", "--git-common-dir"]));
   if (criticPacketId !== null) {
-    try { readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, candidate: sourceCandidate }); }
-    catch (error) { fail(`VEP-${error?.code ?? "CRITIC-INVALID"}`, error?.message ?? "Release Verify Critic admission failed."); }
-    return Object.freeze({ criticPacketId, reusedLifecycleId: null });
+    try {
+      if (criticEvidenceFeatureId === null) {
+        readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, candidate: sourceCandidate });
+      } else {
+        inspectConsumedCriticEvidenceCarryForward({ repoRoot: root, gitCommonDir,
+          featureId: criticEvidenceFeatureId, criticPacketId, targetCandidate: sourceCandidate });
+      }
+    }
+    catch (error) { fail(`VEP-${error?.code ?? "CRITIC-INVALID"}`, error?.message ?? "Governed Verify Critic admission failed."); }
+    return Object.freeze({ criticPacketId, reusedLifecycleId: null, featureId: criticEvidenceFeatureId });
   }
-  if (!LIFECYCLE_ID.test(criticReverifyReceiptId ?? "")) fail("VEP-CRITIC-REVERIFY-ID", "Release Verify recheck receipt ID is invalid.");
+  if (!LIFECYCLE_ID.test(criticReverifyReceiptId ?? "")) fail("VEP-CRITIC-REVERIFY-ID", "Governed Verify recheck receipt ID is invalid.");
   let metadata;
-  try { metadata = readCriticVerifyLifecycle({ gitCommonDir, id: criticReverifyReceiptId, candidate: sourceCandidate }); }
-  catch (error) { fail(`VEP-${error?.code ?? "CRITIC-REVERIFY"}`, error?.message ?? "Release Verify recheck receipt is unavailable."); }
+  try { metadata = readCriticVerifyLifecycle({ repoRoot: root, gitCommonDir, id: criticReverifyReceiptId, candidate: sourceCandidate }); }
+  catch (error) { fail(`VEP-${error?.code ?? "CRITIC-REVERIFY"}`, error?.message ?? "Governed Verify recheck receipt is unavailable."); }
   const priorPath = metadata.receipt.verify.evidencePath;
   let priorEvidence;
   try { priorEvidence = JSON.parse(readFileSync(safeOutPath(root, priorPath), "utf8")); }
-  catch { fail("VEP-CRITIC-REVERIFY-EVIDENCE", "Release Verify recheck requires the prior exact release evidence."); }
-  try { readCriticVerifyLifecycle({ gitCommonDir, id: criticReverifyReceiptId, candidate: sourceCandidate, evidencePath: priorPath, evidence: priorEvidence }); }
-  catch (error) { fail(`VEP-${error?.code ?? "CRITIC-REVERIFY"}`, error?.message ?? "Release Verify recheck evidence does not match its private receipt."); }
+  catch { fail("VEP-CRITIC-REVERIFY-EVIDENCE", "Governed Verify recheck requires the prior exact evidence."); }
+  try { readCriticVerifyLifecycle({ repoRoot: root, gitCommonDir, id: criticReverifyReceiptId, candidate: sourceCandidate, evidencePath: priorPath, evidence: priorEvidence }); }
+  catch (error) { fail(`VEP-${error?.code ?? "CRITIC-REVERIFY"}`, error?.message ?? "Governed Verify recheck evidence does not match its private receipt."); }
   if (priorEvidence?.schema !== VERIFY_EVIDENCE_SCHEMA || priorEvidence?.exitCode !== 0
-    || priorEvidence?.selection?.mode !== "release" || priorEvidence?.selection?.execution !== "full") {
-    fail("VEP-CRITIC-REVERIFY-NOT-RELEASE", "Release Verify recheck requires a prior passing full release Verify evidence artifact.");
+    || priorEvidence?.selection?.mode !== mode || priorEvidence?.selection?.execution !== "full") {
+    fail("VEP-CRITIC-REVERIFY-NOT-RELEASE", "Governed Verify recheck requires a prior passing full Verify evidence artifact of the same mode.");
   }
   try {
-    const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId: metadata.receipt.critic.packetId, candidate: sourceCandidate });
+    const bound = readBoundConsumedCriticReceipt({ gitCommonDir,
+      criticPacketId: metadata.receipt.critic.packetId,
+      candidate: metadata.receipt.carryForward?.proof.reviewedCandidate ?? sourceCandidate });
     if (bound.criticReceiptSha256 !== metadata.receipt.critic.receiptSha256
       || bound.critic.packetDigest !== metadata.receipt.critic.packetDigest
       || bound.critic.verdictSha256 !== metadata.receipt.critic.verdictSha256
       || JSON.stringify(bound.critic.reviewRange) !== JSON.stringify(metadata.receipt.critic.reviewRange)) {
-      fail("VEP-CRITIC-REVERIFY-CRITIC", "Release Verify recheck Critic receipt differs from its private lifecycle binding.");
+      fail("VEP-CRITIC-REVERIFY-CRITIC", "Governed Verify recheck Critic receipt differs from its private lifecycle binding.");
     }
   } catch (error) {
     if (error instanceof VerifyEvidenceError) throw error;
-    fail(`VEP-${error?.code ?? "CRITIC-REVERIFY"}`, error?.message ?? "Release Verify recheck Critic receipt is unavailable.");
+    fail(`VEP-${error?.code ?? "CRITIC-REVERIFY"}`, error?.message ?? "Governed Verify recheck Critic receipt is unavailable.");
   }
-  return Object.freeze({ criticPacketId: metadata.receipt.critic.packetId, reusedLifecycleId: criticReverifyReceiptId });
+  return Object.freeze({ criticPacketId: metadata.receipt.critic.packetId,
+    reusedLifecycleId: criticReverifyReceiptId,
+    featureId: metadata.receipt.carryForward?.proof.featureId ?? null });
 }
 
 /**
@@ -236,8 +252,11 @@ function preflightReleaseCriticAdmission({ root, candidate: sourceCandidate, cri
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
  */
-export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, assessPushHookBackstop = realAssessPushHookBackstop }) {
+export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath = null, mode = "candidate", base = null, reuseReceipts = true, criticPacketId = null, criticReverifyReceiptId = null, criticEvidenceFeatureId = null, assessPushHookBackstop = realAssessPushHookBackstop }) {
   const root = resolve(rootDir);
+  if (criticEvidenceFeatureId !== null && (criticPacketId === null || !["candidate", "release"].includes(mode))) {
+    fail("VEP-CRITIC-CARRY-INPUT", "Evidence-only carry-forward requires a Critic-bound candidate or release Verify.");
+  }
   // Release/push evidence is used to clear the push boundary. Do not mint it
   // while a manifest-declared blocking gate lacks its git-level backstop.
   if (mode === "release" || mode === "push") {
@@ -277,8 +296,9 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
     catch (error) { fail("VEP-CALIBRATION", error.message); }
     if (configuration.fullCommand === null) fail("VEP-NO-COMMAND", `${mode} Verify requires configured product verification.`);
   }
-  const releaseCritic = mode === "release" && started.status === "clean"
-    ? preflightReleaseCriticAdmission({ root, candidate: { commit: started.commit, tree: started.tree }, criticPacketId, criticReverifyReceiptId })
+  const governedCritic = (mode === "release" || (mode === "candidate"
+    && (criticPacketId !== null || criticReverifyReceiptId !== null))) && started.status === "clean"
+    ? preflightGovernedCriticAdmission({ root, mode, candidate: { commit: started.commit, tree: started.tree }, criticPacketId, criticReverifyReceiptId, criticEvidenceFeatureId })
     : null;
   // Invalidate prior success before configuration, candidate checks or execution.
   // An interrupted replacement attempt must never leave consumable stale green.
@@ -437,10 +457,12 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   // close lane supplies one and therefore gains a private, revalidated receipt
   // rather than relying on a caller-provided green status object.
   let criticLifecycle = null;
-  const lifecyclePacketId = releaseCritic?.criticPacketId ?? criticPacketId;
+  const lifecyclePacketId = governedCritic?.criticPacketId ?? criticPacketId;
   if (lifecyclePacketId !== null) {
     try {
       criticLifecycle = recordCriticVerifyLifecycle({
+        repoRoot: governedCritic?.featureId === null || governedCritic?.featureId === undefined ? null : root,
+        featureId: governedCritic?.featureId ?? null,
         gitCommonDir: resolve(root, git(root, ["rev-parse", "--git-common-dir"])),
         criticPacketId: lifecyclePacketId,
         candidate: evidence.candidate,
@@ -473,7 +495,7 @@ function parseArgs(argv) {
     const flag = argv[index];
     if (flag === "--prepare") { value.prepare = true; continue; }
     if (flag === "--no-reuse") { value.reuseReceipts = false; continue; }
-    if (!["--root", "--out", "--event-out", "--mode", "--base", "--critic-packet-id", "--critic-reverify-receipt-id"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
+    if (!["--root", "--out", "--event-out", "--mode", "--base", "--critic-packet-id", "--critic-reverify-receipt-id", "--critic-evidence-feature-id"].includes(flag)) fail("VEP-USAGE", `Unknown option: ${flag}`);
     const next = argv[++index];
     if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) {
       fail("VEP-USAGE", "Usage: verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]");
@@ -482,7 +504,7 @@ function parseArgs(argv) {
   }
   const mode = value["--mode"] ?? "candidate";
   if (!["work", "critic", "push", "candidate", "release"].includes(mode)) fail("VEP-USAGE", `Unknown Verify mode: ${mode}`);
-  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath: value["--event-out"] ?? null, mode, base: value["--base"] ?? null, reuseReceipts: value.reuseReceipts !== false, criticPacketId: value["--critic-packet-id"] ?? null, criticReverifyReceiptId: value["--critic-reverify-receipt-id"] ?? null };
+  return { prepare: value.prepare === true, rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH, eventOutPath: value["--event-out"] ?? null, mode, base: value["--base"] ?? null, reuseReceipts: value.reuseReceipts !== false, criticPacketId: value["--critic-packet-id"] ?? null, criticReverifyReceiptId: value["--critic-reverify-receipt-id"] ?? null, criticEvidenceFeatureId: value["--critic-evidence-feature-id"] ?? null };
 }
 
 if (isDirectInvocation(import.meta.url)) {

@@ -12,9 +12,10 @@ function binding(rootDir, candidate) {
   return Object.freeze({ commit: git(rootDir, ["rev-parse", candidate]), tree: git(rootDir, ["rev-parse", `${candidate}^{tree}`]) });
 }
 
-export function checkProtectedDelta({ rootDir = process.cwd(), base = "HEAD^", candidate = "HEAD", gitFn = git } = {}) {
+export function checkProtectedDelta({ rootDir = process.cwd(), base = "HEAD^", candidate = "HEAD",
+  gitFn = git, resolveBaselineFn = resolveProtectedBaseline } = {}) {
   const root = resolve(rootDir);
-  const baseline = resolveProtectedBaseline({ rootDir: root });
+  const baseline = resolveBaselineFn({ rootDir: root });
   let paths;
   let candidateBinding;
   try {
@@ -29,7 +30,8 @@ export function checkProtectedDelta({ rootDir = process.cwd(), base = "HEAD^", c
   });
   return Object.freeze({
     schema: "pipeline.protected-delta-check.v1",
-    status: protectedPaths.length ? "protected-delta" : "pass",
+    status: baseline.status !== "ready" ? "unavailable"
+      : protectedPaths.length ? "protected-delta" : "pass",
     ok: baseline.status === "ready" && protectedPaths.length === 0,
     candidate: candidateBinding,
     base,

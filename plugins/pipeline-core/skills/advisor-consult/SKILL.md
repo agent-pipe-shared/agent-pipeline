@@ -42,8 +42,12 @@ Before any child, model request, prompt export or timeout:
    `architecture-tradeoff|decision-ambiguity|evidence-conflict|recovery-choice|risk-review`.
 4. Bind runner, profile, reason, question SHA-256, evidence SHA-256, dispatch
    ID/revision, candidate commit/tree, V2 policy digest and frozen V3 route
-   digest in one closed `pipeline.advisory-demand.v2`. Never persist the raw
-   question or answer in that demand.
+   digest in one closed `pipeline.advisory-demand.v2`. When the trusted host
+   has a current Claude session selection for `duty.advisory.fallback`, it
+   reconstructs the demand as `pipeline.advisory-demand.v3`, binding that
+   exact selected model, effort and private-store readback digests. The
+   session ID itself is never copied into the demand. Never persist the raw
+   question or answer in either demand version.
    The evidence SHA-256 is derived from one canonical
    `pipeline.advisory-evidence-bundle.v1`, not accepted as a caller assertion.
    The bundle contains 1–32 sorted, unique, repository-relative physical
@@ -105,9 +109,16 @@ success. Every claim says:
 
 After the same trigger gate, Claude uses the V3 native Opus route: native Opus,
 then one fresh read-only Claude consult only after repeated native-Opus failure.
-It never switches runner or main model. The coordinator persists only the sanitized
-`pipeline.advisory-receipt.v1` plus the V2 consultation record; raw question,
-answer, prompt, trace and adapter error remain runtime-only.
+The native call remains exactly the V3 Opus route. For the consult fallback only,
+the host reads the current session's admitted functional route
+`duty.advisory.fallback` (`frontier`) and uses its exact model ID at the V3
+fallback effort. The receipt binds that route to the private session readback by
+digest, without persisting the session ID. If the optional selection is absent,
+damaged or incompatible, the consult uses the exact registered V3 Opus fallback;
+it does not block the valid V3 call. Neither path switches runner. The
+coordinator persists only the sanitized `pipeline.advisory-receipt.v1` plus the
+V2 consultation record; raw question, answer, prompt, trace and adapter error
+remain runtime-only.
 
 ## Separation from bootstrap
 

@@ -104,7 +104,8 @@ test("inspect after set-feature surfaces phase, draft lifecycle, and the live Ne
   const statePathValue = resolveStatePath(root);
   const beforeBytes = readFileSync(statePathValue, "utf8");
 
-  const result = invoke(root, ["inspect"]);
+  const readyArchitecture = { architectureEntryReadiness: () => ({ status: "ready" }) };
+  const result = invoke(root, ["inspect"], readyArchitecture);
   assert.equal(result.status, 0, result.err);
   const payload = JSON.parse(result.out);
   assert.equal(payload.schema, "pipeline.inspect.v1");
@@ -145,7 +146,7 @@ function awaitingApprovalSubmission(featureId, planPath) {
     planSha256: sha256Hex(`plan:${planPath}`),
     specPath: "specs/widget/spec.md",
     specSha256: sha256Hex("spec:specs/widget/spec.md"),
-    profile: "feature",
+    profile: "mini",
     profileSha256: sha256Hex("profile"),
     submittedBy: "coordinator",
     submittedAt: NOW,
@@ -271,6 +272,7 @@ function approvedFixture(name, verify) {
   for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
     cpSync(join(fileURLToPath(new URL("../../..", import.meta.url)), directory), join(root, directory), { recursive: true });
   }
+  writeFileSync(join(root, "AGENTS.md"), "Architecture: [map](architecture/map/index.md).\n", "utf8");
   mkdirSync(join(root, "project"), { recursive: true });
   writeFileSync(join(root, "plugins/pipeline-core/architecture-entry-plan.md"), "Implement plugins/pipeline-core/lib/architecture-entry-readiness.mjs\n", "utf8");
   writeFileSync(join(root, "project", "pipeline.json"), JSON.stringify({
@@ -295,11 +297,12 @@ function approvedFixture(name, verify) {
 
 test("approved next-action uses the shipped baseline without asking the PO for a project command", () => {
   const root = approvedFixture("approved-baseline-verify", SEEDED_VERIFY);
+  const readyArchitecture = { architectureEntryReadiness: () => ({ status: "ready" }) };
   const statePathValue = resolveStatePath(root);
   const calibrationPath = join(root, "project", "pipeline.json");
   const beforeCalibration = readFileSync(calibrationPath, "utf8");
 
-  const result = invoke(root, ["inspect"]);
+  const result = invoke(root, ["inspect"], readyArchitecture);
   assert.equal(result.status, 0, result.err);
   const payload = JSON.parse(result.out);
   assert.equal(payload.status, "approved");
@@ -310,7 +313,7 @@ test("approved next-action uses the shipped baseline without asking the PO for a
     mutation: true,
     requiresConfirmation: true,
   });
-  const transitioned = invoke(root, payload.nextAction.argv.slice(1));
+  const transitioned = invoke(root, payload.nextAction.argv.slice(1), readyArchitecture);
   assert.equal(transitioned.status, 0, transitioned.err);
   assert.equal(JSON.parse(readFileSync(statePathValue, "utf8")).activeFeature.phase, "implementation");
   assert.equal(readFileSync(calibrationPath, "utf8"), beforeCalibration,
@@ -320,7 +323,8 @@ test("approved next-action uses the shipped baseline without asking the PO for a
 test("approved next-action keeps the existing bare set-phase command when verify is already configured", () => {
   const root = approvedFixture("approved-configured-verify", "node --test");
 
-  const result = invoke(root, ["inspect"]);
+  const readyArchitecture = { architectureEntryReadiness: () => ({ status: "ready" }) };
+  const result = invoke(root, ["inspect"], readyArchitecture);
   assert.equal(result.status, 0, result.err);
   const payload = JSON.parse(result.out);
   assert.equal(payload.status, "approved");
@@ -332,7 +336,7 @@ test("approved next-action keeps the existing bare set-phase command when verify
     requiresConfirmation: true,
   });
 
-  const transitioned = invoke(root, payload.nextAction.argv.slice(1));
+  const transitioned = invoke(root, payload.nextAction.argv.slice(1), readyArchitecture);
   assert.equal(transitioned.status, 0, transitioned.err);
   assert.equal(JSON.parse(readFileSync(resolveStatePath(root), "utf8")).activeFeature.phase, "implementation",
     "the already-configured bare transition must remain runnable without --verify-command");

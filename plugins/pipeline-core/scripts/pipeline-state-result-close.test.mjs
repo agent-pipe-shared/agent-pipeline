@@ -112,6 +112,20 @@ function approvedImplementation() {
     by: "PO",
     at: "2026-07-31T11:10:00.000Z",
     designAdvisorAdmissionSha256: h("8"),
+    // In-memory state fixture: preserve the current feature approval shape.
+    // The PO proof/complete-package ceremony is exercised in its own suite.
+    designWorkflowPackagePath: "specs/feature/evidence/design-workflow-package.json",
+    designWorkflowPackageSha256: h("9"),
+    designWorkflowApproval: {
+      schema: "pipeline.design-workflow-package-approval.v1",
+      mode: "chat",
+      approvedBy: "PO",
+      approvedAt: "2026-07-31T11:10:00.000Z",
+      packageSha256: h("9"),
+      intentSha256: null,
+      proofSha256: null,
+      proof: null,
+    },
   });
   assert.equal(approved.ok, true);
   const implementation = enterPlanImplementation({

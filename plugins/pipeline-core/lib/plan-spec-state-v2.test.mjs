@@ -25,6 +25,8 @@ const PLAN = "1".repeat(64);
 const SPEC = "2".repeat(64);
 const PROFILE = "3".repeat(64);
 const ADVISOR = "a".repeat(64);
+const DESIGN_WORKFLOW_PACKAGE_PATH = "specs/feature/evidence/design-workflow-package.json";
+const DESIGN_WORKFLOW_PACKAGE_SHA256 = "b".repeat(64);
 const AUTHORITY = {
   schema: "pipeline.po-gate-authority.v2",
   humanFacing: "en",
@@ -113,6 +115,24 @@ function approved(state = submitted(), authority = AUTHORITY, at = LATER) {
     by: "PO",
     at,
     designAdvisorAdmissionSha256: state.planSubmission.profile === "mini" ? null : ADVISOR,
+    designWorkflowPackagePath: state.planSubmission.profile === "mini" ? null : DESIGN_WORKFLOW_PACKAGE_PATH,
+    designWorkflowPackageSha256: state.planSubmission.profile === "mini" ? null : DESIGN_WORKFLOW_PACKAGE_SHA256,
+    designWorkflowApproval: state.planSubmission.profile === "mini" ? null : {
+      schema: "pipeline.design-workflow-package-approval.v1",
+      mode: "signature",
+      approvedBy: "verified:test-key",
+      approvedAt: at,
+      packageSha256: DESIGN_WORKFLOW_PACKAGE_SHA256,
+      intentSha256: "e".repeat(64),
+      proofSha256: "f".repeat(64),
+      proof: {
+        schema: "pipeline.po-approval-proof.v1",
+        intentSha256: "e".repeat(64),
+        keyReference: "test-key",
+        publicKey: "test-public-key",
+        signatureBase64: "dGVzdA==",
+      },
+    },
   });
   assert.equal(result.ok, true, JSON.stringify(result));
   return result.state;
@@ -660,9 +680,9 @@ test("V2 revocation atomically returns the feature to design and the exact legac
   }
 });
 
-test("current v5 approval can be revoked and replayed, but a forged submission binding cannot", () => {
+test("current v6 approval can be revoked and replayed, but a forged submission binding cannot", () => {
   const accepted = approved();
-  assert.equal(accepted.planApproval.schema, "pipeline.plan-approval.v5");
+  assert.equal(accepted.planApproval.schema, "pipeline.plan-approval.v7");
   const request = {
     state: accepted,
     expectedStateSha256: sha256CanonicalJson(accepted),
@@ -938,7 +958,7 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
   const successorSubmission = submitted(firstReopen.state, AUTHORITY, RESUBMITTED);
   const successor = approved(successorSubmission, AUTHORITY, REAPPROVED);
   const priorInvalidationSha256 = sha256CanonicalJson(firstReopen.invalidation);
-  assert.equal(successor.planApproval.schema, "pipeline.plan-approval.v5");
+  assert.equal(successor.planApproval.schema, "pipeline.plan-approval.v7");
   assert.equal(successor.planApproval.priorInvalidationSha256, priorInvalidationSha256);
   assert.equal(derivePlanLifecycle(successor).status, "approved");
 
@@ -950,6 +970,9 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
 
   const v4WithAudit = { ...successor, planApproval: { ...successor.planApproval, schema: "pipeline.plan-approval.v4" } };
   delete v4WithAudit.planApproval.designAdvisorAdmissionSha256;
+  delete v4WithAudit.planApproval.designWorkflowPackagePath;
+  delete v4WithAudit.planApproval.designWorkflowPackageSha256;
+  delete v4WithAudit.planApproval.designWorkflowApproval;
   v4WithAudit.planApproval.priorInvalidationSha256 = null;
   assert.equal(derivePlanLifecycle(v4WithAudit).ok, false);
   const sealed = sealCurrentPlanApproval({ state: v4WithAudit, expectedStateSha256: sha256CanonicalJson(v4WithAudit) });
@@ -961,6 +984,9 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
   const v3WithoutAudit = { ...first, planApproval: { ...first.planApproval, schema: "pipeline.plan-approval.v3" } };
   delete v3WithoutAudit.planApproval.priorInvalidationSha256;
   delete v3WithoutAudit.planApproval.designAdvisorAdmissionSha256;
+  delete v3WithoutAudit.planApproval.designWorkflowPackagePath;
+  delete v3WithoutAudit.planApproval.designWorkflowPackageSha256;
+  delete v3WithoutAudit.planApproval.designWorkflowApproval;
   assert.equal(derivePlanLifecycle(v3WithoutAudit).status, "approved");
 
   const secondAt = "2026-07-30T20:25:00.000Z";
@@ -972,7 +998,7 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
   assert.equal(secondReopen.invalidation.invalidatedApprovalSha256, sha256CanonicalJson(successor.planApproval));
 });
 
-test("new approval requires an Advisor digest exactly for epic and feature profiles", () => {
+test("new approval requires a design-workflow package exactly for epic and feature profiles", () => {
   const feature = submitted();
   const lifecycle = derivePlanLifecycle(feature);
   const missing = approveSubmittedPlan({
@@ -985,10 +1011,12 @@ test("new approval requires an Advisor digest exactly for epic and feature profi
     at: LATER,
   });
   assert.equal(missing.ok, false);
-  assert.equal(missing.code, "PLAN-APPROVE-ADVISOR-PROFILE-INVALID");
+  assert.equal(missing.code, "PLAN-APPROVE-DESIGN-WORKFLOW-PROFILE-INVALID");
 
   const accepted = approved(feature);
   assert.equal(accepted.planApproval.designAdvisorAdmissionSha256, ADVISOR);
+  assert.equal(accepted.planApproval.designWorkflowPackagePath, DESIGN_WORKFLOW_PACKAGE_PATH);
+  assert.equal(accepted.planApproval.designWorkflowPackageSha256, DESIGN_WORKFLOW_PACKAGE_SHA256);
   assert.equal(derivePlanLifecycle(accepted).status, "approved");
 
   const mini = submitted(draft(), AUTHORITY, NOW, "mini");
@@ -1002,9 +1030,13 @@ test("new approval requires an Advisor digest exactly for epic and feature profi
     by: "PO",
     at: LATER,
     designAdvisorAdmissionSha256: null,
+    designWorkflowPackagePath: null,
+    designWorkflowPackageSha256: null,
   });
   assert.equal(miniAccepted.ok, true, JSON.stringify(miniAccepted));
   assert.equal(miniAccepted.approval.designAdvisorAdmissionSha256, null);
+  assert.equal(miniAccepted.approval.designWorkflowPackagePath, null);
+  assert.equal(miniAccepted.approval.designWorkflowPackageSha256, null);
 });
 
 test("appendPhaseHistory is purely additive and order-preserving", () => {

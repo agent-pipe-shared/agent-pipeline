@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
+import { admitModelRoleHostBootstrap, prepareModelRoleHostBootstrap } from "../lib/model-role-host-session.mjs";
 import { dispatchElephantAgyImplementation, parseArgs } from "./elephant-agy-implementation-dispatch.mjs";
 
 const sha = "a".repeat(64);
@@ -136,4 +138,87 @@ test("route, session, binding and live unavailability stay typed with zero inven
   assert.equal(route.code, "AGY-ELEPHANT-ROUTE-UNAVAILABLE"); assert.equal(calls, 0);
   const unready = await dispatchElephantAgyImplementation({ root: value.root, dispatchRequestPath: value.request, resultPath: "results/next.json", sessionId: "session-1", descriptorSha256: sha }, { ...value.common, validateDispatchBinding: () => ({ ok: false, code: "AGY-CONSENT-SCOPE-MISMATCH" }), runLiveHost: async () => { calls += 1; } });
   assert.equal(unready.code, "AGY-CONSENT-SCOPE-MISMATCH"); assert.equal(calls, 0);
+});
+
+test("invalid optional model-role state visibly falls back to the consent-bound V3 route", async () => {
+  const value = fixture(); let launches = 0;
+  const args = { root: value.root, dispatchRequestPath: value.request,
+    resultPath: "results/model-role.json", sessionId: "session-1", descriptorSha256: sha };
+  const runLiveHost = async (sealed) => {
+    launches += 1;
+    assert.equal(sealed.requestedModel, "gemini-3.8-flash-medium");
+    assert.equal(sealed.routePolicySha256, "e".repeat(64));
+    return { status: "final-pending-host-commit", code: "AGY-SESSION-FINAL-VALIDATED",
+      observed: { model: "gemini-3.8-flash-medium" }, modelCalls: 1, launcherCalls: 1 };
+  };
+  const wrong = await dispatchElephantAgyImplementation(args, { ...value.common,
+    modelRoleStore: { inspect: () => ({ ok: true, status: "present" }),
+      read: () => ({ ok: false, code: "MODEL-ROLE-STORE-BINDING" }) },
+    runLiveHost });
+  assert.equal(wrong.status, "final-pending-host-commit");
+  assert.equal(wrong.modelRoleDiagnostic, "AGY-MODEL-ROLE-NOT-BOUND");
+  assert.equal(wrong.route.requestedModel, "gemini-3.8-flash-medium");
+  const unsafe = await dispatchElephantAgyImplementation(args, { ...value.common,
+    modelRoleStore: { inspect: () => ({ ok: false, code: "MODEL-ROLE-STORE-UNAVAILABLE" }) },
+    runLiveHost });
+  assert.equal(unsafe.status, "final-pending-host-commit");
+  assert.equal(unsafe.modelRoleDiagnostic, "AGY-MODEL-ROLE-STORE-UNAVAILABLE");
+  const ambiguous = await dispatchElephantAgyImplementation(args, { ...value.common,
+    modelRoleStore: { inspect: () => ({ ok: true, status: "unknown" }) },
+    runLiveHost });
+  assert.equal(ambiguous.status, "final-pending-host-commit");
+  assert.equal(ambiguous.modelRoleDiagnostic, "AGY-MODEL-ROLE-STORE-UNAVAILABLE");
+  const throws = await dispatchElephantAgyImplementation(args, { ...value.common,
+    modelRoleStore: { inspect: () => { throw new Error("private path"); } }, runLiveHost });
+  assert.equal(throws.status, "final-pending-host-commit");
+  assert.equal(throws.modelRoleDiagnostic, "AGY-MODEL-ROLE-STORE-UNAVAILABLE");
+  assert.equal(JSON.stringify(throws).includes("private path"), false);
+  assert.equal(launches, 4);
+  const denied = await dispatchElephantAgyImplementation(args, { ...value.common,
+    modelRoleStore: { inspect: () => ({ ok: false }) },
+    validateDispatchBinding: () => ({ ok: false, code: "AGY-CONSENT-SCOPE-MISMATCH" }),
+    runLiveHost });
+  assert.equal(denied.code, "AGY-CONSENT-SCOPE-MISMATCH");
+  assert.equal(launches, 4);
+});
+
+test("one admitted Agy session selects its approved replacement model before scope and consent binding", async () => {
+  const value = fixture();
+  const source = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "antigravity");
+  const modelFor = ({ role, effort }) => role === "worker" && effort === "medium"
+    ? "gemini-approved-next-worker" : `agy-${role}-${effort}`;
+  const proposal = prepareModelRoleHostBootstrap({ sessionId: "session-1",
+    candidateCommit: "b".repeat(40), observedAt: "2026-09-26T00:00:00.000Z",
+    routeSource: source,
+    approvedPolicies: source.configuredRoutes.map((route) => ({ runner: route.runner,
+      role: route.role, effort: route.effort,
+      policy: { schema: "pipeline.model-role-policy.v1", runner: route.runner,
+        role: route.role, approved: [{ modelId: modelFor(route), rank: 1,
+          efforts: [route.effort], compatibilityEvidenceSha256: "d".repeat(64) }] } })),
+    observations: source.configuredRoutes.map((route) => ({ runner: route.runner,
+      role: route.role, effort: route.effort, ok: true,
+      assurance: "installed-host-observed", availableModelIds: [modelFor(route)] })) });
+  assert.equal(proposal.ok, true);
+  let held;
+  const modelRoleStore = { inspect: () => ({ ok: true, status: "present" }),
+    persist: (entry) => { held = entry; return { ok: true }; },
+    read: () => ({ ok: true, ...held }) };
+  assert.equal(admitModelRoleHostBootstrap({ proposal, store: modelRoleStore,
+    acknowledgement: { sessionId: "session-1", confirmed: true,
+      readbackSha256: proposal.readback.readbackSha256 } }).ok, true);
+  let sealed; let bound;
+  const result = await dispatchElephantAgyImplementation({ root: value.root,
+    dispatchRequestPath: value.request, resultPath: "results/approved.json",
+    sessionId: "session-1", descriptorSha256: sha }, { ...value.common,
+    modelRoleStore,
+    validateDispatchBinding: (_record, input) => { bound = input; return { ok: true }; },
+    runLiveHost: async (request) => { sealed = request; return {
+      status: "final-pending-host-commit", code: "AGY-SESSION-FINAL-VALIDATED",
+      observed: { model: "gemini-approved-next-worker" }, modelCalls: 1, launcherCalls: 1 }; } });
+  assert.equal(result.status, "final-pending-host-commit");
+  assert.equal(sealed.requestedModel, "gemini-approved-next-worker");
+  assert.equal(bound.requestedModel, sealed.requestedModel);
+  assert.equal(bound.scope.routePolicySha256, sealed.routePolicySha256);
+  assert.notEqual(sealed.routePolicySha256, "e".repeat(64));
+  assert.equal(result.observed.identityEvidence, "host-observed-model");
 });

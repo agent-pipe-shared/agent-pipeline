@@ -11,6 +11,7 @@ ownedPaths:
 publicContracts:
   - harness/scripts/verify.mjs
   - harness/scripts/check-verify-suite-registration.mjs
+  - harness/scripts/check-verify-suite-append.mjs
   - harness/verify-suites.json
 allowedDependencies:
   - pipeline-core
@@ -20,6 +21,7 @@ authorityEffects:
   - read-workspace-test-tree
 verificationEntryPoints:
   - harness/scripts/check-verify-suite-registration.mjs
+  - harness/scripts/check-verify-suite-append.mjs
 adrReferences:
   - ADR-0063
 ---
@@ -36,7 +38,9 @@ Verification runner, test orchestration, suite registration validation, and CI c
 ## Public Contracts
 - `harness/scripts/verify.mjs`: Main test suite verification runner.
 - `harness/scripts/check-verify-suite-registration.mjs`: Static and declarative suite registration completeness checker.
+- `harness/scripts/check-verify-suite-append.mjs`: TP-13-era Git history and pending-postimage append-only check for the declarative registry.
 - `harness/verify-suites.json`: Declarative suite registry.
 
 ## Verification
 - `node harness/scripts/check-verify-suite-registration.mjs`
+- `node harness/scripts/check-verify-suite-append.mjs`

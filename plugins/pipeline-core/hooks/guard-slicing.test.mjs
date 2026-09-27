@@ -741,7 +741,10 @@ test("GS31: registered Codex spawn_agent matcher receives raw spawn_agent input 
   const manifest = JSON.parse(readFileSync(fileURLToPath(new URL("./codex-hooks.json", import.meta.url)), "utf8"));
   const observer = manifest.hooks.PreToolUse.find((entry) => entry.matcher === "spawn_agent|update_plan");
   assert.match(observer.hooks[0].command, /codex-slicing-hint\.mjs.*PreToolUse/);
-  assert.match(manifest.hooks.SubagentStart[0].hooks[0].command, /codex-slicing-hint\.mjs" SubagentStart/);
+  const slicingStart = manifest.hooks.SubagentStart.flatMap((entry) => entry.hooks)
+    .find((hook) => /codex-slicing-hint\.mjs/u.test(hook.command));
+  assert.ok(slicingStart, "the native slicing observer remains registered alongside host-commit hooks");
+  assert.match(slicingStart.command, /codex-slicing-hint\.mjs" SubagentStart/u);
   const repo = initNativeRepo();
   try {
     const base = { cwd: repo, session_id: "codex-native-session", tool_name: "spawn_agent", tool_input: {} };

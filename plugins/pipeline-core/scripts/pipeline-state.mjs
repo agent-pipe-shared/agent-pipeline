@@ -417,8 +417,14 @@ import {
 } from "../lib/external-push-ledger.mjs";
 import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
-import { inspectArchitectureEntryReadiness } from "../lib/architecture-entry-readiness.mjs";
-import { designAdvisoryAdmission } from "../lib/guard-devplan-policy.mjs";
+import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
+import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
+import {
+  createDesignWorkflowPackageApprovalRequest,
+  DESIGN_WORKFLOW_APPROVAL_SCHEMA,
+  validateDesignWorkflowPackageApprovalRequest,
+  verifyDesignWorkflowPackageApproval,
+} from "../lib/design-workflow-approval.mjs";
 import { materializeArchitectureDesign } from "../lib/architecture-design.mjs";
 import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
 import {
@@ -461,6 +467,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
+import { parseStrictJson } from "../lib/governance-event.mjs";
 import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
 import { discoverRepository, inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
 import {
@@ -3287,6 +3294,21 @@ function parseExactFlags(argv, names) {
   return Object.keys(out).length === names.size ? { ok: true, value: out } : { ok: false };
 }
 
+function parseAllowedOptionalFlags(argv, allowedNames) {
+  const out = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const raw = argv[index];
+    if (typeof raw !== "string" || !raw.startsWith("--")) return { ok: false };
+    const name = raw.slice(2);
+    const value = argv[index + 1];
+    if (!allowedNames.has(name) || Object.hasOwn(out, name)
+      || value === undefined || (typeof value === "string" && value.startsWith("--"))) return { ok: false };
+    out[name] = value;
+    index += 1;
+  }
+  return Object.keys(out).length > 0 ? { ok: true, value: out } : { ok: false };
+}
+
 const LEGACY_V2_REVOCATION_RECOVERY_PLAN_SCHEMA = "pipeline.plan-legacy-v2-revocation-recovery-plan.v1";
 const LEGACY_V2_RECOVERY_PLAN_FLAGS = new Set(["by", "prepared-at", "preimage-sha256", "postimage-sha256", "plan-sha256", "activate"]);
 
@@ -3938,6 +3960,7 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
   }
   if (lifecycle.status === "awaiting-approval") {
     const submission = state.planSubmission && typeof state.planSubmission === "object" ? state.planSubmission : {};
+    const requiresWorkflowPackage = ["epic", "feature"].includes(submission.profile);
     // NVA-CF-PRESENTPLANDRIVER: `approve-plan` refuses unseen content (case
     // "approve-plan", ~line 8364) unless a `planPresentation` record exists
     // bound to this EXACT submission's sha256 -- a session following only
@@ -3949,9 +3972,26 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     // judgement about the plan's content -- unlike `approve-plan --by`, this
     // one is safe to derive and surface as an agent-runnable `command`,
     // mirroring the `draft` branch's own `--by` derivation pattern exactly.
-    if (!validPlanPresentation(state.planPresentation) || state.planPresentation.submissionSha256 !== lifecycle.submissionSha256) {
+    const presentationCurrent = validPlanPresentation(state.planPresentation)
+      && state.planPresentation.submissionSha256 === lifecycle.submissionSha256
+      && (!requiresWorkflowPackage || state.planPresentation.schema === PLAN_PRESENTATION_DWP_SCHEMA);
+    if (!presentationCurrent) {
       const scriptPath = fileURLToPath(import.meta.url);
       const by = resolveLocalGitUserName(dir, deps);
+      if (requiresWorkflowPackage) {
+        const inputs = [];
+        if (by === null) inputs.push({ name: "by", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true });
+        inputs.push({ name: "design-workflow-package", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true });
+        const byArg = by ?? placeholder("<presenter's name>");
+        const packageArg = placeholder("<complete-package-repo-path>");
+        const command = boundedCopySafeCommand({ executable: process.execPath, argv: [scriptPath, "present-plan", "--by", byArg, "--design-workflow-package", packageArg] });
+        return {
+          kind: "collect-input", inputs, mutation: false, requiresConfirmation: false,
+          guidance: "Before one final PO decision, assemble and validate a complete design-workflow package containing the original input, current PRD/Spec, revised design, traceability, completed Advisor route (normal plus governed fallback if needed), and independent readiness. No intermediate presentation locks approval. Then fill the exact package path and run the returned present-plan action; it will show the complete bounded review and create the exact signature request.",
+          applyAction: { kind: "command", ...command, mutation: true, requiresConfirmation: true },
+          expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+        };
+      }
       if (by !== null) {
         return {
           kind: "command",
@@ -3973,24 +4013,14 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
       };
     }
-    if (["epic", "feature"].includes(submission.profile)) {
-      const advisor = (deps.designAdvisoryAdmission ?? designAdvisoryAdmission)(state, dir, submission.planPath, submission.specPath);
-      if (!advisor?.ok || !SHA256_RE.test(advisor.id ?? "")) {
-        const code = advisor?.code ?? "DAA-PRIVATE-INVALID";
-        return {
-          kind: "collect-input",
-          inputs: [
-            { name: "runner", encoding: "utf8", trim: true, minBytes: 5, maxBytes: 11, singleLine: true, rejectNul: true },
-            { name: "decision", encoding: "utf8", trim: true, minBytes: 6, maxBytes: 7, singleLine: true, rejectNul: true },
-            { name: "rationale-file", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 500, singleLine: true, rejectNul: true },
-          ],
-          mutation: false,
-          requiresConfirmation: false,
-          guidance: `Before final PO approval (approve-plan), this ${submission.profile} requires a current design Advisor admission (${code}). Ask for the current runner, accept/decline decision, and a nonempty rationale file below scratch/, then run design-advisory-coordinator.mjs for this exact Plan/Spec and inspect again.`,
-          expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
-        };
-      }
-    }
+    // Epic/feature presentations already require a complete, physically
+    // validated design-workflow package. Its Advisor receipt/disposition (or
+    // proposed unavailable exception) and independent readiness are bound by
+    // the one final package approval below. Requiring a second public/private
+    // Advisor admission here would recreate the approval-order deadlock for an
+    // unavailable route: that exception is intentionally approved together
+    // with the package, never in an earlier partial lifecycle step. The writer
+    // and implementation boundary independently re-read the exact package.
     const scriptPath = fileURLToPath(import.meta.url);
     // A committed repository-wide human approval policy owns plan approval as
     // well as push approval.  Its acknowledgement is the one human decision
@@ -4025,12 +4055,28 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
       } catch { acknowledgement = { status: "unavailable" }; }
       const expectedStatus = humanMode.mode === "signature" ? "verified" : "chat";
       if (acknowledgement?.status === expectedStatus && typeof acknowledgement.receiptPath === "string") {
+        const argv = [scriptPath, "approve-plan", "--bootstrap-acknowledgement-receipt", acknowledgement.receiptPath];
+        if (requiresWorkflowPackage) argv.push("--design-workflow-approval-request", state.planPresentation.designWorkflowApprovalRequestPath);
+        if (humanMode.mode === "chat") argv.push("--by", placeholder(PLAN_APPROVER_NAME_PLACEHOLDER));
+        if (requiresWorkflowPackage && humanMode.mode === "signature") {
+          const signed = observeDesignWorkflowSignatureApproval({ dir, presentation: state.planPresentation, submission, authority: {
+            planPath: submission.planPath, planSha256: submission.planSha256,
+            specPath: submission.specPath, specSha256: submission.specSha256,
+          }, deps });
+          if (!signed.ok) {
+            return {
+              kind: "collect-input", mutation: false, requiresConfirmation: false,
+              guidance: `The complete package is presented and the bootstrap receipt is intact, but its exact final approval proof is ${signed.code}. In the PO terminal, sign exactly: ${process.execPath} ${fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url))} sign-intent --repo-root <absolute-repo> --request ${state.planPresentation.designWorkflowApprovalRequestPath}. Then inspect again; never substitute the earlier bootstrap signature for this package signature.`,
+              expected: { schema: INSPECT_SCHEMA, statuses: ["awaiting-approval"] },
+            };
+          }
+        }
         return {
           kind: "command",
           executable: process.execPath,
-          argv: [scriptPath, "approve-plan", "--bootstrap-acknowledgement-receipt", acknowledgement.receiptPath],
+          argv,
           mutation: true,
-          requiresConfirmation: false,
+          requiresConfirmation: humanMode.mode === "chat",
           expected: { schema: INSPECT_SCHEMA, statuses: ["approved"] },
         };
       }
@@ -4048,7 +4094,8 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
     // terminal attribution route. Fresh/onboarded repositories never reach it.
     const rendered = boundedCopySafeCommand({
       executable: process.execPath,
-      argv: [scriptPath, "approve-plan", "--by", placeholder(PLAN_APPROVER_NAME_PLACEHOLDER)],
+      argv: [scriptPath, "approve-plan", "--by", placeholder(PLAN_APPROVER_NAME_PLACEHOLDER),
+        ...(requiresWorkflowPackage ? ["--design-workflow-approval-request", state.planPresentation.designWorkflowApprovalRequestPath] : [])],
     });
     return {
       kind: "collect-input",
@@ -4060,7 +4107,8 @@ function buildInspectNextAction(dir, state, lifecycle, deps = {}) {
         + ` ${submission.planPath} (sha256 ${submission.planSha256}) and the specification at`
         + ` ${submission.specPath} (sha256 ${submission.specSha256}); if and only if satisfied, the PO`
         + ` approves it themselves. Replace exactly ${PLAN_APPROVER_NAME_PLACEHOLDER} in applyAction.argv`
-        + " with that typed name and execute the exact returned action; do not reconstruct approve-plan.",
+        + " with that typed name and execute the exact returned action; do not reconstruct approve-plan."
+        + (requiresWorkflowPackage ? " The command reprints the full digest-bound design-workflow review and requires the PO to complete its attended final confirmation." : ""),
       applyAction: {
         kind: "command",
         ...rendered,
@@ -8426,14 +8474,107 @@ function validPlanApprovalBriefing(value) {
  * other `--by`-taking mutation in this file.
  */
 const PLAN_PRESENTATION_SCHEMA = "pipeline.plan-presentation.v1";
+const PLAN_PRESENTATION_DWP_SCHEMA = "pipeline.plan-presentation.v2";
 const PLAN_PRESENTATION_KEYS = ["schema", "submissionSha256", "presentedBy", "presentedAt"];
+const PLAN_PRESENTATION_DWP_KEYS = [...PLAN_PRESENTATION_KEYS, "designWorkflowPackagePath", "designWorkflowPackageSha256", "designWorkflowApprovalRequestPath"];
+const DESIGN_WORKFLOW_PACKAGE_PATH_RE = /^(?!\/)(?!.*\\)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._/@:-]+$/u;
 
 function validPlanPresentation(value) {
-  return hasExactBriefingKeys(value, PLAN_PRESENTATION_KEYS)
-    && value.schema === PLAN_PRESENTATION_SCHEMA
+  const legacy = hasExactBriefingKeys(value, PLAN_PRESENTATION_KEYS) && value.schema === PLAN_PRESENTATION_SCHEMA;
+  const workflow = hasExactBriefingKeys(value, PLAN_PRESENTATION_DWP_KEYS) && value.schema === PLAN_PRESENTATION_DWP_SCHEMA
+    && DESIGN_WORKFLOW_PACKAGE_PATH_RE.test(value.designWorkflowPackagePath ?? "")
+    && SHA256_RE.test(value.designWorkflowPackageSha256 ?? "")
+    && value.designWorkflowApprovalRequestPath === `scratch/design-workflow-approval-request-${value.designWorkflowPackageSha256}.json`;
+  return (legacy || workflow)
     && SHA256_RE.test(value.submissionSha256)
     && typeof value.presentedBy === "string" && value.presentedBy.length > 0
     && typeof value.presentedAt === "string" && value.presentedAt.length > 0;
+}
+
+function designWorkflowGitCandidate(dir, deps = {}) {
+  const candidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
+  return candidate?.ok === true ? { commit: candidate.commit, tree: candidate.tree } : null;
+}
+
+function writeDesignWorkflowApprovalRequest(dir, request) {
+  const root = realpathSync(resolve(dir));
+  const scratch = join(root, "scratch");
+  try {
+    if (!existsSync(scratch)) mkdirSync(scratch, { mode: 0o700 });
+    const directory = lstatSync(scratch);
+    if (!directory.isDirectory() || directory.isSymbolicLink() || realpathSync(scratch) !== scratch) return { ok: false, code: "DWP-REQUEST-SCRATCH-UNSAFE" };
+    const name = `design-workflow-approval-request-${request.packageSha256}.json`;
+    const target = join(scratch, name);
+    const bytes = Buffer.from(`${JSON.stringify(request, null, 2)}\n`, "utf8");
+    if (existsSync(target)) {
+      const stat = lstatSync(target);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || realpathSync(target) !== target
+        || !readFileSync(target).equals(bytes)) return { ok: false, code: "DWP-REQUEST-EXISTS-DRIFT" };
+      return { ok: true, path: `scratch/${name}`, replay: true };
+    }
+    let fd;
+    try {
+      fd = openSync(target, "wx", 0o600);
+      let offset = 0;
+      while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
+      fsyncSync(fd);
+      closeSync(fd); fd = undefined;
+      if (!syncDirectory(scratch).ok || !lstatSync(target).isFile() || !readFileSync(target).equals(bytes)) {
+        return { ok: false, code: "DWP-REQUEST-READBACK" };
+      }
+      return { ok: true, path: `scratch/${name}`, replay: false };
+    } finally { if (fd !== undefined) closeSync(fd); }
+  } catch { return { ok: false, code: "DWP-REQUEST-WRITE" }; }
+}
+
+function readPhysicalScratchJson(dir, relativePath) {
+  if (typeof relativePath !== "string" || !/^scratch\/[A-Za-z0-9._-]+\.json$/u.test(relativePath)) return null;
+  const root = realpathSync(resolve(dir));
+  const scratch = join(root, "scratch");
+  const target = resolve(root, relativePath);
+  try {
+    const directory = lstatSync(scratch);
+    const file = lstatSync(target);
+    if (!directory.isDirectory() || directory.isSymbolicLink() || realpathSync(scratch) !== scratch
+      || !file.isFile() || file.isSymbolicLink() || file.nlink !== 1 || file.size > 1024 * 1024
+      || dirname(realpathSync(target)) !== scratch || realpathSync(target) !== target) return null;
+    return parseStrictJson(readFileSync(target));
+  } catch { return null; }
+}
+
+function designWorkflowApprovalProofPath(requestPath) {
+  const name = typeof requestPath === "string" ? requestPath.slice("scratch/".length) : "";
+  if (!/^design-workflow-approval-request-[a-f0-9]{64}\.json$/u.test(name)) return null;
+  return `scratch/${name.replace("request-", "proof-")}`;
+}
+
+function observeDesignWorkflowSignatureApproval({ dir, presentation, submission, authority, deps = {} }) {
+  const requestPath = presentation?.designWorkflowApprovalRequestPath;
+  const proofPath = designWorkflowApprovalProofPath(requestPath);
+  if (proofPath === null) return { ok: false, code: "DWP-APPROVAL-REQUEST-PATH" };
+  const request = readPhysicalScratchJson(dir, requestPath);
+  const proof = readPhysicalScratchJson(dir, proofPath);
+  if (request === null || proof === null) return { ok: false, code: "DWP-APPROVAL-PROOF-UNAVAILABLE", requestPath, proofPath };
+  const policy = (deps.readCriticalHumanProofPolicy ?? readCriticalHumanProofPolicy)(dir);
+  if (!policy?.ok) return { ok: false, code: policy?.code ?? "DWP-APPROVAL-TRUST-POLICY" };
+  const anchors = policy.trustAnchors ?? (policy.trustAnchor === null ? [] : [policy.trustAnchor]);
+  const verified = verifyDesignWorkflowPackageApproval({
+    repoRoot: dir,
+    request,
+    proof,
+    anchors,
+    packagePath: presentation.designWorkflowPackagePath,
+    featureId: submission.featureId,
+    planPath: authority.planPath,
+    planSha256: authority.planSha256,
+    specPath: authority.specPath,
+    specSha256: authority.specSha256,
+    readCandidate: () => designWorkflowGitCandidate(dir, deps),
+    allowUnrelatedCommits: true,
+  });
+  return verified.ok
+    ? { ...verified, requestPath, proofPath }
+    : { ...verified, requestPath, proofPath };
 }
 
 /**
@@ -9649,6 +9790,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log('Phase set: "implementation"; lifecycle="implementing".');
+      const decisionSummary = summarizePlanningDecisionApplicability(architecture.artifacts?.decisionApplicability);
+      if (decisionSummary !== null) console.log(`Architecture decisions: ${JSON.stringify(decisionSummary)}`);
       return 0;
     }
 
@@ -9956,7 +10099,13 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     // why this is a caller attestation bound to the exact current submission
     // rather than a hash of rendered bytes or a passive side-effect flag.
     case "present-plan": {
-      const by = flags.by;
+      const parsedPresentation = parseAllowedOptionalFlags(rest, new Set(["by", "design-workflow-package"]));
+      if (!parsedPresentation.ok) {
+        console.error("Error: present-plan accepts only --by <name> and optional --design-workflow-package <repo-relative-json-path>.");
+        return 2;
+      }
+      const presentationFlags = parsedPresentation.value;
+      const by = presentationFlags.by;
       if (isBlank(by)) {
         console.error('Error: present-plan requires --by <name> (non-empty) -- an unattributed presentation is refused.');
         return 2;
@@ -9968,6 +10117,46 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const submissionSha256 = lifecycle.submissionSha256;
+      const submitted = base.planSubmission;
+      const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);
+      let workflowPackagePath = null;
+      let workflowPackageSha256 = null;
+      let approvalRequestPath = null;
+      let approvalReview = null;
+      if (requiresWorkflowPackage) {
+        workflowPackagePath = presentationFlags["design-workflow-package"];
+        if (!DESIGN_WORKFLOW_PACKAGE_PATH_RE.test(workflowPackagePath ?? "")) {
+          console.error("Error: present-plan for epic/feature requires --design-workflow-package <repo-relative-json-path>; intermediate or missing packages cannot lock approval.");
+          return 2;
+        }
+        const packageResult = createDesignWorkflowPackageApprovalRequest({
+          repoRoot: dir,
+          packagePath: workflowPackagePath,
+          featureId: submitted.featureId,
+          planPath: submitted.planPath,
+          planSha256: submitted.planSha256,
+          specPath: submitted.specPath,
+          specSha256: submitted.specSha256,
+          readCandidate: () => designWorkflowGitCandidate(dir, deps),
+          ...(typeof deps.verifyDesignReadinessHostExecution === "function"
+            ? { verifyReadinessExecution: deps.verifyDesignReadinessHostExecution } : {}),
+        });
+        if (!packageResult.ok) {
+          console.error(`Error: present-plan requires one complete, current design-workflow package (${packageResult.code}); no presentation or approval lock was recorded.`);
+          return 2;
+        }
+        const persisted = writeDesignWorkflowApprovalRequest(dir, packageResult.request);
+        if (!persisted.ok) {
+          console.error(`Error: present-plan could not safely publish its exact PO signature request (${persisted.code}); no presentation or approval lock was recorded.`);
+          return 2;
+        }
+        workflowPackageSha256 = packageResult.request.packageSha256;
+        approvalRequestPath = persisted.path;
+        approvalReview = packageResult.packageRead.approvalReview;
+      } else if (presentationFlags["design-workflow-package"] !== undefined) {
+        console.error("Error: mini-profile present-plan does not accept a design-workflow package.");
+        return 2;
+      }
       let presentedAt;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
@@ -9977,10 +10166,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             state: {
               ...observed,
               planPresentation: {
-                schema: PLAN_PRESENTATION_SCHEMA,
+                schema: requiresWorkflowPackage ? PLAN_PRESENTATION_DWP_SCHEMA : PLAN_PRESENTATION_SCHEMA,
                 submissionSha256,
                 presentedBy: by,
                 presentedAt,
+                ...(requiresWorkflowPackage ? {
+                  designWorkflowPackagePath: workflowPackagePath,
+                  designWorkflowPackageSha256: workflowPackageSha256,
+                  designWorkflowApprovalRequestPath: approvalRequestPath,
+                } : {}),
               },
               updatedAt: presentedAt,
             },
@@ -9993,7 +10187,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan presentation recorded by "${by}" on ${presentedAt}; bound to submission ${submissionSha256.slice(0, 12)}....`);
-      console.log('Next: run `approve-plan --by <name>` once the PO has confirmed \'approved\'.');
+      if (approvalReview !== null) {
+        console.log("Complete bounded design-workflow review (still pending PO approval):");
+        console.log(JSON.stringify(approvalReview, null, 2));
+        console.log(`Exact PO request: ${approvalRequestPath} (package sha256 ${workflowPackageSha256}).`);
+        console.log(`For signature mode: run po-human-approval.mjs sign-intent --repo-root <absolute-repo> --request ${approvalRequestPath}.`);
+        console.log("The request is pending only; it does not approve the package or unlock implementation.");
+      } else {
+        console.log('Next: run `approve-plan --by <name>` once the PO has confirmed \'approved\'.');
+      }
       return 0;
     }
 
@@ -10137,13 +10339,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         }
         approvalArgv.push(rest[index]);
       }
-      const parsedBy = parseExactFlags(approvalArgv, new Set(["by"]));
-      const parsedReceipt = parseExactFlags(approvalArgv, new Set(["bootstrap-acknowledgement-receipt"]));
-      if (!parsedBy.ok && !parsedReceipt.ok) {
-        console.error("Error: approve-plan accepts only --by <name> for a legacy attribution or one exact --bootstrap-acknowledgement-receipt.");
+      const parsedApproval = parseAllowedOptionalFlags(approvalArgv, new Set(["by", "bootstrap-acknowledgement-receipt", "design-workflow-approval-request"]));
+      if (!parsedApproval.ok) {
+        console.error("Error: approve-plan accepts --by <name>, --bootstrap-acknowledgement-receipt <path>, and --design-workflow-approval-request <path> only in the combinations shown by inspect.");
         return 2;
       }
-      const approvalFlags = parsedBy.ok ? parsedBy.value : parsedReceipt.value;
+      const approvalFlags = parsedApproval.value;
       const lifecycle = derivePlanLifecycle(base);
       if (!lifecycle.ok || lifecycle.status !== "awaiting-approval"
         || !SHA256_RE.test(lifecycle.submissionSha256 ?? "")) {
@@ -10198,15 +10399,37 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       const advisorRequired = ["epic", "feature"].includes(base.planSubmission?.profile);
       let designAdvisorAdmissionSha256 = null;
+      let designWorkflowPackagePath = null;
+      let designWorkflowPackageSha256 = null;
+      let designWorkflowPackageRead = null;
       if (advisorRequired) {
-        const advisor = (deps.designAdvisoryAdmission ?? designAdvisoryAdmission)(
-          base, dir, authority.value.planPath, authority.value.specPath,
-        );
-        if (!advisor?.ok || !SHA256_RE.test(advisor.id ?? "")) {
-          console.error(`Error: approve-plan requires a current design Advisor admission for this ${base.planSubmission?.profile} (${advisor?.code ?? "DAA-PRIVATE-INVALID"}); complete the Advisor route before requesting final PO approval.`);
+        designWorkflowPackagePath = base.planPresentation?.designWorkflowPackagePath;
+        designWorkflowPackageSha256 = base.planPresentation?.designWorkflowPackageSha256;
+        const packageRead = readDesignWorkflowPackageFromRepository({
+          repoRoot: dir,
+          packagePath: designWorkflowPackagePath,
+          readCandidate: () => designWorkflowGitCandidate(dir, deps),
+          requireCurrentCandidate: false,
+          ...(typeof deps.verifyDesignReadinessHostExecution === "function"
+            ? { verifyReadinessExecution: deps.verifyDesignReadinessHostExecution } : {}),
+        });
+        if (!packageRead.ok || packageRead.packageSha256 !== designWorkflowPackageSha256
+          || packageRead.workflowPackage.featureId !== base.planSubmission.featureId
+          || packageRead.workflowPackage.sources.prd.path !== authority.value.planPath
+          || packageRead.workflowPackage.sources.prd.sha256 !== authority.value.planSha256
+          || packageRead.workflowPackage.sources.spec.path !== authority.value.specPath
+          || packageRead.workflowPackage.sources.spec.sha256 !== authority.value.specSha256) {
+          console.error(`Error: approve-plan requires the exact complete design-workflow package previously presented (${packageRead?.code ?? "DWP-APPROVAL-BINDING"}); no authority was written.`);
           return 2;
         }
-        designAdvisorAdmissionSha256 = advisor.id;
+        designWorkflowPackageRead = packageRead;
+        if (approvalFlags["design-workflow-approval-request"] !== base.planPresentation.designWorkflowApprovalRequestPath) {
+          console.error("Error: approve-plan requires the exact design-workflow approval request produced by present-plan; inspect again and do not substitute a different request.");
+          return 2;
+        }
+      } else if (approvalFlags["design-workflow-approval-request"] !== undefined) {
+        console.error("Error: mini-profile approve-plan does not accept a design-workflow approval request.");
+        return 2;
       }
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
@@ -10226,8 +10449,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // either posture to fall through to legacy `--by` would let an agent
       // skip the acknowledgement receipt entirely after binding.
       if (usesSharedPolicy) {
-        if (typeof receiptFlag !== "string" || approvalFlags.by !== undefined) {
-          console.error("Error: approve-plan under the shared human-approval policy requires exactly the receipt returned by inspection; --by attribution is not a substitute for the configured human gate.");
+        if (typeof receiptFlag !== "string"
+          || (approvalMode.mode === "signature" && approvalFlags.by !== undefined)
+          || (approvalMode.mode === "chat" && isBlank(approvalFlags.by))) {
+          console.error("Error: approve-plan under the shared human-approval policy requires the exact bootstrap receipt; signature mode forbids --by, while chat mode requires the PO's explicit actor name.");
           return 2;
         }
         let acknowledgement;
@@ -10244,11 +10469,75 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           console.error(`Error: approve-plan requires a current ${approvalMode.mode} bootstrap acknowledgement receipt (${acknowledgement?.status ?? "unavailable"}); a stale, foreign, or chat/signature-mismatched receipt is refused.`);
           return 2;
         }
-        by = approvalMode.mode === "signature"
-          ? `verified:${acknowledgement.signer.keyReference}`
-          : "PO chat acknowledgement";
-      } else if (isBlank(by) || receiptFlag !== undefined) {
-        console.error('Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.');
+        if (approvalMode.mode === "signature") by = `verified:${acknowledgement.signer.keyReference}`;
+      } else if (!(advisorRequired && approvalMode?.mode === "signature")
+        && (isBlank(by) || receiptFlag !== undefined)) {
+        if (isBlank(by)) {
+          console.error('Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.');
+          return 2;
+        }
+        if (receiptFlag !== undefined) {
+          console.error("Error: this repository has no active shared-policy bootstrap receipt route; do not supply an unrelated receipt.");
+          return 2;
+        }
+      }
+      let designWorkflowApproval = null;
+      if (advisorRequired) {
+        const requestPath = approvalFlags["design-workflow-approval-request"];
+        if (requestPath !== base.planPresentation.designWorkflowApprovalRequestPath) {
+          console.error("Error: approve-plan requires the exact design-workflow approval request recorded by present-plan.");
+          return 2;
+        }
+        if (approvalMode?.mode === "signature") {
+          const signed = observeDesignWorkflowSignatureApproval({
+            dir, presentation: base.planPresentation, submission: base.planSubmission,
+            authority: authority.value, deps,
+          });
+          if (!signed.ok) {
+            console.error(`Error: approve-plan requires the exact PO signature over this complete package (${signed.code}); no approval was recorded.`);
+            return 2;
+          }
+          by = `verified:${signed.signer.keyReference}`;
+          designWorkflowApproval = {
+            schema: DESIGN_WORKFLOW_APPROVAL_SCHEMA,
+            mode: "signature",
+            approvedBy: by,
+            approvedAt: now(),
+            packageSha256: designWorkflowPackageSha256,
+            intentSha256: signed.intentSha256,
+            proofSha256: signed.proofSha256,
+            proof: signed.proof,
+          };
+        } else {
+          const challenge = `approve-${designWorkflowPackageSha256.slice(0, 12)}`;
+          const confirmation = requireAttendedChatGateConfirmation({
+            summaryLines: [
+              "FINAL DESIGN-WORKFLOW PACKAGE APPROVAL -- inspect the complete package before confirming:",
+              JSON.stringify(designWorkflowPackageRead.approvalReview, null, 2),
+              `actor: ${by}`,
+              `confirmation value: ${challenge}`,
+              "This is the single final PO approval for the presented package; it does not authorize implementation to begin, push, release or publication.",
+            ],
+            expected: challenge,
+            dependencies: deps,
+          });
+          if (!confirmation.ok) {
+            console.error(`Error: approve-plan refused (${confirmation.code}); the final package decision must be completed by the PO in an attended terminal.`);
+            return 2;
+          }
+          designWorkflowApproval = {
+            schema: DESIGN_WORKFLOW_APPROVAL_SCHEMA,
+            mode: "chat",
+            approvedBy: by,
+            approvedAt: now(),
+            packageSha256: designWorkflowPackageSha256,
+            intentSha256: null,
+            proofSha256: null,
+            proof: null,
+          };
+        }
+      } else if (approvalFlags["design-workflow-approval-request"] !== undefined) {
+        console.error("Error: mini-profile approve-plan does not accept a design-workflow approval request.");
         return 2;
       }
       // `approveSubmittedPlan` deliberately validates its approval envelope with
@@ -10268,6 +10557,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             by,
             at: approvedAt,
             designAdvisorAdmissionSha256,
+            designWorkflowPackagePath,
+            designWorkflowPackageSha256,
+            designWorkflowApproval,
           });
           return transition.ok
             ? {
@@ -10288,7 +10580,27 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           const generatorExempt = !observed?.ok
             && observed?.code === "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING"
             && exactGeneratorAcknowledgementExemption({ dir, authority: authority.value, deps });
-          return (observed?.ok || generatorExempt)
+          const finalPackageStillValid = !advisorRequired || (() => {
+            const currentPackage = readDesignWorkflowPackageFromRepository({
+              repoRoot: dir,
+              packagePath: designWorkflowPackagePath,
+              readCandidate: () => designWorkflowGitCandidate(dir, deps),
+              requireCurrentCandidate: false,
+              ...(typeof deps.verifyDesignReadinessHostExecution === "function"
+                ? { verifyReadinessExecution: deps.verifyDesignReadinessHostExecution } : {}),
+            });
+            if (!currentPackage.ok || currentPackage.packageSha256 !== designWorkflowPackageSha256) return false;
+            if (designWorkflowApproval?.mode === "signature") {
+              const currentSignature = observeDesignWorkflowSignatureApproval({
+                dir, presentation: base.planPresentation, submission: base.planSubmission,
+                authority: authority.value, deps,
+              });
+              return currentSignature.ok && currentSignature.intentSha256 === designWorkflowApproval.intentSha256
+                && currentSignature.proofSha256 === designWorkflowApproval.proofSha256;
+            }
+            return designWorkflowApproval?.mode === "chat";
+          })();
+          return finalPackageStillValid && (observed?.ok || generatorExempt)
             && (generatorExempt || JSON.stringify(observed.value) === JSON.stringify(authority.value))
             && observedProfile?.ok
             && sha256CanonicalJson(observedProfile.value) === profileSha256
@@ -10986,7 +11298,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             const verifyPath = saved.plan.qualification.path;
             const verifyBytes = readFileSync(physicalAuditPath(dir, verifyPath));
             const verify = JSON.parse(verifyBytes);
-            const lifecycle = readCriticVerifyLifecycle({ gitCommonDir: common.path, id: criticVerifyLifecycle,
+            const lifecycle = readCriticVerifyLifecycle({ repoRoot: dir, gitCommonDir: common.path, id: criticVerifyLifecycle,
               candidate: saved.plan.candidate, evidencePath: verifyPath, evidence: verify });
             if (lifecycle.receiptSha256 !== audit.criticVerifyLifecycleReceiptSha256) throw new Error("Critic/Verify lifecycle drift");
             auditReference = {

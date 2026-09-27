@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { createHash } from "node:crypto";
-import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { commitTypeFindings, finishedCommitMessageFindings } from "./commit-message-policy.mjs";
 import { normalizeDispatchRecordPath, validateDispatchRecord } from "./dispatch-record.mjs";
@@ -20,17 +19,6 @@ function checkedGit(root, args, timeoutMs) {
   const result = git(root, args, timeoutMs);
   if (!isSuccessfulSpawn(result) || typeof result.stdout !== "string") fail("PC-GIT", "could not inspect the repository snapshot");
   return result.stdout;
-}
-function readCommit(root, timeoutMs) {
-  try {
-    return {
-      commit: checkedGit(root, ["rev-parse", "--verify", "HEAD^{commit}"], timeoutMs).trim(),
-      parent: checkedGit(root, ["rev-parse", "--verify", "HEAD^"], timeoutMs).trim(),
-      tree: checkedGit(root, ["rev-parse", "--verify", "HEAD^{tree}"], timeoutMs).trim(),
-      paths: checkedGit(root, ["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "HEAD"], timeoutMs).split("\0").filter(Boolean),
-      message: checkedGit(root, ["log", "-1", "--format=%B"], timeoutMs).trimEnd(),
-    };
-  } catch { return null; }
 }
 function dispatch(task, role) { return `Dispatch: ${task} (${role})`; }
 function physicalRoot(root) {
@@ -64,34 +52,16 @@ export function commitPipeline({ root = process.cwd(), type, scope, message, dis
   root = physicalRoot(root); if (!TYPE.test(type ?? "") || !SCOPE.test(scope ?? "") || typeof message !== "string" || message.trim() === "" || message.includes("\0")) fail("PC-INPUT", "type, scope and message are invalid");
   if (Object.hasOwn(legacyAttribution, "dispatchTask") || Object.hasOwn(legacyAttribution, "dispatchRole")) fail("PC-DISPATCH", "caller-supplied dispatch attribution is forbidden");
   if (typeof dispatchRecord !== "string") fail("PC-DISPATCH", "a canonical validated dispatch record is required");
+  // A canonical opening record proves neither that this is the current live
+  // dispatch nor that its exclusive terminal path can later be published.
+  // The productive Agy flow commits from host-held admission after Final Return.
+  // A standalone CLI must never convert a caller-selected record to Git truth.
+  if (execute) fail("PC-HOST-CONTEXT", "standalone commit execution has no live host dispatch binding");
   const staged = checkedGit(root, ["diff", "--cached", "--name-only", "-z"], timeoutMs).split("\0").filter(Boolean); if (staged.length === 0) fail("PC-EMPTY-STAGE", "no staged changes");
   const baseCommit = checkedGit(root, ["rev-parse", "--verify", "HEAD^{commit}"], timeoutMs).trim();
   const head = checkedGit(root, ["diff", "--cached", "--raw"], timeoutMs); const snapshotSha256 = createHash("sha256").update(head).digest("hex"); const record = loadDispatchRecord(root, dispatchRecord);
   if (record.record.candidateCommit !== baseCommit) fail("PC-DISPATCH-STALE", "dispatch record does not bind the current repository HEAD");
   const trailer = dispatch(record.record.taskId, recordRole(record.record.agentType));
   const full = `${type}(${scope}): ${message.trim()}\n\n${trailer}\nAI-Assisted: true\n`; const findings = [...commitTypeFindings(`${type}(${scope}): ${message.trim()}`).findings, ...finishedCommitMessageFindings(full, { requireMarker: true, requireDispatch: true }).findings]; if (findings.length) fail("PC-MESSAGE", findings.map((finding) => finding.code).join("; "));
-  const preview = { schema: "pipeline.commit-preview.v1", root, stagedSnapshotSha256: snapshotSha256, paths: staged, dispatch: { taskId: record.record.taskId, role: recordRole(record.record.agentType), recordPath: record.path, recordSha256: record.sha256, candidateCommit: baseCommit }, message: full, status: "preview" }; if (!execute) return preview;
-  const before = head; const dir = mkdtempSync(join(tmpdir(), "pipeline-commit-")); const file = join(dir, "message.txt");
-  try {
-    if (checkedGit(root, ["rev-parse", "--verify", "HEAD^{commit}"], timeoutMs).trim() !== baseCommit) fail("PC-HEAD-CHANGED", "repository HEAD changed before commit");
-    if (checkedGit(root, ["diff", "--cached", "--raw"], timeoutMs) !== before) fail("PC-STAGED-CHANGED", "staged snapshot changed before commit");
-    const expectedTree = checkedGit(root, ["write-tree"], timeoutMs).trim();
-    if (!expectedTree) fail("PC-GIT", "staged tree is unavailable");
-    writeFileSync(file, full, { flag: "wx", mode: 0o600 });
-    const result = git(root, ["commit", "--file", file], timeoutMs);
-    if (!isSuccessfulSpawn(result)) {
-      let currentHead = null;
-      try { currentHead = checkedGit(root, ["rev-parse", "--verify", "HEAD^{commit}"], timeoutMs).trim(); } catch { /* unknown after attempted commit */ }
-      if (result.error || !currentHead || currentHead !== baseCommit) {
-        return { ...preview, status: "recovery-required", code: "PC-COMMIT-OUTCOME-UNKNOWN", commit: currentHead };
-      }
-      fail("PC-COMMIT", "git commit was refused; the staged snapshot remains for recovery");
-    }
-    const observed = readCommit(root, timeoutMs);
-    if (!observed || observed.parent !== baseCommit || observed.tree !== expectedTree || observed.message !== full.trimEnd()
-      || JSON.stringify(observed.paths) !== JSON.stringify(staged)) {
-      return { ...preview, status: "recovery-required", code: "PC-COMMIT-READBACK-MISMATCH", commit: observed?.commit ?? null };
-    }
-    return { ...preview, status: "committed", commit: observed.commit };
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  return { schema: "pipeline.commit-preview.v1", root, stagedSnapshotSha256: snapshotSha256, paths: staged, dispatch: { taskId: record.record.taskId, role: recordRole(record.record.agentType), recordPath: record.path, recordSha256: record.sha256, candidateCommit: baseCommit }, message: full, status: "preview" };
 }

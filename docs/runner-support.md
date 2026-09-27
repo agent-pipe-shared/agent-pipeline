@@ -7,6 +7,12 @@ evidence for the exact candidate before treating execution or completion as
 verified. See [SETUP.md](../SETUP.md) for installation and
 [runtime-boundary.md](runtime-boundary.md) for guard coverage.
 
+One supported runner is sufficient for a user repository. Install, bootstrap,
+and confirm model routing only for the runner actually in use; no account,
+installation, or model-catalogue access for the other two is required. Model
+routes that this runner cannot use remain explicitly unavailable; their
+absence does not make the other runners a bootstrap prerequisite.
+
 | Runner | Supported boundary | Not claimed |
 | --- | --- | --- |
 | Codex | The runner-native continuation contract may project and read back one generation-bound native goal. | Background supervision, hidden input channels, automatic unblock or a broader execution capability. |

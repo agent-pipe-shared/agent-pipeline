@@ -45,15 +45,16 @@ the project changes. Preparation preserves your configured verify command;
 it does not replace your tests. A conflicting adapter is reported for repair.
 
 On the clean committed candidate, choose the boundary explicitly. `work`,
-`critic`, `candidate`, and `push` select the fixed baseline plus commands
-registered for changed areas from the supplied base; use the mode matching the
-work, review, candidate, or push boundary. `release` always runs the full
-project command. Unknown paths, missing bindings and incomplete policies fall
-back to full.
+`critic`, and `push` select the fixed baseline plus commands registered for
+changed areas from the supplied base. `candidate` and `release` always run the
+full project command. Unknown paths, missing bindings and incomplete policies
+also fall back to full. One installed runner is enough for a consuming project;
+Verify does not require accounts or installations for the other two runners.
 
 Choose **one** command for the boundary you are at; the five lines below are
-alternatives, not a sequence. Supply that boundary's reviewed base and run
-the evidence producer once:
+alternative invocations, not instructions to run every mode. A final
+`candidate` run follows the required Critic review. Supply that boundary's
+reviewed base and run the evidence producer once:
 
 Obtain the base from the boundary already under review: the task's starting
 commit for `work`, the Critic packet's review base for `critic`, the approved
@@ -65,10 +66,29 @@ reviewed base, omit `--base` and accept the producer's full-run fallback.
 ```bash
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode work --base <work-base>
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode critic --base <review-base>
-node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode candidate --base <candidate-base>
+node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode candidate --base <candidate-base> --critic-packet-id <reviewed-packet-id>
 node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode push --base <remote-base>
-node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode release --base <release-base>
+node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root> --mode release --base <release-base> --critic-packet-id <reviewed-packet-id>
 ```
+
+Use `critic` mode for pre-review diagnostics; a failing or not-yet-run Full
+Verify can be disclosed to the Critic without claiming a final PASS. The
+`candidate` line above is the Critic-bound final run: its packet is checked
+before existing evidence is replaced. A same-candidate deterministic rerun
+may use `--critic-reverify-receipt-id <id>` instead of the packet ID. An
+unbound `candidate` run remains diagnostic and does not by itself prove the
+required Critic/Verify lifecycle or authorize release.
+After a clean exact-candidate run, check the installed plugin's read-only
+qualification consumer:
+
+```bash
+node <plugin-root>/scripts/check-critic-bound-verify.mjs --root <project-root>
+```
+
+It reports whether canonical Verify evidence still matches the project checkout and
+the consumed private Critic packet. A green diagnostic run, a dirty checkout
+or missing private review evidence remains unqualified; this check does not
+grant release or publication authority.
 
 Add `--no-reuse` when a race, flake, or environment check must execute every
 selected suite again at the same commit. The default continues to reuse valid

@@ -150,7 +150,7 @@ test("approve-plan success output announces the required set-phase --phase imple
     assert.equal(initCode, 0);
     const continuityInit = initializeLifecycleContinuity(dir, "approve-announce", planPath);
     assert.equal(continuityInit, 0);
-    const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], lifecycleDeps(dir, planPath));
+    const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "mini"], lifecycleDeps(dir, planPath));
     assert.equal(submitted, 0);
     const presented = run(["present-plan", "--by", "coordinator"], lifecycleDeps(dir, planPath));
     assert.equal(presented, 0);

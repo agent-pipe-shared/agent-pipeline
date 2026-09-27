@@ -282,7 +282,7 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
         assert.equal(parsed.count, 1);
         assert.equal(parsed.decisions[0].id, "0001-test");
         assert.equal(parsed.authorityStatus, "inventory-only");
-        assert.equal(parsed.effectiveProjection.status, "blocked");
+        assert.equal(parsed.effectiveProjection.status, "advisory");
         assert.ok(parsed.effectiveProjection.findings.some(({ code }) => code === "legacy-decision-without-sidecar"));
       } finally {
         fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -299,9 +299,25 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
           digest: createHash("sha256").update(body).digest("hex"), scope: "project", date: "2026-09-25" };
         fs.writeFileSync(path.join(dir, "ADR-1.md"), body);
         fs.writeFileSync(path.join(dir, "ADR-1.json"), `${JSON.stringify(record)}\n`);
+        const moduleBody = "# Module decision\n";
+        const moduleRecord = { schema: "pipeline.architecture-decision.v2", id: "ADR-module", title: "Module decision",
+          status: "accepted", digest: createHash("sha256").update(moduleBody).digest("hex"),
+          scope: "module", date: "2026-09-25", moduleIds: ["pipeline-core"] };
+        fs.writeFileSync(path.join(dir, "ADR-module.md"), moduleBody);
+        fs.writeFileSync(path.join(dir, "ADR-module.json"), `${JSON.stringify(moduleRecord)}\n`);
+        const mapDir = path.join(root, "architecture", "map");
+        fs.mkdirSync(mapDir, { recursive: true });
+        fs.writeFileSync(path.join(mapDir, "index.md"), "# Map\n\nOKF v0.1 concept bundle.\n\n- [pipeline-core](pipeline-core.md)\n- [harness](harness.md)\n");
+        for (const id of ["pipeline-core", "harness"]) {
+          fs.writeFileSync(path.join(mapDir, `${id}.md`), `---\ntype: Governed Module\nid: ${id}\nresponsibility: Own ${id}\nnonResponsibilities: []\nownedPaths:\n  - ${id}/**\npublicContracts: []\nallowedDependencies: []\nauthorityEffects: []\nverificationEntryPoints: []\nadrReferences: []\n---\n# ${id}\n`);
+        }
         const valid = compileDecisionSummary(root, { write: false });
         assert.equal(valid.authorityStatus, "source-validated");
         assert.deepEqual(valid.effectiveProjection.decisionIds, ["ADR-1"]);
+        assert.deepEqual(valid.decisions.find(({ id }) => id === "ADR-module").moduleIds, ["pipeline-core"]);
+        assert.deepEqual(valid.effectiveProjection.decisions, [{
+          id: "ADR-1", digest: record.digest, scope: "project", path: "docs/adr/ADR-1.md",
+        }]);
         assert.deepEqual(valid.activeExceptions, []);
 
         const waivedBody = "# Claimed waiver\n";
@@ -313,6 +329,7 @@ describe("architecture-baseline & architecture decision continuity (WP-D1)", () 
         assert.equal(unverified.authorityStatus, "inventory-only");
         assert.deepEqual(unverified.activeExceptions, []);
         assert.deepEqual(unverified.effectiveProjection.decisionIds, []);
+        assert.deepEqual(unverified.effectiveProjection.decisions, []);
         assert.ok(unverified.effectiveProjection.findings.some(({ code }) => code === "waiver-human-authority-unverified"));
       } finally {
         fs.rmSync(root, { recursive: true, force: true });

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,6 +20,7 @@ import { retryGovernanceVerificationAction } from "../lib/governance-verificatio
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
+import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 
 function run(executable, args, options = {}) {
   const result = spawnSync(executable, args, { encoding: "utf8", ...options });
@@ -48,11 +50,18 @@ function activeSessionDescriptors(root) {
   const directory = join(root, ".git", "agent-pipeline", "session-descriptors", "active");
   return existsSync(directory) ? readdirSync(directory).sort() : [];
 }
-async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict = null } = {}) {
+async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict = null, featureId = null } = {}) {
   mkdirSync(join(root, "specs"), { recursive: true });
   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
   writeFileSync(join(root, "specs", "spec.md"), "# Review fixture\n");
-  git(root, ["add", ".claude/pipeline.yaml", "specs/spec.md"]);
+  if (featureId !== null) {
+    mkdirSync(join(root, "specs", featureId, "evidence"), { recursive: true });
+    writeFileSync(join(root, "specs", featureId, "lifecycle.json"), `${JSON.stringify({
+      schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 },
+      state: "approved", artifacts: [],
+    })}\n`);
+  }
+  git(root, ["add", ".claude/pipeline.yaml", "specs/spec.md", ...(featureId === null ? [] : [`specs/${featureId}/lifecycle.json`])]);
   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "critic candidate"]);
   const candidate = git(root, ["rev-parse", "HEAD"]);
   const base = git(root, ["rev-parse", "HEAD^1"]);
@@ -95,6 +104,49 @@ async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict 
   assert.equal(observed.receipt.packetId, packetId);
   return { packetId, candidate, final };
 }
+
+test("candidate Verify carries a consumed Critic only over exact registered evidence commits", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const featureId = "carry-feature";
+    const reviewed = await completedCriticPacket(root, { featureId });
+    const evidencePath = `specs/${featureId}/evidence/review.json`;
+    const evidenceBytes = `${JSON.stringify({ schema: "fixture.review.v1", verdict: "pass" })}\n`;
+    writeFileSync(join(root, evidencePath), evidenceBytes);
+    writeFileSync(join(root, "specs", featureId, "lifecycle.json"), `${JSON.stringify({
+      schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 },
+      state: "approved", artifacts: [{ class: "candidate-evidence", path: evidencePath,
+        sha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+        authority: false, mutability: "immutable", retention: "retain" }],
+    })}\n`);
+    git(root, ["add", `specs/${featureId}`]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+      "commit", "-qm", "register review evidence"]);
+    const target = git(root, ["rev-parse", "HEAD"]);
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate",
+      criticPacketId: reviewed.packetId, criticEvidenceFeatureId: featureId });
+    assert.equal(result.status, "passed");
+    assert.equal(result.evidence.candidate.commit, target);
+    assert.equal(result.criticLifecycle.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v2");
+    assert.equal(result.criticLifecycle.receipt.carryForward.proof.reviewedCandidate.commit, reviewed.candidate);
+    const ready = checkCurrentCriticBoundVerify(root);
+    assert.equal(ready.ok, true, JSON.stringify({ code: ready.code,
+      candidate: ready.candidate, evidence: {
+        schema: result.evidence.schema, commit: result.evidence.commit,
+        tree: result.evidence.tree, candidate: result.evidence.candidate,
+        exitCode: result.evidence.exitCode, terminalStatus: result.evidence.verifyRun?.status,
+        terminalSha256: result.evidence.verifyRun?.terminalSha256,
+      } }));
+    assert.equal(ready.receiptId, result.criticLifecycle.receipt.id);
+    writeFileSync(join(root, "README.md"), "# Changed after review\n");
+    git(root, ["add", "README.md"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+      "commit", "-qm", "change source after review"]);
+    assert.equal(checkCurrentCriticBoundVerify(root).ok, false);
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root, mode: "candidate",
+      criticPacketId: reviewed.packetId, criticEvidenceFeatureId: featureId }),
+    error => error.code === "VEP-CVL-CARRY-CONTENT-CHANGED");
+  });
+});
 
 test("a passing verify produces a consumable artifact bound to the exact commit and tree", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
@@ -302,11 +354,36 @@ test("release Verify consumes a real fresh Critic packet and its same-candidate 
   });
 });
 
+test("Critic-bound candidate Verify checks the packet before replacing evidence and binds a same-mode rerun", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const target = join(root, "evidence", "verify.json");
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(target, "prior retained evidence\n");
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json",
+        mode: "candidate", criticPacketId: "c".repeat(32) }),
+      error => error.code === "VEP-CVL-CRITIC-UNAVAILABLE",
+    );
+    assert.equal(readFileSync(target, "utf8"), "prior retained evidence\n");
+    const critic = await completedCriticPacket(root);
+    const first = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json",
+      mode: "candidate", criticPacketId: critic.packetId });
+    assert.equal(first.evidence.selection.mode, "candidate");
+    assert.equal(first.criticLifecycle.receipt.critic.packetId, critic.packetId);
+    const rerun = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json",
+      mode: "candidate", criticReverifyReceiptId: first.criticLifecycle.receipt.id });
+    assert.equal(rerun.status, "passed");
+    assert.equal(rerun.criticLifecycle.receipt.critic.packetId, critic.packetId);
+  });
+});
+
 test("release reverify refuses changed candidates and tampered prior evidence", async () => {
   await withFixture('node -e "process.exit(0)"', async (root) => {
     const critic = await completedCriticPacket(root);
     const first = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticPacketId: critic.packetId });
-    writeFileSync(join(root, "evidence", "verify.json"), "{\"forged\":true}\n");
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({
+      ...first.evidence, startedAt: "2026-09-26T00:00:00.000Z",
+    })}\n`);
     await assert.rejects(
       () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticReverifyReceiptId: first.criticLifecycle.receipt.id }),
       error => error.code === "VEP-CVL-VERIFY-DRIFT",

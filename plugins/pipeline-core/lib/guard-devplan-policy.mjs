@@ -50,6 +50,9 @@ import {
 import { readDesignAdvisoryTransaction } from "./design-advisory-transaction.mjs";
 import { hasExactDesignAdvisorFinalApproval } from "./design-advisory-final-approval.mjs";
 import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
+import { readApprovedDesignWorkflowPackage } from "./design-workflow-package.mjs";
+import { verifyStoredDesignWorkflowPackageSignature } from "./design-workflow-approval.mjs";
+import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
 
 // Validate before hashing: the final authority reader must never read a state-
 // selected path outside the physical package, or follow a symlink.
@@ -68,6 +71,21 @@ function advisorPackageSha256(root, relativePath) {
   return createHash("sha256").update(readFileSync(target)).digest("hex");
 }
 
+function currentGitCandidate(root) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const commit = spawnSync("git", ["-C", root, "rev-parse", "HEAD"], {
+    encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+  });
+  const tree = spawnSync("git", ["-C", root, "rev-parse", "HEAD^{tree}"], {
+    encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+  });
+  const commitId = String(commit.stdout ?? "").trim();
+  const treeId = String(tree.stdout ?? "").trim();
+  if (commit.status !== 0 || tree.status !== 0
+    || !/^[a-f0-9]{40,64}$/u.test(commitId) || !/^[a-f0-9]{40,64}$/u.test(treeId)) return null;
+  return { commit: commitId, tree: treeId };
+}
+
 /** Read both the package projection and its actual repository-private transaction.
  * Git environment overrides must not redirect this authority read to another repo.
  * Neither public flags nor the legacy planApproved projection grant the exception.
@@ -81,6 +99,56 @@ export function designAdvisoryAdmission(state, projectDir, planPath, specPath) {
     const root = realpathSync(projectDir);
     const planSha256 = advisorPackageSha256(root, planPath);
     const specSha256 = advisorPackageSha256(root, specPath);
+    const approval = state?.planApproval;
+    if (approval?.schema === CURRENT_APPROVAL_SCHEMA && state?.planApproved === true) {
+      if (state?.planSubmission?.profile === "mini"
+        && approval.designWorkflowPackagePath === null
+        && approval.designWorkflowPackageSha256 === null
+        && approval.designWorkflowApproval === null) {
+        return { ok: true, id: "mini-no-design-workflow-package", mode: "not-required" };
+      }
+      if (!["epic", "feature"].includes(state?.planSubmission?.profile)) {
+        return { ok: false, code: "DAA-WORKFLOW-PROFILE" };
+      }
+      const readCandidate = () => currentGitCandidate(root);
+      const workflow = readApprovedDesignWorkflowPackage({
+        repoRoot: root,
+        packagePath: approval.designWorkflowPackagePath,
+        packageSha256: approval.designWorkflowPackageSha256,
+        featureId,
+        planPath,
+        planSha256,
+        specPath,
+        specSha256,
+        readCandidate,
+      });
+      if (!workflow.ok) return { ok: false, code: workflow.code ?? "DWP-APPROVAL-INVALID" };
+      const packageApproval = approval.designWorkflowApproval;
+      if (packageApproval?.mode === "signature") {
+        const trust = readCriticalHumanProofPolicy(root);
+        if (!trust.ok) return { ok: false, code: "DAA-PO-APPROVAL-TRUST-POLICY" };
+        const anchors = trust.trustAnchors ?? (trust.trustAnchor === null ? [] : [trust.trustAnchor]);
+        const verified = verifyStoredDesignWorkflowPackageSignature({
+          repoRoot: root,
+          packagePath: approval.designWorkflowPackagePath,
+          packageSha256: approval.designWorkflowPackageSha256,
+          featureId,
+          planPath,
+          planSha256,
+          specPath,
+          specSha256,
+          approval: packageApproval,
+          anchors,
+          readCandidate,
+        });
+        if (!verified.ok) return { ok: false, code: `DAA-${verified.code ?? "PO-APPROVAL-INVALID"}` };
+      } else if (packageApproval?.mode !== "chat"
+        || packageApproval.packageSha256 !== workflow.packageSha256
+        || packageApproval.approvedBy !== approval.approvedBy) {
+        return { ok: false, code: "DAA-PO-APPROVAL-INVALID" };
+      }
+      return { ok: true, id: workflow.packageSha256, mode: `approved-workflow-package-${packageApproval.mode}` };
+    }
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
     const git = spawnSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"],
       { encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000 });

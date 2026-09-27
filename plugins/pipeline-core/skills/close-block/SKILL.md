@@ -41,6 +41,18 @@ to the unified close coordinator. It must not maintain a parallel completion
 state or require push; inspect → plan-transition → confirmed `--activate`
 apply, with publication and release handled as separate gates.
 
+## Runtime-truth rule for either close profile
+
+Carry the current bootstrap's `dutyNotRuntimeLive` readback into the close
+report. If it names differing agent, skill or template files, attach the typed
+`DUTY-NOT-RUNTIME-LIVE` note and those relative files to any claim about the
+work just closed; never say the changed checkout duties are already "in
+force" in the installed plugin. If no installed-versus-checkout comparison
+was observed, say `runtime-live unverified`, not `in force`. A stale install
+does not by itself prohibit an honest local-source close or require the user
+to reinstall before recording unfinished work. This applies equally to the
+full and close-light report.
+
 ## Mandatory H5 dispatcher
 
 The coordinator decides which close mode is legal. The numbered ritual below
@@ -72,7 +84,7 @@ independent sequence and must not advance when its coordinator phase is stale.
 
 # close-block — session close ritual (parametrized)
 
-Normative sources (agent-pipeline repo — canon pointers, not runtime reads): `docs/operating-model.md`, `harness/checklists/session-close.md`, `policies/model-policy.md` MP-16/MP-19/MP-20, ADR-0012 (handover), single source of truth. `disable-model-invocation: true` is deliberate: closing writes a commit — the PO times it, the model never self-triggers it. This skill runs IN the main context (no fork): it needs the session's own state (`/usage`, `/context`, what actually happened this block).
+Normative sources (agent-pipeline repo — canon pointers, not runtime reads): `docs/operating-model.md`, `harness/checklists/session-close.md`, `policies/model-policy.md` MP-16/MP-19/MP-20, ADR-0012 (handover), single source of truth. The shipped frontmatter keeps `disable-model-invocation: false`, as required by plugin validation; therefore the hard entry gate above is essential. An invocation without the PO's explicit `durable-stop` or `runtime-transfer` intent must refuse before any close step or commit. This skill runs IN the main context (no fork): it needs the session's own state (`/usage`, `/context`, what actually happened this block).
 
 Intent: first argument, exactly `durable-stop` or `runtime-transfer` (mandatory).
 The remaining arguments form the optional block label used in the telemetry

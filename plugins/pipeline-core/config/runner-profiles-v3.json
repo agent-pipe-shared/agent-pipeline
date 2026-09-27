@@ -434,6 +434,38 @@
         "evidence": "dispatch-receipt"
       }
     },
+    "read": {
+      "claude": {
+        "state": "opt-in",
+        "selector": {
+          "kind": "alias",
+          "value": "haiku"
+        },
+        "effort": "medium",
+        "unavailable": "defer",
+        "evidence": "dispatch-receipt"
+      },
+      "codex": {
+        "state": "opt-in",
+        "selector": {
+          "kind": "model-id",
+          "value": "gpt-6-luna"
+        },
+        "effort": "medium",
+        "unavailable": "defer",
+        "evidence": "dispatch-receipt"
+      },
+      "antigravity": {
+        "state": "unavailable",
+        "selector": {
+          "kind": "model-id",
+          "value": "gemini-3.8-flash-medium"
+        },
+        "effort": "medium",
+        "unavailable": "defer",
+        "evidence": "dispatch-receipt"
+      }
+    },
     "advisory": {
       "eligibility": {
         "epic": "required",

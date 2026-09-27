@@ -340,11 +340,40 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/provenance-envelope.mjs",
   "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
   "plugins/pipeline-core/lib/verify-selection.mjs",
+  // The human signing command invokes portable export checks in child Node
+  // processes. Their authority-critical transitive imports stay non-liftable.
+  "plugins/pipeline-core/lib/architecture-effective-decisions.mjs",
+  // 0.7 AC-19/A and AC-25 add first-party authority edges from existing
+  // kernel readers. A maintenance window may not replace their decision
+  // continuity, inherited-source proof, waiver or host-observation checks.
+  "plugins/pipeline-core/lib/architecture-decision-continuity.mjs",
+  "plugins/pipeline-core/lib/architecture-decision-waiver-store.mjs",
+  "plugins/pipeline-core/lib/organization-architecture-source.mjs",
+  "plugins/pipeline-core/lib/organization-architecture-source-store.mjs",
+  "plugins/pipeline-core/lib/native-goldfish-host-observation.mjs",
+  "plugins/pipeline-core/lib/native-goldfish-host-return.mjs",
+  "plugins/pipeline-core/lib/native-goldfish-host-state.mjs",
+  "plugins/pipeline-core/lib/agent-model-registry.mjs",
+  "plugins/pipeline-core/lib/agy-host-commit-admission.mjs",
+  "plugins/pipeline-core/lib/agy-host-observed-local-readback.mjs",
+  "plugins/pipeline-core/lib/agy-host-observed-receipt.mjs",
+  "plugins/pipeline-core/lib/agy-host-observed-store.mjs",
+  "plugins/pipeline-core/lib/agy-final-return.mjs",
+  "plugins/pipeline-core/lib/agy-session-authority.mjs",
+  "plugins/pipeline-core/lib/agy-session-dispatch.mjs",
+  "plugins/pipeline-core/lib/antigravity-execution-host.mjs",
+  "plugins/pipeline-core/lib/critic-disposition-addendum.mjs",
+  "plugins/pipeline-core/lib/portable-agy-authorship-export.mjs",
+  "plugins/pipeline-core/lib/portable-critic-export.mjs",
+  "plugins/pipeline-core/lib/role-dispatch-preflight.mjs",
   "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
   "plugins/pipeline-core/scripts/installed-plugin-attestation-host.mjs",
   "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
   "plugins/pipeline-core/scripts/po-approval-request.mjs",
   "plugins/pipeline-core/scripts/po-human-approval.mjs",
+  "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+  "plugins/pipeline-core/scripts/portable-agy-authorship-export.mjs",
+  "plugins/pipeline-core/scripts/portable-critic-export.mjs",
   "plugins/pipeline-core/scripts/push-gate-satisfiability.mjs",
   "plugins/pipeline-core/scripts/push-prepare.mjs",
   "plugins/pipeline-core/scripts/ruleset-freshness.mjs",
@@ -490,12 +519,44 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
   "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
   "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
-  // Intake and Critic admission are now imported by existing kernel entry points.
-  // They must remain protected from the same maintenance-window bypass.
+  // The session Critic finalizer selects its admitted model through this
+  // route resolver. Keep both the resolver and its dynamically loaded
+  // host-managed bootstrap in the kernel: changing either could alter the
+  // model/effort that receives a protected Critic packet.
+  "plugins/pipeline-core/scripts/model-role-dispatch-select.mjs",
+  "plugins/pipeline-core/scripts/model-role-bootstrap.mjs",
+  // Intake and Critic admission are imported by kernel entry points and stay
+  // protected alongside the closure documented for the 2026-09-21 refresh.
   "plugins/pipeline-core/lib/onboarding-initial-answers-state.mjs",
   "plugins/pipeline-core/lib/onboarding-initial-answers-transaction.mjs",
   "plugins/pipeline-core/lib/onboarding-later-language.mjs",
   "plugins/pipeline-core/lib/critic-course-admission.mjs",
+  // The selector/bootstrap and protected design gates are transitively closed
+  // over these authorities, host observations, evidence readers, and their
+  // sandbox contract. A maintenance window must not rewrite the route, its
+  // local admission proof, or the read-only readiness evidence it consumes.
+  "plugins/pipeline-core/lib/design-workflow-package.mjs",
+  "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+  "plugins/pipeline-core/lib/advisory-attempt-trail.mjs",
+  "plugins/pipeline-core/lib/model-role-host-session.mjs",
+  "plugins/pipeline-core/lib/model-role-host-identity.mjs",
+  "plugins/pipeline-core/lib/model-role-host-store.mjs",
+  "plugins/pipeline-core/lib/model-role-route-source.mjs",
+  "plugins/pipeline-core/lib/model-role-approved-policy.mjs",
+  "plugins/pipeline-core/lib/model-role-host-observations.mjs",
+  "plugins/pipeline-core/lib/model-role-v3-baseline.mjs",
+  "plugins/pipeline-core/lib/model-role-session.mjs",
+  "plugins/pipeline-core/lib/model-role-dispatch.mjs",
+  "plugins/pipeline-core/lib/antigravity-model-host-observation.mjs",
+  "plugins/pipeline-core/lib/claude-model-host-observation.mjs",
+  "plugins/pipeline-core/lib/codex-model-host-observation.mjs",
+  "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+  "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+  "plugins/pipeline-core/lib/sandboxed-readonly-duty.mjs",
+  "plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs",
+  "plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs",
+  "plugins/pipeline-core/scripts/codex-sandbox-select.mjs",
+  "plugins/pipeline-core/lib/sandbox-failure.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

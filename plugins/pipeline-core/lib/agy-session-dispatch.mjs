@@ -15,7 +15,9 @@ import { dirname, relative, resolve, sep } from "node:path";
 import { invokeAgy } from "./antigravity-execution-host.mjs";
 import { AGY_FINAL_RETURN_JSON_SCHEMA, validateAgyFinalReturn } from "./agy-final-return.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
+import { bindStoredModelRoleDispatch } from "./model-role-host-session.mjs";
 import { ROLE_DISPATCH_PREFLIGHT_SCHEMA, preflightRoleDispatch } from "./role-dispatch-preflight.mjs";
+import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 
 export const AGY_SESSION_DISPATCH_SCHEMA = "pipeline.agy-session-dispatch-receipt.v1";
 export const AGY_SESSION_CONSENT_SCHEMA = "pipeline.agy-session-consent.v1";
@@ -192,6 +194,8 @@ export async function dispatchAgySession({
   session,
   consent,
   requestedModel,
+  modelRoleStore,
+  readRegistry = loadRunnerProfilesV3Registry,
   effort = "high",
   scope,
   inputSha256,
@@ -208,6 +212,27 @@ export async function dispatchAgySession({
   if (!validSessionIdentity(session)) return rejected(AGY_SESSION_DISPATCH_CODES.SESSION_MISMATCH, "session");
   if (!IMPLEMENTATION_ROLES.has(packet?.role)) return rejected(AGY_SESSION_DISPATCH_CODES.ROLE_FORBIDDEN, "packet.role");
   if (typeof requestedModel !== "string" || requestedModel.trim() === "") return rejected(AGY_SESSION_DISPATCH_CODES.MODEL_MISMATCH, "requestedModel");
+  if (modelRoleStore !== undefined) {
+    const taskRoute = packet.role === "pipeline-core:goldfish-mechanic" ? "duty.mechanic" : "duty.implement";
+    let registry;
+    try { registry = readRegistry(); } catch { return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore"); }
+    if (!validateRunnerProfilesV3Registry(registry).ok)
+      return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore");
+    // Both bounded implementation agent types have the same productive V3
+    // base duty. The mechanic-specific functional role is optional and may
+    // still be unavailable; it cannot revoke the admitted implement route.
+    const cell = registry.duties?.implement?.antigravity;
+    if (!cell || cell.state === "unavailable")
+      return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore");
+    const v3Match = cell.selector?.kind === "model-id"
+      && cell.selector.value === requestedModel && cell.effort === effort;
+    let bound;
+    try { bound = bindStoredModelRoleDispatch({ taskRoute, runner: "antigravity",
+      sessionId: session.id, requestedModel, store: modelRoleStore }); }
+    catch { bound = null; }
+    if ((!bound?.ok || bound.effort !== effort) && !v3Match)
+      return rejected("AGY-SESSION-MODEL-ROLE-NOT-BOUND", "modelRoleStore");
+  }
   if ((typeof scope !== "string" && (scope === null || typeof scope !== "object" || Array.isArray(scope))) || (typeof scope === "string" && scope.trim() === "") || !SHA256.test(inputSha256 ?? "")) return rejected(AGY_SESSION_DISPATCH_CODES.INPUT_MISMATCH, "inputSha256");
   const consentCheck = validateConsent(consent, { sessionId: session.id, model: requestedModel, role: packet.role, scope, nowEpochMs });
   if (!consentCheck.ok) return rejected(consentCheck.code, "consent");

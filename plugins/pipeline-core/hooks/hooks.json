@@ -140,6 +140,19 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "$comment": "Explicit native Goldfish host-commit route: finalize only a single marked foreground Task/Agent after exact PostToolUse/model readback; unmarked and background Claude dispatches remain unchanged.",
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

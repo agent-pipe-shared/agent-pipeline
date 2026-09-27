@@ -12,6 +12,7 @@ import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 import { agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
 import { agyAgentTypeForRole } from "../lib/agy-final-return.mjs";
 import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
+import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation } from "../lib/native-goldfish-host-observation.mjs";
 
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 const REQUEST_SCHEMA = "pipeline.dispatch-record-write-request.v1";
@@ -162,7 +163,14 @@ export function writeHostObservedAgyDispatchRecord({ repoRoot, target, record },
   return publishDispatchRecord(root, target, record, dependencies, { hostObservedAgy: true });
 }
 
-function publishDispatchRecord(root, targetPath, inputRecord, dependencies, { hostObservedAgy = false } = {}) {
+/** Host-only Claude/Codex authored-return publication after private and Git readback. */
+export function writeHostObservedNativeGoldfishDispatchRecord({ repoRoot, target, record }, dependencies = {}) {
+  const root = physicalRoot(repoRoot);
+  return publishDispatchRecord(root, target, record, dependencies, { hostObservedNativeGoldfish: true });
+}
+
+function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
+  { hostObservedAgy = false, hostObservedNativeGoldfish = false } = {}) {
   const record = validateDispatchRecord(inputRecord);
   const modelCheck = compareRecordedModel(record);
   const agyUndelivered = record.schema === "pipeline.dispatch-record.v4"
@@ -182,12 +190,24 @@ function publishDispatchRecord(root, targetPath, inputRecord, dependencies, { ho
     && record.runner === "antigravity"
     && agyAgentTypeForRole(`pipeline-core:${record.agentType}`) !== null
     && record.outcomeClassification.kind === "authored-commit";
+  const nativeGoldfishAuthored = record.schema === "pipeline.dispatch-record.v4"
+    && ["claude", "codex"].includes(record.runner)
+    && record.outcomeClassification.kind === "authored-commit";
   if (hostObservedAgy && !agyAuthored) fail("record-host-observation", "host-observed route requires authored Agy v4");
+  if (hostObservedNativeGoldfish && !nativeGoldfishAuthored) fail("record-host-observation", "native host-observed route requires authored Claude/Codex v4");
+  if (nativeGoldfishAuthored && !hostObservedNativeGoldfish) {
+    fail("record-host-observation", "authored Claude/Codex v4 must use the native host-observed writer");
+  }
+  if (nativeGoldfishAuthored && hostObservedNativeGoldfish) {
+    const checked = inspectNativeGoldfishHostObservation({ root, taskId: record.taskId,
+      record, recordBytes: nativeAuthoredRecordBytes(record) });
+    if (!checked.ok) fail("record-host-observation", `native Goldfish host observation is not independently readable: ${checked.code}`);
+  }
   if (agyAuthored && hostObservedAgy) {
     const checked = inspectAgyHostObservedLocalReadback({ root, taskId: record.taskId,
       record, recordBytes: agyAuthoredRecordBytes(record) });
     if (!checked.ok) fail("record-host-observation", `Agy host observation is not independently readable: ${checked.code}`);
-  } else if (!agyUndelivered && !agyInterrupted && modelCheck.classification !== "model-matches") {
+  } else if (!hostObservedNativeGoldfish && !agyUndelivered && !agyInterrupted && modelCheck.classification !== "model-matches") {
     fail("record-model", `record model/effort is not bound to agentType without caller authority: ${modelCheck.reason}`);
   }
   const targetRelative = normalizeDispatchRecordPath(targetPath, "target path");

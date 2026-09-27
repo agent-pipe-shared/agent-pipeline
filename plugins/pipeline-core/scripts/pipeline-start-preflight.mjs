@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { observeArchitectureAdoptionOrientation } from "../lib/architecture-adoption-orientation.mjs";
-import { inspectEffectiveArchitectureDecisions } from "../lib/architecture-effective-decisions.mjs";
+import { inspectArchitectureDecisionContinuity } from "../lib/architecture-decision-continuity.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 // NVA-K-DRIVERREACH (backlog: 2026-08-28-the-guided-driver-is-neither-discoverable-nor-
 // runnable.md): the same typed readiness check the readiness guard itself uses
@@ -1015,7 +1015,7 @@ export function observePipelineStartPreflight({
   observeUnseenPushToRemoteFn = observeUnseenPushToRemote,
   requireProjectOnboardingReadyFn = requireProjectOnboardingReady,
   observeArchitectureAdoptionOrientationFn = observeArchitectureAdoptionOrientation,
-  inspectEffectiveArchitectureDecisionsFn = inspectEffectiveArchitectureDecisions,
+  inspectEffectiveArchitectureDecisionsFn = inspectArchitectureDecisionContinuity,
   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
   resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
   antigravityPluginRegistries = () => [
@@ -1395,15 +1395,23 @@ export function observePipelineStartPreflight({
   let effectiveDecisions;
   try {
     const projection = inspectEffectiveArchitectureDecisionsFn({ rootDir: resolve(cwd), area: "project" });
-    const expectedCodes = {
+    const localCodes = {
       ready: "ARCH-DECISION-EFFECTIVE-READY",
       advisory: "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
       blocked: "ARCH-DECISION-EFFECTIVE-UNRESOLVED",
     };
-    if (projection?.schema !== "pipeline.architecture-effective-decisions.v1"
+    const combinedCodes = {
+      ready: "ARCH-CONTINUITY-READY",
+      advisory: "ARCH-CONTINUITY-ADVISORY",
+    };
+    const knownCode = projection?.schema === "pipeline.architecture-decision-continuity.v1"
+      ? (projection.status === "blocked" ? typeof projection.code === "string"
+        && projection.code.startsWith("ARCH-CONTINUITY-") : projection.code === combinedCodes[projection.status])
+      : projection?.schema === "pipeline.architecture-effective-decisions.v1"
+        && projection.code === localCodes[projection.status];
+    if (!knownCode
       || projection.area !== "project"
       || !["ready", "advisory", "blocked"].includes(projection.status)
-      || projection.code !== expectedCodes[projection.status]
       || !Array.isArray(projection.decisions) || !Array.isArray(projection.findings)
       || (projection.status === "blocked" ? projection.projectionSha256 !== null
         : !/^[a-f0-9]{64}$/u.test(projection.projectionSha256 ?? ""))) {

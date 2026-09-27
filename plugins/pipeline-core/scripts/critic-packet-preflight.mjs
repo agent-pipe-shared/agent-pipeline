@@ -214,14 +214,27 @@ function normalizeRoute(route) {
   }
   return Object.fromEntries(keys.map((key) => [key, route[key]]));
 }
-function normalizeSessionBinding(value) {
+function normalizeSessionBinding(value, route) {
   const keys = ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"];
-  if (!exactKeys(value, keys) || value.schema !== SESSION_PACKET_BINDING_SCHEMA
+  const hasModelRole = isObject(value) && Object.hasOwn(value, "modelRole");
+  if (!exactKeys(value, hasModelRole ? [...keys, "modelRole"] : keys) || value.schema !== SESSION_PACKET_BINDING_SCHEMA
     || typeof value.sessionId !== "string" || !SAFE_ID.test(value.sessionId)
     || typeof value.preflightSha256 !== "string" || !SHA256.test(value.preflightSha256)
     || value.assurance !== SESSION_ASSURANCE || value.freshContext !== true
     || value.historyInherited !== false || value.mayDelegate !== false) fail("CPP-SESSION-BINDING", "Session Critic binding is invalid.");
-  return Object.freeze(Object.fromEntries(keys.map((key) => [key, value[key]])));
+  if (hasModelRole) {
+    const role = value.modelRole;
+    if (!exactKeys(role, ["schema", "runner", "taskRoute", "modelId", "effort", "readbackSha256", "receiptSha256"])
+      || role.schema !== "pipeline.session-critic-model-role.v1"
+      || !["codex", "claude"].includes(role.runner)
+      || !["duty.critic_normal", "duty.critic_high_risk"].includes(role.taskRoute)
+      || typeof role.modelId !== "string" || role.modelId.length === 0 || role.modelId.length > 128
+      || role.modelId.trim() !== role.modelId || typeof role.effort !== "string" || role.effort.length === 0
+      || !SHA256.test(role.readbackSha256) || !SHA256.test(role.receiptSha256)
+      || (route !== undefined && (role.runner !== route.runner || role.modelId !== route.modelTier
+        || role.effort !== route.effortTier))) fail("CPP-SESSION-BINDING", "Session Critic model-role binding is invalid.");
+  }
+  return Object.freeze(Object.fromEntries((hasModelRole ? [...keys, "modelRole"] : keys).map((key) => [key, value[key]])));
 }
 function normalizeReferences(references, candidateByPath) {
   if (!Array.isArray(references)) fail("CPP-REFERENCE", "references must be an array.");
@@ -303,7 +316,7 @@ function validatePacketShape(packet) {
     || !SHA256.test(packet.bindings?.governanceSha256)) fail("CPP-DIGEST", "Packet shape is invalid.");
   const expected = bindingsFor(packet);
   if (JSON.stringify(expected) !== JSON.stringify(packet.bindings)) fail("CPP-DIGEST", "Packet binding digest mismatch.");
-  if (packet.request?.sessionBinding !== undefined) normalizeSessionBinding(packet.request.sessionBinding);
+  if (packet.request?.sessionBinding !== undefined) normalizeSessionBinding(packet.request.sessionBinding, packet.route);
   if (packet.diagnostics !== undefined && !validateDiagnosticBundleShape(packet.diagnostics)) fail("CPP-DIAGNOSTIC", "Invalid diagnostic bundle.");
 }
 function packetContext(controlRoot, packetId) {
@@ -424,7 +437,8 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const controlRoot = assertRealPrivateDir(resolve(options.controlRoot), "control root");
     if (controlRoot !== requiredControl) fail("CPP-CONTROL", "controlRoot is not the canonical Git common-dir packet root.");
     if (!PACKET_ID.test(options.packetId) || !SAFE_ID.test(options.taskId) || !SAFE_ID.test(options.projectId)) fail("CPP-ARGUMENT", "Unsafe packet/task/project ID.");
-    const sessionBinding = options.sessionBinding === undefined ? undefined : normalizeSessionBinding(options.sessionBinding);
+    const route = normalizeRoute(options.route);
+    const sessionBinding = options.sessionBinding === undefined ? undefined : normalizeSessionBinding(options.sessionBinding, route);
     const objectFormat = gitText(repoRoot, ["rev-parse", "--show-object-format"]);
     const base = assertOid(options.baseCommit, objectFormat, "baseCommit");
     const candidate = assertOid(options.candidateCommit, objectFormat, "candidateCommit");
@@ -487,7 +501,7 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
         ...(sessionBinding === undefined ? {} : { sessionBinding }),
       },
       ruleset: { oid: rulesetOid, objectFormat },
-      route: normalizeRoute(options.route),
+      route,
       candidate: { base, commit: candidate, tree: candidateTree },
       diff,
       diffPaths,

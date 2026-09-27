@@ -19,7 +19,8 @@ The complete execution and receipt contract lives in
 ## Contract
 
 - Start only after the coordinator validates the current
-  `pipeline.advisory-demand.v2`. Session start, resume, re-entry and Compact
+  `pipeline.advisory-demand.v2` or its host-reconstructed,
+  session-role-bound `pipeline.advisory-demand.v3`. Session start, resume, re-entry and Compact
   never dispatch this agent, and an unchanged reuse key never dispatches it
   twice.
 - Begin from a fresh context. Do not request or consume chat history, a

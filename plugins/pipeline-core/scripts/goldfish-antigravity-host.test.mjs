@@ -303,6 +303,50 @@ check("a hand-authored current A1 PASS never qualifies the production E3 gate", 
   });
 });
 
+check("session-bound CLI route keeps the V3 model when an optional role receipt is absent", async () => {
+  await withFixture(async (value) => {
+    const result = await dispatchGoldfishToAntigravity(
+      request(value, packet(value), { sessionId: "host-session-1" }), {
+        readGateState: (input) => readE3GateState(input, { qualifyNativeA1: () => true }),
+        modelRoleStore: { read: () => ({ ok: false, code: "MODEL-ROLE-STORE-UNAVAILABLE" }) },
+      });
+    assert.equal(result.code, E3_CODES.COMPLETED, JSON.stringify(result));
+    assert.equal(result.modelCalls, 1);
+    assert.equal(calls(value).length, 2);
+  });
+  await withFixture(async (value) => {
+    const mechanic = packet(value);
+    mechanic.role = "pipeline-core:goldfish-mechanic";
+    const result = await dispatchGoldfishToAntigravity(
+      request(value, mechanic, { sessionId: "host-session-1" }), {
+        readGateState: (input) => readE3GateState(input, { qualifyNativeA1: () => true }),
+        modelRoleStore: { read: () => ({ ok: false, code: "MODEL-ROLE-STORE-UNAVAILABLE" }) },
+      });
+    assert.equal(result.code, E3_CODES.COMPLETED, JSON.stringify(result));
+    assert.equal(result.modelCalls, 1);
+  });
+  await withFixture(async (value) => {
+    const result = await dispatchGoldfishToAntigravity(
+      request(value, packet(value), { sessionId: "host-session-1", model: "unapproved-model" }), {
+        readGateState: (input) => readE3GateState(input, { qualifyNativeA1: () => true }),
+        modelRoleStore: { read: () => ({ ok: false, code: "MODEL-ROLE-STORE-UNAVAILABLE" }) },
+      });
+    assert.equal(result.code, E3_CODES.MODEL_ROLE_NOT_BOUND);
+    assert.equal(result.modelCalls, 0);
+    assert.equal(calls(value).length, 0);
+  });
+  await withFixture(async (value) => {
+    const result = await dispatchGoldfishToAntigravity(
+      request(value, packet(value), { sessionId: "host-session-1" }), {
+        readRegistry: () => ({ duties: {} }),
+        modelRoleStore: { read: () => ({ ok: false, code: "MODEL-ROLE-STORE-UNAVAILABLE" }) },
+      });
+    assert.equal(result.code, E3_CODES.MODEL_ROLE_NOT_BOUND);
+    assert.equal(result.modelCalls, 0);
+    assert.equal(calls(value).length, 0);
+  });
+});
+
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

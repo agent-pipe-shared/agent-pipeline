@@ -114,8 +114,22 @@ against, which is the cheapest remaining step toward closing this item.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
+- **Decision (PO, 2026-09-27):** Retain this item for the first efficiency
+  increment after 0.7. Prefer reducing avoidable Pipeline/tool overhead,
+  retries, repeated analysis and redundant verification before reducing the
+  quality tier used for ordinary work. Treat functional model-role routing as
+  a measured hypothesis: the PO currently prefers GPT-6 Luna to GPT-5.6 Terra
+  for worker/efficient duties where compatible, while GPT-6 Sol remains
+  available for tasks whose benefit warrants its higher consumption. Do not
+  silently change the 0.7 routes or infer API dollars from subscription-plan
+  usage.
+- **Rationale:** The existing Greenfield comparisons are heterogeneous and
+  partly self-estimated; the historical 17.2% C2 figure lacks reproducible raw
+  per-dispatch inputs. A useful efficiency pass must first establish comparable
+  baselines and separate fixed pipeline, per-tool, retry, human-wait and
+  productive-work costs. Lower model spend alone is not evidence of better
+  total outcome if it increases rework or failure.
 - **Assignment:** `sprint: nightwing` — deferred past this sprint, per the
-  source triage's own `LATER (measurement item)` classification.
-- **Date:**
+  source triage's own `LATER (measurement item)` classification; execute after
+  the 0.7 local-candidate work.
+- **Date:** 2026-09-27

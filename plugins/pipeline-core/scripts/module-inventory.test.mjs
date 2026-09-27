@@ -26,14 +26,14 @@ describe("module-inventory (WP-D2, AC-8, AC-22, AC-23)", () => {
   const schema = getModuleInventorySchema();
 
   describe("1. Map bundle loading and validation", () => {
-    it("successfully loads live map bundle with 4 governed modules", () => {
+    it("successfully loads live map bundle with 5 governed modules", () => {
       const result = loadMapBundle(REPO_ROOT, schema);
       assert.equal(result.ok, true, `loadMapBundle failed: ${result.errors.join("; ")}`);
       assert.equal(result.indexFileExists, true, "Root map index must exist");
-      assert.equal(result.modules.length, 4, "Must load exactly 4 governed modules");
+      assert.equal(result.modules.length, 5, "Must load exactly 5 governed modules");
 
       const moduleIds = result.modules.map((m) => m.id).sort();
-      assert.deepEqual(moduleIds, ["backlog", "harness", "pipeline-core", "schemas"]);
+      assert.deepEqual(moduleIds, ["backlog", "governance", "harness", "pipeline-core", "schemas"]);
     });
 
     it("ensures each governed module satisfies all 6 contract-sufficiency fields", () => {
@@ -149,6 +149,16 @@ describe("module-inventory (WP-D2, AC-8, AC-22, AC-23)", () => {
       assert.equal(mod.id, "backlog");
     });
 
+    it("resolves canonical rules to governance without stealing plugin or harness paths", () => {
+      for (const owned of ["docs/operating-model.md", "policies/model-policy.md",
+        "roles/elephant.md", "roles/goldfish.md", "guardrails/token-budget.md"]) {
+        assert.equal(resolveModuleForPath(owned, inventory)?.id, "governance", owned);
+      }
+      assert.equal(resolveModuleForPath("plugins/pipeline-core/roles/elephant.md", inventory)?.id, "pipeline-core");
+      assert.equal(resolveModuleForPath("harness/session-bootstrap.md", inventory)?.id, "harness");
+      assert.equal(resolveModuleForPath("docs/usage.md", inventory), null);
+    });
+
     it("returns null for unowned paths", () => {
       const mod = resolveModuleForPath("untracked/unknown/file.txt", inventory);
       assert.equal(mod, null);
@@ -165,6 +175,27 @@ describe("module-inventory (WP-D2, AC-8, AC-22, AC-23)", () => {
       const mod = resolveModuleForPath(abs, inventory);
       assert.ok(mod);
       assert.equal(mod.id, "harness");
+    });
+
+    it("resolves an absolute path in the consuming repository rather than the plugin checkout", () => {
+      const consumerRoot = path.join(os.tmpdir(), "independent-consumer-repo");
+      const consumerModules = [{ id: "application", ownedPaths: ["src/**"],
+        conceptFilePath: path.join(consumerRoot, "architecture/map/application.md") }];
+      assert.equal(resolveModuleForPath(path.join(consumerRoot, "src/main.mjs"), consumerModules)?.id,
+        "application");
+      assert.equal(resolveModuleForPath(path.join(REPO_ROOT, "src/main.mjs"), consumerModules), null);
+      assert.equal(resolveModuleForPath(path.join(consumerRoot, "src/main.mjs"), [
+        ...consumerModules, { id: "unbound", ownedPaths: ["src/**"] },
+      ]), null, "a partly unbound inventory cannot resolve an absolute path");
+    });
+
+    it("does not silently choose one of two equally specific module owners", () => {
+      const overlapping = [
+        { id: "first", ownedPaths: ["src/**"] },
+        { id: "second", ownedPaths: ["src/**"] },
+      ];
+      assert.equal(resolveModuleForPath("src/main.mjs", overlapping), null);
+      assert.equal(resolveModuleForPath("src/main.mjs", overlapping.reverse()), null);
     });
   });
 

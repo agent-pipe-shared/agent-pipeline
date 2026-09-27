@@ -35,7 +35,8 @@ function files() {
   writeFileSync(schema, JSON.stringify({ type: "object", required: ["findings", "deliberately_not_flagged", "trajectory_verdict", "trajectory_evidence", "briefing_violations", "pass"], additionalProperties: false, properties: { findings: { type: "array", items: { type: "object" } }, deliberately_not_flagged: { type: "array", items: { type: "string" } }, trajectory_verdict: { type: "string", enum: ["consistent", "inconsistent", "not verifiable"] }, trajectory_evidence: { type: "string" }, briefing_violations: { type: "array", items: { type: "string" } }, pass: { type: "boolean" } } }));
   return { root, executable, contract, schema };
 }
-function repository({ references = [{ kind: "spec", path: "specs/work.md" }], diagnostic = false } = {}) {
+function repository({ references = [{ kind: "spec", path: "specs/work.md" }], diagnostic = false,
+  sessionBinding, routeModel = "opus", routeEffort = "max", trigger = "T1" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "claude-packet-"));
   git(root, ["init", "--quiet"]); git(root, ["config", "user.email", "test@example.invalid"]); git(root, ["config", "user.name", "Test"]);
   mkdirSync(join(root, "specs")); writeFileSync(join(root, "specs", "work.md"), "base\n"); git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "base"]); const base = git(root, ["rev-parse", "HEAD"]);
@@ -57,7 +58,7 @@ function repository({ references = [{ kind: "spec", path: "specs/work.md" }], di
     report: { text: "done", changedFiles: ["specs/work.md"] },
     criticRequired: {
       schema: "pipeline.critic-required-decision.v1",
-      trigger: {
+    trigger: {
         schema: "pipeline.critic-trigger-input.v1",
         rigorLevel: 2,
         riskClass: "high",
@@ -77,9 +78,23 @@ function repository({ references = [{ kind: "spec", path: "specs/work.md" }], di
   }
   const prepared = prepareCandidatePacket({ repoRoot: root, controlRoot: control, packetId: "7".repeat(32), taskId: "batman-claude", projectId: "pipeline", baseCommit: base, candidateCommit: candidate, rulesetOid: candidate,
     ...(diagnostic ? { evidencePaths: ["evidence/diagnostic.json"] } : {}),
-    route: { routeId: "claude-critic", runner: "claude", adapter: "claude-host", provider: "anthropic", modelTier: "sonnet", effortTier: "max", assurance: "native-preferred", projectionDigest: "8".repeat(64) }, references },
+    trigger,
+    route: { routeId: "claude-critic", runner: "claude", adapter: "claude-host", provider: "anthropic", modelTier: routeModel, effortTier: routeEffort, assurance: "native-preferred", projectionDigest: "8".repeat(64) },
+    references,
+    ...(sessionBinding === undefined ? {} : { sessionBinding }) },
   { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 15) });
   return { root, control, prepared };
+}
+function claudeCriticModelRole(modelId = "claude-opus-current") {
+  return { schema: "pipeline.session-critic-model-role.v1", runner: "claude",
+    taskRoute: "duty.critic_high_risk", modelId, effort: "max",
+    readbackSha256: "a".repeat(64), receiptSha256: "b".repeat(64) };
+}
+function claudeCriticSessionBinding(modelRole) {
+  return { schema: "pipeline.session-critic-packet-binding.v1", sessionId: "claude-session-1",
+    preflightSha256: "8".repeat(64),
+    assurance: "functional-equivalent-read-only; OS isolation not asserted",
+    freshContext: true, historyInherited: false, mayDelegate: false, modelRole };
 }
 function packetFile(repo, name) { return join(repo.control, repo.prepared.packet.packetId, name); }
 function assertDispatchPreflightRejection(repo, fn, expectedCode) {
@@ -97,6 +112,81 @@ check("builds exact native argv with bare, CLI schema, fixed read-only tools and
   const argv = buildNativeBareArgv({ prompt: "p", checkoutRoot: "/repo", schemaText: "{}", model: "sonnet", effort: "max", contractPath: "/contract" });
   assert.deepEqual(argv.slice(0, 6), ["-p", "p", "--bare", "--add-dir", "/repo", "--output-format"]);
   assert.equal(argv.includes("--json-schema"), true); assert.deepEqual(argv.slice(argv.indexOf("--tools"), argv.indexOf("--tools") + 2), ["--tools", "Read,Grep,Glob"]);
+});
+
+check("Claude packet execution accepts an admitted session model only with the same sealed session readback", () => {
+  const modelRole = claudeCriticModelRole();
+  const repo = repository({ sessionBinding: claudeCriticSessionBinding(modelRole), routeModel: modelRole.modelId });
+  const f = files();
+  try {
+    const calls = [];
+    const selected = { ok: true, status: "ready", runner: "claude", taskRoute: modelRole.taskRoute,
+      sessionId: "claude-session-1", modelId: modelRole.modelId, effort: modelRole.effort,
+      readbackSha256: modelRole.readbackSha256, receiptSha256: modelRole.receiptSha256 };
+    const prepared = prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId,
+      adapter: "claude-host", claimantNonce: "6".repeat(64), executablePath: f.executable,
+      contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, {
+      modelRoleEnvironment: { CLAUDE_CODE_SESSION_ID: "claude-session-1" },
+      selectModelRoleForTaskFn: () => selected,
+      now: new Date("2026-07-18T12:01:00.000Z"),
+      spawnFn: (command, args, options) => { calls.push({ command, args, options }); return { status: 0, stdout: stream(), stderr: "" }; },
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].args[calls[0].args.indexOf("--model") + 1], modelRole.modelId);
+    assert.equal(prepared.packet.request.sessionBinding.modelRole.readbackSha256, modelRole.readbackSha256);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("rejects an unbound selected Claude route before any model probe or export", () => {
+  const repo = repository(); const f = files(); let calls = 0;
+  try {
+    const modelRole = claudeCriticModelRole();
+    assert.throws(() => prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId,
+      adapter: "claude-host", claimantNonce: "7".repeat(64), executablePath: f.executable,
+      contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, {
+      modelRoleEnvironment: { CLAUDE_CODE_SESSION_ID: "claude-session-1" },
+      selectModelRoleForTaskFn: () => ({ ok: true, status: "ready", runner: "claude",
+        taskRoute: modelRole.taskRoute, sessionId: "claude-session-1", modelId: modelRole.modelId,
+        effort: modelRole.effort, readbackSha256: modelRole.readbackSha256,
+        receiptSha256: modelRole.receiptSha256 }),
+      now: new Date("2026-07-18T12:01:00.000Z"),
+      spawnFn: () => { calls += 1; return { status: 0, stdout: stream(), stderr: "" }; },
+    }), (error) => error instanceof ClaudeCriticHostError && error.code === "CLH-MODEL-ROLE-PACKET");
+    assert.equal(calls, 0);
+    assert.equal(existsSync(packetFile(repo, "export-native.json")), false);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("optional Claude selector failure uses only the exact validated V3 route", () => {
+  const repo = repository(); const f = files(); let calls = 0;
+  try {
+    const prepared = prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId,
+      adapter: "claude-host", claimantNonce: "8".repeat(64), executablePath: f.executable,
+      contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, {
+      modelRoleEnvironment: {},
+      selectModelRoleForTaskFn: () => { throw new Error("optional selection unavailable"); },
+      now: new Date("2026-07-18T12:01:00.000Z"),
+      spawnFn: (command, args) => { calls += 1; assert.equal(args[args.indexOf("--model") + 1], "opus"); return { status: 0, stdout: stream(), stderr: "" }; },
+    });
+    assert.equal(prepared.packet.route.modelTier, "opus");
+    assert.equal(calls, 1);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("refuses a stale Claude packet instead of guessing after V3 fallback", () => {
+  const repo = repository({ routeModel: "sonnet" }); const f = files(); let calls = 0;
+  try {
+    assert.throws(() => prepareClaudePacketReview({ controlRoot: repo.control, packetId: repo.prepared.packet.packetId,
+      adapter: "claude-host", claimantNonce: "9".repeat(64), executablePath: f.executable,
+      contractPath: f.contract, schemaPath: f.schema, neutralCwd: f.root }, {
+      modelRoleEnvironment: {},
+      selectModelRoleForTaskFn: () => ({ ok: true, status: "legacy-v3", runner: "claude",
+        taskRoute: "duty.critic_high_risk", v3Route: { selector: { kind: "alias", value: "opus" }, effort: "max" } }),
+      now: new Date("2026-07-18T12:01:00.000Z"),
+      spawnFn: () => { calls += 1; return { status: 0, stdout: stream(), stderr: "" }; },
+    }), (error) => error instanceof ClaudeCriticHostError && error.code === "CLH-MODEL-ROLE-PACKET");
+    assert.equal(calls, 0);
+  } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
 });
 
 check("preflights and reuses one exact executable identity without PATH or shell", () => {
@@ -320,4 +410,4 @@ check("closes the late fallback dispatch over runner, references and reason", ()
   } finally { rmSync(repo.root, { recursive: true, force: true }); rmSync(f.root, { recursive: true, force: true }); }
 });
 
-process.stdout.write(`${passed}/16 checks passed.\n`);
+process.stdout.write(`${passed}/20 checks passed.\n`);

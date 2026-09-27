@@ -9,6 +9,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
+  advisorySessionRoleSelectionSha256,
   advisoryEvidenceBundleSha256,
   advisoryConsultationDisposition,
   buildAdvisoryEvidenceBundle,
@@ -98,6 +99,46 @@ test("only a concrete trigger, one question and exact candidate/evidence binding
       evidenceSha256: sha256("same"), dispatch,
     }).ok, false);
   }
+});
+
+test("Claude session-selected Advisor fallback is bound in v3 demand and material reuse", () => {
+  const selectionBase = {
+    runner: "claude", taskRoute: "duty.advisory.fallback", role: "frontier",
+    effort: "max", modelId: "claude-frontier-reviewed", sessionId: "claude-session-01",
+    readbackSha256: "1".repeat(64), receiptSha256: "2".repeat(64),
+  };
+  const selection = { ...selectionBase,
+    selectionSha256: advisorySessionRoleSelectionSha256(selectionBase) };
+  const input = {
+    runner: "claude", profile: "feature", reason: "risk-review",
+    question: "Which session-admitted fallback is valid?",
+    evidenceSha256: sha256("bounded advisor evidence"), dispatch,
+    sessionRoleSelection: selection,
+  };
+  const created = createAdvisoryDemand(input);
+  assert.equal(created.ok, true);
+  assert.equal(created.demand.schema, "pipeline.advisory-demand.v3");
+  assert.equal(Object.hasOwn(created.demand.sessionRoleBinding, "sessionId"), false);
+  assert.equal(created.demand.sessionRoleBinding.modelId, selection.modelId);
+  assert.equal(created.demand.sessionRoleBinding.selectionSha256, selection.selectionSha256);
+  assert.equal(validateAdvisoryDemand(created.demand, input).ok, true);
+
+  const record = createAdvisoryConsultationRecord({ demand: created.demand,
+    outcome: "answered", receipt: { sanitized: true }, completedAtMs: 10 }).record;
+  assert.equal(advisoryConsultationDisposition(created.demand, record).disposition, "reuse-no-repeat");
+  const nextSelectionBase = { ...selectionBase, modelId: "claude-frontier-next",
+    sessionId: "claude-session-02", receiptSha256: "3".repeat(64) };
+  const nextSelection = { ...nextSelectionBase,
+    selectionSha256: advisorySessionRoleSelectionSha256(nextSelectionBase) };
+  const changed = createAdvisoryDemand({ ...input, sessionRoleSelection: nextSelection }).demand;
+  assert.equal(advisoryConsultationDisposition(changed, record).disposition, "consult-material-drift");
+
+  const tampered = structuredClone(created.demand);
+  tampered.sessionRoleBinding.modelId = "attacker-selected-model";
+  assert.equal(validateAdvisoryDemand(tampered, input).code, "advisory_demand_binding_mismatch");
+  assert.equal(createAdvisoryDemand({ ...input, sessionRoleSelection: {
+    ...selection, effort: "medium",
+  } }).ok, false);
 });
 
 test("allowlisted evidence is content-bound, bounded and rendered into the model input", () => {

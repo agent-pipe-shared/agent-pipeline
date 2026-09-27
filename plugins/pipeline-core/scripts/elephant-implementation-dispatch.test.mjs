@@ -28,13 +28,13 @@ function fixture(overrides = {}) {
   writeFileSync(request, JSON.stringify(packet(overrides.packet)));
   let launches = 0;
   const dependencies = {
-    routeAuthority: () => ({ runner: "antigravity", provider: "google", requestedModel: "gemini-3.8-flash-high", effort: "high", routePolicySha256: "e".repeat(64) }),
+    routeAuthority: () => ({ runner: "antigravity", provider: "google", requestedModel: "gemini-3.8-flash-medium", effort: "medium", routePolicySha256: "e".repeat(64) }),
     preflightRoleDispatch: ({ packet: value }) => ({ status: "prepared", packet: value, candidate: value.candidate }),
     loadLiveSession: () => ({ ok: true, session: { id: "session-1", descriptorSha256: SHA }, descriptor: { repo: { primaryRoot: root, commonDir: root } } }),
     loadStoredConsent: () => ({ record: { subjectSha256: SHA, mode: "chat", subject: { fallbackPolicy: "none" } }, descriptor: { repo: { primaryRoot: root, commonDir: root } } }),
     validateConsentRecord: () => ({ ok: true }),
     validateDispatchBinding: () => ({ ok: true }),
-    runLiveHost: async () => { launches += 1; return { status: "completed-undelivered", code: "AGY-SESSION-FINAL-UNDELIVERED", observed: { provider: "google", model: "gemini-3.8-flash-high", effectiveSandbox: "unknown" }, result: { path: "results/out.json", sha256: "f".repeat(64) }, record: { target: "evidence/dispatch-record-agy-production-route-1.json", sha256: "e".repeat(64), attemptId: "attempt-1", authorship: "not-applicable" }, launcherCalls: 1, modelCalls: 1 }; },
+    runLiveHost: async () => { launches += 1; return { status: "completed-undelivered", code: "AGY-SESSION-FINAL-UNDELIVERED", observed: { provider: "google", model: "gemini-3.8-flash-medium", effectiveSandbox: "unknown" }, result: { path: "results/out.json", sha256: "f".repeat(64) }, record: { target: "evidence/dispatch-record-agy-production-route-1.json", sha256: "e".repeat(64), attemptId: "attempt-1", authorship: "not-applicable" }, launcherCalls: 1, modelCalls: 1 }; },
   };
   return { root, request, dependencies, launches: () => launches };
 }
@@ -126,9 +126,9 @@ test("absence, stale session, altered route, scope and request binding fail on t
   assert.equal(noOwner.code, "AGY-SESSION-OWNER-STALE");
   assert.equal(stale.launches(), 0);
   for (const route of [
-    { runner: "antigravity", provider: "other", requestedModel: "gemini-3.8-flash-high", effort: "high", routePolicySha256: "e".repeat(64) },
-    { runner: "antigravity", provider: "google", requestedModel: "gemini-other", effort: "high", routePolicySha256: "e".repeat(64) },
-    { runner: "antigravity", provider: "google", requestedModel: "gemini-3.8-flash-high", effort: "low", routePolicySha256: "e".repeat(64) },
+    { runner: "antigravity", provider: "other", requestedModel: "gemini-3.8-flash-medium", effort: "medium", routePolicySha256: "e".repeat(64) },
+    { runner: "antigravity", provider: "google", requestedModel: "gemini-other", effort: "medium", routePolicySha256: "e".repeat(64) },
+    { runner: "antigravity", provider: "google", requestedModel: "gemini-3.8-flash-medium", effort: "low", routePolicySha256: "e".repeat(64) },
   ]) {
     const changed = fixture();
     const result = await dispatchElephantImplementation(input(changed), { ...changed.dependencies, routeAuthority: () => route });

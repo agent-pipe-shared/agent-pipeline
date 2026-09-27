@@ -80,12 +80,17 @@ export function validateAdvisoryReceipt(receipt, schema = loadAdvisoryReceiptSch
     || !GIT_OBJECT.test(dispatch.candidateCommit ?? "") || !GIT_OBJECT.test(dispatch.candidateTree ?? "")) {
     return { ok: false, reason: "dispatch-binding" };
   }
-  if (!exactKeys(configuredRoute, ["runner", "selector", "effort"])
+  const hasSessionRoleBinding = Object.hasOwn(configuredRoute ?? {}, "sessionRoleBindingSha256");
+  if (!exactKeys(configuredRoute, hasSessionRoleBinding
+    ? ["runner", "selector", "effort", "sessionRoleBindingSha256"]
+    : ["runner", "selector", "effort"])
     || !["claude", "codex", "antigravity"].includes(configuredRoute.runner)
     || !exactKeys(configuredRoute.selector, ["kind", "value"])
     || !["alias", "model-id"].includes(configuredRoute.selector.kind)
     || !MODEL_ID.test(configuredRoute.selector.value ?? "")
     || !["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(configuredRoute.effort)
+    || (hasSessionRoleBinding && (configuredRoute.runner !== "claude"
+      || receipt.adapter !== "consult" || !SHA256.test(configuredRoute.sessionRoleBindingSha256 ?? "")))
     || !ADVISORY_ADAPTERS.includes(receipt.adapter)) {
     return { ok: false, reason: "configured-route" };
   }

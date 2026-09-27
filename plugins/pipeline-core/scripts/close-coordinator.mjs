@@ -259,6 +259,7 @@ function auditLifecycleReadback({ root, common, request, auditPlan }) {
   let lifecycle;
   try {
     lifecycle = readCriticVerifyLifecycle({
+      repoRoot: root,
       gitCommonDir: common,
       id: request.value.criticVerifyLifecycleId,
       candidate: auditPlan.candidate,
@@ -712,7 +713,7 @@ function preparedAuditReadback(root, common, coordinator, continuityRequest) {
       expectedPlanSha256: audit.auditPlanSha256, plan: saved.plan, receipt: saved.receipt });
     if (!checked.ok || checked.receiptSha256 !== audit.auditReceiptSha256) throw new Error(checked.code ?? "receipt binding");
     const verify = readJsonFile(root, saved.plan.qualification.path, "candidate Verify evidence");
-    const lifecycle = readCriticVerifyLifecycle({ gitCommonDir: common, id: audit.criticVerifyLifecycleId,
+    const lifecycle = readCriticVerifyLifecycle({ repoRoot: root, gitCommonDir: common, id: audit.criticVerifyLifecycleId,
       candidate: saved.plan.candidate, evidencePath: saved.plan.qualification.path, evidence: verify.value });
     if (lifecycle.receiptSha256 !== audit.criticVerifyLifecycleReceiptSha256) throw new Error("lifecycle receipt drift");
     const expectedInput = sha256(canonical({

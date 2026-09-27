@@ -7,8 +7,8 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { recordCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
-import { canonicalJson } from "./critic-packet-preflight.mjs";
 import { planVerifySelection } from "../lib/verify-selection.mjs";
+import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
 import { finishFeature } from "./finish-feature.mjs";
 
 const ROOT = process.cwd();
@@ -40,7 +40,11 @@ function fixture(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const [path, text] of [["specs/audit-feature/prd.md", "# PRD\n"], ["specs/audit-feature/spec.md", "# Spec\n"], ["specs/audit-feature/result.md", "# Result\n"], ["evidence/close.txt", "close\n"], ["docs/state.md", "# State\n"]]) put(root, path, text);
   mkdirSync(join(root, ".claude"));
-  git(root, ["init", "-q"]); git(root, ["add", "."]); git(root, ["commit", "-qm", "base"]); git(root, ["commit", "--allow-empty", "-qm", "candidate"]);
+  git(root, ["init", "-q"]); git(root, ["add", "."]); git(root, ["commit", "-qm", "base"]);
+  put(root, "specs/audit-feature/spec.md", "# Spec\nQualified candidate\n");
+  put(root, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
+  git(root, ["add", "specs/audit-feature/spec.md", ".claude/pipeline.yaml"]);
+  git(root, ["commit", "-qm", "candidate"]);
   const candidate = { commit: git(root, ["rev-parse", "HEAD"]), tree: git(root, ["rev-parse", "HEAD^{tree}"]) };
   const prd = readFileSync(join(root, "specs/audit-feature/prd.md")); const spec = readFileSync(join(root, "specs/audit-feature/spec.md")); const result = readFileSync(join(root, "specs/audit-feature/result.md"));
   const verify = { schema: "pipeline.verify-evidence.v0", commit: candidate.commit, tree: candidate.tree, candidate, exitCode: 0, selection: planVerifySelection({ mode: "candidate", candidateCommit: candidate.commit, registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }) };
@@ -48,10 +52,44 @@ function fixture(t) {
   const artifacts = [["prd", "specs/audit-feature/prd.md", prd], ["spec", "specs/audit-feature/spec.md", spec], ["result", "specs/audit-feature/result.md", result], ["acceptance", "specs/audit-feature/acceptance.md", readFileSync(join(root, "specs/audit-feature/acceptance.md"))], ["candidate-evidence", "specs/audit-feature/verify.json", readFileSync(join(root, "specs/audit-feature/verify.json"))]].map(([kind, path, bytes]) => ({ class: kind, path, sha256: sha(bytes), authority: kind === "prd" || kind === "spec", mutability: kind === "candidate-evidence" ? "immutable" : "mutable", retention: "active" }));
   put(root, "specs/audit-feature/lifecycle.json", JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id: "audit-feature", rigor: 1 }, state: "completed", artifacts, candidate, supersedes: null }));
   const common = git(root, ["rev-parse", "--git-common-dir"]);
-  const critic = { schema: "pipeline.session-critic-receipt.v1", packetId: "1".repeat(32), packetDigest: null, session: { id: "review-1", freshContext: true, historyInherited: false, mayDelegate: false }, candidate: { base: git(root, ["rev-parse", "HEAD^"]), ...candidate }, reviewRange: { base: git(root, ["rev-parse", "HEAD^"]), commit: candidate.commit, diffSha256: h("3") }, rulesetSha: candidate.commit, assurance: "functional-equivalent-read-only; OS isolation not asserted", verdictSha256: h("4"), findingCount: 0, reviewPass: true };
-  const criticPacket = { packetId: critic.packetId, candidate: { ...critic.candidate }, diff: { base: critic.reviewRange.base, commit: critic.reviewRange.commit, sha256: critic.reviewRange.diffSha256 } };
-  critic.packetDigest = sha(canonicalJson(criticPacket));
-  const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common), criticPacketId: critic.packetId, candidate, evidencePath: "specs/audit-feature/verify.json", evidence: verify }, { readConsumedCandidateReceiptFn: () => ({ packet: criticPacket, receipt: critic }) });
+  const criticPacketId = "1".repeat(32);
+  const baseCommit = git(root, ["rev-parse", "HEAD^"]);
+  const criticDiagnostic = { schema: "pipeline.verify-evidence.v0", commit: candidate.commit,
+    tree: candidate.tree, candidate, exitCode: 0,
+    selection: planVerifySelection({ mode: "critic", baseCommit, candidateCommit: candidate.commit,
+      changedPaths: [".claude/pipeline.yaml", "specs/audit-feature/spec.md"],
+      registeredSuiteIds: ["test"], policy: { schema: "pipeline.verify-selection.v1",
+        baseline: ["test"], areas: [{ id: "all", paths: ["**"], suites: ["test"] }] } }),
+    steps: [{ name: "test", exitCode: 0 }] };
+  put(root, "evidence/critic-diagnostic.json", JSON.stringify(criticDiagnostic));
+  put(root, "evidence/dispatch-record-close-audit-review.json", JSON.stringify({
+    schema: "pipeline.dispatch-record.v3", taskId: "close-audit-review",
+    agentType: "default", model: "gpt-5.6-luna", effort: "medium",
+    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+    dispatcher: "elephant", outcome: "completed", commits: [candidate.commit],
+    candidateCommit: candidate.commit, resultSha256: h("a"), log: [],
+    report: { text: "done", changedFiles: ["specs/audit-feature/spec.md"] },
+    criticRequired: { schema: "pipeline.critic-required-decision.v1",
+      trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2,
+        riskClass: "high", riskFlag: true,
+        diff: { mechanical: false, architecture: false, guardrails: true, security: false } },
+      appliedRow: "T1" },
+  }));
+  const review = { preflightInput: { root, base: baseCommit,
+    candidate: candidate.commit, specPath: "specs/audit-feature/spec.md",
+    guardrailPaths: [], evidencePaths: ["evidence/critic-diagnostic.json"],
+    priorCriticEvidencePath: null }, taskId: "close-audit-review",
+    projectId: "fixture", sessionId: "close-review-1", packetId: criticPacketId,
+    route: { routeId: "session-critic", runner: "codex",
+      adapter: "session-functional-equivalent", provider: "openai",
+      modelTier: "higher-capability", effortTier: "xhigh" },
+    verdict: { findings: [], deliberately_not_flagged: ["fixture"],
+      trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence",
+      briefing_violations: [], pass: true } };
+  admitSessionCriticReview(review);
+  finalizeSessionCriticReview(review);
+  const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common),
+    criticPacketId, candidate, evidencePath: "specs/audit-feature/verify.json", evidence: verify });
   const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs: [{ schema: "pipeline.organization-policy-pack.v1", packId: "test-policy", revision: h("5"), compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] }], criticVerifyLifecycleId: lifecycle.receipt.id };
   put(root, "evidence/audit-request.json", JSON.stringify(request));
   const state = { schema: "pipeline.state.v0", planApproved: true, activeFeature: { id: "audit-feature", planPath: "specs/audit-feature/prd.md", phase: "implementation" }, planApproval: { poGateAuthority: { planSha256: sha(prd), specPath: "specs/audit-feature/spec.md", specSha256: sha(spec) } }, continuity: { schema: "pipeline.continuity.v0", featureId: "audit-feature", runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, revision: 1, authority: { prd: { path: "specs/audit-feature/prd.md", sha256: sha(prd) }, spec: { path: "specs/audit-feature/spec.md", sha256: sha(spec) }, result: { path: "specs/audit-feature/result.md", sha256: sha(result) } }, queueHead: { packageId: "close-package", actionId: "close-action", nextAction: "close", dispatch: null, productRetryCount: 0, environmentRerouteCount: 0 }, blocker: null, decisionTxn: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" }, recovery: null, capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } } };
@@ -75,6 +113,28 @@ test("coordinator builds the README audit bundle and forwards only a readback-bo
   assert.match(closed, /Feature "audit-feature" closed/);
   const state = JSON.parse(readFileSync(f.statePath));
   assert.equal(state.closedFeatures.at(-1).auditReference.criticVerifyLifecycleId, f.lifecycle.receipt.id);
+});
+test("forged private lifecycle Critic fields cannot qualify feature close", t => {
+  const f = fixture(t);
+  const target = join(f.root, ".git", "agent-pipeline", "critic-verify-lifecycle",
+    `${f.lifecycle.receipt.id}.json`);
+  const forged = { ...f.lifecycle.receipt,
+    critic: { ...f.lifecycle.receipt.critic, verdictSha256: h("9") } };
+  writeFileSync(target, `${JSON.stringify(forged)}\n`);
+  const start = invoke(f.root, ["plan-start", "--root", f.root,
+    "--lifecycle", "close-forged", "--actor", "PO", "--close-intent", "durable-stop"]);
+  invokeAction(f.root, start.nextAction);
+  const checkpoint = invoke(f.root, ["plan-transition", "--root", f.root,
+    "--lifecycle", "close-forged", "--actor", "PO", "--phase", "checkpointed"]);
+  invokeAction(f.root, checkpoint.nextAction);
+  const blocked = invoke(f.root, ["plan-transition", "--root", f.root,
+    "--lifecycle", "close-forged", "--actor", "PO", "--phase", "feature-close-prepared",
+    "--architecture-impact", "no-architecture-impact",
+    "--continuity-close-request", "evidence/close-request.json",
+    "--audit-request", "evidence/audit-request.json",
+    "--critic-verify-lifecycle", f.lifecycle.receipt.id], 2);
+  assert.equal(blocked.code, "CVL-CRITIC-DRIFT");
+  assert.equal(existsSync(join(f.root, "audit-bundles")), false);
 });
 test("finish-feature drives the real coordinator and State writer through verified bundle readback", t => {
   const f = fixture(t);

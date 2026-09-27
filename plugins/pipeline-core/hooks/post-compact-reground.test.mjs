@@ -239,7 +239,7 @@ check("a compact projects a host-attested main-session drift without changing th
   assert.equal(decided.projection.mainSessionRoute.code, "MSR-DRIFT-RETURN-REQUESTED");
   assert.equal(decided.projection.mainSessionRoute.action.automatic, false);
   assert.deepEqual(decided.projection.mainSessionRoute.action.target, {
-    runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-terra" }, effort: "medium",
+    runner: "codex", selector: { kind: "model-id", value: "gpt-6-sol" }, effort: "medium",
   });
 });
 

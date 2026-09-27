@@ -402,7 +402,8 @@ export function compileDecisionSummary(root, options = {}) {
               scope: raw.scope || "project",
               digest: raw.digest || null,
               supersedes: raw.supersedes || null,
-              exception: raw.exception || null
+              exception: raw.exception || null,
+              ...(raw.schema === "pipeline.architecture-decision.v2" ? { moduleIds: raw.moduleIds } : {})
             });
             // A self-declared `waived` sidecar is not a human-authorized active
             // exception. Effective status is resolved separately below.
@@ -447,6 +448,9 @@ export function compileDecisionSummary(root, options = {}) {
       status: effective.status,
       code: effective.code,
       projectionSha256: effective.projectionSha256,
+      // Only the byte-validated reader may populate this applicable set.
+      // `decisions` below is a historical inventory, not an authority list.
+      decisions: effective.decisions,
       decisionIds: effective.decisions.map(({ id }) => id),
       findings: effective.findings,
     },

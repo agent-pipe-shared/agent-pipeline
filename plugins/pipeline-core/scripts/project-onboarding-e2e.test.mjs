@@ -47,6 +47,8 @@ import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-re
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
+import { observeOnboardingBootstrapPlanApproval } from "../lib/onboarding-continuity.mjs";
 import { inspectArchitectureDesign } from "../lib/architecture-design.mjs";
 import { coordinateDesignAdvisory } from "../lib/design-advisory-coordinator.mjs";
 import { checkPlanningAdoptionDisposition, resolveAdoptionState } from "./architecture-adoption.mjs";
@@ -191,7 +193,7 @@ function run(script, args, cwd) {
   return { status, stdout, json: stdout ? JSON.parse(stdout) : null };
 }
 
-function publicDriverRun(path, invocations) {
+function publicDriverRun(path, invocations, designWorkflowDeps = {}) {
   return (executable, argv) => {
     invocations.push({ executable, argv: [...argv] });
     const [script, ...args] = argv;
@@ -211,6 +213,7 @@ function publicDriverRun(path, invocations) {
           dir: path,
           now: () => "2026-08-30T12:00:00.000Z",
           writeError: (chunk) => { stderr.push(String(chunk)); },
+          ...designWorkflowDeps,
         });
         return { status, stdout: stdout.join("\n"), stderr: stderr.join("\n") };
       } finally {
@@ -713,8 +716,9 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
     assert.equal(normalized.status, 0, JSON.stringify({ action, argv, stderr: normalized.stderr, stdout: normalized.stdout }));
     return { argv, json: JSON.parse(normalized.stdout) };
   };
-  const freshDriver = (cwd, runner, env) => {
-    const run = publicDriverRun(cwd, []);
+  const freshDriver = (cwd, runner, env, signerPrivateKey) => {
+    const designWorkflowDeps = {};
+    const run = publicDriverRun(cwd, [], designWorkflowDeps);
     let driven = driveOnboardingInit({
       rootDir: cwd,
       runner,
@@ -730,41 +734,44 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       const stateScript = driven.steps.at(-1)?.argv?.[0];
       assert.equal(typeof stateScript, "string");
       const submittedArgv = [stateScript, "submit-plan", "--by", "Greenfield E2E PO", "--profile", "feature"];
-      const presentedArgv = [stateScript, "present-plan", "--by", "Greenfield E2E PO"];
       const submitted = run("node", submittedArgv);
-      const presented = run("node", presentedArgv);
       assert.equal(submitted.status, 0, submitted.stderr);
+      const submission = JSON.parse(readFileSync(join(cwd, "project", "pipeline-state.json"), "utf8")).planSubmission;
+      const designFixture = materializeTestDesignWorkflowPackage({
+        root: cwd, featureId: submission.featureId,
+        planPath: submission.planPath, specPath: submission.specPath,
+        signerPrivateKey, signerKeyReference: "fixture-po-key",
+      });
+      Object.assign(designWorkflowDeps, designFixture.deps);
+      const bootstrapPolicy = readCriticalHumanProofPolicy(cwd);
+      assert.equal(bootstrapPolicy.ok, true);
+      designWorkflowDeps.readCriticalHumanProofPolicy = () => bootstrapPolicy;
+      const presentedArgv = [stateScript, "present-plan", "--by", "Greenfield E2E PO", "--design-workflow-package", designFixture.packagePath];
+      const presented = run("node", presentedArgv);
       assert.equal(presented.status, 0, presented.stderr);
+      const presentation = JSON.parse(readFileSync(join(cwd, "project", "pipeline-state.json"), "utf8")).planPresentation;
+      designFixture.signRequest(presentation.designWorkflowApprovalRequestPath);
+      const bootstrapApproval = observeOnboardingBootstrapPlanApproval({
+        rootDir: cwd, authority: { planPath: submission.planPath, specPath: submission.specPath },
+      });
+      assert.equal(bootstrapApproval.status, "verified", `${runner}: bootstrap acknowledgement must remain independently verified`);
+      designWorkflowDeps.isattyFn = () => true;
+      designWorkflowDeps.readLineFn = () => `approve-${presentation.designWorkflowPackageSha256.slice(0, 12)}`;
+      const approvedArgv = [
+        stateScript, "approve-plan",
+        "--bootstrap-acknowledgement-receipt", bootstrapApproval.receiptPath,
+        "--design-workflow-approval-request", presentation.designWorkflowApprovalRequestPath,
+      ];
+      const approved = run("node", approvedArgv);
+      assert.equal(approved.status, 0, approved.stderr);
       const reentered = driveOnboardingInit({ rootDir: cwd, runner, run, env });
-      // In shared signature mode the signed bootstrap receipt is the one PO
-      // authorization for this transition.  The driver must consume that
-      // receipt and continue; constructing a legacy `approve-plan --by`
-      // prompt here would recreate the bypass this E2E is meant to prevent.
-      if (reentered.final?.pushApprovalMode === "signature") {
-        return {
-          ...reentered,
-          steps: [
-            ...driven.steps,
-            { executable: "node", argv: submittedArgv, exitCode: submitted.status, faultCode: null },
-            { executable: "node", argv: presentedArgv, exitCode: presented.status, faultCode: null },
-            ...reentered.steps,
-          ],
-        };
-      }
-      const approvalAction = {
-        kind: "command",
-        executable: "node",
-        argv: [stateScript, "approve-plan", "--by", "<PO_PLAN_APPROVER_NAME>"],
-        mutation: true,
-        requiresConfirmation: true,
-      };
       driven = {
         ...reentered,
-        collectInput: { ...reentered.collectInput, input: { ...firstInput, name: "by" }, applyAction: approvalAction },
         steps: [
           ...driven.steps,
           { executable: "node", argv: submittedArgv, exitCode: submitted.status, faultCode: null },
           { executable: "node", argv: presentedArgv, exitCode: presented.status, faultCode: null },
+          { executable: "node", argv: approvedArgv, exitCode: approved.status, faultCode: null },
           ...reentered.steps,
         ],
       };
@@ -797,7 +804,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       delete env.CODEX_THREAD_ID;
       delete env.CODEX_SESSION_ID;
 
-      const first = freshDriver(path, runner, env);
+      const first = freshDriver(path, runner, env, privateKey);
       assert.equal(first.outcome, "pending-asks", `${runner}: ${JSON.stringify(first)}`);
       assert.equal(first.pendingAsks.length, 1, `${runner}: initial PO round must be one action`);
       const initialAsk = first.pendingAsks[0];
@@ -834,7 +841,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       assert.ok(initial.json.steps.some((step) => step.argv[0] === onboarding && step.argv[1] === "inspect"),
         `${runner}: the returned onboarding-init action must re-enter through its public inspect driver`);
       const anchorAsk = initial.json.pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"))
-        ?? freshDriver(path, runner, env).pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
+        ?? freshDriver(path, runner, env, privateKey).pendingAsks?.find((ask) => ask.inputs?.some((input) => input.name === "trustAnchorSetupMode"));
       assert.ok(anchorAsk, `${runner}: signature re-entry reaches the separate trust-anchor action`);
       assert.equal(anchorAsk.applyAction.argv.includes("--push-approval"), false);
       const anchored = invokeAction(anchorAsk.applyAction, new Map([
@@ -873,7 +880,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         assert.deepEqual(anchored.json.collectInput?.inputs?.map((input) => input.name), ["language", "profile", "projectDescription"]);
       }
 
-      let intake = freshDriver(path, runner, env);
+      let intake = freshDriver(path, runner, env, privateKey);
       assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
       assert.deepEqual(intake.collectInput.inputs.map((input) => input.name), ["language", "profile", "projectDescription"]);
       assert.equal(intake.collectInput.applyAction.argv.includes("--git-author-name"), false);
@@ -884,7 +891,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         ["<PO_INTAKE_PROFILE>", "feature"],
       ]), path, env);
 
-      intake = freshDriver(path, runner, env);
+      intake = freshDriver(path, runner, env, privateKey);
       assert.equal(intake.outcome, "collect-input", `${runner}: ${JSON.stringify(intake)}`);
       assert.equal(intake.collectInput.input.name, "answersJson");
       const answers = JSON.stringify([
@@ -895,7 +902,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         ["<PO_INTAKE_DESIGN_ANSWERS_JSON>", answers],
       ]), path, env);
 
-      const designStop = freshDriver(path, runner, env);
+      const designStop = freshDriver(path, runner, env, privateKey);
       assert.equal(designStop.outcome, "unsupported-next-action", JSON.stringify(designStop));
       assert.equal(designStop.final.nextAction.kind, "architecture-design-required");
       assert.equal(existsSync(join(path, "architecture/baseline.json")), false);
@@ -922,7 +929,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
         baseline: { schema: "pipeline.architecture-baseline.v1", baselineRevision: 1, acceptedViolations: [],
           ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 } } };
       writeFileSync(prdFile, readFileSync(prdFile, "utf8") + "\n\n```pipeline-architecture-design\n" + JSON.stringify(architecture, null, 2) + "\n```\n");
-      const signatureRequest = freshDriver(path, runner, env);
+      const signatureRequest = freshDriver(path, runner, env, privateKey);
       assert.equal(signatureRequest.outcome, "external-operator", `${runner}: ${JSON.stringify(signatureRequest)}`);
       assert.equal(signatureRequest.final.status, "signature-required");
       assert.equal(signatureRequest.externalOperator.action.argv[1], "sign-intent");
@@ -949,7 +956,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       // executes the exact acknowledgement/bind actions, submits and presents
       // the plan, coordinates the required design advisory, and enters
       // implementation without accepting --by as a substitute for the signature.
-      const preApproval = freshDriver(path, runner, env);
+      const preApproval = freshDriver(path, runner, env, privateKey);
       const preState = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
       const stagedDesign = spawnSync("git", ["add", "--", "."], { cwd: path, encoding: "utf8" });
       assert.equal(stagedDesign.status, 0, stagedDesign.stderr);
@@ -978,7 +985,7 @@ test("in-process driver contract: Claude, Codex, and Antigravity follow only ret
       });
       assert.equal(advisory.status, "admitted", `${runner}: the mandatory Advisor transaction must bind before implementation`);
 
-      const postApproval = freshDriver(path, runner, env);
+      const postApproval = freshDriver(path, runner, env, privateKey);
       const approval = {
         ...postApproval,
         steps: [...preApproval.steps, ...postApproval.steps],

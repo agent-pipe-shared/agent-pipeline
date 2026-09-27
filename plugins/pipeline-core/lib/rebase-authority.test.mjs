@@ -133,6 +133,20 @@ function approvedState() {
     poGateAuthority: AUTHORITY,
     profileSha256: PROFILE,
     designAdvisorAdmissionSha256: "a".repeat(64),
+    // This resolver fixture tests rebase semantics, not the PO ceremony. Keep
+    // the in-memory epic approval shape current without claiming a signature.
+    designWorkflowPackagePath: "specs/feature/evidence/design-workflow-package.json",
+    designWorkflowPackageSha256: "b".repeat(64),
+    designWorkflowApproval: {
+      schema: "pipeline.design-workflow-package-approval.v1",
+      mode: "chat",
+      approvedBy: "PO",
+      approvedAt: LATER,
+      packageSha256: "b".repeat(64),
+      intentSha256: null,
+      proofSha256: null,
+      proof: null,
+    },
     by: "PO",
     at: LATER,
   });

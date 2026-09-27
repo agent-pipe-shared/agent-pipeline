@@ -55,9 +55,60 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { authorizeCriticalPushCommand, outside, parseHumanArgs, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, describeArchitectureInheritedSourcesRequest, outside, parseHumanArgs, persistExplicitDirectoryIntoMachinePlane, poHumanApprovalSetupCommand, readPoHumanApprovalAuthority, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
+import { organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+
+test("AC-19 inherited source signing disclosure binds every source and rejects drift", () => {
+  const dirs = fixtureDirs();
+  try {
+    mkdirSync(join(dirs.repoRoot, "project"), { recursive: true });
+    const subject = { schema: "pipeline.organization-architecture-config.v1", expectedPriorSha256: null,
+      sources: [{ sourceId: "team-architecture", layer: "team", required: true,
+        trustAnchor: { keyReference: "team-adr-key", publicKeySha256: "a".repeat(64) } }] };
+    const intentSha256 = organizationArchitectureConfigIntentSha256(subject);
+    const request = { schema: "pipeline.organization-architecture-config-request.v1", subject, intentSha256 };
+    const disclosure = describeArchitectureInheritedSourcesRequest(request, intentSha256, dirs.repoRoot);
+    assert.equal(disclosure.resolved, true);
+    assert.match(disclosure.lines.join("\n"), /team-architecture \| team \| mandatory/u);
+    assert.match(disclosure.lines.join("\n"), /does not sign the source contents/u);
+    assert.equal(describeArchitectureInheritedSourcesRequest({ ...request,
+      subject: { ...subject, sources: [{ ...subject.sources[0], required: false }] } }, intentSha256, dirs.repoRoot), null);
+    assert.equal(describeArchitectureInheritedSourcesRequest({ ...request, unexplained: true }, intentSha256, dirs.repoRoot), null);
+    writeFileSync(join(dirs.repoRoot, "project", "architecture-inherited-sources.json"), "changed\n");
+    assert.equal(describeArchitectureInheritedSourcesRequest(request, intentSha256, dirs.repoRoot), null);
+  } finally { cleanup(dirs); }
+});
+
+test("AC-19 sign-intent presents the exact inherited registry before signing", {
+  skip: spawnSync("openssl", ["version"], { stdio: "pipe" }).status !== 0
+    ? "requires the production OpenSSL binary" : false,
+}, () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    mkdirSync(join(dirs.repoRoot, "project"), { recursive: true });
+    const subject = { schema: "pipeline.organization-architecture-config.v1", expectedPriorSha256: null,
+      sources: [{ sourceId: "organization-adrs", layer: "organization", required: true,
+        trustAnchor: { keyReference: "org-adr-owner", publicKeySha256: "b".repeat(64) } }] };
+    const intentSha256 = organizationArchitectureConfigIntentSha256(subject);
+    const path = "scratch/architecture-inherited-sources-request-fixture.json";
+    writeFileSync(join(dirs.repoRoot, path), `${JSON.stringify({
+      schema: "pipeline.organization-architecture-config-request.v1", subject, intentSha256,
+    })}\n`);
+    const prompts = [];
+    const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot,
+      "--directory", dirs.directory, "--request", path], {
+      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.intentSha256, intentSha256);
+    assert.match(prompts[0], /organization-adrs \| organization \| mandatory/u);
+    assert.match(prompts[0], /does not sign the source contents/u);
+  } finally { cleanup(dirs); }
+});
 import { PORTABLE_AGY_AUTHORSHIP_SUBJECT_SCHEMA, portableAgyAuthorshipExportPath,
   portableAgyAuthorshipIntent, portableAgyAuthorshipRequest } from "../lib/portable-agy-authorship-export.mjs";
 import { PORTABLE_CRITIC_EXPORT_SUBJECT_SCHEMA, portableCriticExportRequest } from "../lib/portable-critic-export.mjs";

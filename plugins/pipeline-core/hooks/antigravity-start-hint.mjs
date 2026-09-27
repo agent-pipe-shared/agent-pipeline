@@ -56,13 +56,14 @@ function main() {
   }
 
   let decision;
+  let sessionId;
   try {
     const rootDir = antigravityRepositoryRoot(input);
     if (!rootDir) {
       reportFailure('AGY-REPOSITORY-CONTEXT-UNAVAILABLE');
       return;
     }
-    const sessionId = nativeHookSessionId(input, {});
+    sessionId = nativeHookSessionId(input, {});
     decision = sessionStartDecision(rootDir, undefined, sessionId, 'antigravity');
 
     // Workspace-local installation does not itself activate governance in an
@@ -122,7 +123,7 @@ function main() {
   process.stdout.write(JSON.stringify({
     injectSteps: [
       {
-        ephemeralMessage: decision.context
+        ephemeralMessage: `${decision.context}\nModel-role bootstrap: use this session's native hook ID ${sessionId} with the installed model-role-bootstrap.mjs --runner antigravity --host-session-id option. This ID is an ephemeral session locator, not approval or provider attestation.`
       }
     ]
   }) + '\n');

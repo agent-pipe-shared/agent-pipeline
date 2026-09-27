@@ -5,6 +5,7 @@ autonomy:
   branch_model: "feature-branch"
   push_policy: "gated"
   wip_limit: 3
+core_registry_sha256: "c1641d49dc6e651e0ddbd19583322a067a4c8a2031275b94b10e70810bbcf0ac"
 critic_export:
   mode: "allowlisted"
   rules:
@@ -212,6 +213,31 @@ routing:
         unavailable: "defer"
       codex:
         effort: "high"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gpt-6-luna"
+        state: "opt-in"
+        unavailable: "defer"
+    read:
+      antigravity:
+        effort: "medium"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.8-flash-medium"
+        state: "unavailable"
+        unavailable: "defer"
+      claude:
+        effort: "medium"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "alias"
+          value: "haiku"
+        state: "opt-in"
+        unavailable: "defer"
+      codex:
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
@@ -429,7 +455,6 @@ runners:
     - "codex"
     - "antigravity"
 schema: "pipeline.user.v3"
-core_registry_sha256: "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5"
 session:
   keep_awake: true
 usage:

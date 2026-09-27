@@ -46,9 +46,9 @@ evidence; they are not copy-and-run instructions for a consumer project.
   certification or authority.
 - [`security-controls.md`](security-controls.md) — scanner/control boundaries,
   framework mappings, waivers, and runtime limits.
-- [`cost-and-measurement.md`](cost-and-measurement.md) — measurement boundary,
-  historical Verify observations, and the explicit missing consumer-overhead
-  comparison; not a cost estimate.
+- [`cost-and-measurement.md`](cost-and-measurement.md) — what small Greenfield
+  trials and Verify receipts actually measure, what remains estimated or
+  unavailable, and why they are not a cost forecast.
 - [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
   integration boundaries.
 

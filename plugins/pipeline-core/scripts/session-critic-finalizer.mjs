@@ -19,6 +19,7 @@ import {
   writeGovernanceReviewAction,
 } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
 import {
   SESSION_PACKET_BINDING_SCHEMA,
   canonicalJson,
@@ -92,6 +93,35 @@ function controlRootFor(repoRoot) {
 function routeFor(route, preflightSha256) {
   if (!exact(route, ROUTE_KEYS)) fail("SCF-ROUTE");
   return { ...route, assurance: SESSION_CRITIC_ASSURANCE, projectionDigest: preflightSha256 };
+}
+function selectedSessionCriticModelRole(root, trigger, route, deps) {
+  const runner = route.runner;
+  const env = deps.modelRoleEnvironment ?? process.env;
+  const identityAvailable = runner === "codex"
+    ? env.CODEX_SESSION_ID !== undefined || env.CODEX_THREAD_ID !== undefined
+    : runner === "claude" ? env.CLAUDE_CODE_SESSION_ID !== undefined : false;
+  if (!identityAvailable) return null;
+  // T1 covers architecture/guardrail/security changes; T2 is the separate
+  // high-risk-class row. Neither may be downgraded to the normal Critic duty.
+  const taskRoute = trigger === "T1" || trigger === "T2"
+    ? "duty.critic_high_risk" : "duty.critic_normal";
+  let selected;
+  try {
+    selected = (deps.selectModelRoleForTaskFn ?? selectModelRoleForTask)({
+      rootDir: root, runner, taskRoute, env });
+  } catch { return null; }
+  // Model-role admission is optional. Only a fully bound current-session
+  // selection may replace the independently admitted V3 Critic route.
+  if (!selected?.ok || selected.status !== "ready"
+    || selected.runner !== runner || selected.taskRoute !== taskRoute) return null;
+  if (route.effortTier !== selected.effort || typeof selected.modelId !== "string"
+    || selected.modelId.trim() !== selected.modelId || selected.modelId.length === 0
+    || !SHA256.test(selected.readbackSha256 ?? "")
+    || !SHA256.test(selected.receiptSha256 ?? "")) return null;
+  return { schema: "pipeline.session-critic-model-role.v1", runner, taskRoute,
+    modelId: selected.modelId, effort: selected.effort,
+    readbackSha256: selected.readbackSha256,
+    receiptSha256: selected.receiptSha256 };
 }
 function sessionId(value) {
   if (typeof value !== "string" || !SAFE_ID.test(value)) fail("SCF-SESSION");
@@ -179,6 +209,24 @@ function courseDigestsFor(preflight) {
   };
 }
 
+function admittedRouteFor(packet, requestedRoute, trigger, preflightSha256) {
+  const binding = packet.request.sessionBinding;
+  const role = binding?.modelRole;
+  if (role === undefined) return routeFor(requestedRoute, preflightSha256);
+  const taskRoute = trigger === "T1" || trigger === "T2"
+    ? "duty.critic_high_risk" : "duty.critic_normal";
+  if (!exact(role, ["schema", "runner", "taskRoute", "modelId", "effort", "readbackSha256", "receiptSha256"])
+    || role.schema !== "pipeline.session-critic-model-role.v1"
+    || role.runner !== requestedRoute.runner || role.taskRoute !== taskRoute
+    || role.effort !== requestedRoute.effortTier
+    || typeof role.modelId !== "string" || role.modelId.length === 0
+    || !SHA256.test(role.readbackSha256) || !SHA256.test(role.receiptSha256)) fail("SCF-MODEL-ROLE");
+  // The model was selected before launch and sealed in the claimed packet.
+  // Finalization checks that admission; it must not reselect or compare the
+  // exact admitted model with the older V3 selector in the caller's request.
+  return routeFor({ ...requestedRoute, modelTier: role.modelId }, preflightSha256);
+}
+
 /** Prepare and claim the exact session packet before any fresh Critic spawn. */
 export function admitSessionCriticReview(options, deps = {}) {
   const preflight = (deps.preflightCriticDispatchFn ?? preflightCriticDispatch)(options.preflightInput);
@@ -192,6 +240,9 @@ export function admitSessionCriticReview(options, deps = {}) {
   const packetId = options.packetId;
   if (!PACKET_ID.test(packetId ?? "")) fail("SCF-PACKET-ID");
   const preflightSha256 = sha256(canonicalJson(preflight));
+  const modelRole = selectedSessionCriticModelRole(root, options.trigger ?? "T1", options.route, deps);
+  const route = routeFor(modelRole === null ? options.route
+    : { ...options.route, modelTier: modelRole.modelId }, preflightSha256);
   const controlRoot = controlRootFor(root);
   const prepared = (deps.prepareCandidatePacketFn ?? prepareCandidatePacket)({
     repoRoot: root,
@@ -203,7 +254,7 @@ export function admitSessionCriticReview(options, deps = {}) {
     candidateCommit: preflight.candidate.commit,
     rulesetOid: preflight.dispatch.reviewerInput.rulesetSha,
     trigger: options.trigger ?? "T1",
-    route: routeFor(options.route, preflightSha256),
+    route,
     references: referencesFor(preflight),
     evidencePaths: options.preflightInput.evidencePaths,
     sessionBinding: {
@@ -214,6 +265,7 @@ export function admitSessionCriticReview(options, deps = {}) {
       freshContext: true,
       historyInherited: false,
       mayDelegate: false,
+      ...(modelRole === null ? {} : { modelRole }),
     },
   }, deps.packetDependencies);
   (deps.claimCandidatePacketFn ?? claimCandidatePacket)({
@@ -244,7 +296,9 @@ function validateResult(result, packet) {
   const sessionBinding = packet.request.sessionBinding;
   if (!exact(result, RESULT_KEYS) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
     || result.packetId !== packet.packetId || result.packetDigest !== sha256(canonicalJson(packet))
-    || !exact(sessionBinding, ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"])
+    || !exact(sessionBinding, Object.hasOwn(sessionBinding ?? {}, "modelRole")
+      ? ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate", "modelRole"]
+      : ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"])
     || sessionBinding.schema !== SESSION_PACKET_BINDING_SCHEMA
     || !exact(result.session, ["id", "freshContext", "historyInherited", "mayDelegate"])
     || result.session.id !== sessionBinding.sessionId || result.session.freshContext !== true
@@ -331,7 +385,8 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     || packet.candidate.commit !== preflight.candidate.commit
     || packet.candidate.tree !== preflight.candidate.tree
     || packet.ruleset.oid !== preflight.dispatch.reviewerInput.rulesetSha
-    || canonicalJson(packet.route) !== canonicalJson(routeFor(options.route, preflightSha256))
+    || canonicalJson(packet.route) !== canonicalJson(admittedRouteFor(packet, options.route,
+      options.trigger ?? "T1", preflightSha256))
     || canonicalJson(actualReferences) !== canonicalJson(expectedReferences)) fail("SCF-PRELAUNCH-BINDING");
   const prepared = { packet, packetDigest: sha256(canonicalJson(packet)) };
 

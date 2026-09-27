@@ -19,9 +19,10 @@ Stateless context-budgeted agents and fresh sessions re-enter this repository by
 
 ## Governed Modules
 
-The repository is partitioned into 4 governed modules:
+The repository is partitioned into 5 governed modules:
 
 - [pipeline-core](pipeline-core.md): Core agent pipeline engine, hooks, lifecycle management, guards, and CLI scripts.
 - [harness](harness.md): Verification runner, test orchestration, suite registration validation, and CI checks.
 - [schemas](schemas.md): Canonical JSON schemas defining contracts, profiles, state, and receipts.
 - [backlog](backlog.md): Sprint backlog items, evidence records, interruption baseline, and ledger history.
+- [governance](governance.md): Canonical operating rules, agent roles, policies, and guardrails.

@@ -10,11 +10,14 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import {
+  ADVISORY_DEMAND_SESSION_SCHEMA,
+  advisorySessionRoleSelectionSha256,
   advisoryConsultationDisposition,
   createAdvisoryConsultationRecord,
   validateAdvisoryDemand,
 } from "./advisory-lifecycle-v2.mjs";
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
+import { CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE } from "./model-role-route-source.mjs";
 import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 
 const SUCCESS = "answered";
@@ -108,6 +111,8 @@ function receiptRoute(step) {
     runner: step.runner,
     selector: copy(step.selector),
     effort: step.effort,
+    ...(step.sessionRoleBindingSha256 === undefined
+      ? {} : { sessionRoleBindingSha256: step.sessionRoleBindingSha256 }),
   };
 }
 
@@ -176,14 +181,52 @@ function nativePayload(input, step, attempt) {
   };
 }
 
-function routeSteps(contract, runner) {
+function validClaudeFallbackSelection(selection, consult) {
+  if (!consult || !selection || typeof selection !== "object" || Array.isArray(selection)
+    || JSON.stringify(Object.keys(selection).sort()) !== JSON.stringify([
+      "runner", "taskRoute", "role", "effort", "modelId", "sessionId",
+      "readbackSha256", "receiptSha256", "selectionSha256",
+    ].sort())
+    || selection.runner !== "claude"
+    || selection.taskRoute !== CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE
+    || selection.role !== "frontier"
+    || selection.effort !== consult.effort
+    || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(selection.modelId ?? "")
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(selection.sessionId ?? "")
+    || !/^[a-f0-9]{64}$/u.test(selection.readbackSha256 ?? "")
+    || !/^[a-f0-9]{64}$/u.test(selection.receiptSha256 ?? "")
+    || !/^[a-f0-9]{64}$/u.test(selection.selectionSha256 ?? "")
+    || selection.selectionSha256 !== advisorySessionRoleSelectionSha256(selection)) return false;
+  return true;
+}
+
+function sessionSelectionMatchesDemand(selection, demand) {
+  const binding = demand?.sessionRoleBinding;
+  return binding !== null && typeof binding === "object" && !Array.isArray(binding)
+    && binding.taskRoute === selection.taskRoute
+    && binding.role === selection.role
+    && binding.effort === selection.effort
+    && binding.modelId === selection.modelId
+    && binding.readbackSha256 === selection.readbackSha256
+    && binding.receiptSha256 === selection.receiptSha256
+    && binding.selectionSha256 === selection.selectionSha256;
+}
+
+function routeSteps(contract, runner, claudeFallbackSelection = null) {
   const route = contract[runner];
   if (!route || route.state !== "default") return [];
   if (runner === "codex" || runner === "antigravity") {
     return [{ kind: "consult", adapter: route.adapter, runner, selector: route.selector, effort: route.effort, attempts: 1 }];
   }
   const nativeFallback = route.fallbacks?.find((entry) => entry.adapter?.startsWith("native-"));
-  const consult = route.fallbacks?.find((entry) => entry.adapter === "consult");
+  let consult = route.fallbacks?.find((entry) => entry.adapter === "consult");
+  if (runner === "claude" && consult && validClaudeFallbackSelection(claudeFallbackSelection, consult)) {
+    consult = {
+      ...consult,
+      selector: { kind: "model-id", value: claudeFallbackSelection.modelId },
+      sessionRoleBindingSha256: claudeFallbackSelection.selectionSha256,
+    };
+  }
   return [
     { kind: "native", adapter: route.adapter, runner, selector: route.selector, effort: route.effort, attempts: ADVISORY_NATIVE_ATTEMPTS },
     nativeFallback && { kind: "native", ...nativeFallback, effort: nativeFallback.effort ?? route.effort, attempts: 1 },
@@ -224,6 +267,7 @@ function validateInput(input) {
 export async function coordinateAdvisory(input, {
   invokeNative,
   invokeConsult,
+  claudeFallbackSelection = null,
   advisorExport = null,
   now = () => Date.now(),
   makeReceiptId = () => `advisory-${randomUUID()}`,
@@ -257,6 +301,17 @@ export async function coordinateAdvisory(input, {
   if (!demand.ok) {
     return { ok: false, code: demand.code, answer: null, receipt: null, consultationRecord: null, attempts: [] };
   }
+  let boundClaudeFallbackSelection = null;
+  if (input.demand.schema === ADVISORY_DEMAND_SESSION_SCHEMA) {
+    const configuredFallback = contract?.claude?.fallbacks?.find((entry) => entry.adapter === "consult");
+    if (input.runner !== "claude"
+      || !validClaudeFallbackSelection(claudeFallbackSelection, configuredFallback)
+      || !sessionSelectionMatchesDemand(claudeFallbackSelection, input.demand)) {
+      return { ok: false, code: "advisory_demand_binding_mismatch", answer: null,
+        receipt: null, consultationRecord: null, attempts: [] };
+    }
+    boundClaudeFallbackSelection = claudeFallbackSelection;
+  }
   const disposition = advisoryConsultationDisposition(input.demand, input.priorConsultation);
   if (!disposition.ok) {
     return { ok: false, code: disposition.code, answer: null, receipt: null, consultationRecord: null, attempts: [] };
@@ -276,7 +331,7 @@ export async function coordinateAdvisory(input, {
   if (input.runner === "codex" && contract?.codex?.adapter === "host-consult") {
     return { ok: false, code: "host_route_required", status: "deferred", answer: null, receipt: null, attempts: [] };
   }
-  const steps = routeSteps(contract, input.runner);
+  const steps = routeSteps(contract, input.runner, boundClaudeFallbackSelection);
   if (steps.length === 0) {
     return { ok: false, code: "route_unavailable", answer: null, receipt: null, attempts: [] };
   }

@@ -26,7 +26,7 @@ test("CLI rejects duplicate, mixed, multiline, unknown and unsafe timeout inputs
   assert.throws(() => parse([...base, "--timeout-ms", "NaN"]), /usage/u);
   assert.throws(() => parse([...base, "--timeout-ms", "300001"]), /usage/u);
 });
-test("CLI returns a nonzero exit for post-commit recovery without exposing private Git diagnostics", () => {
+test("CLI reports denied execution without exposing private diagnostics", () => {
   const output = [], errors = [];
   const argv = ["--type", "fix", "--scope", "core", "--summary", "safe", "--body", "why",
     "--dispatch-record", "evidence/dispatch-record-T.json", "--execute"];
@@ -38,10 +38,10 @@ test("CLI returns a nonzero exit for post-commit recovery without exposing priva
   assert.equal(JSON.parse(output[0]).status, "recovery-required");
   assert.deepEqual(errors, []);
   const privateError = runPipelineCommitCli(argv, {
-    commit: () => { throw Object.assign(new Error("private host path"), { code: "PC-COMMIT" }); },
+    commit: () => { throw Object.assign(new Error("private host path"), { code: "PC-HOST-CONTEXT" }); },
     stdout: { write: (value) => output.push(value) }, stderr: { write: (value) => errors.push(value) },
   });
   assert.equal(privateError, 2);
-  assert.equal(errors[0], "pipeline-commit: PC-COMMIT\n");
+  assert.equal(errors[0], "pipeline-commit: PC-HOST-CONTEXT\n");
   assert.equal(errors[0].includes("private host path"), false);
 });

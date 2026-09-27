@@ -318,6 +318,135 @@
       "file": "plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs",
       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs",
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/publication-close-audit-binding.test.mjs"
+    },
+    {
+      "name": "architecture-decision-continuity-tests",
+      "file": "plugins/pipeline-core/lib/architecture-decision-continuity.test.mjs",
+      "invariantPinned": "Composition and parity of validated project ADRs with #9 inherited source bindings",
+      "nonOverlapNote": "Cross-layer authority composition is distinct from local sidecar validation and private source admission"
+    },
+    {
+      "name": "architecture-decision-waiver-store-tests",
+      "file": "plugins/pipeline-core/lib/architecture-decision-waiver-store.test.mjs",
+      "invariantPinned": "Exact PO-signed module exception readback, source tamper refusal and expiry",
+      "nonOverlapNote": "Human waiver proof is distinct from inherited source admission and project/inherited composition"
+    },
+    {
+      "name": "organization-architecture-source-tests",
+      "file": "plugins/pipeline-core/lib/organization-architecture-source.test.mjs",
+      "invariantPinned": "Signed, fresh organization/team ADR reference admission fails closed on source or authority drift",
+      "nonOverlapNote": "#9 inherited-source admission is distinct from local ADR applicability and organization document-class policy"
+    },
+    {
+      "name": "organization-architecture-source-store-tests",
+      "file": "plugins/pipeline-core/lib/organization-architecture-source-store.test.mjs",
+      "invariantPinned": "PO-bound source configuration and private signed organization feed readback remain distinct from absent optional guidance",
+      "nonOverlapNote": "The physical source loader checks private bytes and configured authority, beyond the pure inherited-reference resolver"
+    },
+    {
+      "name": "architecture-inherited-sources-cli-tests",
+      "file": "plugins/pipeline-core/scripts/architecture-inherited-sources.test.mjs",
+      "invariantPinned": "Exact source-registry preparation, PO proof activation, CAS readback and tamper refusal",
+      "nonOverlapNote": "The operator-facing source registry writer is distinct from read-only source admission"
+    },
+    {
+      "name": "goldfish-commit-command-flow-tests",
+      "file": "plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs",
+      "invariantPinned": "Read-only exact-path Goldfish Git command rendering, quoting and real trailer readback",
+      "nonOverlapNote": "Legacy shell-command guidance is distinct from host-owned commit execution and dispatch-record authorship"
+    },
+    {
+      "name": "design-advisory-admission-cli-tests",
+      "file": "plugins/pipeline-core/scripts/design-advisory-admission.test.mjs",
+      "invariantPinned": "The inspect CLI rechecks the private Advisor transaction and cannot reuse a past final-approval claim without current human-authority readback",
+      "nonOverlapNote": "CLI readback coverage distinct from the pure transaction and admission contracts"
+    },
+    {
+      "name": "verify-suite-append-policy-tests",
+      "file": "plugins/pipeline-core/lib/verify-suite-append-policy.test.mjs",
+      "invariantPinned": "A block-level declarative Verify registration may only append suites without altering prior gate coverage",
+      "nonOverlapNote": "Unique append-only transition policy; the registration completeness checker validates the postimage itself"
+    },
+    {
+      "name": "verify-suite-append-history-tests",
+      "file": "harness/scripts/check-verify-suite-append.test.mjs",
+      "invariantPinned": "Every TP-13-era registry commit and the pending worktree postimage must preserve all earlier registrations",
+      "nonOverlapNote": "Git history and candidate-boundary coverage distinct from the pure transition policy"
+    },
+    {
+      "name": "verify-suite-append-history-check",
+      "file": "harness/scripts/check-verify-suite-append.mjs",
+      "invariantPinned": "The actual candidate registry has only append-shaped edits since TP-13 introduction",
+      "nonOverlapNote": "Real Git-history gate distinct from the registry's schema and coverage check"
+    },
+    {
+      "name": "codex-critic-session-route-tests",
+      "file": "plugins/pipeline-core/scripts/codex-critic-session-route.test.mjs",
+      "invariantPinned": "Selected Codex Critic model and receipt digests bind to the valid V3 high-risk duty without making optional selection a lifecycle blocker",
+      "nonOverlapNote": "Direct selected-host producer coverage distinct from the shared Critic finalizer's packet binding"
+    },
+    {
+      "name": "native-goldfish-host-state-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHS01",
+          "NGHS02",
+          "NGHS03",
+          "NGHS04",
+          "NGHS05"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Runner-native Claude and Codex dispatches persist private exact-correlation state only after candidate, role, clean-baseline, and write-scope validation; consumed or expired Codex start candidates cannot poison later runs",
+      "nonOverlapNote": "Private prelaunch binding, bounded unstarted-state TTL, and Codex start-stop correlation are separate from returned-final validation and commit readback"
+    },
+    {
+      "name": "native-goldfish-host-return-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHR01",
+          "NGHR02",
+          "NGHR03",
+          "NGHR04",
+          "NGHR05"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Claude and Codex native Goldfish completions bind to their exact runner-specific dispatch identity and a strict, path-bounded final return",
+      "nonOverlapNote": "Pure runner callback and final-return contracts; Git mutation, private persistence, and full live-hook integration remain separately tested"
+    },
+    {
+      "name": "native-goldfish-host-finalizer-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHF01",
+          "NGHF02",
+          "NGHF03"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "A runner-native Claude/Codex host finalizer commits only a validated exact return, publishes its private observation, then writes one exclusive authored v4 record",
+      "nonOverlapNote": "Ordering and failure-state orchestration is separate from pure callback validation, private receipt integrity, and real-Git commit execution"
+    },
+    {
+      "name": "native-goldfish-host-commit-execution-tests",
+      "file": "plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "NGHC01",
+          "NGHC02"
+        ],
+        "maxBytes": 65536
+      },
+      "invariantPinned": "Claude/Codex native Host-Commit stages only the admitted return diff, runs ordinary Git hooks, and reads back runner-specific exact commit metadata",
+      "nonOverlapNote": "Temporary real-Git mutation coverage is separate from callback validation and the Agy-specific host commit contract"
     }
   ]
 }

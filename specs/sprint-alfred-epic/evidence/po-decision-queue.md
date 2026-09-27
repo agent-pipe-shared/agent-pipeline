@@ -22,6 +22,20 @@ mechanism, a substitute for signed gates, or a record of feature acceptance.
 
 ## PO decisions
 
+### 2026-09-27 — Codex model-family and post-0.7 efficiency direction
+
+- Retain the current Codex set Astra / Sol / Luna for 0.7. Do not add or
+  prefer a separate GPT-5.6 Terra route merely to reduce consumption: the
+  quality gain of GPT-6 over GPT-5.6 is worth keeping Luna 6 for compatible
+  worker duties. This does not mean Sol is appropriate for every task; use
+  the approved functional routing for each duty.
+- Further efficiency work belongs to the release after 0.7. Measure task-level
+  quality, observed usage, retries, elapsed work and verification/review cost;
+  do not promise savings from the heterogeneous historical trials or weaken
+  required Critic, security or Verify coverage.
+- The current Elephant-on-Luna use is a session cost-control choice, not a
+  blanket change to every design, implementation or high-risk review route.
+
 ### 2026-09-25 — 0.7 candidate boundaries clarified in chat
 
 - The PO performs the clean candidate installation. Agents prepare and
@@ -414,6 +428,49 @@ expired armed capability and divergent histories. Prepare reconciliation and
 push prerequisites before any execution; do not claim a push or signature.
 
 ## Open agent work and later gates
+
+### Resolved source-stage decisions
+
+These decisions are distinct from post-install operational evidence. A resolved
+product decision authorizes implementation; it does not itself close the source
+row or turn fixtures into installed-runner evidence.
+
+1. **Generic Claude/Codex Goldfish commit path — RESOLVED 2026-09-27 (A).**
+   Extend host-owned commit-after-validated-return to both runners and test each
+   runner independently. Each adapter must bind its native live dispatch,
+   validated return, exact Git postimage, ordinary-hook commit and exclusive
+   authored-v4 record. Caller-selected dispatch records remain non-authorizing;
+   a runner stays unavailable if its native host observation cannot be proven.
+   This decision does not itself close `shell-dispatch-command-flow` or prove a
+   real installed-runner execution.
+
+2. **Accepted v2 ADR module applicability — RESOLVED 2026-09-27 (A).**
+   A digest-valid v2 ADR with `status: accepted` and explicit, sorted module IDs
+   that all exist in the physically validated OKF map is effective immediately
+   for exactly those modules. It never applies to an unlisted module or to the
+   all-project projection. Proposed v2 decisions remain inactive; v1 ADRs with
+   ambiguous module scope remain visible warnings. Focused implementation and
+   consumer checks are still required; inherited #9 feeds are a separate topic.
+
+### AC-19 inherited-source direction — RESOLVED 2026-09-27 (A)
+
+1. **Inherited organization/team ADR sources for AC-19** — the PO chose A in
+   chat on 2026-09-27: retain the full AC-19 scope. The Alfred source
+   now resolves local project ADR applicability, but the #9 policy result is a
+   document-class governance projection, not an architecture-decision feed;
+   the current #9 snapshot has no org/team ADR source contract.
+   - **Chosen implementation direction:** extend the owned #9 contract first,
+     then make Alfred consume its validated effective-decision references
+     (identity, digest, layer, applicability, authority class, freshness,
+     supersession/conflict and optional-vs-mandatory availability). Do not copy
+     the source resolver into Alfred. This is honest full-scope work, but needs
+     an explicit #9 owner/interface and a cross-epic implementation slice.
+   - **Current evidence limit:** report AC-19 source scope as pending until that
+     implementation and its consumer checks pass; don't treat
+     `organization-policy.mjs`, an unconfigured result, or a two-runner local
+     fixture as proof that inherited ADR decisions were consumed. Historical
+     ADRs without safe mappings remain visible warnings under the already
+     confirmed PO policy.
 
 | Topic | Current status | Next owner/action |
 |---|---|---|

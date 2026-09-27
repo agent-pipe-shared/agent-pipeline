@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,6 +22,7 @@ import {
 } from "./pipeline-start-preflight.mjs";
 import { formatOnboardingRerunCommand } from "./project-onboarding-v3.mjs";
 import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
+import { inspectEffectiveArchitectureDecisions } from "../lib/architecture-effective-decisions.mjs";
 // NVA-K-DRIVERREACH: `ProjectOnboardingReadyError` to inject a readiness denial exactly like
 // the readiness guard's own test suite does (guard-lifecycle-ready.test.mjs's `deny()`), and
 // `isSanctionedLifecycleCommand` -- the SAME real admission function that guard enforces at
@@ -182,6 +184,41 @@ test("all three runner bootstraps expose the same nonblocking decision digest", 
     inspectEffectiveArchitectureDecisionsFn: () => ({ status: "ready", projectionSha256: expected }) });
   assert.equal(malformed.effectiveDecisions.status, "unavailable");
   assert.equal(malformed.effectiveDecisions.projectionSha256, null);
+});
+
+test("AC19 source parity uses the same physical decision projection for fresh runner bootstrap invocations", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "pipeline-ac19-bootstrap-parity-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, "docs", "adr"), { recursive: true });
+  const body = Buffer.from("# Shared project decision\n\nAll supported runners read this exact decision.\n", "utf8");
+  writeFileSync(join(root, "docs", "adr", "ADR-0001.md"), body);
+  writeFileSync(join(root, "docs", "adr", "ADR-0001.json"), `${JSON.stringify({
+    schema: "pipeline.architecture-decision.v1",
+    id: "ADR-0001",
+    title: "Shared project decision",
+    status: "accepted",
+    digest: createHash("sha256").update(body).digest("hex"),
+    scope: "project",
+    date: "2026-09-27",
+  })}\n`);
+
+  const invocations = [
+    ["claude", { CLAUDECODE: "1" }],
+    ["codex", { CODEX_SESSION_ID: "fresh-codex-session" }],
+    ["antigravity", { ANTIGRAVITY_AGENT: "1" }],
+  ].map(([runner, env]) => {
+    const result = preflight({ env, pluginList: pluginList(), read: () => manifest, cwd: root,
+      inspectEffectiveArchitectureDecisionsFn: inspectEffectiveArchitectureDecisions });
+    assert.equal(resolveActiveRunner({ env }), runner);
+    assert.equal(result.effectiveDecisions.area, "project");
+    assert.equal(result.effectiveDecisions.status, "ready");
+    assert.equal(result.effectiveDecisions.decisionCount, 1);
+    assert.equal(result.effectiveDecisions.taskScopeResolved, false);
+    return result.effectiveDecisions;
+  });
+
+  assert.deepEqual(invocations[1], invocations[0]);
+  assert.deepEqual(invocations[2], invocations[0]);
 });
 
 test("preflight reports exact identity and no-handoff without secret fields", () => {

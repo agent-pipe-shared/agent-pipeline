@@ -144,6 +144,46 @@ with the ruleset SHA from field 6):
 If this briefing lacks the ruleset SHA, that is a briefing defect: stop and
 report back to the Elephant — do not research it yourself.
 
+**Native host-commit mode (only when the exact binding block below is present):**
+the dispatcher has opted this one foreground Claude `Agent` (or legacy `Task`)
+or Codex `spawn_agent` call into
+the runner-hook host-commit transaction. This mode overrides the ordinary
+Goldfish commit/dispatch-record instructions in this template: do NOT run
+`git add`, `git commit`, or write a dispatch record. Leave the changes
+uncommitted. Return exactly one JSON object, with no Markdown fence or leading
+prose, matching `pipeline.native-goldfish-host-return.v1`:
+
+```json
+{"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"<exact binding dispatchId>","candidateCommit":"<exact binding candidateCommit>","outcome":"succeeded|failed|blocked","report":"<durable sanitized report>","changedPaths":["<exact repository-relative changed path>"]}
+```
+
+`changedPaths` must list the complete resulting diff, not just the files you
+intended to touch; use `outcome: "succeeded"` only when the DoD checks passed.
+The host independently admits only those exact paths, creates one ordinary Git
+commit with hooks enabled, reads it back, stores a local host-observation, and
+publishes the v4 record last. If the marker or its binding is malformed, or the
+runner hook cannot prepare, this route will not commit; do not try to repair the
+authority by committing yourself. The dispatcher then handles the uncommitted
+result through the ordinary recovery path. A local host observation is not a
+provider-signed attestation and is not portable to a fresh clone without a
+separate signed export.
+
+For Claude, the native host path additionally requires the dispatch call to set
+`run_in_background: false`; Claude Code's default/background `async_launched`
+response is not a final return and cannot be host-committed. A missing or true
+background flag leaves the ordinary dispatch available but produces no host
+commit authority.
+
+The opt-in binding has this exact shape and must occur once in the prompt; its
+separate host directive must also occur once:
+
+```text
+<!-- pipeline-native-goldfish-host-commit:v1
+{"schema":"pipeline.native-goldfish-host-briefing.v1","dispatchId":"...","candidateCommit":"...","candidateTree":"...","runner":"claude|codex","role":"pipeline-core:goldfish-implementor|pipeline-core:goldfish-mechanic","agentType":"goldfish-implementor|goldfish-mechanic","model":"<concrete runner-observed id>","effort":"<resolved effort>","rulesetSha":"<sha256>","allowedPaths":["<exact allowed repo-relative path>"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1|pipeline.critic-skip-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":2,"riskClass":"low","riskFlag":false,"diff":{"mechanical":false,"architecture":false,"guardrails":false,"security":false}},"appliedRow":"T3"}}
+-->
+NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
+```
+
 **Scratch location:** for any temporary file (probe script, held note,
 throwaway fixture) use the repository's own `scratch/` directory — gitignored,
 inside the project root, and the only location the guard needs no exception
@@ -340,8 +380,27 @@ Use this module when dispatching a bugfix (not for new features or mini-edits). 
 
 ## Final report (mandatory format, target ≤ 1,000 tokens, hard max 40 lines)
 
-**For write tasks: commit BEFORE writing this report** — reference your commit SHA in the sections below; this ordering is what keeps finals from truncating mid-report (evidence: 0 truncated finals since the pattern is in use, vs. 4 incidents at 2–5 min resume cost before). Every goldfish commit message CONTAINS the trailer line `Dispatch: <TASK_ID> (goldfish)` and `AI-Assisted: true` in its final trailer block. `Dispatch:` evidences ONE fact only — WHICH work package the diff belongs to (deterministic work-package/diff-authorship evidence for close step 6b and the Critic). It does NOT evidence who performed the commit act itself — a dispatch that authors a diff but is truncated before committing, and whose orchestrator finishes that last step, produces a `Dispatch:` line textually identical to the ordinary case. `AI-Assisted: true` records anonymous assistance only. Provider/model co-author data, session URLs/IDs, account identifiers, and other private correlation metadata are prohibited. **Commit by explicit pathspec, never by wildcard:** `git commit -- <exact paths>` commits the current content of exactly those paths in ONE act — no separate `git add` is needed for a file git already tracks, so the shared-index race closes without a second call. A file git does not yet track has to be staged first, so that case is unavoidably two calls: `git add -- <path>`, then `git commit -- <same paths>`. NEVER `git add -A` or `git add .` — in a shared working tree a wildcard add lets another parallel goldfish's files ride along on your commit. Do NOT chain the two with `&&`: the closed shell grammar refuses composed commands, so `git add -- <p> && git commit -- <p>` is denied outright (`GUARD-OPERATOR-UNAPPROVED`). This paragraph used to prescribe exactly that chain; it was corrected on 2026-08-28 after the guard refused it in a live dispatch.
-**For the normal newline-free route, use repeated `-m` values for message paragraphs and repeated `--trailer` values for the final trailers**. This literal safe example has the same spelling in POSIX shell, PowerShell, and cmd.exe:
+For ordinary write tasks **outside native host-commit mode**, first run the
+read-only `goldfish-commit-command-flow.mjs` producer from the repository root.
+Supply the exact task ID, Conventional Commit type/scope/summary, one to four
+single-line WHY body paragraphs, and the complete sorted changed-path list
+(repeat `--body` and `--path`). Example:
+
+```text
+node plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs --task-id {{TASK_ID}} --type docs --scope pipeline --summary 'update guidance' --body 'Explain the supported route.' --path path/to/file
+```
+
+Inspect the returned paths. For a POSIX shell, execute each step's
+`copyCommand.posix`; for PowerShell, execute each step's
+`copyCommand.powershell`. Run the stage and commit blocks in **two separate
+tool calls**. The plain `command` field is POSIX-only. Never compose
+either Git command yourself or join them with `&&`. This producer only renders
+quoted exact-path commands: it does not stage, commit, authorize attribution,
+bypass hooks, or publish the v4 record. If it refuses an input, report its
+typed code and stop; the native host-commit path above remains separate.
+
+**For write tasks: commit BEFORE writing this report** — reference your commit SHA in the sections below; this ordering is what keeps finals from truncating mid-report (evidence: 0 truncated finals since the pattern is in use, vs. 4 incidents at 2–5 min resume cost before). Every goldfish commit message CONTAINS the trailer line `Dispatch: <TASK_ID> (goldfish)` and `AI-Assisted: true` in its final trailer block. `Dispatch:` evidences ONE fact only — WHICH work package the diff belongs to (deterministic work-package/diff-authorship evidence for close step 6b and the Critic). It does NOT evidence who performed the commit act itself — a dispatch that authors a diff but is truncated before committing, and whose orchestrator finishes that last step, produces a `Dispatch:` line textually identical to the ordinary case. `AI-Assisted: true` records anonymous assistance only. Provider/model co-author data, session URLs/IDs, account identifiers, and other private correlation metadata are prohibited. **Commit by explicit pathspec, never by wildcard:** the generated flow stages only the exact paths and commits only those same pathspecs. Staging is necessary for new files; it is redundant but safe for tracked files. NEVER `git add -A` or `git add .` — in a shared working tree a wildcard add lets another parallel goldfish's files ride along on your commit. Do NOT chain the two with `&&`: the closed shell grammar refuses composed commands, so `git add -- <p> && git commit -- <p>` is denied outright (`GUARD-OPERATOR-UNAPPROVED`). This paragraph used to prescribe exactly that chain; it was corrected on 2026-08-28 after the guard refused it in a live dispatch.
+The producer's newline-free route uses repeated `-m` values for message paragraphs and repeated `--trailer` values for the final trailers. The following literal safe example illustrates its output, not an instruction to hand-compose it; arbitrary values require the producer's quoting:
 
 ```text
 git commit -m "docs: update guidance" -m "Explain the supported route." --trailer "Dispatch: TASK-ID (goldfish)" --trailer "AI-Assisted: true" -- path/to/file

@@ -8,6 +8,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { dispatchAgySession, AGY_SESSION_CONSENT_SCHEMA } from "./agy-session-dispatch.mjs";
+import { resolveModelRoleSession } from "./model-role-session.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -32,6 +33,47 @@ test("role, model, scope and consent are closed and bound", async () => {
   assert.equal((await dispatchAgySession({ ...common, consent: consent({ model: "gemini-other" }) })).code, "AGY-SESSION-CONSENT-INVALID");
   assert.equal((await dispatchAgySession({ ...common, inputSha256: "bad", consent: consent() })).code, "AGY-SESSION-INPUT-MISMATCH");
   assert.equal((await dispatchAgySession({ ...common, consent: consent({ expiresAtMs: 2 }) })).code, "AGY-SESSION-CONSENT-INVALID");
+});
+
+test("an opted-in functional model route rejects a substituted model before launch", async () => {
+  const selected = resolveModelRoleSession({ runner: "antigravity", role: "worker", effort: "medium",
+    sessionId: session.id, candidateCommit: "a".repeat(40), observedAt: "2026-09-26T00:00:00.000Z",
+    policy: { schema: "pipeline.model-role-policy.v1", runner: "antigravity", role: "worker",
+      approved: [{ modelId: "gemini-3.8-flash-medium", rank: 1, efforts: ["medium"],
+        compatibilityEvidenceSha256: "b".repeat(64) }] },
+    availableModelIds: ["gemini-3.8-flash-medium"] });
+  assert.equal(selected.ok, true);
+  const result = await dispatchAgySession({ ...authority, packet: packet(), session,
+    consent: consent(), requestedModel: "gemini-3.8-flash-high", effort: "medium",
+    modelRoleStore: { read: () => ({ ok: true, sessionId: session.id,
+      receipts: [selected.receipt], admission: {
+        ok: true, code: "MODEL-ROLE-BOOTSTRAP-ADMITTED", readbackSha256: "c".repeat(64),
+        receiptSha256s: [selected.receipt.receiptSha256] } }) },
+    scope: "scope-1", inputSha256: hash("scope-1"), agyPath: "unused", nowEpochMs: 2 });
+  assert.equal(result.code, "AGY-SESSION-MODEL-ROLE-NOT-BOUND");
+  assert.equal(result.launcherCalls, 0);
+});
+
+test("a missing optional role receipt preserves only the valid consent-bound V3 route", async () => {
+  const common = { ...authority, packet: packet(), session,
+    requestedModel: "gemini-3.8-flash-medium", effort: "medium",
+    consent: consent({ model: "gemini-3.8-flash-medium" }),
+    modelRoleStore: { read: () => ({ ok: false, code: "MODEL-ROLE-STORE-UNAVAILABLE" }) },
+    scope: "scope-1", inputSha256: hash("scope-1"), agyPath: "unused", nowEpochMs: 2 };
+  const fallback = await dispatchAgySession(common);
+  assert.equal(fallback.code, "AGY-SESSION-PREFLIGHT-FAILED", JSON.stringify(fallback));
+  assert.equal(fallback.modelCalls, 0);
+  const mechanicFallback = await dispatchAgySession({ ...common,
+    packet: packet({ role: "pipeline-core:goldfish-mechanic" }),
+    consent: consent({ model: "gemini-3.8-flash-medium", role: "pipeline-core:goldfish-mechanic" }) });
+  assert.equal(mechanicFallback.code, "AGY-SESSION-PREFLIGHT-FAILED", JSON.stringify(mechanicFallback));
+  const unapproved = await dispatchAgySession({ ...common, requestedModel: "unapproved-model",
+    consent: consent({ model: "unapproved-model" }) });
+  assert.equal(unapproved.code, "AGY-SESSION-MODEL-ROLE-NOT-BOUND");
+  assert.equal(unapproved.launcherCalls, 0);
+  const damagedAuthority = await dispatchAgySession({ ...common, readRegistry: () => ({ duties: {} }) });
+  assert.equal(damagedAuthority.code, "AGY-SESSION-MODEL-ROLE-NOT-BOUND");
+  assert.equal(damagedAuthority.launcherCalls, 0);
 });
 
 test("same-session consent permits a bounded positive fixture dispatch and exclusive result", async () => {

@@ -32,6 +32,7 @@ no hand-maintained guard count or command list.
 | Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;invoke_subagent | node hooks/antigravity-pretool-guard.mjs |
 | Antigravity | PreToolUse | run_command&#124;write_to_file&#124;replace_file_content&#124;invoke_subagent | node hooks/antigravity-slicing-hint.mjs observe |
 | Antigravity | Stop | (all) | node hooks/antigravity-stop-hook.mjs |
+| Claude Code | PostToolUse | Task&#124;Agent | node "${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner claude |
 | Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;Agent&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write&#124;Workflow | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs" |
 | Claude Code | PreToolUse | Bash&#124;Edit&#124;Glob&#124;Grep&#124;NotebookEdit&#124;Read&#124;Task&#124;TodoWrite&#124;WebFetch&#124;WebSearch&#124;Write | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs" |
 | Claude Code | PreToolUse | Bash&#124;PowerShell | node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs" |
@@ -58,7 +59,9 @@ no hand-maintained guard count or command list.
 | Codex | PreToolUse | spawn_agent&#124;update_plan | node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" PreToolUse; Windows: node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" PreToolUse |
 | Codex | SessionStart | startup&#124;resume&#124;clear&#124;compact | node "${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs"; Windows: node "${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs" |
 | Codex | SubagentStart | (all) | node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStart; Windows: node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStart |
+| Codex | SubagentStart | (all) | node "${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner codex; Windows: node "${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner codex |
 | Codex | SubagentStop | (all) | node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStop; Windows: node "${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs" SubagentStop |
+| Codex | SubagentStop | (all) | node "${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner codex; Windows: node "${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs" --runner codex |
 
 ## Maintained explanation and limits
 
@@ -76,6 +79,6 @@ The hashes bind this generated page to the exact manifest bytes it read.
 
 | Runner | Manifest | SHA-256 |
 | --- | --- | --- |
-| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `0a64e116d51db1372862e910a78cdbe49cb084a4875924e87682bea5b7896b1e` |
-| Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `a2b112cf560ca898a8e0799f0c98930d0a2ed76e551611c2aecc1a515738fa99` |
+| Claude Code | [`plugins/pipeline-core/hooks/hooks.json`](../plugins/pipeline-core/hooks/hooks.json) | `e1a67026eb36e4d5ec52d6db8e04e568a799496dab93bb17a7e4c13448bafe48` |
+| Codex | [`plugins/pipeline-core/hooks/codex-hooks.json`](../plugins/pipeline-core/hooks/codex-hooks.json) | `dcc23075e81a254603c9b7ab96bc6e2bc046830532b1cc0535934e6af67aa010` |
 | Antigravity | [`plugins/pipeline-core/hooks.json`](../plugins/pipeline-core/hooks.json) | `3df5fc3e6d6aba4d31aee208cef31fcbfeadeae4a860a7832c06fba973e83d96` |

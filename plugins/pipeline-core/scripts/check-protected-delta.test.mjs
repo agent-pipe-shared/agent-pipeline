@@ -27,3 +27,13 @@ test("A3 candidate delta passes ordinary unprotected paths", () => {
   assert.equal(result.ok, true);
   assert.deepEqual(result.protectedPaths, []);
 });
+
+test("A3 never labels a missing shipped baseline as a passing empty delta", () => {
+  const result = checkProtectedDelta({ rootDir: process.cwd(), gitFn: gitFor(["README.md"]),
+    resolveBaselineFn: () => ({ status: "unavailable", entries: [], identity: null,
+      diagnostics: [{ code: "PB-CONFIG-INVALID" }], dynamic: { status: "unavailable" } }) });
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.protectedPaths, []);
+  assert.equal(result.baseline.diagnostics[0].code, "PB-CONFIG-INVALID");
+});

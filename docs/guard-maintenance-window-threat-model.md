@@ -183,6 +183,31 @@ below assumes it holds and is written to catch a change that would break it.
   `scripts/installed-plugin-attestation-host.mjs`; then
   `scripts/pipeline-update-channel.mjs`, `scripts/po-approval-request.mjs`,
   `scripts/po-human-approval.mjs` (the script the human uses to sign),
+  `scripts/dispatch-authorship-verify.mjs` (the dynamically loaded authored-commit check),
+  `scripts/portable-agy-authorship-export.mjs` and
+  `scripts/portable-critic-export.mjs` (its child-process proof checks),
+  plus their non-liftable first-party dependencies:
+  `lib/architecture-effective-decisions.mjs`,
+  `lib/architecture-decision-continuity.mjs`,
+  `lib/architecture-decision-waiver-store.mjs`,
+  `lib/organization-architecture-source.mjs`,
+  `lib/organization-architecture-source-store.mjs`,
+  `lib/native-goldfish-host-observation.mjs`,
+  `lib/native-goldfish-host-return.mjs`,
+  `lib/native-goldfish-host-state.mjs`,
+  `lib/agent-model-registry.mjs`,
+  `lib/agy-host-commit-admission.mjs`,
+  `lib/agy-host-observed-local-readback.mjs`,
+  `lib/agy-host-observed-receipt.mjs`,
+  `lib/agy-host-observed-store.mjs`,
+  `lib/agy-final-return.mjs`,
+  `lib/agy-session-authority.mjs`,
+  `lib/agy-session-dispatch.mjs`,
+  `lib/antigravity-execution-host.mjs`,
+  `lib/critic-disposition-addendum.mjs`,
+  `lib/portable-agy-authorship-export.mjs`,
+  `lib/portable-critic-export.mjs`, and
+  `lib/role-dispatch-preflight.mjs`,
   `scripts/push-gate-satisfiability.mjs`, `scripts/push-prepare.mjs`,
   `scripts/ruleset-freshness.mjs`, and `scripts/ruleset-update-policy.mjs`. A
   seventh gap (NVA-V25-DRIVERKERNEL, 2026-08-29) is a different shape than the
@@ -282,12 +307,30 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/governance-review-action.mjs`, `lib/organization-policy.mjs`,
   `lib/requirement-traceability.mjs`, `scripts/check-critic-skip-coverage.mjs`,
   `scripts/critic-dispatch-preflight.mjs`, `scripts/critic-packet-preflight.mjs`, and
-  `scripts/session-critic-finalizer.mjs`.
+  `scripts/session-critic-finalizer.mjs`. The finalizer's model-route selection
+  is also protected: `scripts/model-role-dispatch-select.mjs` and its
+  Antigravity bootstrap target `scripts/model-role-bootstrap.mjs`.
   The intake and Critic admission dependencies reached from those kernel paths
   also remain protected: `lib/onboarding-initial-answers-state.mjs`,
   `lib/onboarding-initial-answers-transaction.mjs`,
   `lib/onboarding-later-language.mjs`, and `lib/critic-course-admission.mjs`.
   Guards and close coordination import these modules to enforce verified feature close audit and critic lifecycle readback.
+- The 2026-09-27 design-workflow, model-role and readiness closure adds:
+  `lib/design-workflow-package.mjs`, `lib/design-workflow-approval.mjs`,
+  `lib/advisory-attempt-trail.mjs`, `lib/model-role-host-session.mjs`,
+  `lib/model-role-host-identity.mjs`, `lib/model-role-host-store.mjs`,
+  `lib/model-role-route-source.mjs`, `lib/model-role-approved-policy.mjs`,
+  `lib/model-role-host-observations.mjs`, `lib/model-role-v3-baseline.mjs`,
+  `lib/model-role-session.mjs`, `lib/model-role-dispatch.mjs`,
+  `lib/antigravity-model-host-observation.mjs`,
+  `lib/claude-model-host-observation.mjs`,
+  `lib/codex-model-host-observation.mjs`,
+  `lib/design-readiness-host-evidence.mjs`, `lib/advisory-lifecycle-v2.mjs`,
+  `lib/sandboxed-readonly-duty.mjs`, `lib/codex-sandbox-compatibility.mjs`,
+  `lib/design-readiness-runner-host-store.mjs`,
+  `scripts/codex-sandbox-select.mjs`, and `lib/sandbox-failure.mjs`.
+  They are imported by protected design approval, readiness, or model-route
+  entry points and therefore must remain inside the same transitive kernel.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

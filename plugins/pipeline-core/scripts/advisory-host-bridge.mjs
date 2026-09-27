@@ -10,17 +10,20 @@
  * runtime transport; only the sanitized receipt is written to disk.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
+import { createAdvisoryAttemptTrail, validateAdvisoryAttemptTrail } from "../lib/advisory-attempt-trail.mjs";
 import { buildAdvisoryDecisionEvent } from "../lib/advisory-decision-event.mjs";
 import {
+  advisorySessionRoleSelectionSha256,
   advisoryEvidenceBundleSha256,
   advisoryConsultationDisposition,
   buildAdvisoryEvidenceBundle,
+  createAdvisoryDemand,
   createAdvisoryConsultationRecord,
   sameAdvisoryEvidenceRepository,
   validateAdvisoryDemand,
@@ -35,6 +38,8 @@ import { designAdvisoryReceiptBinding } from "../lib/design-advisory-coordinator
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
+import { CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
+import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
 import { ROUTES, selectHostAdvisorRoute, selectHostAdvisorRouteForHost } from "./codex-host-advisor-route.mjs";
 import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
@@ -62,7 +67,8 @@ function hostRouteInput(input) {
   return { runner: input?.runner, profile: input?.profile, consent: advisorExport?.consent ?? "default" };
 }
 
-function resolvedAdvisoryRoute(input, rootDir, resolveRoute = resolveV3DutyRoute) {
+function resolvedAdvisoryRoute(input, rootDir, resolveRoute = resolveV3DutyRoute,
+  selectRole = selectModelRoleForTask, env = process.env) {
   try {
     const route = resolveRoute({
       rootDir,
@@ -76,7 +82,64 @@ function resolvedAdvisoryRoute(input, rootDir, resolveRoute = resolveV3DutyRoute
       || typeof route.effort !== "string" || route.effort.length === 0
       || !/^[a-f0-9]{64}$/.test(route.sourceSha256)
       || route.candidateCommit !== input?.dispatch?.candidateCommit) return null;
-    return Object.freeze({ ...route });
+    // The V3 route is the independently valid floor. A session-role receipt
+    // can replace its exact model only after host readback; optional selector
+    // failure must not strand an otherwise valid Advisor call.
+    let selected;
+    try { selected = selectRole({ rootDir, runner: "codex", taskRoute: "duty.advisory", env }); }
+    catch { return Object.freeze({ ...route }); }
+    if (selected?.ok !== true || selected.status !== "ready") return Object.freeze({ ...route });
+    if (selected.runner !== "codex" || selected.taskRoute !== "duty.advisory"
+      || selected.effort !== route.effort || typeof selected.modelId !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,127}$/u.test(selected.modelId)
+      || !/^[a-f0-9]{64}$/u.test(selected.readbackSha256 ?? "")
+      || !/^[a-f0-9]{64}$/u.test(selected.receiptSha256 ?? "")) return Object.freeze({ ...route });
+    return Object.freeze({ ...route, model: selected.modelId,
+      sourceSha256: sha256(canonicalJson({ v3SourceSha256: route.sourceSha256,
+        taskRoute: selected.taskRoute, modelId: selected.modelId, effort: selected.effort,
+        readbackSha256: selected.readbackSha256, receiptSha256: selected.receiptSha256 })) });
+  } catch { return null; }
+}
+
+/**
+ * Resolve Claude's optional session-selected consult fallback from the host's
+ * admitted model-role store. Native Claude Advisor remains governed by V3 and
+ * is intentionally not remapped. Any optional-route defect falls back to the
+ * exact V3 consult cell rather than blocking an otherwise usable call.
+ */
+function resolvedClaudeAdvisoryFallbackSelection(rootDir,
+  selectRole = selectModelRoleForTask, env = process.env) {
+  try {
+    const source = registeredFunctionalTaskRoutes();
+    if (!source?.ok) return null;
+    const routes = source.taskRoutes.filter((route) =>
+      route.runner === "claude" && route.taskRoute === CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE);
+    if (routes.length !== 1 || routes[0].state === "unavailable"
+      || routes[0].role !== "frontier" || routes[0].selector?.kind !== "alias"
+      || typeof routes[0].selector.value !== "string" || routes[0].effort !== "max") return null;
+    let selected;
+    try {
+      selected = selectRole({ rootDir, runner: "claude",
+        taskRoute: CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE, env });
+    } catch { return null; }
+    if (selected?.ok !== true || selected.status !== "ready"
+      || selected.runner !== "claude" || selected.taskRoute !== CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE
+      || selected.role !== routes[0].role || selected.effort !== routes[0].effort
+      || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u.test(selected.modelId ?? "")
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(selected.sessionId ?? "")
+      || !/^[a-f0-9]{64}$/u.test(selected.readbackSha256 ?? "")
+      || !/^[a-f0-9]{64}$/u.test(selected.receiptSha256 ?? "")) return null;
+    const binding = {
+      runner: selected.runner,
+      taskRoute: selected.taskRoute,
+      role: selected.role,
+      effort: selected.effort,
+      modelId: selected.modelId,
+      sessionId: selected.sessionId,
+      readbackSha256: selected.readbackSha256,
+      receiptSha256: selected.receiptSha256,
+    };
+    return Object.freeze({ ...binding, selectionSha256: advisorySessionRoleSelectionSha256(binding) });
   } catch { return null; }
 }
 
@@ -292,6 +355,8 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
     input,
     evidenceRoot,
     transport?.resolveAdvisoryRoute ?? resolveV3DutyRoute,
+    transport?.selectModelRoleForTaskFn ?? selectModelRoleForTask,
+    transport?.modelRoleEnvironment ?? process.env,
   );
   if (advisoryRoute === null) return demandRejected("advisory_route_unavailable");
   const selectedHost = selectedAdvisoryHostBridge(input, advisoryRoute, {
@@ -429,6 +494,8 @@ export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, tra
     input,
     root,
     transport.resolveAdvisoryRoute ?? resolveV3DutyRoute,
+    transport.selectModelRoleForTaskFn ?? selectModelRoleForTask,
+    transport.modelRoleEnvironment ?? process.env,
   );
   if (advisoryRoute === null) return demandRejected("advisory_route_unavailable");
   const observe = transport.observeWorkspace ?? observeHostAdvisorWorkspace;
@@ -659,6 +726,37 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     let repositoryRoot = configuredRepositoryRoot;
     try { repositoryRoot = realpathSync(configuredRepositoryRoot); } catch { /* shared preflight returns RDP-ROOT */ }
     validateDesignReceiptTarget(input, repositoryRoot);
+    let claudeFallbackSelection = null;
+    if (input.runner === "claude") {
+      const incomingDemand = validateAdvisoryDemand(input?.demand, {
+        runner: input?.runner,
+        profile: input?.profile,
+        question: input?.question,
+        dispatch: input?.dispatch,
+      });
+      if (incomingDemand.ok) {
+        claudeFallbackSelection = resolvedClaudeAdvisoryFallbackSelection(
+          repositoryRoot,
+          dependencies.selectModelRoleForTaskFn ?? selectModelRoleForTask,
+          dependencies.modelRoleEnvironment ?? process.env,
+        );
+        // Reconstruct the demand at the trusted host boundary. A caller-supplied
+        // v3 route binding is never authority: only the current private-store
+        // read can produce it, and missing optional selection rebuilds ordinary
+        // V2 demand so the registered V3 route remains usable.
+        const reboundDemand = createAdvisoryDemand({
+          runner: input.runner,
+          profile: input.profile,
+          reason: input.demand.reason,
+          question: input.question,
+          evidenceSha256: input.demand.evidenceSha256,
+          dispatch: input.dispatch,
+          ...(claudeFallbackSelection === null ? {} : { sessionRoleSelection: claudeFallbackSelection }),
+        });
+        if (reboundDemand.ok) input.demand = reboundDemand.demand;
+        else claudeFallbackSelection = null;
+      }
+    }
     const preparation = advisoryDispatchPreparation(
       input,
       args,
@@ -703,6 +801,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       result = await coordinateAdvisory(input, {
         invokeNative: adapter,
         invokeConsult: adapter,
+        claudeFallbackSelection,
         advisorExport,
         makeReceiptId: () => receiptIdFor(input),
       });
@@ -741,6 +840,22 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       }
     }
     let persistedConsultationRecordPath = null;
+    let attemptTrailPath = null;
+    if (input.designAdvisoryBinding && reported.receipt && receiptPath) {
+      const trail = createAdvisoryAttemptTrail({
+        receipt: reported.receipt,
+        receiptBytes: jsonBytes(reported.receipt),
+        attempts: reported.attempts,
+      });
+      const checked = validateAdvisoryAttemptTrail({ trail, receipt: reported.receipt,
+        receiptBytes: jsonBytes(reported.receipt),
+        requireNativeThenConsult: input.runner === "claude" && reported.receipt.adapter === "consult"
+          && reported.receipt.fallback.reason.startsWith("native-") });
+      if (!checked.ok) throw Object.assign(new Error("Advisor attempt trail does not bind its host result"), { code: checked.code });
+      attemptTrailPath = resolve(`${args.receipt}.attempts-v1.json`);
+      if (existsSync(attemptTrailPath)) throw Object.assign(new Error("Advisor attempt trail already exists"), { code: "advisor-attempt-trail-exists" });
+      writeJsonAtomic(attemptTrailPath, trail);
+    }
     if (reported.consultationRecord && reported.code !== "advisory_reused_no_repeat") {
       writeJsonAtomic(consultationRecordPath, reported.consultationRecord);
       persistedConsultationRecordPath = consultationRecordPath;
@@ -758,6 +873,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       attempts: reported.attempts,
       consultationRecord: reported.consultationRecord ?? null,
       consultationRecordPath: persistedConsultationRecordPath,
+      attemptTrailPath,
       sandboxBinding: sandboxBinding ?? null,
       agentDecisionEvent,
     });

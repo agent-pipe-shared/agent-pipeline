@@ -68,6 +68,10 @@ const RECOVERY_AUTHORIZATION_SCHEMA = "pipeline.runner-profile-migration-recover
 const PREWRITE_PREVIEW_SCHEMA = "pipeline.runner-profile-migration-prewrite-preview.v3";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
+// Exact predecessor of the additive 0.7 pure-read duty. This is not a generic
+// "older version" bypass: only its complete Core-owned route and export
+// preimage may advance through the explicit migration transaction.
+const READ_DUTY_PREDECESSOR_REGISTRY_SHA256 = "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5";
 const OID = /^[0-9a-f]{40}$/u;
 const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
@@ -449,14 +453,28 @@ function v3IntentFromV2(v2) {
 // compared here -- a future Core-owned surface needs exactly one new table
 // entry, never a new branch in this function.
 function refreshKnownV3RegistryDelta(parsed) {
+  const registry = loadRunnerProfilesV3Registry();
   // A present binding from an unknown Core registry is not an old project
   // default we may overwrite. In particular, an older installed plugin must
   // never rewrite a newer project's model routes during bootstrap.
+  const previousBinding = parsed.core_registry_sha256;
+  const boundToKnownPredecessor = previousBinding === READ_DUTY_PREDECESSOR_REGISTRY_SHA256;
   if (Object.hasOwn(parsed, "core_registry_sha256")
-    && parsed.core_registry_sha256 !== RUNNER_PROFILES_V3_REGISTRY_SHA256) return null;
-  const registry = loadRunnerProfilesV3Registry();
+    && previousBinding !== RUNNER_PROFILES_V3_REGISTRY_SHA256) {
+    if (!boundToKnownPredecessor || !Object.hasOwn(registry.duties, "read")) return null;
+    const oldDuties = clone(registry.duties);
+    delete oldDuties.read;
+    if (!same(parsed.routing, { profiles: registry.profiles, duties: oldDuties })
+      || !same(parsed.critic_export, registry.criticExportPolicy)) return null;
+  }
   const candidate = clone(parsed);
   const compatibilityDeltas = [];
+  if (boundToKnownPredecessor) {
+    candidate.core_registry_sha256 = RUNNER_PROFILES_V3_REGISTRY_SHA256;
+    compatibilityDeltas.push({ name: "known-v3-read-duty-registry-upgrade",
+      path: "core_registry_sha256", from: previousBinding,
+      to: RUNNER_PROFILES_V3_REGISTRY_SHA256 });
+  }
 
   for (const surface of CORE_OWNED_V3_SURFACES) {
     const present = Object.hasOwn(parsed, surface.path);

@@ -43,49 +43,51 @@ function stagedBlob(root, path, spawn) {
   return match && match[2] === path ? match[1] : undefined;
 }
 
-export function commitAdmittedAgyReturn({ baseline, final, allowedPaths, taskId, priorAdmission } = {}, dependencies = {}) {
-  if (!isSafeTaskId(taskId) || final?.outcome !== "succeeded") return fail("AGY-HOST-COMMIT-INPUT");
+function commitAdmittedReturn({ baseline, final, allowedPaths, taskId, priorAdmission } = {}, dependencies = {}, {
+  runner, subject, body, marker, codePrefix,
+} = {}) {
+  const code = (suffix) => `${codePrefix}-${suffix}`;
+  if (!isSafeTaskId(taskId) || final?.outcome !== "succeeded") return fail(code("HOST-COMMIT-INPUT"));
   const admitted = assessAgyHostCommit({ baseline, final, allowedPaths });
-  if (!admitted.ok) return admitted;
+  if (!admitted.ok) return { ...admitted, code: admitted.code.replace(/^AGY-/u, `${codePrefix}-`) };
   if (priorAdmission?.code !== "AGY-HOST-COMMIT-ADMITTED"
     || priorAdmission.candidateCommit !== admitted.candidateCommit
     || !same(priorAdmission.paths, admitted.paths)
     || !same(priorAdmission.admittedBlobs, admitted.admittedBlobs)) {
-    return fail("AGY-HOST-COMMIT-PRIOR-ADMISSION-DRIFT");
+    return fail(code("HOST-COMMIT-PRIOR-ADMISSION-DRIFT"));
   }
   const root = admitted.root;
   const spawn = dependencies.spawnSync ?? spawnSync;
-  const subject = "feat(agy): deliver validated Goldfish return";
-  const message = `${subject}\n\nHost commit after validated Agy final and exact-path admission.\n\nDispatch: ${taskId} (goldfish)\n${AGY_HOST_OBSERVED_TRAILER}\nAI-Assisted: true\n`;
+  const message = `${subject}\n\n${body}\n\nDispatch: ${taskId} (goldfish)\n${marker}\nAI-Assisted: true\n`;
   if (commitTypeFindings(subject).findings.length > 0
     || finishedCommitMessageFindings(message, { requireMarker: true, requireDispatch: true }).findings.length > 0) {
-    return fail("AGY-HOST-COMMIT-MESSAGE");
+    return fail(code("HOST-COMMIT-MESSAGE"));
   }
-  if (git(root, ["add", "-A", "--", ...admitted.paths], spawn) === null) return fail("AGY-HOST-COMMIT-STAGE-FAILED");
+  if (git(root, ["add", "-A", "--", ...admitted.paths], spawn) === null) return fail(code("HOST-COMMIT-STAGE-FAILED"));
   const staged = paths(git(root, ["diff", "--cached", "--name-only", "-z"], spawn));
   const unstaged = paths(git(root, ["diff", "--name-only", "-z"], spawn));
   if (staged === null || unstaged === null || !same(staged, admitted.paths) || unstaged.length !== 0) {
-    return fail("AGY-HOST-COMMIT-STAGED-DRIFT");
+    return fail(code("HOST-COMMIT-STAGED-DRIFT"));
   }
   if (admitted.admittedBlobs.some(({ path, oid }) => stagedBlob(root, path, spawn) !== oid)) {
-    return fail("AGY-HOST-COMMIT-CONTENT-DRIFT");
+    return fail(code("HOST-COMMIT-CONTENT-DRIFT"));
   }
-  if (git(root, ["diff", "--cached", "--check"], spawn) === null) return fail("AGY-HOST-COMMIT-DIFF-CHECK");
+  if (git(root, ["diff", "--cached", "--check"], spawn) === null) return fail(code("HOST-COMMIT-DIFF-CHECK"));
   const stagedTree = git(root, ["write-tree"], spawn)?.trim();
-  if (!stagedTree) return fail("AGY-HOST-COMMIT-TREE");
+  if (!stagedTree) return fail(code("HOST-COMMIT-TREE"));
   // Neither --no-verify nor a temporary hooksPath is permitted here. A hook
   // rejection leaves the staged snapshot visible for explicit recovery.
-  const committed = runGit(root, ["commit", "-m", subject, "-m", "Host commit after validated Agy final and exact-path admission.",
-    "-m", `Dispatch: ${taskId} (goldfish)\n${AGY_HOST_OBSERVED_TRAILER}\nAI-Assisted: true`], spawn);
+  const committed = runGit(root, ["commit", "-m", subject, "-m", body,
+    "-m", `Dispatch: ${taskId} (goldfish)\n${marker}\nAI-Assisted: true`], spawn);
   if (committed.error || committed.status !== 0) {
     const observedHead = git(root, ["rev-parse", "--verify", "HEAD^{commit}"], spawn)?.trim();
     // A timeout or a changed/unreadable HEAD cannot honestly be reduced to
     // "the guard rejected before a commit". Preserve the observed OID for
     // recovery, and never publish a no-delivery record from this result.
     if (committed.error || !observedHead || observedHead !== baseline.candidateCommit) {
-      return { ...fail("AGY-HOST-COMMIT-OUTCOME-UNKNOWN"), commit: observedHead ?? null };
+      return { ...fail(code("HOST-COMMIT-OUTCOME-UNKNOWN")), commit: observedHead ?? null };
     }
-    return fail("AGY-HOST-COMMIT-GUARD-OR-GIT-FAILED");
+    return fail(code("HOST-COMMIT-GUARD-OR-GIT-FAILED"));
   }
   const commit = git(root, ["rev-parse", "--verify", "HEAD^{commit}"], spawn)?.trim();
   const parent = git(root, ["rev-parse", "--verify", "HEAD^"], spawn)?.trim();
@@ -96,10 +98,26 @@ export function commitAdmittedAgyReturn({ baseline, final, allowedPaths, taskId,
   if (!commit || parent !== baseline.candidateCommit || committedTree !== stagedTree
     || committedPaths === null || !same(committedPaths, admitted.paths) || actualMessage !== message
     || finalHead !== commit) {
-    return { ...fail("AGY-HOST-COMMIT-READBACK-MISMATCH"), commit: commit ?? null };
+    return { ...fail(code("HOST-COMMIT-READBACK-MISMATCH")), commit: commit ?? null };
   }
   return {
-    ok: true, code: "AGY-HOST-COMMIT-READBACK-VERIFIED", commit,
+    ok: true, code: code("HOST-COMMIT-READBACK-VERIFIED"), commit,
     parent, tree: committedTree, paths: committedPaths,
   };
+}
+
+export function commitAdmittedAgyReturn(input = {}, dependencies = {}) {
+  return commitAdmittedReturn(input, dependencies, { runner: "antigravity",
+    subject: "feat(agy): deliver validated Goldfish return",
+    body: "Host commit after validated Agy final and exact-path admission.",
+    marker: AGY_HOST_OBSERVED_TRAILER, codePrefix: "AGY" });
+}
+
+/** Claude/Codex native hook return adapter; no caller-controlled runner, model, or marker. */
+export function commitAdmittedNativeGoldfishReturn({ runner, ...input } = {}, dependencies = {}) {
+  if (runner !== "claude" && runner !== "codex") return fail("NATIVE-HOST-COMMIT-RUNNER");
+  return commitAdmittedReturn(input, dependencies, { runner,
+    subject: `feat(${runner}): deliver validated Goldfish return`,
+    body: `Host commit after validated ${runner} native Goldfish return and exact-path admission.`,
+    marker: `Native-Host-Observed: v1 (${runner})`, codePrefix: "NATIVE" });
 }

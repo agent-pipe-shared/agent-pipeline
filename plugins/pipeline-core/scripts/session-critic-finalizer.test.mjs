@@ -193,6 +193,132 @@ test("prelaunch admission creates one claimed, digest-bound packet before the ve
   } finally { cleanup(fx); }
 });
 
+test("invalid optional Critic selection retains V3, while valid selection binds before packet creation", () => {
+  const fx = fixture();
+  try {
+    const request = options(fx, { packetId: "8".repeat(32) });
+    const env = { CODEX_SESSION_ID: "fixture-codex-session" };
+    const select = ({ runner, taskRoute }) => {
+      assert.equal(runner, "codex");
+      assert.equal(taskRoute, "duty.critic_high_risk");
+      return { ok: true, status: "ready", modelId: "wrong-model", effort: "xhigh" };
+    };
+    admitSessionCriticReview(request, {
+      modelRoleEnvironment: env, selectModelRoleForTaskFn: select,
+    });
+    const common = git(fx.root, ["rev-parse", "--git-common-dir"]);
+    const controlRoot = join(fx.root, common, "agent-pipeline", "critic-packets");
+    const fallback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
+    assert.equal(fallback.packet.route.modelTier, request.route.modelTier);
+    assert.equal(Object.hasOwn(fallback.packet.request.sessionBinding, "modelRole"), false);
+    const approvedRequest = { ...request, packetId: "9".repeat(32) };
+    const admitted = admitSessionCriticReview(approvedRequest, {
+      modelRoleEnvironment: env,
+      selectModelRoleForTaskFn: () => ({ ok: true, status: "ready",
+        runner: "codex", taskRoute: "duty.critic_high_risk",
+        modelId: "new-reviewed-model", effort: request.route.effortTier,
+        readbackSha256: "a".repeat(64), receiptSha256: "b".repeat(64) }),
+    });
+    assert.equal(admitted.status, "admitted");
+    const readback = inspectClaimedSessionAdmission({
+      controlRoot, packetId: approvedRequest.packetId,
+    });
+    assert.equal(readback.packet.route.modelTier, "new-reviewed-model");
+    assert.deepEqual(readback.packet.request.sessionBinding.modelRole, {
+      schema: "pipeline.session-critic-model-role.v1", runner: "codex",
+      taskRoute: "duty.critic_high_risk", modelId: "new-reviewed-model",
+      effort: request.route.effortTier, readbackSha256: "a".repeat(64), receiptSha256: "b".repeat(64),
+    });
+  } finally { cleanup(fx); }
+});
+
+test("an admitted exact session model survives finalization without reselecting the V3 model", () => {
+  for (const [runner, provider, env] of [
+    ["codex", "openai", { CODEX_SESSION_ID: "fixture-codex-session" }],
+    ["claude", "anthropic", { CLAUDE_CODE_SESSION_ID: "fixture-claude-session" }],
+  ]) {
+    const fx = fixture();
+    try {
+      const request = options(fx, { packetId: "a".repeat(32),
+        route: { ...options(fx).route, runner, provider } });
+      let selections = 0;
+      admitSessionCriticReview(request, {
+        modelRoleEnvironment: env,
+        selectModelRoleForTaskFn: ({ runner: selectedRunner, taskRoute }) => {
+          selections += 1;
+          assert.equal(selectedRunner, runner);
+          assert.equal(taskRoute, "duty.critic_high_risk");
+          return { ok: true, status: "ready", runner, taskRoute,
+            modelId: "new-reviewed-model", effort: request.route.effortTier,
+            readbackSha256: "a".repeat(64), receiptSha256: "b".repeat(64) };
+        },
+      });
+      assert.throws(() => finalizeSessionCriticReview({ ...request,
+        route: { ...request.route, effortTier: "medium" } }),
+      (error) => error.code === "SCF-MODEL-ROLE");
+      const finalized = finalizeSessionCriticReview(request, {
+        selectModelRoleForTaskFn: () => { throw new Error("must not reselect after launch"); },
+      });
+      assert.equal(finalized.status, "completed");
+      assert.equal(finalized.receipt.reviewPass, true);
+      assert.equal(selections, 1);
+    } finally { cleanup(fx); }
+  }
+});
+
+test("missing optional model selection retains the independently admitted V3 Critic route", () => {
+  const fx = fixture();
+  try {
+    const request = options(fx, { packetId: "7".repeat(32) });
+    admitSessionCriticReview(request, {
+      modelRoleEnvironment: { CODEX_SESSION_ID: "fixture-codex-session" },
+      selectModelRoleForTaskFn: () => ({ ok: true, status: "legacy-v3", runner: "codex",
+        taskRoute: "duty.critic_high_risk", diagnostic: "MODEL-ROLE-SELECT-STORE-UNAVAILABLE" }),
+    });
+    const common = git(fx.root, ["rev-parse", "--git-common-dir"]);
+    const readback = inspectClaimedSessionAdmission({
+      controlRoot: join(fx.root, common, "agent-pipeline", "critic-packets"), packetId: request.packetId,
+    });
+    assert.equal(readback.packet.route.modelTier, request.route.modelTier);
+    assert.equal(Object.hasOwn(readback.packet.request.sessionBinding, "modelRole"), false);
+    const throwingRequest = { ...request, packetId: "6".repeat(32) };
+    admitSessionCriticReview(throwingRequest, {
+      modelRoleEnvironment: { CODEX_SESSION_ID: "fixture-codex-session" },
+      selectModelRoleForTaskFn: () => { throw new Error("optional selector unavailable"); },
+    });
+    const throwingReadback = inspectClaimedSessionAdmission({
+      controlRoot: join(fx.root, common, "agent-pipeline", "critic-packets"),
+      packetId: throwingRequest.packetId,
+    });
+    assert.equal(throwingReadback.packet.route.modelTier, request.route.modelTier);
+    assert.equal(Object.hasOwn(throwingReadback.packet.request.sessionBinding, "modelRole"), false);
+  } finally { cleanup(fx); }
+});
+
+test("high-risk T2 and normal T3 retain their V3 duties when optional selection is unavailable", () => {
+  for (const [trigger, expected] of [["T2", "duty.critic_high_risk"],
+    ["T3", "duty.critic_normal"]]) {
+    const fx = fixture();
+    try {
+      const request = options(fx, { trigger });
+      admitSessionCriticReview(request, {
+        modelRoleEnvironment: { CODEX_SESSION_ID: "fixture-codex-session" },
+        selectModelRoleForTaskFn: ({ runner, taskRoute }) => {
+          assert.equal(runner, "codex");
+          assert.equal(taskRoute, expected);
+          return { ok: false, status: "unavailable" };
+        },
+      });
+      const common = git(fx.root, ["rev-parse", "--git-common-dir"]);
+      const readback = inspectClaimedSessionAdmission({
+        controlRoot: join(fx.root, common, "agent-pipeline", "critic-packets"), packetId: request.packetId,
+      });
+      assert.equal(readback.packet.route.modelTier, request.route.modelTier);
+      assert.equal(Object.hasOwn(readback.packet.request.sessionBinding, "modelRole"), false);
+    } finally { cleanup(fx); }
+  }
+});
+
 test("normal fresh-session finalization consumes the prelaunch packet, reads back, and emits", () => {
   const fx = fixture({ targetedExitCode: 1 });
   try {

@@ -347,9 +347,12 @@ Mechanical batch, one dispatch: GG-22 defined in `guardrails/git.md`
 rule) cross-linked from `backlog/README.md`; SendMessage scope-relay rule
 added to `workflow-dispatch.md`; `docs/push-release-flow.md` `--expires-at`
 claim corrected + CLI error message states the exact wanted form with the
-corrected value; `backlog-item-strip-for-dispatch.mjs` strips only the
-Triage section body (next-`##`-heading boundary), with the later-sections
-fixture from the item.
+corrected value; `backlog-item-strip-for-dispatch.mjs` strips the Triage
+section body and later sections or inline markers that are independently
+verdict-/closure-shaped, without discarding genuine later requirement or
+decision content. A later heading alone is not a license to strip the rest
+of the item. Preserve the Triage-boundary and later-sections fixtures and
+add regressions for contamination beyond Triage.
 
 ## 6. Track C — Measurable rigor
 

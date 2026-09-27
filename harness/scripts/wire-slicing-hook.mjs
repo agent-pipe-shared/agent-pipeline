@@ -97,9 +97,13 @@ export function transformDocuments(hooksText, inventoryText) {
     // Preserve the protected manifest's original bytes everywhere except the
     // one new registration. JSON.stringify would normalize its escaped unicode
     // characters and make a small attended change look like a whole-file edit.
-    const anchor = '\n    ],\n    "Stop":';
-    const at = hooksText.indexOf(anchor);
-    if (at < 0 || hooksText.indexOf(anchor, at + anchor.length) !== -1) throw new Error("cannot find one unambiguous end of hooks.PreToolUse");
+    const preToolUseKey = '"PreToolUse": [';
+    const preToolUseAt = hooksText.indexOf(preToolUseKey);
+    const closingPrefix = '\n    ],\n    "';
+    const at = preToolUseAt < 0 ? -1 : hooksText.indexOf(closingPrefix, preToolUseAt + preToolUseKey.length);
+    if (preToolUseAt < 0 || hooksText.indexOf(preToolUseKey, preToolUseAt + preToolUseKey.length) !== -1 || at < 0) {
+      throw new Error("cannot find one unambiguous end of hooks.PreToolUse");
+    }
     const addition = JSON.stringify(registration(), null, 2).split("\n").map((line) => `      ${line}`).join("\n");
     transformedHooks = `${hooksText.slice(0, at)},\n${addition}${hooksText.slice(at)}`;
   }

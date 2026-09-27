@@ -42,6 +42,12 @@ import { REPO_KEY_DIRECTORY_SCHEMA, readRepoKeyDirectory, repoScopedKeyDirectory
 import { boundedCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import {
+  DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA,
+  validateDesignWorkflowPackageApprovalRequest,
+} from "../lib/design-workflow-approval.mjs";
+import { readDesignWorkflowPackageFromRepository } from "../lib/design-workflow-package.mjs";
+import { ORGANIZATION_ARCHITECTURE_CONFIG_PATH, organizationArchitectureConfigIntentSha256 } from "../lib/organization-architecture-source-store.mjs";
 
 // NVA-SIGENTRY-1: the same resolved-plugin-root derivation guard-human-override.mjs
 // already uses (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`) -- needed
@@ -49,6 +55,8 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 // needs a `pluginRoot` to re-plan/re-prepare a candidate HGO request the same way the
 // signature-mode ceremony itself does.
 const SCRIPT = fileURLToPath(import.meta.url);
+const PORTABLE_AGY_AUTHORSHIP_EXPORT_SCRIPT = fileURLToPath(new URL("./portable-agy-authorship-export.mjs", import.meta.url));
+const PORTABLE_CRITIC_EXPORT_SCRIPT = fileURLToPath(new URL("./portable-critic-export.mjs", import.meta.url));
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] [--existing-key <path-to-an-already-existing-private-key-pem>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> | sign-intent --repo-root <repo> [--directory <external-dir>] (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight|feature-package-reconcile> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n>";
@@ -113,7 +121,7 @@ function describePortableAgyAuthorshipRequest(record, intentSha256) {
 }
 
 function checkPortableAgyAuthorshipRequestOnHost({ repository, requestPath, taskId, intentSha256 }) {
-  const checked = spawnSync(process.execPath, [join(dirname(SCRIPT), "portable-agy-authorship-export.mjs"),
+  const checked = spawnSync(process.execPath, [PORTABLE_AGY_AUTHORSHIP_EXPORT_SCRIPT,
     "check", "--root", repository, "--task-id", taskId], {
     cwd: repository, encoding: "utf8", shell: false, timeout: 20_000, maxBuffer: 8192,
     stdio: ["ignore", "pipe", "ignore"],
@@ -145,8 +153,89 @@ function describePortableCriticExportRequest(record, intentSha256) {
   ] };
 }
 
+export function describeArchitectureInheritedSourcesRequest(record, intentSha256, repository) {
+  if (record?.schema !== "pipeline.organization-architecture-config-request.v1"
+    || record.intentSha256 !== intentSha256
+    || organizationArchitectureConfigIntentSha256(record.subject) !== intentSha256
+    || Object.keys(record).sort().join("\0") !== ["schema", "subject", "intentSha256"].sort().join("\0")) return null;
+  if (typeof repository !== "string" || !isAbsolute(repository)) return null;
+  const projectPath = join(repository, "project");
+  try {
+    const projectStat = lstatSync(projectPath);
+    if (!projectStat.isDirectory() || projectStat.isSymbolicLink()
+      || realpathSync(projectPath) !== projectPath) return null;
+  } catch { return null; }
+  const configPath = join(repository, ORGANIZATION_ARCHITECTURE_CONFIG_PATH);
+  let currentSha256 = null;
+  let stat;
+  try { stat = lstatSync(configPath); }
+  catch (error) { if (error?.code !== "ENOENT") return null; }
+  if (stat) {
+    try {
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size === 0 || stat.size > 128 * 1024
+        || realpathSync(configPath) !== configPath) return null;
+      currentSha256 = createHash("sha256").update(readFileSync(configPath)).digest("hex");
+    } catch { return null; }
+  }
+  if (currentSha256 !== record.subject.expectedPriorSha256) return null;
+  return { resolved: true, lines: [
+    "action: authorize this repository's exact inherited architecture-source registry",
+    `previous registry sha256: ${record.subject.expectedPriorSha256 ?? "none (first activation)"}`,
+    ...record.subject.sources.map((source) =>
+      `source: ${source.sourceId} | ${source.layer} | ${source.required ? "mandatory" : "optional"} | key ${source.trustAnchor.keyReference} | public key sha256 ${source.trustAnchor.publicKeySha256}`),
+    "this pins source identities and trust anchors; it does not sign the source contents, approve an ADR waiver, or authorize a release or push",
+  ] };
+}
+
+function currentGitCandidate(repository) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const commit = spawnSync("git", ["-C", repository, "rev-parse", "HEAD"], {
+    encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+  });
+  const tree = spawnSync("git", ["-C", repository, "rev-parse", "HEAD^{tree}"], {
+    encoding: "utf8", env, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: 3000,
+  });
+  const commitId = String(commit.stdout ?? "").trim();
+  const treeId = String(tree.stdout ?? "").trim();
+  return commit.status === 0 && tree.status === 0 && /^[a-f0-9]{40,64}$/u.test(commitId)
+    && /^[a-f0-9]{40,64}$/u.test(treeId) ? { commit: commitId, tree: treeId } : null;
+}
+
+function describeDesignWorkflowApprovalRequest(record, intentSha256, repository) {
+  if (record?.schema !== DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA
+    || record.approvalIntent?.sha256 !== intentSha256
+    || record.approvalIntent?.value?.kind !== "design-workflow-package") return null;
+  const intent = record.approvalIntent.value;
+  const packageRead = readDesignWorkflowPackageFromRepository({ repoRoot: repository,
+    packagePath: record.packagePath, readCandidate: () => currentGitCandidate(repository) });
+  if (!packageRead.ok) return null;
+  const pkg = packageRead.workflowPackage;
+  const rebound = validateDesignWorkflowPackageApprovalRequest({
+    repoRoot: repository, request: record,
+    featureId: intent.featureId,
+    planPath: pkg.sources.prd.path, planSha256: intent.planSha256,
+    specPath: pkg.sources.spec.path, specSha256: intent.specSha256,
+    readCandidate: () => currentGitCandidate(repository),
+  });
+  if (!rebound.ok) return null;
+  return {
+    resolved: true,
+    lines: [
+      "action: approve the complete design workflow package for the exact submitted feature",
+      `feature: ${intent.featureId}`,
+      `design package: ${record.packagePath} (sha256 ${record.packageSha256})`,
+      `candidate provenance: ${intent.candidate.commit} / ${intent.candidate.tree}`,
+      `PRD sha256: ${intent.planSha256}`,
+      `Spec sha256: ${intent.specSha256}`,
+      "complete bounded review material follows (exact bytes were re-read and validated before signing):",
+      JSON.stringify(packageRead.approvalReview, null, 2),
+      "this approves only the package-bound design-to-implementation plan decision; it does not approve push, release or publication",
+    ],
+  };
+}
+
 function checkPortableCriticExportRequestOnHost({ repository, requestPath, packetId, intentSha256 }) {
-  const checked = spawnSync(process.execPath, [join(dirname(SCRIPT), "portable-critic-export.mjs"),
+  const checked = spawnSync(process.execPath, [PORTABLE_CRITIC_EXPORT_SCRIPT,
     "check", "--root", repository, "--packet-id", packetId], {
     cwd: repository, encoding: "utf8", shell: false, timeout: 20_000, maxBuffer: 8192,
     stdio: ["ignore", "pipe", "ignore"],
@@ -1516,6 +1605,8 @@ function executeHumanApproval(args, dependencies = {}) {
     const bootstrapAcknowledgement = describeBootstrapAcknowledgementRequest(scratchRequestRecord, intentSha256);
     const portableAgyAuthorship = describePortableAgyAuthorshipRequest(scratchRequestRecord, intentSha256);
     const portableCriticExport = describePortableCriticExportRequest(scratchRequestRecord, intentSha256);
+    const designWorkflowApproval = describeDesignWorkflowApprovalRequest(scratchRequestRecord, intentSha256, repository);
+    const inheritedSources = describeArchitectureInheritedSourcesRequest(scratchRequestRecord, intentSha256, repository);
     // A scratch request which claims the bootstrap-acknowledgement schema is
     // never a generic, opaque `sign-intent` request. In particular, do not
     // fall through to the generic GMW/HGO disclosure route when its action
@@ -1529,6 +1620,12 @@ function executeHumanApproval(args, dependencies = {}) {
     }
     if (scratchRequestRecord?.schema === PORTABLE_CRITIC_EXPORT_REQUEST_SCHEMA && portableCriticExport === null) {
       fail("the portable Critic export request does not bind its exact subject and intent digest");
+    }
+    if (scratchRequestRecord?.schema === DESIGN_WORKFLOW_APPROVAL_REQUEST_SCHEMA && designWorkflowApproval === null) {
+      fail("the design-workflow approval request does not bind a current, complete package and its exact sources");
+    }
+    if (scratchRequestRecord?.schema === "pipeline.organization-architecture-config-request.v1" && inheritedSources === null) {
+      fail("the inherited architecture-source request does not bind its exact registry and intent digest");
     }
     if (portableAgyAuthorship !== null) {
       const checkPortable = dependencies.checkPortableAgyAuthorshipRequest
@@ -1547,7 +1644,7 @@ function executeHumanApproval(args, dependencies = {}) {
         fail("the portable Critic export request is not bound to a current consumed private Critic review");
       }
     }
-    let record = bootstrapAcknowledgement ?? portableAgyAuthorship ?? portableCriticExport
+    let record = bootstrapAcknowledgement ?? portableAgyAuthorship ?? portableCriticExport ?? designWorkflowApproval ?? inheritedSources
       ?? describeGmw({ rootDir: repository, intentSha256 });
     if (!record.resolved) {
       record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });

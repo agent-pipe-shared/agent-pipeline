@@ -251,7 +251,9 @@ test("inspect exposes one typed PO approval action after submit and presentation
   for (const runner of ["claude", "codex", "antigravity"]) {
     const f = generatorSubmitFixture(`approval-${runner}`, { exempt: true });
     const runnerDeps = { ...f.deps, env: runnerEnv(runner) };
-    assert.equal(invoke(["submit-plan", "--by", "coordinator", "--profile", "feature"], runnerDeps).status, 0);
+    // This is runner/action rendering coverage. The separate feature-package
+    // suite owns the stronger epic/feature review and signature path.
+    assert.equal(invoke(["submit-plan", "--by", "coordinator", "--profile", "mini"], runnerDeps).status, 0);
     assert.equal(invoke(["present-plan", "--by", "coordinator"], runnerDeps).status, 0);
     const inspected = invoke(["inspect"], runnerDeps);
     assert.equal(inspected.status, 0, inspected.err);

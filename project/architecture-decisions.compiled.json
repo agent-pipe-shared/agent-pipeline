@@ -1,11 +1,12 @@
 {
   "schema": "pipeline.architecture-decisions-summary.v1",
-  "compiledAt": "2026-09-25T19:35:02.641Z",
+  "compiledAt": "2026-09-26T15:54:54.358Z",
   "authorityStatus": "inventory-only",
   "effectiveProjection": {
-    "status": "blocked",
-    "code": "ARCH-DECISION-EFFECTIVE-UNRESOLVED",
-    "projectionSha256": null,
+    "status": "advisory",
+    "code": "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
+    "projectionSha256": "8264ab82935874853df5ad388453be57e19785a191b509ffddf754796b92d33b",
+    "decisions": [],
     "decisionIds": [],
     "findings": [
       {
@@ -41,7 +42,7 @@
         "path": "docs/adr/0008-permissions-worktree-policy.md"
       },
       {
-        "code": "legacy-decision-without-sidecar",
+        "code": "module-applicability-awaiting-approval",
         "path": "docs/adr/0009-session-hygiene-lifecycle.md"
       },
       {
@@ -366,7 +367,7 @@
       }
     ]
   },
-  "count": 95,
+  "count": 96,
   "decisions": [
     {
       "id": "0001-distribution-plugin-marketplace",
@@ -441,10 +442,10 @@
       "exception": null
     },
     {
-      "id": "0009-session-hygiene-lifecycle",
-      "title": "ADR-0009: Session Hygiene and Session Lifecycle",
+      "id": "ADR-0009",
+      "title": "Session Hygiene and Session Lifecycle",
       "status": "accepted",
-      "scope": "project",
+      "scope": "module",
       "digest": "a976536902b969b6a3b154fc4f69577f12feaf98014e002fdcf64a13ef208c07",
       "supersedes": null,
       "exception": null
@@ -1134,6 +1135,15 @@
       "exception": null
     },
     {
+      "id": "draft-agy-e3-lower-assurance-admission",
+      "title": "Explicit lower-assurance Agy E3 admission",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "ba4f94b031dbc5ccd41aff807f07c323d969fbc43f5bc6dcc8697ef75ffb1b21",
+      "supersedes": null,
+      "exception": null
+    },
+    {
       "id": "draft-agy-host-observed-authorship",
       "title": "Agy host-observed authorship and portable evidence",
       "status": "proposed",
@@ -1201,7 +1211,7 @@
       "title": "Functional model roles resolved at session bootstrap",
       "status": "proposed",
       "scope": "global",
-      "digest": "93af75a9e0df81e67ef4f3af9ed3dc80a469b8b8ba6220a5d04160ac620cf76f",
+      "digest": "8be37075dd8bb6057c24a7dda9ab0e77a10bfe77b57a891404e1f89d4f608837",
       "supersedes": null,
       "exception": null
     },

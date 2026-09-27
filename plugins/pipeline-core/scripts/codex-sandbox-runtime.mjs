@@ -75,8 +75,10 @@ function validateRuntime(value) {
 }
 function validateHostBridge(value) {
   if (value === null || value === undefined) return null;
-  exactKeys(value, ["launch", "finalize"], "Codex selected host bridge");
-  if (typeof value.launch !== "function" || typeof value.finalize !== "function") fail("Codex selected host bridge is invalid");
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(["finalize", "launch", ...(Object.hasOwn(value, "take") ? ["take"] : [])].sort())
+    || typeof value.launch !== "function" || typeof value.finalize !== "function"
+    || (Object.hasOwn(value, "take") && typeof value.take !== "function")) fail("Codex selected host bridge is invalid");
   return value;
 }
 export function coalesceInputCoveredRuntimeReads(inputRoot, runtimeReadSet) {
@@ -254,6 +256,7 @@ export function createCodexSandboxRuntimeTransport({ sandboxContext, sandboxRunt
   }
   return {
     store,
+    ...(typeof selectedHostBridge?.take === "function" ? { take: (selectionId) => selectedHostBridge.take(selectionId) } : {}),
     selection: {
       async observeHost() {
         const receipt = await runPreflight();

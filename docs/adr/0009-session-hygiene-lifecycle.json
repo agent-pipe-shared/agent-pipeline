@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.architecture-decision.v2",
+  "id": "ADR-0009",
+  "title": "Session Hygiene and Session Lifecycle",
+  "status": "accepted",
+  "digest": "a976536902b969b6a3b154fc4f69577f12feaf98014e002fdcf64a13ef208c07",
+  "scope": "module",
+  "moduleIds": [
+    "governance",
+    "harness",
+    "pipeline-core"
+  ],
+  "date": "2026-07-03"
+}

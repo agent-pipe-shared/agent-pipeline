@@ -19,7 +19,9 @@ and the living decision summary.
   evidence; approval, adoption, and waivers are PO-performed via the existing
   signature-or-chat ceremony duality (`gates.push_approval`).
 - **Prose is not a control:** Architectural decisions exist as versioned machine-readable
-  records (`pipeline.architecture-decision.v1`) with bound SHA-256 digests.
+  records (`pipeline.architecture-decision.v1` or `.v2`) with bound SHA-256 digests.
+  V1 is used for project/global scope. V2 names exact OKF module IDs; its module
+  mapping is not effective authority merely because the record says `accepted`.
 
 ---
 
@@ -46,7 +48,12 @@ node plugins/pipeline-core/scripts/architecture-baseline.mjs --root "$PWD" [--di
 ### 2. Draft Concise ADR from Governed Evidence
 When an architectural decision is required, draft a concise ADR in `docs/adr/`:
 - Filename convention: `docs/adr/XXXX-<slug>.md` (e.g. `docs/adr/0064-storage-adapter-migration.md`).
-- Companion sidecar JSON: `docs/adr/XXXX-<slug>.json` adhering to `pipeline.architecture-decision.v1`.
+- Companion sidecar JSON: `docs/adr/XXXX-<slug>.json` adhering to
+  `pipeline.architecture-decision.v1` for project/global scope, or `.v2` for
+  an explicit module scope. A v2 record must name sorted, unique module IDs
+  present in the physical OKF map. Its mapping stays advisory until the
+  separately approved, verifiable activation contract is present; do not treat
+  `status: "accepted"` as that approval.
 - Compute the SHA-256 digest of the markdown content and record it in `digest`.
 - Include standard ADR sections: Title, Status, Date, Context, Decision, Consequences, and Affected Contracts.
 
@@ -97,8 +104,12 @@ The summary captures IDs, titles, status, scopes, and active exceptions, bounded
 
 ### 7. Validate Status, Identity, Applicability, Supersession, and Traceability
 Validate the entire decision estate:
-- Every sidecar JSON matches schema `pipeline.architecture-decision.v1`.
-- Digest in JSON matches the SHA-256 hash of the markdown ADR.
+- Every sidecar JSON matches its declared schema (`pipeline.architecture-decision.v1`
+  or `.v2`).
+- V2 module IDs exist in the physical OKF map; v1 module-scoped decisions have
+  no safe module identity and remain visibly unresolved rather than being
+  assigned from filenames or prose.
+- Digest in JSON matches the SHA-256 hash of the Markdown ADR.
 - All superseded IDs link to valid, existing ADR records.
 - Active exceptions are unexpired and trace to explicit human authority.
 - Token ADRs that do not match the implementation are flagged as semantic non-conformance.

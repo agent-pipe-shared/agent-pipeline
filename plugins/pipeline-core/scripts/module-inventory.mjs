@@ -16,7 +16,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // `<plugin>/schemas/`. Resolving through the source repository root happened
 // to work in development but points at the marketplace root after installation.
 const SCHEMA_PATH = path.resolve(__dirname, "../schemas/pipeline.module-inventory.v1.json");
-const REPO_ROOT = path.resolve(__dirname, "../../..");
 
 let cachedSchema = null;
 export function getModuleInventorySchema() {
@@ -206,13 +205,19 @@ export function resolveModuleForPath(filePath, inventory) {
   const moduleList = Array.isArray(inventory) ? inventory : (inventory?.modules || []);
   if (!filePath || moduleList.length === 0) return null;
 
-  // Normalize path relative to cwd/root if needed
+  // Concept files belong to the consuming repository, not the plugin's own
+  // installation tree. A plugin-only install may live in a wholly different
+  // checkout from the architecture map it is inspecting.
   let normalizedPath = filePath.replace(/\\/g, "/");
   if (path.isAbsolute(normalizedPath)) {
-    const rootPosix = REPO_ROOT.replace(/\\/g, "/");
-    if (normalizedPath.startsWith(rootPosix + "/")) {
-      normalizedPath = normalizedPath.slice(rootPosix.length + 1);
-    }
+    if (moduleList.some((mod) => typeof mod.conceptFilePath !== "string"
+      || !path.isAbsolute(mod.conceptFilePath))) return null;
+    const roots = new Set(moduleList.map((mod) => mod.conceptFilePath)
+      .map((value) => path.resolve(path.dirname(value), "../..").replace(/\\/g, "/")));
+    if (roots.size !== 1) return null;
+    const [root] = roots;
+    if (!normalizedPath.startsWith(`${root}/`)) return null;
+    normalizedPath = normalizedPath.slice(root.length + 1);
   }
   if (normalizedPath.startsWith("./")) {
     normalizedPath = normalizedPath.slice(2);
@@ -220,6 +225,7 @@ export function resolveModuleForPath(filePath, inventory) {
 
   let bestMatch = null;
   let bestMatchLength = -1;
+  let ambiguous = false;
 
   for (const mod of moduleList) {
     for (const pattern of mod.ownedPaths || []) {
@@ -228,12 +234,15 @@ export function resolveModuleForPath(filePath, inventory) {
         if (patternLength > bestMatchLength) {
           bestMatch = mod;
           bestMatchLength = patternLength;
+          ambiguous = false;
+        } else if (patternLength === bestMatchLength && bestMatch?.id !== mod.id) {
+          ambiguous = true;
         }
       }
     }
   }
 
-  return bestMatch;
+  return ambiguous ? null : bestMatch;
 }
 
 /**

@@ -456,6 +456,8 @@ writeFileSync(
     ],
   }),
 );
+// The briefed grant must use the repository's committed human approval mode.
+writeFileSync(join(BRIEFED_DIR, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
 gitCommitAll(BRIEFED_DIR);
 
 const testTarget = "plugins/pipeline-core/hooks/guard-git.test.mjs";

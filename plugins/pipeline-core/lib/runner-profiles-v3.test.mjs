@@ -73,6 +73,9 @@ const cases = [
       "readiness.codex": route(registry.duties.readiness.codex),
       "readiness.claude": route(registry.duties.readiness.claude),
       "readiness.antigravity": route(registry.duties.readiness.antigravity),
+      "read.codex": route(registry.duties.read.codex),
+      "read.claude": route(registry.duties.read.claude),
+      "read.antigravity": route(registry.duties.read.antigravity),
       "test-author.codex": route(registry.duties.test_author.codex),
       "test-author.claude": route(registry.duties.test_author.claude),
       "test-author.antigravity": route(registry.duties.test_author.antigravity),
@@ -104,6 +107,8 @@ const cases = [
       "mechanic.antigravity": "gemini-3.8-flash-medium / medium",
       "readiness.codex": "gpt-6-luna / high", "readiness.claude": "sonnet / high",
       "readiness.antigravity": "gemini-3.8-flash-high / high",
+      "read.codex": "gpt-6-luna / medium", "read.claude": "haiku / medium",
+      "read.antigravity": "gemini-3.8-flash-medium / medium",
       "test-author.codex": "gpt-6-sol / medium", "test-author.claude": "opus / medium",
       "test-author.antigravity": "gemini-3.8-flash-high / high",
     });

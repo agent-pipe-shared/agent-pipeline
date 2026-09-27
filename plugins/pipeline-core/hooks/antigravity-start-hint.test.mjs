@@ -60,6 +60,10 @@ test("antigravity-start-hint: conversationId arms the lock consumed by the preto
       input: JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: session }), encoding: "utf8",
     });
     assert.equal(start.status, 0, start.stderr);
+    assert.match(JSON.parse(start.stdout).injectSteps[0].ephemeralMessage,
+      /--runner antigravity --host-session-id/u);
+    assert.match(JSON.parse(start.stdout).injectSteps[0].ephemeralMessage,
+      /agy-conversation-1/u);
     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "run", `session-${session}`, "requires-bootstrap.lock")), true);
     const tool = spawnSync(process.execPath, [PRETOOL], {
       cwd: root,

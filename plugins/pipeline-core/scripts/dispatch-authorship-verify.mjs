@@ -113,8 +113,9 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
-import { AGY_HOST_OBSERVED_TRAILER, agyAuthoredRecordBytes } from "../lib/agy-host-observed-receipt.mjs";
+import { AGY_HOST_OBSERVED_TRAILER } from "../lib/agy-host-observed-receipt.mjs";
 import { inspectAgyHostObservedLocalReadback } from "../lib/agy-host-observed-local-readback.mjs";
+import { nativeAuthoredRecordBytes, inspectNativeGoldfishHostObservation } from "../lib/native-goldfish-host-observation.mjs";
 import { readPortableAgyAuthorshipExport } from "../lib/portable-agy-authorship-export.mjs";
 import { verifyCriticDispositionAddendumForRecord } from "./check-critic-skip-coverage.mjs";
 import { criticDecisionPathFinding, criticDisposition } from "../lib/critic-skip-decision.mjs";
@@ -545,7 +546,7 @@ export function verifyCommit(sha, deps) {
   }
   if ((isV3 || isV4) && criticDisposition(record) === "required") {
     let addendum = null;
-    if (isV4 && record.runner === "antigravity"
+    if (isV4 && ["antigravity", "claude", "codex"].includes(record.runner)
       && record.outcomeClassification?.kind === "authored-commit"
       && typeof deps.verifyCriticAddendum === "function") {
       try { addendum = deps.verifyCriticAddendum(taskId, record); }
@@ -638,7 +639,40 @@ export function verifyCommit(sha, deps) {
   // (NVA-BL-78). Silent (no effect on verdict) when the record predates `agentType`.
   const modelCheck = compareRecordedModel(record);
   let acceptedModelCheck = modelCheck;
-  if (modelCheck.classification === "runner-model-authority-required") {
+  const nativeHostMarkers = parseTrailerBlock(message).filter((entry) => entry.key.toLowerCase() === "native-host-observed");
+  if (isV4 && record.outcomeClassification?.kind === "authored-commit"
+    && ["claude", "codex"].includes(record.runner) && nativeHostMarkers.length === 0) {
+    return result(sha, VERDICT.unverifiable, "native-host-marker-required",
+      `authored ${record.runner} v4 record for \`${taskId}\` has no native host-observed commit marker`, { taskId });
+  }
+  let nativeHostObserved = false;
+  if (nativeHostMarkers.length > 0) {
+    const expectedMarker = `Native-Host-Observed: v1 (${record.runner})`;
+    if (!isV4 || record.outcomeClassification?.kind !== "authored-commit"
+      || !["claude", "codex"].includes(record.runner) || nativeHostMarkers.length !== 1
+      || `${nativeHostMarkers[0].key}: ${nativeHostMarkers[0].value}` !== expectedMarker) {
+      return result(sha, VERDICT.fail, "native-host-marker-invalid",
+        "native host-observed marker is malformed, duplicated, or contradicts its v4 runner binding", { taskId });
+    }
+    let observation = null;
+    if (typeof deps.verifyNativeHostObservation === "function") {
+      try { observation = deps.verifyNativeHostObservation(taskId, record); }
+      catch { observation = { ok: false, code: "native-host-observation-readback-error" }; }
+    }
+    if (!observation?.ok || observation.authority !== "host-observed-local") {
+      if (observation?.code === "NGHO-OBSERVATION-MISSING" || observation?.code === "native-record-bytes-unverifiable") {
+        return result(sha, VERDICT.unverifiable, "native-host-observation-required",
+          `native ${record.runner} host commit for \`${taskId}\` has no verifier-readable local observation; fresh clones need a separately signed export`,
+          { taskId, observationCode: observation.code });
+      }
+      return result(sha, VERDICT.fail, "native-host-observation-invalid",
+        `native ${record.runner} host observation for \`${taskId}\` is present or attempted but fails private receipt or Git readback`,
+        { taskId, observationCode: observation?.code ?? "native-host-observation-unavailable" });
+    }
+    nativeHostObserved = true;
+    acceptedModelCheck = { classification: "host-observed-local", reason: "runner-native callback, exact return, private receipt and Git readback bound" };
+  }
+  if (!nativeHostObserved && modelCheck.classification === "runner-model-authority-required") {
     let observation = null;
     if (record.runner === "antigravity"
       && record.outcomeClassification?.kind === "authored-commit"
@@ -663,7 +697,7 @@ export function verifyCommit(sha, deps) {
       acceptedModelCheck = { classification: "host-observed-local", reason: "private receipt, consent, result and Git readback bound" };
     }
   }
-  if (modelCheck.classification === "model-mismatch" || modelCheck.classification === "model-override-malformed") {
+  if (!nativeHostObserved && (modelCheck.classification === "model-mismatch" || modelCheck.classification === "model-override-malformed")) {
     return result(
       sha,
       VERDICT.fail,
@@ -708,7 +742,7 @@ export function verifyCommit(sha, deps) {
   });
 }
 
-function readExactAgyRecordBytes(evidenceDir, taskId, record) {
+function readExactRecordBytes(evidenceDir, taskId, expectedBytes) {
   if (!isSafeTaskId(taskId)) return null;
   const target = join(evidenceDir, `dispatch-record-${taskId}.json`);
   let fd;
@@ -731,7 +765,7 @@ function readExactAgyRecordBytes(evidenceDir, taskId, record) {
     if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size
       || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs
       || current.dev !== before.dev || current.ino !== before.ino
-      || !bytes.equals(agyAuthoredRecordBytes(record))) return null;
+      || !bytes.equals(expectedBytes)) return null;
     return bytes;
   } catch { return null; }
   finally { if (fd !== undefined) closeSync(fd); }
@@ -739,8 +773,8 @@ function readExactAgyRecordBytes(evidenceDir, taskId, record) {
 
 export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = join(repoRoot, "evidence") } = {}) {
   const git = (args) => execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
-  const agyRecordBytes = (taskId, record) => evidenceDir === join(repoRoot, "evidence")
-    ? readExactAgyRecordBytes(evidenceDir, taskId, record) : null;
+  const exactRecordBytes = (taskId, record) => evidenceDir === join(repoRoot, "evidence")
+    ? readExactRecordBytes(evidenceDir, taskId, nativeAuthoredRecordBytes(record)) : null;
   return {
     readCommitMessage: (sha) => git(["show", "-s", "--format=%B", `${sha}^{commit}`]),
     readChangedPaths: (sha) =>
@@ -750,13 +784,18 @@ export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = join(repoRoot, "ev
         .filter((line) => line !== ""),
     readRecord: (taskId) => readRecordFile(evidenceDir, taskId),
     verifyAgyHostObservation: (taskId, record) => {
-      const recordBytes = agyRecordBytes(taskId, record);
+      const recordBytes = exactRecordBytes(taskId, record);
       return recordBytes === null ? { ok: false, code: "agy-record-bytes-unverifiable" }
         : inspectAgyHostObservedLocalReadback({ root: repoRoot, taskId, record, recordBytes });
     },
+    verifyNativeHostObservation: (taskId, record) => {
+      const recordBytes = exactRecordBytes(taskId, record);
+      return recordBytes === null ? { ok: false, code: "native-record-bytes-unverifiable" }
+        : inspectNativeGoldfishHostObservation({ root: repoRoot, taskId, record, recordBytes });
+    },
     verifyAgyPortableExport: (taskId, sha, record) => readPortableAgyAuthorshipExport({ root: repoRoot, taskId, commit: sha, record }),
     verifyCriticAddendum: (taskId, record) => {
-      const recordBytes = agyRecordBytes(taskId, record);
+      const recordBytes = exactRecordBytes(taskId, record);
       return recordBytes === null ? { ok: false, code: "critic-addendum-record-unverifiable" }
         : verifyCriticDispositionAddendumForRecord({ root: repoRoot, taskId, record, recordBytes });
     },

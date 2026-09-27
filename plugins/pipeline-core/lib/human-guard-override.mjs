@@ -4612,6 +4612,31 @@ function canonicalBriefedTarget(rootDir, targetPath, spawn = spawnSync) {
   return rel;
 }
 
+function briefedTestIntent(targetPath, briefingDigest, expiresAtMs) {
+  const subjectSha256 = sha({ targetPath, briefingDigest, expiry: new Date(expiresAtMs).toISOString() });
+  return createPoApprovalIntent({
+    kind: BRIEFED_TEST_CHANGE_KIND,
+    featureId: "briefed-test-change",
+    planSha256: subjectSha256,
+    specSha256: sha(BRIEFED_TEST_AUTHORIZATION_SCHEMA),
+    candidate: { commit: "0".repeat(40), tree: "1".repeat(40) },
+    policyRevision: "briefed-test-authorization-v1",
+    subjectSha256,
+    decision: "authorize",
+  });
+}
+
+function recognizedBriefedSigner(rootDir, proof) {
+  if (!proof || typeof proof !== "object" || !isWellFormedEd25519PublicKey(proof.publicKey)) return null;
+  const publicKeySha256 = createHash("sha256").update(proof.publicKey).digest("hex");
+  const policy = readCriticalHumanProofPolicy(rootDir);
+  const anchors = policy.ok && Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0
+    ? policy.trustAnchors : policy.ok && policy.trustAnchor !== null ? [policy.trustAnchor] : [];
+  const anchor = anchors.find(value => value?.publicKeySha256 === publicKeySha256
+    && value?.keyReference === proof.keyReference);
+  return anchor ? { keyReference: anchor.keyReference, publicKeySha256 } : null;
+}
+
 export function createBriefedTestChangeAuthorization({
   rootDir,
   targetPath,
@@ -4620,7 +4645,6 @@ export function createBriefedTestChangeAuthorization({
   mode = "chat",
   reason = "briefed test-change authorization",
   proof = null,
-  trustPolicy = null,
   nowMs = Date.now(),
   spawn = spawnSync,
 } = {}) {
@@ -4645,53 +4669,28 @@ export function createBriefedTestChangeAuthorization({
     try { repo = controlPathTopology(rootDir); }
     catch { fail("HGO-ROOT", "repository root could not be established"); }
   }
+  let approval;
+  try { approval = readHumanApprovalMode(rootDir, { legacyKind: "push", spawn }); }
+  catch { fail("HGO-BRIEFED-MODE", "human approval mode could not be read"); }
+  if (!["chat", "signature"].includes(mode) || approval.mode !== mode) {
+    fail("HGO-BRIEFED-MODE", "briefed test authorization must use the repository's current human approval mode");
+  }
+  if (mode === "chat" && proof !== null) {
+    fail("HGO-BRIEFED-MODE", "chat authorization cannot carry a signature proof");
+  }
   const paths = storage(repo.common);
 
   let signer = null;
   if (mode === "signature") {
-    if (!proof || typeof proof !== "object") {
-      fail("HGO-PROOF-INVALID", "proof is required for signature mode");
-    }
-    if (!isWellFormedEd25519PublicKey(proof.publicKey)) {
+    if (!proof || typeof proof !== "object" || !isWellFormedEd25519PublicKey(proof.publicKey)) {
       fail("HGO-PROOF-INVALID", "PO-APPROVAL-PROOF-INVALID");
     }
-    const intent = createPoApprovalIntent({
-      kind: BRIEFED_TEST_CHANGE_KIND,
-      featureId: "briefed-test-change",
-      planSha256: sha({ targetPath: normTarget, briefingDigest, expiry: new Date(expiresAtMs).toISOString() }),
-      specSha256: sha(BRIEFED_TEST_AUTHORIZATION_SCHEMA),
-      candidate: { commit: "0".repeat(40), tree: "1".repeat(40) },
-      policyRevision: "briefed-test-authorization-v1",
-      subjectSha256: sha({ targetPath: normTarget, briefingDigest, expiry: new Date(expiresAtMs).toISOString() }),
-      decision: "authorize",
-    });
-    const derived = {
-      keyReference: proof.keyReference,
-      publicKeySha256: createHash("sha256").update(proof.publicKey).digest("hex"),
-    };
+    const intent = briefedTestIntent(normTarget, briefingDigest, expiresAtMs);
+    const derived = recognizedBriefedSigner(rootDir, proof);
+    if (!derived) fail("HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED", "signing key is not recognized by the committed policy");
     const sigCheck = verifyPoApprovalProof({ intent, trustPolicy: derived, proof });
     if (!sigCheck.verified) {
       fail("HGO-PROOF-INVALID", sigCheck.code ?? "PO-APPROVAL-PROOF-INVALID");
-    }
-    const resolvedTrustAnchors = trustPolicy !== null
-      ? [trustPolicy]
-      : (() => {
-        const policy = readCriticalHumanProofPolicy(rootDir);
-        if (policy.ok && Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0) {
-          return policy.trustAnchors;
-        }
-        if (policy.ok && policy.trustAnchor !== null) return [policy.trustAnchor];
-        return [];
-      })();
-    const isRecognized = Array.isArray(resolvedTrustAnchors) && resolvedTrustAnchors.some(
-      (a) => a?.publicKeySha256 === derived.publicKeySha256
-    );
-    if (!isRecognized) {
-      fail(
-        "HGO-TRUST-ANCHOR-NEW-KEY-CONFIRMATION-REQUIRED",
-        `public key ${derived.publicKeySha256} (${derived.keyReference}) is not recognized in trustAnchors; human confirmation required before first use`,
-        { keyReference: derived.keyReference, publicKeySha256: derived.publicKeySha256 }
-      );
     }
     signer = derived;
   }
@@ -4745,17 +4744,37 @@ export function readActiveBriefedTestAuthorizations({
     ? canonicalBriefedTarget(rootDir, targetPath, spawn)
     : null;
   if (typeof targetPath === "string" && normTarget === null) return [];
+  let approval;
+  try { approval = readHumanApprovalMode(rootDir, { legacyKind: "push", spawn }); }
+  catch { return []; }
+  if (!["chat", "signature"].includes(approval.mode)) return [];
   const results = [];
   try {
     const entries = readdirSync(paths.briefedAuthorizations).filter((n) => n.endsWith(".json"));
     for (const name of entries) {
       try {
-        const content = readFileSync(join(paths.briefedAuthorizations, name), "utf8");
+        const recordPath = join(paths.briefedAuthorizations, name);
+        if (!lstatSync(recordPath).isFile()) continue;
+        const content = readFileSync(recordPath, "utf8");
         const rec = JSON.parse(content);
         if (rec?.schema !== BRIEFED_TEST_AUTHORIZATION_SCHEMA || rec?.kind !== BRIEFED_TEST_CHANGE_KIND) continue;
+        if (rec.mode !== approval.mode || typeof rec.targetPath !== "string" ||
+            typeof rec.briefingDigest !== "string" || !SHA256.test(rec.briefingDigest)) continue;
         if (typeof rec.expiresAtMs !== "number" || !Number.isFinite(rec.expiresAtMs)) continue;
         if (typeof rec.expiry !== "string" || !Number.isFinite(Date.parse(rec.expiry))) continue;
-        if (rec.expiresAtMs <= nowMs || Date.parse(rec.expiry) <= nowMs) continue;
+        if (rec.expiresAtMs <= nowMs || new Date(rec.expiresAtMs).toISOString() !== rec.expiry) continue;
+        if (canonicalBriefedTarget(rootDir, rec.targetPath, spawn) !== rec.targetPath) continue;
+        if (rec.id !== briefedAuthorizationId(rec.targetPath, rec.briefingDigest) || name !== `${rec.id}.json`) continue;
+        if (rec.mode === "signature") {
+          const signer = recognizedBriefedSigner(rootDir, rec.proof);
+          if (!signer || rec.signer?.keyReference !== signer.keyReference ||
+              rec.signer?.publicKeySha256 !== signer.publicKeySha256 ||
+              !verifyPoApprovalProof({
+                intent: briefedTestIntent(rec.targetPath, rec.briefingDigest, rec.expiresAtMs),
+                trustPolicy: signer,
+                proof: rec.proof,
+              }).verified) continue;
+        } else if (rec.proof !== null || rec.signer !== null) continue;
         if (normTarget !== null) {
           const recNorm = canonicalBriefedTarget(rootDir, rec.targetPath, spawn);
           if (recNorm === null || recNorm !== normTarget) continue;

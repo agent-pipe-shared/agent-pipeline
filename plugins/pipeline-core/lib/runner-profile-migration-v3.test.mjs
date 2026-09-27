@@ -608,6 +608,37 @@ record("a newer registry-bound project cannot be downgraded by an older Core ref
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+record("the exact prior V3 registry upgrades its pure-read duty without weakening unknown-binding denial", () => {
+  const intent = v3Intent();
+  delete intent.routing.duties.read;
+  intent.core_registry_sha256 = "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5";
+  const root = fixture(yaml(intent));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "ready");
+    assert.equal(inspection.sourceKind, "v3-refresh");
+    assert.deepEqual(inspection.compatibilityDeltas.map((delta) => delta.path),
+      ["core_registry_sha256", "routing"]);
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root }).status, "activation-required");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const upgraded = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+    assert.equal(upgraded.core_registry_sha256, RUNNER_PROFILES_V3_REGISTRY_SHA256);
+    assert.equal(upgraded.routing.duties.read.codex.selector.value, "gpt-6-luna");
+    assert.equal(validatePipelineUserV3(upgraded).ok, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+  const altered = v3Intent();
+  delete altered.routing.duties.read;
+  altered.routing.duties.implement.codex.selector.value = "unapproved-model";
+  altered.core_registry_sha256 = "12ec7be9e63630f0c3621761b2efb41f52e94bcd002c431655161befa6864ee5";
+  const alteredRoot = fixture(yaml(altered));
+  try {
+    assert.equal(inspectRunnerProfileMigrationV3({ rootDir: alteredRoot }).status, "invalid-source");
+  } finally { rmSync(alteredRoot, { recursive: true, force: true }); }
+});
+
 record("historical Public aliases migrate atomically without pre-seeded Codex files or private policy", () => {
   const root = fixture(yaml(publicLegacyIntent()), { omitCodex: true });
   try {
@@ -1743,7 +1774,7 @@ record("a customised existing manifest is never replaced by the fresh seed", () 
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 53, "the complete runner profile migration corpus must be registered before execution begins");
+assert.equal(cases.length, 54, "the complete runner profile migration corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

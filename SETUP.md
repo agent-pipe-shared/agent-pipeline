@@ -85,6 +85,12 @@ routes for Claude, Codex, and Antigravity duties, but a requested route is not
 proof that a host used that model, and one runner's evidence does not prove
 another's behavior.
 
+**One installed runner is enough for a consuming repository.** Bootstrap and
+confirm the model mapping for that runner only. The other integrations,
+accounts, and model catalogues are optional; their absence must not block
+onboarding or ordinary work with the installed runner. Cross-runner evidence
+is needed only for a claim that explicitly covers those other runners.
+
 Supported runner integrations can enforce configured guards and lifecycle
 checks when their adapter is installed and project prerequisites are met. Use
 the runner's supported integration and follow its setup path. See

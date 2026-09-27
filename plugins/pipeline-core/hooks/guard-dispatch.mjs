@@ -61,6 +61,7 @@ import {
 import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
 import { dispatchBudgetBinding, dispatchFindings } from "../lib/dispatch-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { prepareNativeGoldfishHostState } from "../lib/native-goldfish-host-state.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 
 // Recover `{ agentType: '...', prompt: `...` }`-shaped dispatches embedded in a Workflow
@@ -214,6 +215,21 @@ if (isDirectInvocation(import.meta.url)) {
       if (persisted.status !== "prepared") {
         process.stderr.write(`BLOCKED (guard-dispatch, plugin pipeline-core): ${persisted.code}: the validated tool budget could not be bound to this dispatch before launch.\n`);
         process.exit(2);
+      }
+    }
+    const nativeMarker = "<!-- pipeline-native-goldfish-host-commit:v1";
+    const markedNative = dispatches.filter((dispatch) => dispatch.prompt.includes(nativeMarker));
+    if (markedNative.length > 0) {
+      const nativeRunner = ["Task", "Agent"].includes(input?.tool_name) ? "claude"
+        : input?.tool_name === "spawn_agent" ? "codex" : null;
+      if (!nativeRunner || dispatches.length !== 1) {
+        process.stderr.write("WARNING (guard-dispatch): marked native host-commit route is not a single direct Claude Task or Codex spawn_agent; child changes will not be host-committed.\n");
+      } else {
+        const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
+        const prepared = prepareNativeGoldfishHostState({ root: rootDir, runner: nativeRunner, input });
+        if (!prepared.ok) {
+          process.stderr.write(`WARNING (guard-dispatch): native host-commit preparation failed (${prepared.code}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.\n`);
+        }
       }
     }
     process.exit(0);

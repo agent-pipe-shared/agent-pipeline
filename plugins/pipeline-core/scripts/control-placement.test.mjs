@@ -80,3 +80,22 @@ test("ships a syntactically complete but deliberately unqualified table until A1
   assert.ok(e3.perRunnerStatus.every((status) => status.status === "unavailable"));
   assert.equal(checkControlPlacement({ table: shipped, hooksDocument: hooks, a1Record: null, activeRunner: "codex" }).findings.includes("A2-A1-RECORD-REQUIRED"), true);
 });
+
+test("AC-2: known protected-surface mutation-route gaps are explicit A2 debt, not silent coverage claims", () => {
+  const shipped = JSON.parse(readFileSync(join(repoRoot, "policies/control-placement.v1.json"), "utf8"));
+  const row = (controlId) => shipped.controls.find((candidate) => candidate.controlId === controlId);
+  const requireGapCodes = (controlId, codes) => {
+    const residuals = row(controlId)?.residualGaps ?? [];
+    for (const code of codes) {
+      assert.ok(
+        residuals.some((gap) => gap.startsWith(`mutation-route-gap[${code}]:`)),
+        `${controlId} must disclose mutation-route-gap[${code}]`,
+      );
+    }
+  };
+
+  requireGapCodes("hook:pretooluse:guard-testpath", ["MULTIEDIT-UNWIRED", "SCRIPT-MEDIATED-WRITE", "RUNTIME-PATH-ALIAS"]);
+  requireGapCodes("hook:pretooluse:guard-devplan", ["MULTIEDIT-UNWIRED", "SCRIPT-MEDIATED-WRITE", "RUNTIME-PATH-ALIAS"]);
+  requireGapCodes("alfred:a4-plan-authority-sealing", ["RUNNER-PROOF", "STATIC-SHELL-CLASSIFIER"]);
+  requireGapCodes("alfred:a5-closed-evidence-integrity", ["RUNNER-PROOF", "PATH-IDENTITY"]);
+});

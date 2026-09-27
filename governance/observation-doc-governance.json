@@ -200,6 +200,7 @@
           "docs/adr/0006-model-effort-policy.md",
           "docs/adr/0007-workflows-ultracode-opt-in.md",
           "docs/adr/0008-permissions-worktree-policy.md",
+          "docs/adr/0009-session-hygiene-lifecycle.json",
           "docs/adr/0009-session-hygiene-lifecycle.md",
           "docs/adr/0010-session-bootstrap.md",
           "docs/adr/0011-language-policy.md",

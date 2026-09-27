@@ -12,6 +12,8 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
+import { selectStoredModelRoleDispatch } from "../lib/model-role-host-session.mjs";
+import { createModelRoleHostStore } from "../lib/model-role-host-store.mjs";
 import { digest, loadLiveSession, loadStoredConsent, validateConsentRecord, validateDispatchBinding } from "../lib/agy-session-authority.mjs";
 import { preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
 import { LIVE_REQUEST_SCHEMA, LIVE_REQUEST_SEAL, runGoldfishAntigravityLiveHost } from "./goldfish-antigravity-live-host.mjs";
@@ -109,7 +111,7 @@ function closedAuthoredRecord(value, taskId) {
     && value.authorship === "host-observed-local" ? { ...value } : null;
 }
 
-function receipt({ packet, sessionId, descriptorSha256, route, record, scope, inputSha256, result, status, code }) {
+function receipt({ packet, sessionId, descriptorSha256, route, record, scope, inputSha256, result, status, code, modelRoleDiagnostic = null }) {
   return {
     schema: ELEPHANT_AGY_IMPLEMENTATION_DISPATCH_SCHEMA,
     status,
@@ -118,6 +120,7 @@ function receipt({ packet, sessionId, descriptorSha256, route, record, scope, in
     candidate: packet.candidate,
     session: { id: sessionId, descriptorSha256 },
     route,
+    modelRoleDiagnostic,
     authority: { consentSubjectSha256: record.subjectSha256, mode: record.mode, fallbackPolicy: record.subject.fallbackPolicy },
     binding: { role: packet.role, scopeSha256: digest(scope), inputSha256, requiredPathsSha256: digest(packet.requiredPaths) },
     observed: {
@@ -148,11 +151,52 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
   try { packet = JSON.parse(input.bytes.toString("utf8")); } catch { return empty("AGY-ELEPHANT-REQUEST-JSON"); }
   if (packet?.schema !== ELEPHANT_AGY_IMPLEMENTATION_REQUEST_SCHEMA || packet.transport !== "antigravity" || !IMPLEMENTATION_ROLES.has(packet.role)) return empty("AGY-ELEPHANT-ROLE-FORBIDDEN");
   if (packet.resultDestination?.kind !== "return" || Object.keys(packet.resultDestination).length !== 1) return empty("AGY-ELEPHANT-RESULT-DESTINATION");
-  const route = (dependencies.routeAuthority ?? routeAuthority)(dependencies);
-  if (!route) return empty("AGY-ELEPHANT-ROUTE-UNAVAILABLE", "unavailable");
-  if (!validRouteAuthority(route)) return empty("AGY-ELEPHANT-ROUTE-MISMATCH", "unavailable");
+  const baseRoute = (dependencies.routeAuthority ?? routeAuthority)(dependencies);
+  if (!baseRoute) return empty("AGY-ELEPHANT-ROUTE-UNAVAILABLE", "unavailable");
+  if (!validRouteAuthority(baseRoute)) return empty("AGY-ELEPHANT-ROUTE-MISMATCH", "unavailable");
   const preflight = (dependencies.preflightRoleDispatch ?? preflightRoleDispatch)({ root: input.root, resultRoot: input.root, packet });
   if (preflight.status !== "prepared") return empty("AGY-ELEPHANT-PREFLIGHT-FAILED", "rejected", { preflight });
+  let live;
+  try { live = (dependencies.loadLiveSession ?? loadLiveSession)(input.root, sessionId, descriptorSha256); } catch { return empty("AGY-SESSION-OWNER-UNAVAILABLE", "unavailable"); }
+  if (!live?.ok) return empty(live?.code ?? "AGY-SESSION-OWNER-UNAVAILABLE", "unavailable");
+  // Functional model selection is optional. A bad or unavailable receipt
+  // cannot authorize a new model, but must not block the already admitted V3
+  // route. Consent is still checked against the route actually selected.
+  let route = baseRoute;
+  let modelRoleDiagnostic = null;
+  let modelRoleStore;
+  let modelRolePresence;
+  try {
+    modelRoleStore = dependencies.modelRoleStore
+      ?? createModelRoleHostStore(live.descriptor.repo.commonDir, { rootDir: input.root });
+    modelRolePresence = modelRoleStore.inspect(sessionId);
+  } catch {
+    modelRoleDiagnostic = "AGY-MODEL-ROLE-STORE-UNAVAILABLE";
+  }
+  if (!modelRoleDiagnostic && (!modelRolePresence?.ok || !["present", "absent"].includes(modelRolePresence.status))) {
+    modelRoleDiagnostic = "AGY-MODEL-ROLE-STORE-UNAVAILABLE";
+  }
+  if (!modelRoleDiagnostic && modelRolePresence.status === "present") {
+    const taskRoute = packet.role === "pipeline-core:goldfish-mechanic"
+      ? "duty.mechanic" : "duty.implement";
+    let selected;
+    try {
+      selected = selectStoredModelRoleDispatch({ taskRoute, runner: "antigravity",
+        sessionId, store: modelRoleStore });
+    } catch {
+      modelRoleDiagnostic = "AGY-MODEL-ROLE-NOT-BOUND";
+    }
+    if (!modelRoleDiagnostic && (selected?.ok !== true || selected.effort !== baseRoute.effort)) {
+      modelRoleDiagnostic = "AGY-MODEL-ROLE-NOT-BOUND";
+    }
+    if (!modelRoleDiagnostic) {
+      // An approved replacement is sealed before scope and consent binding.
+      route = { ...baseRoute, requestedModel: selected.modelId,
+        routePolicySha256: digest({ baseRoutePolicySha256: baseRoute.routePolicySha256,
+          taskRoute, sessionId, modelRoleReadbackSha256: selected.readbackSha256,
+          modelRoleReceiptSha256: selected.receiptSha256 }) };
+    }
+  }
   const scope = {
     schema: "pipeline.agy-implementation-scope.v1",
     dispatchId: packet.dispatchId,
@@ -164,9 +208,6 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
     routePolicySha256: route.routePolicySha256,
   };
   const inputSha256 = sha256(Buffer.concat([input.bytes, Buffer.from(`\n${JSON.stringify(scope)}\n`, "utf8")]));
-  let live;
-  try { live = (dependencies.loadLiveSession ?? loadLiveSession)(input.root, sessionId, descriptorSha256); } catch { return empty("AGY-SESSION-OWNER-UNAVAILABLE", "unavailable"); }
-  if (!live?.ok) return empty(live?.code ?? "AGY-SESSION-OWNER-UNAVAILABLE", "unavailable");
   let stored;
   try { stored = (dependencies.loadStoredConsent ?? loadStoredConsent)(input.root, sessionId, descriptorSha256); } catch { return empty("AGY-SESSION-CONSENT-UNAVAILABLE", "unavailable"); }
   if (!stored?.record) return empty("AGY-SESSION-CONSENT-REQUIRED");
@@ -181,21 +222,21 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
     // The child may already have run or changed the checkout. Never turn an
     // unexpected host exception into a safe retry or expose its private text.
     return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record,
-      scope, inputSha256, result: null, status: "recovery-required", code: "AGY-ELEPHANT-HOST-EXCEPTION" });
+      scope, inputSha256, result: null, status: "recovery-required", code: "AGY-ELEPHANT-HOST-EXCEPTION", modelRoleDiagnostic });
   }
   if (!launched || typeof launched !== "object" || Array.isArray(launched)) {
     return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record,
-      scope, inputSha256, result: null, status: "recovery-required", code: "AGY-ELEPHANT-HOST-RESULT-INVALID" });
+      scope, inputSha256, result: null, status: "recovery-required", code: "AGY-ELEPHANT-HOST-RESULT-INVALID", modelRoleDiagnostic });
   }
   if (launched.modelCalls > 0 && ["unavailable", "rejected"].includes(launched.status)) {
     return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record,
-      scope, inputSha256, result: launched, status: "recovery-required", code: "AGY-ELEPHANT-LAUNCHED-NONFINAL" });
+      scope, inputSha256, result: launched, status: "recovery-required", code: "AGY-ELEPHANT-LAUNCHED-NONFINAL", modelRoleDiagnostic });
   }
   const terminalModelClaim = ["final-pending-host-commit", "completed-undelivered"].includes(launched?.status);
   if (terminalModelClaim && (launched?.observed?.model !== route.requestedModel
     || !Number.isSafeInteger(launched.modelCalls) || launched.modelCalls < 1)) {
     return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record,
-      scope, inputSha256, result: launched, status: "recovery-required", code: "AGY-ELEPHANT-HOST-MODEL-UNVERIFIED" });
+      scope, inputSha256, result: launched, status: "recovery-required", code: "AGY-ELEPHANT-HOST-MODEL-UNVERIFIED", modelRoleDiagnostic });
   }
   // The real sealed host carries its internal admission only inside this
   // process. Test-injected hosts remain pending; they cannot mint an authored
@@ -208,7 +249,7 @@ export async function dispatchElephantAgyImplementation({ root, dispatchRequestP
   const status = completed.status === "authored-commit-recorded" ? "authored-commit-recorded" : completed.status === "final-pending-host-commit" ? "final-pending-host-commit" : completed.status === "completed-undelivered" ? "completed-undelivered" : completed.status === "interrupted-recorded" ? "interrupted-recorded" : completed.status === "recovery-required" ? "recovery-required" : completed.status === "unavailable" ? "unavailable" : "rejected";
   const recordMissing = ["completed-undelivered", "interrupted-recorded"].includes(status) && !closedUndeliveredRecord(completed.record, preflight.packet.dispatchId);
   const authoredMissing = status === "authored-commit-recorded" && !closedAuthoredRecord(completed.record, preflight.packet.dispatchId);
-  return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record, scope, inputSha256, result: completed,
+  return receipt({ packet: preflight.packet, sessionId, descriptorSha256, route, record: stored.record, scope, inputSha256, result: completed, modelRoleDiagnostic,
     status: recordMissing || authoredMissing ? "recovery-required" : status,
     code: recordMissing ? status === "completed-undelivered"
       ? "AGY-UNDELIVERED-RECORD-UNVERIFIED" : "AGY-INTERRUPTION-RECORD-UNVERIFIED"

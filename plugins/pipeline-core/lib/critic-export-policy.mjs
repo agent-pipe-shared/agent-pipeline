@@ -65,6 +65,42 @@ function nonempty(value) {
   return typeof value === "string" && value.length > 0;
 }
 
+function validPacketRequest(request, route) {
+  const baseKeys = ["taskId", "projectId", "trigger"];
+  if (!route || typeof route !== "object" || Array.isArray(route)
+    || typeof route.projectionDigest !== "string") return false;
+  const hasSessionBinding = exactKeys(request, [...baseKeys, "sessionBinding"]);
+  if (!hasSessionBinding && !exactKeys(request, baseKeys)) return false;
+  if (!baseKeys.every((key) => nonempty(request[key]))) return false;
+  if (!hasSessionBinding) return true;
+
+  const binding = request.sessionBinding;
+  const bindingKeys = ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"];
+  const hasModelRole = binding !== null && typeof binding === "object" && !Array.isArray(binding)
+    && Object.hasOwn(binding, "modelRole");
+  if (!exactKeys(binding, hasModelRole ? [...bindingKeys, "modelRole"] : bindingKeys)
+    || binding.schema !== "pipeline.session-critic-packet-binding.v1"
+    || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(binding.sessionId ?? "")
+    || !/^[a-f0-9]{64}$/u.test(binding.preflightSha256 ?? "")
+    || binding.preflightSha256 !== route.projectionDigest
+    || binding.assurance !== "functional-equivalent-read-only; OS isolation not asserted"
+    || binding.freshContext !== true || binding.historyInherited !== false || binding.mayDelegate !== false) return false;
+  if (!hasModelRole) return true;
+
+  const role = binding.modelRole;
+  const expectedTaskRoute = request.trigger === "T1" || request.trigger === "T2"
+    ? "duty.critic_high_risk" : request.trigger.match(/^T[3-6]$/u) ? "duty.critic_normal" : null;
+  return expectedTaskRoute !== null
+    && exactKeys(role, ["schema", "runner", "taskRoute", "modelId", "effort", "readbackSha256", "receiptSha256"])
+    && role.schema === "pipeline.session-critic-model-role.v1"
+    && ["claude", "codex"].includes(role.runner)
+    && role.runner === route.runner && role.taskRoute === expectedTaskRoute
+    && nonempty(role.modelId) && role.modelId.trim() === role.modelId
+    && role.modelId === route.modelTier && role.effort === route.effortTier
+    && /^[a-f0-9]{64}$/u.test(role.readbackSha256 ?? "")
+    && /^[a-f0-9]{64}$/u.test(role.receiptSha256 ?? "");
+}
+
 function validTimestamp(value) {
   return typeof value === "string" && Number.isFinite(Date.parse(value))
     && new Date(value).toISOString() === value;
@@ -77,8 +113,7 @@ function validPacketBoundary(packet) {
     || !/^[a-f0-9]{32}$/u.test(packet.packetId ?? "")
     || !validTimestamp(packet.createdAt) || !validTimestamp(packet.expiresAt)
     || Date.parse(packet.expiresAt) <= Date.parse(packet.createdAt)
-    || !exactKeys(packet.request, ["taskId", "projectId", "trigger"])
-    || !Object.values(packet.request).every(nonempty)
+    || !validPacketRequest(packet.request, packet.route)
     || !exactKeys(packet.ruleset, ["oid", "objectFormat"])
     || !validOid(packet.ruleset.oid) || !["sha1", "sha256"].includes(packet.ruleset.objectFormat)
     || packet.ruleset.oid.length !== (packet.ruleset.objectFormat === "sha1" ? 40 : 64)

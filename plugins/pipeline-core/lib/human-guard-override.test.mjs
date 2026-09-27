@@ -55,7 +55,7 @@ import {
   refreezeHumanGuardOverridePlan,
   verifyHumanGuardOverrideAudit,
 } from "./human-guard-override.mjs";
-import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 import { probeSymlinkCapability, symlinkCapability, symlinkSkip } from "./symlink-capability.mjs";
 import { planVerifySelection } from "./verify-selection.mjs";
 
@@ -892,6 +892,100 @@ test("WP-B2-1: createBriefedTestChangeAuthorization lifecycle, query, and eligib
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("WP-B2-1: a signature-mode repository cannot mint an admitted chat test-change grant", () => {
+  const root = fixtureSignature();
+  try {
+    const targetPath = "plugins/pipeline-core/hooks/guard-git.test.mjs";
+    const briefingDigest = "a".repeat(64);
+    assert.throws(() => createBriefedTestChangeAuthorization({ rootDir: root,
+      targetPath, briefingDigest, expiry: Date.now() + 600000 }),
+    error => error.code === "HGO-BRIEFED-MODE");
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, false);
+    assert.throws(() => createBriefedTestChangeAuthorization({ rootDir: root,
+      targetPath, briefingDigest, expiry: Date.now() + 600000, mode: "signature" }),
+    error => error.code === "HGO-PROOF-INVALID");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("WP-B2-1: a prior chat grant cannot survive a committed switch to signature mode", () => {
+  const root = fixture();
+  try {
+    const targetPath = "plugins/pipeline-core/hooks/guard-git.test.mjs";
+    const briefingDigest = "a".repeat(64);
+    createBriefedTestChangeAuthorization({ rootDir: root, targetPath, briefingDigest,
+      expiry: Date.now() + 600000, mode: "chat" });
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, true);
+    writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+    git(root, "add", "pipeline.user.yaml");
+    git(root, "commit", "-q", "-m", "require signature");
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("WP-B2-1: a chat writer does not claim a granted record its reader would reject", () => {
+  const root = fixture();
+  try {
+    const targetPath = "plugins/pipeline-core/hooks/guard-git.test.mjs";
+    const briefingDigest = "a".repeat(64);
+    assert.throws(() => createBriefedTestChangeAuthorization({ rootDir: root,
+      targetPath, briefingDigest, expiry: Date.now() + 600000,
+      mode: "chat", proof: {} }), error => error.code === "HGO-BRIEFED-MODE");
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("WP-B2-1: a recognized signed grant is admitted and an altered stored proof is not", () => {
+  const root = fixtureSignature();
+  try {
+    const targetPath = "plugins/pipeline-core/hooks/guard-git.test.mjs";
+    const briefingDigest = "e".repeat(64);
+    const expiresAtMs = Date.now() + 600000;
+    const expiry = new Date(expiresAtMs).toISOString();
+    const hash = value => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
+    const subjectSha256 = hash({ targetPath, briefingDigest, expiry });
+    const intent = createPoApprovalIntent({ kind: BRIEFED_TEST_CHANGE_KIND,
+      featureId: "briefed-test-change", planSha256: subjectSha256,
+      specSha256: hash(BRIEFED_TEST_AUTHORIZATION_SCHEMA),
+      candidate: { commit: "0".repeat(40), tree: "1".repeat(40) },
+      policyRevision: "briefed-test-authorization-v1", subjectSha256, decision: "authorize" });
+    const proof = { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256,
+      keyReference: SIG_KEY_REFERENCE, publicKey: sigPublicKey,
+      signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), sigPair.privateKey).toString("base64") };
+    const granted = createBriefedTestChangeAuthorization({ rootDir: root, targetPath,
+      briefingDigest, expiry: expiresAtMs, mode: "signature", proof });
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, true);
+    const recordPath = join(root, ".git", "agent-pipeline", "human-guard-overrides", "briefed-authorizations", `${granted.id}.json`);
+    const record = JSON.parse(readFileSync(recordPath, "utf8"));
+    writeFileSync(recordPath, JSON.stringify({ ...record,
+      proof: { ...record.proof, keyReference: "different-key" },
+      signer: { ...record.signer, keyReference: "different-key" } }));
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, false);
+    record.proof.signatureBase64 = Buffer.alloc(64).toString("base64");
+    writeFileSync(recordPath, JSON.stringify(record));
+    assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("WP-B2-1: retained chat grants must preserve their exact record identity and expiry", () => {
+  const root = fixture();
+  try {
+    const targetPath = "plugins/pipeline-core/hooks/guard-git.test.mjs";
+    const briefingDigest = "b".repeat(64);
+    const granted = createBriefedTestChangeAuthorization({ rootDir: root, targetPath, briefingDigest,
+      expiry: Date.now() + 600000, mode: "chat" });
+    const recordPath = join(root, ".git", "agent-pipeline", "human-guard-overrides", "briefed-authorizations", `${granted.id}.json`);
+    const original = JSON.parse(readFileSync(recordPath, "utf8"));
+    for (const altered of [
+      { ...original, id: "c".repeat(64) },
+      { ...original, expiry: new Date(original.expiresAtMs + 60000).toISOString() },
+      { ...original, proof: {} },
+    ]) {
+      writeFileSync(recordPath, JSON.stringify(altered));
+      assert.equal(checkBriefedTestChangeAdmitted({ rootDir: root, targetPath, briefingDigest }).admitted, false);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("WP-B2-1 physical target: missing leaf beneath an external symlink is rejected", { skip: symlinkSkip(symlinkCapability({ type: "dir" })) }, () => {

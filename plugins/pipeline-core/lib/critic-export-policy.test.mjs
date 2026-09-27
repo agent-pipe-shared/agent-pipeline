@@ -172,6 +172,53 @@ test("matching classified packet is authorized once without hiding external gate
   assert.equal(validateCriticExportAuthorization({ receipt: result.receipt, packet, exportView, policy }, { registry }), true);
 });
 
+test("session-bound Critic packet model authority stays private while the route remains export-valid", () => {
+  const bound = structuredClone(packet);
+  const sessionId = "claude-session-export-test";
+  const readbackSha256 = "5".repeat(64);
+  const receiptSha256 = "6".repeat(64);
+  bound.route = { ...bound.route, runner: "claude", provider: "anthropic",
+    modelTier: "claude-current-frontier", effortTier: "max",
+    assurance: "functional-equivalent-read-only; OS isolation not asserted" };
+  bound.request.sessionBinding = {
+    schema: "pipeline.session-critic-packet-binding.v1",
+    sessionId,
+    preflightSha256: bound.route.projectionDigest,
+    assurance: "functional-equivalent-read-only; OS isolation not asserted",
+    freshContext: true,
+    historyInherited: false,
+    mayDelegate: false,
+    modelRole: {
+      schema: "pipeline.session-critic-model-role.v1",
+      runner: "claude",
+      taskRoute: "duty.critic_high_risk",
+      modelId: bound.route.modelTier,
+      effort: bound.route.effortTier,
+      readbackSha256,
+      receiptSha256,
+    },
+  };
+  bound.bindings.requestSha256 = hash(bound.request);
+  const boundView = deriveCriticExportView(bound);
+  assert.notEqual(boundView, null);
+  assert.equal(JSON.stringify(boundView).includes(sessionId), false);
+  assert.equal(JSON.stringify(boundView).includes(readbackSha256), false);
+  assert.equal(checkCriticExport({ policy, packet: bound, exportView: boundView,
+    provider: "anthropic", assuranceClass: bound.route.assurance }, options).ok, true);
+
+  for (const mutation of [
+    (candidate) => { candidate.request.sessionBinding.modelRole.modelId = "different-model"; },
+    (candidate) => { candidate.request.trigger = "T3"; },
+    (candidate) => { candidate.route.effortTier = "medium"; },
+    (candidate) => { candidate.request.sessionBinding.preflightSha256 = "0".repeat(64); },
+  ]) {
+    const invalid = structuredClone(bound);
+    mutation(invalid);
+    invalid.bindings.requestSha256 = hash(invalid.request);
+    assert.equal(deriveCriticExportView(invalid), null);
+  }
+});
+
 test("provider must match the packet runner", () => {
   const contradictory = structuredClone(packet);
   contradictory.route = { ...contradictory.route, provider: "anthropic" };

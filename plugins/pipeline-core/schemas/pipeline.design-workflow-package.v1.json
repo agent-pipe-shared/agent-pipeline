@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.design-workflow-package.v1",
+  "title": "Digest-bound design approval package",
+  "description": "Immutable, pre-approval package presented for one final PO decision. This record is never itself approval or implementation authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "featureId", "authoringDispatchId", "candidate", "sources", "advisor", "readiness", "createdAt"],
+  "properties": {
+    "schema": { "const": "pipeline.design-workflow-package.v1" },
+    "featureId": { "$ref": "#/$defs/id" },
+    "authoringDispatchId": { "$ref": "#/$defs/id" },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "sources": { "$ref": "#/$defs/sources" },
+    "advisor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "runner", "nativeAvailable", "receipt", "attemptTrail", "disposition", "exception"],
+      "properties": {
+        "status": { "enum": ["answered", "unavailable"] },
+        "runner": { "enum": ["claude", "codex", "antigravity"] },
+        "nativeAvailable": { "type": "boolean" },
+        "receipt": { "$ref": "#/$defs/evidenceFile" },
+        "attemptTrail": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/evidenceFile" }
+          ],
+          "description": "Required for exhausted/unavailable routes and for Claude consult fallback after native failure; nullable for successful direct routes."
+        },
+        "disposition": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["decision", "rationale"],
+              "properties": {
+                "decision": { "enum": ["accept", "decline"] },
+                "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 }
+              }
+            }
+          ]
+        },
+        "exception": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "failureCode", "rationale"],
+              "properties": {
+                "status": { "const": "proposed" },
+                "failureCode": { "enum": ["capacity-unavailable", "permission-denied", "timeout", "invalid-output", "route-unavailable"] },
+                "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "readiness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "dispatchId"],
+      "properties": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "dispatchId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "gitObject": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "repositoryPath": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._/@:-]+$" },
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": { "commit": { "$ref": "#/$defs/gitObject" }, "tree": { "$ref": "#/$defs/gitObject" } }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": { "path": { "$ref": "#/$defs/repositoryPath" }, "sha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "sources": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input", "prd", "spec", "design", "traceability"],
+      "properties": {
+        "input": { "$ref": "#/$defs/source" }, "prd": { "$ref": "#/$defs/source" },
+        "spec": { "$ref": "#/$defs/source" }, "design": { "$ref": "#/$defs/source" },
+        "traceability": { "$ref": "#/$defs/source" }
+      }
+    },
+    "evidenceFile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": { "path": { "$ref": "#/$defs/repositoryPath" }, "sha256": { "$ref": "#/$defs/sha256" } }
+    }
+  }
+}

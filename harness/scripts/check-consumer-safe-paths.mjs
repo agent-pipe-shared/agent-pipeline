@@ -127,6 +127,7 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
   { file: "plugins/pipeline-core/templates/prompts/agent-obligations.md", match: "d by:   harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/agent-obligations.md") }, // L4
   { file: "plugins/pipeline-core/templates/prompts/agent-obligations.md", match: "P-3` | `harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/agent-obligations.md") }, // L90
   { file: "plugins/pipeline-core/templates/prompts/agent-obligations.md", match: "?:-v2)?|harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/agent-obligations.md") }, // L92
+  { file: "plugins/pipeline-core/templates/prompts/agent-obligations.md", match: "TP-13` | `harness/verify-suites", reason: vendoredCanonAllowlistReason("templates/prompts/agent-obligations.md") }, // generated TP-13 pattern
   // templates/prompts/critic-review.md (line 7)
   { file: "plugins/pipeline-core/templates/prompts/critic-review.md", match: "harness/", reason: vendoredCanonAllowlistReason("templates/prompts/critic-review.md") }, // L7
   // templates/prompts/elephant-kickoff.md (lines 5, 87)

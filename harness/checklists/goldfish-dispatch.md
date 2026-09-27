@@ -33,4 +33,4 @@
 - [ ] Stop conditions respected; deviations reported, none silently built in
 - [ ] DoD status assigned: done / 🟡 not-human-verified / blocked (`harness/definition-of-done.md` §3)
 - [ ] Telemetry: first-pass (y/n) + interventions (y/n) per goldfish; look-away time noted (MP-20)
-- [ ] Commit discipline followed: staging+commit as ONE bundled `git add -- <paths> && git commit -- <same paths>` act — never `git add -A`/`git add .`; trailer lines (`Dispatch:` etc.) sit directly in the trailer block, no blank line between trailers (avoids the shared-index race and keeps trailers parseable)
+- [ ] Commit discipline followed: commit only explicit owned paths. For already-tracked files, use `git commit -- <exact paths>` without a separate staging call; for new files, run `git add -- <exact new paths>` as its own command, then commit those same paths. Never use `git add -A`/`git add .` or chain commands with `&&`. Trailer lines (`Dispatch:` etc.) sit directly in the trailer block, with no blank line between trailers.

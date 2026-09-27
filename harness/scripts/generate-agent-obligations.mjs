@@ -240,8 +240,12 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("<!-- hand-maintained: these are role/policy rules (GIT-03, the shared-index");
   put("     race), not values any guard exports, so no generator can derive them. -->");
   put();
-  put("- `git add -- <exact paths>` then `git commit -m \"<subject>\" --trailer \"AI-Assisted: true\" --trailer \"Dispatch: <binding>\" -- <same paths>`, as");
-  put("  two consecutive calls. Never `git add -A`, never `git add .`, never a bare");
+  put("- For an ordinary Goldfish write outside native host-commit mode, generate");
+  put("  the exact stage and commit commands with the read-only");
+  put("  `goldfish-commit-command-flow.mjs` producer named in the briefing. Run its");
+  put("  two returned commands separately after checking the exact paths; never");
+  put("  hand-compose a chained `git add && git commit`. Never `git add -A`,");
+  put("  never `git add .`, never a bare");
   put("  `git commit` — in a shared working tree a wildcard add lets another agent's");
   put("  files ride along on your commit.");
   put("- Commit messages carry **no** provider or model co-author trailers, **no**");

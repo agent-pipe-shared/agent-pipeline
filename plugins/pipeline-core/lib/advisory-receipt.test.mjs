@@ -77,6 +77,27 @@ test("a recorded native failure can bind a later consult fallback without a rout
   assert.deepEqual(validateAdvisoryReceipt(receipt), { ok: true });
 });
 
+test("session-selected Claude fallback receipt binds only the selection digest", () => {
+  const receipt = copy(BASE);
+  receipt.adapter = "consult";
+  receipt.fallback = { reason: "native-unavailable", redactedErrorClass: "unavailable" };
+  receipt.configuredRoute = {
+    runner: "claude", selector: { kind: "model-id", value: "claude-frontier-reviewed" },
+    effort: "max", sessionRoleBindingSha256: "c".repeat(64),
+  };
+  receipt.observed.identity = { provider: "anthropic", modelId: "claude-frontier-reviewed", effort: "max" };
+  assert.deepEqual(validateAdvisoryReceipt(receipt), { ok: true });
+  const privateSessionLeak = copy(receipt);
+  privateSessionLeak.configuredRoute.sessionId = "claude-private-session";
+  assert.equal(validateAdvisoryReceipt(privateSessionLeak).ok, false);
+  const wrongRunner = copy(receipt);
+  wrongRunner.configuredRoute.runner = "codex";
+  assert.equal(validateAdvisoryReceipt(wrongRunner).ok, false);
+  const malformedDigest = copy(receipt);
+  malformedDigest.configuredRoute.sessionRoleBindingSha256 = "not-a-digest";
+  assert.equal(validateAdvisoryReceipt(malformedDigest).ok, false);
+});
+
 test("rejects raw question or answer fields and malformed content digests", () => {
   const rawQuestion = { ...copy(BASE), question: "please advise" };
   assert.equal(validateAdvisoryReceipt(rawQuestion).ok, false);
