@@ -7,7 +7,7 @@ status: open
 created: 2026-09-27
 sprint: alfred
 done_when: manual
-source: "PO Agy greenfield handover, 2026-09-27; Rune_Test1_agy_70_113/docs/agent-pipeline-review.md, .claude/settings.json, pipeline.user.yaml, project/pipeline-state.json; installed Antigravity plugin.json and agy plugins list readback."
+source: "PO Agy greenfield handover, 2026-09-27; private fixture docs/agent-pipeline-review.md, .claude/settings.json, pipeline.user.yaml, project/pipeline-state.json; installed Antigravity plugin.json and agy plugins list readback."
 ---
 
 # Require a version-correct Antigravity run before 0.7 acceptance

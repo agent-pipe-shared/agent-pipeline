@@ -728,7 +728,7 @@
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-09-27",
-      "source": "PO Agy greenfield handover, 2026-09-27; Rune_Test1_agy_70_113/docs/agent-pipeline-review.md, .claude/settings.json, pipeline.user.yaml, project/pipeline-state.json; installed Antigravity plugin.json and agy plugins list readback.",
+      "source": "PO Agy greenfield handover, 2026-09-27; private fixture docs/agent-pipeline-review.md, .claude/settings.json, pipeline.user.yaml, project/pipeline-state.json; installed Antigravity plugin.json and agy plugins list readback.",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -1441,7 +1441,7 @@
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-09-27",
-      "source": "Agy consumer test-results/*/error-context.md, 2026-09-27; direct 0.7 browser-evidence-preflight.mjs run against Rune_Test1_agy_70_113 returned BEP-BROWSER-E2E-READY despite missing libnspr4.so.",
+      "source": "PO-supplied Agy consumer test-results/*/error-context.md, 2026-09-27; direct 0.7 browser-evidence-preflight.mjs run against the same private fixture returned BEP-BROWSER-E2E-READY despite missing libnspr4.so.",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -9568,7 +9568,7 @@
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-09-27",
-      "source": "Rune_Test1_agy_70_113/docs/agent-pipeline-review.md section 2, 2026-09-27; plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeDesignQuestions and validateIntakeCheckpoint.",
+      "source": "PO-supplied Antigravity greenfield review section 2, 2026-09-27; plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeDesignQuestions and validateIntakeCheckpoint.",
       "deferred": false,
       "sprint": "nightwing"
     }

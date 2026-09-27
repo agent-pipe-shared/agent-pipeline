@@ -7,7 +7,7 @@ status: open
 created: 2026-09-27
 sprint: nightwing
 done_when: manual
-source: "Rune_Test1_agy_70_113/docs/agent-pipeline-review.md section 2, 2026-09-27; plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeDesignQuestions and validateIntakeCheckpoint."
+source: "PO-supplied Antigravity greenfield review section 2, 2026-09-27; plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeDesignQuestions and validateIntakeCheckpoint."
 ---
 
 # Permit an explicit zero-open-question design intake

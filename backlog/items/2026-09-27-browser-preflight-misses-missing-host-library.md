@@ -7,7 +7,7 @@ status: open
 created: 2026-09-27
 sprint: alfred
 done_when: manual
-source: "Agy consumer test-results/*/error-context.md, 2026-09-27; direct 0.7 browser-evidence-preflight.mjs run against Rune_Test1_agy_70_113 returned BEP-BROWSER-E2E-READY despite missing libnspr4.so."
+source: "PO-supplied Agy consumer test-results/*/error-context.md, 2026-09-27; direct 0.7 browser-evidence-preflight.mjs run against the same private fixture returned BEP-BROWSER-E2E-READY despite missing libnspr4.so."
 ---
 
 # Browser preflight reports ready when Chromium cannot load a host library

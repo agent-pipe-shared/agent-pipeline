@@ -1,6 +1,7 @@
 # Antigravity greenfield report: verified disposition (2026-09-27)
 
-Source report: `/home/skar667/src/Rune_Test1_agy_70_113/docs/agent-pipeline-review.md`.
+Source report: PO-supplied local Antigravity greenfield review,
+`docs/agent-pipeline-review.md` in the private test fixture.
 This review used the consumer repository's public files and the installed
 plugin manifest. The referenced Antigravity transcript was outside the
 current session's admitted read scope; no transcript-level claim is made.

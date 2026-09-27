@@ -39,3 +39,33 @@ After this correction batch is committed, dispatch two fresh readers against
 that exact document state. If they still require public-document edits, stop
 under the course limit and obtain a documented course decision; do not
 silently begin round five.
+
+## Fourth-round outcome (20260927b)
+
+The correction batch was committed as `d2df7b61`; the backlog projection
+commit `c3ff4084` left the sixteen covered document blobs unchanged. The
+source checker snapshot for `c3ff4084872ff5351b37e0438a932573479fb3c3`
+returned docset digest
+`25cc0a319ac951f06a4ef21ba213b482f1b626a187a4c97a631ca14beea17c34`.
+Two fresh readers completed phase one and phase two. All five phase-one
+findings stand in phase two:
+
+1. `SETUP.md` places a long Antigravity-specific setup before the common
+   newcomer classification path.
+2. `SETUP.md`'s F0/F0A labels are not connected to the detailed onboarding
+   status vocabulary in `docs/v3-consumer-onboarding.md`.
+3. `PIPELINE_FLOW.md` and `docs/usage.md` give different placements for
+   applicable security checks relative to Critic and final Verify.
+4. The 0.7/Nova release-status explanation is repeated across several
+   newcomer/task pages instead of keeping the detail in `docs/overview.md`.
+5. The maintained German flow lacks the route-availability and skill-use
+   context present before route selection in the English guide.
+
+The raw phase-one and phase-two reports are preserved unchanged in ignored
+`scratch/` files. The public phase-one copy normalizes local absolute path
+links before publication; it is explicitly a course-decision aid, not an
+immutable source-bound report. No `disposition/20260927b.json` or
+`record.json` can honestly claim a passing reader binding while these
+findings remain open. Four rounds and three correction batches are exhausted.
+Do not edit the sixteen public documents or dispatch another reader for this
+course until the documentation owner makes an explicit new course decision.
