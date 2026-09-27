@@ -26,8 +26,10 @@ Passing the canonical schema directly as `turn/start.outputSchema` fails with
 The selected sandbox adds two more failures: the nested App Server attempts to
 write under the read-only user Codex home and exits before `initialize`; a
 fresh writable home starts but lacks authentication and the model turn fails
-with 401. A diagnostic read-only link to the existing local auth file, removed
-after the turn, allowed the review. Even then the default production host
+with 401. A diagnostic link to the existing local auth file, removed
+after a normal turn, allowed the review but is unsafe: a killed child can leave
+the link in registered scratch and the review environment can read through it.
+It must not be promoted to production. Even then the default production host
 composition omitted its `take` callback, so a successful child ended with
 `readiness host has no exact report readback`.
 
@@ -40,17 +42,19 @@ of describing every non-reviewed result as lost stdio.
 
 ## Proposal
 
-Treat `commandActions` as telemetry while keeping the selected filesystem
-sandbox, `approvalPolicy: never`, file-change and server-RPC checks. Use a
+Treat an `unknown` command action as inconclusive telemetry, but continue to
+reject explicit mutating action types as well as file-change and server-RPC
+events. Keep the selected filesystem sandbox and `approvalPolicy: never`. Use a
 Codex-compatible, fully typed `outputSchema` bound to dispatch, candidate and
 the five source hashes; validate the returned report again against the
 canonical receipt schema. Set finite, coordinated child/host deadlines for the
 real comparison and return a typed failure when the child exits cleanly with
 an invalid report or terminal turn failure.
-Provide the nested App Server a scratch-contained writable home and an
-explicit, temporary, read-only credential reference that the host can verify
-and remove before scratch resealing. Never copy or persist secret bytes in a
-public receipt or bypass a denied host/export decision. Connect the selected
+Provide an authenticated host-boundary route that keeps the credential source
+outside model-readable scratch, including on crash and restart. The receipt
+must truthfully name the isolation mechanism actually used. Never copy or
+persist secret bytes in a public receipt or bypass a denied host/export
+decision. Connect the selected
 bridge's exact `take` callback to the runtime transport on the default path.
 
 ## Acceptance
@@ -59,7 +63,8 @@ bridge's exact `take` callback to the runtime transport on the default path.
   readiness receipt or a typed unavailable result; it does not fabricate a
   successful review when a child fails.
 - A command event with `commandActions: ["unknown"]` does not alone abort a
-  read-only review. A file change or unexpected App Server request still fails.
+  read-only review. An explicit mutating command action, file change, or
+  unexpected App Server request still fails.
 - A five-source review has a bounded time budget long enough for the current
   configured model, with host deadline exceeding child deadline.
 - The structured output schema is accepted by Codex and the host independently
@@ -67,9 +72,10 @@ bridge's exact `take` callback to the runtime transport on the default path.
 - A failed turn, invalid schema, timeout and lost stdio remain distinguishable
   in sanitized diagnostics without retaining raw prompts or reports in the
   public failure receipt.
-- The selected sandbox starts the App Server, completes an authenticated turn,
-  removes any temporary credential reference before resealing, and returns the
-  exact bound report through the default runtime `take` path.
+- The selected route completes an authenticated turn while the review cannot
+  read a credential reference, including after SIGKILL. Registered scratch
+  remains recoverable and the exact bound report reaches the runtime `take`
+  path.
 
 ## Triage
 
@@ -77,6 +83,9 @@ Reproduced locally. A scratch-only child with the proposed schema and time
 budget completed two real Codex turns with valid bound reports, including a
 full comparison. A later selected-sandbox diagnostic with a temporary auth
 link and corrected `take` callback published a candidate-bound probe receipt
-under `scratch/` (`design-readiness-selected-probe-20260928i.json`). The
-production source path remains unverified until the fix is integrated and
-replayed without dependency substitution.
+under `scratch/` (`design-readiness-selected-probe-20260928i.json`). An
+independent patch critique found the link's credential exposure and crash
+cleanup flaw plus loss of explicit mutation detection. This probe is a
+diagnostic only, and `scratch/codex-readiness-fix.patch` must not be applied as
+written. The production source path remains unverified until a safe fix is
+integrated and replayed without dependency substitution.
