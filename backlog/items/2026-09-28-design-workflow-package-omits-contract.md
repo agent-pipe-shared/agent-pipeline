@@ -22,19 +22,24 @@ the requested sequence, Advisor fallback and exception boundary, implementation
 authority predicate, or one-final-approval rule from the supplied design.
 The original input's Critic-before-Full-Verify and chat/signature consistency
 integration is also incomplete in the five-source mapping.
+The later selected Codex readiness replay additionally confirmed that PRD and
+Spec do not state the design-workflow sequence, shared authority gate, or
+single final approval as explicit normative 0.7 requirements. Amending only
+the addendum and traceability would leave this cross-document gap open.
 
 ## Affected artifact
 
-`specs/sprint-alfred-epic/design/greenfield-0.7-remediation-2026-09-27.md`,
-`greenfield-0.7-traceability-2026-09-27.md`, and the final package's five-source
+`specs/sprint-alfred-epic/prd_sprint-alfred-epic.md`, `spec.md`,
+`design/greenfield-0.7-remediation-2026-09-27.md`,
+`design/greenfield-0.7-traceability-2026-09-27.md`, and the final package's five-source
 inventory. A proposed exact correction is in
 `scratch/greenfield-design-readiness-fix.patch`.
 
 ## Proposal
 
-Place the material workflow and authority contract in the design source that
-the readiness reviewer actually receives, or formally choose and bind a
-different complete design source. Make the final plan approval the one ordinary
+Place the product obligation in PRD and the testable authority contract in
+Spec, with matching design and traceability in the five-source package. Make
+the final plan approval the one ordinary
 package decision; distinguish earlier intake acknowledgement and per-file
 write signatures from that decision. Specify the narrow unavailable exception,
 its real route attempts and non-authorizing status. Map Critic/Verify ordering,
@@ -57,5 +62,7 @@ installed-version drift, and chat/signature equivalence explicitly.
 ## Triage
 
 Confirmed as a five-source package coverage gap. The provisional review
-returned five blocking findings; its standalone probe is not a host-bound
-readiness receipt. Recheck after the design correction is committed.
+returned five blocking findings. A later selected-sandbox diagnostic produced
+a host-bound probe receipt with three blocking findings, including the PRD/Spec
+gap, but used substituted Scratch code and is not production readiness.
+Recheck after the full correction is committed.
