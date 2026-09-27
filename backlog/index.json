@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6ca2097d812b5b4853169a72eee949b86e0f84cf96dd21cf662a9836e9246c62"
+    "transitionHead": "74b315fe162fd0a22305e9e1d331b9c440a8b67017f4a9a74d645d6cd8bca21f"
   },
   "counts": {
-    "open": 43,
+    "open": 47,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -723,6 +723,16 @@
       "closureEvidence": "backlog/items/2026-08-28-agents-talk-the-po-out-of-the-signature-instead-of-walking-it.md"
     },
     {
+      "id": "pipeline.agy-greenfield-run-used-stale-plugin",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "PO Agy greenfield handover, 2026-09-27; Rune_Test1_agy_70_113/docs/agent-pipeline-review.md, .claude/settings.json, pipeline.user.yaml, project/pipeline-state.json; installed Antigravity plugin.json and agy plugins list readback.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.all-three-runners-should-install-against-the-stable-branch",
       "status": "closed",
       "type": "requirement",
@@ -1424,6 +1434,16 @@
       "closureRepository": "self",
       "closureCommit": "e7d729042a1dfdf6439c74959b143eade6d7870c",
       "closureEvidence": "backlog/items/2026-08-08-a-briefings-model-field-can-contradict-the-agent-it-dispatches.md"
+    },
+    {
+      "id": "pipeline.browser-preflight-misses-missing-host-library",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Agy consumer test-results/*/error-context.md, 2026-09-27; direct 0.7 browser-evidence-preflight.mjs run against Rune_Test1_agy_70_113 returned BEP-BROWSER-E2E-READY despite missing libnspr4.so.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.budget-guard-test-suite-silent-pass",
@@ -7658,6 +7678,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/staleness-check.test.mjs"
     },
     {
+      "id": "pipeline.scratch-must-remain-writable-across-lifecycle-states",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "PO ruling, 2026-09-27: 'scratch muss immer gehen'; live Alfred design/draft write probe and guard-lifecycle-ready.test.mjs session-capability-unavailable fixture.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.scratch-write-exemption-does-not-cover-restart-required",
       "status": "closed",
       "type": "defect",
@@ -9531,6 +9561,16 @@
       "closureRepository": "self",
       "closureCommit": "0a0b3ad9b56c9eff97d5d8323aa102e1e9b1578c",
       "closureEvidence": "backlog/evidence/2026-09-11-write-lane-dotdot-disposition.md"
+    },
+    {
+      "id": "pipeline.zero-open-design-questions-force-fabricated-answer",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Rune_Test1_agy_70_113/docs/agent-pipeline-review.md section 2, 2026-09-27; plugins/pipeline-core/lib/onboarding-continuity.mjs applyOnboardingIntakeDesignQuestions and validateIntakeCheckpoint.",
+      "deferred": false,
+      "sprint": "nightwing"
     }
   ]
 }

@@ -57,6 +57,7 @@
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | closed | defect | pipeline | — | 2026-08-08 | 2026-08-15 | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | nightwing | 2026-08-09 | 2026-08-20 | — |
 | pipeline.agents-talk-the-po-out-of-the-signature | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — the one control in the model that is actual protection is the one agents routinely lobby the PO to abandon. Reported by the PO 2026-08-28 as recurring behaviour across agents, not a single incident. |
+| pipeline.agy-greenfield-run-used-stale-plugin | open | requirement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.all-three-runners-should-install-against-the-stable-branch | closed | requirement | pipeline | nightwing | 2026-08-27 | — | — |
 | pipeline.an-authorized-rebase-demands-a-fresh-po-signature-after-every-conflict | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.an-expired-override-is-armed-instead-of-refused | closed | defect | pipeline | nightwing | 2026-08-28 | — | — |
@@ -110,6 +111,7 @@
 | pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them | closed | workflow-improvement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.briefing-bundling-two-findings-asks-for-two-dispatches | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem. |
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
+| pipeline.browser-preflight-misses-missing-host-library | open | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.budget-guard-test-suite-silent-pass | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B -- guard-dispatch-budget.test.mjs imports its module at the test file's own module scope. If that guard's entrypoint gate ever regresses to an unconditional top-level body, the import calls process.exit at module-evaluation time and node --test reports the whole file as ONE PASSING TEST with no assertion having run. The sibling suite guard-dispatch.test.mjs had the identical shape and it was removed in e4aeb8fe; this one was on that package's no-go list and was carried forward in a commit message body, which is not a tracked mitigation. |
 | pipeline.calibration-twins-should-have-one-canonical-writer-and-a-derived-copy | closed | workflow-improvement | pipeline | nova-b | 2026-09-13 | — | Nova B — two tracked calibration authorities multiply review/signature work and make a small configuration repair look like two unrelated protected changes. |
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
@@ -567,6 +569,7 @@
 | pipeline.sanctioned-verify-transition-is-rejected-by-the-commit-backstop | closed | defect | pipeline | nova | 2026-09-13 | — | NOW / next local 0.6.2 candidate — blocks a normal greenfield project from committing the exact runtime-sanctioned design-to-implementation verification transaction without two unrelated human-signature ceremonies. |
 | pipeline.scanner-bootstrap-is-not-self-sufficient | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — PO decision 2026-08-28: security is default ON and its prerequisites are made ready in init ('das ist echt basis für diese pipeline'). Pulled forward from Nova B because turning the gate on is what this item unblocks. |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | closed | defect | pipeline | nova | 2026-08-08 | 2026-08-15 | — |
+| pipeline.scratch-must-remain-writable-across-lifecycle-states | open | requirement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.scratch-write-exemption-does-not-cover-restart-required | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.scratch-write-refused-during-intake-against-documented-exemption | closed | defect | pipeline | nova | 2026-08-28 | — | — |
 | pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -704,10 +707,11 @@
 | pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | closed | defect | pipeline | — | 2026-08-11 | — | — |
 | pipeline.worktree-isolation-hook-matcher-omits-the-agent-tool-name | closed | defect | pipeline | nova-b | 2026-09-02 | — | Nova B — the worktree-isolation count check registers its baseline on the dispatch call itself, but its hooks.json matcher names Task and not Agent. guard-dispatch.mjs's own stanza names both and says in those words that naming the wrong tool is a silent no-op. |
 | pipeline.write-lane-containment-may-share-read-lane-dotdot-bypass | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — a T1 Critic reviewing NVA-B-READCONTAIN-1's symlink-containment fix found that the read-scope lane's new realpath check still admits a `<symlink-inside-root>/../<outside>/<file>` argument, because `path.resolve()` collapses the `..` lexically before any symlink is examined. The write lane's own `isPathWithinRealpathedRoot` — the pattern the read-lane fix was modeled on — opens with the identical `resolve(root, filePath)` call, before its own existence/realpath walk. Whether this is actually exploitable for a WRITE depends on a fact this session could not verify from inside the repository: how the host tool that performs the actual Edit/Write file mutation resolves the same path string. |
+| pipeline.zero-open-design-questions-force-fabricated-answer | open | workflow-improvement | pipeline | nightwing | 2026-09-27 | — | — |
 
 ## Counts
 
-- open: 43
+- open: 47
 - in_progress: 0
 - closed: 642
 - rejected: 3
