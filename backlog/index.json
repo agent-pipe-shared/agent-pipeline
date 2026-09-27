@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6c811397c68d0e92ea6f1fa0e34e1966f375930ee84d7787d960b639999685fa"
+    "transitionHead": "252b0af1b06e717d3c5dcd35d56e639b1b1f54ede017b883104c121d1d66f964"
   },
   "counts": {
-    "open": 51,
+    "open": 53,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -1788,6 +1788,16 @@
       "closureEvidence": "backlog/items/2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md"
     },
     {
+      "id": "pipeline.codex-design-readiness-child-rejects-valid-review",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Local Codex 0.157.1 design-readiness replay on 2026-09-27/28; scratch/codex-readiness-provisional-report.json and scratch/codex-readiness-fix.patch.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap",
       "status": "closed",
       "type": "defect",
@@ -2619,6 +2629,16 @@
       "closureRepository": "self",
       "closureCommit": "d7600de57502e89fc18bb95d2324f02e022e5352",
       "closureEvidence": "plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs"
+    },
+    {
+      "id": "pipeline.design-workflow-package-omits-contract",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Independent provisional Codex five-source readiness comparison on 2026-09-28; scratch/codex-readiness-provisional-report.json.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session",

@@ -137,6 +137,7 @@
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
 | pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.codex-design-readiness-child-rejects-valid-review | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap | closed | defect | pipeline | nova-b | 2026-09-20 | — | — |
 | pipeline.codex-plugin-validator-host-parity | closed | workflow-improvement | pipeline | — | 2026-07-19 | — | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | closed | defect | pipeline | — | 2026-08-18 | — | — |
@@ -198,6 +199,7 @@
 | pipeline.design-generator-repeats-large-source-material | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding | closed | defect | pipeline | alfred | 2026-08-28 | — | — |
 | pipeline.design-to-implementation-path-has-no-driver | closed | workflow-improvement | pipeline | nova | 2026-08-28 | — | Nova A — re-prioritized 2026-08-30, retrospective-analysis follow-up item #4 ('ja das brauchen wir') |
+| pipeline.design-workflow-package-omits-contract | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.discard-feature-writes-a-state-the-cleanup-observer-rejects-and-strands-the-session | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.discarded-feature-dead-end | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — delivered 2026-08-28, same session it was reported |
 | pipeline.dispatch-evidence-record-shape-not-enforced-beyond-taskid-and-outcome | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
@@ -715,7 +717,7 @@
 
 ## Counts
 
-- open: 51
+- open: 53
 - in_progress: 0
 - closed: 642
 - rejected: 3
