@@ -6793,11 +6793,16 @@ export function resolvePoRebindRunner(explicitRunner, env) {
 // call this route after the PO has actually reviewed the content and named
 // themself; the attribution field exists so that instruction is recorded,
 // not merely trusted.
-function eligibleAcknowledgeContinuity(state, prd, spec) {
+function eligibleAcknowledgeContinuity(state, prd, spec, reopenedApprovedDraft = false) {
   const continuity = state?.continuity;
+  const currentBinding = continuity?.authority?.prd?.sha256 === prd.sha256
+    && continuity?.authority?.spec?.sha256 === spec.sha256;
+  const invalidatedBinding = reopenedApprovedDraft
+    && continuity?.authority?.prd?.sha256 === state.planSubmission.planSha256
+    && continuity?.authority?.spec?.sha256 === state.planSubmission.specSha256;
   if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
     || continuity.authority.prd.path !== prd.path || continuity.authority.spec.path !== spec.path
-    || continuity.authority.prd.sha256 !== prd.sha256 || continuity.authority.spec.sha256 !== spec.sha256
+    || (!currentBinding && !invalidatedBinding)
     || continuity.queueHead?.dispatch !== null || continuity.blocker !== null
     || continuity.decisionTxn !== null || continuity.closeTransition != null
     || continuity.revision === Number.MAX_SAFE_INTEGER) return null;
@@ -6836,8 +6841,23 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   const runnerResolved = resolvePoRebindRunner(deps.acknowledgeRunner ?? deps.runner, deps.env ?? process.env);
   if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-ACK-STATE" };
   const state = existing.state;
+  // A reopened approved plan retains its old submission and approval as
+  // historical evidence. Admit the PO ceremony only when the invalidation
+  // binds both exact records and the lifecycle is an editable Design/Draft.
+  const retainedSubmission = state.planSubmission;
+  const retainedApproval = state.planApproval;
+  const invalidation = state.planInvalidation;
+  const reopenedApprovedDraft = state.activeFeature?.phase === "design"
+    && state.planApproved === false
+    && validPlanSubmission(retainedSubmission)
+    && (validCurrentPlanApproval(retainedApproval) || validPreviousCurrentPlanApproval(retainedApproval))
+    && retainedApproval.submissionSha256 === sha256CanonicalJson(retainedSubmission)
+    && invalidation?.invalidatedSubmissionSha256 === sha256CanonicalJson(retainedSubmission)
+    && invalidation.invalidatedApprovalSha256 === sha256CanonicalJson(retainedApproval)
+    && derivePlanLifecycle(state).ok
+    && derivePlanLifecycle(state).status === "draft";
   if (state.schema !== SCHEMA_ID || !state.activeFeature || typeof state.activeFeature.planPath !== "string"
-    || state.planApproved === true || state.planSubmission != null) return { ok: false, code: "PO-ACK-STATE" };
+    || state.planApproved === true || (state.planSubmission != null && !reopenedApprovedDraft)) return { ok: false, code: "PO-ACK-STATE" };
   const prd = physicalRebindFile(dir, state.activeFeature.planPath);
   if (prd === null) return { ok: false, code: "PO-ACK-PRD-IDENTITY" };
   const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
@@ -6855,7 +6875,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   if (acknowledgementMarkers.length === 1 && !acknowledgedStaleSpec) {
     return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
   }
-  const continuity = eligibleAcknowledgeContinuity(state, prd, spec);
+  const continuity = eligibleAcknowledgeContinuity(state, prd, spec, reopenedApprovedDraft);
   if (continuity === null) return { ok: false, code: "PO-ACK-CONTINUITY" };
   const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
   const currentProfile = validCurrentPoProfile(profile);
@@ -6884,6 +6904,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   const nextContinuity = structuredClone(continuity);
   nextContinuity.revision += 1;
   nextContinuity.authority.prd.sha256 = nextPrdSha256;
+  nextContinuity.authority.spec.sha256 = spec.sha256;
   if (!validateContinuityState(nextContinuity, state.activeFeature.id).ok) return { ok: false, code: "PO-ACK-CONTINUITY" };
   const nextState = structuredClone(state);
   nextState.continuity = nextContinuity;

@@ -635,6 +635,60 @@ function acknowledgedApplyArgs(plan) {
   return plan.applyAction.argv.slice(1);
 }
 
+// A real reopen keeps the invalidated approved submission for audit. The PO
+// must still be able to acknowledge amended authority before resubmission.
+{
+  const { root, deps, planPath, specPath, planSha, specSha } = acknowledgeFixture("reopened-approved");
+  const state = JSON.parse(readFileSync(statePath(root), "utf8"));
+  const submission = {
+    schema: "pipeline.plan-submission.v1", featureId: "ack-feature",
+    planPath, planSha256: planSha, specPath, specSha256: specSha,
+    profile: "epic", profileSha256: "5".repeat(64),
+    submittedBy: "PO", submittedAt: "2026-08-18T09:00:00.000Z",
+  };
+  const approval = {
+    schema: "pipeline.plan-approval.v4", approvedBy: "PO",
+    approvedAt: "2026-08-18T09:05:00.000Z",
+    submissionSha256: sha256CanonicalJson(submission),
+    profileSha256: submission.profileSha256,
+    poGateAuthority: deps.poGateAuthority({ expectedPlanSha256: planSha, expectedSpecSha256: specSha }).value,
+    priorInvalidationSha256: null,
+  };
+  state.planSubmission = submission;
+  state.planApproval = approval;
+  state.planInvalidation = {
+    schema: "pipeline.plan-invalidation.v1", featureId: "ack-feature",
+    invalidatedSubmissionSha256: sha256CanonicalJson(submission),
+    invalidatedApprovalSha256: sha256CanonicalJson(approval),
+    invalidatedBy: "PO", invalidatedAt: "2026-08-18T10:00:00.000Z",
+    reason: "reopen-design",
+  };
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  writeFileSync(join(root, specPath), "# Technical Spec\nAmended content.\n");
+  writeFileSync(join(root, planPath), "# PRD\nAmended content.\n");
+  const amendedSpecSha = sha256Hex(readFileSync(join(root, specPath)));
+
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  const attended = { ...deps, isattyFn: () => true, readLineFn: () => PO_ACK_APPLY_CONFIRMATION_TOKEN };
+  const applied = invokeCaptured(acknowledgedApplyArgs(plan), attended);
+  assert.equal(applied.status, 0, applied.err);
+  const after = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.deepEqual(after.planSubmission, submission);
+  assert.deepEqual(after.planApproval, approval);
+  assert.deepEqual(after.planInvalidation, state.planInvalidation);
+  assert.equal(after.continuity.authority.spec.sha256, amendedSpecSha);
+  assert.match(readFileSync(join(root, planPath), "utf8"), /po-plan-acknowledged: content-sound-and-spec-consistent/);
+
+  const broken = { ...state, planInvalidation: { ...state.planInvalidation,
+    invalidatedApprovalSha256: "0".repeat(64) } };
+  writeFileSync(statePath(root), JSON.stringify(broken, null, 2) + "\n");
+  const refused = invokeCaptured(["po-authority-acknowledge-plan", "--runner", "codex", "--by", "PO"], deps);
+  assert.equal(refused.status, 2);
+  assert.match(refused.err, /PO-ACK-STATE/);
+}
+
 // NVA-GF-GREENFIELD-POACKROOT-1: onboarding presents project-scoped commands
 // with an explicit --root. The acknowledge family must accept that exact
 // ordinary CLI shape instead of misdiagnosing the otherwise-present --by as
