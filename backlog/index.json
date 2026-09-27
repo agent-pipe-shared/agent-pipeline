@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "96c784df2c403dd21cf6618d9d24a9b943bea78d5a181bb7480bc30b3bb7e347"
+    "transitionHead": "6ca2097d812b5b4853169a72eee949b86e0f84cf96dd21cf662a9836e9246c62"
   },
   "counts": {
-    "open": 27,
+    "open": 43,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -548,6 +548,16 @@
       "closureEvidence": "backlog/items/2026-08-17-advisor-consent-is-requested-before-the-readiness-preflight.md"
     },
     {
+      "id": "pipeline.advisor-prompt-is-emitted-before-host-route-admission",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Codex/WSL greenfield review B2 on 2026-09-27; bridge source-order verification in specs/sprint-alfred-epic/evidence/0.7-codex-greenfield-advisor-triage-2026-09-27.md.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.afk-assumption-mode",
       "status": "closed",
       "type": "workflow-improvement",
@@ -925,6 +935,36 @@
       "closureRepository": "self",
       "closureCommit": "c01dbf76199e249e2a7873b3558ff58ff2c76653",
       "closureEvidence": "backlog/items/2026-08-08-approved-but-not-implementing-refuses-every-write-and-asks-for-nothing.md"
+    },
+    {
+      "id": "pipeline.architecture-design-errors-omit-field-paths",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Codex/WSL greenfield review B7; source verification of architecture-design.mjs error sites on 2026-09-27.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
+      "id": "pipeline.architecture-fitness-model-repeats-module-fields",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Claude/Windows greenfield review F-08, 2026-09-27; architecture-design.mjs source inspection confirms module and fitness-model fields are compared for identical values.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
+      "id": "pipeline.architecture-materialization-requires-premature-code",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Claude/Windows greenfield review F-07, 2026-09-27; predicted blocker, not reached live. Source confirms nonempty contract and verification files are required by architecture-design.mjs before materialization.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.atomic-prd-approval-without-mutation",
@@ -1570,6 +1610,16 @@
       "closureEvidence": "backlog/items/2026-08-08-citation-coordinate-checker-resolved-bare-basenames-to-the-wrong-file.md"
     },
     {
+      "id": "pipeline.claude-bootstrap-action-rejected-by-guard",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Claude/Windows greenfield review F-01, 2026-09-27; source inspection of project-onboarding-v3 and onboarding-argv-shapes confirmed the emitted/admitted argv mismatch.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.claude-code-has-no-mechanical-resume-hint-delivery-hook",
       "status": "closed",
       "type": "defect",
@@ -1900,6 +1950,16 @@
       "deferred": true,
       "tracking": "Deferred by PO on 2026-09-11 to a future native-Windows Codex sandbox package; WSL is not an acceptance environment for this scope.",
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.codex-wsl-required-advisor-has-no-completable-route",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "PO observation and Codex/WSL greenfield review on 2026-09-27; independently checked against the installed 0.7 Codex route and the consumer's awaiting-approval readback. See specs/sprint-alfred-epic/evidence/0.7-codex-greenfield-advisor-triage-2026-09-27.md.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",
@@ -2480,6 +2540,26 @@
       "deferred": false,
       "tracking": "Batman (PO decision 2026-08-29) — gate model extension to cover non-agent-invoked deploys, scheduled for Batman, not blocking the Nova/0.6.0 candidate",
       "sprint": "batman"
+    },
+    {
+      "id": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Codex/WSL greenfield review B8; current consumer project/pipeline.json has verify: null while onboarding guidance intentionally defers the real command.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
+      "id": "pipeline.design-generator-repeats-large-source-material",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Codex/WSL greenfield review B6 and Claude/Windows greenfield review F-06, 2026-09-27; observed large generation output and repeated ask envelopes; exact token cost remains unmetered.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.design-phase-prd-and-spec-are-frozen-by-their-own-continuity-binding",
@@ -3130,6 +3210,16 @@
       "closureEvidence": "backlog/evidence/2026-09-18-tracked-evidence-cleanup-closure.md"
     },
     {
+      "id": "pipeline.fresh-preflight-hides-onboarding-action",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Claude/Windows greenfield review F-05, 2026-09-27; reported preflight plugin-refresh-required with advisory nextAction in a fresh self-application project.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.fresh-repo-onboarding-intake-first-transaction",
       "status": "closed",
       "type": "workflow-improvement",
@@ -3571,6 +3661,16 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
+      "id": "pipeline.greenfield-approval-policy-applies-after-intake-transition",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Codex/WSL greenfield review B4 and Claude/Windows greenfield review F-03, 2026-09-27; Codex historical ordering remains unverified, Claude reports guard refusals in three lifecycle phases.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.greenfield-ask-before-install-duty-ignored-live",
       "status": "closed",
       "type": "defect",
@@ -3597,6 +3697,16 @@
       "closureRepository": "self",
       "closureCommit": "02d8d1db47fb14555dc77b4d5b048fbbdbf814e0",
       "closureEvidence": "backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md"
+    },
+    {
+      "id": "pipeline.greenfield-handover-claims-absent-supersession-marker",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Codex/WSL greenfield review B9; current consumer docs/state.md claims SUPERSEDED.md, tracked tree has none, and onboarding-continuity.mjs emits the sentence unconditionally.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference",
@@ -4468,6 +4578,16 @@
       "closureRepository": "self",
       "closureCommit": "ee5b72050ed1fd897c1b1e22f733dd2f80127211",
       "closureEvidence": "backlog/evidence/2026-09-03-nva-b-inode2-1-green.txt"
+    },
+    {
+      "id": "pipeline.installed-design-trailer-example-is-rejected-by-git-guard",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Codex greenfield review B3 and independent 2026-09-27 self-application: installed obligations print `Dispatch: design (elephant)`, active Git guard rejects it.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.installed-marketplace-guard-copy-drifts-silently-from-repo-source",
@@ -5592,6 +5712,16 @@
       "closureEvidence": "backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md"
     },
     {
+      "id": "pipeline.onboarding-spec-marker-has-no-preapproval-reconcile",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Claude/Windows greenfield review F-04, 2026-09-27; consumer reports blocked ad-hoc hashing, source confirms marker requirement and a separate post-approval rebind helper.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.operating-model-not-shipped-with-the-plugin",
       "status": "closed",
       "type": "defect",
@@ -6213,6 +6343,16 @@
       "closureRepository": "self",
       "closureCommit": "a035723503ea62562c95fad80976fc375cad2f19",
       "closureEvidence": "backlog/items/2026-08-19-post-compact-reground-carries-no-state-md-narrative.md"
+    },
+    {
+      "id": "pipeline.powershell-bypasses-onboarding-read-boundary",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Claude/Windows greenfield review F-02, 2026-09-27; consumer reported safe path-listing and command probes; guard source confirms PowerShell returns allow before lifecycle and read-scope checks.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.prd-binding-precedes-framing-with-no-reopen-path-back",
@@ -7188,6 +7328,16 @@
       "closureEvidence": "backlog/items/2026-08-17-repair-map-crashes-on-a-fresh-repository-with-no-head.md"
     },
     {
+      "id": "pipeline.repeated-lifecycle-denials-are-not-counted",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Claude/Windows greenfield review F-11, 2026-09-27; reported seven lifecycle refusals but denial-class telemetry contained only the outside-root read class; source says lifecycle denials remain outside that recorder.",
+      "deferred": false,
+      "sprint": "none"
+    },
+    {
       "id": "pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice",
       "status": "closed",
       "type": "defect",
@@ -7224,6 +7374,16 @@
       "closureRepository": "self",
       "closureCommit": "361358dbbb81c730277935653e31ea482a3277b8",
       "closureEvidence": "backlog/evidence/2026-09-11-done-when-enforcement-evidence.md"
+    },
+    {
+      "id": "pipeline.restart-barrier-can-precede-verbatim-intake-capture",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Codex/WSL greenfield review B5, 2026-09-27: a restart card summarized the original input while the intake checkpoint's materialInput was reported empty.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
