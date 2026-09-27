@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v3",
   "sourceBaseline": {
-    "commit": "b10a5b7c3a124e109f585560f81cae8ba7c47535",
-    "tree": "fd12e5cbef002a7ec59cd20086ad2c7feb65e31c"
+    "commit": "ef471b03f5115e9cf6317bce3e3f0fd73534402c",
+    "tree": "1e55cab76fff875676898dfd939d0b741751eb3a"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -30,6 +30,7 @@
         "guard:plugins/pipeline-core/hooks/guard-slicing.mjs:guard-slicing",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
         "guard:plugins/pipeline-core/hooks/guard-worktree-isolation.mjs:guard-worktree-isolation",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PostToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|Agent|TodoWrite|WebFetch|WebSearch|Write|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-worktree-isolation.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|Edit|Glob|Grep|NotebookEdit|Read|Task|TodoWrite|WebFetch|WebSearch|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch-budget.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
@@ -92,12 +93,14 @@
         "plugins/pipeline-core/hooks/guard-push.mjs",
         "plugins/pipeline-core/hooks/guard-testpath.mjs",
         "plugins/pipeline-core/hooks/guard-worktree-isolation.mjs",
-        "plugins/pipeline-core/hooks/hooks.json"
+        "plugins/pipeline-core/hooks/hooks.json",
+        "plugins/pipeline-core/hooks/native-goldfish-host.mjs"
       ],
       "testEvidence": [
         "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
         "plugins/pipeline-core/hooks/guard-git.test.mjs",
-        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+        "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs"
       ],
       "targets": [
         {
@@ -124,7 +127,9 @@
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:spawn_agent|update_plan:node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" PreToolUse",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStart",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStart::node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStop::node \"${PLUGIN_ROOT}/hooks/codex-slicing-hint.mjs\" SubagentStop",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SubagentStop::node \"${PLUGIN_ROOT}/hooks/native-goldfish-host.mjs\" --runner codex",
         "publication:plugins/pipeline-core/.codex-plugin/plugin.json:codex-plugin-manifest"
       ],
       "runners": [
@@ -165,6 +170,7 @@
         "plugins/pipeline-core/hooks/codex-hooks.json",
         "plugins/pipeline-core/hooks/codex-slicing-hint.mjs",
         "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+        "plugins/pipeline-core/hooks/native-goldfish-host.mjs",
         "plugins/pipeline-core/hooks/native-slicing.mjs"
       ],
       "testEvidence": [
@@ -1522,6 +1528,7 @@
         "duty:pipeline.user.yaml:deep",
         "duty:pipeline.user.yaml:implement",
         "duty:pipeline.user.yaml:mechanic",
+        "duty:pipeline.user.yaml:read",
         "duty:pipeline.user.yaml:readiness",
         "duty:pipeline.user.yaml:test_author",
         "verify-phase:harness/scripts/verify.mjs:codex-design-readiness-bootstrap-tests",
