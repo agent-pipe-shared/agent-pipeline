@@ -55,17 +55,6 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint 
 
 ---
 
-### Track D — Agent-First Architecture Standard
-
-| Work Package | Spezifikation / Anforderung | Gelieferte Lösung & Technische Mechanismen | Relevante Dateien |
-|---|---|---|---|
-| **WP-D1** | Architecture Decision Continuity (#99, AC-19, AC-20) | 1. 5-Achsen-Signifikanzrubrik zur deterministischen Bewertung von Architekturentscheidungen.<br>2. ADR-Skill (`architecture-decision`) mit 7 Kernfähigkeiten (Signifikanz, Drafting, Konfliktlösung, Human-Waivers) unter `plugins/pipeline-core/skills/architecture-decision/`.<br>3. Die begrenzte Zusammenfassung `project/architecture-decisions.compiled.json` existiert und wird durch den sanktionierten Compiler `architecture-baseline.mjs --compile-summary` aus dem ADR-Bestand erzeugt. | `schemas/pipeline.architecture-decision.v1.json`, `plugins/pipeline-core/scripts/architecture-baseline.mjs`, `plugins/pipeline-core/skills/architecture-decision/` |
-| **WP-D2** | Agent-First Standard & Concept Map (#104, AC-8, AC-22, AC-23) | 1. Standard-Profil `agent-first-profile.v1.json` mit 9 Property-Klassen und Status-Semantik.<br>2. OKF v0.1 Concept Map Bundle in `architecture/map/` mit `index.md` und Modul-Konzeptdateien.<br>3. 6-Schritte Re-Entry-Reading-Order in `AGENTS.md` verankert (AC-23).<br>4. `module-inventory.mjs` Lader und Pfad-Auflöser.<br>5. `architecture-remedy.mjs`: Remedy-Vergleichsgenerator mit Schutz gegen Tiny-Module-Gaming (AC-21, AC-22). | `schemas/pipeline.architecture-profile.v1.json`, `schemas/pipeline.module-inventory.v1.json`, `architecture/map/*`, `module-inventory.mjs`, `architecture-remedy.mjs` |
-| **WP-D3** | Fitness Enforcement (#106, AC-10, AC-18, AC-21) | 1. `architecture-fitness.mjs`: Evaluator für alle 10 Architektur-Klassen.<br>2. **Deterministic-Pass Rule (AC-10):** Prompt-Compliance liefert niemals `pass`.<br>3. **Map Currency Fails Closed (AC-18):** Candidate/Push schlagen bei veralteter Map fehl; Checkpoint pusht `architecture-map-stale`-Schulden.<br>4. **Ratchet Store:** `architecture/baseline.json` und `fitness-model.json`. | `schemas/pipeline.fitness-evidence.v1.json`, `schemas/pipeline.architecture-baseline.v1.json`, `architecture/fitness-model.json`, `architecture/baseline.json`, `architecture-fitness.mjs` |
-| **WP-D4** | Adoption Demand (#109, AC-9, AC-17) | 1. `architecture-adoption.mjs`: 4-Stufen-Adoptions-Vorschlag (Map first per Issue #109 §5).<br>2. **Disposition vor Autorität (AC-17):** Gating am Planungs-Boundary.<br>3. **Dogfood-Lauf (AC-9):** Ausführung im Repository und Speicherung des PO-beschlossenen Zustands `approved-scoped` in `architecture/adoption-state.json`. | `schemas/pipeline.adoption-state.v1.json`, `schemas/pipeline.adoption-proposal.v1.json`, `architecture/adoption-state.json`, `architecture-adoption.mjs` |
-
----
-
 ### Track C & Operations — Economics, Telemetry & Maintenance
 
 | Thema | Backlog Item | Gelieferte Lösung & Technische Mechanismen | Relevante Dateien |
@@ -77,6 +66,17 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint 
 | **C2** | Range Mode Commit Check | `check-commit-type-range.mjs`: Revisionsbereich-Prüfung für Conventional Commits (GIT-01/GG-22) als redundante Defense-in-Depth. | `plugins/pipeline-core/scripts/check-commit-type-range.mjs`, `check-commit-type-range.test.mjs` |
 | **Ops** | Fresh Clone Provisioning | `check-clone-provisioning.mjs`: Idempotenter Check für Pre-Push-Hook, PO-Profile und private Verzeichnisse. Integriert in `pipeline-start-preflight.mjs`. | `schemas/pipeline.clone-provisioning-report.v1.json`, `plugins/pipeline-core/scripts/check-clone-provisioning.mjs` |
 | **Ops** | Critic Scratch Notes | Zulassung von `scratch/dispatch/**/critic-notes.md` in Guardrails und Critic-Definition zur Sicherstellung von Zwischenergebnissen bei Truncations. | `plugins/pipeline-core/lib/guard-devplan-policy.mjs`, `plugins/pipeline-core/agents/critic.md` |
+
+---
+
+### Track D — Agent-First Architecture Standard
+
+| Work Package | Spezifikation / Anforderung | Gelieferte Lösung & Technische Mechanismen | Relevante Dateien |
+|---|---|---|---|
+| **WP-D1** | Architecture Decision Continuity (#99, AC-19, AC-20) | 1. 5-Achsen-Signifikanzrubrik zur deterministischen Bewertung von Architekturentscheidungen.<br>2. ADR-Skill (`architecture-decision`) mit 7 Kernfähigkeiten (Signifikanz, Drafting, Konfliktlösung, Human-Waivers) unter `plugins/pipeline-core/skills/architecture-decision/`.<br>3. Die begrenzte Zusammenfassung `project/architecture-decisions.compiled.json` existiert und wird durch den sanktionierten Compiler `architecture-baseline.mjs --compile-summary` aus dem ADR-Bestand erzeugt. | `schemas/pipeline.architecture-decision.v1.json`, `plugins/pipeline-core/scripts/architecture-baseline.mjs`, `plugins/pipeline-core/skills/architecture-decision/` |
+| **WP-D2** | Agent-First Standard & Concept Map (#104, AC-8, AC-22, AC-23) | 1. Standard-Profil `agent-first-profile.v1.json` mit 9 Property-Klassen und Status-Semantik.<br>2. OKF v0.1 Concept Map Bundle in `architecture/map/` mit `index.md` und Modul-Konzeptdateien.<br>3. 6-Schritte Re-Entry-Reading-Order in `AGENTS.md` verankert (AC-23).<br>4. `module-inventory.mjs` Lader und Pfad-Auflöser.<br>5. `architecture-remedy.mjs`: Remedy-Vergleichsgenerator mit Schutz gegen Tiny-Module-Gaming (AC-21, AC-22). | `schemas/pipeline.architecture-profile.v1.json`, `schemas/pipeline.module-inventory.v1.json`, `architecture/map/*`, `module-inventory.mjs`, `architecture-remedy.mjs` |
+| **WP-D3** | Fitness Enforcement (#106, AC-10, AC-18, AC-21) | 1. `architecture-fitness.mjs`: Evaluator für alle 10 Architektur-Klassen.<br>2. **Deterministic-Pass Rule (AC-10):** Prompt-Compliance liefert niemals `pass`.<br>3. **Map Currency Fails Closed (AC-18):** Candidate/Push schlagen bei veralteter Map fehl; Checkpoint pusht `architecture-map-stale`-Schulden.<br>4. **Ratchet Store:** `architecture/baseline.json` und `fitness-model.json`. | `schemas/pipeline.fitness-evidence.v1.json`, `schemas/pipeline.architecture-baseline.v1.json`, `architecture/fitness-model.json`, `architecture/baseline.json`, `architecture-fitness.mjs` |
+| **WP-D4** | Adoption Demand (#109, AC-9, AC-17) | 1. `architecture-adoption.mjs`: 4-Stufen-Adoptions-Vorschlag (Map first per Issue #109 §5).<br>2. **Disposition vor Autorität (AC-17):** Gating am Planungs-Boundary.<br>3. **Dogfood-Lauf (AC-9):** Ausführung im Repository und Speicherung des PO-beschlossenen Zustands `approved-scoped` in `architecture/adoption-state.json`. | `schemas/pipeline.adoption-state.v1.json`, `schemas/pipeline.adoption-proposal.v1.json`, `architecture/adoption-state.json`, `architecture-adoption.mjs` |
 
 ---
 

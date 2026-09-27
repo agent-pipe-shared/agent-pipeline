@@ -13,17 +13,6 @@ disagrees with one of them, use that source.
 
 ## Start here: one change, one honest route
 
-<!-- capability:session-and-delivery-skills -->
-<a id="capability-session-and-delivery-skills"></a>
-
-The plugin ships skills for starting a session, bounded advice and observation
-intake, technical and reader-facing review, and deliberate closeout. They make
-those steps discoverable, but a skill does not itself approve a plan, commit,
-or release.
-In a consuming repository, use the relevant skill at its named lifecycle step;
-its output still needs the repository's configured checks and any applicable
-human decision before the next protected action.
-
 <!-- capability:specialist-agent-roles -->
 <a id="capability-specialist-agent-roles"></a>
 
@@ -95,7 +84,9 @@ flowchart TD
     GOV --> C
     C --> CR[Critic result and disposition]
     CR -->|correction needed| RC
-    CR -->|clear or disposition recorded| HA{Human acceptance required?}
+    CR -->|clear or disposition recorded| FV[Final full Verify bound to the reviewed candidate]
+    FV -->|red| RC
+    FV -->|green| HA{Human acceptance required?}
     HA -->|no| CL[Close feature lifecycle]
     HA -->|yes| HD[Human decision on delivered candidate]
     HD -->|accepted| CL
@@ -112,6 +103,17 @@ flowchart TD
 The arrows do not promise that every change visits every box. The tables state
 when a branch exists, who owns it, the evidence that makes it real, and where it
 returns.
+
+<!-- capability:session-and-delivery-skills -->
+<a id="capability-session-and-delivery-skills"></a>
+
+The plugin ships skills for starting a session, bounded advice and observation
+intake, technical and reader-facing review, and deliberate closeout. They make
+those steps discoverable, but a skill does not itself approve a plan, commit,
+or release.
+In a consuming repository, use the relevant skill at its named lifecycle step;
+its output still needs the repository's configured checks and any applicable
+human decision before the next protected action.
 
 ## 1. Confirm the V3 profile before bootstrap
 
@@ -171,7 +173,9 @@ flowchart LR
     CM --> VE[One configured verify command]
     VE -->|green evidence| CR[Fresh read-only Critic]
     VE -->|red evidence| RE[Classified recovery]
-    CR -->|clear / disposition| CO[Close]
+    CR -->|clear / disposition| FV[Final full Verify bound to review]
+    FV -->|green| CO[Close]
+    FV -->|red| RE
     CR -->|correction| RE
     RE -->|allowed correction| PF
 ```
@@ -186,6 +190,7 @@ flowchart LR
 | Candidate commit | Coordinator or authorized host, after validating the returned package. | Integrate the bounded result and create a clean committed candidate before candidate-bound Verify. | Record the actual commit and tree; a Child's proposed commit or a dirty checkout is not a substitute. |
 | Verify — mandatory | Coordinator invokes the configured evidence producer on the committed candidate. | For release, the producer runs the one configured project command; documented boundary-aware modes run the fixed baseline plus registered changed-area commands. Running the project command alone does not create the Verify receipt. | Green means the producer wrote an exact machine-written evidence artifact for the candidate. Red is evidence of failure, not partial success. |
 | Critic — mandatory | Fresh read-only Critic; Elephant owns disposition. | The Critic receives references to candidate, Spec, guardrails, and evidence — not implementation chat or rationale. | It runs after deterministic checks. Findings need evidence, a rule/criterion, and a consequence. A correction gets a fresh delta re-gate. Goldfish delivery stays review-pending until independent Critic evidence exists. |
+| Final Verify — mandatory for release | Coordinator runs the configured full evidence producer after the substantive Critic review. | The release-mode receipt binds the reviewed candidate and consumed Critic packet; corrections return through review. | The exact committed candidate needs a passing final receipt before close or promotion. |
 
 Each project uses the one full `verify` command named by its own calibration.
 For non-release boundaries, the evidence producer may run its fixed baseline
@@ -327,9 +332,11 @@ installation source, or availability claim:
   boundaries for external actions.
 - Nova's candidate-ready increment includes the guided greenfield driver, a
   usable first project, and runner-aware delivery.
-- Nova B remains roadmap work: lighter plan-change and close flows, clearer
-  cross-runner approval and Verify guidance, stronger delivery-loop
-  observability, and remaining platform- or runner-specific evidence.
+- Nova A/B implementation is present in the repository; its issue criteria
+  still need final candidate-bound acceptance. Lighter plan-change and close
+  flows, clearer cross-runner guidance, and stronger delivery-loop
+  observability remain follow-up work only where the current candidate does
+  not yet meet their acceptance criteria.
 - The three-runner greenfield contract covers Claude, Codex, and Antigravity;
   coverage does not imply identical native enforcement on each host.
 - This release line does not claim publication, a Git tag, marketplace

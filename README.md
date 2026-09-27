@@ -34,15 +34,6 @@ inspect later.
 > for the lifecycle, and then use [Usage](docs/usage.md). The links below are
 > optional reference.
 
-> **Beta licensing outlook:** The current license permits internal use by a
-> commercial company; monetizing Agent-Pipeline itself already requires a
-> separate agreement. If Agent-Pipeline proves useful at broader scale, a
-> future version of this product may require payment for commercial use under
-> a clearly published, proportionate fair-use policy. No such fee, threshold,
-> or change is in force today. This notice does not amend the current license
-> or retroactively change the terms for copies already received. See
-> [Licensing](docs/licensing.md).
-
 ## The problem
 
 Teams with audit obligations often need more than a chat transcript or a claim
@@ -194,6 +185,15 @@ Follow the canonical [documentation map](docs/README.md): it keeps adoption,
 enforcement, evidence, security, cost, and maintainer references in one order.
 For the normative contract, read [`docs/operating-model.md`](docs/operating-model.md).
 - [`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional Permission; see [`docs/licensing.md`](docs/licensing.md).
+
+> **Beta licensing outlook:** The current license permits internal use by a
+> commercial company; monetizing Agent-Pipeline itself already requires a
+> separate agreement. If Agent-Pipeline proves useful at broader scale, a
+> future version of this product may require payment for commercial use under
+> a clearly published, proportionate fair-use policy. No such fee, threshold,
+> or change is in force today. This notice does not amend the current license
+> or retroactively change the terms for copies already received. See
+> [Licensing](docs/licensing.md).
 
 ### Maintainer and runtime reference
 

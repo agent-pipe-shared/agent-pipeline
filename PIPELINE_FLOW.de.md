@@ -82,7 +82,9 @@ flowchart TD
     GOV --> C
     C --> CR[Critic-Ergebnis und Disposition]
     CR -->|Korrektur nötig| RC
-    CR -->|klar oder Disposition festgehalten| HA{Menschliche Abnahme erforderlich?}
+    CR -->|klar oder Disposition festgehalten| FV[Finales Full Verify zum reviewten Kandidaten]
+    FV -->|rot| RC
+    FV -->|grün| HA{Menschliche Abnahme erforderlich?}
     HA -->|nein| CL[Feature-Lifecycle abschließen]
     HA -->|ja| HD[Menschliche Entscheidung zum gelieferten Kandidaten]
     HD -->|angenommen| CL
@@ -150,7 +152,9 @@ flowchart LR
     CM --> VE[Ein konfigurierter Verify-Befehl]
     VE -->|grüner Nachweis| CR[Frischer lesender Critic]
     VE -->|roter Nachweis| RE[Eingeordnete Recovery]
-    CR -->|klar / Disposition| CO[Close]
+    CR -->|klar / Disposition| FV[Finales Full Verify zum Review]
+    FV -->|grün| CO[Close]
+    FV -->|rot| RE
     CR -->|Korrektur| RE
     RE -->|zulässige Korrektur| PF
 ```
@@ -165,6 +169,7 @@ flowchart LR
 | Kandidaten-Commit | Koordinator oder autorisierter Host nach Prüfung der Rückgabe. | Begrenztes Ergebnis integrieren und vor kandidatengebundenem Verify einen sauberen Commit-Kandidaten schaffen. | Tatsächlichen Commit und Tree festhalten; ein vorgeschlagener Child-Commit oder schmutziger Checkout ersetzt sie nicht. |
 | Verify — Pflicht | Der Koordinator ruft den konfigurierten Evidence-Producer für den committeten Kandidaten auf. | Für Releases fährt der Producer den einen konfigurierten Projektbefehl; dokumentierte grenzbewusste Modi fahren die feste Baseline plus registrierte Befehle für geänderte Bereiche. Der Projektbefehl allein erzeugt keinen Verify-Receipt. | Grün heißt: Der Producer hat ein exaktes maschinell geschriebenes Nachweis-Artefakt für den Kandidaten geschrieben. Rot ist Fehlernachweis, kein Teilerfolg. |
 | Critic — Pflicht | Frischer lesender Critic; Elephant besitzt die Disposition. | Der Critic bekommt Verweise auf Kandidat, Spec, Guardrails und Nachweis — nicht den Implementierungschat oder dessen Begründung. | Er läuft nach deterministischen Checks. Befunde brauchen Nachweis, Regel/Kriterium und Konsequenz. Eine Korrektur erhält ein frisches Delta-Re-Gate. Die Goldfish-Lieferung bleibt ohne unabhängigen Critic-Nachweis als Review-ausstehend markiert. |
+| Finales Verify — Pflicht für Releases | Der Koordinator führt nach dem substanziellen Critic-Review den vollständigen Evidence-Producer aus. | Der Release-Receipt bindet den reviewten Kandidaten und das konsumierte Critic-Paket; Korrekturen gehen erneut durch das Review. | Vor Close oder Promotion braucht der exakte Commit einen grünen finalen Receipt. |
 
 Jedes Projekt verwendet den einen vollständigen `verify`-Befehl seiner eigenen
 Kalibrierung. Für Nicht-Release-Grenzen darf der Evidence-Producer seine feste
@@ -254,10 +259,11 @@ Verfügbarkeitsaussage:
   Betriebsaufzeichnungen und typisierte Grenzen für externe Aktionen.
 - Novas kandidatreifes Increment ist enthalten: der geführte Greenfield-
   Driver, ein praktikables erstes Projekt und runner-bewusstes Delivery.
-- Nova B bleibt als Roadmap-Punkt offen — leichtere Planänderungs- und
-  Abschlussflüsse, klarere runnerübergreifende Freigabe- und Verify-Hinweise,
-  stärkere Delivery-Loop-Beobachtbarkeit sowie verbleibende plattform- oder
-  runnerspezifische Evidenz.
+- Nova A/B ist im Repository implementiert; die Issue-Kriterien benötigen noch
+  eine finale kandidatengebundene Abnahme. Leichtere Planänderungs- und
+  Abschlussflüsse, klarere runnerübergreifende Hinweise und stärkere
+  Delivery-Loop-Beobachtbarkeit bleiben nur dort Folgearbeit, wo der aktuelle
+  Kandidat ihre Akzeptanzkriterien noch nicht erfüllt.
 - Der Drei-Runner-Greenfield-Vertrag ist für Claude, Codex und Antigravity
   abgedeckt, aber diese Abdeckung ist kein Anspruch auf identische native
   Durchsetzung je Host.
