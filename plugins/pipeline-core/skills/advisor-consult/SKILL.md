@@ -23,19 +23,15 @@ Before any child, model request, prompt export or timeout:
    even its own consent check). If that check fails (`PORG-NOT-READY`), do not
    request consent and do not proceed to the steps below — surface it to the
    human as "the Advisor isn't reachable right now" and stop.
-2. For runner `codex`, resolve the `codex` executable and model-free host route
-   next, still ahead of any consent request or evidence-bundle assembly: the
-   same cheap, non-spawning
-   existence check `codex-advisory-bootstrap.mjs` performs immediately after
-   its onboarding-readiness check (before its consent read). A missing or
-   unresolvable executable is not a consultation to prepare — surface it to
-   the human as "the Advisor isn't reachable right now" and stop, same as
-   step 1's failure, before requesting consent or reading/hashing any
-   evidence file. On WSL the route returns
-   `advisory-unavailable-wsl-native-deferred`; treat it as typed unavailable
-   without retry, fallback, evidence export, child launch, or PO question.
-   Native Windows remains unverified and requires its separate future
-   activation package.
+2. For runner `codex`, inspect the ordinary fresh-consult host capability
+   before preparing any prompt-bearing dispatch. The older selected-sandbox
+   route may still return `advisory-unavailable-wsl-native-deferred` on WSL;
+   that result says nothing about the separate ordinary consult. The host must
+   explicitly admit export and observe a fresh read-only child. If it cannot,
+   write a no-child route-selection record and a sanitized unavailable receipt
+   for the narrow final-package PO exception. Do not claim a model call, child
+   attempt or answer from route selection. Native Windows remains unverified
+   until a tested host capability is present.
 3. Require profile `epic` or `feature`, repository Advisor-export consent that
    is not `declined`, exactly one bounded UTF-8 question, bounded allowlisted
    evidence and exactly one reason:
@@ -70,22 +66,28 @@ unavailable and never permission to invoke an adapter.
 
 ## Codex consultation
 
-Codex selected-sandbox/App-Server consultation is deactivated on WSL. The
-generic V3 cell remains a portable route description because the registry has
-no platform dimension; it is not WSL readiness or permission to bypass the
-host disposition.
+The ordinary host route is a fresh `consult-advisor` dispatch. Its admission
+requires current repository export consent plus the host's own export decision
+and executable child capability. Only after both are admitted may the host
+construct or emit the bounded question and allowlisted evidence packet.
+The host observes the actual dispatch, child completion, route/model readback
+and result bytes. The receipt binds the candidate, question/evidence and
+answer digests to that observation; an agent-supplied JSON result is never
+host execution proof. A route without a host-owned callback is unavailable,
+not an invitation to use the old selected-sandbox/App-Server adapter. A host
+export denial is terminal for this request, with no alternate egress.
+Until the host callback and its independent private execution readback are
+installed, Codex's ordinary route produces only the no-child unavailable
+record below, even if export admission is reported as available. Do not call
+that an answered Advisor run.
 
-After the trigger gate, resolve exactly `{ runner: "codex", profile, consent }`
-through:
-
-`node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-host-advisor-route.mjs" --runner codex --profile "{{PROFILE}}" --consent "{{CONSENT}}"`
-
-Accept exactly one JSON line with exactly `route|policy`. For
-`host-bound-consult`, require `pipeline.codex-host-advisor-policy.v1`. Resolve
-the candidate-bound Codex advisory duty from validated V3 authority and launch
-it once with the policy's monotonic deadline. Polling never resets it. The
-current governed fallback chain is empty: never synthesize a model, switch
-model, or start a second attempt. An exhausted route is advisory-unavailable.
+The no-child path records a closed `pipeline.advisory-route-selection.v1`
+beside the sanitized receipt. It has `attemptCount: 0`, `childStarted: false`
+and no observed identity or answer. This selection is not a row in
+`pipeline.advisory-attempt-trail.v1`, which remains reserved for actual native
+or consult invocations. The design package may present it only as a proposed,
+scoped unavailable exception for the one final PO package decision; it grants
+no implementation authority by itself.
 
 The advisory agent starts fresh and is project-scoped. It receives only the
 bound question and allowlisted evidence, has no inherited
@@ -99,11 +101,11 @@ the exact bundle contents into the one model turn, explicitly marked as
 untrusted repository data rather than instructions. Raw evidence remains
 runtime-only and is never added to the demand, consultation record or receipt.
 
-The Elephant creates the one-use launch and validates
-`pipeline.host-advisor-status.v1` against the demand and before/between/after
-workspace observations. Codex never turns a raw host-adapter answer into
-success. Every claim says:
-`no attested selected-sandbox execution; OS isolation and model identity are not asserted`.
+The Elephant validates the host execution independently before treating an
+ordinary consult as answered. No OS isolation or provider attestation follows
+from an ordinary fresh read-only role alone. The older
+`pipeline.host-advisor-status.v1` and selected-sandbox workspace observations
+describe only that separate transport and cannot attest the ordinary route.
 
 ## Claude consultation
 

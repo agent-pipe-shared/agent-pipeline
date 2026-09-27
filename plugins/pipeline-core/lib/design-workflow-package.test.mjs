@@ -18,6 +18,7 @@ import {
   verifyStoredDesignWorkflowPackageSignature,
 } from "./design-workflow-approval.mjs";
 import { createAdvisoryAttemptTrail } from "./advisory-attempt-trail.mjs";
+import { createAdvisoryRouteSelection } from "./advisory-route-selection.mjs";
 import { advisoryEvidenceBundleSha256, ADVISORY_EVIDENCE_BUNDLE_SCHEMA } from "./advisory-lifecycle-v2.mjs";
 import { designReadinessReportSha256, verifyDesignReadinessHostExecution } from "./design-readiness-host-evidence.mjs";
 import { canonicalJson } from "./codex-sandbox-compatibility.mjs";
@@ -366,6 +367,36 @@ check("an unavailable Advisor route requires an exact attempt trail and proposed
   mutateTrail.workflowPackage.advisor.attemptTrail.sha256 = sha(mutateTrail.attemptTrailBytes);
   mutateTrail.packageBytes = serialized(mutateTrail.workflowPackage);
   assert.equal(validateDesignWorkflowPackage(mutateTrail).code, "DWP-ADVISOR-ATTEMPTS");
+});
+
+check("no-child Codex route selection is a narrow PO exception input, never an invented attempt", () => {
+  const fixture = baseFixture({ unavailable: true });
+  fixture.advisorReceipt.questionSha256 = fixture.workflowPackage.sources.design.sha256;
+  fixture.advisorReceiptBytes = serialized(fixture.advisorReceipt);
+  fixture.attemptTrail = createAdvisoryRouteSelection({
+    receipt: fixture.advisorReceipt,
+    receiptBytes: fixture.advisorReceiptBytes,
+    code: "ordinary-consult-host-callback-unavailable",
+  });
+  fixture.attemptTrailBytes = serialized(fixture.attemptTrail);
+  fixture.workflowPackage.advisor.receipt.sha256 = sha(fixture.advisorReceiptBytes);
+  fixture.workflowPackage.advisor.attemptTrail.sha256 = sha(fixture.attemptTrailBytes);
+  fixture.workflowPackage.advisor.exception.failureCode = "route-unavailable";
+  fixture.packageBytes = serialized(fixture.workflowPackage);
+  const validated = validateDesignWorkflowPackage(fixture);
+  assert.equal(validated.ok, true, JSON.stringify(validated));
+  assert.equal(validated.approvalReview.advisor.attempts.length, 0);
+  assert.equal(validated.approvalReview.advisor.routeSelection.childStarted, false);
+  assert.equal(validated.implementationAuthority, false);
+
+  const forged = { ...fixture,
+    workflowPackage: structuredClone(fixture.workflowPackage),
+    attemptTrail: structuredClone(fixture.attemptTrail) };
+  forged.attemptTrail.childStarted = true;
+  forged.attemptTrailBytes = serialized(forged.attemptTrail);
+  forged.workflowPackage.advisor.attemptTrail.sha256 = sha(forged.attemptTrailBytes);
+  forged.packageBytes = serialized(forged.workflowPackage);
+  assert.equal(validateDesignWorkflowPackage(forged).code, "DWP-ADVISOR-ATTEMPTS");
 });
 
 check("rejects package fields that could masquerade as an embedded approval", () => {
@@ -865,7 +896,7 @@ check("the implementation guard verifies the package signature and admits the ex
   }
 });
 
-assert.equal(cases.length, 20, "the complete design workflow package corpus must register before execution");
+assert.equal(cases.length, 21, "the complete design workflow package corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(process.platform === "win32" ? "NUL" : "/dev/null", "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

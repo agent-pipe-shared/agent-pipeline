@@ -13,7 +13,7 @@
  * implementation-transition authority, not by this transport coordinator.
  */
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -21,7 +21,11 @@ import { dirname, join, relative, resolve } from "node:path";
 import { advisoryEvidenceBundleSha256, buildAdvisoryEvidenceBundle, createAdvisoryDemand } from "./advisory-lifecycle-v2.mjs";
 import { validateAdvisoryAttemptTrail } from "./advisory-attempt-trail.mjs";
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
+import { createAdvisoryRouteSelection, validateAdvisoryRouteSelection } from "./advisory-route-selection.mjs";
+import { persistAdvisoryReceipt } from "./advisory-receipt-assurance.mjs";
 import { DESIGN_ADVISORY_RECEIPT_DIRECTORY, readDesignAdvisoryTransaction, writeDesignAdvisoryTransaction } from "./design-advisory-transaction.mjs";
+import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
+import { parseYaml } from "./yaml-lite.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const PATH = /^(?!\/)(?!.*\\)(?!.*(?:^|\/)\.{1,2}(?:\/|$))[A-Za-z0-9._/@:-]+$/u;
@@ -113,6 +117,134 @@ function currentProjectionSha(root) {
   return sha(readFileSync(target));
 }
 
+function repositoryAdvisorConsent(root) {
+  const path = join(root, "pipeline.user.yaml");
+  physicalFile(path, "DAC-REPOSITORY-CONSENT");
+  const config = parseYaml(readFileSync(path, "utf8"));
+  const policy = config?.advisor_export;
+  if (!exact(policy, ["consent"]) || !["approved", "declined"].includes(policy.consent)) {
+    fail("DAC-REPOSITORY-CONSENT", "Advisor export consent is missing or invalid");
+  }
+  return policy.consent;
+}
+
+function noChildCodexReceipt({ binding, dispatch, profile, planBytes, code }) {
+  const route = loadRunnerProfilesV3Registry().duties.advisory.codex;
+  const denied = code === "advisor-repository-export-declined" || code === "advisor-host-export-denied";
+  const receipt = {
+    schema: "pipeline.advisory-receipt.v1",
+    receiptId: binding.receiptId,
+    dispatch,
+    duty: "advisory",
+    profile,
+    configuredRoute: { runner: "codex", selector: structuredClone(route.selector), effort: route.effort },
+    adapter: "consult",
+    observed: { status: denied ? "permission-denied" : "unavailable", identity: null },
+    questionSha256: sha(planBytes),
+    answerSha256: null,
+    fallback: denied
+      ? { reason: "consult-permission-denied", redactedErrorClass: "permission-denied" }
+      : { reason: "consult-unavailable", redactedErrorClass: "unavailable" },
+    emittedAtMs: Date.now(),
+  };
+  if (!validateAdvisoryReceipt(receipt).ok) fail("DAC-NO-CHILD-RECEIPT", "no-child Advisor receipt is invalid");
+  return receipt;
+}
+
+function persistNoChildCodex({ common, binding, dispatch, profile, planBytes, code }) {
+  const target = receiptTarget(common, binding.receiptId);
+  if (existsSync(target)) fail("DAC-RECEIPT-EXISTS", "package-derived Advisor receipt already exists");
+  const receipt = noChildCodexReceipt({ binding, dispatch, profile, planBytes, code });
+  const receiptBytes = Buffer.from(canonical(receipt), "utf8");
+  persistAdvisoryReceipt({ target, bytes: receiptBytes, temporaryName: `.${binding.receiptId}.${randomUUID()}.tmp` });
+  const selection = createAdvisoryRouteSelection({ receipt, receiptBytes, code });
+  const selectionPath = `${target}.route-v1.json`;
+  if (existsSync(selectionPath)) fail("DAC-ROUTE-SELECTION-EXISTS", "Advisor route selection already exists");
+  const selectionBytes = Buffer.from(canonical(selection), "utf8");
+  persistAdvisoryReceipt({ target: selectionPath, bytes: selectionBytes,
+    temporaryName: `.${binding.receiptId}.${randomUUID()}.route.tmp` });
+  if (!validateAdvisoryRouteSelection({ selection, receipt, receiptBytes }).ok) {
+    fail("DAC-ROUTE-SELECTION", "Advisor route selection failed readback");
+  }
+  return Object.freeze({
+    schema: "pipeline.design-advisory-coordinator-result.v1",
+    status: "unavailable-pending-final-approval",
+    binding: { packageSha256: binding.packageSha256, receiptId: binding.receiptId,
+      candidateCommit: dispatch.candidateCommit, candidateTree: dispatch.candidateTree },
+    bridge: { code: 2, target, observedAtMs: Date.now() },
+    routeSelection: { path: selectionPath, sha256: sha(selectionBytes), code },
+    attemptTrail: null,
+    write: null,
+    readback: null,
+  });
+}
+
+/**
+ * Export only the validated sanitized no-child receipt and route selection to
+ * the canonical repository evidence directory. This is a separate, explicit
+ * publication step; the private coordinator result by itself is not package
+ * evidence and never asserts PO approval.
+ */
+export function exportNoChildDesignAdvisoryEvidence({ repoRoot, featureId, planPath, specPath } = {}) {
+  const root = physicalDirectory(resolve(repoRoot ?? ""), "DAC-ROOT");
+  if (!ID.test(featureId ?? "")) fail("DAC-FEATURE", "feature id is invalid");
+  const plan = safePath(planPath, "plan");
+  const spec = safePath(specPath, "spec");
+  const planBytes = bytesAt(root, plan, "DAC-PLAN");
+  const specBytes = bytesAt(root, spec, "DAC-SPEC");
+  const candidateCommit = git(root, ["rev-parse", "HEAD"]);
+  const candidateTree = git(root, ["rev-parse", "HEAD^{tree}"]);
+  const common = gitCommonDir(root);
+  const binding = designAdvisoryReceiptBinding({ root, featureId,
+    planPath: plan, specPath: spec, planSha256: sha(planBytes), specSha256: sha(specBytes),
+    candidateCommit, candidateTree, runner: "codex" });
+  const privateReceipt = receiptTarget(common, binding.receiptId);
+  const privateSelection = `${privateReceipt}.route-v1.json`;
+  physicalFile(privateReceipt, "DAC-PRIVATE-RECEIPT");
+  physicalFile(privateSelection, "DAC-PRIVATE-ROUTE-SELECTION");
+  const receiptBytes = readFileSync(privateReceipt);
+  const selectionBytes = readFileSync(privateSelection);
+  let receipt, selection;
+  try {
+    receipt = JSON.parse(receiptBytes.toString("utf8"));
+    selection = JSON.parse(selectionBytes.toString("utf8"));
+  } catch { fail("DAC-PRIVATE-EVIDENCE", "private Advisor evidence is malformed"); }
+  if (!validateAdvisoryReceipt(receipt).ok
+    || !validateAdvisoryRouteSelection({ selection, receipt, receiptBytes }).ok
+    || receipt.receiptId !== binding.receiptId
+    || receipt.dispatch.dispatchId !== binding.receiptId
+    || receipt.dispatch.candidateCommit !== candidateCommit
+    || receipt.dispatch.candidateTree !== candidateTree
+    || receipt.questionSha256 !== sha(planBytes)) {
+    fail("DAC-PRIVATE-EVIDENCE", "private Advisor evidence does not bind the current package");
+  }
+  const evidenceDir = join(root, "specs", featureId, "evidence");
+  physicalDirectory(evidenceDir, "DAC-PUBLIC-EVIDENCE-DIRECTORY");
+  const basename = `design-advisor-${binding.packageSha256}`;
+  const targets = [
+    { path: join(evidenceDir, `${basename}.receipt.json`), bytes: receiptBytes },
+    { path: join(evidenceDir, `${basename}.route-selection.json`), bytes: selectionBytes },
+  ];
+  for (const target of targets) {
+    if (existsSync(target.path)) {
+      physicalFile(target.path, "DAC-PUBLIC-EVIDENCE-DRIFT");
+      if (!readFileSync(target.path).equals(target.bytes)) fail("DAC-PUBLIC-EVIDENCE-DRIFT", "published Advisor evidence differs from its private source");
+    } else {
+      writeFileSync(target.path, target.bytes, { flag: "wx", mode: 0o600 });
+      physicalFile(target.path, "DAC-PUBLIC-EVIDENCE-READBACK");
+      if (!readFileSync(target.path).equals(target.bytes)) fail("DAC-PUBLIC-EVIDENCE-READBACK", "published Advisor evidence failed exact-byte readback");
+    }
+  }
+  return Object.freeze({
+    schema: "pipeline.design-advisory-no-child-export.v1",
+    candidate: { commit: candidateCommit, tree: candidateTree },
+    receipt: { path: relative(root, targets[0].path).replaceAll("\\", "/"), sha256: sha(receiptBytes) },
+    routeSelection: { path: relative(root, targets[1].path).replaceAll("\\", "/"), sha256: sha(selectionBytes) },
+    status: "unavailable-pending-final-approval",
+    implementationAuthority: false,
+  });
+}
+
 /**
  * Invoke one fresh Advisor through the existing host bridge, persist the
  * package-derived receipt, require an Elephant disposition, then publish and
@@ -131,6 +263,8 @@ export async function coordinateDesignAdvisory({
   disposition = null,
   expectedPublicSha256 = undefined,
   invokeBridge,
+  readRepositoryConsent = repositoryAdvisorConsent,
+  admitHostConsult = null,
   writeAdmission = writeDesignAdvisoryTransaction,
   readAdmission = readDesignAdvisoryTransaction,
   now = () => Date.now(),
@@ -151,6 +285,25 @@ export async function coordinateDesignAdvisory({
     root, featureId, planPath: plan, specPath: spec, planSha256: sha(planBytes), specSha256: sha(specBytes),
     candidateCommit, candidateTree, runner: trustedRuntime.runner,
   });
+  const dispatch = { dispatchId: binding.receiptId, queueRevision: 0, candidateCommit, candidateTree };
+  const repositoryConsent = readRepositoryConsent(root);
+  if (trustedRuntime.runner === "codex") {
+    let code = repositoryConsent === "declined" ? "advisor-repository-export-declined" : null;
+    if (code === null) {
+      // Admission alone is not execution proof. Until a host-owned execution
+      // store and independent package verifier exist, even an admitted export
+      // cannot be promoted to an answered Codex receipt.
+      const admission = typeof admitHostConsult === "function"
+        ? await admitHostConsult({ repoRoot: root, dispatch: structuredClone(dispatch),
+          featureId, profile: trustedRuntime.profile, planSha256: sha(planBytes), specSha256: sha(specBytes) })
+        : null;
+      code = admission?.status === "denied" ? "advisor-host-export-denied"
+        : admission?.status === "unavailable" ? "ordinary-consult-host-route-unavailable"
+          : "ordinary-consult-host-callback-unavailable";
+    }
+    return persistNoChildCodex({ common, binding, dispatch,
+      profile: trustedRuntime.profile, planBytes, code });
+  }
   const target = receiptTarget(common, binding.receiptId);
   if (existsSync(target)) fail("DAC-RECEIPT-EXISTS", "package-derived Advisor receipt already exists; inspect or recover the existing transaction instead of replacing it");
   const references = [plan, spec];
@@ -159,7 +312,6 @@ export async function coordinateDesignAdvisory({
   // itself. The independently bound Spec is an evidence reference, not text
   // spliced into the question; this prevents a second, undocumented digest.
   const question = questionFor({ planBytes });
-  const dispatch = { dispatchId: binding.receiptId, queueRevision: 0, candidateCommit, candidateTree };
   const demandResult = createAdvisoryDemand({
     runner: trustedRuntime.runner,
     profile: trustedRuntime.profile,
@@ -179,7 +331,7 @@ export async function coordinateDesignAdvisory({
     evidenceBundle,
     // Export consent is intentionally left at the host bridge's safe default.
     // A runner adapter may only narrow it through its own authority surface.
-    advisorExport: { consent: "default" },
+    advisorExport: { consent: repositoryConsent },
     receiptId: binding.receiptId,
     designAdvisoryBinding: {
       featureId,

@@ -716,13 +716,13 @@ test("a symlinked advisory receipt directory rejects before the host adapter sta
   }
 });
 
-test("Codex launch receives the exact physical repository root admitted by preflight", async () => {
+test("Codex without a host-owned consult callback keeps the prompt out of output and never launches", async () => {
   const { root, dispatchCandidate, evidence } = await governanceRepoRoot();
   const inputRoot = await mkdtemp(join(tmpdir(), "advisory-codex-root-"));
   try {
     const dispatch = { dispatchId: "codex-root-01", queueRevision: 1, ...dispatchCandidate };
     const input = {
-      ...advisoryInput(dispatch, "Which repository is reviewed?", evidence, "codex"),
+      ...advisoryInput(dispatch, "SENSITIVE_DESIGN_MARKER_DO_NOT_EMIT", evidence, "codex"),
       advisorExport: { consent: "approved" },
     };
     const inputPath = join(inputRoot, "input.json");
@@ -743,8 +743,17 @@ test("Codex launch receives the exact physical repository root admitted by prefl
       },
     ));
     assert.equal(code, 2);
-    assert.equal(launchedRoot, await realpath(root));
-    assert.equal(events.find((event) => event.type === "dispatch.prepare")?.preparation?.status, "prepared");
+    assert.equal(launchedRoot, null);
+    assert.equal(events.find((event) => event.type === "dispatch.prepare"), undefined);
+    assert.equal(events.find((event) => event.type === "advisory.completed")?.code,
+      "ordinary-consult-host-route-unavailable");
+    assert.equal(JSON.stringify(events).includes(input.question), false);
+    const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    const selection = JSON.parse(await readFile(`${receiptPath}.route-v1.json`, "utf8"));
+    assert.equal(receipt.observed.status, "unavailable");
+    assert.equal(receipt.answerSha256, null);
+    assert.equal(selection.attemptCount, 0);
+    assert.equal(selection.childStarted, false);
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(inputRoot, { recursive: true, force: true });

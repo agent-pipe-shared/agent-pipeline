@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { coordinateDesignAdvisory } from "./design-advisory-coordinator.mjs";
+import { coordinateDesignAdvisory, exportNoChildDesignAdvisoryEvidence } from "./design-advisory-coordinator.mjs";
 import { DESIGN_ADVISORY_RECORD_PATH } from "./design-advisory-enforcement.mjs";
 import { runAdvisoryHostBridge } from "../scripts/advisory-host-bridge.mjs";
 
@@ -22,6 +22,8 @@ function root() {
   execFileSync("git", ["config", "user.name", "Test"], { cwd: value });
   mkdirSync(join(value, "project"), { recursive: true });
   mkdirSync(join(value, "specs", "feature-1"), { recursive: true });
+  mkdirSync(join(value, "specs", "feature-1", "evidence"), { recursive: true });
+  writeFileSync(join(value, "pipeline.user.yaml"), "advisor_export:\n  consent: approved\n");
   writeFileSync(join(value, "specs", "feature-1", "prd.md"), "# Initial plan\n\nKeep the boundary closed.\n");
   writeFileSync(join(value, "specs", "feature-1", "spec.md"), "# Specification\n\nAdd an independent check.\n");
   execFileSync("git", ["add", "."], { cwd: value });
@@ -57,7 +59,7 @@ function bridge(options = {}) {
 function args(value, extra = {}) {
   return {
     repoRoot: value,
-    runtime: { runner: "codex", profile: "feature" },
+    runtime: { runner: "claude", profile: "feature" },
     featureId: "feature-1",
     planPath: "specs/feature-1/prd.md",
     specPath: "specs/feature-1/spec.md",
@@ -66,6 +68,82 @@ function args(value, extra = {}) {
     ...extra,
   };
 }
+
+test("Codex without a host-owned consult callback creates a private no-child PO exception input", async () => {
+  const value = root();
+  try {
+    let bridgeCalls = 0;
+    const result = await coordinateDesignAdvisory(args(value, {
+      runtime: { runner: "codex", profile: "feature" },
+      admitHostConsult: null,
+      invokeBridge: () => { bridgeCalls += 1; throw new Error("must not dispatch"); },
+    }));
+    assert.equal(result.status, "unavailable-pending-final-approval");
+    assert.equal(result.routeSelection.code, "ordinary-consult-host-callback-unavailable");
+    assert.equal(result.attemptTrail, null);
+    assert.equal(result.write, null);
+    assert.equal(bridgeCalls, 0);
+    const receipt = JSON.parse(readFileSync(result.bridge.target, "utf8"));
+    const route = JSON.parse(readFileSync(result.routeSelection.path, "utf8"));
+    assert.equal(receipt.observed.status, "unavailable");
+    assert.equal(receipt.observed.identity, null);
+    assert.equal(receipt.answerSha256, null);
+    assert.equal(route.childStarted, false);
+    assert.equal(route.attemptCount, 0);
+    assert.equal(route.questionSha256, sha(readFileSync(join(value, "specs/feature-1/prd.md"))));
+  } finally { rmSync(value, { recursive: true, force: true }); }
+});
+
+test("Codex repository denial and apparent host admission never build a prompt or claim an answer", async () => {
+  for (const policy of ["declined", "approved"]) {
+    const value = root();
+    try {
+      writeFileSync(join(value, "pipeline.user.yaml"), `advisor_export:\n  consent: ${policy}\n`);
+      let bridgeCalls = 0;
+      let admissionCalls = 0;
+      const result = await coordinateDesignAdvisory(args(value, {
+        runtime: { runner: "codex", profile: "feature" },
+        admitHostConsult: () => { admissionCalls += 1; return { status: "admitted", route: "ordinary-fresh-consult" }; },
+        invokeBridge: () => { bridgeCalls += 1; throw new Error("must not dispatch"); },
+      }));
+      assert.equal(result.status, "unavailable-pending-final-approval");
+      assert.equal(result.routeSelection.code, policy === "declined"
+        ? "advisor-repository-export-declined"
+        : "ordinary-consult-host-callback-unavailable");
+      assert.equal(admissionCalls, policy === "declined" ? 0 : 1);
+      assert.equal(bridgeCalls, 0);
+      const receipt = JSON.parse(readFileSync(result.bridge.target, "utf8"));
+      assert.equal(receipt.observed.status, policy === "declined" ? "permission-denied" : "unavailable");
+      assert.equal(receipt.answerSha256, null);
+    } finally { rmSync(value, { recursive: true, force: true }); }
+  }
+});
+
+test("sanitized no-child artifacts export with exact private-byte readback and replay", async () => {
+  const value = root();
+  try {
+    const result = await coordinateDesignAdvisory(args(value, {
+      runtime: { runner: "codex", profile: "feature" },
+      admitHostConsult: null,
+    }));
+    const exportInput = { repoRoot: value, featureId: "feature-1",
+      planPath: "specs/feature-1/prd.md", specPath: "specs/feature-1/spec.md" };
+    const published = exportNoChildDesignAdvisoryEvidence(exportInput);
+    assert.equal(published.status, "unavailable-pending-final-approval");
+    assert.equal(published.implementationAuthority, false);
+    assert.equal(published.receipt.sha256, sha(readFileSync(result.bridge.target)));
+    assert.equal(published.routeSelection.sha256, sha(readFileSync(result.routeSelection.path)));
+    assert.deepEqual(exportNoChildDesignAdvisoryEvidence(exportInput), published);
+    const publicReceipt = readFileSync(join(value, published.receipt.path));
+    const publicSelection = readFileSync(join(value, published.routeSelection.path));
+    assert.equal(publicReceipt.equals(readFileSync(result.bridge.target)), true);
+    assert.equal(publicSelection.equals(readFileSync(result.routeSelection.path)), true);
+    assert.equal(publicReceipt.includes("Keep the boundary closed."), false);
+    assert.equal(publicSelection.includes("Keep the boundary closed."), false);
+    writeFileSync(join(value, published.routeSelection.path), "tampered");
+    assert.throws(() => exportNoChildDesignAdvisoryEvidence(exportInput), { code: "DAC-PUBLIC-EVIDENCE-DRIFT" });
+  } finally { rmSync(value, { recursive: true, force: true }); }
+});
 
 test("coordinates an immutable package-derived receipt through durable admission readback", async () => {
   const value = root();

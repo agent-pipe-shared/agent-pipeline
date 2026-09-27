@@ -10,13 +10,14 @@
  * runtime transport; only the sanitized receipt is written to disk.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
 import { createAdvisoryAttemptTrail, validateAdvisoryAttemptTrail } from "../lib/advisory-attempt-trail.mjs";
+import { createAdvisoryRouteSelection } from "../lib/advisory-route-selection.mjs";
 import { buildAdvisoryDecisionEvent } from "../lib/advisory-decision-event.mjs";
 import {
   advisorySessionRoleSelectionSha256,
@@ -48,6 +49,8 @@ import { executeSandboxedReadonlyDuty } from "./sandboxed-readonly-host-bridge.m
 import { observeHostAdvisorWorkspace } from "./host-advisor-workspace.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
+import { loadRunnerProfilesV3Registry } from "../lib/runner-profiles-v3.mjs";
 
 const USAGE = "usage: advisory-host-bridge.mjs --input <json> --receipt <json> [--timeout-ms <1000..600000>]";
 
@@ -202,13 +205,24 @@ function receiptFor(input, advisoryRoute, { status, identity = null, answer = nu
     answerSha256: answer === null ? null : sha256(answer),
     fallback: {
       reason: fallbackReason,
-      redactedErrorClass: fallbackReason === "none" ? null : fallbackReason.endsWith("unavailable") ? "unavailable" : "failure",
+      redactedErrorClass: fallbackReason === "none" ? null
+        : fallbackReason.endsWith("unavailable") ? "unavailable"
+          : fallbackReason.endsWith("permission-denied") ? "permission-denied" : "failure",
     },
     emittedAtMs: Date.now(),
   };
   const checked = validateAdvisoryReceipt(receipt);
   if (!checked.ok) throw new Error(`selected advisory receipt is invalid: ${checked.reason}`);
   return receipt;
+}
+
+function readPhysicalRepositoryConsent(root) {
+  const path = resolve(root, "pipeline.user.yaml");
+  const stat = lstatSync(path);
+  if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(path) !== path) return "missing";
+  const source = parseYaml(readPublicRepositoryFile(root, "pipeline.user.yaml").toString("utf8"));
+  const consent = source?.advisor_export?.consent;
+  return consent === "approved" || consent === "declined" ? consent : "missing";
 }
 
 function unavailable(input, advisoryRoute, code, execution = null) {
@@ -756,6 +770,87 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
         if (reboundDemand.ok) input.demand = reboundDemand.demand;
         else claudeFallbackSelection = null;
       }
+    }
+    if (input.runner === "codex") {
+      // Admission precedes any prompt-bearing dispatch packet. The CLI has no
+      // trusted ordinary-consult host callback today; a JSON reply on stdin
+      // is deliberately insufficient to claim a child or model observation.
+      const demand = validateAdvisoryDemand(input?.demand, {
+        runner: input?.runner, profile: input?.profile,
+        question: input?.question, dispatch: input?.dispatch,
+      });
+      if (!demand.ok) {
+        emit({ schema: "pipeline.advisory-host.v1", type: "advisory.completed",
+          ok: false, code: demand.code, answer: null, receiptPath: null,
+          attempts: [], attemptTrailPath: null, routeSelectionPath: null,
+          modelCalls: 0, launcherCalls: 0 });
+        return 2;
+      }
+      const disposition = advisoryConsultationDisposition(input.demand, input.priorConsultation);
+      if (!disposition.ok) {
+        emit({ schema: "pipeline.advisory-host.v1", type: "advisory.completed",
+          ok: false, code: disposition.code, answer: null, receiptPath: null,
+          attempts: [], attemptTrailPath: null, routeSelectionPath: null,
+          modelCalls: 0, launcherCalls: 0 });
+        return 2;
+      }
+      if (disposition.disposition === "reuse-no-repeat") {
+        emit({ schema: "pipeline.advisory-host.v1", type: "advisory.completed",
+          ok: true, code: "advisory_reused_no_repeat", answer: null, receiptPath: null,
+          attempts: [], attemptTrailPath: null, routeSelectionPath: null,
+          consultationRecord: input.priorConsultation, consultationRecordPath,
+          modelCalls: 0, launcherCalls: 0 });
+        return 0;
+      }
+      const evidence = validateAdvisoryEvidenceBundleForRepository(repositoryRoot,
+        input.evidenceBundle, input.demand.evidenceSha256);
+      if (!evidence.ok || !equal(input.references,
+        input.evidenceBundle?.references?.map(({ path }) => path))) {
+        emit({ schema: "pipeline.advisory-host.v1", type: "advisory.completed",
+          ok: false, code: "advisory_evidence_binding_mismatch", answer: null,
+          receiptPath: null, attempts: [], attemptTrailPath: null,
+          routeSelectionPath: null, modelCalls: 0, launcherCalls: 0 });
+        return 2;
+      }
+      let repositoryConsent;
+      try { repositoryConsent = (dependencies.readRepositoryConsent ?? readPhysicalRepositoryConsent)(repositoryRoot); }
+      catch { repositoryConsent = "missing"; }
+      let code = repositoryConsent === "declined" ? "advisor-repository-export-declined"
+        : repositoryConsent !== "approved" ? "ordinary-consult-host-route-unavailable" : null;
+      if (code === null) {
+        const admission = typeof dependencies.admitOrdinaryConsult === "function"
+          ? await dependencies.admitOrdinaryConsult({ repoRoot: repositoryRoot,
+            dispatch: structuredClone(input.dispatch), profile: input.profile,
+            questionSha256: sha256(input.question), evidenceSha256: input.demand.evidenceSha256 })
+          : null;
+        code = admission?.status === "denied" ? "advisor-host-export-denied"
+          : admission?.status === "unavailable" ? "ordinary-consult-host-route-unavailable"
+            : "ordinary-consult-host-callback-unavailable";
+      }
+      const registered = loadRunnerProfilesV3Registry().duties.advisory.codex;
+      const denied = code === "advisor-repository-export-declined" || code === "advisor-host-export-denied";
+      const receipt = receiptFor(input, { model: registered.selector.value, effort: registered.effort }, {
+        status: denied ? "permission-denied" : "unavailable",
+        fallbackReason: denied ? "consult-permission-denied" : "consult-unavailable",
+      });
+      const receiptBytes = jsonBytes(receipt);
+      const persisted = writeJsonAtomic(args.receipt, receipt);
+      const selection = createAdvisoryRouteSelection({ receipt, receiptBytes,
+        code, evidenceSha256: input?.demand?.evidenceSha256 ?? null });
+      const routeSelectionPath = resolve(`${args.receipt}.route-v1.json`);
+      writeJsonAtomic(routeSelectionPath, selection);
+      const record = createAdvisoryConsultationRecord({ demand: input.demand,
+        receipt, outcome: receipt.observed.status, completedAtMs: Date.now() });
+      if (!record.ok) throw new Error(record.code);
+      writeJsonAtomic(consultationRecordPath, record.record);
+      emit({ schema: "pipeline.advisory-host.v1", type: "advisory.completed",
+        ok: false, code, answer: null, receiptPath: resolve(args.receipt),
+        directoryDurability: persisted?.directoryDurability ?? null,
+        attempts: [], attemptTrailPath: null, routeSelectionPath,
+        consultationRecord: record.record, consultationRecordPath,
+        sandboxBinding: null, agentDecisionEvent: null,
+        modelCalls: 0, launcherCalls: 0 });
+      return 2;
     }
     const preparation = advisoryDispatchPreparation(
       input,

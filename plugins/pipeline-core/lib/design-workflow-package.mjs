@@ -18,6 +18,7 @@ import { TextDecoder } from "node:util";
 
 import { validateAdvisoryAttemptTrail } from "./advisory-attempt-trail.mjs";
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
+import { ADVISORY_ROUTE_SELECTION_SCHEMA, validateAdvisoryRouteSelection } from "./advisory-route-selection.mjs";
 import { designReadinessReportSha256, verifyDesignReadinessHostExecution } from "./design-readiness-host-evidence.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
@@ -220,6 +221,9 @@ function createApprovalReview({ workflowPackage, sourceBytes, readinessReceipt, 
         runner: attempt.runner,
         status: attempt.status,
       }))),
+      routeSelection: attemptTrail?.schema === ADVISORY_ROUTE_SELECTION_SCHEMA
+        ? { status: attemptTrail.status, code: attemptTrail.code,
+          childStarted: false, attemptCount: 0 } : null,
       disposition: workflowPackage.advisor.disposition,
       exception: workflowPackage.advisor.exception,
     }),
@@ -338,7 +342,11 @@ export function validateDesignWorkflowPackage({
     || advisorReceipt.dispatch.candidateCommit !== workflowPackage.candidate.commit
     || advisorReceipt.dispatch.candidateTree !== workflowPackage.candidate.tree
     || advisorReceipt.dispatch.dispatchId === workflowPackage.authoringDispatchId) return fail("DWP-ADVISOR-RECEIPT-BINDING");
-  if (advisorReceipt.questionSha256 !== designWorkflowAdvisorQuestionSha256(workflowPackage.sources)) return fail("DWP-ADVISOR-QUESTION");
+  const noChildRouteSelection = attemptTrail?.schema === ADVISORY_ROUTE_SELECTION_SCHEMA;
+  const expectedQuestionSha256 = noChildRouteSelection
+    ? workflowPackage.sources.design.sha256
+    : designWorkflowAdvisorQuestionSha256(workflowPackage.sources);
+  if (advisorReceipt.questionSha256 !== expectedQuestionSha256) return fail("DWP-ADVISOR-QUESTION");
 
   const readiness = workflowPackage.readiness;
   if (!exact(readiness, ["path", "sha256", "dispatchId"]) || !safeRepoPath(readiness.path)
@@ -396,10 +404,14 @@ export function validateDesignWorkflowPackage({
       || !SHA256.test(advisor.attemptTrail.sha256 ?? "")) return fail("DWP-ADVISOR-EXCEPTION");
     const trailRaw = bytes(attemptTrailBytes);
     if (!trailRaw || trailRaw.length > MAX_ATTEMPT_TRAIL_BYTES
-      || sha(trailRaw) !== advisor.attemptTrail.sha256 || !sameJsonBytes(attemptTrail, trailRaw)
-      || !validateAdvisoryAttemptTrail({ trail: attemptTrail, receipt: advisorReceipt, receiptBytes: advisorRaw,
-        requireNativeThenConsult: advisor.runner === "claude" && advisor.nativeAvailable }).ok) return fail("DWP-ADVISOR-ATTEMPTS");
-    const failureClass = advisorReceipt.observed.status === "timed-out" ? "timeout"
+      || sha(trailRaw) !== advisor.attemptTrail.sha256 || !sameJsonBytes(attemptTrail, trailRaw)) return fail("DWP-ADVISOR-ATTEMPTS");
+    const trailChecked = noChildRouteSelection
+      ? validateAdvisoryRouteSelection({ selection: attemptTrail, receipt: advisorReceipt, receiptBytes: advisorRaw })
+      : validateAdvisoryAttemptTrail({ trail: attemptTrail, receipt: advisorReceipt, receiptBytes: advisorRaw,
+        requireNativeThenConsult: advisor.runner === "claude" && advisor.nativeAvailable });
+    if (!trailChecked.ok) return fail("DWP-ADVISOR-ATTEMPTS");
+    const failureClass = noChildRouteSelection && attemptTrail.status === "unavailable" ? "route-unavailable"
+      : advisorReceipt.observed.status === "timed-out" ? "timeout"
       : advisorReceipt.observed.status === "permission-denied" ? "permission-denied"
         : advisorReceipt.observed.status === "unavailable" ? "capacity-unavailable" : "invalid-output";
     if (advisor.exception.failureCode !== failureClass) return fail("DWP-ADVISOR-FAILURE-CODE");
