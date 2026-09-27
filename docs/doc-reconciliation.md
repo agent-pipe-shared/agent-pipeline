@@ -338,6 +338,17 @@ distribution authority.
 - ADR-0078: checked, no change needed.
 - ADR-0081: checked, no change needed.
 
+## Candidate 481e5cc16da4b3ebfada8ebdb3800ec799955513 — 2026-09-27, 0.7 greenfield remediation design
+
+The candidate links a new reviewable three-runner remediation addendum from
+the Alfred PRD and Spec. It records 22 later backlog findings as five owned
+slices without moving their backlog assignments or claiming implementation
+authority. The existing canonical feature design paths and artifact ownership
+remain in force; the PO plan acknowledgement was removed pending review of
+the amended scope.
+
+- ADR-0045: checked, no change needed.
+
 ## Candidate 8b747c185c0d002dba685a791d14d23f5ccd6449 — 2026-09-18, Alfred integration candidate reconciliation
 
 - ADR-0001: checked, no change needed.
