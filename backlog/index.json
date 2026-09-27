@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "74b315fe162fd0a22305e9e1d331b9c440a8b67017f4a9a74d645d6cd8bca21f"
+    "transitionHead": "1ed4262d7b05d797fd91c98e03aa5008529aa3ea8ef987e91d2c34fe73b32c3e"
   },
   "counts": {
-    "open": 47,
+    "open": 49,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -1378,6 +1378,16 @@
       "closureRepository": "self",
       "closureCommit": "2f466462dbe97bc1330e7578bd21af2d958f1488",
       "closureEvidence": "backlog/items/2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-the-wrong-reason.md"
+    },
+    {
+      "id": "pipeline.bounded-reader-terminal-binding",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Documentation-owner 2+2 course decision, 2026-09-27; source Reader skill, harness/reader-review-protocol.md, check-doc-reader-binding.mjs and release-preflight reader gate.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff",
@@ -4408,6 +4418,16 @@
       "closureRepository": "self",
       "closureCommit": "887ac164e61fdb81effe8de50e2464ff95753e6c",
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
+    },
+    {
+      "id": "pipeline.hgo-patch-preflight-before-signature",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Alfred 0.7 Reader terminal correction, 2026-09-27: two exact signed apply_patch actions failed on missing blank-line context before a third root-guide signature applied.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs",

@@ -107,6 +107,7 @@
 | pipeline.bootstrap-po-questions-asked-sequentially-instead-of-in-one-block | closed | workflow-improvement | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module | open | workflow-improvement | pipeline | nightwing | 2026-08-08 | 2026-09-05 | — |
 | pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
+| pipeline.bounded-reader-terminal-binding | open | requirement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff | closed | defect | pipeline | — | 2026-08-23 | — | — |
 | pipeline.briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them | closed | workflow-improvement | pipeline | nova-b | 2026-09-06 | — | — |
 | pipeline.briefing-bundling-two-findings-asks-for-two-dispatches | closed | defect | pipeline | nova-b | 2026-09-01 | — | Nova B — dispatcher-side scoping defect: bundling two independent review findings into one briefing produced a package that could not fit any single tool budget, and the overrun was read as an agent problem rather than a briefing problem. |
@@ -330,6 +331,7 @@
 | pipeline.hgo-candidate-drift-invalidates-ceremony-on-any-concurrent-commit | closed | defect | pipeline | nova | 2026-08-30 | — | NOW / Nova A -- surfaced 2026-08-30, reproduced live in this session: a background trust-anchor-fix dispatch's commit 6876ba53 invalidated an in-flight hooks.json TP-4 signature ceremony, requiring refreeze-plan and a second PO signature for the identical edit. |
 | pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
 | pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check | closed | requirement | pipeline | — | 2026-08-19 | — | — |
+| pipeline.hgo-patch-preflight-before-signature | open | improvement | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | closed | workflow-improvement | pipeline | — | 2026-08-18 | — | — |
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | — | 2026-08-17 | — | — |
@@ -711,7 +713,7 @@
 
 ## Counts
 
-- open: 47
+- open: 49
 - in_progress: 0
 - closed: 642
 - rejected: 3
