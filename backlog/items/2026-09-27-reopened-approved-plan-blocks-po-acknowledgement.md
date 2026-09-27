@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.reopened-approved-plan-blocks-po-acknowledgement
-type: bug
+type: defect
 owner: pipeline
 status: open
 created: 2026-09-27

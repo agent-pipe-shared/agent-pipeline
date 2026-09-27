@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1ed4262d7b05d797fd91c98e03aa5008529aa3ea8ef987e91d2c34fe73b32c3e"
+    "transitionHead": "8c4ca9319d33b3d7ed7ab2b800dea2729f37d0d6b6a98d1ac7bc0d23c8fbc3db"
   },
   "counts": {
-    "open": 49,
+    "open": 50,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -7353,6 +7353,16 @@
       "closureRepository": "self",
       "closureCommit": "44d6d506a485178ac2cef46141711d59e013541f",
       "closureEvidence": "backlog/evidence/2026-08-09-reopen-design-drift-mechanism.md"
+    },
+    {
+      "id": "pipeline.reopened-approved-plan-blocks-po-acknowledgement",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-27",
+      "source": "Alfred 0.7 plan refresh after reopen-design, 2026-09-27; live project/pipeline-state.json and po-authority-acknowledge-plan readback.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head",

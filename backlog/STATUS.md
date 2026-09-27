@@ -546,6 +546,7 @@
 | pipeline.release-preflight-has-a-builder-but-no-cli | closed | defect | pipeline | — | 2026-08-06 | 2026-09-06 | — |
 | pipeline.remote-side-enforcement-is-the-last-instance | open | requirement | pipeline | nightwing | 2026-08-28 | — | — |
 | pipeline.reopen-design-invites-the-edit-that-ends-the-session | closed | defect | pipeline | — | 2026-08-09 | 2026-08-12 | — |
+| pipeline.reopened-approved-plan-blocks-po-acknowledgement | open | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | closed | defect | pipeline | — | 2026-08-17 | — | — |
 | pipeline.repeated-lifecycle-denials-are-not-counted | open | workflow-improvement | pipeline | none | 2026-09-27 | — | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | closed | defect | pipeline | — | 2026-08-08 | 2026-09-07 | — |
@@ -713,7 +714,7 @@
 
 ## Counts
 
-- open: 49
+- open: 50
 - in_progress: 0
 - closed: 642
 - rejected: 3
