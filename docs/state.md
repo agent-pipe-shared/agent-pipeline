@@ -7,28 +7,26 @@
 
 ## Aktuelle Arbeit — 0.7-Greenfield-Korrekturen, 2026-09-28
 
-Die kanonische Planfreigabe wurde am 2026-09-28 verifiziert und der reguläre
-Übergang nach **Implementation** ausgeführt. Maßgeblich sind
+Seit 2026-09-28 gilt reguläre **Implementation**, gebunden an
 `project/pipeline-state.json` und das unveränderte
 [freigegebene Designpaket](../specs/sprint-alfred-epic/evidence/design-workflow-package-c22c1cd281b1.json).
-Die dokumentierte Advisor-Unverfügbarkeit wurde mit diesem Paket akzeptiert;
-sie ist kein erfolgreicher Advisor-Aufruf. Die native Readiness meldete keine
-offenen Befunde. Eine weitere Planfreigabe ist für den genehmigten Umfang
-nicht erforderlich.
+Advisor-Unverfügbarkeit ist akzeptiert, kein Advisor-PASS. Native Readiness:
+keine offenen Befunde. Der genehmigte Umfang braucht keine weitere Planfreigabe.
 
 Der PO hat den Recovery-Stand `f9ebdd5b` lokal installiert. Seine drei Runner-
 Stamps teilen die Build-Identität `20260928194946.0cace08c`. Er enthält die
-bereits geprüfte Paketvalidierung und die Korrektur des Codex-Compact-
-SessionStart-JSON. Der neu geladene Codex-Guard akzeptiert die bestehende
-Implementation-Autorität; der Arbeitsbaum war nach dem Recovery-Commit sauber.
-Dies ist noch kein vollständig qualifizierter neuer 0.7-Kandidat.
+Paketvalidierung und Codex-Compact-SessionStart-JSON-Korrektur. Der geladene
+Guard akzeptiert die Implementation-Autorität. Die finale Qualifizierung fehlt.
 
 Die genehmigten Pakete zu Aktivierung und Hook-Scope, Agy-Topologie und
 Aktualisierung sowie inhaltserhaltender Deinstallation mit Git-Hook-Recovery
 werden parallel umgesetzt. Frühere 0.7-Korrekturen bleiben im gemeinsamen
-Integrationsumfang. Der neue Claude-Readiness-Alias-Befund ist kanonisch im
-Backlog registriert; der bestätigte Compact-Befund erhält seine dauerhafte
-Regression und Eintragung im nächsten Integrationsschritt. Danach folgen
+Integrationsumfang. Die Claude-Alias- und kanonische Signierkorrektur ist in
+`3d9ffe77` geliefert; 11/11 gezielte Source-Tests bestehen. Der Guard ließ den
+regulären Implementation-Schreibzugriff ohne weitere Signatur zu. Die neuen
+Befunde sind im Backlog registriert; die Compact-Regression und die korrigierte
+Aktivierungsprüfung sind als geprüfte Patches für die Integration vorbereitet.
+Die Codex-Modellzuordnung wurde bestätigt und erneut gelesen. Danach folgen
 gebundene Prüfbelege, der unabhängige Critic und die finale Qualifizierung.
 Es gibt keine weitere Reader-Korrekturrunde. Installation des abschließenden
 Kandidaten übernimmt der PO; Push, Tag und Veröffentlichung bleiben eigene
