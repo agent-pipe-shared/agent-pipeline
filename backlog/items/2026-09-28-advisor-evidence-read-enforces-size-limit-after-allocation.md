@@ -90,3 +90,21 @@ remained stable. Patch SHA256
 `scratch/advisory-canonical-read-bounds-evidence.md` reports the exact scope.
 The source file remains unchanged. Canonical regression registration, productive
 integration and candidate qualification remain required.
+
+## Further prepared journal read bound (2026-09-28)
+
+The proposed private Advisor store independently bounds its own receipt reads,
+but its imported `readHostJournal` still performs `readFileSync(descriptor)`
+after a size check. File growth after that check can therefore exceed the
+declared 524,288-byte journal limit. This concerns the prepared generic host
+journal, not a demonstrated resource exhaustion or private-file incident.
+
+A separate correction checks descriptor identity before content reads and uses
+a fixed 524,289-byte overflow buffer with final size/identity checks. Six cases
+pass: real canonical private bytes, actual sparse oversize with no allocation
+or read, growth after fstat bounded to limit+1, pre-read descriptor drift,
+short content and preserved alias/hardlink/noncanonical refusals. The racing
+growth and instrumentation use an isolated VM dependency seam; ordinary fixture
+filesystem reads are real. Source preparation and proposed Verify registration
+are in `scratch/codex-journal-read-bounds-*`. No source application or native
+Advisor/store qualification follows from these cases.

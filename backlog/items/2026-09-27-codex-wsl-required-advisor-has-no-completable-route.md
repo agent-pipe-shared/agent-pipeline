@@ -140,3 +140,36 @@ productive store must bind the exact Advisor namespace. Real export observation,
 ordinary sealed adapter/store/transaction, raw-output/complete-stdio custody,
 registered isolation adoption and actual installed replay remain outstanding.
 No answered Advisor receipt, formal stamp or item closure is claimed.
+
+## Further source preparation (2026-09-28)
+
+The output-custody patch passes twelve focused cases, including nine actual
+managed Node protocol processes. Fatal streaming UTF8, strict duplicate-key
+parsing, LF-complete framing and genuine stdin/stdout/stderr events determine
+completeness. Original serialized report JSON, final outer frame and canonical
+parsed report have distinct digests; durable observations contain metadata only.
+The versioned Advisor record v2 separately checks that custody against an actual
+private host result. Its controlled managed-host case and invalid custody/digest
+mutations pass; historical record v1 remains unchanged.
+
+A production-shaped private store independently derives canonical Git topology,
+uses an existing GUID without mint/migration and verifies the exact registered
+Advisor namespace and process ownership. Ten cases pass, including real Git,
+managed Node ownership, immutable publication and bounded receipt reads. The
+required pure GUID getter has seven new regression cases plus two existing
+identity cases passing through a proposed canonical test registration.
+
+The store is asynchronous and is not a drop-in dependency for the earlier
+synchronous binding verifier. Its current fixtures bind v1, with synthetic
+session/model controls. Sealed v2 adoption and live transaction consumers must
+be wired explicitly. A controlled fresh identity/namespace composition fails
+on shared parent 0755 versus private 0700; the distinct open item is
+`pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity`.
+The generic journal read-growth bound is tracked with the evidence-read item.
+
+Evidence: `scratch/codex-host-output-custody-evidence.md`,
+`scratch/codex-advisor-host-record-custody-evidence.md`,
+`scratch/codex-advisor-production-store-design.md` and
+`scratch/existing-repository-identity-registration-evidence.md`.
+These are prepared contracts and controlled process evidence. No productive
+Advisor execution, source application, release stamp or new signature occurred.
