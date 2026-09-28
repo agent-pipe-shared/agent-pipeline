@@ -539,6 +539,7 @@
 | pipeline.read-scope-guard-admits-single-command-but-blocks-the-piped-form | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.read-scope-tilde-expansion-mismatch | closed | defect | pipeline | nova-b | 2026-09-06 | — | Nova B — while triaging NVA-B-READCONTAIN-1's closure, the Elephant independently checked whether the restored read-scope containment accounts for shell tilde expansion. It does not: the guard's parser never expands a leading `~` in a path-taking argument, so it evaluates the LITERAL string `~/.ssh/id_rsa` as a (nonexistent) path under the project root, while the actual shell expands `~` to the real home directory before the command ever runs. Confirmed live via evaluateLifecycleReadyGuard() directly (never via an executed Bash cat of a real credential path). |
 | pipeline.readiness-guard-blocks-its-own-recovery | closed | defect | pipeline | nova | 2026-08-28 | — | NOW / Nova A — a guard that refuses the exact command its own refusal prescribes is a deadlock, and it fired twice in one consumer session |
+| pipeline.readiness-input-omits-current-advisor-observation | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented | closed | requirement | pipeline | — | 2026-08-19 | — | — |
 | pipeline.readonly-command-guard-classification | closed | workflow-improvement | pipeline | — | 2026-07-26 | — | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | — | 2026-08-05 | — | — |
@@ -728,7 +729,7 @@
 
 ## Counts
 
-- open: 64
+- open: 65
 - in_progress: 0
 - closed: 642
 - rejected: 3

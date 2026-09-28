@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bfee5396f1dcbb09a1a477c5cce253aaf06c9d46b81547a416748d7a7727216b"
+    "transitionHead": "ada55bdaddc668a8d3377c3cca6e1d4e36de3cc8bd17f8899f01fdfc7de1797d"
   },
   "counts": {
-    "open": 64,
+    "open": 65,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -7214,6 +7214,16 @@
       "closureRepository": "self",
       "closureCommit": "8c9146d3d7219870df4ca5b75b4ed37752e8587a",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+    },
+    {
+      "id": "pipeline.readiness-input-omits-current-advisor-observation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Two real independent native Readiness runs report absent current Advisor evidence although the canonical current no-child receipt was exported before each run.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented",
