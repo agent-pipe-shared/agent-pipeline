@@ -123,3 +123,18 @@ with 47 passing syntax checks and successful Git dry application.
 This supersedes the unprepared payload-only branch above. Full guard-union,
 mixed apply-patch adapter, subagent bootstrap and installed Codex sweeps remain
 pending; no universal live scratch guarantee or release stamp is claimed.
+
+### Additional shell-output boundary (2026-09-28)
+
+The supported read-only `pipeline-state.mjs inspect --root <this repo> --runner
+codex` succeeds. Attempting to save its output with a shell `>` redirect to the
+flat contained `scratch/codex-autonomous-preparation-state-2026-09-28.json`
+was refused before execution: `GUARD-REDIRECT-UNAPPROVED`, empty retryActions,
+and override planner `HGO-EXTERNAL-PROJECT-BOUNDARY` / external operator required.
+No override, alternate implementation of that denied action or signature was
+attempted. The existing read result remains available; no snapshot was written.
+
+This is a separate shell grammar boundary, not a failure of admitted native
+Write/Edit. Any future contained output-capture route needs explicit physical
+target checking and command admission; blanket shell redirection would not be
+a justified fix. The PO's scratch guarantee remains incomplete for this shape.
