@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d8704ae8f9a5efce7c5454a7ed9bec9004f6700c8715b2f55c07eff93e02dc68"
+    "transitionHead": "c800116ec6588e15599b69f175032e361c29c6ce95eb7b2cf4bd6627fa7a298e"
   },
   "counts": {
-    "open": 74,
+    "open": 75,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -3819,6 +3819,16 @@
       "closureRepository": "self",
       "closureCommit": "0b540510214e4868d683c86cd1af01b044ff9417",
       "closureEvidence": "backlog/items/2026-08-07-governance-product-verify-suites-deregistered.md"
+    },
+    {
+      "id": "pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Pre-integration verification of the S1 Governance Scope proposal in a network-off disposable Git fixture. An enrolled repository becomes inactive solely after deleting an unrelated registered worktree directory. Terminal 58232a, exit 0.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.grammar-refusal-does-not-say-which-part-failed",

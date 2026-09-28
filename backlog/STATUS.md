@@ -290,6 +290,7 @@
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | — | 2026-08-09 | 2026-08-23 | — |
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | — | 2026-08-18 | — | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+| pipeline.governance-scope-proposal-loses-enrollment-with-stale-worktree | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | closed | defect | pipeline | — | 2026-08-08 | 2026-08-22 | — |
 | pipeline.greenfield-approval-policy-applies-after-intake-transition | open | defect | pipeline | alfred | 2026-09-27 | — | — |
 | pipeline.greenfield-ask-before-install-duty-ignored-live | closed | defect | pipeline | — | 2026-08-19 | — | — |
@@ -739,7 +740,7 @@
 
 ## Counts
 
-- open: 74
+- open: 75
 - in_progress: 0
 - closed: 643
 - rejected: 3
