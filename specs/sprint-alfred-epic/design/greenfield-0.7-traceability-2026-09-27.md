@@ -68,7 +68,7 @@ preparation does not close them or authorize implementation.
 ## 2026-09-27 greenfield intake
 
 Every item below remains open until its own acceptance evidence is recorded.
-The slice letters refer to the table in the design addendum.
+The A–E slice letters refer to the canonical remediation design's slice table. Its added S1–S5 boundaries, frozen activation decisions and full acceptance matrix are included directly in that same bound design source; the preparation mirror is not required to discover normative scope.
 
 | Slice | Backlog findings | Planned acceptance |
 | --- | --- | --- |
@@ -77,7 +77,7 @@ The slice letters refer to the table in the design addendum.
 | B | `hgo-patch-preflight-before-signature`; `installed-design-trailer-example-is-rejected-by-git-guard`; `reopened-approved-plan-blocks-po-acknowledgement`; `git-apply-bypasses-draft-source-guard` | Exact patch preflight, generated trailer guard replay, signed acknowledgement and submission replay, denied unsigned mutating `git apply`. |
 | C | `restart-barrier-can-precede-verbatim-intake-capture`; `onboarding-spec-marker-has-no-preapproval-reconcile`; `greenfield-approval-policy-applies-after-intake-transition`; `fresh-preflight-hides-onboarding-action`; `greenfield-handover-claims-absent-supersession-marker` | Byte-exact intake replay, phase-admitted marker and preference repair, onboarding action/readback, honest handover on fresh hosts. |
 | D | `zero-open-design-questions-force-fabricated-answer`; `design-bootstrap-verify-state-contradicts-deferred-contract`; `architecture-materialization-requires-premature-code`; `architecture-fitness-model-repeats-module-fields`; `architecture-design-errors-omit-field-paths`; `design-generator-repeats-large-source-material` | Closed-schema and deferred-Verify fixtures, greenfield generation before code, compact model and local diagnostics, measured output. |
-| E | `browser-preflight-misses-missing-host-library`; `agy-greenfield-run-used-stale-plugin`; `bounded-reader-terminal-binding` | Missing-library host fixture, installed-version Agy replay, terminal Reader binding without a fifth review. |
+| E | `browser-preflight-misses-missing-host-library`; `bounded-reader-terminal-binding`; historical `agy-greenfield-run-used-stale-plugin` superseded by the S3 imported-snapshot item below | Missing-library host fixture, installed-version Agy replay, terminal Reader binding without a fifth review. Supersession preserves historical evidence and does not mean the Agy defect is fixed. |
 
 No reported symptom is accepted solely because a report asserts it. Each
 source fix needs its own test or readback; the source commit and installed
@@ -94,8 +94,16 @@ plugin version must be recorded separately in final release evidence.
 
 All three remain open until their own actual acceptance and canonical backlog reconciliation. This addendum records requirements and planned checks, not source implementation or installed-host acceptance. The original five-source workflow and single final approval contract remain truthful; changed source bindings are handled by the parent through the sanctioned authority route.
 
-The existing approval/lifecycle repair slice also owns the newly confirmed
-`design-workflow-signing-request-schema-drift` and
-`historical-plan-cancellation-blocks-current-withdrawal` items: canonical closed
-request signing with one confirmation, and successive cancellation/replay with
-validated history retention. Both remain open until their real acceptance.
+| Slice/item | Complete bound location | Acceptance and observed limit |
+| --- | --- | --- |
+| B: `design-workflow-signing-request-schema-drift` | Spec §19; canonical remediation Slice B row and Signing transport and historical withdrawal | Default-validator complete-request signing, one attended confirmation, malformed/alias/stale negatives. The exact separate author repair is historical commit `3b05a045e4acfd4e2d3393b6a0c015a799c2bee6`, with 5 canonical source tests. It is not final package approval or a complete native signing qualification. |
+| B: `historical-plan-cancellation-blocks-current-withdrawal` | Spec §19; the same canonical Slice B boundary | Successive submission withdrawal, retained bounded closed v1/v2 history, exact latest zero-write replay, malformed/stale/capacity refusals and actual canonical writer lock/CAS/readback. Historical repair source has 27 helper tests; installed old-decoder refresh is separate. |
+
+Both remain open until their own real acceptance. The independent native
+readiness for historical candidate `3b05a045` reports `not-ready`, with two
+document gaps: absent ownership/acceptance for these two items and scope detail
+available only in the unlisted preparation addendum. This correction puts
+both B items in the design table/Spec and embeds all S1–S5 requirements,
+ownership, sequence and acceptance in the bound design. It changes the source
+bundle and requires a fresh comparison; it is not a retrospective readiness
+PASS or a new Reader course.

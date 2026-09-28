@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": false,
-  "updatedAt": "2026-09-28T18:55:40.759Z",
+  "updatedAt": "2026-09-27T19:19:34.288Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -420,6 +420,10 @@
       {
         "phase": "design",
         "at": "2026-09-27T19:19:34.288Z"
+      },
+      {
+        "phase": "design",
+        "at": "2026-09-27T19:19:34.288Z"
       }
     ]
   },
@@ -483,7 +487,7 @@
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-alfred-epic",
-    "invalidatedSubmissionSha256": "6c6cdb7c76227f85815c398297fcf2859bc8e0671fa8e4a7c6e4214f6b802112",
+    "invalidatedSubmissionSha256": "2d9e55a353c63ab548fbd80ce39d9346ffa336c0bf0421136485da288e0d7389",
     "invalidatedApprovalSha256": null,
     "invalidatedBy": "codex",
     "invalidatedAt": "2026-09-27T19:19:34.288Z",

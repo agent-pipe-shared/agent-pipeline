@@ -1,0 +1,67 @@
+{
+  "candidate": {
+    "commit": "3b05a045e4acfd4e2d3393b6a0c015a799c2bee6",
+    "tree": "d3d1945b346362b59f653dfb8357debe057e0d53"
+  },
+  "dispatchId": "alfred-design-readiness-3b05a045-20260928",
+  "findings": [
+    {
+      "code": "DESIGN-OMITS-OWNED-OPEN-ITEMS",
+      "severity": "blocking",
+      "summary": "Traceability assigns design-workflow-signing-request-schema-drift and historical-plan-cancellation-blocks-current-withdrawal to the existing approval/lifecycle repair slice, but the design's Slice B findings and implementation boundary do not identify them or specify their acceptance. Reconcile the scope and ownership across the package."
+    },
+    {
+      "code": "UNLISTED-ADDENDUM-REQUIRED-FOR-SCOPE",
+      "severity": "blocking",
+      "summary": "The design says the additional-scope addendum contains the activation/topology/uninstall slice table, acceptance matrix, engineering questions, and architecture alignment; Spec §18 relies on an associated addendum for implementation sequence and exclusive ownership. This conflicts with treating the five-source package as complete and the addendum as non-normative scratch, leaving scope details and choices unavailable for this review."
+    }
+  ],
+  "hostExecution": {
+    "dutyReceiptSha256": "f7779f11dc045cd354e7fa223c99c7bdebcb5aba92fee205ce57d294e27d409c",
+    "executionReceiptSha256": "4af03b2e685f7a29497e783293e670924ba977ea914e4556c86b1b6211fa50a5",
+    "repoFingerprint": "468021d018a706c26049c829295f12234b1421955f902b925cb7d7496c4806bc",
+    "route": {
+      "candidateCommit": "3b05a045e4acfd4e2d3393b6a0c015a799c2bee6",
+      "effort": "high",
+      "model": "gpt-6-luna",
+      "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16"
+    },
+    "runner": "codex",
+    "schema": "pipeline.design-readiness-host-execution.v1",
+    "selectionId": "drh_e3fb5f35b069c33bb4e022569e7cc23c",
+    "selectionSha256": "8624c0d3812c4fa8ac7bc649ce07cf495212130b61ab9ee49b2a95c175852de4"
+  },
+  "outcome": "not-ready",
+  "runner": "codex",
+  "schema": "pipeline.design-readiness-receipt.v1",
+  "sources": {
+    "design": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-remediation-2026-09-27.md",
+      "sha256": "d63ae6a556ddf57b81ad649e4cbb5b5952e341cb972f200f58f5a1bd0a7dc0c6"
+    },
+    "input": {
+      "path": "specs/sprint-alfred-epic/design/design-advisory-workflow-input.md",
+      "sha256": "eae25ed7eea6355c0d69f3f0b1a8d2a0c65cffa8617a4c3cc40ec682e22dd99b"
+    },
+    "prd": {
+      "path": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "sha256": "aa69cd9f694d6b55946ba6d26584ace3ac1fa58711d5d675b7769b654095ffbf"
+    },
+    "spec": {
+      "path": "specs/sprint-alfred-epic/spec.md",
+      "sha256": "aa5ddfa5cdb190f97fb9cb11cddc9d5091a4bbda04375fd0a8fbbd88e3a1a931"
+    },
+    "traceability": {
+      "path": "specs/sprint-alfred-epic/design/greenfield-0.7-traceability-2026-09-27.md",
+      "sha256": "d890ad15077f3c489a79cd157974cd6f0337514a00a0fe95b2b412d2c7728323"
+    }
+  },
+  "summary": "The current Advisor observation is a candidate- and question-bound unavailable no-child result with zero attempts, consistent with the documented proposed Advisor-only exception path; it is neither missing evidence nor an answer, and the exception remains for the PO to decide. Readiness is not established because the package has unresolved completeness and scope-ownership gaps. This result grants no PO approval.",
+  "unresolvedChoices": [
+    {
+      "id": "activation-topology-uninstall-addendum",
+      "impact": "Until clarified and the five-source package contains the binding requirements and ownership/sequence, completeness and readiness of this added candidate scope cannot be established.",
+      "question": "Are the activation, Agy topology, and uninstall details in the referenced additional-scope design addendum binding requirements, or is that addendum non-normative preparation?"
+    }
+  ]
+}
