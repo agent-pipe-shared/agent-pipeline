@@ -12,6 +12,31 @@ done_when: manual
 
 # No uninstall path for a repository that once opted in
 
+## Implementation observation: retained approval during re-enrollment
+
+A four-case disposable probe is frozen in
+`scratch/0.7-reenrollment-authority-20260928/frozen/manifest.json`
+(`ead7cca01b34dcca73e78fbb3e43fdf786c6b4ca5cb867f89f2b4a71dfb12a3d`).
+An enroll → decline → enroll cycle left a synthetic structurally current V7
+approval current according to the canonical lifecycle reader. The canonical
+reopen writer retired that V7 approval; a plain legacy approval accepted by
+the reader was refused by that writer. This is evidence of a compatibility
+gap, without a claim that a real signed PO approval was replayed or a complete
+uninstall and re-onboarding cycle was qualified.
+
+Re-enrollment must publish a durable declined physical barrier and retire
+old lifecycle authority through its canonical writer before fresh intake can
+activate a new generation. Retain old state, consent and consumed intake as
+bounded byte-exact history; fresh consent must belong to the pending generation.
+An already active valid legacy scope and repeated enrollment retain legitimate
+current authority without a write. Crashes, aliases, stale CAS and foreign
+history must leave a recoverable declined state. Merely clearing a profile
+receipt does not retire current plan authority.
+
+The initial state/writer proposal is inert preparation; coordinator, intake,
+consent and schema integration are required before acceptance. The item stays
+open until actual Source and combined qualification establish these properties.
+
 ## Description
 
 A repository that once opted into the Pipeline cannot leave it again in a

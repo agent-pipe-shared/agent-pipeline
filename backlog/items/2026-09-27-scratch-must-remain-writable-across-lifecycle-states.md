@@ -138,3 +138,25 @@ This is a separate shell grammar boundary, not a failure of admitted native
 Write/Edit. Any future contained output-capture route needs explicit physical
 target checking and command admission; blanket shell redirection would not be
 a justified fix. The PO's scratch guarantee remains incomplete for this shape.
+
+### Implementation confirmation: inert sanctioned-writer snapshot
+
+The installed Codex guard also refused a native `apply_patch` targeting
+`scratch/0.7-reenrollment-retirement-fix-20260928/runtime/plugins/pipeline-core/scripts/pipeline-state.mjs`
+with `PB-SANCTIONED-WRITER`. Request digest:
+`ead0a37c6d04ae02d8fb63e2e3961860e602b8080862fa4f8011df553d9ef0ee`;
+action digest:
+`a4d3c37584446f387207bbdaaf4f5cb91f36e8ad90de714f5297299c9be78a9c`.
+The physically inert copy was not changed. No alternate writer or human
+override was consumed. This confirms the existing item rather than creating
+a duplicate defect.
+
+The integrated public helper already distinguishes physical Scratch from
+active roots. The held guard successor passes its root into that helper; a
+further exact proposal also supplies the executing hook's plugin root when
+the helper is loaded from a different public tree. This retains protection
+for an active plugin installed beneath Scratch. Preparation is bound in
+`scratch/0.7-scratch-guard-context-preparation-20260928/manifest.json`:
+syntax and inverse preservation pass, but protected Source delivery and a
+live native guard regression remain pending. Installing a recovery build
+does not establish the all-state guarantee.

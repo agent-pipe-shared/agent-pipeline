@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c800116ec6588e15599b69f175032e361c29c6ce95eb7b2cf4bd6627fa7a298e"
+    "transitionHead": "a975ba3145263d0fd22057d828024e7f169b1869c2e1dbc3bdcbad0324c75dd1"
   },
   "counts": {
-    "open": 75,
+    "open": 76,
     "in_progress": 0,
     "closed": 643,
     "rejected": 3,
@@ -9838,6 +9838,16 @@
       "owner": "pipeline",
       "created": "2026-09-28",
       "source": "Real synthetic Linux process replay on 2026-09-28; scratch/worktree-spaced-process-identity-probe.json, source 200014e939cfab9b8dcf0a82d9030955fb6c599b.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-29",
+      "source": "Source-confirmed dependency of the approved re-enrollment correction: codex-onboarding-runtime.mjs local private-state resolver shares Git-common onboarding slots, while onboarding-continuity.mjs validates an exact physical intake root. No live cross-worktree corruption or real PO approval replay is asserted.",
       "deferred": false,
       "sprint": "alfred"
     },

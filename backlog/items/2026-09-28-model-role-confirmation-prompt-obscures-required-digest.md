@@ -42,3 +42,19 @@ or that receipt verification failed.
 - **Decision:** Strong toil reduction within the existing 0.7 bootstrap scope.
 - **Assignment:** Model-role bootstrap CLI and its entry guidance.
 - **Date:** 2026-09-28.
+
+## Source progress
+
+The Source bootstrap now prints the exact digest beside the prompt, explains
+wrong input, and renders an attended action bound to the observed session,
+loaded executable/script, root and runner. Codex/Claude session transfer
+requires an attended terminal and refuses conflicting ambient identities;
+Antigravity retains native hook observation. It never confirms a mapping
+on the agent's behalf.
+
+All 16 targeted cases passed with real completion-FD receipts in
+`scratch/0.7-model-confirmation-ux-20260928/verification.json`; the original
+ten case bodies are preserved. Bootstrap Source SHA:
+`76c41f1d7962b0c824ace4ac63e394e265201c0173a49161bbce9dc0054871ec`.
+Combined Verify, independent Critic and installed attended acceptance remain
+pending. This progress does not close the item or qualify the final candidate.
