@@ -45,3 +45,21 @@ physical readback.
 
 ## Triage
 
+## Preparation evidence (2026-09-28)
+
+Read-only reconciliation found that the earlier prepared direct-intake fix
+still inferred physical marker publication from the kickoff-promotion kind.
+The canonical annotation writer intentionally tolerates absent directories,
+preexisting unrelated markers and failure after durable State publication.
+Replay is zero-write. Reading a fresh marker while reconstructing the handover
+would also change a digest-bound transaction target after publication.
+
+The revised `scratch/onboarding-handover-truth.patch` therefore retains the
+proved predecessor fact for kickoff promotion and removes the physical marker
+assertion from transaction-generated handovers. Direct intake has no predecessor
+assertion. A future positive marker statement requires separately bound readback.
+Existing crash, removed-directory, unrelated-marker and direct-intake fixtures
+now assert truthful handover text. Eight targeted source fixture cases pass
+using the exact aggregate-proposed continuity module/test bytes in an isolated
+module load, including unchanged promotion and direct-bind replay. No canonical
+file was rewritten; this is preparation evidence, not integrated acceptance.

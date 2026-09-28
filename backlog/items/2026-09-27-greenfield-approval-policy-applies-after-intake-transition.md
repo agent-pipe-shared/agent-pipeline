@@ -61,3 +61,20 @@ The Claude report is at `scratch/pipeline-greenfield-review-2026-09-27.md`
 in the external consumer project.
 
 ## Triage
+
+## Confirmed producer/guard mismatch and preparation (2026-09-28)
+
+`initialGitAuthorAction` always publishes the confirmed or placeholder
+`--language` argument with shared approval answers. The driver accepts only
+de/en; canonical `sanctionedDriverArgs` omits this argument from its initial
+answer shape, so even a correctly answered published action cannot match.
+This proves an argv mismatch; it does not independently prove the reported
+historical phase sequence or ready-but-exit-1 outcome.
+
+`scratch/onboarding-driver-language.patch` adds bounded de/en parity to that
+shape and prepares guard fixtures for intake/bootstrap phases, omitted or
+complete identity, invalid language, duplicate fields and incomplete identity.
+Three exact proposed-qualifier tests pass, including existing/new external
+trust-anchor shapes and negative root/enum/policy checks. They do not replace
+full guard/producer replay or the pending driver exit-code reproduction.
+The item remains open; source integration and live Codex readback are pending.
