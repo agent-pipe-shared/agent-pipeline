@@ -67,3 +67,27 @@ generation writers do not all share one document lock; final CAS/readback checks
 are not a universal exclusion of concurrent filesystem mutation. Canonical
 integration, full tests and actual consumer readback remain pending. Current
 live-host scope is Codex; no Claude/Windows acceptance is claimed.
+
+## Prepared Codex route and focused evidence (2026-09-28)
+
+The next preparation connects the core to registered plan/apply CLI commands,
+their closed shared argv shape, and the generated-checkpoint coordinator before
+the PO acknowledgement. A stale marker returns the exact digest-bound repair;
+unavailable or malformed observations return no acknowledgement action. After
+repair, the existing design and human-approval checks continue. The shared B
+slice supplies the closed intent validator; this route permits only that enum.
+
+Ten proposed core/CLI cases and two Codex coordinator fixtures pass. They prove
+actual producer-to-guard admission in bootstrap-binding phase, plan/apply and
+no-op exit-code parity, duplicate/unknown intent refusal, read-only inspection,
+and transition from changed Spec through repair to the regular chat-policy
+acknowledgement action. Testing exposed and corrected the omitted intent shape
+and successful apply returning exit 1. The two fixture cases do not perform
+real PO acknowledgement or change this repository's lifecycle.
+
+Hashes and terminal results are recorded in
+`scratch/spec-marker-route-preparation-evidence.json`. The prepared aggregate
+contains 55 files, 47 syntax-valid JavaScript files and 297 registered continuity
+cases; Git dry application passes. This supersedes the route-preparation gaps
+above. Canonical integration, full corpus, fresh real Codex onboarding and
+release qualification remain open. No new signature was requested.
