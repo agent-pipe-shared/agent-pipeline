@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e4d9396ca032d0f1cef3c42a6ed75680bb37020bf2eadaab24b8cf2d52c298f4"
+    "transitionHead": "d5fa40b02717d9ce757eb8d2720b706a3dd99d63a294e31fdab72886a4a20237"
   },
   "counts": {
-    "open": 57,
+    "open": 58,
     "in_progress": 0,
     "closed": 642,
     "rejected": 3,
@@ -1782,6 +1782,16 @@
       "closureRepository": "self",
       "closureCommit": "329ac49c4f082a71df1e5676e9e35155e8f82276",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+    },
+    {
+      "id": "pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-09-28",
+      "source": "Controlled ordinary Git Fresh-Start reproduction against the canonical sanctioned identity writer and prepared Codex Advisor namespace helper; source 7a2dcfe7, aggregate 563fbe7b. No operator namespace or model was accessed.",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",

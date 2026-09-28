@@ -137,6 +137,7 @@
 | pipeline.closed-grammar-rejects-git-subcommand-piped-to-head | closed | workflow-improvement | pipeline | — | 2026-08-30 | — | Retrospective-analysis follow-up item #6, PO-confirmed 2026-08-30 ('ja bitte umsetzen') |
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-08-10 | — |
 | pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
+| pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity | open | defect | pipeline | none | 2026-09-28 | — | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.codex-design-readiness-child-rejects-valid-review | open | defect | pipeline | alfred | 2026-09-28 | — | — |
 | pipeline.codex-lifecycle-guard-can-contradict-ready-bootstrap | closed | defect | pipeline | nova-b | 2026-09-20 | — | — |
@@ -721,7 +722,7 @@
 
 ## Counts
 
-- open: 57
+- open: 58
 - in_progress: 0
 - closed: 642
 - rejected: 3
