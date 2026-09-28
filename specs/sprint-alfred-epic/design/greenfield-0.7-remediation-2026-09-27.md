@@ -278,6 +278,17 @@ routine Advisor or implementation decision, nor may either substitute for the
 final package decision. The current source must be checked for an
 approval/admission cycle before this path is activated.
 
+The agent performs `submit-plan` and complete-package `present-plan`
+autonomously. Neither mechanical step requires a separate PO permission,
+content acknowledgement or signature. Remove the current extra submission
+acknowledgement gate and misleading human-confirmation flags while retaining
+genuine onboarding/profile authority and current-source validation. Submission
+and presentation never approve implementation. The happy path has exactly
+one human design-to-implementation approval, after the Advisor cycle,
+disposition/corrections and independent readiness. Test the actual writer and
+returned actions in both chat and signature modes without a pre-submission
+content acknowledgement; final package approval remains mandatory.
+
 0.7 integration acceptance also owns the Critic-before-Full-Verify repair,
 plugin-update drift repair, and chat/signature consistency repair named in the
 original input. A candidate test must reject release Verify when a fresh
